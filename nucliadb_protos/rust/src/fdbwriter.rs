@@ -1091,6 +1091,8 @@ pub struct Shards {
     #[deprecated]
     #[prost(enumeration = "super::utils::VectorSimilarity", tag = "4")]
     pub similarity: i32,
+    /// DEPRECATED: use vectorset configurations instead
+    #[deprecated]
     #[prost(message, optional, tag = "5")]
     pub model: ::core::option::Option<super::knowledgebox::SemanticModelMetadata>,
     #[prost(enumeration = "super::utils::ReleaseChannel", tag = "6")]
@@ -1241,6 +1243,41 @@ pub mod del_vector_set_response {
             }
         }
     }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewKnowledgeBoxV2Request {
+    #[prost(string, tag = "1")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub description: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "5")]
+    pub vectorsets: ::prost::alloc::vec::Vec<new_knowledge_box_v2_request::VectorSet>,
+}
+/// Nested message and enum types in `NewKnowledgeBoxV2Request`.
+pub mod new_knowledge_box_v2_request {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct VectorSet {
+        #[prost(string, tag = "1")]
+        pub vectorset_id: ::prost::alloc::string::String,
+        #[prost(enumeration = "super::super::utils::VectorSimilarity", tag = "2")]
+        pub similarity: i32,
+        #[prost(uint32, tag = "3")]
+        pub vector_dimension: u32,
+        #[prost(uint32, repeated, tag = "4")]
+        pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewKnowledgeBoxV2Response {
+    #[prost(enumeration = "super::knowledgebox::KnowledgeBoxResponseStatus", tag = "1")]
+    pub status: i32,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

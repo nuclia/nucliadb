@@ -108,6 +108,21 @@ class AbstractIndexNode(metaclass=ABCMeta):
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
 
+    async def new_shard_with_vectorsets(
+        self,
+        kbid: str,
+        release_channel: utils_pb2.ReleaseChannel.ValueType,
+        vectorsets_configs: dict[str, VectorIndexConfig],
+    ) -> noderesources_pb2.ShardCreated:
+        req = NewShardRequest(
+            kbid=kbid,
+            release_channel=release_channel,
+            vectorsets_configs=vectorsets_configs,
+        )
+
+        resp = await self.writer.NewShard(req)  # type: ignore
+        return resp
+
     async def list_shards(self) -> list[str]:
         shards = await self.writer.ListShards(noderesources_pb2.EmptyQuery())  # type: ignore
         return [shard.id for shard in shards.ids]

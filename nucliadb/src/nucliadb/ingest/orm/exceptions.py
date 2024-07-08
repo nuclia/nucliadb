@@ -23,6 +23,10 @@ class NotFound(Exception):
     pass
 
 
+class KnowledgeBoxCreationError(Exception):
+    pass
+
+
 class KnowledgeBoxConflict(Exception):
     pass
 

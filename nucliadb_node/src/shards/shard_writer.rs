@@ -20,7 +20,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{Resource, ResourceId};
@@ -28,6 +27,7 @@ use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
+use nucliadb_core::{paragraphs::*, Channel};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 use nucliadb_vectors::config::VectorConfig;
@@ -36,63 +36,10 @@ use nucliadb_vectors::VectorErr;
 use super::indexes::{ShardIndexes, DEFAULT_VECTORS_INDEX_NAME};
 use super::metadata::ShardMetadata;
 use super::versioning::{self, Versions};
-use crate::disk_structure::*;
+use crate::disk_structure::{self, *};
 use crate::telemetry::run_with_telemetry;
 
 const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
-
-pub fn open_vectors_writer(version: u32, path: &Path, shard_id: String) -> NodeResult<VectorsWriterPointer> {
-    match version {
-        1 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
-            .map(|i| Box::new(i) as VectorsWriterPointer),
-        2 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
-            .map(|i| Box::new(i) as VectorsWriterPointer),
-        v => Err(node_error!("Invalid vectors version {v}")),
-    }
-}
-pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
-    match version {
-        3 => nucliadb_paragraphs3::writer::ParagraphWriterService::open(config)
-            .map(|i| Box::new(i) as ParagraphsWriterPointer),
-        v => Err(node_error!("Invalid paragraphs version {v}")),
-    }
-}
-
-pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
-    match version {
-        2 => nucliadb_texts2::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
-        v => Err(node_error!("Invalid text writer version {v}")),
-    }
-}
-
-pub fn open_relations_writer(version: u32, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
-    match version {
-        2 => nucliadb_relations2::writer::RelationsWriterService::open(config)
-            .map(|i| Box::new(i) as RelationsWriterPointer),
-        v => Err(node_error!("Invalid relations version {v}")),
-    }
-}
-
-fn remove_invalid_labels(resource: &mut Resource) {
-    resource.labels.retain(|l| {
-        if l.len() > MAX_LABEL_LENGTH {
-            warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
-            false
-        } else {
-            true
-        }
-    });
-    for text in resource.texts.values_mut() {
-        text.labels.retain(|l| {
-            if l.len() > MAX_LABEL_LENGTH {
-                warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
-                false
-            } else {
-                true
-            }
-        });
-    }
-}
 
 #[derive(Debug)]
 pub struct ShardWriter {
@@ -110,6 +57,13 @@ struct ShardWriterIndexes {
     paragraphs_index: ParagraphsWriterPointer,
     vectors_indexes: HashMap<String, VectorsWriterPointer>,
     relations_index: RelationsWriterPointer,
+}
+
+pub struct NewShard {
+    pub kbid: String,
+    pub shard_id: String,
+    pub channel: Channel,
+    pub vector_configs: HashMap<String, VectorConfig>,
 }
 
 impl ShardWriter {
@@ -151,22 +105,19 @@ impl ShardWriter {
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(metadata: Arc<ShardMetadata>, vector_config: VectorConfig) -> NodeResult<ShardWriter> {
-        let shard_path = metadata.shard_path();
-        let indexes = ShardIndexes::new(&shard_path);
+    pub fn new(new: NewShard, shards_path: &Path) -> NodeResult<(Self, Arc<ShardMetadata>)> {
+        let span = tracing::Span::current();
 
-        let tsc = TextConfig {
-            path: indexes.texts_path(),
-        };
-        let psc = ParagraphConfig {
-            path: indexes.paragraphs_path(),
-        };
-        let rsc = RelationConfig {
-            path: indexes.relations_path(),
-            channel: metadata.channel(),
-        };
+        if new.vector_configs.is_empty() {
+            return Err(node_error!("Shards must be created with at least one vector index"));
+        }
 
-        std::fs::create_dir(shard_path)?;
+        let shard_id = new.shard_id;
+        let shard_path = disk_structure::shard_path_by_id(shards_path, &shard_id);
+        let metadata = Arc::new(ShardMetadata::new(shard_path.clone(), shard_id.clone(), new.kbid, new.channel));
+        let mut indexes = ShardIndexes::new(&shard_path);
+
+        std::fs::create_dir(&shard_path)?;
 
         let versions = Versions {
             paragraphs: versioning::PARAGRAPHS_VERSION,
@@ -174,65 +125,91 @@ impl ShardWriter {
             texts: versioning::TEXTS_VERSION,
             relations: versioning::RELATIONS_VERSION,
         };
-        let versions_path = metadata.shard_path().join(VERSION_FILE);
+        let versions_path = shard_path.join(VERSION_FILE);
         Versions::create(&versions_path, versions)?;
 
-        let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(tsc));
-        let paragraph_task = || Some(nucliadb_paragraphs3::writer::ParagraphWriterService::create(psc));
-        let vector_task = || {
-            Some(nucliadb_vectors::service::VectorWriterService::create(
-                &indexes.vectors_path(),
-                metadata.id(),
-                vector_config,
-            ))
-        };
-        let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(rsc));
+        // indexes creation tasks
 
-        let span = tracing::Span::current();
+        let tsc = TextConfig {
+            path: indexes.texts_path(),
+        };
+        let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(tsc));
         let info = info_span!(parent: &span, "text start");
         let text_task = || run_with_telemetry(info, text_task);
+
+        let psc = ParagraphConfig {
+            path: indexes.paragraphs_path(),
+        };
+        let paragraph_task = || Some(nucliadb_paragraphs3::writer::ParagraphWriterService::create(psc));
         let info = info_span!(parent: &span, "paragraph start");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector start");
-        let vector_task = || run_with_telemetry(info, vector_task);
+
+        let mut vector_tasks = vec![];
+        for (vectorset_id, config) in new.vector_configs {
+            let vectorset_path = indexes.add_vectors_index(vectorset_id.clone())?;
+            let shard_id_clone = shard_id.clone();
+            vector_tasks.push(|| {
+                run_with_telemetry(info_span!(parent: &span, "vector start"), move || {
+                    Some((
+                        vectorset_id,
+                        nucliadb_vectors::service::VectorWriterService::create(&vectorset_path, shard_id_clone, config),
+                    ))
+                })
+            })
+        }
+
+        let rsc = RelationConfig {
+            path: indexes.relations_path(),
+            channel: new.channel,
+        };
+        let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(rsc));
         let info = info_span!(parent: &span, "relation start");
         let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut text_result = None;
         let mut paragraph_result = None;
-        let mut vector_result = None;
+        let mut vector_results = Vec::with_capacity(vector_tasks.len());
+        for _ in 0..vector_tasks.len() {
+            vector_results.push(None);
+        }
         let mut relation_result = None;
         thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
+            for (vector_task, vector_result) in vector_tasks.into_iter().zip(vector_results.iter_mut()) {
+                s.spawn(|_| *vector_result = vector_task());
+            }
             s.spawn(|_| relation_result = relation_task());
         });
 
         let fields = text_result.transpose()?;
         let paragraphs = paragraph_result.transpose()?;
-        let vectors = vector_result.transpose()?;
+        let mut vectors = HashMap::with_capacity(vector_results.len());
+        for result in vector_results {
+            let (name, vector_writer) = result.unwrap();
+            vectors.insert(name, Box::new(vector_writer?) as VectorsWriterPointer);
+        }
         let relations = relation_result.transpose()?;
 
         metadata.serialize_metadata()?;
         indexes.store()?;
 
-        Ok(ShardWriter {
-            id: metadata.id(),
-            path: metadata.shard_path(),
+        Ok((
+            ShardWriter {
+                id: shard_id,
+                path: shard_path,
+                metadata: Arc::clone(&metadata),
+                indexes: RwLock::new(ShardWriterIndexes {
+                    texts_index: Box::new(fields.unwrap()),
+                    paragraphs_index: Box::new(paragraphs.unwrap()),
+                    vectors_indexes: vectors,
+                    relations_index: Box::new(relations.unwrap()),
+                }),
+                versions,
+                gc_lock: tokio::sync::Mutex::new(()),
+            },
             metadata,
-            indexes: RwLock::new(ShardWriterIndexes {
-                texts_index: Box::new(fields.unwrap()),
-                paragraphs_index: Box::new(paragraphs.unwrap()),
-                vectors_indexes: HashMap::from([(
-                    DEFAULT_VECTORS_INDEX_NAME.to_string(),
-                    Box::new(vectors.unwrap()) as VectorsWriterPointer,
-                )]),
-                relations_index: Box::new(relations.unwrap()),
-            }),
-            versions,
-            gc_lock: tokio::sync::Mutex::new(()),
-        })
+        ))
     }
 
     #[measure(actor = "shard", metric = "open")]
@@ -241,10 +218,16 @@ impl ShardWriter {
         let shard_path = metadata.shard_path();
 
         // fallback to default indexes while there are shards without the file
-        let indexes = ShardIndexes::load(&shard_path).unwrap_or_else(|_| ShardIndexes::new(&shard_path));
+        let indexes = ShardIndexes::load(&shard_path).or_else(|_| {
+            let mut indexes = ShardIndexes::new(&shard_path);
+            indexes.add_vectors_index(DEFAULT_VECTORS_INDEX_NAME.to_string())?;
+            Ok::<ShardIndexes, anyhow::Error>(indexes)
+        })?;
 
         // This call will generate the shard indexes file, as a lazy migration.
-        // TODO: When every shard has the file, this line should be removed
+        // TODO: When every shard has the file, this line should be removed.
+        // Currently, all hosted environments are migrated, missing validation
+        // for onprem
         indexes.store()?;
 
         let versions_path = metadata.shard_path().join(VERSION_FILE);
@@ -680,5 +663,58 @@ impl From<GarbageCollectorStatus> for nucliadb_core::protos::garbage_collector_r
             GarbageCollectorStatus::GarbageCollected => nucliadb_core::protos::garbage_collector_response::Status::Ok,
             GarbageCollectorStatus::TryLater => nucliadb_core::protos::garbage_collector_response::Status::TryLater,
         }
+    }
+}
+
+pub fn open_vectors_writer(version: u32, path: &Path, shard_id: String) -> NodeResult<VectorsWriterPointer> {
+    match version {
+        1 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
+            .map(|i| Box::new(i) as VectorsWriterPointer),
+        2 => nucliadb_vectors::service::VectorWriterService::open(path, shard_id)
+            .map(|i| Box::new(i) as VectorsWriterPointer),
+        v => Err(node_error!("Invalid vectors version {v}")),
+    }
+}
+pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
+    match version {
+        3 => nucliadb_paragraphs3::writer::ParagraphWriterService::open(config)
+            .map(|i| Box::new(i) as ParagraphsWriterPointer),
+        v => Err(node_error!("Invalid paragraphs version {v}")),
+    }
+}
+
+pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
+    match version {
+        2 => nucliadb_texts2::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
+        v => Err(node_error!("Invalid text writer version {v}")),
+    }
+}
+
+pub fn open_relations_writer(version: u32, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
+    match version {
+        2 => nucliadb_relations2::writer::RelationsWriterService::open(config)
+            .map(|i| Box::new(i) as RelationsWriterPointer),
+        v => Err(node_error!("Invalid relations version {v}")),
+    }
+}
+
+fn remove_invalid_labels(resource: &mut Resource) {
+    resource.labels.retain(|l| {
+        if l.len() > MAX_LABEL_LENGTH {
+            warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+            false
+        } else {
+            true
+        }
+    });
+    for text in resource.texts.values_mut() {
+        text.labels.retain(|l| {
+            if l.len() > MAX_LABEL_LENGTH {
+                warn!("Label length ({}) longer than maximum, it will not be indexed", l.len());
+                false
+            } else {
+                true
+            }
+        });
     }
 }

@@ -223,42 +223,42 @@ class KBShardManager:
                 if node is None:
                     logger.error(f"Node {node_id} is not found or not available")
                     continue
-                is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
-                vector_index_config = nodewriter_pb2.VectorIndexConfig(
-                    similarity=kb_shards.similarity,
-                    vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-                    vector_dimension=kb_shards.model.vector_dimension,
-                    normalize_vectors=is_matryoshka,
-                )
-                try:
-                    shard_created = await node.new_shard(
-                        kbid,
-                        release_channel=kb_shards.release_channel,
-                        vector_index_config=vector_index_config,
-                    )
-                except Exception as e:
-                    errors.capture_exception(e)
-                    logger.exception(f"Error creating new shard at {node}: {e}")
-                    continue
 
-                shard_id = shard_created.id
+                vectorsets = {
+                    vectorset_id: vectorset_config.vectorset_index_config
+                    async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
+                        txn, kbid=kbid
+                    )
+                }
+
                 try:
-                    async for vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
-                        response = await node.add_vectorset(
-                            shard_id,
-                            vectorset=vectorset_config.vectorset_id,
-                            config=vectorset_config.vectorset_index_config,
+                    if not vectorsets:
+                        # bw/c KBs without vectorsets
+                        is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
+                        vector_index_config = nodewriter_pb2.VectorIndexConfig(
+                            similarity=kb_shards.similarity,
+                            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                            vector_dimension=kb_shards.model.vector_dimension,
+                            normalize_vectors=is_matryoshka,
                         )
-                        if response.status != response.Status.OK:
-                            raise Exception(response.detail)
-                except Exception as e:
-                    errors.capture_exception(e)
+
+                        shard_created = await node.new_shard(
+                            kbid,
+                            release_channel=kb_shards.release_channel,
+                            vector_index_config=vector_index_config,
+                        )
+
+                    else:
+                        shard_created = await node.new_shard_with_vectorsets(
+                            kbid,
+                            release_channel=kb_shards.release_channel,
+                            vectorsets_configs=vectorsets,
+                        )
+
+                except Exception as exc:
+                    errors.capture_exception(exc)
                     logger.exception(
-                        "Error creating vectorset '{vectorset_id}' new shard at {node}: {details}".format(
-                            vectorset_id=vectorset_config.vectorset_id,
-                            node=node,
-                            details=e,
-                        )
+                        f"Error creating new shard for KB", extra={"kbid": kbid, "node_id": node}
                     )
                     continue
 
@@ -266,11 +266,11 @@ class KBShardManager:
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)
                 replicas_created += 1
-        except Exception as e:
-            errors.capture_exception(e)
-            logger.error(f"Unexpected error creating new shard: {e}")
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.exception(f"Unexpected error creating new shard for KB", extra={"kbid": kbid})
             await self.rollback_shard(shard)
-            raise e
+            raise exc
 
         # set previous shard as read only, we only have one writable shard at a
         # time

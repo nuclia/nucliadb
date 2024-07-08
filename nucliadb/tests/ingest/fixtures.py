@@ -185,20 +185,16 @@ def learning_config():
 
 @pytest.fixture(scope="function")
 async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, learning_config):
-    kbid = str(uuid.uuid4())
-    kbslug = str(uuid.uuid4())
-    async with maindb_driver.transaction() as txn:
-        model = SemanticModelMetadata(
-            similarity_function=upb.VectorSimilarity.COSINE, vector_dimension=len(V1)
-        )
-        await KnowledgeBox.create(txn, kbslug, model, uuid=kbid)
-        await txn.commit()
+    kbid = KnowledgeBox.new_unique_kbid()
+    kbslug = "slug-" + str(uuid.uuid4())
+    model = SemanticModelMetadata(
+        similarity_function=upb.VectorSimilarity.COSINE, vector_dimension=len(V1)
+    )
+    await KnowledgeBox.create(maindb_driver, kbid=kbid, slug=kbslug, semantic_model=model)
 
     yield kbid
 
-    async with maindb_driver.transaction() as txn:
-        await KnowledgeBox.delete(txn, kbid)
-        await txn.commit()
+    await KnowledgeBox.delete(maindb_driver, kbid)
 
 
 @pytest.fixture(scope="function")

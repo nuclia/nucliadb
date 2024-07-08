@@ -1456,7 +1456,9 @@ class Shards(google.protobuf.message.Message):
     @property
     def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardObject]: ...
     @property
-    def model(self) -> nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata: ...
+    def model(self) -> nucliadb_protos.knowledgebox_pb2.SemanticModelMetadata:
+        """DEPRECATED: use vectorset configurations instead"""
+
     @property
     def extra(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     def __init__(
@@ -1638,3 +1640,69 @@ class DelVectorSetResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["details", b"details", "status", b"status"]) -> None: ...
 
 global___DelVectorSetResponse = DelVectorSetResponse
+
+@typing.final
+class NewKnowledgeBoxV2Request(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class VectorSet(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        VECTORSET_ID_FIELD_NUMBER: builtins.int
+        SIMILARITY_FIELD_NUMBER: builtins.int
+        VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
+        MATRYOSHKA_DIMENSIONS_FIELD_NUMBER: builtins.int
+        vectorset_id: builtins.str
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+        vector_dimension: builtins.int
+        @property
+        def matryoshka_dimensions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+        def __init__(
+            self,
+            *,
+            vectorset_id: builtins.str = ...,
+            similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+            vector_dimension: builtins.int = ...,
+            matryoshka_dimensions: collections.abc.Iterable[builtins.int] | None = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["matryoshka_dimensions", b"matryoshka_dimensions", "similarity", b"similarity", "vector_dimension", b"vector_dimension", "vectorset_id", b"vectorset_id"]) -> None: ...
+
+    KBID_FIELD_NUMBER: builtins.int
+    SLUG_FIELD_NUMBER: builtins.int
+    TITLE_FIELD_NUMBER: builtins.int
+    DESCRIPTION_FIELD_NUMBER: builtins.int
+    VECTORSETS_FIELD_NUMBER: builtins.int
+    kbid: builtins.str
+    slug: builtins.str
+    title: builtins.str
+    description: builtins.str
+    @property
+    def vectorsets(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NewKnowledgeBoxV2Request.VectorSet]: ...
+    def __init__(
+        self,
+        *,
+        kbid: builtins.str = ...,
+        slug: builtins.str = ...,
+        title: builtins.str = ...,
+        description: builtins.str = ...,
+        vectorsets: collections.abc.Iterable[global___NewKnowledgeBoxV2Request.VectorSet] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "kbid", b"kbid", "slug", b"slug", "title", b"title", "vectorsets", b"vectorsets"]) -> None: ...
+
+global___NewKnowledgeBoxV2Request = NewKnowledgeBoxV2Request
+
+@typing.final
+class NewKnowledgeBoxV2Response(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STATUS_FIELD_NUMBER: builtins.int
+    status: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxResponseStatus.ValueType
+    def __init__(
+        self,
+        *,
+        status: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxResponseStatus.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["status", b"status"]) -> None: ...
+
+global___NewKnowledgeBoxV2Response = NewKnowledgeBoxV2Response

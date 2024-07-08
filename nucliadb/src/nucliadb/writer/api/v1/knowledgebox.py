@@ -112,30 +112,25 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     rollback_learning_config = partial(_rollback_learning_config, kbid)
 
-    config = knowledgebox_pb2.KnowledgeBoxConfig(
-        title=item.title or "",
-        description=item.description or "",
-    )
     semantic_model = learning_config.into_semantic_model_metadata()
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
     try:
-        async with driver.transaction() as txn:
-            kbid = await KnowledgeBox.create(
-                txn,
-                slug=item.slug or "",  # empty slugs will be changed on KB creation
-                semantic_model=semantic_model,
-                uuid=kbid,
-                config=config,
-                release_channel=release_channel,
-            )
-            await txn.commit()
+        (kbid, slug) = await KnowledgeBox.create(
+            driver,
+            kbid=kbid,
+            slug=item.slug or kbid,
+            title=item.title or "",
+            description=item.description or "",
+            semantic_model=semantic_model,
+            release_channel=release_channel,
+        )
 
     except Exception as exc:
         logger.error("Unexpected error creating KB", exc_info=exc, extra={"slug": item.slug})
         await rollback_learning_config()
         raise
 
-    return (kbid, item.slug)
+    return (kbid, slug)
 
 
 @only_for_onprem
@@ -189,9 +184,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
 async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     driver = get_driver()
     try:
-        async with driver.transaction() as txn:
-            await KnowledgeBox.delete(txn, kbid=kbid)
-            await txn.commit()
+        await KnowledgeBox.delete(driver, kbid=kbid)
     except datamanagers.exceptions.KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exists")
     except Exception as exc:

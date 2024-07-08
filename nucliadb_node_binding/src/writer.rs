@@ -17,9 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::Cursor;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::collect_garbage::{garbage_collection_loop, GCParameters};
@@ -32,7 +32,8 @@ use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::cache::ShardWriterCache;
 use nucliadb_node::settings::load_settings;
-use nucliadb_node::shards::metadata::ShardMetadata;
+use nucliadb_node::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
+use nucliadb_node::shards::shard_writer::NewShard;
 use nucliadb_node::shards::writer::ShardWriter;
 use nucliadb_node::{lifecycle, VectorConfig};
 use prost::Message;
@@ -48,7 +49,6 @@ pub struct NodeWriter {
     #[allow(unused)]
     gc_loop_handle: JoinHandle<()>,
     shards: Arc<ShardWriterCache>,
-    shards_path: PathBuf,
 }
 
 impl NodeWriter {
@@ -83,11 +83,9 @@ impl NodeWriter {
             Err(MergerError::GlobalMergerAlreadyInstalled) => (),
         }
 
-        let shards_path = settings.shards_path();
         Ok(Self {
             gc_loop_handle,
             shards: shard_cache,
-            shards_path,
         })
     }
 
@@ -95,24 +93,48 @@ impl NodeWriter {
         send_analytics_event(AnalyticsEvent::Create);
 
         let request = NewShardRequest::decode(&mut Cursor::new(metadata)).expect("Error decoding arguments");
+
+        let kbid = request.kbid.clone();
         let shard_id = uuid::Uuid::new_v4().to_string();
-        let metadata = ShardMetadata::new(
-            self.shards_path.join(shard_id.clone()),
-            shard_id,
-            request.kbid.clone(),
-            Channel::from(request.release_channel()),
-        );
-        let vector_config = if let Some(req_config) = request.config {
-            VectorConfig::try_from(req_config).map_err(|err| IndexNodeException::new_err(err.to_string()))?
-        } else {
-            #[allow(deprecated)]
-            VectorConfig {
-                similarity: request.similarity().into(),
-                normalize_vectors: request.normalize_vectors,
-                ..Default::default()
+        let channel = Channel::from(request.release_channel());
+
+        #[allow(deprecated)]
+        let vector_configs = if !request.vectorsets_configs.is_empty() {
+            // create shard maybe with multiple vectorsets
+            let mut configs = HashMap::with_capacity(request.vectorsets_configs.len());
+            for (vectorset_id, config) in request.vectorsets_configs {
+                configs.insert(
+                    vectorset_id,
+                    VectorConfig::try_from(config).map_err(|e| IndexNodeException::new_err(e.to_string()))?,
+                );
             }
+            configs
+        } else if let Some(vector_index_config) = request.config {
+            // DEPRECATED bw/c code, remove when shard creators populate
+            // vector_index_configs
+            HashMap::from([(
+                DEFAULT_VECTORS_INDEX_NAME.to_string(),
+                VectorConfig::try_from(vector_index_config).map_err(|e| IndexNodeException::new_err(e.to_string()))?,
+            )])
+        } else {
+            // DEPRECATED bw/c code, remove when shard creators populate
+            // vector_index_configs
+            HashMap::from([(
+                DEFAULT_VECTORS_INDEX_NAME.to_string(),
+                VectorConfig {
+                    similarity: request.similarity().into(),
+                    normalize_vectors: request.normalize_vectors,
+                    ..Default::default()
+                },
+            )])
         };
-        let new_shard = self.shards.create(metadata, vector_config);
+
+        let new_shard = self.shards.create(NewShard {
+            kbid,
+            shard_id,
+            channel,
+            vector_configs,
+        });
         match new_shard {
             Ok(new_shard) => Ok(PyList::new(
                 py,

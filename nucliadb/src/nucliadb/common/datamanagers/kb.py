@@ -55,6 +55,16 @@ async def get_kb_uuid(txn: Transaction, *, slug: str) -> Optional[str]:
         return None
 
 
+async def set_kbid_for_slug(txn: Transaction, *, slug: str, kbid: str):
+    key = KB_SLUGS.format(slug=slug)
+    await txn.set(key, kbid.encode())
+
+
+async def delete_kb_slug(txn: Transaction, *, slug: str):
+    key = KB_SLUGS.format(slug=slug)
+    await txn.delete(key)
+
+
 async def get_config(
     txn: Transaction, *, kbid: str, for_update: bool = False
 ) -> Optional[knowledgebox_pb2.KnowledgeBoxConfig]:
@@ -72,6 +82,11 @@ async def set_config(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.Kn
     await txn.set(key, config.SerializeToString())
 
 
+async def delete_config(txn: Transaction, *, kbid: str) -> None:
+    key = KB_UUID.format(kbid=kbid)
+    await txn.delete(key)
+
+
 async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.SemanticModelMetadata:
     shards_obj = await cluster.get_kb_shards(txn, kbid=kbid, for_update=False)
     if shards_obj is None:
@@ -84,7 +99,14 @@ async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2
         return knowledgebox_pb2.SemanticModelMetadata(similarity_function=shards_obj.similarity)
 
 
-async def get_matryoshka_vector_dimension(txn: Transaction, *, kbid: str) -> Optional[int]:
+# DEPRECATED: this function should be removed once the "default" vectorset
+# concept is removed and processing sends us all messages with a vectorset_id
+async def get_matryoshka_vector_dimension(
+    txn: Transaction,
+    *,
+    kbid: str,
+    vectorset_id: Optional[str] = None,
+) -> Optional[int]:
     """Return vector dimension for matryoshka models"""
     model_metadata = await get_model_metadata(txn, kbid=kbid)
     dimension = None

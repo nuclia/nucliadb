@@ -48,6 +48,7 @@ async fn test_vector_normalization_shard(
     // Create a shard with vector normalization
 
     const KBID: &str = "vector-normalization-kbid";
+    #[allow(deprecated)]
     let shard = writer
         .new_shard(Request::new(NewShardRequest {
             kbid: KBID.to_string(),
