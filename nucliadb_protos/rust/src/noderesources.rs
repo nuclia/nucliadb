@@ -488,8 +488,8 @@ pub struct NodeMetadata {
     >,
     #[prost(string, tag = "4")]
     pub node_id: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "5")]
-    pub primary_node_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, tag = "5")]
+    pub primary_node_id: ::prost::alloc::string::String,
     #[prost(uint64, tag = "6")]
     pub available_disk: u64,
     #[prost(uint64, tag = "7")]
