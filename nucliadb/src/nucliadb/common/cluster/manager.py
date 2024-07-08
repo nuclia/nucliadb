@@ -255,20 +255,22 @@ class KBShardManager:
                             vectorsets_configs=vectorsets,
                         )
 
-                except Exception as e:
-                    errors.capture_exception(e)
-                    logger.exception(f"Error creating new shard at {node}: {e}")
+                except Exception as exc:
+                    errors.capture_exception(exc)
+                    logger.exception(
+                        f"Error creating new shard for KB", extra={"kbid": kbid, "node_id": node}
+                    )
                     continue
 
                 replica = writer_pb2.ShardReplica(node=str(node_id))
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)
                 replicas_created += 1
-        except Exception as e:
-            errors.capture_exception(e)
-            logger.error(f"Unexpected error creating new shard: {e}")
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.exception(f"Unexpected error creating new shard for KB", extra={"kbid": kbid})
             await self.rollback_shard(shard)
-            raise e
+            raise exc
 
         # set previous shard as read only, we only have one writable shard at a
         # time
