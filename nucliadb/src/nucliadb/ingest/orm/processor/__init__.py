@@ -163,47 +163,47 @@ class Processor:
         partition: str,
         transaction_check: bool = True,
     ) -> None:
-        txn = await self.driver.begin()
-        try:
-            kb = KnowledgeBox(txn, self.storage, message.kbid)
+        async with self.driver.transaction() as txn:
+            try:
+                kb = KnowledgeBox(txn, self.storage, message.kbid)
 
-            uuid = await self.get_resource_uuid(kb, message)
-            async with locking.distributed_lock(
-                locking.RESOURCE_INDEX_LOCK.format(kbid=message.kbid, resource_id=uuid)
-            ):
-                # we need to have a lock at indexing time because we don't know if
-                # a resource was in the process of being moved when a delete occurred
-                shard_id = await datamanagers.resources.get_resource_shard_id(
-                    txn, kbid=message.kbid, rid=uuid
-                )
-            if shard_id is None:
-                logger.warning(f"Resource {uuid} does not exist")
-            else:
-                shard = await kb.get_resource_shard(shard_id)
-                if shard is None:
-                    raise AttributeError("Shard not available")
-
-                await self.shard_manager.delete_resource(
-                    shard, message.uuid, seqid, partition, message.kbid
-                )
-                try:
-                    await kb.delete_resource(message.uuid)
-                except Exception as exc:
-                    await txn.abort()
-                    await self.notify_abort(
-                        partition=partition,
-                        seqid=seqid,
-                        multi=message.multiid,
-                        kbid=message.kbid,
-                        rid=message.uuid,
-                        source=message.source,
+                uuid = await self.get_resource_uuid(kb, message)
+                async with locking.distributed_lock(
+                    locking.RESOURCE_INDEX_LOCK.format(kbid=message.kbid, resource_id=uuid)
+                ):
+                    # we need to have a lock at indexing time because we don't know if
+                    # a resource was in the process of being moved when a delete occurred
+                    shard_id = await datamanagers.resources.get_resource_shard_id(
+                        txn, kbid=message.kbid, rid=uuid
                     )
-                    raise exc
-        finally:
-            if txn.open:
-                if transaction_check:
-                    await sequence_manager.set_last_seqid(txn, partition, seqid)
-                await txn.commit()
+                if shard_id is None:
+                    logger.warning(f"Resource {uuid} does not exist")
+                else:
+                    shard = await kb.get_resource_shard(shard_id)
+                    if shard is None:
+                        raise AttributeError("Shard not available")
+
+                    await self.shard_manager.delete_resource(
+                        shard, message.uuid, seqid, partition, message.kbid
+                    )
+                    try:
+                        await kb.delete_resource(message.uuid)
+                    except Exception as exc:
+                        await txn.abort()
+                        await self.notify_abort(
+                            partition=partition,
+                            seqid=seqid,
+                            multi=message.multiid,
+                            kbid=message.kbid,
+                            rid=message.uuid,
+                            source=message.source,
+                        )
+                        raise exc
+            finally:
+                if txn.open:
+                    if transaction_check:
+                        await sequence_manager.set_last_seqid(txn, partition, seqid)
+                    await txn.commit()
         await self.notify_commit(
             partition=partition,
             seqid=seqid,
@@ -245,66 +245,84 @@ class Processor:
                     await txn.commit()
             return None
 
-        txn = await self.driver.begin()
-        try:
-            multi = messages[0].multiid
-            kb = KnowledgeBox(txn, self.storage, kbid)
-            uuid = await self.get_resource_uuid(kb, messages[0])
-            resource: Optional[Resource] = None
-            handled_exception = None
-            created = False
+        async with self.driver.transaction() as txn:
+            try:
+                multi = messages[0].multiid
+                kb = KnowledgeBox(txn, self.storage, kbid)
+                uuid = await self.get_resource_uuid(kb, messages[0])
+                resource: Optional[Resource] = None
+                handled_exception = None
+                created = False
 
-            for message in messages:
-                if resource is not None:
-                    assert resource.uuid == message.uuid
-                result = await self.apply_resource(message, kb, resource)
+                for message in messages:
+                    if resource is not None:
+                        assert resource.uuid == message.uuid
+                    result = await self.apply_resource(message, kb, resource)
 
-                if result is None:
-                    continue
+                    if result is None:
+                        continue
 
-                resource, _created = result
-                created = created or _created
+                    resource, _created = result
+                    created = created or _created
 
-            if resource:
-                await resource.compute_global_text()
-                await resource.compute_global_tags(resource.indexer)
-                await resource.compute_security(resource.indexer)
-                if message.reindex:
-                    # when reindexing, let's just generate full new index message
-                    resource.replace_indexer(await resource.generate_index_message(reindex=True))
+                if resource:
+                    await resource.compute_global_text()
+                    await resource.compute_global_tags(resource.indexer)
+                    await resource.compute_security(resource.indexer)
+                    if message.reindex:
+                        # when reindexing, let's just generate full new index message
+                        resource.replace_indexer(await resource.generate_index_message(reindex=True))
 
-            if resource and resource.modified:
-                await self.index_resource(  # noqa
-                    resource=resource,
-                    txn=txn,
-                    uuid=uuid,
-                    kbid=kbid,
-                    seqid=seqid,
-                    partition=partition,
-                    kb=kb,
-                    source=messages_source(messages),
-                )
+                if resource and resource.modified:
+                    await self.index_resource(  # noqa
+                        resource=resource,
+                        txn=txn,
+                        uuid=uuid,
+                        kbid=kbid,
+                        seqid=seqid,
+                        partition=partition,
+                        kb=kb,
+                        source=messages_source(messages),
+                    )
 
-                if transaction_check:
-                    await sequence_manager.set_last_seqid(txn, partition, seqid)
-                await txn.commit()
+                    if transaction_check:
+                        await sequence_manager.set_last_seqid(txn, partition, seqid)
+                    await txn.commit()
 
-                if created:
-                    await self.commit_slug(resource)
+                    if created:
+                        await self.commit_slug(resource)
 
-                await self.notify_commit(
-                    partition=partition,
-                    seqid=seqid,
-                    multi=multi,
-                    message=message,
-                    write_type=(
-                        writer_pb2.Notification.WriteType.CREATED
-                        if created
-                        else writer_pb2.Notification.WriteType.MODIFIED
-                    ),
-                )
-            elif resource and resource.modified is False:
-                await txn.abort()
+                    await self.notify_commit(
+                        partition=partition,
+                        seqid=seqid,
+                        multi=multi,
+                        message=message,
+                        write_type=(
+                            writer_pb2.Notification.WriteType.CREATED
+                            if created
+                            else writer_pb2.Notification.WriteType.MODIFIED
+                        ),
+                    )
+                elif resource and resource.modified is False:
+                    await txn.abort()
+                    await self.notify_abort(
+                        partition=partition,
+                        seqid=seqid,
+                        multi=multi,
+                        kbid=kbid,
+                        rid=uuid,
+                        source=message.source,
+                    )
+                    logger.warning("This message did not modify the resource")
+            except (
+                asyncio.TimeoutError,
+                asyncio.CancelledError,
+                aiohttp.client_exceptions.ClientError,
+                ConflictError,
+                MaindbServerError,
+            ):  # pragma: no cover
+                # Unhandled exceptions here that should bubble and hard fail
+                # XXX We swallow too many exceptions here!
                 await self.notify_abort(
                     partition=partition,
                     seqid=seqid,
@@ -313,54 +331,36 @@ class Processor:
                     rid=uuid,
                     source=message.source,
                 )
-                logger.warning("This message did not modify the resource")
-        except (
-            asyncio.TimeoutError,
-            asyncio.CancelledError,
-            aiohttp.client_exceptions.ClientError,
-            ConflictError,
-            MaindbServerError,
-        ):  # pragma: no cover
-            # Unhandled exceptions here that should bubble and hard fail
-            # XXX We swallow too many exceptions here!
-            await self.notify_abort(
-                partition=partition,
-                seqid=seqid,
-                multi=multi,
-                kbid=kbid,
-                rid=uuid,
-                source=message.source,
-            )
-            raise
-        except Exception as exc:
-            # As we are in the middle of a transaction, we cannot let the exception raise directly
-            # as we need to do some cleanup. The exception will be reraised at the end of the function
-            # and then handled by the top caller, so errors can be handled in the same place.
-            await self.deadletter(messages, partition, seqid)
-            await self.notify_abort(
-                partition=partition,
-                seqid=seqid,
-                multi=multi,
-                kbid=kbid,
-                rid=uuid,
-                source=message.source,
-            )
-            handled_exception = exc
-        finally:
-            if resource is not None:
-                resource.clean()
-            # txn should be already commited or aborted, but in the event of an exception
-            # it could be left open. Make sure to close it if it's still open
-            if txn.open:
-                await txn.abort()
-
-        if handled_exception is not None:
-            if seqid == -1:
-                raise handled_exception
-            else:
+                raise
+            except Exception as exc:
+                # As we are in the middle of a transaction, we cannot let the exception raise directly
+                # as we need to do some cleanup. The exception will be reraised at the end of the function
+                # and then handled by the top caller, so errors can be handled in the same place.
+                await self.deadletter(messages, partition, seqid)
+                await self.notify_abort(
+                    partition=partition,
+                    seqid=seqid,
+                    multi=multi,
+                    kbid=kbid,
+                    rid=uuid,
+                    source=message.source,
+                )
+                handled_exception = exc
+            finally:
                 if resource is not None:
-                    await self._mark_resource_error(kb, resource, partition, seqid)
-                raise DeadletteredError() from handled_exception
+                    resource.clean()
+                # txn should be already commited or aborted, but in the event of an exception
+                # it could be left open. Make sure to close it if it's still open
+                if txn.open:
+                    await txn.abort()
+
+            if handled_exception is not None:
+                if seqid == -1:
+                    raise handled_exception
+                else:
+                    if resource is not None:
+                        await self._mark_resource_error(kb, resource, partition, seqid)
+                    raise DeadletteredError() from handled_exception
 
         return None
 

@@ -26,10 +26,10 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb.search.search import paragraphs
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
+from nucliadb.utils import get_driver
 from nucliadb_models.search import (
     SCORE_TYPE,
     FieldExtensionStrategy,
@@ -175,27 +175,27 @@ async def default_prompt_context(
     - Using an dict prevents from duplicates pulled in through conversation expansion.
     """
     # Sort retrieved paragraphs by decreasing order (most relevant first)
-    txn = await get_read_only_transaction()
-    storage = await get_storage()
-    kb = KnowledgeBoxORM(txn, storage, kbid)
-    for paragraph in ordered_paragraphs:
-        context[paragraph.id] = _clean_paragraph_text(paragraph)
+    async with get_driver().transaction(read_only=True) as txn:
+        storage = await get_storage()
+        kb = KnowledgeBoxORM(txn, storage, kbid)
+        for paragraph in ordered_paragraphs:
+            context[paragraph.id] = _clean_paragraph_text(paragraph)
 
-        # If the paragraph is a conversation and it matches semantically, we assume we
-        # have matched with the question, therefore try to include the answer to the
-        # context by pulling the next few messages of the conversation field
-        rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
-        if field_type == "c" and paragraph.score_type in (
-            SCORE_TYPE.VECTOR,
-            SCORE_TYPE.BOTH,
-        ):
-            expanded_msgs = await get_expanded_conversation_messages(
-                kb=kb, rid=rid, field_id=field_id, mident=mident
-            )
-            for msg in expanded_msgs:
-                text = msg.content.text.strip()
-                pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
-                context[pid] = text
+            # If the paragraph is a conversation and it matches semantically, we assume we
+            # have matched with the question, therefore try to include the answer to the
+            # context by pulling the next few messages of the conversation field
+            rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
+            if field_type == "c" and paragraph.score_type in (
+                SCORE_TYPE.VECTOR,
+                SCORE_TYPE.BOTH,
+            ):
+                expanded_msgs = await get_expanded_conversation_messages(
+                    kb=kb, rid=rid, field_id=field_id, mident=mident
+                )
+                for msg in expanded_msgs:
+                    text = msg.content.text.strip()
+                    pid = f"{rid}/{field_type}/{field_id}/{msg.ident}/0-{len(msg.content.text) + 1}"
+                    context[pid] = text
 
 
 async def get_field_extracted_text(field: Field) -> Optional[tuple[Field, str]]:
@@ -233,24 +233,25 @@ async def get_resource_extracted_texts(
     kbid: str,
     resource_uuid: str,
 ) -> list[tuple[Field, str]]:
-    txn = await get_read_only_transaction()
-    storage = await get_storage()
-    kb = KnowledgeBoxORM(txn, storage, kbid)
-    resource = ResourceORM(
-        txn=txn,
-        storage=storage,
-        kb=kb,
-        uuid=resource_uuid,
-    )
+    async with get_driver().transaction(read_only=True) as txn:
+        storage = await get_storage()
+        kb = KnowledgeBoxORM(txn, storage, kbid)
+        resource = ResourceORM(
+            txn=txn,
+            storage=storage,
+            kb=kb,
+            uuid=resource_uuid,
+        )
 
-    # Schedule the extraction of the text of each field in the resource
-    runner = ConcurrentRunner(max_tasks=MAX_RESOURCE_FIELD_TASKS)
-    for field_type, field_key in await resource.get_fields(force=True):
-        field = await resource.get_field(field_key, field_type, load=False)
-        runner.schedule(get_field_extracted_text(field))
+        # Schedule the extraction of the text of each field in the resource
+        runner = ConcurrentRunner(max_tasks=MAX_RESOURCE_FIELD_TASKS)
+        for field_type, field_key in await resource.get_fields(force=True):
+            field = await resource.get_field(field_key, field_type, load=False)
+            runner.schedule(get_field_extracted_text(field))
 
-    # Wait for the results
-    results = await runner.wait()
+        # Wait for the results
+        results = await runner.wait()
+
     return [result for result in results if result is not None]
 
 
@@ -321,26 +322,26 @@ async def composed_prompt_context(
             ordered_resources.append(resource_uuid)
 
     # Fetch the extracted texts of the specified fields for each resource
-    txn = await get_read_only_transaction()
-    kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
+    async with get_driver().transaction(read_only=True) as txn:
+        kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
 
-    tasks = [
-        get_resource_field_extracted_text(kb_obj, resource_uuid, field_id)
-        for resource_uuid in ordered_resources
-        for field_id in extend_with_fields
-    ]
-    field_extracted_texts = await run_concurrently(tasks)
+        tasks = [
+            get_resource_field_extracted_text(kb_obj, resource_uuid, field_id)
+            for resource_uuid in ordered_resources
+            for field_id in extend_with_fields
+        ]
+        field_extracted_texts = await run_concurrently(tasks)
 
-    for result in field_extracted_texts:
-        if result is None:
-            continue
-        # Add the extracted text of each field to the beginning of the context.
-        field, extracted_text = result
-        context[field.resource_unique_id] = extracted_text
+        for result in field_extracted_texts:
+            if result is None:
+                continue
+            # Add the extracted text of each field to the beginning of the context.
+            field, extracted_text = result
+            context[field.resource_unique_id] = extracted_text
 
-    # Add the extracted text of each paragraph to the end of the context.
-    for paragraph in ordered_paragraphs:
-        context[paragraph.id] = _clean_paragraph_text(paragraph)
+        # Add the extracted text of each paragraph to the end of the context.
+        for paragraph in ordered_paragraphs:
+            context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
 async def hierarchy_prompt_context(

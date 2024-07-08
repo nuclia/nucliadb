@@ -23,8 +23,8 @@ from typing import Optional
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import SERVICE_NAME, logger
+from nucliadb.utils import get_driver
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties
@@ -44,19 +44,19 @@ async def fetch_resources(
     extracted: list[ExtractedDataTypeName],
 ) -> dict[str, Resource]:
     result = {}
-    txn = await get_read_only_transaction()
-    for resource in resources:
-        serialization = await managed_serialize(
-            txn,
-            kbid,
-            resource,
-            show,
-            field_type_filter=field_type_filter,
-            extracted=extracted,
-            service_name=SERVICE_NAME,
-        )
-        if serialization is not None:
-            result[resource] = serialization
+    async with get_driver().transaction(read_only=True) as txn:
+        for resource in resources:
+            serialization = await managed_serialize(
+                txn,
+                kbid,
+                resource,
+                show,
+                field_type_filter=field_type_filter,
+                extracted=extracted,
+                service_name=SERVICE_NAME,
+            )
+            if serialization is not None:
+                result[resource] = serialization
     return result
 
 

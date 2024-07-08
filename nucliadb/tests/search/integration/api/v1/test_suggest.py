@@ -49,29 +49,28 @@ async def test_suggest_resource_all(
     # get shards ids
 
     driver = get_driver()
-    txn = await driver.begin()
-    key = KB_SHARDS.format(kbid=kbid)
-    async for key in txn.keys(key):
-        value = await txn.get(key)
-        assert value is not None
-        shards = PBShards()
-        shards.ParseFromString(value)
-        for replica in shards.shards[0].replicas:
-            node_obj = INDEX_NODES.get(replica.node)
+    async with driver.transaction(read_only=True) as txn:
+        key = KB_SHARDS.format(kbid=kbid)
+        async for key in txn.keys(key):
+            value = await txn.get(key)
+            assert value is not None
+            shards = PBShards()
+            shards.ParseFromString(value)
+            for replica in shards.shards[0].replicas:
+                node_obj = INDEX_NODES.get(replica.node)
 
-            if node_obj is not None:
-                shard = await node_obj.get_shard(replica.shard.id)
-                assert shard.shard_id == replica.shard.id
-                assert shard.fields == 3
-                assert shard.paragraphs == 2
-                assert shard.sentences == 3
+                if node_obj is not None:
+                    shard = await node_obj.get_shard(replica.shard.id)
+                    assert shard.shard_id == replica.shard.id
+                    assert shard.fields == 3
+                    assert shard.paragraphs == 2
+                    assert shard.sentences == 3
 
-                prequest = SuggestRequest(
-                    features=[SuggestFeatures.ENTITIES, SuggestFeatures.PARAGRAPHS],
-                )
-                prequest.shard = replica.shard.id
-                prequest.body = "Ramon"
+                    prequest = SuggestRequest(
+                        features=[SuggestFeatures.ENTITIES, SuggestFeatures.PARAGRAPHS],
+                    )
+                    prequest.shard = replica.shard.id
+                    prequest.body = "Ramon"
 
-                suggest = await node_obj.reader.Suggest(prequest)  # type: ignore
-                assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"
-    await txn.abort()
+                    suggest = await node_obj.reader.Suggest(prequest)  # type: ignore
+                    assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"

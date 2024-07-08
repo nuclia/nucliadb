@@ -194,12 +194,12 @@ async def inject_message(processor, knowledgebox_ingest, message, count: int = 1
 async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Make sure is indexed
     driver = get_driver()
-    txn = await driver.begin()
-    shard_manager = KBShardManager()
-    shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
-    if shard is None:
-        raise Exception("Could not find shard")
-    await txn.abort()
+    async with driver.transaction() as txn:
+        shard_manager = KBShardManager()
+        shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
+        if shard is None:
+            raise Exception("Could not find shard")
+        await txn.abort()
 
     checks: dict[str, bool] = {}
     for replica in shard.replicas:

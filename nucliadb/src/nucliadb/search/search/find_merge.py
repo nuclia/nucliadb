@@ -22,10 +22,10 @@ from typing import Any, Iterator, Optional, cast
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.utils import get_driver
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
@@ -158,7 +158,6 @@ async def fetch_find_metadata(
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
 ):
-    txn = await get_read_only_transaction()
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
@@ -224,28 +223,29 @@ async def fetch_find_metadata(
         find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
         best_matches.append(paragraph_id)
 
-    for resource in resources:
-        operations.append(
-            asyncio.create_task(
-                set_resource_metadata_value(
-                    txn,
-                    kbid=kbid,
-                    resource=resource,
-                    show=show,
-                    field_type_filter=field_type_filter,
-                    extracted=extracted,
-                    find_resources=find_resources,
-                    max_operations=max_operations,
+    async with get_driver().transaction(read_only=True) as txn:
+        for resource in resources:
+            operations.append(
+                asyncio.create_task(
+                    set_resource_metadata_value(
+                        txn,
+                        kbid=kbid,
+                        resource=resource,
+                        show=show,
+                        field_type_filter=field_type_filter,
+                        extracted=extracted,
+                        find_resources=find_resources,
+                        max_operations=max_operations,
+                    )
                 )
             )
-        )
 
-    FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
-    if len(operations) > 0:
-        done, _ = await asyncio.wait(operations)
-        for task in done:
-            if task.exception() is not None:  # pragma: no cover
-                logger.error("Error fetching find metadata", exc_info=task.exception())
+        FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
+        if len(operations) > 0:
+            done, _ = await asyncio.wait(operations)
+            for task in done:
+                if task.exception() is not None:  # pragma: no cover
+                    logger.error("Error fetching find metadata", exc_info=task.exception())
 
 
 @merge_observer.wrap({"type": "merge_paragraphs_vectors"})
@@ -391,11 +391,6 @@ async def find_merge_results(
     min_score_semantic: float,
     highlight: bool = False,
 ) -> KnowledgeboxFindResults:
-    # force getting transaction on current asyncio task
-    # so all sub tasks will use the same transaction
-    # this is contextvar magic that is probably not ideal
-    await get_read_only_transaction()
-
     paragraphs: list[list[ParagraphResult]] = []
     vectors: list[list[DocumentScored]] = []
     relations = []
