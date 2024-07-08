@@ -199,6 +199,31 @@ async def test_create_knowledgebox_with_same_kbid(
 
 
 @pytest.mark.asyncio
+async def test_create_knowledgebox_with_same_slug(
+    storage: Storage,
+    maindb_driver: Driver,
+    shard_manager: cluster_manager.KBShardManager,
+):
+    slug = "my-kb-slug"
+
+    _, result_slug = await KnowledgeBox.create(
+        maindb_driver,
+        kbid=KnowledgeBox.new_unique_kbid(),
+        slug=slug,
+        semantic_models={"vs": SemanticModelMetadata()},
+    )
+    assert result_slug == slug
+
+    with pytest.raises(KnowledgeBoxConflict):
+        await KnowledgeBox.create(
+            maindb_driver,
+            kbid=KnowledgeBox.new_unique_kbid(),
+            slug=slug,
+            semantic_models={"vs": SemanticModelMetadata()},
+        )
+
+
+@pytest.mark.asyncio
 async def test_delete_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,

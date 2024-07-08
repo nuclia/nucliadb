@@ -114,7 +114,9 @@ class KnowledgeBox:
 
         try:
             async with driver.transaction() as txn:
-                exists = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
+                exists = await datamanagers.kb.get_kb_uuid(
+                    txn, slug=slug
+                ) or await datamanagers.kb.exists_kb(txn, kbid=kbid)
                 if exists:
                     raise KnowledgeBoxConflict()
                 if kbid is None or kbid == "":
