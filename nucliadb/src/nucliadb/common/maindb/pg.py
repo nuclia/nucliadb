@@ -20,7 +20,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, Optional, Union
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Optional
 
 import backoff
 import psycopg
@@ -137,7 +138,6 @@ class PGTransaction(Transaction):
                     await self.connection.rollback()
                 finally:
                     self.open = False
-                    await self.driver.pool.putconn(self.connection)
 
     async def commit(self):
         with pg_observer({"type": "commit"}):
@@ -148,7 +148,6 @@ class PGTransaction(Transaction):
                 raise
             finally:
                 self.open = False
-                await self.driver.pool.putconn(self.connection)
 
     async def batch_get(self, keys: list[str], for_update: bool = True):
         return await self.data_layer.batch_get(keys, select_for_update=for_update)
@@ -269,7 +268,7 @@ class PGDriver(Driver):
                 await self.pool.open()
 
                 # check if table exists
-                async with self.pool.connection() as conn:
+                async with self._get_connection() as conn:
                     await conn.execute(CREATE_TABLE)
 
             self.initialized = True
@@ -279,16 +278,15 @@ class PGDriver(Driver):
             await self.pool.close()
             self.initialized = False
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
-    async def begin(self, read_only: bool = False) -> Union[PGTransaction, ReadOnlyPGTransaction]:
+    @asynccontextmanager
+    async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
         if read_only:
-            return ReadOnlyPGTransaction(self)
+            yield ReadOnlyPGTransaction(self)
         else:
-            timeout = self.acquire_timeout_ms / 1000
-            conn = await self.pool.getconn(timeout=timeout)
-            with pg_observer({"type": "begin"}):
-                return PGTransaction(self, conn)
+            async with self._get_connection() as conn:
+                yield PGTransaction(self, conn)
 
+    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
     def _get_connection(self) -> InstrumentedAcquireContext:
         timeout = self.acquire_timeout_ms / 1000
         return InstrumentedAcquireContext(self.pool.connection(timeout=timeout))

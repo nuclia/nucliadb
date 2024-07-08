@@ -23,10 +23,10 @@ from typing import Optional
 
 from lru import LRU
 
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search import SERVICE_NAME
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
 

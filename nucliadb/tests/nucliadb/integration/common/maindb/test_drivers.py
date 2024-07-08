@@ -41,13 +41,13 @@ async def test_pg_driver_pool_timeout(pg):
     await driver.initialize()
 
     # Get one connection and hold it
-    async with driver.transaction() as txn:
+    async with driver.transaction():
         # Try to get another connection, should fail because pool is full
         with pytest.raises(psycopg_pool.PoolTimeout):
             await driver.transaction().__aenter__()
 
     # Should now work
-    async with driver.transaction() as txn:
+    async with driver.transaction():
         pass
 
 

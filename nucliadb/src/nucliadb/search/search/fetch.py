@@ -20,11 +20,11 @@
 from contextvars import ContextVar
 from typing import Optional
 
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties

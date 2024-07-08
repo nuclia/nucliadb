@@ -21,6 +21,7 @@ import copy
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, cast
 
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -29,7 +30,6 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search import logger
 from nucliadb.search.search import paragraphs
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb_models.search import (
     SCORE_TYPE,
     FieldExtensionStrategy,
