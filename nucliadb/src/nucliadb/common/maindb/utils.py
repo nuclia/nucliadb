@@ -51,7 +51,7 @@ async def setup_driver() -> Driver:
 
     if settings.driver == DriverConfig.PG:
         if not PG:
-            raise ConfigurationError("`asyncpg` python package not installed.")
+            raise ConfigurationError("`psycopg` python package not installed.")
         if settings.driver_pg_url is None:
             raise ConfigurationError("No DRIVER_PG_URL env var defined.")
         pg_driver = PGDriver(

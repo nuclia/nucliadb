@@ -37,7 +37,7 @@ def load_extra(sections: List[str]):
 
 requirements = load_reqs("requirements.txt")
 
-extra_requirements = load_extra(["cache", "storages", "fastapi", "postgres"])
+extra_requirements = load_extra(["cache", "storages", "fastapi"])
 
 setup(
     name="nucliadb_utils",
