@@ -23,7 +23,7 @@ import tempfile
 from typing import AsyncIterator
 from unittest.mock import Mock
 
-import asyncpg
+import psycopg
 import pytest
 from grpc import aio
 from httpx import AsyncClient
@@ -515,13 +515,9 @@ async def pg_maindb_driver(pg_maindb_settings):
     ingest_settings.driver = DriverConfig.PG
     ingest_settings.driver_pg_url = url
 
-    conn = await asyncpg.connect(url)
-    await conn.execute(
-        """
-DROP table IF EXISTS resources;
-"""
-    )
-    await conn.close()
+    async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
+        await cur.execute("DROP table IF EXISTS resources")
+
     driver = PGDriver(url=url)
     await driver.initialize()
 

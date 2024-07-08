@@ -278,6 +278,9 @@ class LocalStorage(Storage):
             yield ObjectInfo(name=key)
 
     async def download(self, bucket_name: str, key: str, range: Optional[Range] = None):
+        import asyncio
+
+        await asyncio.sleep(0.2)
         key_path = self.get_file_path(bucket_name, key)
         if not os.path.exists(key_path):
             return
