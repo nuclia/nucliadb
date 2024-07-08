@@ -58,7 +58,10 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         max_tokens=MaxTokens(context=100, answer=50),
         answer_json_schema={
             "type": "object",
-            "properties": {"answer": {"type": "string"}, "confidence": {"type": "number"}},
+            "properties": {
+                "answer": {"type": "string"},
+                "confidence": {"type": "number"},
+            },
         },
     )
     assert result.learning_id == "00"
@@ -84,7 +87,9 @@ def test_ask_on_kb_no_context_found(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 def test_ask_on_resource(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     rid = sdk.list_resources(kbid=docs_dataset).resources[0].id
     # With retrieval
-    _ = sdk.ask_on_resource(kbid=docs_dataset, rid=rid, query="Nuclia loves Semantic Search")
+    _ = sdk.ask_on_resource(
+        kbid=docs_dataset, rid=rid, query="Nuclia loves Semantic Search"
+    )
 
     # Check askting with the whole resource (no retrieval)
     _ = sdk.ask_on_resource(
@@ -124,7 +129,7 @@ def test_ask_response_parser_stream():
         ),
         CitationsAskResponseItem(citations={"some/paragraph/id": "This is a citation"}),
     ]
-    raw_lines = [AskResponseItem(item=item).json() for item in items]
+    raw_lines = [AskResponseItem(item=item).model_dump_json() for item in items]
     response = unittest.mock.Mock()
     response.headers = {
         "NUCLIA-LEARNING-ID": "learning_id",
@@ -137,7 +142,10 @@ def test_ask_response_parser_stream():
     assert ask_response.learning_id == "learning_id"
     assert ask_response.answer == "This is your Nuclia answer."
     assert ask_response.status == "success"
-    assert ask_response.relations.entities["Nuclia"].related_to[0].entity == "Semantic Search"
+    assert (
+        ask_response.relations.entities["Nuclia"].related_to[0].entity
+        == "Semantic Search"
+    )
     assert ask_response.citations["some/paragraph/id"] == "This is a citation"
     assert ask_response.retrieval_results.resources == {}
     assert ask_response.metadata.tokens.input == 10
