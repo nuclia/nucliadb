@@ -25,7 +25,7 @@ from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
-from nucliadb.utils import get_driver
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (

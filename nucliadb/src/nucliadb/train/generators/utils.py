@@ -26,7 +26,7 @@ from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import TrainBatchType
-from nucliadb.utils import get_driver
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb_utils.utilities import get_storage
 
 rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)

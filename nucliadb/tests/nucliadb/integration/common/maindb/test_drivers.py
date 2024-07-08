@@ -41,20 +41,14 @@ async def test_pg_driver_pool_timeout(pg):
     await driver.initialize()
 
     # Get one connection and hold it
-    conn = await driver.begin()
-
-    # Try to get another connection, should fail because pool is full
-    with pytest.raises(psycopg_pool.PoolTimeout):
-        await driver.begin()
-
-    # Abort the connection and try again
-    await conn.abort()
+    async with driver.transaction() as txn:
+        # Try to get another connection, should fail because pool is full
+        with pytest.raises(psycopg_pool.PoolTimeout):
+            await driver.transaction().__aenter__()
 
     # Should now work
-    conn2 = await driver.begin()
-
-    # Closing for hygiene
-    await conn2.abort()
+    async with driver.transaction() as txn:
+        pass
 
 
 async def _clear_db(driver: Driver):

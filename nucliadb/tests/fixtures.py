@@ -641,9 +641,9 @@ async def cleanup_maindb(driver: Driver):
 
 @pytest.fixture(scope="function")
 async def txn(maindb_driver):
-    txn = await maindb_driver.begin()
-    yield txn
-    await txn.abort()
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()
 
 
 @pytest.fixture(scope="function")

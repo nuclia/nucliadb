@@ -144,34 +144,34 @@ async def test_knowledgebox_delete_all_kb_keys(
     maindb_driver,
     knowledgebox_ingest: str,
 ):
-    txn = await maindb_driver.begin()
-    kbid = knowledgebox_ingest
-    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
+    async with maindb_driver.transaction() as txn:
+        kbid = knowledgebox_ingest
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
-    # Create some resources in the KB
-    n_resources = 100
-    uuids = set()
-    for _ in range(n_resources):
-        bm = broker_resource(kbid)
-        r = await kb_obj.add_resource(uuid=bm.uuid, slug=bm.uuid, basic=bm.basic)
-        assert r is not None
-        await r.set_slug()
-        uuids.add(bm.uuid)
-    await txn.commit()
+        # Create some resources in the KB
+        n_resources = 100
+        uuids = set()
+        for _ in range(n_resources):
+            bm = broker_resource(kbid)
+            r = await kb_obj.add_resource(uuid=bm.uuid, slug=bm.uuid, basic=bm.basic)
+            assert r is not None
+            await r.set_slug()
+            uuids.add(bm.uuid)
+        await txn.commit()
 
     # Check that all of them are there
-    txn = await maindb_driver.begin()
-    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
-    for uuid in uuids:
-        assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
-    await txn.abort()
+    async with maindb_driver.transaction() as txn:
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
+        for uuid in uuids:
+            assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
+        await txn.abort()
 
     # Now delete all kb keys
     await KnowledgeBox.delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
 
     # Check that all of them were deleted
-    txn = await maindb_driver.begin()
-    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
-    for uuid in uuids:
-        assert await kb_obj.get_resource_uuid_by_slug(uuid) is None
-    await txn.abort()
+    async with maindb_driver.transaction() as txn:
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
+        for uuid in uuids:
+            assert await kb_obj.get_resource_uuid_by_slug(uuid) is None
+        await txn.abort()
