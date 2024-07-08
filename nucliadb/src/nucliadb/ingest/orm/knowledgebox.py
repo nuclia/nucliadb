@@ -97,6 +97,11 @@ class KnowledgeBox:
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
+        if not kbid:
+            raise KnowledgeBoxCreationError("A kbid must be provided to create a new KB")
+        if not slug:
+            raise KnowledgeBoxCreationError("A slug must be provided to create a new KB")
+
         if semantic_model is None:
             if semantic_models is None or len(semantic_models) == 0:
                 raise KnowledgeBoxCreationError(
@@ -119,11 +124,6 @@ class KnowledgeBox:
                 ) or await datamanagers.kb.exists_kb(txn, kbid=kbid)
                 if exists:
                     raise KnowledgeBoxConflict()
-                if kbid is None or kbid == "":
-                    kbid = str(uuid4())
-
-                if slug == "":
-                    slug = kbid
 
                 # Create in maindb
 

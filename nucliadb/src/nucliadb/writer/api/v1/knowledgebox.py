@@ -118,7 +118,7 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
         (kbid, slug) = await KnowledgeBox.create(
             driver,
             kbid=kbid,
-            slug=item.slug or "",  # empty slugs will be changed on KB creation
+            slug=item.slug or kbid,
             title=item.title or "",
             description=item.description or "",
             semantic_model=semantic_model,
