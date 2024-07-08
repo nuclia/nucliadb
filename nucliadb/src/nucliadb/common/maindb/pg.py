@@ -51,50 +51,41 @@ pg_observer = metrics.Observer(
 class DataLayer:
     def __init__(self, connection: psycopg.AsyncConnection):
         self.connection = connection
-        # A lock to avoid sending concurrent queries to the connection. asyncpg has its own system to control this
-        # but instead of waiting, it raises an Exception. We use our own lock so that concurrent tasks wait for each
-        # other, rather than exploding. This could be avoided if we can guarantee that a single asyncpg connection
-        # is not shared between concurrent tasks.
-        self.lock = asyncio.Lock()
 
     async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
         with pg_observer({"type": "get"}):
-            async with self.lock:
-                statement = "SELECT value FROM resources WHERE key = %s"
-                if select_for_update:
-                    statement += " FOR UPDATE"
-                async with self.connection.cursor() as cur:
-                    await cur.execute(statement, (key,))
-                    row = await cur.fetchone()
-                    return row[0] if row else None
+            statement = "SELECT value FROM resources WHERE key = %s"
+            if select_for_update:
+                statement += " FOR UPDATE"
+            async with self.connection.cursor() as cur:
+                await cur.execute(statement, (key,))
+                row = await cur.fetchone()
+                return row[0] if row else None
 
     async def set(self, key: str, value: bytes) -> None:
         with pg_observer({"type": "set"}):
-            async with self.lock:
-                async with self.connection.cursor() as cur:
-                    await cur.execute(
-                        "INSERT INTO resources (key, value) "
-                        "VALUES (%s, %s) "
-                        "ON CONFLICT (key) "
-                        "DO UPDATE SET value = EXCLUDED.value",
-                        (key, value),
-                    )
+            async with self.connection.cursor() as cur:
+                await cur.execute(
+                    "INSERT INTO resources (key, value) "
+                    "VALUES (%s, %s) "
+                    "ON CONFLICT (key) "
+                    "DO UPDATE SET value = EXCLUDED.value",
+                    (key, value),
+                )
 
     async def delete(self, key: str) -> None:
         with pg_observer({"type": "delete"}):
-            async with self.lock:
-                async with self.connection.cursor() as cur:
-                    await cur.execute("DELETE FROM resources WHERE key = %s", (key,))
+            async with self.connection.cursor() as cur:
+                await cur.execute("DELETE FROM resources WHERE key = %s", (key,))
 
     async def batch_get(self, keys: list[str], select_for_update: bool = False) -> list[Optional[bytes]]:
         with pg_observer({"type": "batch_get"}):
-            async with self.lock:
-                async with self.connection.cursor() as cur:
-                    statement = "SELECT key, value FROM resources WHERE key = ANY(%s)"
-                    if select_for_update:
-                        statement += " FOR UPDATE"
-                    await cur.execute(statement, (keys,))
-                    records = {record[0]: record[1] for record in await cur.fetchall()}
+            async with self.connection.cursor() as cur:
+                statement = "SELECT key, value FROM resources WHERE key = ANY(%s)"
+                if select_for_update:
+                    statement += " FOR UPDATE"
+                await cur.execute(statement, (keys,))
+                records = {record[0]: record[1] for record in await cur.fetchall()}
             # get sorted by keys
             return [records.get(key) for key in keys]
 
@@ -111,20 +102,18 @@ class DataLayer:
             query += " LIMIT %s"
             args.append(limit)
         with pg_observer({"type": "scan_keys"}):
-            async with self.lock:
-                async with self.connection.cursor() as cur:
-                    async for record in cur.stream(query, args):
-                        if not include_start and record[0] == prefix:
-                            continue
-                        yield record[0]
+            async with self.connection.cursor() as cur:
+                async for record in cur.stream(query, args):
+                    if not include_start and record[0] == prefix:
+                        continue
+                    yield record[0]
 
     async def count(self, match: str) -> int:
         with pg_observer({"type": "count"}):
-            async with self.lock:
-                async with self.connection.cursor() as cur:
-                    await cur.execute("SELECT count(*) FROM resources WHERE key LIKE %s", (match + "%",))
-                    row = await cur.fetchone()
-                    return row[0]  # type: ignore
+            async with self.connection.cursor() as cur:
+                await cur.execute("SELECT count(*) FROM resources WHERE key LIKE %s", (match + "%",))
+                row = await cur.fetchone()
+                return row[0]  # type: ignore
 
 
 class PGTransaction(Transaction):
@@ -139,29 +128,26 @@ class PGTransaction(Transaction):
         self.connection = connection
         self.data_layer = DataLayer(connection)
         self.open = True
-        self._lock = asyncio.Lock()
 
     async def abort(self):
         with pg_observer({"type": "rollback"}):
-            async with self._lock:
-                if self.open:
-                    try:
-                        await self.connection.rollback()
-                    finally:
-                        self.open = False
-                        await self.driver.pool.putconn(self.connection)
-
-    async def commit(self):
-        with pg_observer({"type": "commit"}):
-            async with self._lock:
+            if self.open:
                 try:
-                    await self.connection.commit()
-                except Exception:
                     await self.connection.rollback()
-                    raise
                 finally:
                     self.open = False
                     await self.driver.pool.putconn(self.connection)
+
+    async def commit(self):
+        with pg_observer({"type": "commit"}):
+            try:
+                await self.connection.commit()
+            except Exception:
+                await self.connection.rollback()
+                raise
+            finally:
+                self.open = False
+                await self.driver.pool.putconn(self.connection)
 
     async def batch_get(self, keys: list[str], for_update: bool = True):
         return await self.data_layer.batch_get(keys, select_for_update=for_update)
