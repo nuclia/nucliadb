@@ -30,6 +30,7 @@ from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transactio
 from nucliadb_telemetry import metrics
 
 RETRIABLE_EXCEPTIONS = (
+    psycopg_pool.PoolTimeout,
     OSError,
     ConnectionResetError,
 )
@@ -283,7 +284,8 @@ class PGDriver(Driver):
         if read_only:
             return ReadOnlyPGTransaction(self)
         else:
-            conn = await self.pool.getconn()
+            timeout = self.acquire_timeout_ms / 1000
+            conn = await self.pool.getconn(timeout=timeout)
             with pg_observer({"type": "begin"}):
                 return PGTransaction(self, conn)
 

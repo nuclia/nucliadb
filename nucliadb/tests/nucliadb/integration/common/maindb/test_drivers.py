@@ -19,6 +19,7 @@
 #
 import os
 
+import psycopg_pool
 import pytest
 
 from nucliadb.common.maindb.driver import Driver
@@ -43,7 +44,7 @@ async def test_pg_driver_pool_timeout(pg):
     conn = await driver.begin()
 
     # Try to get another connection, should fail because pool is full
-    with pytest.raises(TimeoutError):
+    with pytest.raises(psycopg_pool.PoolTimeout):
         await driver.begin()
 
     # Abort the connection and try again
