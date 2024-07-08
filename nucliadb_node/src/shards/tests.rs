@@ -17,7 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::{sync::Arc, time::SystemTime};
+use std::time::SystemTime;
 
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::{Channel, NodeResult};
@@ -27,21 +27,29 @@ use nucliadb_vectors::config::{Similarity, VectorConfig};
 use tempfile;
 use uuid::Uuid;
 
+use crate::disk_structure;
 use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
 use crate::shards::reader::ShardReader;
 
-use super::{metadata::ShardMetadata, writer::ShardWriter};
+use super::writer::ShardWriter;
 
 #[test]
 fn test_vectorsets() -> NodeResult<()> {
     let tempdir = tempfile::tempdir()?;
-    let shard_path = tempdir.path().join("shard");
+    let shards_path = tempdir.path().join("shards");
+    std::fs::create_dir(&shards_path)?;
     let shard_id = "shard".to_string();
     let kbid = "kbid".to_string();
 
-    let metadata = Arc::new(ShardMetadata::new(shard_path.clone(), shard_id.clone(), kbid.clone(), Channel::default()));
-
-    let writer = ShardWriter::new(Arc::clone(&metadata), VectorConfig::default())?;
+    let (writer, _metadata) = ShardWriter::new(
+        crate::shards::writer::NewShard {
+            kbid: kbid.clone(),
+            shard_id: shard_id.clone(),
+            channel: Channel::default(),
+            vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
+        },
+        &shards_path,
+    )?;
     writer.create_vectors_index(
         "myvectorset".to_string(),
         VectorConfig {
@@ -57,7 +65,7 @@ fn test_vectorsets() -> NodeResult<()> {
     let resource = generate_resource(shard_id.clone());
     writer.set_resource(resource)?;
 
-    let reader = ShardReader::new(shard_id.clone(), &shard_path)?;
+    let reader = ShardReader::new(shard_id.clone(), &disk_structure::shard_path_by_id(&shards_path, &shard_id))?;
 
     // Search in default vectorset (by omitting vectorset)
     let results = reader.search(nodereader::SearchRequest {

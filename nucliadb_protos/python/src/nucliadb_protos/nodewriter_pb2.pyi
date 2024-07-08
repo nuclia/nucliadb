@@ -4,7 +4,9 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import google.protobuf.descriptor
+import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import nucliadb_protos.noderesources_pb2
@@ -235,11 +237,30 @@ global___VectorIndexConfig = VectorIndexConfig
 class NewShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
+    class VectorsetsConfigsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___VectorIndexConfig: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___VectorIndexConfig | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     SIMILARITY_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
     NORMALIZE_VECTORS_FIELD_NUMBER: builtins.int
     CONFIG_FIELD_NUMBER: builtins.int
+    VECTORSETS_CONFIGS_FIELD_NUMBER: builtins.int
     similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     kbid: builtins.str
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
@@ -247,6 +268,8 @@ class NewShardRequest(google.protobuf.message.Message):
     """indicates whether the shard should normalize vectors on indexing or not"""
     @property
     def config(self) -> global___VectorIndexConfig: ...
+    @property
+    def vectorsets_configs(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___VectorIndexConfig]: ...
     def __init__(
         self,
         *,
@@ -255,9 +278,10 @@ class NewShardRequest(google.protobuf.message.Message):
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
         normalize_vectors: builtins.bool = ...,
         config: global___VectorIndexConfig | None = ...,
+        vectorsets_configs: collections.abc.Mapping[builtins.str, global___VectorIndexConfig] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["config", b"config", "kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "release_channel", b"release_channel", "similarity", b"similarity"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["config", b"config", "kbid", b"kbid", "normalize_vectors", b"normalize_vectors", "release_channel", b"release_channel", "similarity", b"similarity", "vectorsets_configs", b"vectorsets_configs"]) -> None: ...
 
 global___NewShardRequest = NewShardRequest
 

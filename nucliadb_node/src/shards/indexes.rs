@@ -95,14 +95,15 @@ impl ShardIndexes {
                 self.inner.vectorsets.len()
             )));
         }
-        if name == DEFAULT_VECTORS_INDEX_NAME {
-            return Err(node_error!(format!("Vectorset id {DEFAULT_VECTORS_INDEX_NAME} is reserved for internal use")));
-        }
         if self.inner.vectorsets.contains_key(&name) {
             return Err(node_error!(format!("Vectorset id {name} is already in use")));
         }
 
-        let uuid = format!("vectorset_{}", Uuid::new_v4());
+        let uuid = if name == DEFAULT_VECTORS_INDEX_NAME {
+            disk_structure::VECTORS_DIR.to_string()
+        } else {
+            format!("vectorset_{}", Uuid::new_v4())
+        };
         let path = self.shard_path.join(uuid.clone());
         self.inner.vectorsets.insert(name, uuid);
         Ok(path)
@@ -160,7 +161,7 @@ impl Default for ShardIndexesFile {
         Self {
             texts: disk_structure::TEXTS_DIR.into(),
             paragraphs: disk_structure::PARAGRAPHS_DIR.into(),
-            vectorsets: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), disk_structure::VECTORS_DIR.into())]),
+            vectorsets: HashMap::new(),
             relations: disk_structure::RELATIONS_DIR.into(),
         }
     }
@@ -195,6 +196,11 @@ mod tests {
         let shard_path = tempdir.path();
 
         let mut indexes = ShardIndexes::new(shard_path);
+
+        let vectorsets = indexes.iter_vectors_indexes().collect::<Vec<(String, PathBuf)>>();
+        assert_eq!(vectorsets.len(), 0);
+
+        indexes.add_vectors_index(DEFAULT_VECTORS_INDEX_NAME.to_string()).unwrap();
 
         let vectorsets = indexes.iter_vectors_indexes().collect::<Vec<(String, PathBuf)>>();
         assert_eq!(vectorsets.len(), 1);
@@ -242,13 +248,12 @@ mod tests {
         indexes.add_vectors_index("openai".to_string()).unwrap();
 
         let vectorsets = indexes.iter_vectors_indexes().sorted().collect::<Vec<(String, PathBuf)>>();
-        assert_eq!(vectorsets.len(), 3);
+        assert_eq!(vectorsets.len(), 2);
 
-        assert_eq!(vectorsets[0].0, DEFAULT_VECTORS_INDEX_NAME.to_string());
-        assert_eq!(vectorsets[1].0, "gecko".to_string());
-        assert_eq!(vectorsets[1].1, indexes.vectorset_path("gecko").unwrap());
-        assert_eq!(vectorsets[2].0, "openai".to_string());
-        assert_eq!(vectorsets[2].1, indexes.vectorset_path("openai").unwrap());
+        assert_eq!(vectorsets[0].0, "gecko".to_string());
+        assert_eq!(vectorsets[0].1, indexes.vectorset_path("gecko").unwrap());
+        assert_eq!(vectorsets[1].0, "openai".to_string());
+        assert_eq!(vectorsets[1].1, indexes.vectorset_path("openai").unwrap());
     }
 
     #[test]
@@ -257,6 +262,9 @@ mod tests {
         let shard_path = tempdir.path();
 
         let mut indexes = ShardIndexes::new(shard_path);
+
+        let added = indexes.add_vectors_index(DEFAULT_VECTORS_INDEX_NAME.to_string()).is_ok();
+        assert!(added);
 
         // Add two vectorsets more
 
@@ -305,7 +313,7 @@ mod tests {
 
         let mut indexes = ShardIndexes::new(shard_path);
 
-        for i in 0..(MAX_ALLOWED_VECTORSETS - 1) {
+        for i in 0..MAX_ALLOWED_VECTORSETS {
             assert!(indexes.add_vectors_index(format!("vectorset-{i}")).is_ok());
         }
         assert!(indexes.add_vectors_index("too-many".to_string()).is_err());

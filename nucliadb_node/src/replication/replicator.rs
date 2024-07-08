@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
 use std::fs;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -36,8 +37,8 @@ use tonic::Request;
 use crate::cache::ShardWriterCache;
 use crate::replication::health::ReplicationHealthManager;
 use crate::settings::Settings;
-use crate::shards::metadata::ShardMetadata;
-use crate::shards::writer::ShardWriter;
+use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
+use crate::shards::writer::{NewShard, ShardWriter};
 use crate::utils::{list_shards, set_primary_node_id};
 
 pub async fn replicate_shard(
@@ -216,7 +217,6 @@ pub async fn connect_to_primary_and_replicate(
 
     set_primary_node_id(&settings.data_path, primary_node_metadata.node_id)?;
 
-    let shards_path = settings.shards_path();
     loop {
         if shutdown_notified.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(());
@@ -263,19 +263,18 @@ pub async fn connect_to_primary_and_replicate(
                 let shard_id_clone = shard_id.clone();
                 shard_lookup = tokio::task::spawn_blocking(move || shard_cache_clone.get(&shard_id_clone)).await?;
             } else {
-                let metadata = ShardMetadata::new(
-                    shards_path.join(shard_id.clone()),
-                    shard_state.shard_id.clone(),
-                    shard_state.kbid.clone(),
-                    shard_state.release_channel().into(),
-                );
                 let shard_cache_clone = Arc::clone(&shard_cache);
 
                 info!("Creating shard to replicate: {shard_id}");
-                // Create the default vectorset with a default config, it will get overwritten on first sync
-                let shard_create =
-                    tokio::task::spawn_blocking(move || shard_cache_clone.create(metadata, VectorConfig::default()))
-                        .await?;
+                let payload = NewShard {
+                    kbid: shard_state.kbid.clone(),
+                    shard_id: shard_state.shard_id.clone(),
+                    channel: shard_state.release_channel().into(),
+                    // Create the default vectorset with a default config, it
+                    // will get overwritten on first sync
+                    vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
+                };
+                let shard_create = tokio::task::spawn_blocking(move || shard_cache_clone.create(payload)).await?;
                 if shard_create.is_err() {
                     warn!("Failed to create shard: {:?}", shard_create);
                     continue;

@@ -160,6 +160,11 @@ class WriterStub:
         nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
     ]
 
+    NewKnowledgeBoxV2: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
+        nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response,
+    ]
+
     DeleteKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         nucliadb_protos.knowledgebox_pb2.DeleteKnowledgeBoxResponse,
@@ -245,6 +250,11 @@ class WriterAsyncStub:
     NewKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
         nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
+    ]
+
+    NewKnowledgeBoxV2: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
+        nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response,
     ]
 
     DeleteKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
@@ -335,6 +345,13 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse]]: ...
+
+    @abc.abstractmethod
+    def NewKnowledgeBoxV2(
+        self,
+        request: nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response, collections.abc.Awaitable[nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response]]: ...
 
     @abc.abstractmethod
     def DeleteKnowledgeBox(

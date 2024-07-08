@@ -34,14 +34,13 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_protos import nodewriter_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
     KnowledgeBoxNew,
     KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate,
-    NewKnowledgeBoxResponse,
     SemanticModelMetadata,
     UpdateKnowledgeBoxResponse,
     VectorSetConfig,
@@ -96,12 +95,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def NewKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxNew, context=None
-    ) -> NewKnowledgeBoxResponse:
+    ) -> knowledgebox_pb2.NewKnowledgeBoxResponse:
         if is_onprem_nucliadb():
             logger.error(
                 "Sorry, this endpoint is only available for hosted. Onprem must use the REST API"
             )
-            return NewKnowledgeBoxResponse(
+            return knowledgebox_pb2.NewKnowledgeBoxResponse(
                 status=KnowledgeBoxResponseStatus.ERROR,
             )
 
@@ -114,20 +113,19 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         semantic_model = parse_model_metadata_from_request(request)
 
         try:
-            async with self.driver.transaction() as txn:
-                kbid = await KnowledgeBoxORM.create(
-                    txn,
-                    slug=request.slug,
-                    semantic_model=semantic_model,
-                    uuid=kbid,
-                    config=request.config,
-                    release_channel=release_channel,
-                )
-                await txn.commit()
+            (kbid, _) = await KnowledgeBoxORM.create(
+                self.driver,
+                kbid=kbid,
+                slug=request.slug,
+                title=request.config.title,
+                description=request.config.description,
+                semantic_model=semantic_model,
+                release_channel=release_channel,
+            )
 
         except KnowledgeBoxConflict:
             logger.info("KB already exists", extra={"slug": request.slug})
-            return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
+            return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
 
         except Exception as exc:
             errors.capture_exception(exc)
@@ -136,11 +134,66 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 exc_info=True,
                 extra={"slug": request.slug},
             )
-            return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
+            return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
 
         else:
             logger.info("KB created successfully", extra={"kbid": kbid})
-            return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
+            return knowledgebox_pb2.NewKnowledgeBoxResponse(
+                status=KnowledgeBoxResponseStatus.OK, uuid=kbid
+            )
+
+    async def NewKnowledgeBoxV2(
+        self, request: writer_pb2.NewKnowledgeBoxV2Request, context=None
+    ) -> writer_pb2.NewKnowledgeBoxV2Response:
+        """v2 of KB creation endpoint. Payload has been refactored and cleaned
+        up to include only necessary fields. It has also been extended to
+        support KB creation with multiple vectorsets
+        """
+        if is_onprem_nucliadb():
+            logger.error(
+                "Sorry, this endpoint is only available for hosted. Onprem must use the REST API"
+            )
+            return writer_pb2.NewKnowledgeBoxV2Response(
+                status=KnowledgeBoxResponseStatus.ERROR,
+            )
+
+        # Hosted KBs are created through backend endpoints. We assume learning
+        # configuration has been already created for it and we are given the
+        # model metadata in the request
+
+        try:
+            kbid, _ = await KnowledgeBoxORM.create(
+                self.driver,
+                kbid=request.kbid,
+                slug=request.slug,
+                title=request.title,
+                description=request.description,
+                semantic_models={
+                    vs.vectorset_id: SemanticModelMetadata(
+                        similarity_function=vs.similarity,
+                        vector_dimension=vs.vector_dimension,
+                        matryoshka_dimensions=vs.matryoshka_dimensions,
+                    )
+                    for vs in request.vectorsets
+                },
+            )
+
+        except KnowledgeBoxConflict:
+            logger.info("KB already exists", extra={"slug": request.slug})
+            return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.CONFLICT)
+
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.exception(
+                "Unexpected error creating KB",
+                exc_info=True,
+                extra={"slug": request.slug},
+            )
+            return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.ERROR)
+
+        else:
+            logger.info("KB created successfully", extra={"kbid": kbid})
+            return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.OK)
 
     async def UpdateKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxUpdate, context=None
@@ -179,8 +232,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             kbid = request.uuid
             # learning configuration is automatically removed in nuclia backend for
             # hosted users, we don't need to do it
-            async with self.driver.transaction() as txn:
-                await KnowledgeBoxORM.delete(txn, kbid=kbid)
+            await KnowledgeBoxORM.delete(self.driver, kbid=kbid)
         except KnowledgeBoxNotFound:
             logger.warning(f"KB not found: kbid={request.uuid}, slug={request.slug}")
         except Exception:

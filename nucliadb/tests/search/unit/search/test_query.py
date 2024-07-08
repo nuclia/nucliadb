@@ -184,6 +184,7 @@ class TestVectorSetAndMatryoshkaParsing:
                 "nucliadb.search.search.query.get_matryoshka_dimension_cached",
                 new=AsyncMock(return_value=matryoshka_dimension),
             ),
+            patch("nucliadb.search.search.query.get_driver"),
         ):
             request, incomplete, _ = await parser.parse()
             assert not incomplete
