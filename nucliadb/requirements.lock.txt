@@ -74,6 +74,9 @@ orjson==3.9.15
 prometheus-client==0.19.0
 protobuf==4.25.2
 psutil==5.9.8
+psycopg==3.2.1
+psycopg-binary==3.2.1
+psycopg-pool==3.2.2
 pyasn1==0.5.1
 pyasn1-modules==0.3.0
 pycares==4.4.0
