@@ -60,7 +60,7 @@ class NatsTaskProducer:
         try:
             pub_ack = await self.context.nats_manager.js.publish(  # type: ignore
                 self.stream.subject,  # type: ignore
-                msg.json().encode("utf-8"),  # type: ignore
+                msg.model_dump_json().encode("utf-8"),  # type: ignore
             )
             logger.info(
                 "Message sent to Nats",
