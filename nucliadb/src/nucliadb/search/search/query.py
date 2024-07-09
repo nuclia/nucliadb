@@ -25,7 +25,7 @@ from typing import Any, Awaitable, Optional, Union
 from async_lru import alru_cache
 
 from nucliadb.common import datamanagers
-from nucliadb.middleware.transaction import get_read_only_transaction
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.search.filters import (
@@ -390,14 +390,14 @@ class QueryParser:
             query_vector = self.user_vector
 
         if self.vectorset:
-            txn = await get_read_only_transaction()
-            if not await datamanagers.vectorsets.exists(
-                txn, kbid=self.kbid, vectorset_id=self.vectorset
-            ):
-                raise InvalidQueryError(
-                    "vectorset",
-                    f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
-                )
+            async with get_driver().transaction(read_only=True) as txn:
+                if not await datamanagers.vectorsets.exists(
+                    txn, kbid=self.kbid, vectorset_id=self.vectorset
+                ):
+                    raise InvalidQueryError(
+                        "vectorset",
+                        f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
+                    )
             request.vectorset = self.vectorset
 
         if query_vector is not None:
@@ -691,26 +691,26 @@ PROCESSING_STATUS_TO_PB_MAP = {
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
 async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
-    txn = await get_read_only_transaction()
-    return await datamanagers.synonyms.get(txn, kbid=kbid)
+    async with get_driver().transaction(read_only=True) as txn:
+        return await datamanagers.synonyms.get(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
 async def get_entities_meta_cache(kbid: str) -> datamanagers.entities.EntitiesMetaCache:
-    txn = await get_read_only_transaction()
-    return await datamanagers.entities.get_entities_meta_cache(txn, kbid=kbid)
+    async with get_driver().transaction(read_only=True) as txn:
+        return await datamanagers.entities.get_entities_meta_cache(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
 async def get_deleted_entity_groups(kbid: str) -> list[str]:
-    txn = await get_read_only_transaction()
-    return list((await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups)
+    async with get_driver().transaction(read_only=True) as txn:
+        return list((await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups)
 
 
 @query_parse_dependency_observer.wrap({"type": "classification_labels"})
 async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
-    txn = await get_read_only_transaction()
-    return await datamanagers.labels.get_labels(txn, kbid=kbid)
+    async with get_driver().transaction(read_only=True) as txn:
+        return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
 def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]):
@@ -745,15 +745,15 @@ async def get_matryoshka_dimension_cached(kbid: str, vectorset: Optional[str]) -
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
 async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optional[int]:
-    txn = await get_read_only_transaction()
-    matryoshka_dimension = None
-    if not vectorset:
-        # XXX this should be migrated once we remove the "default" vectorset
-        # concept
-        matryoshka_dimension = await datamanagers.kb.get_matryoshka_vector_dimension(txn, kbid=kbid)
-    else:
-        vectorset_config = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset)
-        if vectorset_config is not None and vectorset_config.vectorset_index_config.vector_dimension:
-            matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
+    async with get_driver().transaction(read_only=True) as txn:
+        matryoshka_dimension = None
+        if not vectorset:
+            # XXX this should be migrated once we remove the "default" vectorset
+            # concept
+            matryoshka_dimension = await datamanagers.kb.get_matryoshka_vector_dimension(txn, kbid=kbid)
+        else:
+            vectorset_config = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset)
+            if vectorset_config is not None and vectorset_config.vectorset_index_config.vector_dimension:
+                matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
 
-    return matryoshka_dimension
+        return matryoshka_dimension

@@ -266,40 +266,40 @@ async def test_knowledgebox_delete_all_kb_keys(
     maindb_driver,
     knowledgebox_ingest: str,
 ):
-    txn = await maindb_driver.begin()
-    kbid = knowledgebox_ingest
-    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
+    async with maindb_driver.transaction() as txn:
+        kbid = knowledgebox_ingest
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
-    # Create some resources in the KB
-    n_resources = 100
-    rids_and_slugs = set()
-    for _ in range(n_resources):
-        bm = broker_resource(kbid)
-        rid = bm.uuid
-        slug = f"slug-{rid}"
-        bm.basic.slug = slug
-        resource = await kb_obj.add_resource(uuid=rid, slug=slug, basic=bm.basic)
-        assert resource is not None
-        await resource.set_slug()
-        rids_and_slugs.add((rid, slug))
-    await txn.commit()
+        # Create some resources in the KB
+        n_resources = 100
+        rids_and_slugs = set()
+        for _ in range(n_resources):
+            bm = broker_resource(kbid)
+            rid = bm.uuid
+            slug = f"slug-{rid}"
+            bm.basic.slug = slug
+            resource = await kb_obj.add_resource(uuid=rid, slug=slug, basic=bm.basic)
+            assert resource is not None
+            await resource.set_slug()
+            rids_and_slugs.add((rid, slug))
+        await txn.commit()
 
     # Check that all of them are there
-    txn = await maindb_driver.begin()
-    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
-    for rid, slug in rids_and_slugs:
-        assert await kb_obj.get_resource_uuid_by_slug(slug) == rid
-    await txn.abort()
+    async with maindb_driver.transaction() as txn:
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
+        for rid, slug in rids_and_slugs:
+            assert await kb_obj.get_resource_uuid_by_slug(slug) == rid
+        await txn.abort()
 
     # Now delete all kb keys
     await KnowledgeBox.delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
 
     # Check that all of them were deleted
-    txn = await maindb_driver.begin()
-    kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
-    for rid, slug in rids_and_slugs:
-        assert await kb_obj.get_resource_uuid_by_slug(slug) is None
-    await txn.abort()
+    async with maindb_driver.transaction() as txn:
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
+        for rid, slug in rids_and_slugs:
+            assert await kb_obj.get_resource_uuid_by_slug(slug) is None
+        await txn.abort()
 
 
 def test_chunker():

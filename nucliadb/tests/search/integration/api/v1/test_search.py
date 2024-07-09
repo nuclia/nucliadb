@@ -146,59 +146,57 @@ async def test_search_resource_all(
     # get shards ids
 
     driver = get_driver()
-    txn = await driver.begin()
-    key = KB_SHARDS.format(kbid=kbid)
-    async for key in txn.keys(key):
-        value = await txn.get(key)
-        assert value is not None
-        shards = PBShards()
-        shards.ParseFromString(value)
-        for replica in shards.shards[0].replicas:
-            node_obj = INDEX_NODES.get(replica.node)
+    async with driver.transaction(read_only=True) as txn:
+        key = KB_SHARDS.format(kbid=kbid)
+        async for key in txn.keys(key):
+            value = await txn.get(key)
+            assert value is not None
+            shards = PBShards()
+            shards.ParseFromString(value)
+            for replica in shards.shards[0].replicas:
+                node_obj = INDEX_NODES.get(replica.node)
 
-            if node_obj is not None:
-                shard = await node_obj.get_shard(replica.shard.id)
-                assert shard.shard_id == replica.shard.id
-                assert shard.fields == 3
-                assert shard.paragraphs == 2
-                assert shard.sentences == 3
+                if node_obj is not None:
+                    shard = await node_obj.get_shard(replica.shard.id)
+                    assert shard.shard_id == replica.shard.id
+                    assert shard.fields == 3
+                    assert shard.paragraphs == 2
+                    assert shard.sentences == 3
 
-                prequest = ParagraphSearchRequest()
-                prequest.id = replica.shard.id
-                prequest.body = "Ramon"
-                prequest.result_per_page = 10
+                    prequest = ParagraphSearchRequest()
+                    prequest.id = replica.shard.id
+                    prequest.body = "Ramon"
+                    prequest.result_per_page = 10
 
-                drequest = DocumentSearchRequest()
-                drequest.id = replica.shard.id
-                drequest.body = "Ramon"
-                drequest.result_per_page = 10
+                    drequest = DocumentSearchRequest()
+                    drequest.id = replica.shard.id
+                    drequest.body = "Ramon"
+                    drequest.result_per_page = 10
 
-                vrequest = VectorSearchRequest()
-                vrequest.id = replica.shard.id
-                vrequest.vector.extend(Q)
-                vrequest.result_per_page = 20
-                vrequest.min_score = -1.0
+                    vrequest = VectorSearchRequest()
+                    vrequest.id = replica.shard.id
+                    vrequest.vector.extend(Q)
+                    vrequest.result_per_page = 20
+                    vrequest.min_score = -1.0
 
-                paragraphs = await node_obj.reader.ParagraphSearch(prequest)  # type: ignore
-                documents = await node_obj.reader.DocumentSearch(drequest)  # type: ignore
+                    paragraphs = await node_obj.reader.ParagraphSearch(prequest)  # type: ignore
+                    documents = await node_obj.reader.DocumentSearch(drequest)  # type: ignore
 
-                assert paragraphs.total == 1
-                assert documents.total == 1
+                    assert paragraphs.total == 1
+                    assert documents.total == 1
 
-                vectors = await node_obj.reader.VectorSearch(vrequest)  # type: ignore
+                    vectors = await node_obj.reader.VectorSearch(vrequest)  # type: ignore
 
-                # 0-19 : My own text Ramon
-                # 20-45 : This is great to be here
-                # 48-65 : Where is my beer?
+                    # 0-19 : My own text Ramon
+                    # 20-45 : This is great to be here
+                    # 48-65 : Where is my beer?
 
-                # Q : Where is my wine?
-                results = [(x.doc_id.id, x.score) for x in vectors.documents]
-                results.sort(reverse=True, key=lambda x: x[1])
-                assert results[0][0].endswith("48-65")
-                assert results[1][0].endswith("0-19")
-                assert results[2][0].endswith("20-45")
-
-    await txn.abort()
+                    # Q : Where is my wine?
+                    results = [(x.doc_id.id, x.score) for x in vectors.documents]
+                    results.sort(reverse=True, key=lambda x: x[1])
+                    assert results[0][0].endswith("48-65")
+                    assert results[1][0].endswith("0-19")
+                    assert results[2][0].endswith("20-45")
 
 
 @pytest.mark.asyncio

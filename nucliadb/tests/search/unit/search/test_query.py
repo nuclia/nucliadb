@@ -62,13 +62,6 @@ def test_parse_entities_to_filters():
 
 
 @pytest.fixture()
-def read_only_txn():
-    txn = unittest.mock.AsyncMock()
-    with unittest.mock.patch(f"{QUERY_MODULE}.get_read_only_transaction", return_value=txn):
-        yield txn
-
-
-@pytest.fixture()
 def kbdm(read_only_txn):
     kbdm = unittest.mock.AsyncMock()
     with unittest.mock.patch(f"{QUERY_MODULE}.datamanagers.kb", kbdm):
@@ -183,7 +176,6 @@ class TestVectorSetAndMatryoshkaParsing:
             min_score=MinScore(bm25=0, semantic=0),
         )
         with (
-            patch("nucliadb.search.search.query.get_read_only_transaction"),
             patch(
                 "nucliadb.search.search.query.datamanagers.vectorsets.exists",
                 new=AsyncMock(return_value=(vectorset is not None)),
@@ -192,6 +184,7 @@ class TestVectorSetAndMatryoshkaParsing:
                 "nucliadb.search.search.query.get_matryoshka_dimension_cached",
                 new=AsyncMock(return_value=matryoshka_dimension),
             ),
+            patch("nucliadb.search.search.query.get_driver"),
         ):
             request, incomplete, _ = await parser.parse()
             assert not incomplete

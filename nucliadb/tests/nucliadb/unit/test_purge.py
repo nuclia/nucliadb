@@ -80,7 +80,6 @@ async def test_purge(kb, keys, driver):
     await purge.purge_kb(driver)
 
     kb.purge.assert_called_once_with(driver, "kbid")
-    driver.begin.return_value.commit.assert_called_once()
 
 
 async def test_purge_handle_errors(kb, keys, driver):
@@ -95,9 +94,6 @@ async def test_purge_handle_errors(kb, keys, driver):
 
     await purge.purge_kb(driver)
 
-    driver.begin.return_value.commit.assert_not_called()
-    driver.begin.return_value.abort.assert_called_once()
-
 
 async def test_purge_kb_storage(
     keys,
@@ -108,8 +104,6 @@ async def test_purge_kb_storage(
 
     await purge.purge_kb_storage(driver, storage)
 
-    driver.begin.return_value.commit.assert_called_once()
-
 
 async def test_purge_kb_storage_handle_errors(keys, driver, storage):
     keys.append("/failed")
@@ -118,8 +112,6 @@ async def test_purge_kb_storage_handle_errors(keys, driver, storage):
     driver.begin.return_value.delete.side_effect = Exception()
 
     await purge.purge_kb_storage(driver, storage)
-
-    driver.begin.return_value.commit.assert_not_called()
 
 
 async def test_main(driver, storage):

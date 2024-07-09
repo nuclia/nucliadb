@@ -20,7 +20,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, Optional, Union
+import logging
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Optional
 
 import backoff
 import psycopg
@@ -42,11 +44,32 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 """
 
+logger = logging.getLogger(__name__)
 
+# Request Metrics
 pg_observer = metrics.Observer(
     "pg_client",
     labels={"type": ""},
 )
+
+# Pool metrics
+POOL_METRICS_COUNTERS = {
+    # Requests for a connection to the pool
+    "requests_num": metrics.Counter("pg_client_pool_requests_total"),
+    "requests_queued": metrics.Counter("pg_client_pool_requests_queued_total"),
+    "requests_errors": metrics.Counter("pg_client_pool_requests_errors_total"),
+    "requests_wait_ms": metrics.Counter("pg_client_pool_requests_queued_seconds_total"),
+    "usage_ms": metrics.Counter("pg_client_pool_requests_usage_seconds_total"),
+    # Pool opening a connection to PG
+    "connections_num": metrics.Counter("pg_client_pool_connections_total"),
+    "connections_ms": metrics.Counter("pg_client_pool_connections_seconds_total"),
+}
+POOL_METRICS_GAUGES = {
+    "pool_size": metrics.Gauge("pg_client_pool_connections_open"),
+    # The two below most likely change too rapidly to be useful in a metric
+    "pool_available": metrics.Gauge("pg_client_pool_connections_available"),
+    "requests_waiting": metrics.Gauge("pg_client_pool_requests_waiting"),
+}
 
 
 class DataLayer:
@@ -137,7 +160,6 @@ class PGTransaction(Transaction):
                     await self.connection.rollback()
                 finally:
                     self.open = False
-                    await self.driver.pool.putconn(self.connection)
 
     async def commit(self):
         with pg_observer({"type": "commit"}):
@@ -148,7 +170,6 @@ class PGTransaction(Transaction):
                 raise
             finally:
                 self.open = False
-                await self.driver.pool.putconn(self.connection)
 
     async def batch_get(self, keys: list[str], for_update: bool = True):
         return await self.data_layer.batch_get(keys, select_for_update=for_update)
@@ -269,26 +290,65 @@ class PGDriver(Driver):
                 await self.pool.open()
 
                 # check if table exists
-                async with self.pool.connection() as conn:
+                async with self._get_connection() as conn:
                     await conn.execute(CREATE_TABLE)
 
             self.initialized = True
+            self.metrics_task = asyncio.create_task(self._report_metrics_task())
 
     async def finalize(self):
         async with self._lock:
             await self.pool.close()
             self.initialized = False
+            self.metrics_task.cancel()
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
-    async def begin(self, read_only: bool = False) -> Union[PGTransaction, ReadOnlyPGTransaction]:
+    async def _report_metrics_task(self):
+        while True:
+            self._report_metrics()
+            await asyncio.sleep(60)
+
+    def _report_metrics(self):
+        if not self.initialized:
+            return
+
+        metrics = self.pool.pop_stats()
+        for key, metric in POOL_METRICS_COUNTERS.items():
+            value = metrics.get(key, 0)
+            if key.endswith("_ms"):
+                value /= 1000
+            metric.counter.inc(value)
+
+        for key, metric in POOL_METRICS_GAUGES.items():
+            value = metrics.get(key, 0)
+            metric.set(value)
+
+    @asynccontextmanager
+    async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
         if read_only:
-            return ReadOnlyPGTransaction(self)
+            yield ReadOnlyPGTransaction(self)
         else:
-            timeout = self.acquire_timeout_ms / 1000
-            conn = await self.pool.getconn(timeout=timeout)
-            with pg_observer({"type": "begin"}):
-                return PGTransaction(self, conn)
+            async with self._get_connection() as conn:
+                yield PGTransaction(self, conn)
 
-    def _get_connection(self) -> InstrumentedAcquireContext:
+    @asynccontextmanager
+    async def _get_connection(self) -> AsyncGenerator[psycopg.AsyncConnection, None]:
         timeout = self.acquire_timeout_ms / 1000
-        return InstrumentedAcquireContext(self.pool.connection(timeout=timeout))
+        # Manual retry loop since backoff.on_exception does not play well with async context managers
+        retries = 0
+        while True:
+            with pg_observer({"type": "acquire"}):
+                try:
+                    async with self.pool.connection(timeout=timeout) as conn:
+                        yield conn
+                        return
+                except psycopg_pool.PoolTimeout as e:
+                    logger.warning(
+                        f"Timeout getting connection from the pool, backing off. Retries = {retries}"
+                    )
+                    if retries < 3:
+                        await asyncio.sleep(1)
+                        retries += 1
+                    else:
+                        raise e
+                except Exception as e:
+                    raise e

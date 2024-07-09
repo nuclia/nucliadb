@@ -19,7 +19,8 @@
 #
 import glob
 import os
-from typing import Optional
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Optional
 
 from nucliadb.common.maindb.driver import (
     DEFAULT_BATCH_SCAN_LIMIT,
@@ -212,7 +213,8 @@ class LocalDriver(Driver):
     async def finalize(self):
         pass
 
-    async def begin(self, read_only: bool = False) -> LocalTransaction:
+    @asynccontextmanager
+    async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
         if self.url is None:
             raise AttributeError("Invalid url")
-        return LocalTransaction(self.url, self)
+        yield LocalTransaction(self.url, self)

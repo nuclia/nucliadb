@@ -500,174 +500,173 @@ def broker_resource(
 
 
 async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest: str) -> Resource:
-    txn = await driver.begin()
+    async with driver.transaction() as txn:
+        rid = str(uuid.uuid4())
+        kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+        test_resource = await kb_obj.add_resource(uuid=rid, slug="slug")
+        await test_resource.set_slug()
 
-    rid = str(uuid.uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
-    test_resource = await kb_obj.add_resource(uuid=rid, slug="slug")
-    await test_resource.set_slug()
+        # 1.  ROOT ELEMENTS
+        # 1.1 BASIC
 
-    # 1.  ROOT ELEMENTS
-    # 1.1 BASIC
-
-    basic = rpb.Basic(
-        title="My title",
-        summary="My summary",
-        icon="text/plain",
-        thumbnail="/file",
-        last_seqid=1,
-        last_account_seq=2,
-    )
-    basic.metadata.metadata["key"] = "value"
-    basic.metadata.language = "ca"
-    basic.metadata.useful = True
-    basic.metadata.status = rpb.Metadata.Status.PROCESSED
-
-    cl1 = rpb.Classification(labelset="labelset1", label="label1")
-    basic.usermetadata.classifications.append(cl1)
-
-    r1 = upb.Relation(
-        relation=upb.Relation.CHILD,
-        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
-        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
-    )
-
-    basic.usermetadata.relations.append(r1)
-
-    ufm1 = rpb.UserFieldMetadata(
-        token=[rpb.TokenSplit(token="My home", klass="Location")],
-        field=rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text1"),
-    )
-
-    basic.fieldmetadata.append(ufm1)
-    basic.created.FromDatetime(datetime.utcnow())
-    basic.modified.FromDatetime(datetime.utcnow())
-
-    await test_resource.set_basic(basic)
-
-    # 1.2 RELATIONS
-
-    rels = []
-    r1 = upb.Relation(
-        relation=upb.Relation.CHILD,
-        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
-        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
-    )
-
-    rels.append(r1)
-    await test_resource.set_relations(rels)
-
-    # 1.3 ORIGIN
-
-    o2 = rpb.Origin()
-    o2.source = rpb.Origin.Source.API
-    o2.source_id = "My Source"
-    o2.created.FromDatetime(datetime.now())
-    o2.modified.FromDatetime(datetime.now())
-
-    await test_resource.set_origin(o2)
-
-    # 2.  FIELDS
-    #
-    # Add an example of each of the files, containing all possible metadata
-
-    # Title
-    title_field = await test_resource.get_field("title", rpb.FieldType.GENERIC, load=False)
-    await make_field(title_field, "MyText")
-
-    # Summary
-    summary_field = await test_resource.get_field("summary", rpb.FieldType.GENERIC, load=False)
-    await make_field(summary_field, "MyText")
-
-    # 2.1 FILE FIELD
-
-    t2 = rpb.FieldFile(
-        language="es",
-    )
-    t2.added.FromDatetime(datetime.now())
-    t2.file.CopyFrom(TEST_CLOUDFILE)
-
-    file_field = await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
-    await add_field_id(test_resource, file_field)
-    await make_field(file_field, "MyText")
-
-    # 2.2 LINK FIELD
-    li2 = rpb.FieldLink(
-        uri="htts://nuclia.cloud",
-        language="ca",
-    )
-    li2.added.FromDatetime(datetime.now())
-    li2.headers["AUTHORIZATION"] = "Bearer xxxxx"
-    linkfield = await test_resource.set_field(rpb.FieldType.LINK, "link1", li2)
-
-    ex1 = rpb.LinkExtractedData()
-    ex1.date.FromDatetime(datetime.now())
-    ex1.language = "ca"
-    ex1.title = "My Title"
-    ex1.field = "link1"
-
-    ex1.link_preview.CopyFrom(THUMBNAIL)
-    ex1.link_thumbnail.CopyFrom(THUMBNAIL)
-
-    await linkfield.set_link_extracted_data(ex1)
-    await add_field_id(test_resource, linkfield)
-    await make_field(linkfield, "MyText")
-
-    # 2.3 TEXT FIELDS
-
-    t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
-    textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
-    await add_field_id(test_resource, textfield)
-    await make_field(textfield, "MyText")
-
-    # 2.4 CONVERSATION FIELD
-
-    def make_message(text: str, files: Optional[list[rpb.CloudFile]] = None) -> rpb.Message:
-        msg = rpb.Message(
-            who="myself",
+        basic = rpb.Basic(
+            title="My title",
+            summary="My summary",
+            icon="text/plain",
+            thumbnail="/file",
+            last_seqid=1,
+            last_account_seq=2,
         )
-        msg.timestamp.FromDatetime(datetime.now())
-        msg.content.text = text
-        msg.content.format = rpb.MessageContent.Format.PLAIN
+        basic.metadata.metadata["key"] = "value"
+        basic.metadata.language = "ca"
+        basic.metadata.useful = True
+        basic.metadata.status = rpb.Metadata.Status.PROCESSED
 
-        if files:
-            for file in files:
-                msg.content.attachments.append(file)
-        return msg
+        cl1 = rpb.Classification(labelset="labelset1", label="label1")
+        basic.usermetadata.classifications.append(cl1)
 
-    c2 = rpb.Conversation()
+        r1 = upb.Relation(
+            relation=upb.Relation.CHILD,
+            source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
+            to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
+        )
 
-    for i in range(300):
-        new_message = make_message(f"{i} hello")
-        if i == 33:
-            new_message = make_message(f"{i} hello", files=[TEST_CLOUDFILE, THUMBNAIL])
-        c2.messages.append(new_message)
+        basic.usermetadata.relations.append(r1)
 
-    convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
-    await add_field_id(test_resource, convfield)
-    await make_field(convfield, extracted_text="MyText")
+        ufm1 = rpb.UserFieldMetadata(
+            token=[rpb.TokenSplit(token="My home", klass="Location")],
+            field=rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text1"),
+        )
 
-    # Q/A
-    field_obj = await test_resource.get_field("link1", type=rpb.FieldType.LINK)
-    question_answers = rpb.FieldQuestionAnswerWrapper()
-    for i in range(10):
-        qa = rpb.QuestionAnswer()
+        basic.fieldmetadata.append(ufm1)
+        basic.created.FromDatetime(datetime.utcnow())
+        basic.modified.FromDatetime(datetime.utcnow())
 
-        qa.question.text = f"My question {i}"
-        qa.question.language = "catalan"
-        qa.question.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
+        await test_resource.set_basic(basic)
 
-        answer = rpb.Answers()
-        answer.text = f"My answer {i}"
-        answer.language = "catalan"
-        answer.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
-        qa.answers.append(answer)
-        question_answers.question_answers.question_answer.append(qa)
+        # 1.2 RELATIONS
 
-    await field_obj.set_question_answers(question_answers)
+        rels = []
+        r1 = upb.Relation(
+            relation=upb.Relation.CHILD,
+            source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
+            to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
+        )
 
-    await txn.commit()
-    return test_resource
+        rels.append(r1)
+        await test_resource.set_relations(rels)
+
+        # 1.3 ORIGIN
+
+        o2 = rpb.Origin()
+        o2.source = rpb.Origin.Source.API
+        o2.source_id = "My Source"
+        o2.created.FromDatetime(datetime.now())
+        o2.modified.FromDatetime(datetime.now())
+
+        await test_resource.set_origin(o2)
+
+        # 2.  FIELDS
+        #
+        # Add an example of each of the files, containing all possible metadata
+
+        # Title
+        title_field = await test_resource.get_field("title", rpb.FieldType.GENERIC, load=False)
+        await make_field(title_field, "MyText")
+
+        # Summary
+        summary_field = await test_resource.get_field("summary", rpb.FieldType.GENERIC, load=False)
+        await make_field(summary_field, "MyText")
+
+        # 2.1 FILE FIELD
+
+        t2 = rpb.FieldFile(
+            language="es",
+        )
+        t2.added.FromDatetime(datetime.now())
+        t2.file.CopyFrom(TEST_CLOUDFILE)
+
+        file_field = await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
+        await add_field_id(test_resource, file_field)
+        await make_field(file_field, "MyText")
+
+        # 2.2 LINK FIELD
+        li2 = rpb.FieldLink(
+            uri="htts://nuclia.cloud",
+            language="ca",
+        )
+        li2.added.FromDatetime(datetime.now())
+        li2.headers["AUTHORIZATION"] = "Bearer xxxxx"
+        linkfield = await test_resource.set_field(rpb.FieldType.LINK, "link1", li2)
+
+        ex1 = rpb.LinkExtractedData()
+        ex1.date.FromDatetime(datetime.now())
+        ex1.language = "ca"
+        ex1.title = "My Title"
+        ex1.field = "link1"
+
+        ex1.link_preview.CopyFrom(THUMBNAIL)
+        ex1.link_thumbnail.CopyFrom(THUMBNAIL)
+
+        await linkfield.set_link_extracted_data(ex1)
+        await add_field_id(test_resource, linkfield)
+        await make_field(linkfield, "MyText")
+
+        # 2.3 TEXT FIELDS
+
+        t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+        textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
+        await add_field_id(test_resource, textfield)
+        await make_field(textfield, "MyText")
+
+        # 2.4 CONVERSATION FIELD
+
+        def make_message(text: str, files: Optional[list[rpb.CloudFile]] = None) -> rpb.Message:
+            msg = rpb.Message(
+                who="myself",
+            )
+            msg.timestamp.FromDatetime(datetime.now())
+            msg.content.text = text
+            msg.content.format = rpb.MessageContent.Format.PLAIN
+
+            if files:
+                for file in files:
+                    msg.content.attachments.append(file)
+            return msg
+
+        c2 = rpb.Conversation()
+
+        for i in range(300):
+            new_message = make_message(f"{i} hello")
+            if i == 33:
+                new_message = make_message(f"{i} hello", files=[TEST_CLOUDFILE, THUMBNAIL])
+            c2.messages.append(new_message)
+
+        convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
+        await add_field_id(test_resource, convfield)
+        await make_field(convfield, extracted_text="MyText")
+
+        # Q/A
+        field_obj = await test_resource.get_field("link1", type=rpb.FieldType.LINK)
+        question_answers = rpb.FieldQuestionAnswerWrapper()
+        for i in range(10):
+            qa = rpb.QuestionAnswer()
+
+            qa.question.text = f"My question {i}"
+            qa.question.language = "catalan"
+            qa.question.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
+
+            answer = rpb.Answers()
+            answer.text = f"My answer {i}"
+            answer.language = "catalan"
+            answer.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
+            qa.answers.append(answer)
+            question_answers.question_answers.question_answer.append(qa)
+
+        await field_obj.set_question_answers(question_answers)
+
+        await txn.commit()
+        return test_resource
 
 
 async def add_field_id(resource: Resource, field: Field):

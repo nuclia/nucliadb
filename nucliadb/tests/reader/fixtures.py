@@ -120,14 +120,14 @@ async def test_resources(processor, knowledgebox_ingest, test_settings_reader):
     t0 = time()
 
     while time() - t0 < 30:  # wait max 30 seconds for it
-        txn = await driver.begin()
-        count = 0
-        async for key in txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
-        ):
-            count += 1
+        async with driver.transaction() as txn:
+            count = 0
+            async for key in txn.keys(
+                match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
+            ):
+                count += 1
 
-        await txn.abort()
+            await txn.abort()
         if count == amount:
             break
         print(f"got {count}, retrying")

@@ -120,7 +120,7 @@ async def serialize(
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
     driver = get_driver()
-    async with driver.transaction(wait_for_abort=False, read_only=True) as txn:
+    async with driver.transaction(read_only=True) as txn:
         return await managed_serialize(
             txn,
             kbid,

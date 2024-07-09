@@ -77,10 +77,10 @@ async def purge_kb(driver: Driver):
 
         # Now delete the tikv delete mark
         try:
-            txn = await driver.begin()
-            key_to_purge = KB_TO_DELETE.format(kbid=kbid)
-            await txn.delete(key_to_purge)
-            await txn.commit()
+            async with driver.transaction() as txn:
+                key_to_purge = KB_TO_DELETE.format(kbid=kbid)
+                await txn.delete(key_to_purge)
+                await txn.commit()
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             errors.capture_exception(exc)
@@ -120,8 +120,8 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
 
         if delete_marker:
             try:
-                txn = await driver.begin()
-                await txn.delete(key)
+                async with driver.transaction() as txn:
+                    await txn.delete(key)
                 logger.info(f"  √ Deleted storage deletion marker {key}")
             except Exception as exc:
                 errors.capture_exception(exc)
