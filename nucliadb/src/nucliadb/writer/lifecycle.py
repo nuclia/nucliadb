@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from contextlib import asynccontextmanager
+
 from nucliadb.ingest.processing import start_processing_engine
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.writer import SERVICE_NAME
@@ -30,6 +32,13 @@ from nucliadb_utils.utilities import (
     start_transaction_utility,
     stop_transaction_utility,
 )
+
+
+@asynccontextmanager
+async def lifespan(app):
+    await initialize()
+    yield
+    await finalize()
 
 
 async def initialize():

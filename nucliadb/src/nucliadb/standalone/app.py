@@ -37,7 +37,7 @@ from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
-from nucliadb.standalone.lifecycle import finalize, initialize
+from nucliadb.standalone.lifecycle import lifespan
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry.fastapi import metrics_endpoint
@@ -102,8 +102,7 @@ def application_factory(settings: Settings) -> FastAPI:
     fastapi_settings = dict(
         debug=running_settings.debug,
         middleware=middleware,
-        on_startup=[initialize],
-        on_shutdown=[finalize],
+        lifespan=lifespan,
         exception_handlers={
             Exception: global_exception_handler,
             ClientDisconnect: client_disconnect_handler,

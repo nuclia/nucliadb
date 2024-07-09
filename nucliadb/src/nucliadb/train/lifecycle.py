@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from contextlib import asynccontextmanager
+
 from nucliadb.common.cluster.discovery.utils import (
     setup_cluster_discovery,
     teardown_cluster_discovery,
@@ -31,6 +33,13 @@ from nucliadb.train.utils import (
 )
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.utilities import start_audit_utility, stop_audit_utility
+
+
+@asynccontextmanager
+async def lifespan(app):
+    await initialize()
+    yield
+    await finalize()
 
 
 async def initialize() -> None:
