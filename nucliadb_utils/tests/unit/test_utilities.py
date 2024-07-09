@@ -174,3 +174,14 @@ def test_get_endecryptor():
 
     settings.encryption_secret_key = None
     utilities.clean_utility(utilities.Utility.ENDECRYPTOR)
+
+
+def test_get_endecryptor_errors():
+    with pytest.raises(ConfigurationError):
+        utilities.get_endecryptor()
+
+    from nucliadb_utils.encryption.settings import settings
+
+    settings.encryption_secret_key = "foobar"
+    with pytest.raises(ConfigurationError):
+        utilities.get_endecryptor()
