@@ -127,7 +127,7 @@ class Sort(int, Enum):
 class JsonBaseModel(BaseModel):
     def __str__(self):
         try:
-            return self.json()
+            return self.model_dump_json()
         except Exception:
             # fallback to BaseModel implementation
             return super().__str__()

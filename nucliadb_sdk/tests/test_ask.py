@@ -124,7 +124,7 @@ def test_ask_response_parser_stream():
         ),
         CitationsAskResponseItem(citations={"some/paragraph/id": "This is a citation"}),
     ]
-    raw_lines = [AskResponseItem(item=item).json() for item in items]
+    raw_lines = [AskResponseItem(item=item).model_dump_json() for item in items]
     response = unittest.mock.Mock()
     response.headers = {
         "NUCLIA-LEARNING-ID": "learning_id",
