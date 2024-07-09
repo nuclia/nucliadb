@@ -881,6 +881,7 @@ class RagStrategyName:
     FIELD_EXTENSION = "field_extension"
     FULL_RESOURCE = "full_resource"
     HIERARCHY = "hierarchy"
+    ORIGIN_METADATA = "origin_metadata"
 
 
 class ImageRagStrategyName:
@@ -952,6 +953,15 @@ class HierarchyResourceStrategy(RagStrategy):
     )
 
 
+class OriginMetadataStrategy(RagStrategy):
+    name: Literal["origin_metadata"]
+    attributes: List[str] = Field(
+        title="Attributes",
+        description="List of attributes to retrieve from the origin metadata. If not specified, all attributes are retrieved.",
+        examples=[["url"], ["url", "metadata", "tags"]],
+    )
+
+
 class TableImageStrategy(ImageRagStrategy):
     name: Literal["tables"]
 
@@ -970,7 +980,9 @@ class ParagraphImageStrategy(ImageRagStrategy):
 
 
 RagStrategies = Annotated[
-    Union[FieldExtensionStrategy, FullResourceStrategy, HierarchyResourceStrategy],
+    Union[
+        FieldExtensionStrategy, FullResourceStrategy, HierarchyResourceStrategy, OriginMetadataStrategy
+    ],
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
@@ -1060,7 +1072,12 @@ class ChatRequest(BaseModel):
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
-        description="Options for tweaking how the context for the LLM model is crafted. `full_resource` will add the full text of the matching resources to the context. `field_extension` will add the text of the matching resource's specified fields to the context. If empty, the default strategy is used.",  # noqa
+        description="""Options for tweaking how the context for the LLM model is crafted.
+- `full_resource` will add the full text of the matching resources to the context.
+- `hierarchy` will information about the paragrap's parent field and resource.
+- `field_extension` will add the text of the matching resource's specified fields to the context.
+- `origin_metadata` will add the selected origin metadata fields of the matching resources to the context.
+If empty, the default strategy is used.""",
     )
     rag_images_strategies: list[RagImagesStrategies] = Field(
         default=[],
@@ -1107,11 +1124,13 @@ class ChatRequest(BaseModel):
         if len(unique_strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
 
-        # If full_resource or hierarchy strategies is chosen, they must be the only strategy
+        # If full_resource or hierarchy strategies is chosen, they must be the only strategy. They can
+        # be combined with origin_metadata strategy.
+        unique_strategy_names.discard(RagStrategyName.ORIGIN_METADATA)
         for unique_strategy_name in (RagStrategyName.FULL_RESOURCE, RagStrategyName.HIERARCHY):
             if unique_strategy_name in unique_strategy_names and len(rag_strategies) > 1:
                 raise ValueError(
-                    f"If '{unique_strategy_name}' strategy is chosen, it must be the only strategy."
+                    f"If '{unique_strategy_name}' strategy is chosen, it must be the only strategy. They can only be combined with '{RagStrategyName.ORIGIN_METADATA}' strategy."
                 )
         return rag_strategies
 
