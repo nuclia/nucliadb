@@ -104,7 +104,7 @@ async def test_activity(
 
             notifs = []
             async for line in resp.aiter_lines():
-                notification_type = Notification.parse_raw(line).type
+                notification_type = Notification.model_validate_json(line).type
                 assert notification_type in [
                     "resource_indexed",
                     "resource_written",
@@ -112,14 +112,14 @@ async def test_activity(
                 ]
 
                 if notification_type == "resource_indexed":
-                    notif = ResourceIndexedNotification.parse_raw(line)
+                    notif = ResourceIndexedNotification.model_validate_json(line)
                     assert notif.type == "resource_indexed"
                     assert notif.data.resource_uuid == "resource"
                     assert notif.data.resource_title == "Resource"
                     assert notif.data.seqid == 1
 
                 elif notification_type == "resource_written":
-                    notif = ResourceWrittenNotification.parse_raw(line)
+                    notif = ResourceWrittenNotification.model_validate_json(line)
                     assert notif.type == "resource_written"
                     assert notif.data.resource_uuid == "resource"
                     assert notif.data.resource_title == "Resource"
@@ -128,7 +128,7 @@ async def test_activity(
                     assert notif.data.error is False
 
                 elif notification_type == "resource_processed":
-                    notif = ResourceProcessedNotification.parse_raw(line)
+                    notif = ResourceProcessedNotification.model_validate_json(line)
                     assert notif.type == "resource_processed"
                     assert notif.data.resource_uuid == "resource"
                     assert notif.data.resource_title == "Resource"

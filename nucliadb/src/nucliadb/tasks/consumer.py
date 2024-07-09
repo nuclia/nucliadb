@@ -132,7 +132,7 @@ class NatsTaskConsumer:
         )
         async with MessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66):
             try:
-                task_msg = self.msg_type.parse_raw(msg.data)
+                task_msg = self.msg_type.model_validate_json(msg.data)
             except pydantic.ValidationError as e:
                 errors.capture_exception(e)
                 logger.error(

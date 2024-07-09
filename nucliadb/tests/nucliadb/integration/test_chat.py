@@ -185,7 +185,7 @@ async def test_chat_synchronous(nucliadb_reader: AsyncClient, knowledgebox, reso
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
-    resp_data = SyncChatResponse.parse_raw(resp.content)
+    resp_data = SyncChatResponse.model_validate_json(resp.content)
 
     assert resp_data.answer == "some text with status."
     assert len(resp_data.results.resources) == 1
@@ -220,7 +220,7 @@ async def test_chat_with_citations(nucliadb_reader: AsyncClient, knowledgebox, r
     assert resp.status_code == 200
 
     if sync_chat:
-        resp_data = SyncChatResponse.parse_raw(resp.content)
+        resp_data = SyncChatResponse.model_validate_json(resp.content)
         resp_citations = resp_data.citations
     else:
         resp_citations = parse_chat_response(resp.content)[-1]
@@ -248,7 +248,7 @@ async def test_chat_without_citations(nucliadb_reader: AsyncClient, knowledgebox
     assert resp.status_code == 200
 
     if sync_chat:
-        resp_data = SyncChatResponse.parse_raw(resp.content)
+        resp_data = SyncChatResponse.model_validate_json(resp.content)
         resp_citations = resp_data.citations
     else:
         resp_citations = parse_chat_response(resp.content)[-1]
@@ -268,7 +268,7 @@ async def test_sync_chat_returns_prompt_context(
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
-    resp_data = SyncChatResponse.parse_raw(resp.content)
+    resp_data = SyncChatResponse.model_validate_json(resp.content)
     if debug:
         assert resp_data.prompt_context
         assert resp_data.prompt_context_order
@@ -473,7 +473,7 @@ async def test_chat_capped_context(nucliadb_reader: AsyncClient, knowledgebox, r
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200
-    resp_data = SyncChatResponse.parse_raw(resp.content)
+    resp_data = SyncChatResponse.model_validate_json(resp.content)
     assert resp_data.prompt_context is not None
     assert len(resp_data.prompt_context) == 6
     total_size = sum(len(v) for v in resp_data.prompt_context.values())
@@ -492,7 +492,7 @@ async def test_chat_capped_context(nucliadb_reader: AsyncClient, knowledgebox, r
         headers={"X-Synchronous": "True"},
     )
     assert resp.status_code == 200, resp.text
-    resp_data = SyncChatResponse.parse_raw(resp.content)
+    resp_data = SyncChatResponse.model_validate_json(resp.content)
     assert resp_data.prompt_context is not None
     total_size = sum(len(v) for v in resp_data.prompt_context.values())
     assert total_size <= max_size * 3

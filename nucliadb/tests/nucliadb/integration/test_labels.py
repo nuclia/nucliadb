@@ -264,19 +264,19 @@ async def test_classification_labels_are_shown_in_resource_basic(
     # Check resource get
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200, f"Response {resp}: {resp.text}"
-    resource = Resource.parse_raw(resp.content)
+    resource = Resource.model_validate_json(resp.content)
     assert resource.computedmetadata == expected_computedmetadata
 
     # Check resources list
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resources?show=basic")
     assert resp.status_code == 200
-    resources = ResourceList.parse_raw(resp.content)
+    resources = ResourceList.model_validate_json(resp.content)
     assert resources.resources[0].computedmetadata == expected_computedmetadata
 
     # Check search results list
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?show=basic")
     assert resp.status_code == 200
-    results = KnowledgeboxSearchResults.parse_raw(resp.content)
+    results = KnowledgeboxSearchResults.model_validate_json(resp.content)
     assert results.resources[rid].computedmetadata == expected_computedmetadata
 
 
@@ -346,5 +346,5 @@ async def test_fieldmetadata_classification_labels(
     # Check resource get
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
-    resource = Resource.parse_raw(resp.content)
+    resource = Resource.model_validate_json(resp.content)
     assert resource.fieldmetadata[0] == fieldmetadata  # type: ignore
