@@ -44,13 +44,32 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 """
 
+logger = logging.getLogger(__name__)
 
+# Request Metrics
 pg_observer = metrics.Observer(
     "pg_client",
     labels={"type": ""},
 )
 
-logger = logging.getLogger(__name__)
+# Pool metrics
+POOL_METRICS_COUNTERS = {
+    # Requests for a connection to the pool
+    "requests_num": metrics.Counter("pg_client_pool_requests_total"),
+    "requests_queued": metrics.Counter("pg_client_pool_requests_queued_total"),
+    "requests_errors": metrics.Counter("pg_client_pool_requests_errors_total"),
+    "requests_wait_ms": metrics.Counter("pg_client_pool_requests_queued_seconds_total"),
+    "usage_ms": metrics.Counter("pg_client_pool_requests_usage_seconds_total"),
+    # Pool opening a connection to PG
+    "connections_num": metrics.Counter("pg_client_pool_connections_total"),
+    "connections_ms": metrics.Counter("pg_client_pool_connections_seconds_total"),
+}
+POOL_METRICS_GAUGES = {
+    "pool_size": metrics.Gauge("pg_client_pool_connections_open"),
+    # The two below most likely change too rapidly to be useful in a metric
+    "pool_available": metrics.Gauge("pg_client_pool_connections_available"),
+    "requests_waiting": metrics.Gauge("pg_client_pool_requests_waiting"),
+}
 
 
 class DataLayer:
@@ -275,11 +294,33 @@ class PGDriver(Driver):
                     await conn.execute(CREATE_TABLE)
 
             self.initialized = True
+            self.metrics_task = asyncio.create_task(self._report_metrics_task())
 
     async def finalize(self):
         async with self._lock:
             await self.pool.close()
             self.initialized = False
+            self.metrics_task.cancel()
+
+    async def _report_metrics_task(self):
+        while True:
+            await self._report_metrics()
+            await asyncio.sleep(60)
+
+    async def _report_metrics(self):
+        if not self.initialized:
+            return
+
+        metrics = self.pool.pop_stats()
+        for key, metric in POOL_METRICS_COUNTERS.items():
+            value = metrics.get(key, 0)
+            if key.endswith("_ms"):
+                value /= 1000
+            metric.counter.inc(value)
+
+        for key, metric in POOL_METRICS_GAUGES.items():
+            value = metrics.get(key, 0)
+            metric.set(value)
 
     @asynccontextmanager
     async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
