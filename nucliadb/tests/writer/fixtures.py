@@ -82,11 +82,9 @@ async def writer_api(
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
 
-    await application.router.startup()
+    async with application.router.lifespan_context(application):
+        yield make_client_fixture
 
-    yield make_client_fixture
-
-    await application.router.shutdown()
     await tus.finalize()
 
     await driver.flushall()
