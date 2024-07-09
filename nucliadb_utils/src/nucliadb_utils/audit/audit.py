@@ -44,15 +44,11 @@ class AuditStorage:
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
         kb_counter: Optional[AuditKBCounter] = None,
+        send: bool = False,
     ):
         raise NotImplementedError
 
-    def report_resources(
-        self,
-        *,
-        kbid: str,
-        resources: int,
-    ):
+    def report_resources(self, *, kbid: str, resources: int):
         raise NotImplementedError
 
     async def initialize(self):
@@ -62,6 +58,9 @@ class AuditStorage:
         pass
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
+        raise NotImplementedError
+
+    def send(self, msg: AuditRequest):
         raise NotImplementedError
 
     async def search(

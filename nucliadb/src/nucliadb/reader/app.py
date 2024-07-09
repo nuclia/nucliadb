@@ -37,6 +37,7 @@ from nucliadb_telemetry.fastapi.utils import (
     global_exception_handler,
 )
 from nucliadb_utils import const
+from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
@@ -62,7 +63,8 @@ middleware.extend(
         Middleware(
             AuthenticationMiddleware,
             backend=NucliaCloudAuthenticationBackend(),
-        )
+        ),
+        Middleware(AuditMiddleware),
     ]
 )
 

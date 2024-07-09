@@ -50,19 +50,18 @@ class BasicAuditStorage(AuditStorage):
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
         kb_counter: Optional[AuditKBCounter] = None,
+        send: bool = False,
     ):
         logger.debug(f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}")
 
-    def report_resources(
-        self,
-        *,
-        kbid: str,
-        resources: int,
-    ):
+    def report_resources(self, *, kbid: str, resources: int):
         logger.debug(f"REPORT RESOURCES {kbid} {resources}")
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
         logger.debug(f"VISITED {kbid} {uuid} {user} {origin}")
+
+    def send(self, msg: AuditRequest):
+        pass
 
     async def search(
         self,

@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest, ChatContext
+from nucliadb_protos.audit_pb2 import AuditRequest, ChatContext
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_utils.audit.stream import StreamAuditStorage
 
@@ -94,12 +94,7 @@ async def test_publish(audit_storage: StreamAuditStorage, nats):
 
 @pytest.mark.asyncio
 async def test_report(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.report(
-        kbid="kbid",
-        audit_type=AuditRequest.AuditType.DELETED,
-        audit_fields=[],
-        kb_counter=AuditKBCounter(),
-    )
+    await audit_storage.report(kbid="kbid", audit_type=AuditRequest.AuditType.DELETED)
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 

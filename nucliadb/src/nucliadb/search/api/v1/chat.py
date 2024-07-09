@@ -165,6 +165,7 @@ async def create_chat_response(
         origin,
         resource=resource,
     )
+
     if x_synchronous:
         streamed_answer = b""
         async for chunk in chat_result.answer_stream:

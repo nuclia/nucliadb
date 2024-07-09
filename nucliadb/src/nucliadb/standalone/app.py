@@ -45,6 +45,7 @@ from nucliadb_telemetry.fastapi.utils import (
     client_disconnect_handler,
     global_exception_handler,
 )
+from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
@@ -94,6 +95,7 @@ def application_factory(settings: Settings) -> FastAPI:
             AuthenticationMiddleware,
             backend=get_auth_backend(settings),
         ),
+        Middleware(AuditMiddleware),
         Middleware(ReadOnlyTransactionMiddleware),
     ]
     if running_settings.debug:

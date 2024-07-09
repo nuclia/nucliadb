@@ -122,6 +122,7 @@ class IndexAuditHandler:
             kbid=kbid,
             audit_type=audit_pb2.AuditRequest.AuditType.INDEXED,
             kb_counter=audit_pb2.AuditKBCounter(fields=total_fields, paragraphs=total_paragraphs),
+            send=True,
         )
 
 
@@ -184,4 +185,5 @@ class ResourceWritesAuditHandler:
                 field_metadata=list(message_audit.field_metadata),
                 audit_type=AUDIT_TYPES.get(notification.write_type),
                 audit_fields=list(message_audit.audit_fields),
+                send=True,
             )

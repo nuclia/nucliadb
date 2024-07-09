@@ -22,19 +22,28 @@ import io
 import json
 from unittest import mock
 
+import nats
 import pytest
 from httpx import AsyncClient
+from nats.aio.client import Client
+from nats.js import JetStreamContext
 
 from nucliadb.search.api.v1.chat import SyncChatResponse
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.utilities import get_predict
+from nucliadb_protos.audit_pb2 import AuditRequest
+from nucliadb_utils.audit.stream import KB_USAGE_STREAM_AUDIT, StreamAuditStorage
+from nucliadb_utils.utilities import Utility, set_utility
 
 
 @pytest.fixture(scope="function", autouse=True)
-def audit():
-    audit_mock = mock.Mock(chat=mock.AsyncMock())
-    with mock.patch("nucliadb.search.search.chat.query.get_audit", return_value=audit_mock):
-        yield audit_mock
+def audit(request):
+    if "skip_audit_mock" in request.keywords:
+        yield
+    else:
+        audit_mock = mock.Mock(chat=mock.AsyncMock())
+        with mock.patch("nucliadb.search.search.chat.query.get_audit", return_value=audit_mock):
+            yield audit_mock
 
 
 @pytest.mark.asyncio()
@@ -51,6 +60,64 @@ async def test_chat(
         f"/kb/{knowledgebox}/chat", json={"query": "query", "context": context}
     )
     assert resp.status_code == 200
+
+
+async def get_audit_messages(sub):
+    msg = await sub.fetch(1)
+    auditreq = AuditRequest()
+    auditreq.ParseFromString(msg[0].data)
+    return auditreq
+
+
+@pytest.mark.skip_audit_mock
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_chat_sends_one_combined_audit(
+    nucliadb_reader: AsyncClient, knowledgebox, stream_audit: StreamAuditStorage, resource
+):
+    from nucliadb_utils.settings import audit_settings
+
+    kbid = knowledgebox
+
+    predict = get_predict()
+    predict.generated_answer = [b"some ", b"text ", b"with ", b"status.", b"-2"]  # type: ignore
+
+    # Prepare a test audit stream to receive our messages
+    partition = stream_audit.get_partition(kbid)
+    client: Client = await nats.connect(stream_audit.nats_servers)
+    jetstream: JetStreamContext = client.jetstream()
+    if audit_settings.audit_jetstream_target is None:
+        assert False, "Missing jetstream target in audit settings"
+    subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
+
+    set_utility(Utility.AUDIT, stream_audit)
+
+    try:
+        await jetstream.delete_stream(name=audit_settings.audit_stream)
+        await jetstream.delete_stream(name="test_usage")
+    except nats.js.errors.NotFoundError:
+        pass
+
+    await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
+    await jetstream.add_stream(name="test_usage", subjects=[KB_USAGE_STREAM_AUDIT])
+
+    psub = await jetstream.pull_subscribe(subject, "psub")
+
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/chat?debug=xyz", json={"query": "title"})
+    assert resp.status_code == 200
+    _, answer, _, _ = parse_chat_response(resp.content)
+
+    assert answer == b"some text with status."
+    auditreq = await get_audit_messages(psub)
+    assert auditreq.kbid == kbid
+    assert auditreq.HasField("chat")
+    assert auditreq.HasField("search")
+    try:
+        auditreq = await get_audit_messages(psub)
+    except nats.errors.TimeoutError:
+        pass
+    else:
+        assert "There was an unexpected extra audit message in nats"
 
 
 @pytest.fixture(scope="function")

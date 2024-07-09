@@ -976,6 +976,7 @@ async def test_search_and_suggest_sent_audit(
     subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
 
     set_utility(Utility.AUDIT, stream_audit)
+
     try:
         await jetstream.delete_stream(name=audit_settings.audit_stream)
     except nats.js.errors.NotFoundError:
