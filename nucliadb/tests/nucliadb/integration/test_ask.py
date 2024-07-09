@@ -124,7 +124,7 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, re
     citations_chunk = GenerativeChunk(chunk=citations_gen)
 
     predict = get_predict()
-    predict.ndjson_answer.append(citations_chunk.json() + "\n")  # type: ignore
+    predict.ndjson_answer.append(citations_chunk.model_dump_json() + "\n")  # type: ignore
 
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
