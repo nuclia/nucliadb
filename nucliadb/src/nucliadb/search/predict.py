@@ -511,7 +511,7 @@ class DummyPredictEngine(PredictEngine):
 
         async def generate():
             for item in self.ndjson_answer:
-                yield GenerativeChunk.parse_raw(item)
+                yield GenerativeChunk.model_validate_json(item)
 
         return (DUMMY_LEARNING_ID, generate())
 
