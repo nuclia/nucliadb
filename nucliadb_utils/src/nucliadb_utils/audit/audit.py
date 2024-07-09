@@ -57,7 +57,14 @@ class AuditStorage:
     async def finalize(self):
         pass
 
-    async def visited(self, kbid: str, uuid: str, user: str, origin: str):
+    async def visited(
+        self,
+        kbid: str,
+        uuid: str,
+        user: str,
+        origin: str,
+        send: bool = False,
+    ):
         raise NotImplementedError
 
     def send(self, msg: AuditRequest):
@@ -72,16 +79,7 @@ class AuditStorage:
         search: SearchRequest,
         timeit: float,
         resources: int,
-    ):
-        raise NotImplementedError
-
-    async def suggest(
-        self,
-        kbid: str,
-        user: str,
-        client: int,
-        origin: str,
-        timeit: float,
+        send: bool = False,
     ):
         raise NotImplementedError
 
@@ -91,12 +89,15 @@ class AuditStorage:
         user: str,
         client: int,
         origin: str,
-        timeit: float,
         question: str,
         rephrased_question: Optional[str],
         context: List[ChatContext],
         answer: Optional[str],
         learning_id: str,
+        rephrase_time: Optional[float] = None,
+        generative_answer_time: Optional[float] = None,
+        generative_answer_first_chunk_time: Optional[float] = None,
+        send: bool = False,
     ):
         raise NotImplementedError
 

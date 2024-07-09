@@ -57,7 +57,14 @@ class BasicAuditStorage(AuditStorage):
     def report_resources(self, *, kbid: str, resources: int):
         logger.debug(f"REPORT RESOURCES {kbid} {resources}")
 
-    async def visited(self, kbid: str, uuid: str, user: str, origin: str):
+    async def visited(
+        self,
+        kbid: str,
+        uuid: str,
+        user: str,
+        origin: str,
+        send: bool = False,
+    ):
         logger.debug(f"VISITED {kbid} {uuid} {user} {origin}")
 
     def send(self, msg: AuditRequest):
@@ -72,18 +79,9 @@ class BasicAuditStorage(AuditStorage):
         search: SearchRequest,
         timeit: float,
         resources: int,
+        send: bool = False,
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
-
-    async def suggest(
-        self,
-        kbid: str,
-        user: str,
-        client: int,
-        origin: str,
-        timeit: float,
-    ):
-        logger.debug(f"SUGGEST {kbid} {user} {origin} {timeit}")
 
     async def chat(
         self,
@@ -91,14 +89,17 @@ class BasicAuditStorage(AuditStorage):
         user: str,
         client_type: int,
         origin: str,
-        timeit: float,
         question: str,
         rephrased_question: Optional[str],
         context: List[ChatContext],
         answer: Optional[str],
         learning_id: str,
+        rephrase_time: Optional[float] = None,
+        generative_answer_time: Optional[float] = None,
+        generative_answer_first_chunk_time: Optional[float] = None,
+        send: bool = False,
     ):
-        logger.debug(f"CHAT {kbid} {user} {origin} {timeit}")
+        logger.debug(f"CHAT {kbid} {user} {origin}")
 
     async def delete_kb(self, kbid):
         logger.debug(f"KB DELETED {kbid}")

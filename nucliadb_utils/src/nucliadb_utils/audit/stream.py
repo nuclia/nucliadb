@@ -19,6 +19,7 @@
 #
 import asyncio
 import contextvars
+import time
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -61,6 +62,7 @@ KB_USAGE_STREAM_AUDIT = "kb-usage.nuclia_db"
 class RequestContext:
     def __init__(self):
         self.audit_request: AuditRequest = AuditRequest()
+        self.start_time: float = time.monotonic()
 
 
 request_context_var = contextvars.ContextVar[Optional[RequestContext]]("request_context", default=None)
@@ -83,27 +85,27 @@ class AuditMiddleware(BaseHTTPMiddleware):
         token = request_context_var.set(context)
         context.audit_request.time.FromDatetime(datetime.now(tz=timezone.utc))
         response = await call_next(request)
-
         if isinstance(response, StreamingResponse):
             response = self.wrap_streaming_response(response, context)
         else:
-            self.enqueue_pending_audit_request(context.audit_request)
+            self.enqueue_pending(context)
 
         request_context_var.reset(token)
 
         return response
 
-    def enqueue_pending_audit_request(self, audit_request: AuditRequest):
+    def enqueue_pending(self, context: RequestContext):
         # Circular dependency, open to ideas to get rid of this
         from nucliadb_utils.utilities import get_audit
 
-        if audit_request.kbid:
+        if context.audit_request.kbid:
             # an audit request with no kbid makes no sense, we use this as an heuristic
             # mark that no audit has been set during this request
-            audit_request.trace_id = get_trace_id()
+            context.audit_request.trace_id = get_trace_id()
             audit_utility = get_audit()
             if audit_utility is not None:
-                audit_utility.send(audit_request)
+                context.audit_request.request_time = time.monotonic() - context.start_time
+                audit_utility.send(context.audit_request)
 
     def wrap_streaming_response(
         self, response: StreamingResponse, context: RequestContext
@@ -123,7 +125,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 async for chunk in original_body_iterator:
                     yield chunk
             finally:
-                self.enqueue_pending_audit_request(context.audit_request)
+                self.enqueue_pending(context)
 
         response.body_iterator = custom_body_iterator()
         return response
@@ -253,9 +255,13 @@ class StreamAuditStorage(AuditStorage):
         send: bool = False,
     ):
         context = get_request_context()
-        if context is None:
+        if send is True and context is None:
+            auditrequest = AuditRequest()
+        elif send is False and context is not None:
+            auditrequest = context.audit_request
+        else:
             return
-        auditrequest = context.audit_request
+
         # Reports MODIFIED / DELETED / NEW events
 
         auditrequest.kbid = kbid
@@ -294,12 +300,21 @@ class StreamAuditStorage(AuditStorage):
             storage=Storage(resources=resources),
         )
 
-    async def visited(self, kbid: str, uuid: str, user: str, origin: str):
+    async def visited(
+        self,
+        kbid: str,
+        uuid: str,
+        user: str,
+        origin: str,
+        send: bool = False,
+    ):
         context = get_request_context()
-        if context is None:
+        if send is True and context is None:
+            auditrequest = AuditRequest()
+        elif send is False and context is not None:
+            auditrequest = context.audit_request
+        else:
             return
-
-        auditrequest = context.audit_request
 
         auditrequest.origin = origin
         auditrequest.userid = user
@@ -307,12 +322,21 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.kbid = kbid
         auditrequest.type = AuditRequest.VISITED
 
-    async def delete_kb(self, kbid):
-        # Search is a base64 encoded search
+        if send:
+            self.send(auditrequest)
+
+    async def delete_kb(
+        self,
+        kbid,
+        send: bool = False,
+    ):
         context = get_request_context()
-        if context is None:
+        if send is True and context is None:
+            auditrequest = AuditRequest()
+        elif send is False and context is not None:
+            auditrequest = context.audit_request
+        else:
             return
-        auditrequest = context.audit_request
 
         auditrequest.kbid = kbid
         auditrequest.type = AuditRequest.KB_DELETED
@@ -325,6 +349,9 @@ class StreamAuditStorage(AuditStorage):
             storage=Storage(paragraphs=0, fields=0, resources=0),
         )
 
+        if send:
+            self.send(auditrequest)
+
     async def search(
         self,
         kbid: str,
@@ -334,20 +361,22 @@ class StreamAuditStorage(AuditStorage):
         search: SearchRequest,
         timeit: float,
         resources: int,
+        send: bool = False,
     ):
-        # Search is a base64 encoded search
         context = get_request_context()
-        if context is None:
+        if send is True and context is None:
+            auditrequest = AuditRequest()
+        elif send is False and context is not None:
+            auditrequest = context.audit_request
+        else:
             return
-
-        auditrequest = context.audit_request
 
         auditrequest.origin = origin
         auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
         auditrequest.search.CopyFrom(search)
-        auditrequest.timeit = timeit
+        auditrequest.retrieval_time = timeit
         auditrequest.resources = resources
         auditrequest.type = AuditRequest.SEARCH
 
@@ -366,43 +395,8 @@ class StreamAuditStorage(AuditStorage):
                 )
             ],
         )
-
-    async def suggest(
-        self,
-        kbid: str,
-        user: str,
-        client_type: int,
-        origin: str,
-        timeit: float,
-    ):
-        context = get_request_context()
-        if context is None:
-            return
-
-        auditrequest = context.audit_request
-
-        auditrequest.origin = origin
-        auditrequest.client_type = client_type  # type: ignore
-        auditrequest.userid = user
-        auditrequest.kbid = kbid
-        auditrequest.timeit = timeit
-        auditrequest.type = AuditRequest.SUGGEST
-
-        self.kb_usage_utility.send_kb_usage(
-            service=Service.NUCLIA_DB,
-            account_id=None,
-            kb_id=kbid,
-            kb_source=KBSource.HOSTED,
-            # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=[
-                Search(
-                    client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
-                    type=SearchType.SUGGEST,
-                    tokens=0,
-                    num_searches=1,
-                )
-            ],
-        )
+        if send:
+            self.send(auditrequest)
 
     async def chat(
         self,
@@ -410,24 +404,34 @@ class StreamAuditStorage(AuditStorage):
         user: str,
         client_type: int,
         origin: str,
-        timeit: float,
         question: str,
         rephrased_question: Optional[str],
         context: List[ChatContext],
         answer: Optional[str],
         learning_id: str,
+        rephrase_time: Optional[float] = None,
+        generative_answer_time: Optional[float] = None,
+        generative_answer_first_chunk_time: Optional[float] = None,
+        send: bool = False,
     ):
         rcontext = get_request_context()
-        if rcontext is None:
+        if send is True and rcontext is None:
+            auditrequest = AuditRequest()
+        elif send is False and rcontext is not None:
+            auditrequest = rcontext.audit_request
+        else:
             return
-
-        auditrequest = rcontext.audit_request
 
         auditrequest.origin = origin
         auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
-        auditrequest.timeit = timeit
+        if rephrase_time is not None:
+            auditrequest.rephrase_time = rephrase_time
+        if generative_answer_time is not None:
+            auditrequest.generative_answer_time = generative_answer_time
+        if generative_answer_first_chunk_time is not None:
+            auditrequest.generative_answer_first_chunk_time = generative_answer_first_chunk_time
         auditrequest.type = AuditRequest.CHAT
         auditrequest.chat.question = question
         auditrequest.chat.context.extend(context)
@@ -436,3 +440,6 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.chat.rephrased_question = rephrased_question
         if answer is not None:
             auditrequest.chat.answer = answer
+
+        if send:
+            self.send(auditrequest)

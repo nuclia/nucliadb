@@ -103,7 +103,7 @@ async def test_chat_sends_one_combined_audit(
 
     psub = await jetstream.pull_subscribe(subject, "psub")
 
-    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/chat?debug=xyz", json={"query": "title"})
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/chat?debug", json={"query": "title"})
     assert resp.status_code == 200
     _, answer, _, _ = parse_chat_response(resp.content)
 
@@ -112,12 +112,21 @@ async def test_chat_sends_one_combined_audit(
     assert auditreq.kbid == kbid
     assert auditreq.HasField("chat")
     assert auditreq.HasField("search")
+    assert auditreq.request_time > 0
+    assert auditreq.generative_answer_time > 0
+    assert auditreq.retrieval_time > 0
+    assert (auditreq.generative_answer_time + auditreq.retrieval_time) < auditreq.request_time
+
     try:
         auditreq = await get_audit_messages(psub)
     except nats.errors.TimeoutError:
         pass
     else:
         assert "There was an unexpected extra audit message in nats"
+
+    await psub.unsubscribe()
+    await client.flush()
+    await client.close()
 
 
 @pytest.fixture(scope="function")

@@ -52,6 +52,9 @@ async def audit_storage(nats):
 
 
 def stream_audit_finish_condition(audit_storage: StreamAuditStorage, count_publish: int):
+    print(f"qsize {audit_storage.queue.qsize()}")
+    print(f"call_count {audit_storage.js.publish.call_count}")
+    print(f"usage qsize {audit_storage.kb_usage_utility.queue.qsize()}")
     return (
         audit_storage.queue.qsize() == 0
         and audit_storage.kb_usage_utility.queue.qsize() == 0
@@ -87,16 +90,16 @@ async def test_lifecycle(audit_storage: StreamAuditStorage, nats):
 @pytest.mark.asyncio
 async def test_publish(audit_storage: StreamAuditStorage, nats):
     await audit_storage.initialize()
-    await audit_storage.send(AuditRequest())
+    audit_storage.send(AuditRequest())
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
 async def test_report(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.report(kbid="kbid", audit_type=AuditRequest.AuditType.DELETED)
+    await audit_storage.report(kbid="kbid", audit_type=AuditRequest.AuditType.DELETED, send=True)
 
-    await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
+    await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
@@ -111,28 +114,21 @@ async def test_report_resources(audit_storage: StreamAuditStorage, nats):
 
 @pytest.mark.asyncio
 async def test_visited(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.visited("kbid", "uuid", "user", "origin")
+    await audit_storage.visited("kbid", "uuid", "user", "origin", send=True)
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
 async def test_delete_kb(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.delete_kb("kbid")
+    await audit_storage.delete_kb("kbid", send=True)
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 
 
 @pytest.mark.asyncio
 async def test_search(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.search("kbid", "user", 0, "origin", SearchRequest(), -1, 1)
-
-    await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
-
-
-@pytest.mark.asyncio
-async def test_suggest(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.suggest("kbid", "user", 0, "origin", -1)
+    await audit_storage.search("kbid", "user", 0, "origin", SearchRequest(), -1, 1, send=True)
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 
@@ -144,12 +140,15 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
         user="user",
         client_type=0,
         origin="origin",
-        timeit=-1,
+        generative_answer_time=1,
+        generative_answer_first_chunk_time=1,
+        rephrase_time=1,
         question="foo",
         rephrased_question="rephrased",
         context=[ChatContext(author="USER", text="epa")],
         answer="bar",
         learning_id="learning_id",
+        send=True,
     )
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))

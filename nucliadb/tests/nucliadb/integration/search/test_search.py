@@ -930,7 +930,6 @@ async def test_only_search_and_suggest_calls_audit(nucliadb_reader, knowledgebox
 
     audit = get_audit()
     audit.search = AsyncMock()
-    audit.suggest = AsyncMock()
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog", params={"query": ""})
     assert resp.status_code == 200
@@ -945,8 +944,6 @@ async def test_only_search_and_suggest_calls_audit(nucliadb_reader, knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kbid}/suggest?query=")
 
     assert resp.status_code == 200
-
-    audit.suggest.assert_awaited_once()
 
 
 async def get_audit_messages(sub):
