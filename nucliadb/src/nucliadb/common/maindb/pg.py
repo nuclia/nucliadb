@@ -304,10 +304,10 @@ class PGDriver(Driver):
 
     async def _report_metrics_task(self):
         while True:
-            await self._report_metrics()
+            self._report_metrics()
             await asyncio.sleep(60)
 
-    async def _report_metrics(self):
+    def _report_metrics(self):
         if not self.initialized:
             return
 
