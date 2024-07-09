@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from contextlib import asynccontextmanager
 
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.ingest.app import initialize_grpc as initialize_ingest_grpc
@@ -34,6 +35,13 @@ from nucliadb.writer.lifecycle import initialize as initialize_writer
 from nucliadb_utils.utilities import finalize_utilities
 
 SYNC_FINALIZERS = []
+
+
+@asynccontextmanager
+async def lifespan(app):
+    await initialize()
+    yield
+    await finalize()
 
 
 async def initialize():
