@@ -316,7 +316,7 @@ class PGDriver(Driver):
             value = metrics.get(key, 0)
             if key.endswith("_ms"):
                 value /= 1000
-            metric.counter.inc(value)
+            metric.inc(value=value)
 
         for key, metric in POOL_METRICS_GAUGES.items():
             value = metrics.get(key, 0)

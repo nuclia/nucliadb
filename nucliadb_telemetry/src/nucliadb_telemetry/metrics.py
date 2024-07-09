@@ -207,14 +207,14 @@ class Counter:
             name, f"Counter for {name}.", labelnames=tuple(self.labels.keys())
         )
 
-    def inc(self, labels: Optional[Dict[str, str]] = None):
+    def inc(self, labels: Optional[Dict[str, str]] = None, value: Union[float, int] = 1):
         merged_labels = self.labels.copy()
         merged_labels.update(labels or {})
 
         if len(merged_labels) > 0:
-            self.counter.labels(**merged_labels).inc()
+            self.counter.labels(**merged_labels).inc(value)
         else:
-            self.counter.inc()
+            self.counter.inc(value)
 
 
 class Histogram:
