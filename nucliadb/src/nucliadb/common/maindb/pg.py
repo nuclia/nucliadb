@@ -249,18 +249,6 @@ class ReadOnlyPGTransaction(Transaction):
             return await DataLayer(conn).count(match)
 
 
-class InstrumentedAcquireContext:
-    def __init__(self, context):
-        self.context = context
-
-    async def __aenter__(self):
-        with pg_observer({"type": "acquire"}):
-            return await self.context.__aenter__()
-
-    async def __aexit__(self, *exc):
-        return await self.context.__aexit__(*exc)
-
-
 class PGDriver(Driver):
     pool: psycopg_pool.AsyncConnectionPool
 
@@ -316,7 +304,7 @@ class PGDriver(Driver):
             value = metrics.get(key, 0)
             if key.endswith("_ms"):
                 value /= 1000
-            metric.counter.inc(value)
+            metric.inc(value=value)
 
         for key, metric in POOL_METRICS_GAUGES.items():
             value = metrics.get(key, 0)
