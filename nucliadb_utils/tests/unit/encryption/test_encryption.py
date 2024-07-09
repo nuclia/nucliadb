@@ -33,7 +33,10 @@ def get_encoded_secret_key():
 
 
 def test_endecryptor():
-    endecryptor = EndecryptorUtility.from_b64_encoded_secret_key(get_encoded_secret_key())
+    # Key generated with: head -c 32 /dev/urandom | base64
+    key = "gXGebeyXDimP2qXsSdQ+W1GoQKIjbBmrZBxQHiks7I0="
+    endecryptor = EndecryptorUtility.from_b64_encoded_secret_key(key)
+
     text = "This is some other text"
     encrypted_text = endecryptor.encrypt(text)
     assert isinstance(encrypted_text, str)
