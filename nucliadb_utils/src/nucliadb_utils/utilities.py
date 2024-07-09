@@ -34,6 +34,8 @@ from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.encryption import EndecryptorUtility
+from nucliadb_utils.encryption.settings import settings as encryption_settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
@@ -78,6 +80,7 @@ class Utility(str, Enum):
     LOCAL_STORAGE = "local_storage"
     NUCLIA_STORAGE = "nuclia_storage"
     MAINDB_DRIVER = "driver"
+    ENDECRYPTOR = "endecryptor"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -406,3 +409,19 @@ def has_feature(
         if X_ACCOUNT_TYPE_HEADER in headers:
             context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
     return get_feature_flags().enabled(name, default=default, context=context)
+
+
+def get_endecryptor() -> EndecryptorUtility:
+    util = get_utility(Utility.ENDECRYPTOR)
+    if util is not None:
+        return util
+    if encryption_settings.encryption_secret_key is None:
+        raise ConfigurationError("Encryption secret key not configured")
+    try:
+        util = EndecryptorUtility.from_b64_encoded_secret_key(encryption_settings.encryption_secret_key)
+    except ValueError as ex:
+        raise ConfigurationError(
+            "Invalid encryption key. Must be a base64 encoded 32-byte string"
+        ) from ex
+    set_utility(Utility.ENDECRYPTOR, util)
+    return util

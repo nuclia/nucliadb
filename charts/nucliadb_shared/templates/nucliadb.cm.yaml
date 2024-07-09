@@ -94,3 +94,7 @@ data:
 {{- if .Values.flag_settings_url }}
   FLAG_SETTINGS_URL: "{{ .Values.flag_settings_url }}"
 {{- end }}
+
+{{- if .Values.encryption.secret_key }}
+  ENCRYPTION_SECRET_KEY: {{ .Values.encryption.secret_key }}
+{{- end }}
