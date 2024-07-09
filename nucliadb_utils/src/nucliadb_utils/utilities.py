@@ -20,11 +20,14 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import logging
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
+
+import nacl
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import featureflagging
@@ -34,6 +37,8 @@ from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.encryption import EndecryptorUtility
+from nucliadb_utils.encryption.settings import settings as encryption_settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
@@ -78,6 +83,7 @@ class Utility(str, Enum):
     LOCAL_STORAGE = "local_storage"
     NUCLIA_STORAGE = "nuclia_storage"
     MAINDB_DRIVER = "driver"
+    ENDECRYPTOR = "endecryptor"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -406,3 +412,24 @@ def has_feature(
         if X_ACCOUNT_TYPE_HEADER in headers:
             context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
     return get_feature_flags().enabled(name, default=default, context=context)
+
+
+def get_endecryptor() -> EndecryptorUtility:
+    util = get_utility(Utility.ENDECRYPTOR)
+    if util is None:
+        if encryption_settings.encryption_secret_key is None:
+            raise ConfigurationError("Encryption secret key not configured")
+        b64_encoded_key = encryption_settings.encryption_secret_key
+        try:
+            decoded_key = base64.b64decode(b64_encoded_key)
+        except Exception:
+            raise ConfigurationError("Invalid encryption key. Must be a base64 encoded 32-byte string")
+        try:
+            util = EndecryptorUtility(
+                decoded_key,
+                max_thread_pool_size=encryption_settings.encryption_thread_pool_size,
+            )
+        except nacl.exceptions.TypeError:
+            raise ConfigurationError("Invalid encryption key. Must be a base64 encoded 32-byte string")
+        set_utility(Utility.ENDECRYPTOR, util)
+    return util

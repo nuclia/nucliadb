@@ -86,3 +86,7 @@ telemetry:
   enabled: True
 
 flag_settings_url: null
+
+encryption:
+  secret_key: XX
+  thread_pool_size: 2
