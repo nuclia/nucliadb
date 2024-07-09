@@ -21,6 +21,8 @@ import copy
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, cast
 
+from nucliadb.common import datamanagers
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -30,6 +32,7 @@ from nucliadb.middleware.transaction import get_read_only_transaction
 from nucliadb.search import logger
 from nucliadb.search.search import paragraphs
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
+from nucliadb_models.metadata import InputOrigin, Origin
 from nucliadb_models.search import (
     SCORE_TYPE,
     FieldExtensionStrategy,
@@ -39,6 +42,7 @@ from nucliadb_models.search import (
     ImageRagStrategy,
     ImageRagStrategyName,
     KnowledgeboxFindResults,
+    OriginMetadataStrategy,
     PageImageStrategy,
     PromptContext,
     PromptContextImages,
@@ -259,6 +263,7 @@ async def full_resource_prompt_context(
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
     resource: Optional[str],
+    extend_with_origin_metadatas: dict[str, dict],
     number_of_full_resources: Optional[int] = None,
 ) -> None:
     """
@@ -271,6 +276,7 @@ async def full_resource_prompt_context(
         kbid: The knowledge box id.
         results: The results of the retrieval (find) operation.
         resource: The resource to be included in the context. This is used only when chatting with a specific resource with no retrieval.
+        extend_with_origin_metadatas: A dictionary with the origin metadata to be included in the context for each resource.
         number_of_full_resources: The number of full resources to include in the context.
     """  # noqa: E501
     if resource is not None:
@@ -292,13 +298,20 @@ async def full_resource_prompt_context(
         ],
         max_concurrent=MAX_RESOURCE_TASKS,
     )
-
-    for extracted_texts in resource_extracted_texts:
-        if extracted_texts is None:
-            continue
+    # One context block for each field, containing the parent resource origin metadata
+    # and the field extracted text.
+    for resource_uuid, extracted_texts in fields_by_resource.items():
+        common_block = ""
+        # First, add the origin metadata to the context if specified, only once per resource.
+        metadata_text = get_origin_metadata_text(resource_uuid, extend_with_origin_metadatas)
+        if metadata_text != "":
+            common_block += f"DOCUMENT METADATA:\n{metadata_text}\n"
+        field: Field
+        extracted_text: str
         for field, extracted_text in extracted_texts:
-            # Add the extracted text of each field to the context.
-            context[field.resource_unique_id] = extracted_text
+            field_block = common_block[:]
+            field_block += f"DOCUMENT CONTENT: {extracted_text}\n"
+            context[field.resource_unique_id] = field_block
 
 
 async def composed_prompt_context(
@@ -306,6 +319,7 @@ async def composed_prompt_context(
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
     extend_with_fields: list[str],
+    extend_with_origin_metadatas: dict[str, dict],
 ) -> None:
     """
     Algorithm steps:
@@ -347,6 +361,7 @@ async def hierarchy_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
+    extend_with_origin_metadatas: dict[str, dict],
     paragraphs_extra_characters: int = 0,
 ) -> None:
     """
@@ -354,6 +369,8 @@ async def hierarchy_prompt_context(
     craft a context with all paragraphs of the same resource grouped together. Moreover, on each group of paragraphs,
     it includes the resource title and summary so that the LLM can have a better understanding of the context.
     """
+    extend_with_origin_metadatas = extend_with_origin_metadatas or {}
+
     paragraphs_extra_characters = max(paragraphs_extra_characters, 0)
     # Make a copy of the ordered paragraphs to avoid modifying the original list, which is returned
     # in the response to the user
@@ -407,9 +424,10 @@ async def hierarchy_prompt_context(
 
     # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
     # extended paragraph text of all the paragraphs in the resource.
-    for values in resources.values():
+    for rid, values in resources.items():
         title_text = values.title
         summary_text = values.summary
+        metadata_text = get_origin_metadata_text(rid, extend_with_origin_metadatas)
         first_paragraph = None
         text_with_hierarchy = ""
         for paragraph, extended_paragraph_text in values.paragraphs:
@@ -422,7 +440,7 @@ async def hierarchy_prompt_context(
 
         if first_paragraph is not None:
             # The first paragraph is the only one holding the hierarchy information
-            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text_with_hierarchy}"
+            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n METADATA: {metadata_text} \n RESOURCE CONTENT: {text_with_hierarchy}"
 
     # Now that the paragraphs have been modified, we can add them to the context
     for paragraph in ordered_paragraphs_copy:
@@ -431,6 +449,54 @@ async def hierarchy_prompt_context(
             continue
         context[paragraph.id] = _clean_paragraph_text(paragraph)
     return
+
+
+def get_origin_metadata_text(rid: str, extend_with_origin_metadatas: dict[str, dict]) -> str:
+    metadata_text = ""
+    if rid in extend_with_origin_metadatas:
+        origin_metadata_to_extend = extend_with_origin_metadatas[rid]
+        for attribute, value in origin_metadata_to_extend.values():
+            metadata_text += f" - {attribute}: {value}\n"
+    return metadata_text
+
+
+async def get_origin_metadata_for_resources(
+    kbid: str,
+    ordered_paragraphs: list[FindParagraph],
+    resource: Optional[str],
+    extend_with_origin_metadata_attributes: list[str],
+):
+    extend_with_all_attributes = extend_with_origin_metadata_attributes == []
+
+    origin_metadatas = {}
+    for paragraph in ordered_paragraphs:
+        resource_uuid = paragraph.id.split("/")[0]
+        origin_metadatas.setdefault(resource_uuid, None)
+    if resource is not None:
+        origin_metadatas.setdefault(resource, None)
+
+    async def fetch_origin_metadata(kbid: str, resource_uuid: str):
+        async with get_driver().transaction(read_only=True) as txn:
+            origin = await datamanagers.resources.get_origin(txn, kbid=kbid, rid=resource_uuid)
+        if origin is None:
+            # No origin metadata available
+            return
+        origin = cast(Origin, origin)
+        origin_dict = origin.model_dump()
+        extend_origin_dict = {}
+        for attribute, value in origin_dict.values():
+            if value is not None and (
+                attribute in extend_with_origin_metadata_attributes or extend_with_all_attributes
+            ):
+                extend_origin_dict[attribute] = value
+        origin_metadatas[resource_uuid] = extend_origin_dict
+        return
+
+    await run_concurrently(
+        [fetch_origin_metadata(kbid, ruuid) for ruuid in origin_metadatas.keys()],
+        max_concurrent=MAX_RESOURCE_TASKS,
+    )
+    return origin_metadatas
 
 
 class PromptContextBuilder:
@@ -517,6 +583,8 @@ class PromptContextBuilder:
         hierarchy_strategy = False
         hierarchy_paragraphs_extended_characters = 0
         extend_with_fields: list[str] = []
+        extend_with_origin = False
+        extend_with_origin_metadata_attributes = None
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 strategy = cast(FieldExtensionStrategy, strategy)
@@ -533,6 +601,19 @@ class PromptContextBuilder:
                 hierarchy_strategy = True
                 if strategy.count is not None and strategy.count > 0:
                     hierarchy_paragraphs_extended_characters = strategy.count
+            elif strategy.name == RagStrategyName.ORIGIN_METADATA:
+                strategy = cast(OriginMetadataStrategy, strategy)
+                extend_with_origin = True
+                extend_with_origin_metadata_attributes = strategy.attributes
+
+        origin_metadatas = {}
+        if extend_with_origin:
+            origin_metadatas = await get_origin_metadata_for_resources(
+                self.kbid,
+                self.ordered_paragraphs,
+                self.resource,
+                extend_with_origin_metadata_attributes,
+            )
 
         if full_resource_strategy:
             await full_resource_prompt_context(
@@ -540,7 +621,8 @@ class PromptContextBuilder:
                 self.kbid,
                 self.ordered_paragraphs,
                 self.resource,
-                number_of_full_resources,
+                extend_with_origin_metadatas=origin_metadatas,
+                number_of_full_resources=number_of_full_resources,
             )
             return
 
@@ -549,7 +631,8 @@ class PromptContextBuilder:
                 context,
                 self.kbid,
                 self.ordered_paragraphs,
-                hierarchy_paragraphs_extended_characters,
+                extend_with_origin_metadatas=origin_metadatas,
+                paragraphs_extra_characters=hierarchy_paragraphs_extended_characters,
             )
             return
 
@@ -558,6 +641,7 @@ class PromptContextBuilder:
             self.kbid,
             self.ordered_paragraphs,
             extend_with_fields=extend_with_fields,
+            extend_with_origin_metadatas=origin_metadatas,
         )
         return
 
