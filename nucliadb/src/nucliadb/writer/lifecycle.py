@@ -19,6 +19,9 @@
 #
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+
+from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.ingest.processing import start_processing_engine
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.writer import SERVICE_NAME
@@ -35,35 +38,23 @@ from nucliadb_utils.utilities import (
 
 
 @asynccontextmanager
-async def lifespan(app):
-    await initialize()
-    yield
-    await finalize()
-
-
-async def initialize():
+async def lifespan(app: FastAPI):
     await setup_telemetry(SERVICE_NAME)
-
     await start_ingest(SERVICE_NAME)
-
     await start_processing_engine()
-
     start_partitioning_utility()
-
     await start_transaction_utility(SERVICE_NAME)
     await storage_initialize()
 
+    # Inject application context into the fastapi app's state
+    async with inject_app_context(app):
+        yield
 
-async def finalize():
     await stop_transaction_utility()
-
     await stop_ingest()
     processing = get_processing()
     if processing is not None:
         await processing.finalize()
-
     await storage_finalize()
-
     await clean_telemetry(SERVICE_NAME)
-
     await finalize_utilities()

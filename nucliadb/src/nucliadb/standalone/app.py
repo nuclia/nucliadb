@@ -31,7 +31,6 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 import nucliadb_admin_assets  # type: ignore
-from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
 from nucliadb.reader import API_PREFIX
@@ -154,8 +153,5 @@ def application_factory(settings: Settings) -> FastAPI:
     for route in application.router.routes:
         if isinstance(route, Mount):
             route.app.settings = settings  # type: ignore
-
-    # Inject application context into the fastapi app's state
-    set_app_context(application)
 
     return application

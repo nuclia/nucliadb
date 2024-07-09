@@ -19,6 +19,8 @@
 #
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest.utils import start_ingest, stop_ingest
@@ -36,13 +38,7 @@ from nucliadb_utils.utilities import (
 
 
 @asynccontextmanager
-async def lifespan(app):
-    await initialize()
-    yield
-    await finalize()
-
-
-async def initialize() -> None:
+async def lifespan(app: FastAPI):
     await setup_telemetry(SERVICE_NAME)
 
     await start_ingest(SERVICE_NAME)
@@ -53,8 +49,8 @@ async def initialize() -> None:
 
     await start_audit_utility(SERVICE_NAME)
 
+    yield
 
-async def finalize() -> None:
     await stop_ingest()
     if get_utility(Utility.PARTITION):
         clean_utility(Utility.PARTITION)

@@ -28,7 +28,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 
-from nucliadb.common.context.fastapi import get_app_context, set_app_context
+from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import api as api_v1
 from nucliadb.writer.lifecycle import lifespan
@@ -96,7 +96,6 @@ def create_application() -> FastAPI:
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
 
-    set_app_context(application)
     maybe_configure_back_pressure(application)
     return application
 
