@@ -18,7 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import base64
+import binascii
 
+import nacl.exceptions
 import nacl.secret
 import nacl.utils
 
@@ -47,11 +49,17 @@ class EndecryptorUtility:
     """
 
     def __init__(self, secret_key: bytes):
-        self.box = nacl.secret.SecretBox(secret_key)
+        try:
+            self.box = nacl.secret.SecretBox(secret_key)
+        except nacl.exceptions.TypeError as ex:
+            raise ValueError("Invalid secret key") from ex
 
     @classmethod
     def from_b64_encoded_secret_key(cls, encoded_secret_key: str):
-        secret_key = base64.b64decode(encoded_secret_key)
+        try:
+            secret_key = base64.b64decode(encoded_secret_key)
+        except binascii.Error as ex:
+            raise ValueError("Invalid base64 encoding") from ex
         return cls(secret_key=secret_key)
 
     @endecryptor_observer.wrap({"operation": "encrypt"})

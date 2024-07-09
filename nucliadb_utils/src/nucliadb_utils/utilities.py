@@ -20,14 +20,11 @@
 from __future__ import annotations
 
 import asyncio
-import binascii
 import hashlib
 import logging
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
-
-import nacl
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import featureflagging
@@ -422,7 +419,9 @@ def get_endecryptor() -> EndecryptorUtility:
         raise ConfigurationError("Encryption secret key not configured")
     try:
         util = EndecryptorUtility.from_b64_encoded_secret_key(encryption_settings.encryption_secret_key)
-    except (nacl.exceptions.TypeError, binascii.Error):
-        raise ConfigurationError("Invalid encryption key. Must be a base64 encoded 32-byte string")
+    except ValueError as ex:
+        raise ConfigurationError(
+            "Invalid encryption key. Must be a base64 encoded 32-byte string"
+        ) from ex
     set_utility(Utility.ENDECRYPTOR, util)
     return util
