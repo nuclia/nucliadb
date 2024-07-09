@@ -21,34 +21,40 @@ from uuid import uuid4
 
 import pytest
 
+from nucliadb_utils.encryption import DecryptionDataError, DecryptionError, EndecryptorUtility
 
-@pytest.fixture()
-def encryption_settings():
-    from nucliadb_utils.encryption.settings import settings
 
+def get_encoded_secret_key():
     # Get a 32-bytes random string
     secret_key = uuid4().hex[:32]
     # Encode the secret key in base64
     b64_encoded_secret_key = base64.b64encode(secret_key.encode()).decode()
-    settings.encryption_secret_key = b64_encoded_secret_key
-
-    yield settings
+    return b64_encoded_secret_key
 
 
-async def test_endecryptor(encryption_settings):
-    import nacl.utils
-
-    from nucliadb_utils.encryption import EndecryptorUtility
-
-    endecryptor = EndecryptorUtility(key=base64.b64decode(encryption_settings.encryption_secret_key))
-    message = b"This is a test message"
-    encrypted = await endecryptor.encrypt(message)
-    assert isinstance(encrypted, nacl.utils.EncryptedMessage)
-    decrypted = await endecryptor.decrypt(encrypted)
-    assert decrypted == message
-
+def test_endecryptor():
+    endecryptor = EndecryptorUtility.from_b64_encoded_secret_key(get_encoded_secret_key())
     text = "This is some other text"
-    encrypted_text = await endecryptor.encrypt_text(text)
+    encrypted_text = endecryptor.encrypt(text)
     assert isinstance(encrypted_text, str)
-    decrypted_text = await endecryptor.decrypt_text(encrypted_text)
+
+    decrypted_text = endecryptor.decrypt(encrypted_text)
     assert decrypted_text == text
+
+
+def test_errors():
+    # Encrypt some text with a key
+    key1 = get_encoded_secret_key()
+    endecryptor = EndecryptorUtility.from_b64_encoded_secret_key(key1)
+    text = "This is some other text"
+    encrypted_text = endecryptor.encrypt(text)
+
+    # Should not be able to decrypt with a different key
+    key2 = get_encoded_secret_key()
+    endecryptor = EndecryptorUtility.from_b64_encoded_secret_key(key2)
+    with pytest.raises(DecryptionError):
+        endecryptor.decrypt(encrypted_text)
+
+    # Wrongly formatted encrypted text
+    with pytest.raises(DecryptionDataError):
+        endecryptor.decrypt("wrongly formatted encrypted text")

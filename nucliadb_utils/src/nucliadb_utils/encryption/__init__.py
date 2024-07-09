@@ -17,41 +17,57 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
+import base64
 
 import nacl.secret
 import nacl.utils
+
+from nucliadb_telemetry.metrics import Observer
+
+
+class DecryptionError(Exception): ...
+
+
+class DecryptionDataError(DecryptionError): ...
+
+
+endecryptor_observer = Observer(
+    "endecryptor",
+    error_mappings={
+        "DecryptionError": DecryptionError,
+        "DecryptionDataError": DecryptionDataError,
+    },
+    labels={"operation": ""},
+)
 
 
 class EndecryptorUtility:
     """
     Utility class for encryption and decryption of sensitive data using the nacl library.
-    It uses a thread pool to avoid blocking the event loop.
     """
 
-    def __init__(self, key: bytes, max_thread_pool_size: int = 1):
-        self.box = nacl.secret.SecretBox(key)
-        self.executor = ThreadPoolExecutor(max_workers=max_thread_pool_size)
+    def __init__(self, secret_key: bytes):
+        self.box = nacl.secret.SecretBox(secret_key)
 
-    async def encrypt_text(self, message: str) -> str:
-        message_bytes = message.encode()
-        encrypted = await self.encrypt(message_bytes)
+    @classmethod
+    def from_b64_encoded_secret_key(cls, encoded_secret_key: str):
+        secret_key = base64.b64decode(encoded_secret_key)
+        return cls(secret_key=secret_key)
+
+    @endecryptor_observer.wrap({"operation": "encrypt"})
+    def encrypt(self, text: str) -> str:
+        text_bytes = text.encode()
+        encrypted = self.box.encrypt(text_bytes)
         return encrypted.hex()
 
-    async def encrypt(self, message: bytes) -> nacl.utils.EncryptedMessage:
-        loop = asyncio.get_running_loop()
-        func = self.box.encrypt
-        encrypted = await loop.run_in_executor(self.executor, func, message)
-        return encrypted
-
-    async def decrypt_text(self, encrypted_hex: str) -> str:
-        encrypted = nacl.utils.EncryptedMessage.fromhex(encrypted_hex)
-        decrypted_bytes = await self.decrypt(encrypted)
+    @endecryptor_observer.wrap({"operation": "decrypt"})
+    def decrypt(self, encrypted_text: str) -> str:
+        try:
+            encrypted = nacl.utils.EncryptedMessage.fromhex(encrypted_text)
+        except ValueError as ex:
+            raise DecryptionDataError("Error decrypting the message") from ex
+        try:
+            decrypted_bytes = self.box.decrypt(encrypted)
+        except nacl.exceptions.CryptoError as ex:
+            raise DecryptionError("Error decrypting the message") from ex
         return decrypted_bytes.decode()
-
-    async def decrypt(self, encrypted: nacl.utils.EncryptedMessage) -> bytes:
-        loop = asyncio.get_running_loop()
-        func = self.box.decrypt
-        result_bytes = await loop.run_in_executor(self.executor, func, encrypted)
-        return result_bytes

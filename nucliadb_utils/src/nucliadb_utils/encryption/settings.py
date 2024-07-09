@@ -26,12 +26,13 @@ class EncryptionSettings(BaseSettings):
     encryption_secret_key: Optional[str] = Field(
         default=None,
         title="Encryption Secret Key",
-        description="Secret key used for encryption and decryption of sensitive data in the database. The key must be a 32-byte string, base64 encoded.",
-    )
-    encryption_thread_pool_size: int = Field(
-        default=1,
-        title="Encryption Thread Pool Size",
-        description="Number of threads used for encryption and decryption of sensitive data in the database.",
+        description="""Secret key used for encryption and decryption of sensitive data in the database.
+The key must be a 32-byte string, base64 encoded. You can generate a new key with the following unix command:
+head -c 32 /dev/urandom | base64
+""",
+        examples=[
+            "6TGjSkvX6qkFOo/BJKl5OY1fwJoWnMaSVI7VOJjU07Y=",
+        ],
     )
 
 

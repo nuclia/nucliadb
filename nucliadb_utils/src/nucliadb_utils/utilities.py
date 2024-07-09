@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import asyncio
-import base64
+import binascii
 import hashlib
 import logging
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -416,20 +416,13 @@ def has_feature(
 
 def get_endecryptor() -> EndecryptorUtility:
     util = get_utility(Utility.ENDECRYPTOR)
-    if util is None:
-        if encryption_settings.encryption_secret_key is None:
-            raise ConfigurationError("Encryption secret key not configured")
-        b64_encoded_key = encryption_settings.encryption_secret_key
-        try:
-            decoded_key = base64.b64decode(b64_encoded_key)
-        except Exception:
-            raise ConfigurationError("Invalid encryption key. Must be a base64 encoded 32-byte string")
-        try:
-            util = EndecryptorUtility(
-                decoded_key,
-                max_thread_pool_size=encryption_settings.encryption_thread_pool_size,
-            )
-        except nacl.exceptions.TypeError:
-            raise ConfigurationError("Invalid encryption key. Must be a base64 encoded 32-byte string")
-        set_utility(Utility.ENDECRYPTOR, util)
+    if util is not None:
+        return util
+    if encryption_settings.encryption_secret_key is None:
+        raise ConfigurationError("Encryption secret key not configured")
+    try:
+        util = EndecryptorUtility.from_b64_encoded_secret_key(encryption_settings.encryption_secret_key)
+    except (nacl.exceptions.TypeError, binascii.Error):
+        raise ConfigurationError("Invalid encryption key. Must be a base64 encoded 32-byte string")
+    set_utility(Utility.ENDECRYPTOR, util)
     return util

@@ -97,5 +97,4 @@ data:
 
 {{- if .Values.encryption.secret_key }}
   ENCRYPTION_SECRET_KEY: {{ .Values.encryption.secret_key }}
-  ENCRYPTION_THREAD_POOL_SIZE: {{ .Values.encryption.thread_pool_size | quote }}
 {{- end }}
