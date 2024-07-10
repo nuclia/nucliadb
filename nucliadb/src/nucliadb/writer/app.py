@@ -18,9 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
 import importlib.metadata
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from starlette.middleware import Middleware
@@ -29,10 +27,8 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 
-from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import api as api_v1
-from nucliadb.writer.back_pressure import start_materializer, stop_materializer
 from nucliadb.writer.lifecycle import lifespan
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.utils import (
