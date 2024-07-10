@@ -159,6 +159,12 @@ jobs:
       - name: Run tests
         run: source .venv/bin/activate && make -C nucliadb_sidecar test-cov
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./nucliadb_sidecar/coverage.xml
+          flags: nucliadb_sidecar
+
 
   nucliadb-search-tests:
     name: NucliaDB search tests
@@ -193,6 +199,12 @@ jobs:
 
       - name: Run tests
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./nucliadb/coverage.xml
+          flags: nucliadb-search
 
   node-rust-tests:
     name: Node Rust tests
