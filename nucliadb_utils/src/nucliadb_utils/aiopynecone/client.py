@@ -60,7 +60,6 @@ class PineconeClient:
             logger.warning("Pinecone index not found.", extra={"index_name": name})
             return
         response.raise_for_status()
-        return
 
 
 class PineconeSession:
