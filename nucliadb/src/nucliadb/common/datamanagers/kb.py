@@ -123,3 +123,12 @@ async def get_matryoshka_vector_dimension(
                 },
             )
     return dimension
+
+
+async def get_external_index_provider_metadata(
+    txn: Transaction, *, kbid: str
+) -> Optional[knowledgebox_pb2.StoredExternalIndexProviderMetadata]:
+    kb_config = await get_config(txn, kbid=kbid)
+    if kb_config is None:
+        return None
+    return kb_config.external_index_provider
