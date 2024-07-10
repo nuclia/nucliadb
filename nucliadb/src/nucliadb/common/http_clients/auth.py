@@ -64,4 +64,4 @@ class NucliaAuthHTTPClient:
         async with self.session.get(url, headers=self.headers) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
-            return AuthInfoResponse.parse_raw(resp_text)
+            return AuthInfoResponse.model_validate_json(resp_text)

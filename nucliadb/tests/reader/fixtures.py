@@ -70,9 +70,9 @@ async def reader_api(test_settings_reader: None, local_files):  # type: ignore
 
         return client
 
-    await application.router.startup()
-    yield make_client_fixture
-    await application.router.shutdown()
+    async with application.router.lifespan_context(application):
+        yield make_client_fixture
+
     clear_global_cache()
 
 

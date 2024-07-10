@@ -83,7 +83,7 @@ class TestProcessingHTTPClient:
     async def test_requests(self, client: processing.ProcessingHTTPClient, response):
         response_data = processing.RequestsResults(results=[], cursor=None)
         response.status = 200
-        response.text.return_value = response_data.json()
+        response.text.return_value = response_data.model_dump_json()
 
         assert await client.requests() == response_data
 
@@ -91,7 +91,7 @@ class TestProcessingHTTPClient:
     async def test_pull(self, client: processing.ProcessingHTTPClient, response):
         response_data = processing.PullResponse(status="ok", payload="foobar", msgid="1")
         response.status = 200
-        response.text.return_value = response_data.json()
+        response.text.return_value = response_data.model_dump_json()
 
         assert await client.pull(partition="1") == response_data
 
@@ -99,6 +99,6 @@ class TestProcessingHTTPClient:
     async def test_stats(self, client: processing.ProcessingHTTPClient, response):
         response_data = processing.StatsResponse(incomplete=1, scheduled=1)
         response.status = 200
-        response.text.return_value = response_data.json()
+        response.text.return_value = response_data.model_dump_json()
 
         assert await client.stats("kbid") == response_data

@@ -31,12 +31,11 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 import nucliadb_admin_assets  # type: ignore
-from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
-from nucliadb.standalone.lifecycle import finalize, initialize
+from nucliadb.standalone.lifecycle import lifespan
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_telemetry.fastapi import metrics_endpoint
@@ -100,8 +99,7 @@ def application_factory(settings: Settings) -> FastAPI:
     fastapi_settings = dict(
         debug=running_settings.debug,
         middleware=middleware,
-        on_startup=[initialize],
-        on_shutdown=[finalize],
+        lifespan=lifespan,
         exception_handlers={
             Exception: global_exception_handler,
             ClientDisconnect: client_disconnect_handler,
@@ -153,8 +151,5 @@ def application_factory(settings: Settings) -> FastAPI:
     for route in application.router.routes:
         if isinstance(route, Mount):
             route.app.settings = settings  # type: ignore
-
-    # Inject application context into the fastapi app's state
-    set_app_context(application)
 
     return application

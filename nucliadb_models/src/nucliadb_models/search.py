@@ -127,7 +127,7 @@ class Sort(int, Enum):
 class JsonBaseModel(BaseModel):
     def __str__(self):
         try:
-            return self.json()
+            return self.model_dump_json()
         except Exception:
             # fallback to BaseModel implementation
             return super().__str__()
@@ -1108,7 +1108,10 @@ class ChatRequest(BaseModel):
             raise ValueError("There must be at most one strategy of each type")
 
         # If full_resource or hierarchy strategies is chosen, they must be the only strategy
-        for unique_strategy_name in (RagStrategyName.FULL_RESOURCE, RagStrategyName.HIERARCHY):
+        for unique_strategy_name in (
+            RagStrategyName.FULL_RESOURCE,
+            RagStrategyName.HIERARCHY,
+        ):
             if unique_strategy_name in unique_strategy_names and len(rag_strategies) > 1:
                 raise ValueError(
                     f"If '{unique_strategy_name}' strategy is chosen, it must be the only strategy."
@@ -1381,10 +1384,12 @@ class AskTokens(BaseModel):
 
 class AskTimings(BaseModel):
     generative_first_chunk: Optional[float] = Field(
+        default=None,
         title="Generative first chunk",
         description="Time the LLM took to generate the first chunk of the answer",
     )
     generative_total: Optional[float] = Field(
+        default=None,
         title="Generative total",
         description="Total time the LLM took to generate the answer",
     )

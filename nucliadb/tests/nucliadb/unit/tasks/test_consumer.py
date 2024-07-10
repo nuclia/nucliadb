@@ -60,7 +60,7 @@ class TestSubscriptionWorker:
 
     @pytest.fixture(scope="function")
     def msg(self, task_message):
-        data = task_message.json().encode("utf-8")
+        data = task_message.model_dump_json().encode("utf-8")
         msg = MagicMock()
         msg.data = data
         msg.ack = AsyncMock()

@@ -66,7 +66,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
             conversations={
                 "faq": InputConversationField(messages=messages),
             },
-        ).json(by_alias=True),
+        ).model_dump_json(by_alias=True),
     )
 
     assert resp.status_code == 201
@@ -81,7 +81,7 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
             content=InputMessageContent(text="42"),
             ident="computer",
             type=MessageType.ANSWER.value,
-        ).json(by_alias=True)
+        ).model_dump_json(by_alias=True)
         + "]",
     )
 

@@ -182,7 +182,7 @@ class ProcessingHTTPClient:
         async with self.session.get(url, headers=self.headers, params=params) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
-            return PullResponse.parse_raw(resp_text)
+            return PullResponse.model_validate_json(resp_text)
 
     async def pull_position(self, partition: str) -> int:
         url = self.base_url + "/pull/position"
@@ -190,7 +190,7 @@ class ProcessingHTTPClient:
         async with self.session.get(url, headers=self.headers, params=params) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
-            data = PullPosition.parse_raw(resp_text)
+            data = PullPosition.model_validate_json(resp_text)
             return data.cursor
 
     async def requests(
@@ -212,7 +212,7 @@ class ProcessingHTTPClient:
         async with self.session.get(url, headers=self.headers, params=params) as resp:
             resp_text = await resp.text()
             check_status(resp, resp_text)
-            return RequestsResults.parse_raw(resp_text)
+            return RequestsResults.model_validate_json(resp_text)
 
     async def stats(self, kbid: str, timeout: Optional[float] = 1.0) -> StatsResponse:
         url = self.base_url + "/stats"

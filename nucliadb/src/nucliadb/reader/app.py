@@ -27,10 +27,9 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.common.context.fastapi import set_app_context
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_v1
-from nucliadb.reader.lifecycle import finalize, initialize
+from nucliadb.reader.lifecycle import lifespan
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.utils import (
     client_disconnect_handler,
@@ -68,14 +67,10 @@ middleware.extend(
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
-on_startup = [initialize]
-on_shutdown = [finalize]
-
 fastapi_settings = dict(
     debug=running_settings.debug,
     middleware=middleware,
-    on_startup=on_startup,
-    on_shutdown=on_shutdown,
+    lifespan=lifespan,
     exception_handlers={
         Exception: global_exception_handler,
         ClientDisconnect: client_disconnect_handler,
@@ -105,7 +100,7 @@ def create_application() -> FastAPI:
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
 
-    # Inject application context into the fastapi app's state
-    set_app_context(application)
+    # # Inject application context into the fastapi app's state
+    # set_app_context(application)
 
     return application

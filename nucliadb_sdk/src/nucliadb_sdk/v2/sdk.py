@@ -282,7 +282,7 @@ def _request_builder(
                     if not isinstance(content, request_type):  # type: ignore
                         raise TypeError(f"Expected {request_type}, got {type(content)}")
                     else:
-                        data = content.json(by_alias=True)
+                        data = content.model_dump_json(by_alias=True)
                 except TypeError:
                     if not isinstance(content, list):
                         raise
@@ -293,7 +293,7 @@ def _request_builder(
                 for key in list(kwargs.keys()):
                     if key in request_type.model_fields:  # type: ignore
                         content_data[key] = kwargs.pop(key)
-                data = request_type.model_validate(content_data).json(by_alias=True)  # type: ignore
+                data = request_type.model_validate(content_data).model_dump_json(by_alias=True)  # type: ignore
         elif is_raw_request_content(content):
             raw_content = content
 
