@@ -38,7 +38,7 @@ async def inject_app_context(app: FastAPI):
             route.app.state.context = context
 
     await context.initialize()
-    yield
+    yield context
     await context.finalize()
 
 
