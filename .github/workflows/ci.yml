@@ -366,3 +366,9 @@ jobs:
     steps:
       - name: CI passed
         run: echo "CI passed"
+
+  deploy:
+    name: Trigger deploy
+    # needs:
+    #   - ci-passed
+    uses: ./.github/workflows/deploy.yml
