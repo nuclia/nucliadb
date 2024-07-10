@@ -29,6 +29,6 @@ async def test_str_model():
 
 
 async def test_str_model_fallback():
-    with patch.object(ResourceSearchResults, "json", side_effect=Exception("ERROR")):
+    with patch.object(ResourceSearchResults, "model_dump_json", side_effect=Exception("ERROR")):
         res = await merge_paragraphs_results([], 1, 1, "kbid", [], [], [], False, 1)
         assert "sentences=None" in str(res)
