@@ -504,14 +504,10 @@ class KnowledgeBox:
         )
         api_key = request.pinecone_config.api_key
         pinecone = get_pinecone_session().get_client(api_key=api_key)
-        print("EEEEEEP")
-        print("index_name", index_name)
-        print("vector_dimension", vector_dimension)
         index_host = await pinecone.create_index(
             name=index_name,
             dimension=vector_dimension,
         )
-        # Store the api key encrypted
         endecryptor = get_endecryptor()
         encrypted_api_key = endecryptor.encrypt(api_key)
         metadata.pinecone_config.encrypted_api_key = encrypted_api_key
