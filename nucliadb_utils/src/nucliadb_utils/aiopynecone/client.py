@@ -52,7 +52,7 @@ class PineconeClient:
         response_json = response.json()
         return response_json["host"]
 
-    @pinecone_observer.wrap({"type": "create_index"})
+    @pinecone_observer.wrap({"type": "delete_index"})
     async def delete_index(self, name: str) -> None:
         headers = {"Api-Key": self.api_key}
         response = await self.session.delete(f"/indexes/{name}", headers=headers)
