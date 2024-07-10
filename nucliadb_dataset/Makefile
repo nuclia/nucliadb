@@ -20,4 +20,8 @@ lint:
 
 .PHONY: test
 test:
+	pytest -rfE -s --tb=native -v
+
+.PHONY: test-cov
+test-cov:
 	pytest -rfE --cov=nucliadb_dataset -s --tb=native -v --cov-report xml --cov-append tests
