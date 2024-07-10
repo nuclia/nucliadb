@@ -51,7 +51,6 @@ env:
   GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 
 jobs:
-
   build-img:
     name: Build image
     runs-on: ubuntu-latest
@@ -109,3 +108,4 @@ jobs:
         with:
           imageid: ${{ steps.build-image.outputs.imageid }}
           image-name: ${{ inputs.image-name }}
+          aws-ecr-role: ${{ secrets.AWS_ECR_ROLE }}

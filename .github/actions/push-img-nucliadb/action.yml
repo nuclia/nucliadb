@@ -9,13 +9,10 @@ inputs:
     description: "Image ID"
     type: string
     required: true
-outputs:
-  imageid:
-    value: ${{ jobs.build-img.outputs.imageid }}
-  digest:
-    value: ${{ jobs.build-img.outputs.digest }}
-  metadata:
-    value: ${{ jobs.build-img.outputs.metadata }}
+  aws-ecr-role:
+    description: "AWS ECR role"
+    type: string
+    required: true
 
 permissions:
   id-token: write   # This is required for requesting the JWT
@@ -30,6 +27,7 @@ runs:
   steps:
     - name: Calculate short sha
       id: env-vars
+      shell: bash
       run: |-
         HASH=$(git rev-parse --short HEAD)
         BRANCH=${GITHUB_REF##*/}
@@ -54,7 +52,7 @@ runs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        role-to-assume: "${{ secrets.AWS_ECR_ROLE }}"
+        role-to-assume: "${{ inputs.aws-ecr-role }}"
         aws-region: us-east-2
 
     - name: Login to Amazon ECR
@@ -86,6 +84,7 @@ runs:
           ${{ env.REGISTRY }}/${{ inputs.image-name }}:latest
 
     - name: Info about failing to push to ECR
+      shell: bash
       run: |
         msg='If this is the first time pushing this image to ECR, please verify that the repository exists.'
         echo "::error title=Failure to push to ECR::${msg}"

@@ -27,10 +27,10 @@ jobs:
         with:
           imageid: ${{ steps.build-image.outputs.imageid }}
           image-name: nucliadb_node
+          aws-ecr-role: ${{ secrets.AWS_ECR_ROLE }}
 
   build-python-images:
     name: Build Python images
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
