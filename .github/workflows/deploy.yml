@@ -7,6 +7,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+
 jobs:
   build-node-image:
     name: Build node image
@@ -31,7 +35,7 @@ jobs:
           GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
         with:
           imageid: ${{ steps.build-image.outputs.imageid }}
-          image-name: nucliadb_node
+          image-name: node
           aws-ecr-role: ${{ secrets.AWS_ECR_ROLE }}
 
   build-python-images:
@@ -77,8 +81,8 @@ jobs:
       - name: Set helm package image
         id: version_step
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#$node:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
-          sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#$node_sidecar:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#IMAGE_TO_REPLACE#node:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#node_sidecar:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_node/values.yaml
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
@@ -115,6 +119,8 @@ jobs:
     needs:
       - build-python-images
     strategy:
+      # nucliadb_deploy pipeline has issues with too many parallel invocations
+      max-parallel: 1
       fail-fast: false
       matrix:
         component:

@@ -369,6 +369,7 @@ jobs:
 
   deploy:
     name: Trigger deploy
+    if: github.event_name == 'push'
     needs:
       - ci-passed
     uses: ./.github/workflows/deploy.yml
