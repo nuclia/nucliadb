@@ -369,6 +369,7 @@ jobs:
 
   deploy:
     name: Trigger deploy
-    # needs:
-    #   - ci-passed
+    needs:
+      - ci-passed
     uses: ./.github/workflows/deploy.yml
+    secrets: inherit

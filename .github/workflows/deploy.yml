@@ -12,6 +12,8 @@ jobs:
     name: Build node image
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
       - name: Restore binaries
         uses: actions/cache/restore@v4
         with:
@@ -24,6 +26,9 @@ jobs:
       - name: Push image
         id: push-image
         uses: ./.github/actions/push-img-nucliadb
+        env:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+          GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
         with:
           imageid: ${{ steps.build-image.outputs.imageid }}
           image-name: nucliadb_node
@@ -37,7 +42,7 @@ jobs:
           - file: Dockerfile
             image-name: nucliadb_hosted
           - file: Dockerfile.node_sidecar
-            image-name: nucliadb_sidecar
+            image-name: node_sidecar
     uses: ./.github/workflows/_build-img-nucliadb.yml
     with:
       file: ${{ matrix.file }}
@@ -72,8 +77,8 @@ jobs:
       - name: Set helm package image
         id: version_step
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
-          sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#IMAGE_TO_REPLACE#$node:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#$node_sidecar:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_node/values.yaml
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
@@ -96,13 +101,13 @@ jobs:
           helm package charts/nucliadb_node
           curl --data-binary "@nucliadb_node-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
-      # - name: Repository Dispatch
-      #   uses: peter-evans/repository-dispatch@v2
-      #   with:
-      #     token: ${{ steps.app-token.outputs.token }}
-      #     repository: nuclia/nucliadb_deploy
-      #     event-type: promote
-      #     client-payload: '{"component": "nucliadb_node", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: nuclia/nucliadb_deploy
+          event-type: promote
+          client-payload: '{"component": "nucliadb_node", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
 
   deploy-nucliadb-component:
     name: Deploy NucliaDB component
@@ -162,10 +167,10 @@ jobs:
           helm package charts/nucliadb_${{ matrix.component }}
           curl --data-binary "@nucliadb_${{ matrix.component }}-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
-      # - name: Repository Dispatch
-      #   uses: peter-evans/repository-dispatch@v2
-      #   with:
-      #     token: ${{ steps.app-token.outputs.token }}
-      #     repository: nuclia/nucliadb_deploy
-      #     event-type: promote
-      #     client-payload: '{"component": "nucliadb_${{ matrix.component }}", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: nuclia/nucliadb_deploy
+          event-type: promote
+          client-payload: '{"component": "nucliadb_${{ matrix.component }}", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
