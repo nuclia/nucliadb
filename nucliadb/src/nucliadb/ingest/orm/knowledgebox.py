@@ -527,7 +527,12 @@ class KnowledgeBox:
         endecryptor = get_endecryptor()
         api_key = endecryptor.decrypt(encrypted_api_key)
         pinecone = get_pinecone_session().get_client(api_key=api_key)
-        await pinecone.delete_index(name=index_name)
+        try:
+            await pinecone.delete_index(name=index_name)
+        except Exception:
+            logger.exception(
+                "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
+            )
 
 
 def release_channel_for_kb(
