@@ -185,6 +185,7 @@ impl Reader {
             } => dimension == query.len(),
         };
         if !valid_dims {
+            println!("Inconsistent dimension, stored {:?}, query {}", self.config, query.len());
             return Err(VectorErr::InconsistentDimensions);
         }
 
