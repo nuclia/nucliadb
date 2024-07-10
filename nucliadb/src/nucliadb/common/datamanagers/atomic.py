@@ -81,6 +81,7 @@ def rw_txn_wrap(fun: P) -> P:  # type: ignore
 
 class cluster:
     get_current_active_shard = ro_txn_wrap(cluster_dm.get_current_active_shard)
+    get_kb_shards = ro_txn_wrap(cluster_dm.get_kb_shards)
 
 
 class kb:

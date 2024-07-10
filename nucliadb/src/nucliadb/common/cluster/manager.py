@@ -125,13 +125,12 @@ def remove_index_node(node_id: str, primary_id: Optional[str] = None) -> None:
 class KBShardManager:
     # TODO: move to data manager
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        async with datamanagers.with_ro_transaction() as txn:
-            result = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-            if result is None:
-                # could be None because /shards doesn't exist, or beacause the
-                # whole KB does not exist. In any case, this should not happen
-                raise ShardsNotFound(kbid)
-            return result
+        kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
+        if kb_shards is None:
+            # could be None because /shards doesn't exist, or beacause the
+            # whole KB does not exist. In any case, this should not happen
+            raise ShardsNotFound(kbid)
+        return kb_shards
 
     # TODO: move to data manager
     async def get_shards_by_kbid(self, kbid: str) -> list[writer_pb2.ShardObject]:
