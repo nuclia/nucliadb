@@ -33,10 +33,6 @@ pinecone_observer = Observer(
 BASE_URL = "https://api.pinecone.io/"
 
 
-# Singleton to avoid creating multiple http sessions
-_SESSION = None
-
-
 class PineconeClient:
     def __init__(self, api_key: str, http_session: httpx.AsyncClient):
         self.api_key = api_key
@@ -69,7 +65,7 @@ class PineconeClient:
 
 class PineconeSession:
     """
-    Wrapper that manages the session around all Pinecone http api interactions.
+    Wrapper that manages the singletone session around all Pinecone http api interactions.
     """
 
     def __init__(self):
@@ -86,22 +82,3 @@ class PineconeSession:
 
     def get_client(self, api_key: str) -> PineconeClient:
         return PineconeClient(api_key=api_key, http_session=self.http_session)
-
-
-def get_session():
-    global _SESSION
-    if _SESSION is None:
-        _SESSION = PineconeSession()
-    return _SESSION
-
-
-async def finalize_session():
-    global _SESSION
-    if _SESSION is not None:
-        await _SESSION.finalize()
-        _SESSION = None
-
-
-def get_client(api_key: str) -> PineconeClient:
-    session = get_session()
-    return session.get_client(api_key)

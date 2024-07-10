@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import featureflagging
+from nucliadb_utils.aiopynecone.client import PineconeSession
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -81,6 +82,7 @@ class Utility(str, Enum):
     NUCLIA_STORAGE = "nuclia_storage"
     MAINDB_DRIVER = "driver"
     ENDECRYPTOR = "endecryptor"
+    PINECONE_SESSION = "pinecone_session"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -424,4 +426,13 @@ def get_endecryptor() -> EndecryptorUtility:
             "Invalid encryption key. Must be a base64 encoded 32-byte string"
         ) from ex
     set_utility(Utility.ENDECRYPTOR, util)
+    return util
+
+
+def get_pinecone_session() -> Any:
+    util = get_utility(Utility.PINECONE_SESSION)
+    if util is not None:
+        return util
+    util = PineconeSession()
+    set_utility(Utility.PINECONE_SESSION, util)
     return util
