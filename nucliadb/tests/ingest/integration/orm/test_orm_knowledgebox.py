@@ -306,7 +306,7 @@ async def test_knowledgebox_delete_all_kb_keys(
                 await datamanagers.resources.get_resource_uuid_from_slug(
                     kb_obj.txn, kbid=kbid, slug=slug
                 )
-                == rid
+                is None
             )
 
 
