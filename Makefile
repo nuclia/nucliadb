@@ -110,7 +110,7 @@ build-base-node-image-scratch:
 	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/private/node:latest -f Dockerfile.node_local .
 
 build-sidecar:
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/private/node_sidecar:latest -f Dockerfile.node_sidecar .
+	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node_sidecar:latest -f Dockerfile.node_sidecar .
 
 
 debug-test-nucliadb:

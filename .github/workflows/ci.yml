@@ -250,7 +250,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ./coverage.xml
+          file: ./nucliadb/coverage.xml
           flags: nucliadb
 
 
@@ -334,3 +334,23 @@ jobs:
         with:
           file: ./${{ matrix.package }}/coverage.xml
           flags: ${{ matrix.package }}
+
+  # Depends on all tests to pass
+  ci-passed:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs:
+      - format-rust
+      - clippy-rust
+      - updated-protos
+      - pre-checks-python
+      - licenses
+      - sidecar-tests
+      - nucliadb-search-tests
+      - node-rust-tests
+      - nucliadb-tests
+      - nucliadb-components-tests
+      - python-packages-tests
+    steps:
+      - name: CI passed
+        run: echo "CI passed"
