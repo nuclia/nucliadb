@@ -4,8 +4,8 @@ on:
   workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: deploy_workflow
+  cancel-in-progress: false
 
 permissions:
   id-token: write   # This is required for requesting the JWT

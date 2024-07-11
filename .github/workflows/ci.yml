@@ -384,3 +384,11 @@ jobs:
       - ci-passed
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
+
+  release:
+    name: Trigger release
+    if: github.event_name == 'push'
+    needs:
+      - ci-passed
+    uses: ./.github/workflows/release.yml
+    secrets: inherit
