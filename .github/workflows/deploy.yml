@@ -85,7 +85,7 @@ jobs:
           sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#node_sidecar:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_node/values.yaml
           VERSION=`cat VERSION`
-          VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
+          VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_node/Chart.yaml
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
@@ -153,7 +153,7 @@ jobs:
           sed -i.bak "s#IMAGE_TO_REPLACE#nucliadb_hosted:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_${{ matrix.component }}/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_${{ matrix.component }}/values.yaml
           VERSION=`cat VERSION`
-          VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
+          VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_${{ matrix.component }}/Chart.yaml
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
