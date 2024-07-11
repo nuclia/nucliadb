@@ -20,6 +20,7 @@
 import asyncio
 import json
 import logging
+import os
 import random
 from typing import Any, AsyncGenerator, Optional
 
@@ -92,15 +93,8 @@ class PineconeDataPlane:
     async def upsert(self, vectors: list[Vector]) -> None:
         headers = {"Api-Key": self.api_key}
         payload = UpsertRequest(vectors=vectors)
-        try:
-            breakpoint()
-            response = await self.session.post(
-                "/vectors/upsert", headers=headers, json=payload.model_dump()
-            )
-            response.raise_for_status()
-        except Exception:
-            breakpoint()
-            pass
+        response = await self.session.post("/vectors/upsert", headers=headers, json=payload.model_dump())
+        response.raise_for_status()
 
     def _guess_upsert_batch_size(self, vectors: list[Vector]) -> int:
         """
@@ -108,7 +102,7 @@ class PineconeDataPlane:
         Make sure the number of vectors in a batch is never bigger than 100.
         """
         if self._upsert_batch_size is None:
-            # Guess and cache it.
+            # Guess the batch size based on the size of the vectors and the estimated metadata size.
             max_batch_size = 100
             max_upsert_payload_size = 2 * 1024 * 1024
             vector_dimension = len(vectors[0].values)
@@ -116,7 +110,7 @@ class PineconeDataPlane:
             for _ in range(20):
                 metadata_sizes.append(len(json.dumps(random.choice(vectors).metadata)))
             average_metadata_size = sum(metadata_sizes) / len(metadata_sizes)
-            vector_size = 4 * vector_dimension + average_metadata_size
+            vector_size = 4 * vector_dimension + average_metadata_size  # 4 bytes per float
             estimated_batch_size = max_upsert_payload_size // vector_size
             self._upsert_batch_size = int(min(estimated_batch_size, max_batch_size))
 
@@ -188,8 +182,13 @@ class PineconeDataPlane:
 
     @pinecone_observer.wrap({"type": "delete_by_id_prefix"})
     async def delete_by_id_prefix(
-        self, id_prefix: str, batch_size: int = 1000, max_parallel_batches: int = 1
+        self, id_prefix: str, batch_size: int = 100, max_parallel_batches: int = 1
     ) -> None:
+        max_batch_size = 100
+        if batch_size > max_batch_size:
+            logger.warning(f"Batch size {batch_size} is too large. Limiting to {max_batch_size}.")
+            batch_size = max_batch_size
+
         semaphore = asyncio.Semaphore(max_parallel_batches)
 
         async def _delete_batch(batch):
@@ -295,8 +294,8 @@ async def main():
     import random
     import time
 
-    API_KEY = "229b613e-22ec-4903-a5b4-37691f3f2158"
-    INDEX_HOST = "testing-i7gbo8a.svc.aped-4627-b74a.pinecone.io"
+    API_KEY = os.environ.get("PINECONE_API_KEY")
+    INDEX_HOST = os.environ.get("PINECONE_INDEX_HOST")
     DIMENSION = 1024
 
     session = PineconeSession()
@@ -336,8 +335,7 @@ async def main():
     start = time.time()
     for resource, vectors in all_vectors.items():
         inner_start = time.time()
-        breakpoint()
-        await client.upsert_in_batches(vectors, batch_size=100, max_parallel_batches=10)
+        await client.upsert_in_batches(vectors, max_parallel_batches=10)
         inner_end = time.time()
         print(f"Upserted {len(vectors)} vectors in {inner_end - inner_start:.2f} seconds.")
     end = time.time()
@@ -347,7 +345,7 @@ async def main():
     start = time.time()
     for i in range(resources):
         prefix = f"resource_{i}"
-        await client.delete_by_id_prefix(prefix, batch_size=1000, max_parallel_batches=10)
+        await client.delete_by_id_prefix(prefix, max_parallel_batches=10)
     end = time.time()
     print(f"Deleted {total_vectors} vectors in {end - start:.2f} seconds.")
 
