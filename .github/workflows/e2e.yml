@@ -59,7 +59,7 @@ jobs:
 
       - name: Build and push image
         run: |
-          docker build -t localhost:32000/nucliadb:test .
+          docker build -t localhost:32000/nucliadb:test . -f Dockerfile.withbinding
           docker push localhost:32000/nucliadb:test
 
       - name: Install NucliaDB with Helm
