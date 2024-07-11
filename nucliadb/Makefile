@@ -72,7 +72,7 @@ test-%:
 
 test-cov-%:
 	$(PYTEST) \
-		--cov=nucliadb.$* \
+		--cov=nucliadb \
 		--cov-config=../.coveragerc \
 		--cov-report xml \
 		--cov-report term-missing:skip-covered \

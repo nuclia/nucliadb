@@ -1,9 +1,7 @@
 name: PyPI and Helm Releases
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
 
 jobs:
   build_wheels:
@@ -64,14 +62,6 @@ jobs:
 
       - name: Build wheels
         run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry ./nucliadb_dataset/ ./nucliadb/
-
-      - name: Wait for nucliadb tests
-        uses: lewagon/wait-on-check-action@v1.3.1
-        with:
-          ref: main
-          check-name: CI passed
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
 
       - name: Upload to pypi
         run: twine upload --verbose dist/*
