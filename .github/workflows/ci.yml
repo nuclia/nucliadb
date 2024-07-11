@@ -164,6 +164,8 @@ jobs:
         with:
           file: ./nucliadb_sidecar/coverage.xml
           flags: nucliadb_sidecar
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 
   nucliadb-search-tests:
@@ -205,6 +207,8 @@ jobs:
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb-search
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   node-rust-tests:
     name: Node Rust tests
@@ -264,6 +268,8 @@ jobs:
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 
   nucliadb-components-tests:
@@ -305,6 +311,8 @@ jobs:
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb-${{ matrix.component }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 
   python-packages-tests:
@@ -346,6 +354,8 @@ jobs:
         with:
           file: ./${{ matrix.package }}/coverage.xml
           flags: ${{ matrix.package }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Depends on all tests to pass
   ci-passed:
