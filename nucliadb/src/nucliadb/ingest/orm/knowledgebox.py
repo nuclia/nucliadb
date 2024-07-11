@@ -47,13 +47,25 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2, utils_pb2, writer_pb2
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import (
+    CreateExternalIndexProviderMetadata,
+    ExternalIndexProviderType,
+    KnowledgeBoxConfig,
+    SemanticModelMetadata,
+    StoredExternalIndexProviderMetadata,
+)
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_utils import const
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_audit, get_storage, has_feature
+from nucliadb_utils.utilities import (
+    get_audit,
+    get_endecryptor,
+    get_pinecone_session,
+    get_storage,
+    has_feature,
+)
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
 KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
@@ -94,6 +106,7 @@ class KnowledgeBox:
         semantic_model: Optional[SemanticModelMetadata] = None,
         semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
         release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
+        external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
@@ -126,16 +139,7 @@ class KnowledgeBox:
                     raise KnowledgeBoxConflict()
 
                 # Create in maindb
-
                 await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
-
-                config = KnowledgeBoxConfig(
-                    title=title,
-                    description=description,
-                    slug=slug,
-                    migration_version=get_latest_version(),
-                )
-                await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
 
                 # all KBs have the vectorset key initialized, although (for
                 # now), not every KB will store vectorsets there
@@ -146,7 +150,6 @@ class KnowledgeBox:
                 # B/c with Shards.actual
                 kb_shards.actual = -1
                 kb_shards.release_channel = release_channel
-
                 if semantic_model is not None:
                     # bw/c we keep populating the deprecated fields for KBs with
                     # only one vectorset
@@ -159,8 +162,20 @@ class KnowledgeBox:
                         )
                     kb_shards.similarity = semantic_model.similarity_function
                     kb_shards.model.CopyFrom(semantic_model)
-
+                    stored_external_index_provider = await cls._maybe_create_external_index(
+                        kbid,
+                        request=external_index_provider,
+                        vector_dimension=semantic_model.vector_dimension,
+                    )
                 else:
+                    stored_external_index_provider = StoredExternalIndexProviderMetadata(
+                        type=external_index_provider.type
+                    )
+                    if external_index_provider.type != ExternalIndexProviderType.UNSET:
+                        raise KnowledgeBoxCreationError(
+                            "External index provider is only supported with a single semantic model for now"
+                        )
+
                     for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                         # if this KB uses a matryoshka model, we can choose a different
                         # dimension
@@ -168,7 +183,6 @@ class KnowledgeBox:
                             dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
                         else:
                             dimension = semantic_model.vector_dimension
-
                         vectorset_config = knowledgebox_pb2.VectorSetConfig(
                             vectorset_id=vectorset_id,
                             vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
@@ -181,7 +195,14 @@ class KnowledgeBox:
                             matryoshka_dimensions=semantic_model.matryoshka_dimensions,
                         )
                         await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
-
+                config = KnowledgeBoxConfig(
+                    title=title,
+                    description=description,
+                    slug=slug,
+                    migration_version=get_latest_version(),
+                    external_index_provider=stored_external_index_provider,
+                )
+                await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
                 await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 
                 # shard creation will alter this value on maindb, make sure nobody
@@ -263,7 +284,6 @@ class KnowledgeBox:
                 return
 
             # Delete main anchor
-
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is not None:
                 slug = kb_config.slug
@@ -277,6 +297,9 @@ class KnowledgeBox:
             await txn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
 
             await txn.commit()
+
+        if kb_config is not None:
+            await cls._maybe_delete_external_index(kbid, kb_config.external_index_provider)
 
         audit_util = get_audit()
         if audit_util is not None:
@@ -462,6 +485,54 @@ class KnowledgeBox:
         await self.txn.set(KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b"")
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
+
+    @classmethod
+    async def _maybe_create_external_index(
+        cls,
+        kbid: str,
+        request: CreateExternalIndexProviderMetadata,
+        vector_dimension: int,
+    ) -> StoredExternalIndexProviderMetadata:
+        metadata = StoredExternalIndexProviderMetadata(type=request.type)
+        if request.type != ExternalIndexProviderType.PINECONE:
+            return metadata
+
+        index_name = f"{kbid}_default"
+        logger.info(
+            "Creating pincone index",
+            extra={"kbid": kbid, "index_name": index_name, "vector_dimension": vector_dimension},
+        )
+        api_key = request.pinecone_config.api_key
+        pinecone = get_pinecone_session().get_client(api_key=api_key)
+        index_host = await pinecone.create_index(
+            name=index_name,
+            dimension=vector_dimension,
+        )
+        endecryptor = get_endecryptor()
+        encrypted_api_key = endecryptor.encrypt(api_key)
+        metadata.pinecone_config.encrypted_api_key = encrypted_api_key
+        metadata.pinecone_config.index_hosts[index_name] = index_host
+        return metadata
+
+    @classmethod
+    async def _maybe_delete_external_index(
+        cls, kbid: str, external_index_provider: StoredExternalIndexProviderMetadata
+    ):
+        if external_index_provider.type != ExternalIndexProviderType.PINECONE:
+            return
+
+        index_name = f"{kbid}_default"
+        logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
+        encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
+        endecryptor = get_endecryptor()
+        api_key = endecryptor.decrypt(encrypted_api_key)
+        pinecone = get_pinecone_session().get_client(api_key=api_key)
+        try:
+            await pinecone.delete_index(name=index_name)
+        except Exception:
+            logger.exception(
+                "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
+            )
 
 
 def release_channel_for_kb(

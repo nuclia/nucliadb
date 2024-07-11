@@ -39,6 +39,8 @@ from nucliadb_protos.audit_pb2 import (
 )
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
+    CreateExternalIndexProviderMetadata as CreateExternalIndexProviderMetadata,
+    CreatePineconeConfig as CreatePineconeConfig,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
@@ -47,6 +49,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
+    ExternalIndexProviderType as ExternalIndexProviderType,
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
@@ -60,9 +63,13 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NOTFOUND as NOTFOUND,
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
+    PINECONE as PINECONE,
     SemanticModelMetadata as SemanticModelMetadata,
+    StoredExternalIndexProviderMetadata as StoredExternalIndexProviderMetadata,
+    StoredPineconeConfig as StoredPineconeConfig,
     Synonyms as Synonyms,
     TermSynonyms as TermSynonyms,
+    UNSET as UNSET,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
     VectorSet as VectorSet,
     VectorSetConfig as VectorSetConfig,
@@ -1673,12 +1680,15 @@ class NewKnowledgeBoxV2Request(google.protobuf.message.Message):
     TITLE_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     VECTORSETS_FIELD_NUMBER: builtins.int
+    EXTERNAL_INDEX_PROVIDER_FIELD_NUMBER: builtins.int
     kbid: builtins.str
     slug: builtins.str
     title: builtins.str
     description: builtins.str
     @property
     def vectorsets(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NewKnowledgeBoxV2Request.VectorSet]: ...
+    @property
+    def external_index_provider(self) -> nucliadb_protos.knowledgebox_pb2.CreateExternalIndexProviderMetadata: ...
     def __init__(
         self,
         *,
@@ -1687,8 +1697,10 @@ class NewKnowledgeBoxV2Request(google.protobuf.message.Message):
         title: builtins.str = ...,
         description: builtins.str = ...,
         vectorsets: collections.abc.Iterable[global___NewKnowledgeBoxV2Request.VectorSet] | None = ...,
+        external_index_provider: nucliadb_protos.knowledgebox_pb2.CreateExternalIndexProviderMetadata | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["description", b"description", "kbid", b"kbid", "slug", b"slug", "title", b"title", "vectorsets", b"vectorsets"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["external_index_provider", b"external_index_provider"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "external_index_provider", b"external_index_provider", "kbid", b"kbid", "slug", b"slug", "title", b"title", "vectorsets", b"vectorsets"]) -> None: ...
 
 global___NewKnowledgeBoxV2Request = NewKnowledgeBoxV2Request
 

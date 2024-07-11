@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
 import logging
 import os
 import tempfile
@@ -126,7 +127,21 @@ def tmpdir():
 
 
 @pytest.fixture(scope="function")
+def endecryptor_settings():
+    from nucliadb_utils.encryption.settings import settings
+
+    secret_key = os.urandom(32)
+    encoded_secret_key = base64.b64encode(secret_key).decode("utf-8")
+    settings.encryption_secret_key = encoded_secret_key
+
+    yield
+
+    settings.encryption_secret_key = None
+
+
+@pytest.fixture(scope="function")
 async def nucliadb(
+    endecryptor_settings,
     dummy_processing,
     analytics_disabled,
     maindb_settings,

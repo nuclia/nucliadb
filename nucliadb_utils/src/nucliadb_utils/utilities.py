@@ -429,7 +429,7 @@ def get_endecryptor() -> EndecryptorUtility:
     return util
 
 
-def get_pinecone_session() -> Any:
+def get_pinecone_session() -> PineconeSession:
     util = get_utility(Utility.PINECONE_SESSION)
     if util is not None:
         return util

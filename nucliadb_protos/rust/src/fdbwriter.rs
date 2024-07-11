@@ -1257,6 +1257,10 @@ pub struct NewKnowledgeBoxV2Request {
     pub description: ::prost::alloc::string::String,
     #[prost(message, repeated, tag = "5")]
     pub vectorsets: ::prost::alloc::vec::Vec<new_knowledge_box_v2_request::VectorSet>,
+    #[prost(message, optional, tag = "6")]
+    pub external_index_provider: ::core::option::Option<
+        super::knowledgebox::CreateExternalIndexProviderMetadata,
+    >,
 }
 /// Nested message and enum types in `NewKnowledgeBoxV2Request`.
 pub mod new_knowledge_box_v2_request {

@@ -7,6 +7,60 @@ pub struct KnowledgeBoxId {
     #[prost(string, tag = "2")]
     pub uuid: ::prost::alloc::string::String,
 }
+/// Pinecone
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreatePineconeConfig {
+    #[prost(string, tag = "1")]
+    pub api_key: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoredPineconeConfig {
+    #[prost(string, tag = "1")]
+    pub encrypted_api_key: ::prost::alloc::string::String,
+    /// Index name to index host mapping.
+    #[prost(map = "string, string", tag = "2")]
+    pub index_hosts: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+}
+/// External Index node provider
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateExternalIndexProviderMetadata {
+    #[prost(enumeration = "ExternalIndexProviderType", tag = "1")]
+    pub r#type: i32,
+    #[prost(oneof = "create_external_index_provider_metadata::Config", tags = "2")]
+    pub config: ::core::option::Option<create_external_index_provider_metadata::Config>,
+}
+/// Nested message and enum types in `CreateExternalIndexProviderMetadata`.
+pub mod create_external_index_provider_metadata {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Config {
+        #[prost(message, tag = "2")]
+        PineconeConfig(super::CreatePineconeConfig),
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoredExternalIndexProviderMetadata {
+    #[prost(enumeration = "ExternalIndexProviderType", tag = "1")]
+    pub r#type: i32,
+    #[prost(oneof = "stored_external_index_provider_metadata::Config", tags = "2")]
+    pub config: ::core::option::Option<stored_external_index_provider_metadata::Config>,
+}
+/// Nested message and enum types in `StoredExternalIndexProviderMetadata`.
+pub mod stored_external_index_provider_metadata {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Config {
+        #[prost(message, tag = "2")]
+        PineconeConfig(super::StoredPineconeConfig),
+    }
+}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KnowledgeBoxConfig {
@@ -18,6 +72,10 @@ pub struct KnowledgeBoxConfig {
     pub slug: ::prost::alloc::string::String,
     #[prost(int64, tag = "7")]
     pub migration_version: i64,
+    #[prost(message, optional, tag = "9")]
+    pub external_index_provider: ::core::option::Option<
+        StoredExternalIndexProviderMetadata,
+    >,
     #[deprecated]
     #[prost(string, repeated, tag = "3")]
     pub enabled_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
@@ -51,6 +109,10 @@ pub struct KnowledgeBoxNew {
     pub default_min_score: ::core::option::Option<f32>,
     #[prost(uint32, repeated, tag = "9")]
     pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
+    #[prost(message, optional, tag = "10")]
+    pub external_index_provider: ::core::option::Option<
+        CreateExternalIndexProviderMetadata,
+    >,
     /// this field are only used by NucliaDB Writer API when creating a KB. Used
     /// in onprem scenarios
     /// DEPRECATED: onprem don't forward requests to ingest gRPC anymore
@@ -362,6 +424,33 @@ impl KnowledgeBoxResponseStatus {
             "CONFLICT" => Some(Self::Conflict),
             "NOTFOUND" => Some(Self::Notfound),
             "ERROR" => Some(Self::Error),
+            _ => None,
+        }
+    }
+}
+/// External Index node provider
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum ExternalIndexProviderType {
+    Unset = 0,
+    Pinecone = 1,
+}
+impl ExternalIndexProviderType {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            ExternalIndexProviderType::Unset => "UNSET",
+            ExternalIndexProviderType::Pinecone => "PINECONE",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "UNSET" => Some(Self::Unset),
+            "PINECONE" => Some(Self::Pinecone),
             _ => None,
         }
     }

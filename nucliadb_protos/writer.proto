@@ -458,6 +458,8 @@ message NewKnowledgeBoxV2Request {
         repeated uint32 matryoshka_dimensions = 4;
     }
     repeated VectorSet vectorsets = 5;
+
+    knowledgebox.CreateExternalIndexProviderMetadata external_index_provider = 6;
 }
 
 message NewKnowledgeBoxV2Response {

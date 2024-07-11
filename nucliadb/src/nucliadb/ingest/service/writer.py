@@ -121,6 +121,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 description=request.config.description,
                 semantic_model=semantic_model,
                 release_channel=release_channel,
+                external_index_provider=request.external_index_provider,
             )
 
         except KnowledgeBoxConflict:
@@ -176,6 +177,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     )
                     for vs in request.vectorsets
                 },
+                external_index_provider=request.external_index_provider,
             )
 
         except KnowledgeBoxConflict:
