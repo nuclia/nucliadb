@@ -50,6 +50,11 @@ dev = [
     "pytest-xdist>=3.6.1",
     "pdbpp>=0.10.3",
 ]
+sdk = [
+    "-e file:///${PROJECT_ROOT}/nucliadb_sdk#egg=nucliadb-sdk",
+    "-e file:///${PROJECT_ROOT}/nucliadb_dataset#egg=nucliadb-dataset",
+    "requests-mock>=1.12.1",
+]
 
 [tool.setuptools]
 py-modules = []

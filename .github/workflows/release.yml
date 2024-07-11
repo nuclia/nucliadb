@@ -65,44 +65,11 @@ jobs:
       - name: Build wheels
         run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry ./nucliadb_dataset/ ./nucliadb/
 
-      # XXX wait for tests to run successfully in all dependencies before we actually release
-      - name: Wait for utils
-        uses: lewagon/wait-on-check-action@v1.3.1
-        if: steps.component_changes.outputs.nucliadb_utils == 'true'
-        with:
-          ref: main
-          check-name: NucliaDBUtilsTests (3.12)
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-      - name: Wait for sdk tests
-        uses: lewagon/wait-on-check-action@v1.3.1
-        if: steps.component_changes.outputs.nucliadb_sdk == 'true'
-        with:
-          ref: main
-          check-name: NucliaDBSDKTests (3.12)
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-      - name: Wait for dataset tests
-        uses: lewagon/wait-on-check-action@v1.3.1
-        if: steps.component_changes.outputs.nucliadb_dataset == 'true'
-        with:
-          ref: main
-          check-name: NucliaDBDatasetTests (3.12)
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-      - name: Wait for telemetry tests
-        uses: lewagon/wait-on-check-action@v1.3.1
-        if: steps.component_changes.outputs.nucliadb_telemetry == 'true'
-        with:
-          ref: main
-          check-name: NucliaDBTelemetryTests (3.12)
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
       - name: Wait for nucliadb tests
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
           ref: main
-          check-name: NucliaDBTests (3.12, pg)
+          check-name: CI passed
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
 
@@ -111,15 +78,6 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-
-      # failing, disable for now
-      # - name: Run Nuclia SDK tests
-      #   uses: peter-evans/repository-dispatch@v2
-      #   with:
-      #     token: ${{ steps.app-token.outputs.token }}
-      #     repository: nuclia/nuclia.py
-      #     event-type: test-stage
-      #     client-payload: '{"component": "nucliadb", "commit": "${{ github.sha }}", "user": "${{ github.actor }}"}'
 
   push-docker:
     name: Build and push nucliadb docker image
