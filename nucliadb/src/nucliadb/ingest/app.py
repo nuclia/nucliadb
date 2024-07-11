@@ -172,6 +172,22 @@ async def main_subscriber_workers():  # pragma: no cover
     )
 
 
+async def main_pinecone_consumer():  # pragma: no cover
+    finalizers = await initialize()
+
+    context = ApplicationContext("pinecone-index-consumer")
+    await context.initialize()
+
+    metrics_server = await serve_metrics()
+    grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
+    pinecone_consumer_finalizer = await consumer_service.start_pinecone_consumer(context)
+
+    await run_until_exit(
+        [pinecone_consumer_finalizer, metrics_server.shutdown, grpc_health_finalizer, context.finalize]
+        + finalizers
+    )
+
+
 def setup_configuration():  # pragma: no cover
     setup_logging()
     assign_partitions(settings)
@@ -219,3 +235,12 @@ def run_subscriber_workers() -> None:  # pragma: no cover
     """
     setup_configuration()
     asyncio.run(main_subscriber_workers())
+
+
+def run_pinecone_consumer() -> None:  # pragma: no cover
+    """
+    Runs:
+        - Consumer for external index provider
+    """
+    setup_configuration()
+    asyncio.run(main_pinecone_consumer())

@@ -63,6 +63,8 @@ setup(
             "nucliadb-ingest-orm-grpc = nucliadb.ingest.app:run_orm_grpc",
             #   - Subscriber workers: auditing and shard creator
             "nucliadb-ingest-subscriber-workers = nucliadb.ingest.app:run_subscriber_workers",
+            # External index provider consumers
+            "nucliadb-ingest-pinecone-consumer = nucliadb.ingest.app:run_pinecone_consumer",
             # Reader
             "nucliadb-reader = nucliadb.reader.run:run",
             # Writer

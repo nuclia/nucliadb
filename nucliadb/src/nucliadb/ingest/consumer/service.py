@@ -23,9 +23,11 @@ from functools import partial
 from typing import Awaitable, Callable, Optional
 
 from nucliadb.common.cluster import manager
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
+from nucliadb.ingest.consumer.pinecone import PineconeIndexConsumer
 from nucliadb.ingest.consumer.pull import PullWorker
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
@@ -190,3 +192,10 @@ async def start_materializer() -> Callable[[], Awaitable[None]]:
     await materializer.initialize()
 
     return materializer.finalize
+
+
+async def start_pinecone_consumer(context: ApplicationContext) -> Callable[[], Awaitable[None]]:
+    consumer = PineconeIndexConsumer(context)
+    await consumer.initialize()
+
+    return consumer.finalize

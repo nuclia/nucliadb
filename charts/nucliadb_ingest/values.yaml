@@ -118,6 +118,23 @@ ingest_subscriber_workers_autoscaling:
           type: Utilization
           averageUtilization: 75
 
+# ingest-pinecone-consumer settings
+ingest_pinecone_consumer_resources:
+  requests:
+    cpu: "300m"
+    memory: "500Mi"
+ingest_pinecone_consumer_replicaCount: 1
+ingest_pinecone_consumer_autoscaling:
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
 # extra_pod_annotations:
 #   what: "add annotations"
 #   where: "in the pods"
