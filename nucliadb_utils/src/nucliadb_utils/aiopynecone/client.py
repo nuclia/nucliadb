@@ -220,6 +220,9 @@ class DataPlane:
         """
         Delete vectors by their ids.
         Maximum number of ids in a single request is 1000.
+        Params:
+        - `ids`: The ids of the vectors to delete.
+        - `timeout`: to control the request timeout. If not set, the default timeout is used.
         """
         headers = {"Api-Key": self.api_key}
         payload = {"ids": ids}
@@ -248,6 +251,7 @@ class DataPlane:
         - `limit`: to control the number of vectors fetched in each page.
         - `pagination_token`: to fetch the next page. The token is provided in the response
            if there are more pages to fetch.
+        - `timeout`: to control the request timeout. If not set, the default timeout is used.
         """
         headers = {"Api-Key": self.api_key}
         params = {"limit": str(limit)}
@@ -278,6 +282,7 @@ class DataPlane:
         Params:
         - `prefix`: to filter vectors by their id prefix.
         - `page_size`: to control the number of vectors fetched in each page.
+        - `page_timeout`: to control the request timeout for each page. If not set, the default timeout is used.
         """
         pagination_token = None
         while True:
@@ -294,6 +299,8 @@ class DataPlane:
     async def delete_all(self, timeout: Optional[float] = None):
         """
         Delete all vectors in the index.
+        Params:
+        - `timeout`: to control the request timeout. If not set, the default timeout is used.
         """
         headers = {"Api-Key": self.api_key}
         payload = {"deleteAll": True, "ids": [], "namespace": ""}
@@ -327,6 +334,7 @@ class DataPlane:
         - `id_prefix`: to filter vectors by their id prefix.
         - `batch_size`: to control the number of vectors deleted in each batch. Maximum is 1000.
         - `max_parallel_batches`: to control the number of batches sent concurrently.
+        - `batch_timeout`: to control the request timeout for each batch.
         """
         if batch_size > MAX_DELETE_BATCH_SIZE:
             logger.warning(f"Batch size {batch_size} is too large. Limiting to {MAX_DELETE_BATCH_SIZE}.")
@@ -383,6 +391,7 @@ class DataPlane:
         - `include_metadata`: to include the vector metadata in the response.
         - `filter`: to filter the vectors by their metadata. See:
            https://docs.pinecone.io/guides/data/filter-with-metadata#metadata-query-language
+        - `timeout`: to control the request timeout. If not set, the default timeout is used.
         """
         headers = {"Api-Key": self.api_key}
         payload = {
