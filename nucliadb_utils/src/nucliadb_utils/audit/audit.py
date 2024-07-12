@@ -23,7 +23,6 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from nucliadb_protos.audit_pb2 import (
     AuditField,
-    AuditKBCounter,
     AuditRequest,
     ChatContext,
 )
@@ -32,7 +31,7 @@ from nucliadb_protos.resources_pb2 import FieldID
 
 
 class AuditStorage:
-    async def report(
+    def report_and_send(
         self,
         *,
         kbid: str,
@@ -43,12 +42,7 @@ class AuditStorage:
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        kb_counter: Optional[AuditKBCounter] = None,
-        send: bool = False,
     ):
-        raise NotImplementedError
-
-    def report_resources(self, *, kbid: str, resources: int):
         raise NotImplementedError
 
     async def initialize(self):
@@ -57,20 +51,19 @@ class AuditStorage:
     async def finalize(self):
         pass
 
-    async def visited(
+    def visited(
         self,
         kbid: str,
         uuid: str,
         user: str,
         origin: str,
-        send: bool = False,
     ):
         raise NotImplementedError
 
     def send(self, msg: AuditRequest):
         raise NotImplementedError
 
-    async def search(
+    def search(
         self,
         kbid: str,
         user: str,
@@ -79,11 +72,10 @@ class AuditStorage:
         search: SearchRequest,
         timeit: float,
         resources: int,
-        send: bool = False,
     ):
         raise NotImplementedError
 
-    async def chat(
+    def chat(
         self,
         kbid: str,
         user: str,
@@ -97,9 +89,5 @@ class AuditStorage:
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,
-        send: bool = False,
     ):
-        raise NotImplementedError
-
-    async def delete_kb(self, kbid):
         raise NotImplementedError

@@ -22,10 +22,11 @@ import logging
 from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
-from nats.js.client import JetStreamContext
+import nats
 
+from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
     KBSource,
     KbUsage,
@@ -40,29 +41,70 @@ logger = logging.getLogger(__name__)
 
 
 class KbUsageReportUtility:
+    task: Optional[asyncio.Task]
+    initialized: bool
     queue: asyncio.Queue
-    lock: asyncio.Lock
+    service: str
 
     def __init__(
         self,
-        nats_stream: JetStreamContext,
         nats_subject: str,
+        nats_servers: List[str],
+        nats_creds: Optional[str] = None,
         max_queue_size: int = 100,
+        service: str = "",
     ):
-        self.nats_stream = nats_stream
+        self.nats_servers = nats_servers
+        self.nats_creds = nats_creds
         self.nats_subject = nats_subject
         self.queue = asyncio.Queue(max_queue_size)
         self.task = None
+        self.initialized = False
+        self.service = service
+
+    async def disconnected_cb(self):
+        logger.info("Got disconnected from NATS!")
+
+    async def reconnected_cb(self):
+        # See who we are connected to on reconnect.
+        logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
+
+    async def error_cb(self, e):
+        logger.error("There was an error connecting to NATS audit: {}".format(e), exc_info=True)
+
+    async def closed_cb(self):
+        logger.info("Connection is closed on NATS")
 
     async def initialize(self):
+        options = {
+            "error_cb": self.error_cb,
+            "closed_cb": self.closed_cb,
+            "reconnected_cb": self.reconnected_cb,
+        }
+
+        if self.nats_creds:
+            options["user_credentials"] = self.nats_creds
+
+        if len(self.nats_servers) > 0:
+            options["servers"] = self.nats_servers
+
+        self.nc = await nats.connect(**options)
+
+        self.js = get_traced_jetstream(self.nc, self.service)
         if self.task is None:
             self.task = asyncio.create_task(self.run())
+
+        self.initialized = True
 
     async def finalize(self):
         if self.task is not None:
             self.task.cancel()
             with suppress(asyncio.CancelledError, asyncio.exceptions.TimeoutError):
                 await asyncio.wait_for(self.task, timeout=2)
+        if self.nc:
+            await self.nc.flush()
+            await self.nc.close()
+            self.nc = None
 
     async def run(self) -> None:
         while True:
@@ -81,7 +123,7 @@ class KbUsageReportUtility:
             logger.warning("KbUsage utility queue is full, dropping message")
 
     async def _send(self, message: KbUsage) -> int:
-        res = await self.nats_stream.publish(
+        res = await self.js.publish(
             self.nats_subject,
             message.SerializeToString(),
         )

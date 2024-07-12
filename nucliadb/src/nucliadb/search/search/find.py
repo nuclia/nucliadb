@@ -111,7 +111,7 @@ async def find(
 
     search_time = time() - start_time
     if audit is not None:
-        await audit.search(
+        audit.search(
             kbid,
             x_nucliadb_user,
             x_ndb_client.to_proto(),

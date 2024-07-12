@@ -97,45 +97,28 @@ async def test_publish(audit_storage: StreamAuditStorage, nats):
 
 @pytest.mark.asyncio
 async def test_report(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.report(kbid="kbid", audit_type=AuditRequest.AuditType.DELETED, send=True)
-
-    await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
-
-
-@pytest.mark.asyncio
-async def test_report_resources(audit_storage: StreamAuditStorage, nats):
-    audit_storage.report_resources(
-        kbid="kbid",
-        resources=10,
-    )
+    audit_storage.report_and_send(kbid="kbid", audit_type=AuditRequest.AuditType.DELETED)
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
 async def test_visited(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.visited("kbid", "uuid", "user", "origin", send=True)
+    audit_storage.visited("kbid", "uuid", "user", "origin")
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
-async def test_delete_kb(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.delete_kb("kbid", send=True)
-
-    await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
-
-
-@pytest.mark.asyncio
 async def test_search(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.search("kbid", "user", 0, "origin", SearchRequest(), -1, 1, send=True)
+    audit_storage.search("kbid", "user", 0, "origin", SearchRequest(), -1, 1)
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 
 
 @pytest.mark.asyncio
 async def test_chat(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.chat(
+    audit_storage.chat(
         kbid="kbid",
         user="user",
         client_type=0,
@@ -148,7 +131,6 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
         context=[ChatContext(author="USER", text="epa")],
         answer="bar",
         learning_id="learning_id",
-        send=True,
     )
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))

@@ -32,7 +32,7 @@ from nucliadb.search.api.v1.chat import SyncChatResponse
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.utilities import get_predict
 from nucliadb_protos.audit_pb2 import AuditRequest
-from nucliadb_utils.audit.stream import KB_USAGE_STREAM_AUDIT, StreamAuditStorage
+from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.utilities import Utility, set_utility
 
 
@@ -99,7 +99,6 @@ async def test_chat_sends_one_combined_audit(
         pass
 
     await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
-    await jetstream.add_stream(name="test_usage", subjects=[KB_USAGE_STREAM_AUDIT])
 
     psub = await jetstream.pull_subscribe(subject, "psub")
 

@@ -34,29 +34,14 @@ from starlette.responses import Response, StreamingResponse
 
 from nucliadb_protos.audit_pb2 import (
     AuditField,
-    AuditKBCounter,
     AuditRequest,
     ChatContext,
-    ClientType,
 )
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.nats import get_traced_jetstream
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
-    ClientType as ClientTypeKbUsage,
-)
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
-    KBSource,
-    Search,
-    SearchType,
-    Service,
-    Storage,
-)
-from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
-
-KB_USAGE_STREAM_AUDIT = "kb-usage.nuclia_db"
 
 
 class RequestContext:
@@ -101,7 +86,6 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if context.audit_request.kbid:
             # an audit request with no kbid makes no sense, we use this as an heuristic
             # mark that no audit has been set during this request
-            context.audit_request.trace_id = get_trace_id()
             audit_utility = get_audit()
             if audit_utility is not None:
                 context.audit_request.request_time = time.monotonic() - context.start_time
@@ -135,7 +119,6 @@ class StreamAuditStorage(AuditStorage):
     task: Optional[asyncio.Task] = None
     initialized: bool = False
     queue: asyncio.Queue
-    lock: asyncio.Lock
 
     def __init__(
         self,
@@ -151,7 +134,6 @@ class StreamAuditStorage(AuditStorage):
         self.nats_target = nats_target
         self.partitions = partitions
         self.seed = seed
-        self.lock = asyncio.Lock()
         self.queue = asyncio.Queue()
         self.service = service
 
@@ -189,16 +171,9 @@ class StreamAuditStorage(AuditStorage):
         self.js = get_traced_jetstream(self.nc, self.service)
         self.task = asyncio.create_task(self.run())
 
-        self.kb_usage_utility = KbUsageReportUtility(
-            nats_stream=self.js, nats_subject=KB_USAGE_STREAM_AUDIT
-        )
-        await self.kb_usage_utility.initialize()
-
         self.initialized = True
 
     async def finalize(self):
-        await self.kb_usage_utility.finalize()
-
         if self.task is not None:
             self.task.cancel()
         if self.nc:
@@ -240,7 +215,7 @@ class StreamAuditStorage(AuditStorage):
         )
         return res.seq
 
-    async def report(
+    def report_and_send(
         self,
         *,
         kbid: str,
@@ -251,19 +226,12 @@ class StreamAuditStorage(AuditStorage):
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        kb_counter: Optional[AuditKBCounter] = None,
-        send: bool = False,
     ):
-        context = get_request_context()
-        if send is True and context is None:
-            auditrequest = AuditRequest()
-        elif send is False and context is not None:
-            auditrequest = context.audit_request
-        else:
-            return
+        auditrequest = AuditRequest()
 
         # Reports MODIFIED / DELETED / NEW events
 
+        auditrequest.trace_id = get_trace_id()
         auditrequest.kbid = kbid
         auditrequest.userid = user or ""
         auditrequest.rid = rid or ""
@@ -278,29 +246,9 @@ class StreamAuditStorage(AuditStorage):
         if audit_fields:
             auditrequest.fields_audit.extend(audit_fields)
 
-        if kb_counter:
-            auditrequest.kb_counter.CopyFrom(kb_counter)
+        self.send(auditrequest)
 
-            self.kb_usage_utility.send_kb_usage(
-                service=Service.NUCLIA_DB,
-                account_id=None,
-                kb_id=kbid,
-                kb_source=KBSource.HOSTED,
-                storage=Storage(paragraphs=kb_counter.paragraphs, fields=kb_counter.fields),
-            )
-        if send:
-            self.send(auditrequest)
-
-    def report_resources(self, *, kbid: str, resources: int):
-        self.kb_usage_utility.send_kb_usage(
-            service=Service.NUCLIA_DB,
-            account_id=None,
-            kb_id=kbid,
-            kb_source=KBSource.HOSTED,
-            storage=Storage(resources=resources),
-        )
-
-    async def visited(
+    def visited(
         self,
         kbid: str,
         uuid: str,
@@ -309,12 +257,9 @@ class StreamAuditStorage(AuditStorage):
         send: bool = False,
     ):
         context = get_request_context()
-        if send is True and context is None:
-            auditrequest = AuditRequest()
-        elif send is False and context is not None:
-            auditrequest = context.audit_request
-        else:
+        if context is None:
             return
+        auditrequest = context.audit_request
 
         auditrequest.origin = origin
         auditrequest.userid = user
@@ -322,37 +267,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.kbid = kbid
         auditrequest.type = AuditRequest.VISITED
 
-        if send:
-            self.send(auditrequest)
-
-    async def delete_kb(
-        self,
-        kbid,
-        send: bool = False,
-    ):
-        context = get_request_context()
-        if send is True and context is None:
-            auditrequest = AuditRequest()
-        elif send is False and context is not None:
-            auditrequest = context.audit_request
-        else:
-            return
-
-        auditrequest.kbid = kbid
-        auditrequest.type = AuditRequest.KB_DELETED
-
-        self.kb_usage_utility.send_kb_usage(
-            service=Service.NUCLIA_DB,
-            account_id=None,
-            kb_id=kbid,
-            kb_source=KBSource.HOSTED,
-            storage=Storage(paragraphs=0, fields=0, resources=0),
-        )
-
-        if send:
-            self.send(auditrequest)
-
-    async def search(
+    def search(
         self,
         kbid: str,
         user: str,
@@ -361,15 +276,12 @@ class StreamAuditStorage(AuditStorage):
         search: SearchRequest,
         timeit: float,
         resources: int,
-        send: bool = False,
     ):
         context = get_request_context()
-        if send is True and context is None:
-            auditrequest = AuditRequest()
-        elif send is False and context is not None:
-            auditrequest = context.audit_request
-        else:
+        if context is None:
             return
+
+        auditrequest = context.audit_request
 
         auditrequest.origin = origin
         auditrequest.client_type = client_type  # type: ignore
@@ -380,25 +292,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.resources = resources
         auditrequest.type = AuditRequest.SEARCH
 
-        self.kb_usage_utility.send_kb_usage(
-            service=Service.NUCLIA_DB,
-            account_id=None,
-            kb_id=kbid,
-            kb_source=KBSource.HOSTED,
-            # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=[
-                Search(
-                    client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
-                    type=SearchType.SEARCH,
-                    tokens=2000,
-                    num_searches=1,
-                )
-            ],
-        )
-        if send:
-            self.send(auditrequest)
-
-    async def chat(
+    def chat(
         self,
         kbid: str,
         user: str,
@@ -412,15 +306,12 @@ class StreamAuditStorage(AuditStorage):
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,
-        send: bool = False,
     ):
         rcontext = get_request_context()
-        if send is True and rcontext is None:
-            auditrequest = AuditRequest()
-        elif send is False and rcontext is not None:
-            auditrequest = rcontext.audit_request
-        else:
+        if rcontext is None:
             return
+
+        auditrequest = rcontext.audit_request
 
         auditrequest.origin = origin
         auditrequest.client_type = client_type  # type: ignore
@@ -440,6 +331,3 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.chat.rephrased_question = rephrased_question
         if answer is not None:
             auditrequest.chat.answer = answer
-
-        if send:
-            self.send(auditrequest)

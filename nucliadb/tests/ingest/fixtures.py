@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
 from typing import Optional
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import nats
 import pytest
@@ -50,6 +50,7 @@ from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.indexing import IndexingUtility
+from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
@@ -204,6 +205,13 @@ async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, lea
 @pytest.fixture(scope="function")
 async def audit():
     return BasicAuditStorage()
+
+
+@pytest.fixture(scope="function")
+async def usage():
+    nats_stream = Mock(publish=AsyncMock())
+    report_util = KbUsageReportUtility(nats_stream=nats_stream, nats_subject="test-stream")
+    return report_util
 
 
 @pytest.fixture(scope="function")

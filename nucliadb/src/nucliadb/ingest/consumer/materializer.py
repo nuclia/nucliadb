@@ -28,8 +28,10 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KBSource, Service
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import Storage as UsageStorage
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_audit
+from nucliadb_utils.utilities import get_usage_utility
 
 from .utils import DelayedTaskHandler
 
@@ -99,6 +101,12 @@ class MaterializerHandler:
             await datamanagers.resources.set_number_of_resources(txn, kbid=kbid, value=value)
             await txn.commit()
 
-        audit = get_audit()
-        if audit:
-            audit.report_resources(kbid=kbid, resources=value)
+        usage_utility = get_usage_utility()
+        if usage_utility:
+            usage_utility.send_kb_usage(
+                service=Service.NUCLIA_DB,  # type: ignore
+                account_id=None,
+                kb_id=kbid,
+                kb_source=KBSource.HOSTED,  # type: ignore
+                storage=UsageStorage(resources=value),
+            )

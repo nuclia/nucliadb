@@ -346,7 +346,7 @@ async def chat(
         except KeyError:
             rephrase_time = None
 
-        await maybe_audit_chat(
+        maybe_audit_chat(
             kbid=kbid,
             user_id=user_id,
             client_type=client_type,
@@ -395,7 +395,7 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         return AnswerStatusCode(chunk[-2:].decode())
 
 
-async def maybe_audit_chat(
+def maybe_audit_chat(
     *,
     kbid: str,
     user_id: str,
@@ -430,7 +430,7 @@ async def maybe_audit_chat(
             text=AUDIT_TEXT_RESULT_SEP.join(query_context_paragaph_ids),
         )
     )
-    await audit.chat(
+    audit.chat(
         kbid,
         user_id,
         client_type.to_proto(),
@@ -490,7 +490,7 @@ class ChatAuditor:
         self.query_context = query_context
         self.query_context_order = query_context_order
 
-    async def audit(
+    def audit(
         self,
         text_answer: bytes,
         generative_answer_time: float,
@@ -498,7 +498,7 @@ class ChatAuditor:
         rephrase_time: Optional[float],
         status_code: AnswerStatusCode,
     ):
-        await maybe_audit_chat(
+        maybe_audit_chat(
             kbid=self.kbid,
             user_id=self.user_id,
             client_type=self.client_type,

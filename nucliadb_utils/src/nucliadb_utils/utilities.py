@@ -37,6 +37,7 @@ from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     FileBackendConfig,
@@ -45,6 +46,7 @@ from nucliadb_utils.settings import (
     nuclia_settings,
     storage_settings,
     transaction_settings,
+    usage_settings,
 )
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.store import MAIN
@@ -78,6 +80,7 @@ class Utility(str, Enum):
     LOCAL_STORAGE = "local_storage"
     NUCLIA_STORAGE = "nuclia_storage"
     MAINDB_DRIVER = "driver"
+    USAGE = "usage"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -315,6 +318,33 @@ def get_indexing() -> IndexingUtility:
 
 def get_audit() -> Optional[AuditStorage]:
     return get_utility(Utility.AUDIT)
+
+
+def get_usage_utility() -> Optional[KbUsageReportUtility]:
+    return get_utility(Utility.USAGE)
+
+
+async def start_usage_utility(service: str):
+    usage_utility: Optional[KbUsageReportUtility] = get_utility(Utility.USAGE)
+    if usage_utility is not None:
+        return
+
+    usage_utility = KbUsageReportUtility(
+        nats_subject=cast(str, usage_settings.usage_jetstream_target),
+        nats_servers=usage_settings.usage_jetstream_servers,
+        nats_creds=usage_settings.usage_jetstream_auth,
+        service=service,
+    )
+    logger.info(f"Configuring usage report utility {usage_settings.usage_jetstream_target}")
+    await usage_utility.initialize()
+    set_utility(Utility.USAGE, usage_utility)
+
+
+async def stop_usage_utility():
+    usage_utility = get_usage_utility()
+    if usage_utility:
+        await usage_utility.finalize()
+        clean_utility(Utility.USAGE)
 
 
 async def start_audit_utility(service: str):

@@ -23,7 +23,6 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from nucliadb_protos.audit_pb2 import (
     AuditField,
-    AuditKBCounter,
     AuditRequest,
     ChatContext,
 )
@@ -38,7 +37,7 @@ class BasicAuditStorage(AuditStorage):
     def message_to_str(self, message: BrokerMessage) -> str:
         return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
 
-    async def report(
+    async def report_and_send(
         self,
         *,
         kbid: str,
@@ -49,13 +48,8 @@ class BasicAuditStorage(AuditStorage):
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        kb_counter: Optional[AuditKBCounter] = None,
-        send: bool = False,
     ):
-        logger.debug(f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}")
-
-    def report_resources(self, *, kbid: str, resources: int):
-        logger.debug(f"REPORT RESOURCES {kbid} {resources}")
+        logger.debug(f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields}")
 
     async def visited(
         self,
@@ -63,14 +57,13 @@ class BasicAuditStorage(AuditStorage):
         uuid: str,
         user: str,
         origin: str,
-        send: bool = False,
     ):
         logger.debug(f"VISITED {kbid} {uuid} {user} {origin}")
 
     def send(self, msg: AuditRequest):
-        pass
+        logger.debug(f"sending a {msg.type} queued message")
 
-    async def search(
+    def search(
         self,
         kbid: str,
         user: str,
@@ -79,11 +72,10 @@ class BasicAuditStorage(AuditStorage):
         search: SearchRequest,
         timeit: float,
         resources: int,
-        send: bool = False,
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
 
-    async def chat(
+    def chat(
         self,
         kbid: str,
         user: str,
@@ -97,9 +89,5 @@ class BasicAuditStorage(AuditStorage):
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,
-        send: bool = False,
     ):
         logger.debug(f"CHAT {kbid} {user} {origin}")
-
-    async def delete_kb(self, kbid):
-        logger.debug(f"KB DELETED {kbid}")

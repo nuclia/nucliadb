@@ -30,6 +30,9 @@ from nucliadb_protos import audit_pb2, nodereader_pb2, noderesources_pb2, writer
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KBSource, Service
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import Storage as KbUsageStorage
+from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 from nucliadb_utils.storages.storage import Storage
 
 from . import metrics
@@ -58,10 +61,12 @@ class IndexAuditHandler:
         self,
         *,
         audit: AuditStorage,
+        usage: KbUsageReportUtility,
         pubsub: PubSubDriver,
         check_delay: float = 5.0,
     ):
         self.audit = audit
+        self.usage = usage
         self.pubsub = pubsub
         self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
@@ -118,11 +123,12 @@ class IndexAuditHandler:
             total_fields += shard.fields
             total_paragraphs += shard.paragraphs
 
-        await self.audit.report(
-            kbid=kbid,
-            audit_type=audit_pb2.AuditRequest.AuditType.INDEXED,
-            kb_counter=audit_pb2.AuditKBCounter(fields=total_fields, paragraphs=total_paragraphs),
-            send=True,
+        self.usage.send_kb_usage(
+            service=Service.NUCLIA_DB,  # type: ignore
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,  # type: ignore
+            storage=KbUsageStorage(paragraphs=total_paragraphs, fields=total_fields),
         )
 
 
@@ -176,7 +182,7 @@ class ResourceWritesAuditHandler:
         metrics.total_messages.inc({"action": "scheduled", "type": "audit_fields"})
         with metrics.handler_histo({"type": "audit_fields"}):
             when = message_audit.when if message_audit.HasField("when") else None
-            await self.audit.report(
+            self.audit.report_and_send(
                 kbid=message_audit.kbid,
                 when=when,
                 user=message_audit.user,
@@ -185,5 +191,4 @@ class ResourceWritesAuditHandler:
                 field_metadata=list(message_audit.field_metadata),
                 audit_type=AUDIT_TYPES.get(notification.write_type),
                 audit_fields=list(message_audit.audit_fields),
-                send=True,
             )

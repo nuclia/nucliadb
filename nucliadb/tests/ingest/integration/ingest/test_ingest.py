@@ -64,6 +64,7 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.audit.stream import StreamAuditStorage
+from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, get_indexing, get_storage, set_utility
@@ -74,9 +75,12 @@ EXAMPLE_VECTOR = base64.b64decode(
 
 
 @pytest.fixture(autouse=True)
-async def audit_consumers(storage, pubsub, stream_audit: StreamAuditStorage):
+async def audit_consumers(
+    storage, pubsub, stream_audit: StreamAuditStorage, usage: KbUsageReportUtility
+):
     index_auditor = IndexAuditHandler(
         audit=stream_audit,
+        usage=usage,
         pubsub=pubsub,
     )
     resource_writes_auditor = ResourceWritesAuditHandler(
