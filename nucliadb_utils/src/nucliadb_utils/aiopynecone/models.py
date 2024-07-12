@@ -22,7 +22,9 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-KB = 1024
+KILO_BYTE = 1024
+MAX_METADATA_SIZE = 40 * KILO_BYTE
+
 
 # Requests
 
@@ -36,7 +38,7 @@ class Vector(BaseModel):
     @classmethod
     def validate_metadata_size(cls, value):
         json_value = json.dumps(value)
-        if len(json_value) > 40 * KB:
+        if len(json_value) > MAX_METADATA_SIZE:
             raise ValueError("metadata size is too large")
 
 

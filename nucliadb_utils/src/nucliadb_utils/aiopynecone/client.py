@@ -21,6 +21,8 @@ import asyncio
 import json
 import logging
 import random
+from collections.abc import AsyncIterable, Iterable
+from itertools import islice
 from typing import Any, AsyncGenerator, Optional
 
 import httpx
@@ -48,8 +50,8 @@ BASE_API_HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
 }
-MB = 1024 * 1024
-MAX_UPSERT_PAYLOAD_SIZE = 2 * MB
+MEGA_BYTE = 1024 * 1024
+MAX_UPSERT_PAYLOAD_SIZE = 2 * MEGA_BYTE
 MAX_DELETE_BATCH_SIZE = 1000
 
 
@@ -63,10 +65,13 @@ class PineconeAPIError(Exception):
     ):
         self.http_status_code = http_status_code
         self.code = code or ""
-        self.message = message
-        self.details = details
-        exc_message = (
-            f"[{http_status_code}] message=\"{message or ""}\" code={code or ""} details={details}"
+        self.message = message or ""
+        self.details = details or {}
+        exc_message = '[{http_status_code}] message="{message}" code={code} details={details}'.format(
+            http_status_code=http_status_code,
+            message=message,
+            code=code,
+            details=details,
         )
         super().__init__(exc_message)
 
@@ -210,7 +215,7 @@ class DataPlane:
                 await self.upsert(vectors=batch, timeout=batch_timeout)
 
         tasks = []
-        for batch in self._batchify(vectors, size=batch_size):
+        for batch in batchify(vectors, batch_size):
             tasks.append(asyncio.create_task(_upsert_batch(batch)))
 
         await asyncio.gather(*tasks)
@@ -224,6 +229,9 @@ class DataPlane:
         - `ids`: The ids of the vectors to delete.
         - `timeout`: to control the request timeout. If not set, the default timeout is used.
         """
+        if len(ids) > MAX_DELETE_BATCH_SIZE:
+            raise ValueError(f"Maximum number of ids in a single request is {MAX_DELETE_BATCH_SIZE}.")
+
         headers = {"Api-Key": self.api_key}
         payload = {"ids": ids}
         post_kwargs: dict[str, Any] = {
@@ -239,7 +247,7 @@ class DataPlane:
     @pinecone_observer.wrap({"type": "list_page"})
     async def list_page(
         self,
-        prefix: Optional[str] = None,
+        id_prefix: Optional[str] = None,
         limit: int = 100,
         pagination_token: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -247,7 +255,7 @@ class DataPlane:
         """
         List vectors in a paginated manner.
         Params:
-        - `prefix`: to filter vectors by their id prefix.
+        - `id_prefix`: to filter vectors by their id prefix.
         - `limit`: to control the number of vectors fetched in each page.
         - `pagination_token`: to fetch the next page. The token is provided in the response
            if there are more pages to fetch.
@@ -255,8 +263,8 @@ class DataPlane:
         """
         headers = {"Api-Key": self.api_key}
         params = {"limit": str(limit)}
-        if prefix is not None:
-            params["prefix"] = prefix
+        if id_prefix is not None:
+            params["prefix"] = id_prefix
         if pagination_token is not None:
             params["paginationToken"] = pagination_token
 
@@ -275,19 +283,22 @@ class DataPlane:
         return ListResponse.model_validate(response.json())
 
     async def list_all(
-        self, prefix: Optional[str] = None, page_size: int = 100, page_timeout: Optional[float] = None
+        self, id_prefix: Optional[str] = None, page_size: int = 100, page_timeout: Optional[float] = None
     ) -> AsyncGenerator[str, None]:
         """
         Iterate over all vector ids from the index in a paginated manner.
         Params:
-        - `prefix`: to filter vectors by their id prefix.
+        - `id_prefix`: to filter vectors by their id prefix.
         - `page_size`: to control the number of vectors fetched in each page.
         - `page_timeout`: to control the request timeout for each page. If not set, the default timeout is used.
         """
         pagination_token = None
         while True:
             response = await self.list_page(
-                prefix=prefix, limit=page_size, pagination_token=pagination_token, timeout=page_timeout
+                id_prefix=id_prefix,
+                limit=page_size,
+                pagination_token=pagination_token,
+                timeout=page_timeout,
             )
             for vector_id in response.vectors:
                 yield vector_id.id
@@ -347,30 +358,13 @@ class DataPlane:
                 await self.delete(ids=batch, timeout=batch_timeout)
 
         tasks = []
-        async for batch in self._async_batchify(self.list_all(prefix=id_prefix), size=batch_size):
+        async_iterable = self.list_all(
+            id_prefix=id_prefix, page_size=batch_size, page_timeout=batch_timeout
+        )
+        async for batch in async_batchify(async_iterable, batch_size):
             tasks.append(asyncio.create_task(_delete_batch(batch)))
 
         await asyncio.gather(*tasks)
-
-    def _batchify(self, iterable, size: int):
-        """
-        Split an iterable into chunks of size.
-        """
-        for i in range(0, len(iterable), size):
-            yield iterable[i : i + size]
-
-    async def _async_batchify(self, async_iterable, size: int):
-        """
-        Split an async iterable into chunks of size.
-        """
-        batch = []
-        async for item in async_iterable:
-            batch.append(item)
-            if len(batch) == size:
-                yield batch
-                batch = []
-        if batch:
-            yield batch
 
     @pinecone_observer.wrap({"type": "query"})
     async def query(
@@ -486,3 +480,29 @@ def raise_for_status(response: httpx.Response):
             message=message,
             details=details,
         )
+
+
+def batchify(iterable: Iterable, batch_size: int):
+    """
+    Split an iterable into batches of batch_size
+    """
+    iterator = iter(iterable)
+    while True:
+        batch = list(islice(iterator, batch_size))
+        if not batch:
+            break
+        yield batch
+
+
+async def async_batchify(async_iterable: AsyncIterable, batch_size: int):
+    """
+    Split an async iterable into batches of batch_size
+    """
+    batch = []
+    async for item in async_iterable:
+        batch.append(item)
+        if len(batch) == batch_size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch

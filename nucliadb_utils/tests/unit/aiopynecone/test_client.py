@@ -26,6 +26,8 @@ from nucliadb_utils.aiopynecone.client import (
     ControlPlane,
     DataPlane,
     PineconeSession,
+    async_batchify,
+    batchify,
 )
 from nucliadb_utils.aiopynecone.models import QueryResponse, Vector
 
@@ -143,7 +145,7 @@ class TestDataPlane:
             "vectors": [{"id": "id"}],
             "pagination": {"next": "next"},
         }
-        list_resp = await client.list_page(prefix="foo", limit=10, pagination_token="token")
+        list_resp = await client.list_page(id_prefix="foo", limit=10, pagination_token="token")
         assert len(list_resp.vectors) == 1
         assert list_resp.pagination.next == "next"
 
@@ -160,7 +162,7 @@ class TestDataPlane:
             },
         ]
 
-        async for vector_id in client.list_all(prefix="foo", page_size=1):
+        async for vector_id in client.list_all(id_prefix="foo", page_size=1):
             assert vector_id == "id"
 
         assert http_session.get.call_count == 2
@@ -190,25 +192,6 @@ class TestDataPlane:
         assert http_session.post.call_count == 2
         assert http_session.get.call_count == 3
 
-    def test_batchify(self, client: DataPlane):
-        vectors = [Vector(id=str(i), values=[i]) for i in range(10)]
-        batches = list(client._batchify(vectors, size=2))
-        assert len(batches) == 5
-        assert len(batches[0]) == 2
-        assert len(batches[1]) == 2
-        assert len(batches[2]) == 2
-        assert len(batches[3]) == 2
-        assert len(batches[4]) == 2
-
-    async def test_async_batchify(self, client: DataPlane):
-        async def async_iter():
-            await asyncio.sleep(0)
-            for i in range(10):
-                yield Vector(id=str(i), values=[i])
-
-        async for batch in client._async_batchify(async_iter(), size=2):
-            assert len(batch) == 2
-
     def test_estimate_upsert_batch_size(self, client: DataPlane):
         vector_dimension = int(2 * 1024 * 1024 / 4)
         vector = Vector(id="id", values=[1.0] * vector_dimension, metadata={})
@@ -221,3 +204,26 @@ class TestDataPlane:
         batch_size = client._estimate_upsert_batch_size([vector])
         assert batch_size == 511
         client._upsert_batch_size = None
+
+
+def test_batchify():
+    iterable = list(range(10))
+    batches = list(batchify(iterable, batch_size=2))
+    assert len(batches) == 5
+    for batch in batches:
+        assert len(batch) == 2
+
+
+async def test_async_batchify():
+    async def async_iter():
+        await asyncio.sleep(0)
+        for i in range(10):
+            yield i
+
+    async_iterable = async_iter()
+
+    batches = 0
+    async for batch in async_batchify(async_iterable, batch_size=2):
+        batches += 1
+        assert len(batch) == 2
+    assert batches == 5
