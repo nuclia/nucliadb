@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from datetime import datetime
 
-import os
 import pytest
 
 from nucliadb_node_binding import NodeReader, NodeWriter  # type: ignore
@@ -75,9 +75,9 @@ class IndexNode:
 
 @pytest.fixture
 def data_path(tmp_path):
-    os.environ['DATA_PATH'] = str(tmp_path)
+    os.environ["DATA_PATH"] = str(tmp_path)
     yield
-    del os.environ['DATA_PATH']
+    del os.environ["DATA_PATH"]
 
 
 @pytest.mark.asyncio
