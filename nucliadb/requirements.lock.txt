@@ -1,3 +1,6 @@
+#
+# This is only in use by the install-vm.sh script
+#
 aiobotocore==2.11.2
 aiodns==3.1.1
 aiofiles==23.2.1
