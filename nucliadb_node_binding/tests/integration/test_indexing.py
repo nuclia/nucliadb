@@ -19,6 +19,7 @@
 
 from datetime import datetime
 
+import os
 import pytest
 
 from nucliadb_node_binding import NodeReader, NodeWriter  # type: ignore
@@ -70,6 +71,13 @@ class IndexNode:
 
     def call_search_api(self, name, request, resp_klass):
         return self.request(getattr(self.reader, name), request, resp_klass)
+
+
+@pytest.fixture
+def data_path(tmp_path):
+    os.environ['DATA_PATH'] = str(tmp_path)
+    yield
+    del os.environ['DATA_PATH']
 
 
 @pytest.mark.asyncio

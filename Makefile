@@ -89,12 +89,6 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
 
-base-node-image:
-	docker buildx build --platform=linux/amd64 -t europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest . -f Dockerfile.basenode
-	docker push europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest
-	docker tag europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest 042252809363.dkr.ecr.us-east-2.amazonaws.com/basenode:latest
-	docker push 042252809363.dkr.ecr.us-east-2.amazonaws.com/basenode:latest
-
 build-node:
 	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node .
 

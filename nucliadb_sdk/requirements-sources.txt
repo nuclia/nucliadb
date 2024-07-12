@@ -1,2 +1,0 @@
--e ./nucliadb_protos/python
--e ./nucliadb_models
