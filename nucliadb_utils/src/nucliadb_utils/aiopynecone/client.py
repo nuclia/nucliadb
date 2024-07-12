@@ -118,7 +118,7 @@ class ControlPlane:
         """
         headers = {"Api-Key": self.api_key}
         response = await self.http_session.delete(f"/indexes/{name}", headers=headers)
-        if response.status_code == 404:
+        if response.status_code == 404:  # pragma: no cover
             logger.warning("Pinecone index not found.", extra={"index_name": name})
             return
         raise_for_status(response)
@@ -326,7 +326,7 @@ class DataPlane:
         try:
             raise_for_status(response)
         except PineconeAPIError as err:
-            if err.http_status_code == 404 and err.code == 5:
+            if err.http_status_code == 404 and err.code == 5:  # pragma: no cover
                 # Namespace not found. No vectors to delete.
                 return
             raise
@@ -430,9 +430,8 @@ class PineconeSession:
         if not self.control_plane_session.is_closed:
             await self.control_plane_session.aclose()
         for session in self.index_host_sessions.values():
-            if session.is_closed:
-                continue
-            await session.aclose()
+            if not session.is_closed:
+                await session.aclose()
         self.index_host_sessions.clear()
 
     def control_plane(self, api_key: str) -> ControlPlane:

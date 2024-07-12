@@ -20,14 +20,18 @@
 import asyncio
 import unittest
 
+import httpx
 import pytest
 
 from nucliadb_utils.aiopynecone.client import (
+    MAX_DELETE_BATCH_SIZE,
     ControlPlane,
     DataPlane,
+    PineconeAPIError,
     PineconeSession,
     async_batchify,
     batchify,
+    raise_for_status,
 )
 from nucliadb_utils.aiopynecone.models import QueryResponse, Vector
 
@@ -110,7 +114,7 @@ class TestDataPlane:
         return client
 
     async def test_upsert(self, client: DataPlane, http_session):
-        await client.upsert(vectors=[Vector(id="id", values=[1.0])])
+        await client.upsert(vectors=[Vector(id="id", values=[1.0])], timeout=1)
 
         http_session.post.assert_called_once()
 
@@ -124,6 +128,9 @@ class TestDataPlane:
 
         http_session.post.assert_called_once()
 
+        with pytest.raises(ValueError):
+            await client.delete(["id"] * (MAX_DELETE_BATCH_SIZE + 1))
+
     async def test_query(self, client: DataPlane, http_session, http_response):
         http_response.json.return_value = {
             "matches": [{"id": "id", "score": 1.0, "values": [1.0], "metadata": {}}]
@@ -134,6 +141,7 @@ class TestDataPlane:
             include_metadata=True,
             include_values=True,
             filter={"genres": {"$in": ["genre"]}},
+            timeout=1,
         )
         assert isinstance(query_resp, QueryResponse)
         assert len(query_resp.matches) == 1
@@ -192,11 +200,31 @@ class TestDataPlane:
         assert http_session.post.call_count == 2
         assert http_session.get.call_count == 3
 
+    async def test_delete_by_id_prefix_large_batch_size(
+        self, client: DataPlane, http_session, http_response
+    ):
+        http_response.json.side_effect = [
+            {
+                "vectors": [{"id": "id1"}],
+                "pagination": {"next": "next"},
+            },
+            {
+                "vectors": [{"id": "id2"}],
+                "pagination": {"next": "next"},
+            },
+            {
+                "vectors": [],
+            },
+        ]
+        await client.delete_by_id_prefix(id_prefix="prefix", batch_size=40_000, batch_timeout=1)
+
     def test_estimate_upsert_batch_size(self, client: DataPlane):
         vector_dimension = int(2 * 1024 * 1024 / 4)
         vector = Vector(id="id", values=[1.0] * vector_dimension, metadata={})
         batch_size = client._estimate_upsert_batch_size([vector])
         assert batch_size == 1
+        # Since the value is cached, the batch size should be the same
+        assert client._estimate_upsert_batch_size([]) == batch_size
         client._upsert_batch_size = None
 
         vector_dimension = 1024
@@ -227,3 +255,13 @@ async def test_async_batchify():
         batches += 1
         assert len(batch) == 2
     assert batches == 5
+
+
+def test_raise_for_status():
+    request = unittest.mock.MagicMock()
+    response = unittest.mock.MagicMock()
+    response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "message", request=request, response=response
+    )
+    with pytest.raises(PineconeAPIError):
+        raise_for_status(response)
