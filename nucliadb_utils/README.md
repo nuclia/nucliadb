@@ -8,6 +8,6 @@
 # Install and run tests
 
 ```bash
-make install-dev
+pdm sync -d
 make test
 ```

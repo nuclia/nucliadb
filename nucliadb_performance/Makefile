@@ -43,13 +43,6 @@ install: # Install the package
 	pip install -e .
 
 
-.PHONY: install-dev
-install-dev: # Install the package for development
-	pip install --upgrade pip wheel
-	pip install -r ../test-requirements.txt -r requirements.txt
-	pip install -e .
-
-
 .PHONY: format
 format: # Format the code
 	ruff check --fix --config=../ruff.toml .

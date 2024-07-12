@@ -17,7 +17,7 @@ jobs:
   e2e-k8s-cluster:
     #
     # E2E tests run against a Kubernetes cluster.
-    # These tests setup microk8s and run NucliaDB with PostgreSQL.
+    # These tests setup microk8s and run NucliaDB standalone with PostgreSQL.
     # Chart configuration: e2e/conf/chart.values.yaml
     #
     name: E2E Kubernetes Cluster Tests
@@ -103,65 +103,3 @@ jobs:
               kubectl logs -n nucliadb pod/nucliadb-1 &&
               kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
               exit 1)
-
-  e2e-vm-cluster:
-    runs-on: ubuntu-latest
-    name: E2E VM Cluster Tests
-    strategy:
-      matrix:
-        ostypes: ["debian:bookworm-slim", "fedora:38"]
-
-    container:
-      image: ${{ matrix.ostypes }}
-      volumes:
-        - /opt/
-
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres
-        # Provide the password for postgres
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Install NucliaDB
-        # tests that installation script works
-        run: |
-          ./scripts/install-vm.sh
-
-      - name: Install local nucliadb
-        # Now, let's install the current version of nucliadb to
-        # run the tests against.
-        # Unfortunately, we're not testing against the released version
-        # of NucliaDB; however, it seems more important to test against
-        # the current branch.
-        run: |
-          bash -c 'source /opt/nucliadb/bin/activate && make -C nucliadb install-dev'
-
-      - name: Run Cluster and tests
-        env:
-          DRIVER: PG
-          FILE_BACKEND: LOCAL
-          DRIVER_PG_URL: postgresql://postgres:postgres@postgres:5432/postgres
-          NUCLIA_PUBLIC_URL: https://{zone}.stashify.cloud
-          cluster_discovery_mode: manual
-          cluster_discovery_manual_addresses: '["localhost:10009","localhost:10010"]'
-          NUA_API_KEY: ${{ secrets.NUA_API_KEY }}
-          NUCLIADB_DISABLE_ANALYTICS: "True"
-          ENVIRONMENT: "stage"
-          FLAG_SETTINGS_URL: https://raw.githubusercontent.com/nuclia/status/main/features-v2.json
-        run: bash e2e/run-e2e-tests.sh

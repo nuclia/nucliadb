@@ -1,9 +1,0 @@
-pytest-docker-fixtures
-types-python-dateutil
-docker
-types-aiofiles
-numpy
-datasets
-requests
-types-requests
-sentence_transformers
