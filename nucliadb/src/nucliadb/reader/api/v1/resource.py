@@ -77,58 +77,55 @@ async def list_resources(
 
     # Get counters from maindb
     driver = get_driver()
-    txn = await driver.begin(read_only=True)
+    async with driver.transaction(read_only=True) as txn:
+        # Filter parameters for serializer
+        show: list[ResourceProperties] = [ResourceProperties.BASIC]
+        field_types: list[FieldTypeName] = []
+        extracted: list[ExtractedDataTypeName] = []
 
-    # Filter parameters for serializer
-    show: list[ResourceProperties] = [ResourceProperties.BASIC]
-    field_types: list[FieldTypeName] = []
-    extracted: list[ExtractedDataTypeName] = []
+        try:
+            resources: list[Resource] = []
+            max_items_to_iterate = (page + 1) * size
+            first_wanted_item_index = (page * size) + 1  # 1-based index
+            current_key_index = 0
 
-    try:
-        resources: list[Resource] = []
-        max_items_to_iterate = (page + 1) * size
-        first_wanted_item_index = (page * size) + 1  # 1-based index
-        current_key_index = 0
+            # ask for one item more than we need, in order to know if it's the last page
+            keys_generator = txn.keys(
+                match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid),
+                count=max_items_to_iterate + 1,
+            )
+            async for key in keys_generator:
+                current_key_index += 1
 
-        # ask for one item more than we need, in order to know if it's the last page
-        keys_generator = txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid),
-            count=max_items_to_iterate + 1,
-        )
-        async for key in keys_generator:
-            current_key_index += 1
+                # First of all, we need to skip keys, in case we are on a +1 page
+                if page > 0 and current_key_index < first_wanted_item_index:
+                    continue
 
-            # First of all, we need to skip keys, in case we are on a +1 page
-            if page > 0 and current_key_index < first_wanted_item_index:
-                continue
+                # Don't fetch keys once we got all items for this
+                if len(resources) == size:
+                    await keys_generator.aclose()
+                    break
 
-            # Don't fetch keys once we got all items for this
-            if len(resources) == size:
-                await keys_generator.aclose()
-                break
+                # Fetch and Add wanted item
+                rid = await txn.get(key, for_update=False)
+                if rid:
+                    result = await managed_serialize(
+                        txn,
+                        kbid,
+                        rid.decode(),
+                        show,
+                        field_types,
+                        extracted,
+                        service_name=SERVICE_NAME,
+                    )
+                    if result is not None:
+                        resources.append(result)
 
-            # Fetch and Add wanted item
-            rid = await txn.get(key, for_update=False)
-            if rid:
-                result = await managed_serialize(
-                    txn,
-                    kbid,
-                    rid.decode(),
-                    show,
-                    field_types,
-                    extracted,
-                    service_name=SERVICE_NAME,
-                )
-                if result is not None:
-                    resources.append(result)
+            is_last_page = current_key_index <= max_items_to_iterate
 
-        is_last_page = current_key_index <= max_items_to_iterate
-
-    except Exception as exc:
-        errors.capture_exception(exc)
-        raise HTTPException(status_code=500, detail="Couldn't retrieve list of resources right now")
-    finally:
-        await txn.abort()
+        except Exception as exc:
+            errors.capture_exception(exc)
+            raise HTTPException(status_code=500, detail="Couldn't retrieve list of resources right now")
 
     return ResourceList(
         resources=resources,

@@ -1,4 +1,4 @@
-name: New CI
+name: CI
 
 on:
   pull_request:
@@ -81,16 +81,57 @@ jobs:
           done
           exit $ERROR
 
-  licenses:
+  lint-helm:
+    name: Lint all helm charts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.4.0
+
+      - name: Lint helm packages
+        run: |-
+          helm lint charts/*
+          helm package charts/*
+
+  check-licenses:
     name: Check Licenses
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Check License Header
+        uses: apache/skywalking-eyes/header@501a28d2fb4a9b962661987e50cf0219631b32ff
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: EmbarkStudios/cargo-deny-action@v1
         name: cargo deny
         with:
           log-level: warn
           command: check licenses
+
+  check-migrations:
+    runs-on: ubuntu-latest
+    needs:
+      - build-virtual-env
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Check migrations
+        run: .venv/bin/nucliadb-validate-migrations
 
   # Builds
   build-node-binaries:
@@ -98,7 +139,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - uses: Swatinem/rust-cache@v2
       - name: Compile
         run: cargo build --release --bin node_reader --bin node_writer
@@ -120,7 +160,7 @@ jobs:
           python-version: "3.12"
           cache: true
       - name: Install venv
-        run: pdm sync -d
+        run: pdm sync -d --clean --no-editable
       - name: Upload virtualenv to cache
         uses: actions/cache/save@v4
         with:
@@ -128,8 +168,8 @@ jobs:
           key: venv-${{ github.sha }}
 
   # Tests
-  node-python-tests:
-    name: Node Python tests
+  sidecar-tests:
+    name: Sidecar tests
     runs-on: ubuntu-latest
     needs:
       - build-node-binaries
@@ -159,6 +199,56 @@ jobs:
       - name: Run tests
         run: source .venv/bin/activate && make -C nucliadb_sidecar test-cov
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./nucliadb_sidecar/coverage.xml
+          flags: nucliadb_sidecar
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+
+  nucliadb-search-tests:
+    name: NucliaDB search tests
+    runs-on: ubuntu-latest
+    needs:
+      - build-node-binaries
+      - build-virtual-env
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Restore binaries
+        uses: actions/cache/restore@v4
+        with:
+          path: "target/release/node_*er"
+          key: node-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker images for node
+        run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
+
+      - name: Build sidecar image
+        run: make build-sidecar
+
+      - name: Run tests
+        run: source .venv/bin/activate && make -C nucliadb test-cov-search
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./nucliadb/coverage.xml
+          flags: nucliadb-search
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   node-rust-tests:
     name: Node Rust tests
@@ -211,20 +301,31 @@ jobs:
           max_attempts: 2
           retry_on: error
           timeout_minutes: 10
-          command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3"
+          command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" || make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ./coverage.xml
+          file: ./nucliadb/coverage.xml
           flags: nucliadb
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 
-  nucliadb-models-tests:
-    name: nucliadb_models tests
+  nucliadb-components-tests:
+    name: NucliaDB components tests
     runs-on: ubuntu-latest
     needs:
       - build-virtual-env
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - ingest
+          - reader
+          - standalone
+          - train
+          - writer
 
     steps:
       - name: Checkout the repository
@@ -242,11 +343,95 @@ jobs:
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
 
-      - name: Run NucliaDB tests
-        run: source .venv/bin/activate && make -C nucliadb_models test-cov
+      - name: Run package tests
+        run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ./nucliadb_models/coverage.xml
-          flags: models
+          file: ./nucliadb/coverage.xml
+          flags: nucliadb-${{ matrix.component }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+
+  python-packages-tests:
+    name: Python packages tests
+    runs-on: ubuntu-latest
+    needs:
+      - build-virtual-env
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - nucliadb_dataset
+          - nucliadb_models
+          - nucliadb_node_binding
+          - nucliadb_sdk
+          - nucliadb_telemetry
+          - nucliadb_utils
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Run package tests
+        run: source .venv/bin/activate && make -C ${{ matrix.package }} test-cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./${{ matrix.package }}/coverage.xml
+          flags: ${{ matrix.package }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Depends on all tests to pass
+  ci-passed:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs:
+      - format-rust
+      - clippy-rust
+      - updated-protos
+      - pre-checks-python
+      - check-licenses
+      - check-migrations
+      - lint-helm
+      - sidecar-tests
+      - nucliadb-search-tests
+      - node-rust-tests
+      - nucliadb-tests
+      - nucliadb-components-tests
+      - python-packages-tests
+    steps:
+      - name: CI passed
+        run: echo "CI passed"
+
+  deploy:
+    name: Trigger deploy
+    if: github.event_name == 'push'
+    needs:
+      - ci-passed
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+
+  release:
+    name: Trigger release
+    if: github.event_name == 'push'
+    needs:
+      - ci-passed
+    uses: ./.github/workflows/release.yml
+    secrets: inherit

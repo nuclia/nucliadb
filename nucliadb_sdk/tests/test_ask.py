@@ -58,7 +58,10 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         max_tokens=MaxTokens(context=100, answer=50),
         answer_json_schema={
             "type": "object",
-            "properties": {"answer": {"type": "string"}, "confidence": {"type": "number"}},
+            "properties": {
+                "answer": {"type": "string"},
+                "confidence": {"type": "number"},
+            },
         },
     )
     assert result.learning_id == "00"
@@ -124,7 +127,7 @@ def test_ask_response_parser_stream():
         ),
         CitationsAskResponseItem(citations={"some/paragraph/id": "This is a citation"}),
     ]
-    raw_lines = [AskResponseItem(item=item).json() for item in items]
+    raw_lines = [AskResponseItem(item=item).model_dump_json() for item in items]
     response = unittest.mock.Mock()
     response.headers = {
         "NUCLIA-LEARNING-ID": "learning_id",

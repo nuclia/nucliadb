@@ -26,6 +26,8 @@ from nucliadb_protos.audit_pb2 import (
 )
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
+    CreateExternalIndexProviderMetadata as CreateExternalIndexProviderMetadata,
+    CreatePineconeConfig as CreatePineconeConfig,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
@@ -34,6 +36,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
+    ExternalIndexProviderType as ExternalIndexProviderType,
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
@@ -47,9 +50,13 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NOTFOUND as NOTFOUND,
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
+    PINECONE as PINECONE,
     SemanticModelMetadata as SemanticModelMetadata,
+    StoredExternalIndexProviderMetadata as StoredExternalIndexProviderMetadata,
+    StoredPineconeConfig as StoredPineconeConfig,
     Synonyms as Synonyms,
     TermSynonyms as TermSynonyms,
+    UNSET as UNSET,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
     VectorSet as VectorSet,
     VectorSetConfig as VectorSetConfig,
@@ -160,6 +167,11 @@ class WriterStub:
         nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
     ]
 
+    NewKnowledgeBoxV2: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
+        nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response,
+    ]
+
     DeleteKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         nucliadb_protos.knowledgebox_pb2.DeleteKnowledgeBoxResponse,
@@ -245,6 +257,11 @@ class WriterAsyncStub:
     NewKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
         nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
+    ]
+
+    NewKnowledgeBoxV2: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
+        nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response,
     ]
 
     DeleteKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
@@ -335,6 +352,13 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse]]: ...
+
+    @abc.abstractmethod
+    def NewKnowledgeBoxV2(
+        self,
+        request: nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response, collections.abc.Awaitable[nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response]]: ...
 
     @abc.abstractmethod
     def DeleteKnowledgeBox(

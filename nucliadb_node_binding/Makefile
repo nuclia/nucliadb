@@ -1,15 +1,5 @@
 SHELL := /bin/bash
 
-.PHONY: install-dev
-install-dev: check-system
-	pip install --upgrade pip wheel
-	cd .. && pip install \
-		-r test-requirements.txt \
-		-r nucliadb_node/requirements-sources.txt \
-		-r nucliadb_node/requirements.txt \
-		./nucliadb_node/
-	pip install -e .
-
 .PHONY: check-system
 check-system:
 	../scripts/install-system-deps.sh
@@ -36,8 +26,9 @@ install-cov:
 	- cargo install cargo-llvm-cov
 
 .PHONY: test-cov
-test-cov:
-	bash ./cov.sh
+# test-cov:
+# 	bash ./cov.sh
+test-cov: test # Without coverage for now, since it's currently broken
 
 .PHONY: build
 build:

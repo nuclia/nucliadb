@@ -35,7 +35,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 async def create_entities_group(writer: AsyncClient, kbid: str, payload: CreateEntitiesGroupPayload):
     resp = await writer.post(
         f"/{KB_PREFIX}/{kbid}/entitiesgroups",
-        content=payload.json(),
+        content=payload.model_dump_json(),
     )
     return resp
 
@@ -48,7 +48,7 @@ async def update_entities_group(
 ):
     resp = await writer.patch(
         f"/{KB_PREFIX}/{kbid}/entitiesgroup/{group}",
-        content=payload.json(),
+        content=payload.model_dump_json(),
     )
     return resp
 

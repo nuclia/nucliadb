@@ -392,7 +392,7 @@ class ExportStreamReader:
             # Backward compatible code for old exports that don't have a learning config.
             return None, type_bytes + self.stream.buffer
         data = await self.read_item()
-        lconfig = learning_proxy.LearningConfiguration.parse_raw(data)
+        lconfig = learning_proxy.LearningConfiguration.model_validate_json(data)
         return lconfig, self.stream.buffer
 
     async def iter_items(self) -> AsyncGenerator[ExportItem, None]:

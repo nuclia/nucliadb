@@ -17,12 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import base64
 import hashlib
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from nucliadb_utils import featureflagging, utilities
+from nucliadb_utils.aiopynecone.client import PineconeSession
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import FileBackendConfig
 
@@ -89,6 +92,9 @@ async def test_get_nuclia_storage():
 
 @pytest.mark.asyncio
 async def test_get_pubsub():
+    from nucliadb_utils.cache.settings import settings
+
+    settings.cache_pubsub_nats_url = ["nats://localhost:4222"]
     with patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()):
         assert await utilities.get_pubsub() is not None
 
@@ -153,3 +159,46 @@ def test_has_feature():
                 "account_type": "account-type",
             },
         )
+
+
+def test_get_endecryptor():
+    from nucliadb_utils.encryption.settings import settings
+
+    secret_key = uuid.uuid4().hex[:32]
+    b64_secret_key = base64.b64encode(secret_key.encode()).decode()
+    settings.encryption_secret_key = b64_secret_key
+
+    # Check that it returns an instance of EndecryptorUtility
+    endecryptor = utilities.get_endecryptor()
+    assert endecryptor is not None
+    assert isinstance(endecryptor, utilities.EndecryptorUtility)
+    utilities.MAIN.get(utilities.Utility.ENDECRYPTOR) is not None
+
+    # Check that utility is cached
+    assert utilities.get_endecryptor() is endecryptor
+
+    # Clean the utility
+    settings.encryption_secret_key = None
+    utilities.clean_utility(utilities.Utility.ENDECRYPTOR)
+
+
+def test_get_endecryptor_errors():
+    with pytest.raises(ConfigurationError):
+        utilities.get_endecryptor()
+
+    from nucliadb_utils.encryption.settings import settings
+
+    settings.encryption_secret_key = "foobar"
+    with pytest.raises(ConfigurationError):
+        utilities.get_endecryptor()
+
+
+def test_pinecone_session():
+    assert utilities.MAIN.get(utilities.Utility.PINECONE_SESSION) is None
+
+    session = utilities.get_pinecone()
+    assert isinstance(session, PineconeSession)
+
+    assert utilities.MAIN.get(utilities.Utility.PINECONE_SESSION) is session
+
+    assert utilities.get_pinecone() is session

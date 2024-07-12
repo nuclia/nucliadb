@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
 import importlib.metadata
 
 from fastapi import FastAPI
@@ -28,10 +27,9 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 
-from nucliadb.common.context.fastapi import get_app_context, set_app_context
 from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import api as api_v1
-from nucliadb.writer.lifecycle import finalize, initialize
+from nucliadb.writer.lifecycle import lifespan
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.utils import (
     client_disconnect_handler,
@@ -69,14 +67,10 @@ middleware.extend(
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
-on_startup = [initialize]
-on_shutdown = [finalize]
-
 fastapi_settings = dict(
     debug=running_settings.debug,
     middleware=middleware,
-    on_startup=on_startup,
-    on_shutdown=on_shutdown,
+    lifespan=lifespan,
     exception_handlers={
         Exception: global_exception_handler,
         ClientDisconnect: client_disconnect_handler,
@@ -106,18 +100,4 @@ def create_application() -> FastAPI:
     # Use raw starlette routes to avoid unnecessary overhead
     application.add_route("/", homepage)
 
-    set_app_context(application)
-    maybe_configure_back_pressure(application)
     return application
-
-
-def maybe_configure_back_pressure(application: FastAPI):
-    from nucliadb.writer.back_pressure import start_materializer, stop_materializer
-    from nucliadb.writer.settings import back_pressure_settings
-    from nucliadb_utils.settings import is_onprem_nucliadb
-
-    if back_pressure_settings.enabled and not is_onprem_nucliadb():
-        context = get_app_context(application)
-        start_materializer_with_context = functools.partial(start_materializer, context)
-        application.add_event_handler("startup", start_materializer_with_context)
-        application.add_event_handler("shutdown", stop_materializer)

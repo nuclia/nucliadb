@@ -89,28 +89,17 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
 
-base-node-image:
-	docker buildx build --platform=linux/amd64 -t europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest . -f Dockerfile.basenode
-	docker push europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest
-	docker tag europe-west4-docker.pkg.dev/nuclia-internal/private/basenode:latest 042252809363.dkr.ecr.us-east-2.amazonaws.com/basenode:latest
-	docker push 042252809363.dkr.ecr.us-east-2.amazonaws.com/basenode:latest
-
 build-node:
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/private/node:latest -f Dockerfile.node .
+	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node .
 
-build-node-debug:
-	./scripts/download-build.sh && echo "Using build server build" && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt . || ( \
-		echo "Failed to download build from build server. Manually running build." && \
-		docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest --build-arg CARGO_PROFILE=debug -f Dockerfile.node . \
-	)
-
-
-# Not use the base image
-build-base-node-image-scratch:
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/private/node:latest -f Dockerfile.node_local .
+build-node-prebuilt:
+	cargo build --release --bin node_reader --bin node_writer
+	mkdir builds || true
+	cp target/release/node_*er builds
+	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
 
 build-sidecar:
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/private/node_sidecar:latest -f Dockerfile.node_sidecar .
+	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node_sidecar:latest -f Dockerfile.node_sidecar .
 
 
 debug-test-nucliadb:

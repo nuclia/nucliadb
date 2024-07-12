@@ -191,7 +191,7 @@ async def create_chat_response(
             sync_chat_resp.prompt_context = chat_result.prompt_context
             sync_chat_resp.prompt_context_order = chat_result.prompt_context_order
         return Response(
-            content=sync_chat_resp.json(exclude_unset=True),
+            content=sync_chat_resp.model_dump_json(exclude_unset=True),
             headers={
                 "NUCLIA-LEARNING-ID": chat_result.nuclia_learning_id or "unknown",
                 "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
@@ -201,7 +201,7 @@ async def create_chat_response(
     else:
 
         async def _streaming_response():
-            bytes_results = base64.b64encode(chat_result.find_results.json().encode())
+            bytes_results = base64.b64encode(chat_result.find_results.model_dump_json().encode())
             yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
             yield bytes_results
 
@@ -220,7 +220,7 @@ async def create_chat_response(
                     text_answer=answer,
                     target_shard_replicas=chat_request.shards,
                 )
-                yield base64.b64encode(relations_results.json().encode())
+                yield base64.b64encode(relations_results.model_dump_json().encode())
 
         return StreamingResponse(
             _streaming_response(),

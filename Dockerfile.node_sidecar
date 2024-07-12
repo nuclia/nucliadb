@@ -1,9 +1,15 @@
-FROM python:3.12 AS builder
+#
+# Dockerfile for the node sidecar
+#
 
+FROM python:3.12 AS requirements
+RUN pip install pdm
+COPY pdm.lock pyproject.toml .
+RUN pdm export --prod --no-default -G sidecar --no-hashes | grep -v ^-e > requirements.lock.txt
+
+FROM python:3.12
 RUN mkdir -p /usr/src/app
-
-RUN pip install Cython==0.29.24 pybind11
-
+RUN pip install pdm
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
@@ -16,31 +22,21 @@ RUN set -eux; \
     echo "${probeSha256} /bin/grpc_health_probe" | sha256sum -c -; \
     chmod +x /bin/grpc_health_probe
 
-# Copy requirements from all packages to install them before
-# transfering the source code.
-COPY VERSION /usr/src/app/VERSION
-COPY nucliadb_utils/requirements.txt /usr/src/app/requirements-utils.txt
-COPY nucliadb_utils/requirements-storages.txt /usr/src/app/requirements-storages.txt
-COPY nucliadb_sidecar/requirements.txt /usr/src/app/requirements-node.txt
-COPY nucliadb_telemetry/requirements.txt /usr/src/app/requirements-telemetry.txt
+# Install Python dependencies
+WORKDIR /usr/src/app
+COPY --from=requirements requirements.lock.txt /tmp
+RUN python -m venv .venv && \
+    .venv/bin/pip install -r /tmp/requirements.lock.txt
 
 # Copy source code
+COPY VERSION pyproject.toml pdm.lock /usr/src/app
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
 COPY nucliadb_sidecar /usr/src/app/nucliadb_sidecar
 
-WORKDIR /usr/src/app
+# Install our packages to the virtualenv
+RUN pdm sync --prod --no-default -G sidecar --no-editable
 
-# Install all dependendencies on packages on the nucliadb repo
-# and finally the main component.
-RUN set -eux; \
-    pip install --no-cache-dir \
-    -r /usr/src/app/requirements-utils.txt \
-    -r /usr/src/app/requirements-storages.txt \
-    -r /usr/src/app/requirements-telemetry.txt \
-    -r /usr/src/app/requirements-node.txt \
-    -r nucliadb_sidecar/requirements-sources.txt
-RUN pip install --no-deps -e /usr/src/app/nucliadb_sidecar
-
-WORKDIR /usr/src/app
+ENV PATH="/usr/src/app/.venv/bin:$PATH"
+CMD ["node_sidecar"]

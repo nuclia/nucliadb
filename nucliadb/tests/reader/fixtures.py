@@ -70,9 +70,9 @@ async def reader_api(test_settings_reader: None, local_files):  # type: ignore
 
         return client
 
-    await application.router.startup()
-    yield make_client_fixture
-    await application.router.shutdown()
+    async with application.router.lifespan_context(application):
+        yield make_client_fixture
+
     clear_global_cache()
 
 
@@ -120,14 +120,14 @@ async def test_resources(processor, knowledgebox_ingest, test_settings_reader):
     t0 = time()
 
     while time() - t0 < 30:  # wait max 30 seconds for it
-        txn = await driver.begin()
-        count = 0
-        async for key in txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
-        ):
-            count += 1
+        async with driver.transaction() as txn:
+            count = 0
+            async for key in txn.keys(
+                match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
+            ):
+                count += 1
 
-        await txn.abort()
+            await txn.abort()
         if count == amount:
             break
         print(f"got {count}, retrying")

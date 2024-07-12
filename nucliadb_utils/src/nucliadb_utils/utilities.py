@@ -28,12 +28,15 @@ from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import featureflagging
+from nucliadb_utils.aiopynecone.client import PineconeSession
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.encryption import EndecryptorUtility
+from nucliadb_utils.encryption.settings import settings as encryption_settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
@@ -81,6 +84,8 @@ class Utility(str, Enum):
     NUCLIA_STORAGE = "nuclia_storage"
     MAINDB_DRIVER = "driver"
     USAGE = "usage"
+    ENDECRYPTOR = "endecryptor"
+    PINECONE_SESSION = "pinecone_session"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -436,3 +441,28 @@ def has_feature(
         if X_ACCOUNT_TYPE_HEADER in headers:
             context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
     return get_feature_flags().enabled(name, default=default, context=context)
+
+
+def get_endecryptor() -> EndecryptorUtility:
+    util = get_utility(Utility.ENDECRYPTOR)
+    if util is not None:
+        return util
+    if encryption_settings.encryption_secret_key is None:
+        raise ConfigurationError("Encryption secret key not configured")
+    try:
+        util = EndecryptorUtility.from_b64_encoded_secret_key(encryption_settings.encryption_secret_key)
+    except ValueError as ex:
+        raise ConfigurationError(
+            "Invalid encryption key. Must be a base64 encoded 32-byte string"
+        ) from ex
+    set_utility(Utility.ENDECRYPTOR, util)
+    return util
+
+
+def get_pinecone() -> PineconeSession:
+    util = get_utility(Utility.PINECONE_SESSION)
+    if util is not None:
+        return util
+    util = PineconeSession()
+    set_utility(Utility.PINECONE_SESSION, util)
+    return util

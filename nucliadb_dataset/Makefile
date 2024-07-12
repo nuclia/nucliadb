@@ -1,13 +1,3 @@
-.PHONY: install-dev
-install-dev:
-	pip install --upgrade pip wheel
-	cd .. && pip install \
-		-r test-requirements.txt \
-		-r nucliadb_dataset/requirements-sources.txt \
-		-r nucliadb_dataset/requirements.txt \
-		-r nucliadb_dataset/requirements-test.txt
-	pip install -e .
-
 .PHONY: format
 format:
 	ruff check --fix --config=../ruff.toml .
@@ -20,4 +10,8 @@ lint:
 
 .PHONY: test
 test:
-	pytest -rfE --cov=nucliadb_dataset -s --tb=native -v --cov-report xml --cov-append tests
+	TEST_LOCAL_NUCLIADB=START pytest -rfE -s --tb=native -v tests
+
+.PHONY: test-cov
+test-cov:
+	TEST_LOCAL_NUCLIADB=START pytest -rfE --cov=nucliadb_dataset --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml --cov-append tests

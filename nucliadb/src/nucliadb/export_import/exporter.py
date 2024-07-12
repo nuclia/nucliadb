@@ -198,7 +198,7 @@ async def export_learning_config(
     if lconfig is None:
         logger.warning(f"No learning configuration found for kbid", extra={"kbid": kbid})
         return
-    data = lconfig.json().encode("utf-8")
+    data = lconfig.model_dump_json().encode("utf-8")
     yield ExportedItemType.LEARNING_CONFIG.encode("utf-8")
     yield len(data).to_bytes(4, byteorder="big")
     yield data

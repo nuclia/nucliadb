@@ -52,15 +52,16 @@ async def test_migration_0018_global(maindb_driver: Driver):
             await txn.set(key, fake_kb_id.encode())
             assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
 
-            real_kb_slug = "real-kb-slug"
-            real_kb_id = await KnowledgeBox.create(
-                txn,
-                slug=real_kb_slug,
-                semantic_model=knowledgebox_pb2.SemanticModelMetadata(),
-            )
-            assert await datamanagers.kb.exists_kb(txn, kbid=real_kb_id)
-
             await txn.commit()
+
+        real_kb_slug = "real-kb-slug"
+        (real_kb_id, _) = await KnowledgeBox.create(
+            maindb_driver,
+            kbid=KnowledgeBox.new_unique_kbid(),
+            slug=real_kb_slug,
+            semantic_model=knowledgebox_pb2.SemanticModelMetadata(),
+        )
+        assert await datamanagers.atomic.kb.exists_kb(kbid=real_kb_id)
 
         # tikv needs to open a second transaction to be able to read values from
         # the first one using `scan_keys`

@@ -74,36 +74,6 @@ class Driver:
                 except Exception:
                     pass
 
-    async def begin(self, read_only: bool = False) -> Transaction:
-        raise NotImplementedError()
-
     @asynccontextmanager
-    async def transaction(
-        self, wait_for_abort: bool = True, read_only: bool = False
-    ) -> AsyncGenerator[Transaction, None]:
-        """
-        Use to make sure transaction is always aborted.
-
-        :param wait_for_abort: If True, wait for abort to finish before returning.
-                               If False, abort is done in background (unless there
-                               is an error)
-        """
-        txn: Optional[Transaction] = None
-        error: bool = False
-        try:
-            txn = await self.begin(read_only=read_only)
-            yield txn
-        except Exception:
-            error = True
-            raise
-        finally:
-            if txn is not None and txn.open:
-                if error or wait_for_abort:
-                    await txn.abort()
-                else:
-                    self._async_abort(txn)
-
-    def _async_abort(self, txn: Transaction):
-        task = asyncio.create_task(txn.abort())
-        task.add_done_callback(lambda task: self._abort_tasks.remove(task))
-        self._abort_tasks.append(task)
+    async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
+        yield Transaction()

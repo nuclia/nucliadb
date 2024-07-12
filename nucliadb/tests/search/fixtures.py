@@ -98,21 +98,6 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
     from nucliadb.common.cluster import manager
     from nucliadb.search.app import application
 
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
-    await driver.flushall()
-
-    await application.router.startup()
-
-    # Make sure is clean
-    await asyncio.sleep(1)
-    count = 0
-    while len(manager.INDEX_NODES) < 2:
-        print("awaiting cluster nodes - search fixtures.py")
-        await asyncio.sleep(1)
-        if count == 40:
-            raise Exception("No cluster")
-        count += 1
-
     def make_client_fixture(
         roles: Optional[list[Enum]] = None,
         user: str = "",
@@ -139,8 +124,22 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
 
         return client
 
-    yield make_client_fixture
-    await application.router.shutdown()
+    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
+    await driver.flushall()
+
+    async with application.router.lifespan_context(application):
+        # Make sure is clean
+        await asyncio.sleep(1)
+        count = 0
+        while len(manager.INDEX_NODES) < 2:
+            print("awaiting cluster nodes - search fixtures.py")
+            await asyncio.sleep(1)
+            if count == 40:
+                raise Exception("No cluster")
+            count += 1
+
+        yield make_client_fixture
+
     # Make sure nodes can sync
     await asyncio.sleep(1)
     await driver.flushall()
@@ -194,12 +193,12 @@ async def inject_message(processor, knowledgebox_ingest, message, count: int = 1
 async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Make sure is indexed
     driver = get_driver()
-    txn = await driver.begin()
-    shard_manager = KBShardManager()
-    shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
-    if shard is None:
-        raise Exception("Could not find shard")
-    await txn.abort()
+    async with driver.transaction() as txn:
+        shard_manager = KBShardManager()
+        shard = await shard_manager.get_current_active_shard(txn, knowledgebox_ingest)
+        if shard is None:
+            raise Exception("Could not find shard")
+        await txn.abort()
 
     checks: dict[str, bool] = {}
     for replica in shard.replicas:

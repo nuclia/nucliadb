@@ -1,0 +1,231 @@
+name: Deploy
+
+on:
+  workflow_call:
+
+concurrency:
+  group: deploy_workflow
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+
+jobs:
+  build-node-image:
+    name: Build node image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Restore binaries
+        uses: actions/cache/restore@v4
+        with:
+          path: "target/release/node_*er"
+          key: node-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Build docker images for node
+        id: build-image
+        run: mkdir builds && mv target/release/node_* builds && docker build -f Dockerfile.node_prebuilt . --iidfile imageid && echo imageid=$(cat imageid) >> $GITHUB_OUTPUT
+      - name: Push image
+        id: push-image
+        uses: ./.github/actions/push-img-nucliadb
+        env:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+          GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
+        with:
+          imageid: ${{ steps.build-image.outputs.imageid }}
+          image-name: node
+          aws-ecr-role: ${{ secrets.AWS_ECR_ROLE }}
+
+  build-python-images:
+    name: Build Python images
+    strategy:
+      matrix:
+        include:
+          - file: Dockerfile
+            image-name: nucliadb_hosted
+          - file: Dockerfile.node_sidecar
+            image-name: node_sidecar
+    uses: ./.github/workflows/_build-img-nucliadb.yml
+    with:
+      file: ${{ matrix.file }}
+      image-name: ${{ matrix.image-name }}
+    secrets:
+      inherit
+
+  deploy-nucliadb-shared:
+    name: Deploy nucliadb shared
+    runs-on: ubuntu-latest
+    steps:
+    - name: Generate a token
+      id: app-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+        private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+        owner: nuclia
+
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set helm package image
+      id: version_step
+      run: |-
+        VERSION=`cat VERSION`
+        VERSION_SHA=$VERSION-$(echo $GITHUB_SHA | cut -c1-6)
+        sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_shared/Chart.yaml
+        echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
+
+    - name: Configure Git
+      run: |
+        git config user.name "$GITHUB_ACTOR"
+        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: v3.4.0
+
+    - name: Push helm package
+      run: |-
+        helm lint charts/nucliadb_shared
+        helm package charts/nucliadb_shared
+        curl --data-binary "@nucliadb_shared-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+
+    - name: Repository Dispatch
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ steps.app-token.outputs.token }}
+        repository: nuclia/nucliadb_deploy
+        event-type: promote
+        client-payload: '{"component": "nucliadb_shared", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+
+  deploy-nucliadb-node:
+    name: Deploy Node
+    runs-on: ubuntu-latest
+    needs:
+      - build-python-images
+      - build-node-image
+      - deploy-nucliadb-shared
+    steps:
+      - name: Generate a token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+          private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+          owner: nuclia
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Set helm package image
+        id: version_step
+        run: |-
+          sed -i.bak "s#IMAGE_TO_REPLACE#node:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#node_sidecar:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_node/values.yaml
+          VERSION=`cat VERSION`
+          VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
+          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_node/Chart.yaml
+          echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.4.0
+
+      - name: Push helm package
+        run: |-
+          helm lint charts/nucliadb_node
+          helm package charts/nucliadb_node
+          curl --data-binary "@nucliadb_node-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: nuclia/nucliadb_deploy
+          event-type: promote
+          client-payload: '{"component": "nucliadb_node", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+
+  deploy-nucliadb-component:
+    name: Deploy NucliaDB component
+    runs-on: ubuntu-latest
+    needs:
+      - build-python-images
+      - deploy-nucliadb-shared
+    strategy:
+      # nucliadb_deploy pipeline has issues with too many parallel invocations
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        component:
+          - ingest
+          - reader
+          - search
+          - train
+          - writer
+    steps:
+      - name: Generate a token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+          private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+          owner: nuclia
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          echo "short_sha=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Set helm package image
+        id: version_step
+        run: |-
+          sed -i.bak "s#IMAGE_TO_REPLACE#nucliadb_hosted:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_${{ matrix.component }}/values.yaml
+          sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_${{ matrix.component }}/values.yaml
+          VERSION=`cat VERSION`
+          VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
+          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_${{ matrix.component }}/Chart.yaml
+          echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.4.0
+
+      - name: Push helm package
+        run: |-
+          helm lint charts/nucliadb_${{ matrix.component }}
+          helm package charts/nucliadb_${{ matrix.component }}
+          curl --data-binary "@nucliadb_${{ matrix.component }}-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: nuclia/nucliadb_deploy
+          event-type: promote
+          client-payload: '{"component": "nucliadb_${{ matrix.component }}", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'

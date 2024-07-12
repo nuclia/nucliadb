@@ -249,13 +249,13 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest, t
     t0 = time()
 
     while time() - t0 < 30:  # wait max 30 seconds for it
-        txn = await driver.begin()
-        count = 0
-        async for key in txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
-        ):
-            count += 1
-        await txn.abort()
+        async with driver.transaction(read_only=True) as txn:
+            count = 0
+            async for key in txn.keys(
+                match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
+            ):
+                count += 1
+
         if count == amount:
             break
         print(f"got {count}, retrying")
@@ -263,13 +263,13 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest, t
 
     # Add entities
     storage = await get_storage()
-    txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
-    entities_manager = EntitiesManager(kb, txn)
-    entities = EntitiesGroup()
-    entities.entities["entity1"].value = "PERSON"
-    await entities_manager.set_entities_group_force("group1", entities)
-    await txn.commit()
+    async with driver.transaction() as txn:
+        kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+        entities_manager = EntitiesManager(kb, txn)
+        entities = EntitiesGroup()
+        entities.entities["entity1"].value = "PERSON"
+        await entities_manager.set_entities_group_force("group1", entities)
+        await txn.commit()
 
     # Add ontology
     labelset = LabelSet()

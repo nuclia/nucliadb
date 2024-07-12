@@ -17,13 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
 import logging
 import os
 import tempfile
 from typing import AsyncIterator
 from unittest.mock import Mock
 
-import asyncpg
+import psycopg
 import pytest
 from grpc import aio
 from httpx import AsyncClient
@@ -126,7 +127,21 @@ def tmpdir():
 
 
 @pytest.fixture(scope="function")
+def endecryptor_settings():
+    from nucliadb_utils.encryption.settings import settings
+
+    secret_key = os.urandom(32)
+    encoded_secret_key = base64.b64encode(secret_key).decode("utf-8")
+    settings.encryption_secret_key = encoded_secret_key
+
+    yield
+
+    settings.encryption_secret_key = None
+
+
+@pytest.fixture(scope="function")
 async def nucliadb(
+    endecryptor_settings,
     dummy_processing,
     analytics_disabled,
     maindb_settings,
@@ -515,13 +530,9 @@ async def pg_maindb_driver(pg_maindb_settings):
     ingest_settings.driver = DriverConfig.PG
     ingest_settings.driver_pg_url = url
 
-    conn = await asyncpg.connect(url)
-    await conn.execute(
-        """
-DROP table IF EXISTS resources;
-"""
-    )
-    await conn.close()
+    async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
+        await cur.execute("DROP table IF EXISTS resources")
+
     driver = PGDriver(url=url)
     await driver.initialize()
 
@@ -645,9 +656,9 @@ async def cleanup_maindb(driver: Driver):
 
 @pytest.fixture(scope="function")
 async def txn(maindb_driver):
-    txn = await maindb_driver.begin()
-    yield txn
-    await txn.abort()
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()
 
 
 @pytest.fixture(scope="function")

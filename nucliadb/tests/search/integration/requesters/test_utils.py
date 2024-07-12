@@ -43,7 +43,7 @@ async def test_vector_result_metadata(
     pb_query, _, _ = await QueryParser(
         kbid=kbid,
         query="own text",
-        features=[SearchOptions.VECTOR],
+        features=[SearchOptions.SEMANTIC],
         filters=[],
         faceted=[],
         page_number=0,

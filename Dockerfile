@@ -1,8 +1,20 @@
+#
+# This Dockerfile build nucliadb without the binding.
+# See also `Dockerfile.withbinding` for a version with a compiled binding (for standalone)
+#
+
+# Stage to extract the external requirements from the lockfile
+# This is to improve caching, `pdm.lock` changes when our components
+# are updated. The generated requirements.txt does not, so it is
+# more cacheable.
+FROM python:3.12 AS requirements
+RUN pip install pdm
+COPY pdm.lock pyproject.toml .
+RUN pdm export --prod --no-hashes | grep -v ^-e > requirements.lock.txt
+
 FROM python:3.12
-
-WORKDIR /usr/src/app
-
-# Cachable layers
+RUN mkdir -p /usr/src/app
+RUN pip install pdm
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
@@ -14,18 +26,15 @@ RUN set -eux; \
     curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.17/grpc_health_probe-linux-${probeArch}; \
     echo "${probeSha256} /bin/grpc_health_probe" | sha256sum -c -; \
     chmod +x /bin/grpc_health_probe
-RUN apt-get update && apt-get install -y jq
 
+# Install Python dependencies
+WORKDIR /usr/src/app
+COPY --from=requirements requirements.lock.txt /tmp
+RUN python -m venv .venv && \
+    .venv/bin/pip install -r /tmp/requirements.lock.txt
 
-# Cachable pip install dependencies
-COPY nucliadb/requirements.lock.txt requirements.lock.txt
-RUN pip install --upgrade pip wheel && \
-    pip install nucliadb-node-binding>=0.7.5 Cython==0.29.24 pybind11 uvicorn uvloop asyncpg py-spy && \
-    pip install -r requirements.lock.txt
-
-
-# Application install
-COPY VERSION /usr/src/app/VERSION
+# Copy application
+COPY VERSION pyproject.toml pdm.lock /usr/src/app
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
@@ -33,8 +42,12 @@ COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb /usr/src/app/nucliadb
 COPY nucliadb_performance /usr/src/app/nucliadb_performance
 
-RUN pip install -r nucliadb/requirements-sources.txt && \
-    pip install -e /usr/src/app/nucliadb
+# Create a fake binding to avoid installing the real one
+RUN mkdir nucliadb_node_binding && \
+    touch nucliadb_node_binding/pyproject.toml
+
+# Install our packages to the virtualenv
+RUN pdm sync --prod --no-editable
 
 RUN mkdir -p /data
 
@@ -55,4 +68,5 @@ EXPOSE 8060/tcp
 # GRPC - TRAIN
 EXPOSE 8040/tcp
 
+ENV PATH="/usr/src/app/.venv/bin:$PATH"
 CMD ["nucliadb"]

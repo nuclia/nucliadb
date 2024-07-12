@@ -26,10 +26,9 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.middleware.transaction import ReadOnlyTransactionMiddleware
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import api
-from nucliadb.train.lifecycle import finalize, initialize
+from nucliadb.train.lifecycle import lifespan
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.utils import (
     client_disconnect_handler,
@@ -60,7 +59,6 @@ if has_feature(const.Features.CORS_MIDDLEWARE, default=False):
 middleware.extend(
     [
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
-        Middleware(ReadOnlyTransactionMiddleware),
         Middleware(AuditMiddleware),
     ]
 )
@@ -68,15 +66,10 @@ middleware.extend(
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
 
-on_startup = [initialize]
-on_shutdown = [finalize]
-
-
 fastapi_settings = dict(
     debug=running_settings.debug,
     middleware=middleware,
-    on_startup=on_startup,
-    on_shutdown=on_shutdown,
+    lifespan=lifespan,
     exception_handlers={
         Exception: global_exception_handler,
         ClientDisconnect: client_disconnect_handler,

@@ -20,16 +20,19 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, Optional, Union
+import logging
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Optional
 
-import asyncpg
 import backoff
+import psycopg
+import psycopg_pool
 
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
 from nucliadb_telemetry import metrics
 
 RETRIABLE_EXCEPTIONS = (
-    asyncpg.CannotConnectNowError,
+    psycopg_pool.PoolTimeout,
     OSError,
     ConnectionResetError,
 )
@@ -41,57 +44,72 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 """
 
+logger = logging.getLogger(__name__)
 
+# Request Metrics
 pg_observer = metrics.Observer(
     "pg_client",
     labels={"type": ""},
 )
 
+# Pool metrics
+POOL_METRICS_COUNTERS = {
+    # Requests for a connection to the pool
+    "requests_num": metrics.Counter("pg_client_pool_requests_total"),
+    "requests_queued": metrics.Counter("pg_client_pool_requests_queued_total"),
+    "requests_errors": metrics.Counter("pg_client_pool_requests_errors_total"),
+    "requests_wait_ms": metrics.Counter("pg_client_pool_requests_queued_seconds_total"),
+    "usage_ms": metrics.Counter("pg_client_pool_requests_usage_seconds_total"),
+    # Pool opening a connection to PG
+    "connections_num": metrics.Counter("pg_client_pool_connections_total"),
+    "connections_ms": metrics.Counter("pg_client_pool_connections_seconds_total"),
+}
+POOL_METRICS_GAUGES = {
+    "pool_size": metrics.Gauge("pg_client_pool_connections_open"),
+    # The two below most likely change too rapidly to be useful in a metric
+    "pool_available": metrics.Gauge("pg_client_pool_connections_available"),
+    "requests_waiting": metrics.Gauge("pg_client_pool_requests_waiting"),
+}
+
 
 class DataLayer:
-    def __init__(self, connection: Union[asyncpg.Connection, asyncpg.Pool]):
+    def __init__(self, connection: psycopg.AsyncConnection):
         self.connection = connection
-        # A lock to avoid sending concurrent queries to the connection. asyncpg has its own system to control this
-        # but instead of waiting, it raises an Exception. We use our own lock so that concurrent tasks wait for each
-        # other, rather than exploding. This could be avoided if we can guarantee that a single asyncpg connection
-        # is not shared between concurrent tasks.
-        self.lock = asyncio.Lock()
 
     async def get(self, key: str, select_for_update: bool = False) -> Optional[bytes]:
         with pg_observer({"type": "get"}):
-            async with self.lock:
-                statement = "SELECT value FROM resources WHERE key = $1"
-                if select_for_update:
-                    statement += " FOR UPDATE"
-                return await self.connection.fetchval(statement, key)
+            statement = "SELECT value FROM resources WHERE key = %s"
+            if select_for_update:
+                statement += " FOR UPDATE"
+            async with self.connection.cursor() as cur:
+                await cur.execute(statement, (key,))
+                row = await cur.fetchone()
+                return row[0] if row else None
 
     async def set(self, key: str, value: bytes) -> None:
         with pg_observer({"type": "set"}):
-            async with self.lock:
-                await self.connection.execute(
+            async with self.connection.cursor() as cur:
+                await cur.execute(
                     "INSERT INTO resources (key, value) "
-                    "VALUES ($1, $2) "
+                    "VALUES (%s, %s) "
                     "ON CONFLICT (key) "
                     "DO UPDATE SET value = EXCLUDED.value",
-                    key,
-                    value,
+                    (key, value),
                 )
 
     async def delete(self, key: str) -> None:
         with pg_observer({"type": "delete"}):
-            async with self.lock:
-                await self.connection.execute("DELETE FROM resources WHERE key = $1", key)
+            async with self.connection.cursor() as cur:
+                await cur.execute("DELETE FROM resources WHERE key = %s", (key,))
 
     async def batch_get(self, keys: list[str], select_for_update: bool = False) -> list[Optional[bytes]]:
         with pg_observer({"type": "batch_get"}):
-            async with self.lock:
-                statement = "SELECT key, value FROM resources WHERE key = ANY($1)"
+            async with self.connection.cursor() as cur:
+                statement = "SELECT key, value FROM resources WHERE key = ANY(%s)"
                 if select_for_update:
                     statement += " FOR UPDATE"
-                records = {
-                    record["key"]: record["value"]
-                    for record in await self.connection.fetch(statement, keys)
-                }
+                await cur.execute(statement, (keys,))
+                records = {record[0]: record[1] for record in await cur.fetchall()}
             # get sorted by keys
             return [records.get(key) for key in keys]
 
@@ -101,26 +119,25 @@ class DataLayer:
         limit: int = DEFAULT_SCAN_LIMIT,
         include_start: bool = True,
     ) -> AsyncGenerator[str, None]:
-        query = "SELECT key FROM resources WHERE key LIKE $1 ORDER BY key"
+        query = "SELECT key FROM resources WHERE key LIKE %s ORDER BY key"
 
         args: list[Any] = [prefix + "%"]
         if limit > 0:
-            query += " LIMIT $2"
+            query += " LIMIT %s"
             args.append(limit)
         with pg_observer({"type": "scan_keys"}):
-            async with self.lock:
-                async for record in self.connection.cursor(query, *args):
-                    if not include_start and record["key"] == prefix:
+            async with self.connection.cursor() as cur:
+                async for record in cur.stream(query, args):
+                    if not include_start and record[0] == prefix:
                         continue
-                    yield record["key"]
+                    yield record[0]
 
     async def count(self, match: str) -> int:
         with pg_observer({"type": "count"}):
-            async with self.lock:
-                results = await self.connection.fetch(
-                    "SELECT count(*) FROM resources WHERE key LIKE $1", match + "%"
-                )
-            return results[0]["count"]
+            async with self.connection.cursor() as cur:
+                await cur.execute("SELECT count(*) FROM resources WHERE key LIKE %s", (match + "%",))
+                row = await cur.fetchone()
+                return row[0]  # type: ignore
 
 
 class PGTransaction(Transaction):
@@ -129,37 +146,30 @@ class PGTransaction(Transaction):
     def __init__(
         self,
         driver: PGDriver,
-        connection: asyncpg.Connection,
-        txn: Any,
+        connection: psycopg.AsyncConnection,
     ):
         self.driver = driver
         self.connection = connection
         self.data_layer = DataLayer(connection)
-        self.txn = txn
         self.open = True
-        self._lock = asyncio.Lock()
 
     async def abort(self):
         with pg_observer({"type": "rollback"}):
-            async with self._lock:
-                if self.open:
-                    try:
-                        await self.txn.rollback()
-                    finally:
-                        self.open = False
-                        await self.connection.close()
+            if self.open:
+                try:
+                    await self.connection.rollback()
+                finally:
+                    self.open = False
 
     async def commit(self):
         with pg_observer({"type": "commit"}):
-            async with self._lock:
-                try:
-                    await self.txn.commit()
-                except Exception:
-                    await self.txn.rollback()
-                    raise
-                finally:
-                    self.open = False
-                    await self.connection.close()
+            try:
+                await self.connection.commit()
+            except Exception:
+                await self.connection.rollback()
+                raise
+            finally:
+                self.open = False
 
     async def batch_get(self, keys: list[str], for_update: bool = True):
         return await self.data_layer.batch_get(keys, select_for_update=for_update)
@@ -239,27 +249,8 @@ class ReadOnlyPGTransaction(Transaction):
             return await DataLayer(conn).count(match)
 
 
-class InstrumentedAcquireContext:
-    def __init__(self, context):
-        self.context = context
-
-    async def __aenter__(self):
-        with pg_observer({"type": "acquire"}):
-            return await self.context.__aenter__()
-
-    async def __aexit__(self, *exc):
-        return await self.context.__aexit__()
-
-    def __await__(self):
-        async def wrap():
-            with pg_observer({"type": "acquire"}):
-                return await self.context
-
-        return wrap().__await__()
-
-
 class PGDriver(Driver):
-    pool: asyncpg.Pool
+    pool: psycopg_pool.AsyncConnectionPool
 
     def __init__(
         self,
@@ -277,37 +268,75 @@ class PGDriver(Driver):
     async def initialize(self):
         async with self._lock:
             if self.initialized is False:
-                self.pool = await asyncpg.create_pool(
+                self.pool = psycopg_pool.AsyncConnectionPool(
                     self.url,
                     min_size=self.connection_pool_min_size,
                     max_size=self.connection_pool_max_size,
+                    check=psycopg_pool.AsyncConnectionPool.check_connection,
+                    open=False,
                 )
+                await self.pool.open()
 
                 # check if table exists
-                try:
-                    async with self.pool.acquire() as conn:
-                        await conn.execute(CREATE_TABLE)
-                except asyncpg.exceptions.UniqueViolationError:  # pragma: no cover
-                    pass
+                async with self._get_connection() as conn:
+                    await conn.execute(CREATE_TABLE)
 
             self.initialized = True
+            self.metrics_task = asyncio.create_task(self._report_metrics_task())
 
     async def finalize(self):
         async with self._lock:
             await self.pool.close()
             self.initialized = False
+            self.metrics_task.cancel()
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=3)
-    async def begin(self, read_only: bool = False) -> Union[PGTransaction, ReadOnlyPGTransaction]:
+    async def _report_metrics_task(self):
+        while True:
+            self._report_metrics()
+            await asyncio.sleep(60)
+
+    def _report_metrics(self):
+        if not self.initialized:
+            return
+
+        metrics = self.pool.pop_stats()
+        for key, metric in POOL_METRICS_COUNTERS.items():
+            value = metrics.get(key, 0)
+            if key.endswith("_ms"):
+                value /= 1000
+            metric.inc(value=value)
+
+        for key, metric in POOL_METRICS_GAUGES.items():
+            value = metrics.get(key, 0)
+            metric.set(value)
+
+    @asynccontextmanager
+    async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
         if read_only:
-            return ReadOnlyPGTransaction(self)
+            yield ReadOnlyPGTransaction(self)
         else:
-            conn = await self._get_connection()
-            with pg_observer({"type": "begin"}):
-                txn = conn.transaction()
-                await txn.start()
-                return PGTransaction(self, conn, txn)
+            async with self._get_connection() as conn:
+                yield PGTransaction(self, conn)
 
-    def _get_connection(self) -> asyncpg.Connection:
+    @asynccontextmanager
+    async def _get_connection(self) -> AsyncGenerator[psycopg.AsyncConnection, None]:
         timeout = self.acquire_timeout_ms / 1000
-        return InstrumentedAcquireContext(self.pool.acquire(timeout=timeout))
+        # Manual retry loop since backoff.on_exception does not play well with async context managers
+        retries = 0
+        while True:
+            with pg_observer({"type": "acquire"}):
+                try:
+                    async with self.pool.connection(timeout=timeout) as conn:
+                        yield conn
+                        return
+                except psycopg_pool.PoolTimeout as e:
+                    logger.warning(
+                        f"Timeout getting connection from the pool, backing off. Retries = {retries}"
+                    )
+                    if retries < 3:
+                        await asyncio.sleep(1)
+                        retries += 1
+                    else:
+                        raise e
+                except Exception as e:
+                    raise e

@@ -19,6 +19,7 @@
 #
 import os
 
+import psycopg_pool
 import pytest
 
 from nucliadb.common.maindb.driver import Driver
@@ -40,20 +41,14 @@ async def test_pg_driver_pool_timeout(pg):
     await driver.initialize()
 
     # Get one connection and hold it
-    conn = await driver.begin()
-
-    # Try to get another connection, should fail because pool is full
-    with pytest.raises(TimeoutError):
-        await driver.begin()
-
-    # Abort the connection and try again
-    await conn.abort()
+    async with driver.transaction():
+        # Try to get another connection, should fail because pool is full
+        with pytest.raises(psycopg_pool.PoolTimeout):
+            await driver.transaction().__aenter__()
 
     # Should now work
-    conn2 = await driver.begin()
-
-    # Closing for hygiene
-    await conn2.abort()
+    async with driver.transaction():
+        pass
 
 
 async def _clear_db(driver: Driver):
@@ -73,30 +68,30 @@ async def driver_basic(driver: Driver):
     await _clear_db(driver)
 
     # Test deleting a key that doesn't exist does not raise any error
-    txn = await driver.begin()
-    await txn.delete("/i/do/not/exist")
-    await txn.commit()
+    async with driver.transaction() as txn:
+        await txn.delete("/i/do/not/exist")
+        await txn.commit()
 
-    txn = await driver.begin()
-    await txn.set("/internal/kbs/kb1/title", b"My title")
-    await txn.set("/internal/kbs/kb1/shards/shard1", b"node1")
+    async with driver.transaction() as txn:
+        await txn.set("/internal/kbs/kb1/title", b"My title")
+        await txn.set("/internal/kbs/kb1/shards/shard1", b"node1")
 
-    await txn.set("/kbs/kb1/r/uuid1/text", b"My title")
+        await txn.set("/kbs/kb1/r/uuid1/text", b"My title")
 
-    result = await txn.get("/kbs/kb1/r/uuid1/text")
-    assert result == b"My title"
+        result = await txn.get("/kbs/kb1/r/uuid1/text")
+        assert result == b"My title"
 
-    await txn.commit()
+        await txn.commit()
 
-    txn = await driver.begin()
-    result = await txn.get("/kbs/kb1/r/uuid1/text")
-    assert result == b"My title"
+    async with driver.transaction() as txn:
+        result = await txn.get("/kbs/kb1/r/uuid1/text")
+        assert result == b"My title"
 
-    result = await txn.batch_get(  # type: ignore
-        ["/kbs/kb1/r/uuid1/text", "/internal/kbs/kb1/shards/shard1"]
-    )
-    assert result == [b"My title", b"node1"]
-    await txn.abort()
+        result = await txn.batch_get(  # type: ignore
+            ["/kbs/kb1/r/uuid1/text", "/internal/kbs/kb1/shards/shard1"]
+        )
+        assert result == [b"My title", b"node1"]
+        await txn.abort()
 
     current_internal_kbs_keys = set()
     async with driver.transaction() as txn:
@@ -108,9 +103,9 @@ async def driver_basic(driver: Driver):
     }
 
     # Test delete one key
-    txn = await driver.begin()
-    result = await txn.delete("/internal/kbs/kb1/title")
-    await txn.commit()
+    async with driver.transaction() as txn:
+        result = await txn.delete("/internal/kbs/kb1/title")
+        await txn.commit()
 
     current_internal_kbs_keys = set()
     async with driver.transaction() as txn:
@@ -121,9 +116,9 @@ async def driver_basic(driver: Driver):
 
     # Test nested keys are NOT deleted when deleting the parent one
 
-    txn = await driver.begin()
-    result = await txn.delete("/internal/kbs")
-    await txn.commit()
+    async with driver.transaction() as txn:
+        result = await txn.delete("/internal/kbs")
+        await txn.commit()
 
     current_internal_kbs_keys = set()
     async with driver.transaction() as txn:
@@ -134,16 +129,16 @@ async def driver_basic(driver: Driver):
 
     # Test that all nested keys where a parent path exist as a key, are all returned by scan keys
 
-    txn = await driver.begin()
-    await txn.set("/internal/kbs", b"I am the father")
-    await txn.commit()
+    async with driver.transaction() as txn:
+        await txn.set("/internal/kbs", b"I am the father")
+        await txn.commit()
 
     # It works without trailing slash ...
-    txn = await driver.begin()
-    current_internal_kbs_keys = set()
-    async for key in txn.keys("/internal/kbs"):
-        current_internal_kbs_keys.add(key)
-    await txn.abort()
+    async with driver.transaction() as txn:
+        current_internal_kbs_keys = set()
+        async for key in txn.keys("/internal/kbs"):
+            current_internal_kbs_keys.add(key)
+        await txn.abort()
 
     assert current_internal_kbs_keys == {
         "/internal/kbs/kb1/shards/shard1",
@@ -155,11 +150,11 @@ async def driver_basic(driver: Driver):
         assert await txn.count("/internal/a/foobar") == 0
 
     # but with it it does not return the father
-    txn = await driver.begin()
-    current_internal_kbs_keys = set()
-    async for key in txn.keys("/internal/kbs/"):
-        current_internal_kbs_keys.add(key)
-    await txn.abort()
+    async with driver.transaction() as txn:
+        current_internal_kbs_keys = set()
+        async for key in txn.keys("/internal/kbs/"):
+            current_internal_kbs_keys.add(key)
+        await txn.abort()
 
     assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}
 
@@ -171,17 +166,17 @@ async def driver_basic(driver: Driver):
 
 
 async def _test_keys_async_generator(driver):
-    txn = await driver.begin()
-    for i in range(10):
-        await txn.set(f"/keys/{i}", str(i).encode())
-    await txn.commit()
+    async with driver.transaction() as txn:
+        for i in range(10):
+            await txn.set(f"/keys/{i}", str(i).encode())
+        await txn.commit()
 
-    txn = await driver.begin()
-    async_generator = txn.keys("/keys/", count=10)
-    await async_generator.__anext__()
-    await async_generator.__anext__()
-    await async_generator.aclose()
-    await txn.abort()
+    async with driver.transaction() as txn:
+        async_generator = txn.keys("/keys/", count=10)
+        await async_generator.__anext__()
+        await async_generator.__anext__()
+        await async_generator.aclose()
+        await txn.abort()
 
 
 async def _test_transaction_context_manager(driver):

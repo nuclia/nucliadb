@@ -144,10 +144,10 @@ async def get_find_results(
     find_request = FindRequest()
     find_request.resource_filters = chat_request.resource_filters
     find_request.features = []
-    if ChatOptions.VECTORS in chat_request.features:
-        find_request.features.append(SearchOptions.VECTOR)
-    if ChatOptions.PARAGRAPHS in chat_request.features:
-        find_request.features.append(SearchOptions.PARAGRAPH)
+    if ChatOptions.SEMANTIC in chat_request.features:
+        find_request.features.append(SearchOptions.SEMANTIC)
+    if ChatOptions.KEYWORD in chat_request.features:
+        find_request.features.append(SearchOptions.KEYWORD)
     if ChatOptions.RELATIONS in chat_request.features:
         find_request.features.append(SearchOptions.RELATIONS)
     find_request.query = query
