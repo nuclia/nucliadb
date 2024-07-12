@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from datetime import datetime
 
 import pytest
@@ -70,6 +71,13 @@ class IndexNode:
 
     def call_search_api(self, name, request, resp_klass):
         return self.request(getattr(self.reader, name), request, resp_klass)
+
+
+@pytest.fixture
+def data_path(tmp_path):
+    os.environ["DATA_PATH"] = str(tmp_path)
+    yield
+    del os.environ["DATA_PATH"]
 
 
 @pytest.mark.asyncio
