@@ -573,7 +573,7 @@ class SearchParamDefaults:
     search_features = ParamDefault(
         default=None,
         title="Search features",
-        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes.",  # noqa
+        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes. `document`, `paragraph` and `vector` are deprecated, please use `fulltext`, `keyword` and `semantic` instead",  # noqa
     )
     debug = ParamDefault(
         default=False,
@@ -633,7 +633,7 @@ class SearchParamDefaults:
     chat_features = ParamDefault(
         default=[ChatOptions.SEMANTIC, ChatOptions.KEYWORD, ChatOptions.RELATIONS],
         title="Chat features",
-        description="Features enabled for the chat endpoint. Semantic search is done if `vectors` is included. If `paragraphs` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
+        description="Features enabled for the chat endpoint. Semantic search is done if `semantic` (or `vectors`) is included. If `keyword` (or `paragraphs`) is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",  # noqa
     )
     suggest_features = ParamDefault(
         default=[
