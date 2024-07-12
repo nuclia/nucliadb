@@ -47,10 +47,8 @@ def mock_pinecone_client():
     pinecone_mock = mock.MagicMock()
     pinecone_mock.create_index = mock.AsyncMock(return_value="pinecone-host")
     pinecone_mock.delete_index = mock.AsyncMock(return_value=None)
-    session_mock.get_client.return_value = pinecone_mock
-    with unittest.mock.patch(
-        "nucliadb.ingest.orm.knowledgebox.get_pinecone_session", return_value=session_mock
-    ):
+    session_mock.control_plane.return_value = pinecone_mock
+    with unittest.mock.patch("nucliadb.ingest.orm.knowledgebox.get_pinecone", return_value=session_mock):
         yield pinecone_mock
 
 

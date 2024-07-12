@@ -1,0 +1,79 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+import json
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field, field_validator
+
+KILO_BYTE = 1024
+MAX_METADATA_SIZE = 40 * KILO_BYTE
+
+
+# Requests
+
+
+class Vector(BaseModel):
+    id: str = Field(max_length=512)
+    values: list[float]
+    metadata: dict[str, Any] = {}
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata_size(cls, value):
+        json_value = json.dumps(value)
+        if len(json_value) > MAX_METADATA_SIZE:
+            raise ValueError("metadata size is too large")
+
+
+class UpsertRequest(BaseModel):
+    vectors: list[Vector]
+
+
+# Responses
+
+
+class CreateIndexResponse(BaseModel):
+    host: str
+
+
+class VectorId(BaseModel):
+    id: str
+
+
+class Pagination(BaseModel):
+    next: str
+
+
+class ListResponse(BaseModel):
+    vectors: list[VectorId]
+    pagination: Optional[Pagination] = None
+
+
+class VectorMatch(BaseModel):
+    id: str
+    score: float
+    # Only populated if `includeValues` is set to `True
+    values: Optional[list[float]] = None
+    # Only populated if `includeMetadata` is set to `True
+    metadata: Optional[dict[str, Any]] = None
+
+
+class QueryResponse(BaseModel):
+    matches: list[VectorMatch]

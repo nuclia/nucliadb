@@ -196,9 +196,9 @@ def test_get_endecryptor_errors():
 def test_pinecone_session():
     assert utilities.MAIN.get(utilities.Utility.PINECONE_SESSION) is None
 
-    session = utilities.get_pinecone_session()
+    session = utilities.get_pinecone()
     assert isinstance(session, PineconeSession)
 
     assert utilities.MAIN.get(utilities.Utility.PINECONE_SESSION) is session
 
-    assert utilities.get_pinecone_session() is session
+    assert utilities.get_pinecone() is session

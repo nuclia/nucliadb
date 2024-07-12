@@ -62,7 +62,7 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
     get_endecryptor,
-    get_pinecone_session,
+    get_pinecone,
     get_storage,
     has_feature,
 )
@@ -503,7 +503,7 @@ class KnowledgeBox:
             extra={"kbid": kbid, "index_name": index_name, "vector_dimension": vector_dimension},
         )
         api_key = request.pinecone_config.api_key
-        pinecone = get_pinecone_session().get_client(api_key=api_key)
+        pinecone = get_pinecone().control_plane(api_key=api_key)
         index_host = await pinecone.create_index(
             name=index_name,
             dimension=vector_dimension,
@@ -526,7 +526,7 @@ class KnowledgeBox:
         encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
         endecryptor = get_endecryptor()
         api_key = endecryptor.decrypt(encrypted_api_key)
-        pinecone = get_pinecone_session().get_client(api_key=api_key)
+        pinecone = get_pinecone().control_plane(api_key=api_key)
         try:
             await pinecone.delete_index(name=index_name)
         except Exception:
