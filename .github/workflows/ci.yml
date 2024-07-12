@@ -1,4 +1,4 @@
-name: New CI
+name: CI
 
 on:
   pull_request:
