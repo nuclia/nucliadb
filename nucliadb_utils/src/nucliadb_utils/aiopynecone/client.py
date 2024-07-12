@@ -111,10 +111,22 @@ class DataPlane:
     https://docs.pinecone.io/reference/api/data-plane
     """
 
-    def __init__(self, api_key: str, index_host_session: httpx.AsyncClient):
+    def __init__(
+        self, api_key: str, index_host_session: httpx.AsyncClient, timeout: Optional[float] = None
+    ):
+        """
+        Params:
+        - `api_key`: The Pinecone API key.
+        - `index_host_session`: The http session for the index host.
+        - `timeout`: The default timeout for all requests. If not set, the default timeout from httpx.AsyncClient is used.
+        """
         self.api_key = api_key
         self.http_session = index_host_session
+        self.client_timeout = timeout
         self._upsert_batch_size: Optional[int] = None
+
+    def _get_request_timeout(self, timeout: Optional[float] = None) -> Optional[float]:
+        return timeout or self.client_timeout
 
     @pinecone_observer.wrap({"type": "upsert"})
     async def upsert(self, vectors: list[Vector], timeout: Optional[float] = None) -> None:
@@ -130,7 +142,8 @@ class DataPlane:
             "headers": headers,
             "json": payload.model_dump(),
         }
-        if timeout is not None:
+        request_timeout = self._get_request_timeout(timeout)
+        if request_timeout is not None:
             post_kwargs["timeout"] = timeout
         response = await self.http_session.post("/vectors/upsert", **post_kwargs)
         raise_for_status(response)
@@ -154,7 +167,7 @@ class DataPlane:
         # Estimate the size of the vector payload. 4 bytes per float.
         vector_size = 4 * vector_dimension + average_metadata_size
         # Cache the value.
-        self._upsert_batch_size = int(MAX_UPSERT_PAYLOAD_SIZE // vector_size)
+        self._upsert_batch_size = max(int(MAX_UPSERT_PAYLOAD_SIZE // vector_size), 1)
         return self._upsert_batch_size
 
     @pinecone_observer.wrap({"type": "upsert_in_batches"})
@@ -189,19 +202,30 @@ class DataPlane:
         await asyncio.gather(*tasks)
 
     @pinecone_observer.wrap({"type": "delete"})
-    async def delete(self, ids: list[str]) -> None:
+    async def delete(self, ids: list[str], timeout: Optional[float] = None) -> None:
         """
         Delete vectors by their ids.
         Maximum number of ids in a single request is 1000.
         """
         headers = {"Api-Key": self.api_key}
         payload = {"ids": ids}
-        response = await self.http_session.post("/vectors/delete", headers=headers, json=payload)
+        post_kwargs: dict[str, Any] = {
+            "headers": headers,
+            "json": payload,
+        }
+        request_timeout = self._get_request_timeout(timeout)
+        if request_timeout is not None:
+            post_kwargs["timeout"] = timeout
+        response = await self.http_session.post("/vectors/delete", **post_kwargs)
         raise_for_status(response)
 
     @pinecone_observer.wrap({"type": "list_page"})
     async def list_page(
-        self, prefix: Optional[str] = None, limit: int = 100, pagination_token: Optional[str] = None
+        self,
+        prefix: Optional[str] = None,
+        limit: int = 100,
+        pagination_token: Optional[str] = None,
+        timeout: Optional[float] = None,
     ) -> ListResponse:
         """
         List vectors in a paginated manner.
@@ -217,16 +241,23 @@ class DataPlane:
             params["prefix"] = prefix
         if pagination_token is not None:
             params["paginationToken"] = pagination_token
+
+        post_kwargs: dict[str, Any] = {
+            "headers": headers,
+            "params": params,
+        }
+        request_timeout = self._get_request_timeout(timeout)
+        if request_timeout is not None:
+            post_kwargs["timeout"] = timeout
         response = await self.http_session.get(
             "/vectors/list",
-            headers=headers,
-            params=params,
+            **post_kwargs,
         )
         raise_for_status(response)
         return ListResponse.model_validate(response.json())
 
     async def list_all(
-        self, prefix: Optional[str] = None, page_size: int = 100
+        self, prefix: Optional[str] = None, page_size: int = 100, page_timeout: Optional[float] = None
     ) -> AsyncGenerator[str, None]:
         """
         Iterate over all vector ids from the index in a paginated manner.
@@ -237,7 +268,7 @@ class DataPlane:
         pagination_token = None
         while True:
             response = await self.list_page(
-                prefix=prefix, limit=page_size, pagination_token=pagination_token
+                prefix=prefix, limit=page_size, pagination_token=pagination_token, timeout=page_timeout
             )
             for vector_id in response.vectors:
                 yield vector_id.id
@@ -246,13 +277,20 @@ class DataPlane:
             pagination_token = response.pagination.next
 
     @pinecone_observer.wrap({"type": "delete_all"})
-    async def delete_all(self):
+    async def delete_all(self, timeout: Optional[float] = None):
         """
         Delete all vectors in the index.
         """
         headers = {"Api-Key": self.api_key}
         payload = {"deleteAll": True, "ids": [], "namespace": ""}
-        response = await self.http_session.post("/vectors/delete", headers=headers, json=payload)
+        post_kwargs: dict[str, Any] = {
+            "headers": headers,
+            "json": payload,
+        }
+        request_timeout = self._get_request_timeout(timeout)
+        if request_timeout is not None:
+            post_kwargs["timeout"] = timeout
+        response = await self.http_session.post("/vectors/delete", **post_kwargs)
         try:
             raise_for_status(response)
         except PineconeAPIError as err:
@@ -263,9 +301,19 @@ class DataPlane:
 
     @pinecone_observer.wrap({"type": "delete_by_id_prefix"})
     async def delete_by_id_prefix(
-        self, id_prefix: str, batch_size: int = MAX_DELETE_BATCH_SIZE, max_parallel_batches: int = 1
+        self,
+        id_prefix: str,
+        batch_size: int = MAX_DELETE_BATCH_SIZE,
+        max_parallel_batches: int = 1,
+        batch_timeout: Optional[float] = None,
     ) -> None:
-        """ """
+        """
+        Delete vectors by their id prefix. It lists all vectors with the given prefix and deletes them in batches.
+        Params:
+        - `id_prefix`: to filter vectors by their id prefix.
+        - `batch_size`: to control the number of vectors deleted in each batch. Maximum is 1000.
+        - `max_parallel_batches`: to control the number of batches sent concurrently.
+        """
         if batch_size > MAX_DELETE_BATCH_SIZE:
             logger.warning(f"Batch size {batch_size} is too large. Limiting to {MAX_DELETE_BATCH_SIZE}.")
             batch_size = MAX_DELETE_BATCH_SIZE
@@ -274,7 +322,7 @@ class DataPlane:
 
         async def _delete_batch(batch):
             async with semaphore:
-                await self.delete(ids=batch)
+                await self.delete(ids=batch, timeout=batch_timeout)
 
         tasks = []
         async for batch in self._async_batchify(self.list_all(prefix=id_prefix), size=batch_size):
@@ -310,6 +358,7 @@ class DataPlane:
         include_values: bool = False,
         include_metadata: bool = False,
         filter: Optional[dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> QueryResponse:
         """
         Query the index for similar vectors to the given vector.
@@ -330,7 +379,14 @@ class DataPlane:
         }
         if filter:
             payload["filter"] = filter
-        response = await self.http_session.post("/query", headers=headers, json=payload)
+        post_kwargs: dict[str, Any] = {
+            "headers": headers,
+            "json": payload,
+        }
+        request_timeout = self._get_request_timeout(timeout)
+        if request_timeout is not None:
+            post_kwargs["timeout"] = timeout
+        response = await self.http_session.post("/query", **post_kwargs)
         raise_for_status(response)
         return QueryResponse.model_validate(response.json())
 
@@ -382,9 +438,9 @@ class PineconeSession:
         self.index_host_sessions[index_host] = session
         return session
 
-    def data_plane(self, api_key: str, index_host: str) -> DataPlane:
+    def data_plane(self, api_key: str, index_host: str, timeout: Optional[float] = None) -> DataPlane:
         index_host_session = self._get_index_host_session(index_host)
-        return DataPlane(api_key=api_key, index_host_session=index_host_session)
+        return DataPlane(api_key=api_key, index_host_session=index_host_session, timeout=timeout)
 
 
 def raise_for_status(response: httpx.Response):
