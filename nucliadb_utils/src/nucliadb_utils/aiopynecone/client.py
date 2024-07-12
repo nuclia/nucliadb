@@ -82,11 +82,20 @@ class ControlPlane:
         self.http_session = http_session
 
     @pinecone_observer.wrap({"type": "create_index"})
-    async def create_index(self, name: str, dimension: int) -> str:
+    async def create_index(self, name: str, dimension: int, metric: str = "dotproduct") -> str:
+        """
+        Create a new index in Pinecone. It can only create serverless indexes on the AWS us-east-1 region.
+        Params:
+        - `name`: The name of the index.
+        - `dimension`: The dimension of the vectors in the index.
+        - `metric`: The similarity metric to use. Default is "dotproduct".
+        Returns:
+        - The index host to be used for data plane operations.
+        """
         payload = {
             "name": name,
             "dimension": dimension,
-            "metric": "dotproduct",
+            "metric": metric,
             "spec": {"serverless": {"cloud": "aws", "region": "us-east-1"}},
         }
         headers = {"Api-Key": self.api_key}
@@ -97,6 +106,11 @@ class ControlPlane:
 
     @pinecone_observer.wrap({"type": "delete_index"})
     async def delete_index(self, name: str) -> None:
+        """
+        Delete an index in Pinecone.
+        Params:
+        - `name`: The name of the index to delete.
+        """
         headers = {"Api-Key": self.api_key}
         response = await self.http_session.delete(f"/indexes/{name}", headers=headers)
         if response.status_code == 404:
