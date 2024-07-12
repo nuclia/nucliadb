@@ -1,3 +1,0 @@
-types-urllib3
-types-requests
-requests_mock

@@ -138,14 +138,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v3
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          python-version: "3.12"
+          cache: "true"
 
-      - name: Install the package
-        run: make -C nucliadb/ install-dev
+      - name: Install nucliadb
+        run: pdm sync -d --clean --no-editable
 
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v1
@@ -158,6 +158,7 @@ jobs:
       - name: Upload docs
         run: |
           mkdir -p /tmp/openapi
+          source .venv/bin/activate
           nucliadb-extract-openapi-reader /tmp/openapi/nucliadb-reader.json $API_VERSION $GITHUB_SHA
           nucliadb-extract-openapi-writer /tmp/openapi/nucliadb-writer.json $API_VERSION $GITHUB_SHA
           nucliadb-extract-openapi-search /tmp/openapi/nucliadb-search.json $API_VERSION $GITHUB_SHA

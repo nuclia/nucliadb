@@ -1,13 +1,3 @@
-.PHONY: install-dev
-install-dev:
-	pip install --upgrade pip wheel
-	cd .. && pip install \
-		-r test-requirements.txt \
-		-r nucliadb_dataset/requirements-sources.txt \
-		-r nucliadb_dataset/requirements.txt \
-		-r nucliadb_dataset/requirements-test.txt
-	pip install -e .
-
 .PHONY: format
 format:
 	ruff check --fix --config=../ruff.toml .
