@@ -3,23 +3,30 @@ name = "nucliadb_workspace"
 requires-python = ">=3.9"
 version = "0.0.0"
 dependencies = [
-    "azure-identity>=1.16.1",
+    "nucliadb @ file:///${PROJECT_ROOT}/nucliadb",
 ]
 
+[project.optional-dependencies]
+sidecar = [
+    "nucliadb-sidecar @ file:///${PROJECT_ROOT}/nucliadb_sidecar",
+]
 [tool.pdm.dev-dependencies]
 dev = [
+    # List all the packages we want to install as editable
     "-e file:///${PROJECT_ROOT}/nucliadb",
     "-e file:///${PROJECT_ROOT}/nucliadb_models",
     "-e file:///${PROJECT_ROOT}/nucliadb_sidecar",
     "-e file:///${PROJECT_ROOT}/nucliadb_node_binding",
     "-e file:///${PROJECT_ROOT}/nucliadb_protos/python",
-    "-e file:///${PROJECT_ROOT}/nucliadb_telemetry",
-    "-e file:///${PROJECT_ROOT}/nucliadb_utils",
+    "-e file:///${PROJECT_ROOT}/nucliadb_telemetry[all]",
+    "-e file:///${PROJECT_ROOT}/nucliadb_utils[cache,fastapi,storages]",
+
     # Linting
     "mypy-protobuf>=3.6.0",
     "mypy==1.10",
     "ruff==0.4.8",
     "pre-commit==2.20.0",
+
     # Testing
     "pytest==7.4.2",
     "pytest-asyncio~=0.18.0",

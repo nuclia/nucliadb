@@ -1,3 +1,9 @@
+#
+# Dockerfile for nucliadb's index node, using the provided binaries
+# NOTE: Binaries should be built in the same image as this Dockerfile or older (for glibc compatibility)
+# For a version that compiles the binaries inside docker, see `Dockerfile.node`
+#
+
 FROM debian:bookworm-slim
 
 ENV DATA_PATH=data
