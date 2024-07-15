@@ -21,7 +21,7 @@ import asyncio
 import contextvars
 import time
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import backoff
 import mmh3
@@ -66,15 +66,20 @@ def get_request_context() -> Optional[RequestContext]:
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, audit_utility: AuditStorage) -> None:
-        self.audit_utility = audit_utility
+    def __init__(self, app: ASGIApp, audit_utility_getter: Callable[[], Optional[AuditStorage]]) -> None:
+        self.audit_utility_getter = audit_utility_getter
         super().__init__(app)
+
+    @property
+    def audit_utility(self):
+        return self.audit_utility_getter()
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         context = RequestContext()
         token = request_context_var.set(context)
         context.audit_request.time.FromDatetime(datetime.now(tz=timezone.utc))
         response = await call_next(request)
+
         if isinstance(response, StreamingResponse):
             response = self.wrap_streaming_response(response, context)
         else:
@@ -90,7 +95,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
             # mark that no audit has been set during this request
 
             context.audit_request.request_time = time.monotonic() - context.start_time
-            self.audit_utility.send(context.audit_request)
+            if self.audit_utility is not None:
+                self.audit_utility.send(context.audit_request)
 
     def wrap_streaming_response(
         self, response: StreamingResponse, context: RequestContext

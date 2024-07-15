@@ -454,6 +454,8 @@ async def stream_audit(natsd: str):
     from nucliadb_utils.audit.stream import StreamAuditStorage
     from nucliadb_utils.settings import audit_settings
 
+    audit_settings.audit_driver = "stream"
+
     audit = StreamAuditStorage(
         [natsd],
         audit_settings.audit_jetstream_target,  # type: ignore

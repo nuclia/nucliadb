@@ -40,7 +40,7 @@ from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
-from nucliadb_utils.utilities import has_feature, register_audit_utility
+from nucliadb_utils.utilities import get_audit, has_feature
 
 middleware = []
 
@@ -55,11 +55,11 @@ if has_feature(const.Features.CORS_MIDDLEWARE, default=False):
             allow_headers=["*", "Authorization"],
         )
     )
-audit_utility = register_audit_utility(service="nucliadb")
+
 middleware.extend(
     [
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
-        Middleware(AuditMiddleware, audit_utility=audit_utility),
+        Middleware(AuditMiddleware, audit_utility_getter=get_audit),
     ]
 )
 

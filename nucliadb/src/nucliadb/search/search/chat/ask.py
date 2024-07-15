@@ -200,7 +200,8 @@ class AskResult:
 
         generative_answer_time = finish_predict_stream_time - self.metrics._start_times["stream_start"]
         first_chunk_time = self.metrics.first_chunk_yielded_at - self.metrics.global_start
-        await self.auditor.audit(
+
+        self.auditor.audit(
             text_answer=audit_answer,
             generative_answer_time=generative_answer_time,
             generative_answer_first_chunk_time=first_chunk_time,
