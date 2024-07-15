@@ -276,7 +276,6 @@ def test_raise_for_status_rate_limit():
     )
     with pytest.raises(PineconeRateLimitError):
         raise_for_status("op", response)
-        raise_for_status(response)
 
 
 def test_index_name_validation():
