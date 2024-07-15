@@ -335,12 +335,12 @@ async def start_usage_utility(service: str):
         return
 
     usage_utility = KbUsageReportUtility(
-        nats_subject=cast(str, usage_settings.usage_jetstream_target),
+        nats_subject=cast(str, usage_settings.usage_jetstream_subject),
         nats_servers=usage_settings.usage_jetstream_servers,
         nats_creds=usage_settings.usage_jetstream_auth,
         service=service,
     )
-    logger.info(f"Configuring usage report utility {usage_settings.usage_jetstream_target}")
+    logger.info(f"Configuring usage report utility {usage_settings.usage_jetstream_subject}")
     await usage_utility.initialize()
     set_utility(Utility.USAGE, usage_utility)
 

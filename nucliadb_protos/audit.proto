@@ -57,9 +57,9 @@ message AuditRequest {
     STOPPED = 5;
     SEARCH = 6;
     PROCESSED = 7;
-    KB_DELETED = 8;
-    SUGGEST = 9;
-    INDEXED = 10;
+    KB_DELETED = 8 [deprecated=true];
+    SUGGEST = 9 [deprecated=true];
+    INDEXED = 10 [deprecated=true];
     CHAT = 11;
   }
 

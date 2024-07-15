@@ -102,6 +102,7 @@ class MaterializerHandler:
             await txn.commit()
 
         usage_utility = get_usage_utility()
+
         if usage_utility:
             usage_utility.send_kb_usage(
                 service=Service.NUCLIA_DB,  # type: ignore

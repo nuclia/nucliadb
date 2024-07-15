@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
 from typing import Optional
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import nats
 import pytest
@@ -204,10 +204,18 @@ async def audit():
 
 
 @pytest.fixture(scope="function")
-async def usage():
-    nats_stream = Mock(publish=AsyncMock())
-    report_util = KbUsageReportUtility(nats_stream=nats_stream, nats_subject="test-stream")
-    return report_util
+async def usage(natsd):
+    from nucliadb_utils.settings import usage_settings
+    from nucliadb_utils.utilities import Utility, set_utility
+
+    report_util = KbUsageReportUtility(
+        nats_servers=[natsd], nats_subject=usage_settings.usage_jetstream_subject
+    )
+    await report_util.initialize()
+    report_util.js.publish = AsyncMock(side_effect=report_util.js.publish)
+    set_utility(Utility.USAGE, report_util)
+    yield report_util
+    await report_util.finalize()
 
 
 @pytest.fixture(scope="function")
