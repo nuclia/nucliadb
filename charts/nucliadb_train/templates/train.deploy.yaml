@@ -73,19 +73,15 @@ spec:
               # some delay in the shutdown process
               command: ["sleep", "15"]
         envFrom:
-        - configMapRef:
-            name: nucliadb-config
-        - configMapRef:
-            name: train-config
+          - configMapRef:
+              name: train-config
+          {{- toYaml .Values.envFrom | nindent 10 }}
         env:
           - name: VERSION
             valueFrom:
               fieldRef:
                 fieldPath: metadata.labels['version']
-        {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-        {{- end }}
+          {{- include "toEnv" .Values.env | indent 10 }}
         ports:
         - name: grpc-train
           containerPort: {{ .Values.serving.grpc_port }}

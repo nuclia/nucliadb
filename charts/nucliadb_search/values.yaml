@@ -21,6 +21,11 @@ env:
   SEARCH_CACHE_REDIS_HOST:
   SEARCH_CACHE_REDIS_PORT:
 
+# Configmap and/or secrets to mount into the environment
+envFrom:
+  - configMapRef:
+      name: nucliadb-config
+
 # Kubernetes settings
 affinity: {}
 nodeSelector: {}

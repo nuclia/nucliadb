@@ -77,19 +77,15 @@ spec:
           failureThreshold: 3
         command: ["node_sidecar"]
         envFrom:
-        - configMapRef:
-            name: node-config
-        - configMapRef:
-            name: nucliadb-config
+          - configMapRef:
+              name: node-config
+          {{- toYaml .Values.envFrom | nindent 10 }}
         env:
           - name: VERSION
             valueFrom:
               fieldRef:
                 fieldPath: metadata.labels['version']
-        {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-        {{- end }}
+          {{- include "toEnv" .Values.env | indent 10 }}
         ports:
         - name: grpc-sidecar
           containerPort: {{ .Values.serving.grpc_sidecar }}
@@ -118,10 +114,9 @@ spec:
           periodSeconds: 60
         command: ["node_writer"]
         envFrom:
-        - configMapRef:
-            name: node-config
-        - configMapRef:
-            name: nucliadb-config
+          - configMapRef:
+              name: node-config
+          {{- toYaml .Values.envFrom | nindent 10 }}
         env:
           - name: METRICS_PORT
             value: "3032"
@@ -157,10 +152,9 @@ spec:
           initialDelaySeconds: 2
         command: ["node_reader"]
         envFrom:
-        - configMapRef:
-            name: node-config
-        - configMapRef:
-            name: nucliadb-config
+          - configMapRef:
+              name: node-config
+          {{- toYaml .Values.envFrom | nindent 10 }}
         env:
           - name: METRICS_PORT
             value: "3031"

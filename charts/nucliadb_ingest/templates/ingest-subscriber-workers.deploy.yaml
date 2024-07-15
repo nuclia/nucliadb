@@ -67,19 +67,15 @@ spec:
           "nucliadb-ingest-subscriber-workers"
         ]
         envFrom:
-        - configMapRef:
-            name: nucliadb-config
-        - configMapRef:
-            name: {{ .Release.Name }}-config
+          - configMapRef:
+              name: {{ .Release.Name }}-config
+          {{- toYaml .Values.envFrom | nindent 10 }}
         env:
           - name: VERSION
             valueFrom:
               fieldRef:
                 fieldPath: metadata.labels['version']
-        {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-        {{- end }}
+          {{- include "toEnv" .Values.env | indent 10 }}
         ports:
         - name: grpc-ingest
           containerPort: {{ .Values.serving.grpc }}

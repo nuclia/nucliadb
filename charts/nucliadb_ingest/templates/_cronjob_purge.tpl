@@ -53,10 +53,9 @@ spec:
           - name: "{{ .cronname }}"
             image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
             envFrom:
-            - configMapRef:
-                name: nucliadb-config
-            - configMapRef:
-                name: {{ .Release.Name }}-config
+              - configMapRef:
+                  name: {{ .Release.Name }}-config
+              {{- toYaml .Values.envFrom | nindent 14 }}
             imagePullPolicy: Always
             command: ["{{ .command }}"]
 {{ end }}
