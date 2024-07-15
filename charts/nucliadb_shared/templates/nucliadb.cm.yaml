@@ -1,7 +1,9 @@
+---
+{{- if .Values.configMap.create }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nucliadb-config
+  name: {{ .Values.configMapName | default "nucliadb-config" }}
   labels:
     app: writer
     version: "{{ .Chart.Version | replace "+" "_" }}"
@@ -97,4 +99,5 @@ data:
 
 {{- if .Values.encryption.secret_key }}
   ENCRYPTION_SECRET_KEY: {{ .Values.encryption.secret_key }}
+{{- end }}
 {{- end }}
