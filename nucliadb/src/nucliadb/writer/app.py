@@ -36,7 +36,6 @@ from nucliadb_telemetry.fastapi.utils import (
     global_exception_handler,
 )
 from nucliadb_utils import const
-from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
@@ -56,13 +55,7 @@ if has_feature(const.Features.CORS_MIDDLEWARE, default=False):
             allow_headers=["*", "Authorization"],
         )
     )
-
-middleware.extend(
-    [
-        Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
-        Middleware(AuditMiddleware),
-    ]
-)
+middleware.extend([Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend())])
 
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)

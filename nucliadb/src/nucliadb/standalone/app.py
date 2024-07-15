@@ -47,6 +47,7 @@ from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
+from nucliadb_utils.utilities import register_audit_utility
 
 from .api_router import standalone_api_router
 from .auth import get_auth_backend
@@ -82,6 +83,7 @@ HOMEPAGE_HTML = """
 
 
 def application_factory(settings: Settings) -> FastAPI:
+    audit_utility = register_audit_utility(service="nucliadb")
     middleware = [
         Middleware(
             CORSMiddleware,
@@ -93,7 +95,7 @@ def application_factory(settings: Settings) -> FastAPI:
             AuthenticationMiddleware,
             backend=get_auth_backend(settings),
         ),
-        Middleware(AuditMiddleware),
+        Middleware(AuditMiddleware, audit_utility=audit_utility),
     ]
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))

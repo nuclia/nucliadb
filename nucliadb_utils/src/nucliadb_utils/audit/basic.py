@@ -34,6 +34,9 @@ from nucliadb_utils.audit.audit import AuditStorage
 
 
 class BasicAuditStorage(AuditStorage):
+    def __init__(self):
+        self.initialized = True
+
     def message_to_str(self, message: BrokerMessage) -> str:
         return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
 

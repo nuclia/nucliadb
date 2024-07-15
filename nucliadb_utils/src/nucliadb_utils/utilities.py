@@ -352,16 +352,14 @@ async def stop_usage_utility():
         clean_utility(Utility.USAGE)
 
 
-async def start_audit_utility(service: str):
-    audit_utility: Optional[AuditStorage] = get_utility(Utility.AUDIT)
-    if audit_utility is not None:
-        return
-
+def register_audit_utility(service: str) -> AuditStorage:
     if audit_settings.audit_driver == "basic":
-        audit_utility = BasicAuditStorage()
+        b_audit_utility: AuditStorage = BasicAuditStorage()
+        set_utility(Utility.AUDIT, b_audit_utility)
         logger.info("Configuring basic audit log")
+        return b_audit_utility
     elif audit_settings.audit_driver == "stream":
-        audit_utility = StreamAuditStorage(
+        s_audit_utility: AuditStorage = StreamAuditStorage(
             nats_creds=audit_settings.audit_jetstream_auth,
             nats_servers=audit_settings.audit_jetstream_servers,
             nats_target=cast(str, audit_settings.audit_jetstream_target),
@@ -369,11 +367,22 @@ async def start_audit_utility(service: str):
             seed=audit_settings.audit_hash_seed,
             service=service,
         )
+        set_utility(Utility.AUDIT, s_audit_utility)
         logger.info(f"Configuring stream audit log {audit_settings.audit_jetstream_target}")
+        return s_audit_utility
     else:
         raise ConfigurationError("Invalid audit driver")
-    await audit_utility.initialize()
-    set_utility(Utility.AUDIT, audit_utility)
+
+
+async def start_audit_utility(service: str):
+    audit_utility: Optional[AuditStorage] = get_utility(Utility.AUDIT)
+    if audit_utility is not None and audit_utility.initialized is True:
+        return
+
+    if audit_utility is None:
+        audit_utility = register_audit_utility(service)
+    if audit_utility.initialized is False:
+        await audit_utility.initialize()
 
 
 async def stop_audit_utility():

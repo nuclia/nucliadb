@@ -31,6 +31,8 @@ from nucliadb_protos.resources_pb2 import FieldID
 
 
 class AuditStorage:
+    initialized: bool = False
+
     def report_and_send(
         self,
         *,

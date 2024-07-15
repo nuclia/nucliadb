@@ -31,6 +31,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from opentelemetry.trace import format_trace_id, get_current_span
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response, StreamingResponse
+from starlette.types import ASGIApp
 
 from nucliadb_protos.audit_pb2 import (
     AuditField,
@@ -65,6 +66,10 @@ def get_request_context() -> Optional[RequestContext]:
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp, audit_utility: AuditStorage) -> None:
+        self.audit_utility = audit_utility
+        super().__init__(app)
+
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         context = RequestContext()
         token = request_context_var.set(context)
@@ -80,16 +85,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return response
 
     def enqueue_pending(self, context: RequestContext):
-        # Circular dependency, open to ideas to get rid of this
-        from nucliadb_utils.utilities import get_audit
-
         if context.audit_request.kbid:
             # an audit request with no kbid makes no sense, we use this as an heuristic
             # mark that no audit has been set during this request
-            audit_utility = get_audit()
-            if audit_utility is not None:
-                context.audit_request.request_time = time.monotonic() - context.start_time
-                audit_utility.send(context.audit_request)
+
+            context.audit_request.request_time = time.monotonic() - context.start_time
+            self.audit_utility.send(context.audit_request)
 
     def wrap_streaming_response(
         self, response: StreamingResponse, context: RequestContext
@@ -116,8 +117,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
 
 class StreamAuditStorage(AuditStorage):
-    task: Optional[asyncio.Task] = None
-    initialized: bool = False
+    task: Optional[asyncio.Task]
+    initialized: bool
     queue: asyncio.Queue
 
     def __init__(
@@ -136,6 +137,8 @@ class StreamAuditStorage(AuditStorage):
         self.seed = seed
         self.queue = asyncio.Queue()
         self.service = service
+        self.task = None
+        self.initialized = False
 
     def get_partition(self, kbid: str):
         return mmh3.hash(kbid, self.seed, signed=False) % self.partitions
