@@ -24,6 +24,7 @@ from typing import Optional
 import async_lru
 
 from nucliadb.common import datamanagers
+from nucliadb.common.external_index_providers.settings import settings
 from nucliadb_protos.knowledgebox_pb2 import (
     ExternalIndexProviderType,
     StoredExternalIndexProviderMetadata,
@@ -97,19 +98,32 @@ class NoopIndexManager(ExternalIndexManager):
 class PineconeIndexManager(ExternalIndexManager):
     type = "pinecone"
 
-    def __init__(self, kbid: str, api_key: str, index_host: str):
+    def __init__(
+        self,
+        kbid: str,
+        api_key: str,
+        index_host: str,
+        upsert_parallelism: int = 3,
+        delete_parallelism: int = 2,
+        upsert_timeout: int = 10,
+        delete_timeout: int = 10,
+    ):
         super().__init__(kbid=kbid)
         self.api_key = api_key
         self.index_host = index_host
         pinecone = get_pinecone()
         self.control_plane = pinecone.control_plane(api_key=self.api_key)
         self.data_plane = pinecone.data_plane(api_key=self.api_key, index_host=self.index_host)
+        self.upsert_parallelism = upsert_parallelism
+        self.delete_parallelism = delete_parallelism
+        self.upsert_timeout = upsert_timeout
+        self.delete_timeout = delete_timeout
 
     async def _delete_resource(self, resource_uuid: str) -> None:
         await self.data_plane.delete_by_id_prefix(
             id_prefix=resource_uuid,
-            max_parallel_batches=2,
-            batch_timeout=10,
+            max_parallel_batches=self.delete_parallelism,
+            batch_timeout=self.delete_timeout,
         )
 
     async def _index_resource(self, resource_uuid: str, index_data: Resource) -> None:
@@ -124,7 +138,11 @@ class PineconeIndexManager(ExternalIndexManager):
 
         # TODO: run tasks while vectors payload is being built
         for prefix in field_prefixes_to_delete:
-            await self.data_plane.delete_by_id_prefix(id_prefix=prefix, max_parallel_batches=2)
+            await self.data_plane.delete_by_id_prefix(
+                id_prefix=prefix,
+                max_parallel_batches=self.delete_parallelism,
+                batch_timeout=self.delete_timeout,
+            )
 
         access_groups = None
         if index_data.HasField("security"):
@@ -166,7 +184,9 @@ class PineconeIndexManager(ExternalIndexManager):
         if len(vectors) == 0:
             return
         await self.data_plane.upsert_in_batches(
-            vectors=vectors, max_parallel_batches=3, batch_timeout=10
+            vectors=vectors,
+            max_parallel_batches=self.upsert_parallelism,
+            batch_timeout=self.upsert_timeout,
         )
 
 
@@ -189,4 +209,8 @@ async def get_external_index_manager(kbid: str) -> ExternalIndexManager:
         kbid=kbid,
         api_key=api_key,
         index_host=main_index_host,
+        upsert_parallelism=settings.pinecone_upsert_parallelism,
+        delete_parallelism=settings.pinecone_delete_parallelism,
+        upsert_timeout=settings.pinecone_upsert_timeout,
+        delete_timeout=settings.pinecone_delete_timeout,
     )
