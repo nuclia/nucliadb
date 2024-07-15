@@ -171,7 +171,7 @@ jobs:
           curl --data-binary "@nucliadb-${{ steps.version_step.outputs.helm_version }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
       - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/nucliadb_deploy

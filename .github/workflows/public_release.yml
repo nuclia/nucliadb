@@ -167,7 +167,7 @@ jobs:
           gsutil copy /tmp/openapi/nucliadb-search.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json
 
       - name: Trigger doc update
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/docs

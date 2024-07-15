@@ -94,7 +94,7 @@ jobs:
         curl --data-binary "@nucliadb_shared-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
     - name: Repository Dispatch
-      uses: peter-evans/repository-dispatch@v2
+      uses: peter-evans/repository-dispatch@v3
       with:
         token: ${{ steps.app-token.outputs.token }}
         repository: nuclia/nucliadb_deploy
@@ -154,7 +154,7 @@ jobs:
           curl --data-binary "@nucliadb_node-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
       - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/nucliadb_deploy
@@ -223,7 +223,7 @@ jobs:
           curl --data-binary "@nucliadb_${{ matrix.component }}-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
       - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/nucliadb_deploy
