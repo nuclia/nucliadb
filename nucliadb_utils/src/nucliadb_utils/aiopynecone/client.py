@@ -35,6 +35,7 @@ from nucliadb_utils.aiopynecone.exceptions import (
     raise_for_status,
 )
 from nucliadb_utils.aiopynecone.models import (
+    CreateIndexRequest,
     CreateIndexResponse,
     ListResponse,
     QueryResponse,
@@ -100,14 +101,16 @@ class ControlPlane:
         Returns:
         - The index host to be used for data plane operations.
         """
-        payload = {
-            "name": name,
-            "dimension": dimension,
-            "metric": metric,
-            "spec": {"serverless": {"cloud": "aws", "region": "us-east-1"}},
-        }
+        payload = CreateIndexRequest(
+            name=name,
+            dimension=dimension,
+            metric=metric,
+            spec={"serverless": {"cloud": "aws", "region": "us-east-1"}},
+        )
         headers = {"Api-Key": self.api_key}
-        http_response = await self.http_session.post("/indexes", json=payload, headers=headers)
+        http_response = await self.http_session.post(
+            "/indexes", json=payload.model_dump(), headers=headers
+        )
         raise_for_status("create_index", http_response)
         response = CreateIndexResponse.model_validate(http_response.json())
         return response.host

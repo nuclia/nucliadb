@@ -497,7 +497,7 @@ class KnowledgeBox:
         if request.type != ExternalIndexProviderType.PINECONE:
             return metadata
 
-        index_name = f"{kbid}_default"
+        index_name = f"{kbid}---default"
         logger.info(
             "Creating pincone index",
             extra={"kbid": kbid, "index_name": index_name, "vector_dimension": vector_dimension},
@@ -521,7 +521,7 @@ class KnowledgeBox:
         if external_index_provider.type != ExternalIndexProviderType.PINECONE:
             return
 
-        index_name = f"{kbid}_default"
+        index_name = f"{kbid}---default"
         logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
         encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
         endecryptor = get_endecryptor()

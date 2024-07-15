@@ -20,13 +20,44 @@
 import json
 from typing import Any, Optional
 
+import pydantic
 from pydantic import BaseModel, Field, field_validator
+from typing_extensions import Annotated
 
 KILO_BYTE = 1024
 MAX_METADATA_SIZE = 40 * KILO_BYTE
 
 
 # Requests
+
+IndexNamePattern = r"^[a-z0-9-]+$"
+
+
+def validate_index_name(value, handler, info):
+    try:
+        return handler(value)
+    except pydantic.ValidationError as e:
+        if any(x["type"] == "string_pattern_mismatch" for x in e.errors()):
+            raise ValueError(
+                f"Invalid field_id: '{value}'. Pinecone index names must be a string with only "
+                "lowercase letters, numbers and dashes."
+            )
+        else:
+            raise e
+
+
+IndexNameStr = Annotated[
+    str,
+    pydantic.StringConstraints(pattern=IndexNamePattern),
+    pydantic.WrapValidator(validate_index_name),
+]
+
+
+class CreateIndexRequest(BaseModel):
+    name: IndexNameStr
+    dimension: int
+    metric: str
+    spec: dict[str, Any] = {}
 
 
 class Vector(BaseModel):

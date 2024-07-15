@@ -34,7 +34,7 @@ from nucliadb_utils.aiopynecone.client import (
     batchify,
     raise_for_status,
 )
-from nucliadb_utils.aiopynecone.models import QueryResponse, Vector
+from nucliadb_utils.aiopynecone.models import CreateIndexRequest, QueryResponse, Vector
 
 
 async def test_session():
@@ -276,3 +276,18 @@ def test_raise_for_status_rate_limit():
     )
     with pytest.raises(PineconeRateLimitError):
         raise_for_status("op", response)
+        raise_for_status(response)
+
+
+def test_index_name_validation():
+    with pytest.raises(ValueError):
+        CreateIndexRequest(
+            name="foo_bar",
+            dimension=1,
+            metric="dot",
+        )
+    CreateIndexRequest(
+        name="kbid---default",
+        dimension=1,
+        metric="dot",
+    )
