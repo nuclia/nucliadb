@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Calculate short sha
         id: env-vars
@@ -99,7 +99,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Login to DockerHub
         uses: docker/login-action@v2
@@ -136,7 +136,7 @@ jobs:
           owner: nuclia
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3

@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Restore binaries
         uses: actions/cache/restore@v4
         with:
@@ -67,7 +67,7 @@ jobs:
         owner: nuclia
 
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set helm package image
       id: version_step
@@ -118,7 +118,7 @@ jobs:
           owner: nuclia
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Calculate short sha
         id: env-vars
@@ -188,7 +188,7 @@ jobs:
           owner: nuclia
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Calculate short sha
         id: env-vars
