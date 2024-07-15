@@ -69,7 +69,7 @@ async def add_batch_to_index(txn: Transaction, *, kbid: str, batch: list[str]) -
         await txn.set(key, b"")
 
 
-async def get_to_index(txn: Transaction, *, kbid: str) -> Optional[str]:
+async def get_resource_to_index(txn: Transaction, *, kbid: str) -> Optional[str]:
     key = KB_ROLLOVER_RESOURCES_TO_INDEX.format(kbid=kbid, resource="")
     found = [key async for key in txn.keys(key, count=1)]
     if found:
@@ -77,7 +77,7 @@ async def get_to_index(txn: Transaction, *, kbid: str) -> Optional[str]:
     return None
 
 
-async def remove_to_index(txn: Transaction, *, kbid: str, resource: str) -> None:
+async def remove_resource_to_index(txn: Transaction, *, kbid: str, resource: str) -> None:
     to_index = KB_ROLLOVER_RESOURCES_TO_INDEX.format(kbid=kbid, resource=resource)
     await txn.delete(to_index)
 

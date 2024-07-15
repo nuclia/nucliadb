@@ -204,7 +204,7 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
     # now index on all new shards only
     while True:
         async with datamanagers.with_transaction() as txn:
-            resource_id = await datamanagers.rollover.get_to_index(txn, kbid=kbid)
+            resource_id = await datamanagers.rollover.get_resource_to_index(txn, kbid=kbid)
         if resource_id is None:
             break
 
@@ -216,7 +216,9 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
                 extra={"kbid": kbid, "resource_id": resource_id},
             )
             async with datamanagers.with_transaction() as txn:
-                await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
+                await datamanagers.rollover.remove_resource_to_index(
+                    txn, kbid=kbid, resource=resource_id
+                )
                 await txn.commit()
             continue
 
@@ -234,7 +236,9 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
         if resource_index_message is None:
             # resource no longer existing, remove indexing and carry on
             async with datamanagers.with_transaction() as txn:
-                await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
+                await datamanagers.rollover.remove_resource_to_index(
+                    txn, kbid=kbid, resource=resource_id
+                )
                 await txn.commit()
             continue
 
@@ -298,7 +302,6 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
 
     If a resource was removed during the rollover, it will be removed as well.
     """
-
     async with datamanagers.with_ro_transaction() as txn:
         rolled_over_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if rolled_over_shards is None:
