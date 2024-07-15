@@ -28,6 +28,7 @@ from nucliadb_utils.aiopynecone.client import (
     ControlPlane,
     DataPlane,
     PineconeAPIError,
+    PineconeRateLimitError,
     PineconeSession,
     async_batchify,
     batchify,
@@ -259,9 +260,19 @@ async def test_async_batchify():
 
 def test_raise_for_status():
     request = unittest.mock.MagicMock()
-    response = unittest.mock.MagicMock()
+    response = unittest.mock.MagicMock(status_code=500)
     response.raise_for_status.side_effect = httpx.HTTPStatusError(
         "message", request=request, response=response
     )
     with pytest.raises(PineconeAPIError):
-        raise_for_status(response)
+        raise_for_status("op", response)
+
+
+def test_raise_for_status_rate_limit():
+    request = unittest.mock.MagicMock()
+    response = unittest.mock.MagicMock(status_code=429)
+    response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "message", request=request, response=response
+    )
+    with pytest.raises(PineconeRateLimitError):
+        raise_for_status("op", response)
