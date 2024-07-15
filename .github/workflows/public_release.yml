@@ -54,7 +54,7 @@ jobs:
           cmd: yq -i '.appVersion = "${{ steps.version_step.outputs.version_number }}"' 'charts/nucliadb/Chart.yaml'
 
       - name: Install Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
         with:
           version: v3.4.0
 
