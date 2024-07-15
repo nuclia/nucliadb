@@ -26,6 +26,7 @@ import aiohttp.client_exceptions
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.ingest.orm.exceptions import (
@@ -111,7 +112,7 @@ class Processor:
         self.storage = storage
         self.partition = partition
         self.pubsub = pubsub
-        self.shard_manager = get_shard_manager()
+        self.node_shard_manager = get_shard_manager()
 
     async def process(
         self,
@@ -179,11 +180,13 @@ class Processor:
                 if shard_id is None:
                     logger.warning(f"Resource {uuid} does not exist")
                 else:
+                    external_index_manager = await get_external_index_manager(kbid=message.kbid)
+                    await external_index_manager.delete_resource(resource_uuid=uuid)
                     shard = await kb.get_resource_shard(shard_id)
                     if shard is None:
                         raise AttributeError("Shard not available")
 
-                    await self.shard_manager.delete_resource(
+                    await self.node_shard_manager.delete_resource(
                         shard, message.uuid, seqid, partition, message.kbid
                     )
                     try:
@@ -392,17 +395,19 @@ class Processor:
         if shard is None:
             # It's a new resource, get current active shard to place
             # new resource on
-            shard = await self.shard_manager.get_current_active_shard(txn, kbid)
+            shard = await self.node_shard_manager.get_current_active_shard(txn, kbid)
             if shard is None:
                 # no shard available, create a new one
-                shard = await self.shard_manager.create_shard_by_kbid(txn, kbid)
+                shard = await self.node_shard_manager.create_shard_by_kbid(txn, kbid)
             await datamanagers.resources.set_resource_shard_id(
                 txn, kbid=kbid, rid=uuid, shard=shard.shard
             )
 
         if shard is not None:
             index_message = resource.indexer.brain
-            await self.shard_manager.add_resource(
+            external_index_manager = await get_external_index_manager(kbid=kbid)
+            await external_index_manager.index_resource(resource_uuid=uuid, resource_data=index_message)
+            await self.node_shard_manager.add_resource(
                 shard,
                 index_message,
                 seqid,
@@ -608,7 +613,7 @@ class Processor:
             resource.indexer.set_processing_status(
                 basic=resource.basic, previous_status=resource._previous_status
             )
-            await self.shard_manager.add_resource(
+            await self.node_shard_manager.add_resource(
                 shard, resource.indexer.brain, seqid, partition=partition, kb=kb.kbid
             )
         except Exception:
