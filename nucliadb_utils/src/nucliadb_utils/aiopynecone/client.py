@@ -25,9 +25,15 @@ from collections.abc import AsyncIterable, Iterable
 from itertools import islice
 from typing import Any, AsyncGenerator, Optional
 
+import backoff
 import httpx
 
 from nucliadb_telemetry.metrics import Observer
+from nucliadb_utils.aiopynecone.exceptions import (
+    PineconeAPIError,
+    PineconeRateLimitError,
+    raise_for_status,
+)
 from nucliadb_utils.aiopynecone.models import (
     CreateIndexResponse,
     ListResponse,
@@ -38,9 +44,13 @@ from nucliadb_utils.aiopynecone.models import (
 
 logger = logging.getLogger(__name__)
 
+
 pinecone_observer = Observer(
     "pinecone_client",
     labels={"type": ""},
+    error_mappings={
+        "rate_limit": PineconeRateLimitError,
+    },
 )
 
 DEFAULT_TIMEOUT = 30
@@ -55,25 +65,18 @@ MAX_UPSERT_PAYLOAD_SIZE = 2 * MEGA_BYTE
 MAX_DELETE_BATCH_SIZE = 1000
 
 
-class PineconeAPIError(Exception):
-    def __init__(
-        self,
-        http_status_code: int,
-        code: Optional[str] = None,
-        message: Optional[str] = None,
-        details: Optional[Any] = None,
-    ):
-        self.http_status_code = http_status_code
-        self.code = code or ""
-        self.message = message or ""
-        self.details = details or {}
-        exc_message = '[{http_status_code}] message="{message}" code={code} details={details}'.format(
-            http_status_code=http_status_code,
-            message=message,
-            code=code,
-            details=details,
-        )
-        super().__init__(exc_message)
+RETRIABLE_EXCEPTIONS = (
+    PineconeRateLimitError,
+    httpx.ConnectError,
+    httpx.NetworkError,
+)
+
+backoff_handler = backoff.on_exception(
+    backoff.expo,
+    RETRIABLE_EXCEPTIONS,
+    jitter=backoff.random_jitter,
+    max_tries=4,
+)
 
 
 class ControlPlane:
@@ -105,7 +108,7 @@ class ControlPlane:
         }
         headers = {"Api-Key": self.api_key}
         http_response = await self.http_session.post("/indexes", json=payload, headers=headers)
-        raise_for_status(http_response)
+        raise_for_status("create_index", http_response)
         response = CreateIndexResponse.model_validate(http_response.json())
         return response.host
 
@@ -121,7 +124,7 @@ class ControlPlane:
         if response.status_code == 404:  # pragma: no cover
             logger.warning("Pinecone index not found.", extra={"index_name": name})
             return
-        raise_for_status(response)
+        raise_for_status("delete_index", response)
 
 
 class DataPlane:
@@ -147,6 +150,7 @@ class DataPlane:
     def _get_request_timeout(self, timeout: Optional[float] = None) -> Optional[float]:
         return timeout or self.client_timeout
 
+    @backoff_handler
     @pinecone_observer.wrap({"type": "upsert"})
     async def upsert(self, vectors: list[Vector], timeout: Optional[float] = None) -> None:
         """
@@ -165,7 +169,7 @@ class DataPlane:
         if request_timeout is not None:
             post_kwargs["timeout"] = timeout
         response = await self.http_session.post("/vectors/upsert", **post_kwargs)
-        raise_for_status(response)
+        raise_for_status("upsert", response)
 
     def _estimate_upsert_batch_size(self, vectors: list[Vector]) -> int:
         """
@@ -220,6 +224,7 @@ class DataPlane:
 
         await asyncio.gather(*tasks)
 
+    @backoff_handler
     @pinecone_observer.wrap({"type": "delete"})
     async def delete(self, ids: list[str], timeout: Optional[float] = None) -> None:
         """
@@ -242,8 +247,9 @@ class DataPlane:
         if request_timeout is not None:
             post_kwargs["timeout"] = timeout
         response = await self.http_session.post("/vectors/delete", **post_kwargs)
-        raise_for_status(response)
+        raise_for_status("delete", response)
 
+    @backoff_handler
     @pinecone_observer.wrap({"type": "list_page"})
     async def list_page(
         self,
@@ -279,7 +285,7 @@ class DataPlane:
             "/vectors/list",
             **post_kwargs,
         )
-        raise_for_status(response)
+        raise_for_status("list_page", response)
         return ListResponse.model_validate(response.json())
 
     async def list_all(
@@ -306,6 +312,7 @@ class DataPlane:
                 break
             pagination_token = response.pagination.next
 
+    @backoff_handler
     @pinecone_observer.wrap({"type": "delete_all"})
     async def delete_all(self, timeout: Optional[float] = None):
         """
@@ -324,7 +331,7 @@ class DataPlane:
             post_kwargs["timeout"] = timeout
         response = await self.http_session.post("/vectors/delete", **post_kwargs)
         try:
-            raise_for_status(response)
+            raise_for_status("delete_all", response)
         except PineconeAPIError as err:
             if err.http_status_code == 404 and err.code == 5:  # pragma: no cover
                 # Namespace not found. No vectors to delete.
@@ -366,6 +373,7 @@ class DataPlane:
 
         await asyncio.gather(*tasks)
 
+    @backoff_handler
     @pinecone_observer.wrap({"type": "query"})
     async def query(
         self,
@@ -404,7 +412,7 @@ class DataPlane:
         if request_timeout is not None:
             post_kwargs["timeout"] = timeout
         response = await self.http_session.post("/query", **post_kwargs)
-        raise_for_status(response)
+        raise_for_status("query", response)
         return QueryResponse.model_validate(response.json())
 
 
@@ -457,28 +465,6 @@ class PineconeSession:
     def data_plane(self, api_key: str, index_host: str, timeout: Optional[float] = None) -> DataPlane:
         index_host_session = self._get_index_host_session(index_host)
         return DataPlane(api_key=api_key, index_host_session=index_host_session, timeout=timeout)
-
-
-def raise_for_status(response: httpx.Response):
-    try:
-        response.raise_for_status()
-    except httpx.HTTPStatusError:
-        code = None
-        message = None
-        details = None
-        try:
-            resp_json = response.json()
-            code = resp_json.get("code")
-            message = resp_json.get("message")
-            details = resp_json.get("details")
-        except Exception:
-            message = response.text
-        raise PineconeAPIError(
-            http_status_code=response.status_code,
-            code=code,
-            message=message,
-            details=details,
-        )
 
 
 def batchify(iterable: Iterable, batch_size: int):
