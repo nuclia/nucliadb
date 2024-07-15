@@ -46,6 +46,7 @@ from nucliadb_protos import (
     resources_pb2,
     writer_pb2,
 )
+from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -181,7 +182,8 @@ class Processor:
                     logger.warning(f"Resource {uuid} does not exist")
                 else:
                     external_index_manager = await get_external_index_manager(kbid=message.kbid)
-                    await external_index_manager.delete_resource(resource_uuid=uuid)
+                    if external_index_manager:
+                        await external_index_manager.delete_resource(resource_uuid=uuid)
                     shard = await kb.get_resource_shard(shard_id)
                     if shard is None:
                         raise AttributeError("Shard not available")
@@ -406,7 +408,11 @@ class Processor:
         if shard is not None:
             index_message = resource.indexer.brain
             external_index_manager = await get_external_index_manager(kbid=kbid)
-            await external_index_manager.index_resource(resource_uuid=uuid, resource_data=index_message)
+            if external_index_manager:
+                await external_index_manager.index_resource(
+                    resource_uuid=uuid, resource_data=index_message
+                )
+                self.clear_external_index_fields(index_message)
             await self.node_shard_manager.add_resource(
                 shard,
                 index_message,
@@ -417,6 +423,16 @@ class Processor:
             )
         else:
             raise AttributeError("Shard is not available")
+
+    @staticmethod
+    def clear_external_index_fields(index_message: PBBrainResource):
+        """
+        Clear the fields that are already stored in the external index,
+        and we don't want to store them again in the IndexNode cluster.
+        """
+        index_message.ClearField("sentences_to_delete")
+        index_message.ClearField("paragraphs_to_delete")
+        index_message.ClearField("paragraphs")
 
     async def multi(self, message: writer_pb2.BrokerMessage, seqid: int) -> None:
         self.messages.setdefault(message.multiid, []).append(message)

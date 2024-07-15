@@ -58,27 +58,3 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def _index_resource(self, resource_uuid: str, resource_data: Resource) -> None: ...
-
-
-class NoopIndexManager(ExternalIndexManager):
-    """
-    A no-op external index manager that does nothing.
-    This is used for knowledge boxes that do not have an external index.
-    """
-
-    type = "noop"
-
-    def __init__(self):
-        pass
-
-    async def delete_resource(self, resource_uuid: str) -> None:
-        pass
-
-    async def index_resource(self, resource_uuid: str, resource_data: Resource) -> None:
-        pass
-
-    async def _delete_resource(self, resource_uuid: str) -> None:
-        pass
-
-    async def _index_resource(self, resource_uuid: str, resource_data: Resource) -> None:
-        pass

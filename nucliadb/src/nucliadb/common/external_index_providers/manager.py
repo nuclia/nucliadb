@@ -22,7 +22,7 @@ from typing import Optional
 import async_lru
 
 from nucliadb.common import datamanagers
-from nucliadb.common.external_index_providers.base import ExternalIndexManager, NoopIndexManager
+from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb.common.external_index_providers.settings import settings
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -32,10 +32,10 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_utils.utilities import get_endecryptor
 
 
-async def get_external_index_manager(kbid: str) -> ExternalIndexManager:
+async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager]:
     metadata = await get_external_index_metadata(kbid)
     if metadata is None or metadata.type != ExternalIndexProviderType.PINECONE:
-        return NoopIndexManager()
+        return None
     encrypted_api_key = metadata.pinecone_config.encrypted_api_key
     endecryptor = get_endecryptor()
     api_key = endecryptor.decrypt(encrypted_api_key)
