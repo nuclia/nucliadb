@@ -104,9 +104,7 @@ async def test_kb_creation(
         assert decrypted_api_key == "my-pinecone-api-key"
 
         # Check that the rest of the config was stored
-        assert (
-            external_index_provider.pinecone_config.index_hosts[f"{kbid}--default"] == "pinecone-host"
-        )
+        assert external_index_provider.pinecone_config.index_hosts[f"{kbid}--default"] == "pinecone-host"
 
     # Deleting a knowledge box should delete the Pinecone index
     response = await nucliadb_grpc.DeleteKnowledgeBox(KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None)  # type: ignore
