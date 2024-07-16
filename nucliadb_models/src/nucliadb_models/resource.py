@@ -99,6 +99,22 @@ RELEASE_CHANNEL_ENUM_TO_PB = {
 RELEASE_CHANNEL_PB_TO_ENUM = {v: k for k, v in RELEASE_CHANNEL_ENUM_TO_PB.items()}
 
 
+class ExternalIndexProviderType(str, Enum):
+    PINECONE = "pinecone"
+
+
+class ExternalIndexProviderBase(BaseModel):
+    type: ExternalIndexProviderType
+
+
+class PineconeIndexProvider(ExternalIndexProviderBase):
+    type: ExternalIndexProviderType = ExternalIndexProviderType.PINECONE
+    api_key: str
+
+
+ExternalIndexProvider = Union[PineconeIndexProvider,]
+
+
 class KnowledgeBoxConfig(BaseModel):
     slug: Optional[SlugString] = Field(
         default=None, title="Slug", description="Slug for the Knowledge Box."
@@ -118,6 +134,11 @@ class KnowledgeBoxConfig(BaseModel):
         default=None,
         title="Learning Configuration",
         description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",  # noqa: E501
+    )
+    external_index_provider: Optional[ExternalIndexProvider] = Field(
+        default=None,
+        title="External Index Provider",
+        description="External index provider for the Knowledge Box.",
     )
 
     similarity: Optional[VectorSimilarity] = Field(

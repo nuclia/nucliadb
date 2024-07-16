@@ -34,6 +34,7 @@ from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import (
+    ExternalIndexProviderType,
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
     KnowledgeBoxObjID,
@@ -112,6 +113,17 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     rollback_learning_config = partial(_rollback_learning_config, kbid)
 
+    external_index_providers = None
+    if (
+        item.external_index_provider
+        and item.external_index_provider.type == ExternalIndexProviderType.PINECONE
+    ):
+        pinecone_api_key = item.external_index_provider.api_key
+        external_index_providers = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
+            type=knowledgebox_pb2.ExternalIndexProviderType.PINECONE,
+            pinecone_config=knowledgebox_pb2.CreatePineconeConfig(api_key=pinecone_api_key),
+        )
+
     semantic_model = learning_config.into_semantic_model_metadata()
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
     try:
@@ -123,6 +135,7 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
             description=item.description or "",
             semantic_model=semantic_model,
             release_channel=release_channel,
+            external_index_provider=external_index_providers,
         )
 
     except Exception as exc:
