@@ -115,7 +115,9 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          {{- if $values.envFrom }}
           {{- toYaml $values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: NODE_ROLE
             value: secondary
@@ -157,7 +159,9 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          {{- if $values.envFrom }}
           {{- toYaml $values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: NODE_ROLE
             value: secondary

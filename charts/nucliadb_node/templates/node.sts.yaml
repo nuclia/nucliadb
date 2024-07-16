@@ -79,7 +79,9 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: VERSION
             valueFrom:
@@ -116,7 +118,9 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: METRICS_PORT
             value: "3032"
@@ -154,7 +158,9 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: METRICS_PORT
             value: "3031"

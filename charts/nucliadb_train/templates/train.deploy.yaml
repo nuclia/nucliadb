@@ -75,7 +75,9 @@ spec:
         envFrom:
           - configMapRef:
               name: train-config
+          {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: VERSION
             valueFrom:
