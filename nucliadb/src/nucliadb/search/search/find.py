@@ -21,6 +21,8 @@ import logging
 from time import time
 from typing import Optional
 
+from async_lru import alru_cache
+from nucliadb.common import datamanagers
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.metrics import RAGMetrics
@@ -36,12 +38,39 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     SearchOptions,
 )
+from nucliadb_protos.knowledgebox_pb2 import StoredExternalIndexProviderMetadata
 from nucliadb_utils.utilities import get_audit
 
 logger = logging.getLogger(__name__)
 
 
 async def find(
+    kbid: str,
+    item: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    generative_model: Optional[str] = None,
+    metrics: RAGMetrics = RAGMetrics(),
+) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+
+    external_index_metadata = await get_external_index_metadata(kbid)
+    if external_index_metadata is not None:
+        return await _external_index_find(
+            kbid,
+            item,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            generative_model,
+            metrics,
+            external_index_metadata,
+        )
+    return await _node_index_find(
+        kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, generative_model, metrics
+    )
+
+async def _node_index_find(
     kbid: str,
     item: FindRequest,
     x_ndb_client: NucliaDBClientType,
@@ -155,3 +184,26 @@ async def find(
         )
 
     return search_results, incomplete_results, query_parser
+
+
+async def _external_index_find(
+    kbid: str,
+    external_index_provider: StoredExternalIndexProviderMetadata,
+    item: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    generative_model: Optional[str] = None,
+    metrics: RAGMetrics = RAGMetrics(),
+) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+    query_parser = QueryParser.from_external_index_provider(external_index_provider, item)
+    with metrics.time("query_parse"):
+        pb_query, incomplete_results, autofilters = await query_parser.parse()
+    with metrics.time("external_index_query"):
+        results, query_incomplete_results = 
+
+
+@alru_cache(maxsize=None)
+async def get_external_index_metadata(kbid: str) -> StoredExternalIndexProviderMetadata:
+    async with datamanagers.with_ro_transaction() as txn:
+        return await datamanagers.kb.get_external_index_provider_metadata(txn, kbid=kbid)
