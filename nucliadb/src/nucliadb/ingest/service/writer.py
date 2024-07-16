@@ -486,7 +486,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 resobj.disable_vectors = not request.reindex_vectors
 
                 brain = await resobj.generate_index_message(reindex=True)
-                shard_id = await datamanagers.resources.get_resource_shard_id(
+                shard_id = await datamanagers.cluster.get_resource_shard_id(
                     txn, kbid=request.kbid, rid=request.rid
                 )
                 shard: Optional[writer_pb2.ShardObject] = None
@@ -494,12 +494,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     shard = await kbobj.get_resource_shard(shard_id)
 
                 if shard is None:
-                    shard = await self.shards_manager.get_current_active_shard(txn, request.kbid)
+                    shard = await datamanagers.cluster.get_current_active_shard(txn, kbid=request.kbid)
                     if shard is None:
                         # no shard currently exists, create one
                         shard = await self.shards_manager.create_shard_by_kbid(txn, request.kbid)
 
-                    await datamanagers.resources.set_resource_shard_id(
+                    await datamanagers.cluster.set_resource_shard_id(
                         txn, kbid=request.kbid, rid=request.rid, shard=shard.shard
                     )
 

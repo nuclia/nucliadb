@@ -27,6 +27,7 @@ from typing import Optional
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import nodewriter_pb2, writer_pb2
 from nucliadb_telemetry import errors
 
@@ -203,21 +204,21 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
     # now index on all new shards only
     while True:
         async with datamanagers.with_transaction() as txn:
-            resource_id = await datamanagers.rollover.get_to_index(txn, kbid=kbid)
+            resource_id = await datamanagers.rollover.get_resource_to_index(txn, kbid=kbid)
         if resource_id is None:
             break
 
         async with datamanagers.with_transaction() as txn:
-            shard_id = await datamanagers.resources.get_resource_shard_id(
-                txn, kbid=kbid, rid=resource_id
-            )
+            shard_id = await datamanagers.cluster.get_resource_shard_id(txn, kbid=kbid, rid=resource_id)
         if shard_id is None:
             logger.warning(
                 "Shard id not found for resource. Skipping indexing as it may have been deleted",
                 extra={"kbid": kbid, "resource_id": resource_id},
             )
             async with datamanagers.with_transaction() as txn:
-                await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
+                await datamanagers.rollover.remove_resource_to_index(
+                    txn, kbid=kbid, resource=resource_id
+                )
                 await txn.commit()
             continue
 
@@ -235,7 +236,9 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
         if resource_index_message is None:
             # resource no longer existing, remove indexing and carry on
             async with datamanagers.with_transaction() as txn:
-                await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
+                await datamanagers.rollover.remove_resource_to_index(
+                    txn, kbid=kbid, resource=resource_id
+                )
                 await txn.commit()
             continue
 
@@ -299,7 +302,6 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
 
     If a resource was removed during the rollover, it will be removed as well.
     """
-
     async with datamanagers.with_ro_transaction() as txn:
         rolled_over_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if rolled_over_shards is None:
@@ -324,7 +326,7 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
                 continue
         else:
             async with datamanagers.with_transaction() as txn:
-                shard_id = await datamanagers.resources.get_resource_shard_id(
+                shard_id = await datamanagers.cluster.get_resource_shard_id(
                     txn, kbid=kbid, rid=resource_id
                 )  # type: ignore
             if shard_id is None:
@@ -348,7 +350,8 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
             raise UnexpectedRolloverError(f"Shard {shard_id} not found. This should not happen")
 
         async with datamanagers.with_transaction() as txn:
-            res = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
+            kb = KnowledgeBox(txn, app_context.blob_storage, kbid)
+            res = await kb.get(resource_id)
         if res is None:
             logger.error(
                 "Resource not found while validating, skipping",

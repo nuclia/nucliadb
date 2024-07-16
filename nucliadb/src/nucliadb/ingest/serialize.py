@@ -21,6 +21,7 @@
 from typing import Optional
 
 import nucliadb_models as models
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
@@ -353,7 +354,7 @@ async def get_orm_resource(
         if slug is None:
             raise ValueError("Either rid or slug parameters should be used")
 
-        rid = await kb.get_resource_uuid_by_slug(slug)
+        rid = await datamanagers.resources.get_resource_uuid_from_slug(kb.txn, kbid=kb.kbid, slug=slug)
         if rid is None:
             # Could not find resource uuid from slug
             return None
@@ -363,13 +364,3 @@ async def get_orm_resource(
         return None
 
     return orm_resource
-
-
-async def get_resource_uuid_by_slug(
-    kbid: str, slug: str, service_name: Optional[str] = None
-) -> Optional[str]:
-    storage = await get_storage(service_name=service_name)
-    driver = get_driver()
-    async with driver.transaction(read_only=True) as txn:
-        kb = KnowledgeBox(txn, storage, kbid)
-        return await kb.get_resource_uuid_by_slug(slug)

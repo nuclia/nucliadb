@@ -19,16 +19,45 @@
 #
 
 import asyncio
+from typing import AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.fixture()
+async def shard_creator_handler(
+    shard_creator_check_delay: float, pubsub, shard_manager, shards: Shards
+) -> AsyncIterator[shard_creator.ShardCreatorHandler]:
+    datamanagers_mock = MagicMock()
+    datamanagers_mock.atomic.cluster.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
+
+    with (
+        patch("nucliadb.ingest.consumer.shard_creator.datamanagers", new=datamanagers_mock),
+        patch("nucliadb.common.cluster.manager.datamanagers", new=datamanagers_mock),
+    ):
+        sc = shard_creator.ShardCreatorHandler(
+            driver=AsyncMock(transaction=MagicMock(return_value=AsyncMock())),
+            storage=AsyncMock(),
+            pubsub=pubsub,
+            check_delay=shard_creator_check_delay,
+        )
+        await sc.initialize()
+        yield sc
+        await sc.finalize()
+
+
+@pytest.fixture()
+def shard_creator_check_delay() -> float:
+    return 0.005
 
 
 @pytest.fixture()
@@ -39,27 +68,21 @@ def pubsub():
 
 
 @pytest.fixture()
-def reader():
-    yield AsyncMock()
-
-
-@pytest.fixture()
-def kbdm():
-    mock = MagicMock()
-    mock.get_model_metadata = AsyncMock(return_value="model")
-    with patch("nucliadb.common.cluster.manager.datamanagers.kb", return_value=mock):
-        yield mock
-
-
-@pytest.fixture()
-def shard_manager(reader):
-    sm = MagicMock()
-    node = MagicMock(reader=reader)
-    shards = Shards(shards=[ShardObject(read_only=False)], actual=0)
-    sm.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
-    sm.maybe_create_new_shard = AsyncMock()
+def shard_manager(reader, shards):
+    sm = KBShardManager()
+    sm.maybe_create_new_shard = AsyncMock(side_effect=sm.maybe_create_new_shard)
+    sm.create_shard_by_kbid = AsyncMock()
     with (
         patch("nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm),
+    ):
+        yield sm
+
+
+@pytest.fixture()
+def reader():
+    reader = AsyncMock()
+    node = MagicMock(reader=reader)
+    with (
         patch(
             "nucliadb.ingest.consumer.shard_creator.choose_node",
             return_value=(node, "shard_id"),
@@ -69,64 +92,43 @@ def shard_manager(reader):
             return_value=AsyncMock(),
         ),
     ):
-        yield sm
+        yield reader
 
 
 @pytest.fixture()
-async def shard_creator_handler(pubsub, shard_manager):
-    sc = shard_creator.ShardCreatorHandler(
-        driver=AsyncMock(transaction=MagicMock(return_value=AsyncMock())),
-        storage=AsyncMock(),
-        pubsub=pubsub,
-        check_delay=0.05,
-    )
-    await sc.initialize()
-    yield sc
-    await sc.finalize()
+def shards():
+    return Shards(shards=[ShardObject(read_only=False)], actual=0)
 
 
-async def test_handle_message_create_new_shard(
+@pytest.mark.parametrize(
+    "action,paragraphs,should_try_create,should_create",
+    [
+        (Notification.Action.INDEXED, settings.max_shard_paragraphs + 1, True, True),
+        (Notification.Action.INDEXED, settings.max_shard_paragraphs - 1, True, False),
+        # actions other than indexed don't trigger shard creation
+        (Notification.Action.COMMIT, settings.max_shard_paragraphs + 1, False, False),
+        (Notification.Action.ABORT, settings.max_shard_paragraphs + 1, False, False),
+    ],
+)
+async def test_handle_message_new_shard_creation(
     shard_creator_handler: shard_creator.ShardCreatorHandler,
-    reader,
-    kbdm,
+    shard_creator_check_delay: float,
     shard_manager,
+    reader,
+    action: Notification.Action.ValueType,
+    paragraphs: int,
+    should_try_create: bool,
+    should_create: bool,
 ):
-    reader.GetShard.return_value = nodereader_pb2.Shard(paragraphs=settings.max_shard_paragraphs + 1)
-
-    notif = Notification(
+    reader.GetShard.return_value = nodereader_pb2.Shard(paragraphs=paragraphs)
+    notification = Notification(
         kbid="kbid",
-        action=Notification.Action.INDEXED,
+        action=action,
     )
-    await shard_creator_handler.handle_message(notif.SerializeToString())
-    await asyncio.sleep(0.06)
-    shard_manager.maybe_create_new_shard.assert_called_with("kbid", settings.max_shard_paragraphs + 1)
+    await shard_creator_handler.handle_message(notification.SerializeToString())
 
+    # wait for task to be scheduled and executed
+    await asyncio.sleep(shard_creator_check_delay + 0.001)
 
-async def test_handle_message_do_not_create(
-    shard_creator_handler: shard_creator.ShardCreatorHandler, reader, shard_manager
-):
-    reader.GetShard.return_value = nodereader_pb2.Shard(paragraphs=settings.max_shard_paragraphs - 1)
-
-    notif = Notification(
-        kbid="kbid",
-        action=Notification.Action.INDEXED,
-    )
-    await shard_creator_handler.handle_message(notif.SerializeToString())
-
-    await shard_creator_handler.finalize()
-
-    shard_manager.create_shard_by_kbid.assert_not_called()
-
-
-async def test_handle_message_ignore_not_indexed(
-    shard_creator_handler: shard_creator.ShardCreatorHandler, shard_manager
-):
-    notif = Notification(
-        kbid="kbid",
-        action=Notification.Action.COMMIT,
-    )
-    await shard_creator_handler.handle_message(notif.SerializeToString())
-
-    await shard_creator_handler.finalize()
-
-    shard_manager.create_shard_by_kbid.assert_not_called()
+    assert shard_manager.maybe_create_new_shard.called is should_try_create
+    assert shard_manager.create_shard_by_kbid.called is should_create

@@ -150,7 +150,9 @@ class Processor:
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage) -> str:
         if message.uuid is None:
-            uuid = await kb.get_resource_uuid_by_slug(message.slug)
+            uuid = await datamanagers.resources.get_resource_uuid_from_slug(
+                kb.txn, kbid=kb.kbid, slug=message.slug
+            )
         else:
             uuid = message.uuid
         return uuid
@@ -173,7 +175,7 @@ class Processor:
                 ):
                     # we need to have a lock at indexing time because we don't know if
                     # a resource was in the process of being moved when a delete occurred
-                    shard_id = await datamanagers.resources.get_resource_shard_id(
+                    shard_id = await datamanagers.cluster.get_resource_shard_id(
                         txn, kbid=message.kbid, rid=uuid
                     )
                 if shard_id is None:
@@ -383,7 +385,7 @@ class Processor:
         ):
             # we need to have a lock at indexing time because we don't know if
             # a resource was move to another shard while it was being indexed
-            shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+            shard_id = await datamanagers.cluster.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
 
         shard = None
         if shard_id is not None:
@@ -392,13 +394,11 @@ class Processor:
         if shard is None:
             # It's a new resource, get current active shard to place
             # new resource on
-            shard = await self.shard_manager.get_current_active_shard(txn, kbid)
+            shard = await datamanagers.atomic.cluster.get_current_active_shard(kbid=kbid)
             if shard is None:
                 # no shard available, create a new one
                 shard = await self.shard_manager.create_shard_by_kbid(txn, kbid)
-            await datamanagers.resources.set_resource_shard_id(
-                txn, kbid=kbid, rid=uuid, shard=shard.shard
-            )
+            await datamanagers.cluster.set_resource_shard_id(txn, kbid=kbid, rid=uuid, shard=shard.shard)
 
         if shard is not None:
             index_message = resource.indexer.brain
@@ -458,7 +458,9 @@ class Processor:
         if resource is None:
             # Make sure we load the resource in case it already exists on db
             if message.uuid is None and message.slug:
-                uuid = await kb.get_resource_uuid_by_slug(message.slug)
+                uuid = await datamanagers.resources.get_resource_uuid_from_slug(
+                    kb.txn, kbid=kb.kbid, slug=message.slug
+                )
             else:
                 uuid = message.uuid
             resource = await kb.get(uuid)
@@ -588,7 +590,7 @@ class Processor:
             async with self.driver.transaction() as txn:
                 kb.txn = resource.txn = txn
 
-                shard_id = await datamanagers.resources.get_resource_shard_id(
+                shard_id = await datamanagers.cluster.get_resource_shard_id(
                     txn, kbid=kb.kbid, rid=resource.uuid
                 )
                 shard = None

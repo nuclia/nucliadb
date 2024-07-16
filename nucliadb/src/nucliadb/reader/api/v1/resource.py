@@ -23,6 +23,7 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 import nucliadb_models as models
+from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
@@ -342,7 +343,7 @@ async def _get_resource_field(
 
         if rid is None:
             assert rslug is not None, "Either rid or rslug must be defined"
-            rid = await kb.get_resource_uuid_by_slug(rslug)
+            rid = await datamanagers.resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug=rslug)
             if rid is None:
                 raise HTTPException(status_code=404, detail="Resource does not exist")
 

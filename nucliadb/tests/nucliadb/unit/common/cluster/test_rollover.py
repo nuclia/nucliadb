@@ -17,16 +17,90 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from contextlib import ExitStack, contextmanager
 from datetime import datetime
-from unittest.mock import ANY, AsyncMock, MagicMock, patch
+from typing import Optional
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
 from nucliadb.common.cluster import manager, rollover
 from nucliadb.common.cluster.index_node import IndexNode
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import writer_pb2
 
 pytestmark = pytest.mark.asyncio
+
+
+UNSET = object()
+
+
+@contextmanager
+def setup_mocks(
+    *,
+    kb_resources: list[Resource] = UNSET,  # type: ignore
+    resource_shard_id: Optional[str] = UNSET,  # type: ignore
+    kb_shards: Optional[writer_pb2.Shards] = UNSET,  # type: ignore
+    kb_rollover_shards: Optional[writer_pb2.Shards] = UNSET,  # type: ignore
+):
+    """Setup a bunch of mocks to be able to unit test without calling a too many
+    mocks each time or have too complex mock-everything fixtures
+
+    """
+    with ExitStack() as stack:
+        # mock datamanagers transactions
+        stack.enter_context(patch("nucliadb.common.cluster.rollover.datamanagers.with_transaction"))
+        stack.enter_context(patch("nucliadb.common.cluster.rollover.datamanagers.with_ro_transaction"))
+        stack.enter_context(
+            patch("nucliadb.common.cluster.rollover.datamanagers.resources.with_ro_transaction")
+        )
+        stack.enter_context(
+            patch("nucliadb.common.cluster.rollover.datamanagers.rollover.with_ro_transaction")
+        )
+
+        if kb_resources != UNSET:
+            KnowledgeBox_mock = Mock()
+            KnowledgeBox_mock.get = AsyncMock(side_effect=kb_resources + [None])
+
+            stack.enter_context(
+                patch(
+                    "nucliadb.ingest.orm.knowledgebox.KnowledgeBox", Mock(return_value=KnowledgeBox_mock)
+                )
+            )
+
+            kb_resource_ids = [resource.uuid for resource in kb_resources]
+            stack.enter_context(
+                patch(
+                    "nucliadb.common.cluster.rollover.datamanagers.rollover.get_resource_to_index",
+                    side_effect=kb_resource_ids + [None],
+                )
+            )
+
+        if resource_shard_id != UNSET:
+            stack.enter_context(
+                patch(
+                    "nucliadb.common.cluster.rollover.datamanagers.cluster.get_resource_shard_id",
+                    return_value=resource_shard_id,
+                )
+            )
+
+        if kb_shards != UNSET:
+            stack.enter_context(
+                patch(
+                    "nucliadb.common.cluster.rollover.datamanagers.cluster.get_kb_shards",
+                    return_value=kb_shards,
+                )
+            )
+
+        if kb_rollover_shards != UNSET:
+            stack.enter_context(
+                patch(
+                    "nucliadb.common.cluster.rollover.datamanagers.rollover.get_kb_rollover_shards",
+                    return_value=kb_rollover_shards,
+                )
+            )
+
+        yield
 
 
 @pytest.fixture()
@@ -67,204 +141,283 @@ def shards():
 
 
 @pytest.fixture()
-def resource_ids():
-    yield ["1", "2", "3"]
-
-
-@pytest.fixture()
-def resources_datamanager(resource_ids):
-    mock = MagicMock()
-
-    async def iterate_resource_ids(kbid):
-        for id in resource_ids:
-            yield id
-
-    mock.iterate_resource_ids = iterate_resource_ids
-    mock.get_resource_shard_id = AsyncMock()
-    mock.get_resource_shard_id.return_value = "1"
-
+def resource():
     res = MagicMock()
-
     res.basic.modified.ToDatetime.return_value = datetime.now()
 
-    mock.get_resource = AsyncMock()
-    mock.get_resource.return_value = res
+    brain = MagicMock()
+    brain.modified.ToDatetime.return_value = datetime.now()
+    res.generate_index_message = AsyncMock(return_value=Mock(brain=brain))
 
-    mock.get_resource_index_message = AsyncMock()
-    metadata = MagicMock()
-    metadata.modified.ToDatetime.return_value = datetime.now()
-    mock.get_resource_index_message.return_value = metadata
-
-    with patch("nucliadb.common.cluster.rollover.datamanagers.resources", mock):
-        yield mock
+    yield res
 
 
 @pytest.fixture()
-def cluster_datamanager(resource_ids, shards):
-    mock = MagicMock()
-    mock.get_kb_shards = AsyncMock()
-    mock.get_kb_shards.return_value = shards
-    mock.update_kb_shards = AsyncMock()
-
-    with patch("nucliadb.common.cluster.rollover.datamanagers.cluster", mock):
-        yield mock
+def shard_manager():
+    shard_manager = MagicMock()
+    shard_manager.add_resource = AsyncMock()
+    shard_manager.rollback_shard = AsyncMock()
+    yield shard_manager
 
 
 @pytest.fixture()
-def rollover_datamanager(resource_ids, cluster_datamanager):
-    mock = MagicMock()
-    mock.get_kb_rollover_shards = AsyncMock()
-    mock.get_kb_rollover_shards.return_value = None
-    mock.update_kb_rollover_shards = AsyncMock()
-    mock.delete_kb_rollover_shard = AsyncMock()
-    mock.delete_kb_rollover_shards = AsyncMock()
-    mock.get_to_index = AsyncMock(side_effect=["1", None])
-    mock.add_indexed = AsyncMock()
-    mock.remove_to_index = AsyncMock()
-    mock.get_indexed_data = AsyncMock(return_value=("1", 1))
-    mock.remove_indexed = AsyncMock()
+def mock_resource():
+    resource = MagicMock()
+    resource.uuid = "1"
+    resource.basic.modified.ToDatetime.return_value = datetime.now()
 
-    async def _mock_indexed_keys(kbid):
-        yield "1"
+    brain = MagicMock()
+    brain.modified.ToDatetime.return_value = datetime.now()
+    resource.generate_index_message = AsyncMock(return_value=Mock(brain=brain))
 
-    mock.iter_indexed_keys = _mock_indexed_keys
-
-    with (
-        patch("nucliadb.common.cluster.rollover.datamanagers.rollover", mock),
-        patch(
-            "nucliadb.common.cluster.rollover.datamanagers.with_transaction",
-            return_value=AsyncMock(),
-        ),
-        patch(
-            "nucliadb.common.cluster.rollover.datamanagers.with_ro_transaction",
-            return_value=AsyncMock(),
-        ),
-        patch(
-            "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
-            return_value=AsyncMock(),
-        ),
-    ):
-        yield mock
-
-
-@pytest.fixture()
-def app_context(rollover_datamanager, resources_datamanager, available_nodes):
-    mock = MagicMock()
-    mock.shard_manager = MagicMock()
-    mock.shard_manager.rollback_shard = AsyncMock()
-    mock.shard_manager.add_resource = AsyncMock()
-    mock.shard_manager.delete_resource = AsyncMock()
-    mock.kv_driver = MagicMock()
-
-    consumer_info = MagicMock()
-    consumer_info.delivered.stream_seq = 0
-    mock.nats_manager.js.consumer_info.return_value = consumer_info
-    yield mock
+    yield resource
 
 
 async def test_create_rollover_shards(
-    app_context, available_nodes, shards: writer_pb2.Shards, rollover_datamanager
+    available_nodes,
+    shards: writer_pb2.Shards,
 ):
-    new_shards = await rollover.create_rollover_shards(app_context, "kbid")
+    app_context = Mock()
+    app_context.shard_manager = Mock()
 
-    assert new_shards.kbid == "kbid"
-    assert sum([len(node.writer.calls["NewShard"]) for node in available_nodes.values()]) == sum(
-        [len(s.replicas) for s in shards.shards]
-    )
-    rollover_datamanager.update_kb_rollover_shards.assert_called_with(
-        ANY, kbid="kbid", kb_shards=new_shards
-    )
+    with (
+        setup_mocks(kb_shards=shards, kb_rollover_shards=None),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.update_kb_rollover_shards"
+        ) as update_kb_rollover_shards,
+    ):
+        new_shards = await rollover.create_rollover_shards(app_context, "kbid")
+
+        assert new_shards.kbid == "kbid"
+        assert sum([len(node.writer.calls["NewShard"]) for node in available_nodes.values()]) == sum(
+            [len(s.replicas) for s in shards.shards]
+        )
+        update_kb_rollover_shards.assert_called_with(ANY, kbid="kbid", kb_shards=new_shards)
 
 
 async def test_create_rollover_shards_does_not_recreate(
-    app_context, shards: writer_pb2.Shards, rollover_datamanager
+    shards: writer_pb2.Shards,
 ):
-    rollover_datamanager.get_kb_rollover_shards.return_value = shards
+    app_context = Mock()
+    app_context.shard_manager = Mock()
 
-    await rollover.create_rollover_shards(app_context, "kbid")
+    with (
+        setup_mocks(kb_shards=shards, kb_rollover_shards=shards),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.update_kb_rollover_shards"
+        ) as update_kb_rollover_shards,
+    ):
+        await rollover.create_rollover_shards(app_context, "kbid")
 
-    app_context.shard_manager.rollback_shard.assert_not_called()
-    rollover_datamanager.update_kb_rollover_shards.assert_not_called()
+        app_context.shard_manager.rollback_shard.assert_not_called()
+        update_kb_rollover_shards.assert_not_called()
 
 
 async def test_index_rollover_shards(
-    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
+    shard_manager,
+    shards: writer_pb2.Shards,
+    resource,
 ):
-    rollover_datamanager.get_kb_rollover_shards.return_value = shards
-    await rollover.index_rollover_shards(app_context, "kbid")
-    rollover_datamanager.add_indexed.assert_called_with(
-        ANY, kbid="kbid", resource_id="1", shard_id="1", modification_time=1
-    )
+    shard_id = "1"
+    with (
+        setup_mocks(
+            kb_resources=[resource],
+            resource_shard_id=shard_id,
+            kb_rollover_shards=shards,
+        ),
+        patch("nucliadb.common.cluster.rollover.datamanagers.rollover.add_indexed") as add_indexed_mock,
+    ):
+        app_context = MagicMock(shard_manager=shard_manager)
+        kbid = "kbid"
+        await rollover.index_rollover_shards(app_context, kbid)
+
+        add_indexed_mock.assert_called_with(
+            ANY, kbid=kbid, resource_id=resource.uuid, shard_id=shard_id, modification_time=1
+        )
 
 
-async def test_index_rollover_shards_handles_missing_shards(
-    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
-):
-    rollover_datamanager.get_kb_rollover_shards.return_value = None
-    with pytest.raises(rollover.UnexpectedRolloverError):
-        await rollover.index_rollover_shards(app_context, "kbid")
+async def test_index_rollover_shards_handles_missing_shards():
+    with setup_mocks(kb_rollover_shards=None):
+        with pytest.raises(rollover.UnexpectedRolloverError):
+            app_context = Mock()
+            kbid = "kbid"
+            await rollover.index_rollover_shards(app_context, kbid)
 
 
 async def test_index_rollover_shards_handles_missing_shard_id(
-    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
+    shards: writer_pb2.Shards,
+    resource,
 ):
-    rollover_datamanager.get_kb_rollover_shards.return_value = shards
-    resources_datamanager.get_resource_shard_id.return_value = None
-    await rollover.index_rollover_shards(app_context, "kbid")
+    with setup_mocks(
+        kb_resources=[
+            resource,
+        ],
+        resource_shard_id=None,
+        kb_rollover_shards=shards,
+    ):
+        app_context = Mock()
+        kbid = "kbid"
+        await rollover.index_rollover_shards(app_context, kbid)
 
 
-async def test_index_rollover_shards_handles_missing_res(
-    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
-):
-    rollover_datamanager.get_kb_rollover_shards.return_value = shards
-    resources_datamanager.get_resource_index_message.return_value = None
+async def test_index_rollover_shards_handles_missing_resource(shards: writer_pb2.Shards):
+    rid = "1"
 
-    await rollover.index_rollover_shards(app_context, "kbid")
+    with (
+        setup_mocks(kb_resources=[], resource_shard_id="1", kb_rollover_shards=shards),
+        # rollover datamanager will return a resource that doesn't exist anymore
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.get_resource_to_index",
+            side_effect=[rid, None],
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.remove_resource_to_index"
+        ) as remove_resource_to_index_mock,
+    ):
+        app_context = Mock()
+        kbid = "kbid"
+        await rollover.index_rollover_shards(app_context, kbid)
 
-    rollover_datamanager.remove_to_index.assert_called_with(ANY, kbid="kbid", resource="1")
+        remove_resource_to_index_mock.assert_called_with(ANY, kbid=kbid, resource=rid)
 
 
-async def test_cutover_shards(app_context, rollover_datamanager, cluster_datamanager, shards):
-    rollover_datamanager.get_kb_rollover_shards.return_value = shards
+async def test_cutover_shards(shard_manager, shards: writer_pb2.Shards):
+    with (
+        setup_mocks(kb_shards=shards, kb_rollover_shards=shards),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.cluster.update_kb_shards", new=AsyncMock()
+        ) as update_kb_shards_mock,
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.delete_kb_rollover_shards",
+            new=AsyncMock(),
+        ) as delete_kb_rollover_shards_mock,
+    ):
+        app_context = MagicMock(shard_manager=shard_manager)
+        kbid = "kbid"
+        await rollover.cutover_shards(app_context, kbid)
 
-    await rollover.cutover_shards(app_context, "kbid")
+        update_kb_shards_mock.assert_called_with(ANY, kbid=kbid, shards=ANY)
+        delete_kb_rollover_shards_mock.assert_called_with(ANY, kbid=kbid)
+        for shard in shards.shards:
+            app_context.shard_manager.rollback_shard.assert_any_call(shard)
 
-    cluster_datamanager.update_kb_shards.assert_called_with(ANY, kbid="kbid", shards=ANY)
-    [app_context.shard_manager.rollback_shard.assert_any_call(shard) for shard in shards.shards]
 
+async def test_cutover_shards_missing():
+    app_context = Mock()
+    kbid = "kbid"
 
-async def test_cutover_shards_missing(app_context, rollover_datamanager):
-    rollover_datamanager.get_kb_rollover_shards.return_value = None
+    with setup_mocks(kb_shards=shards, kb_rollover_shards=None):
+        with pytest.raises(rollover.UnexpectedRolloverError):
+            await rollover.cutover_shards(app_context, kbid)
 
-    with pytest.raises(rollover.UnexpectedRolloverError):
-        await rollover.cutover_shards(app_context, "kbid")
+    with setup_mocks(kb_shards=None, kb_rollover_shards=shards):
+        with pytest.raises(rollover.UnexpectedRolloverError):
+            await rollover.cutover_shards(app_context, kbid)
 
 
 async def test_validate_indexed_data(
-    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
+    shard_manager,
+    shards: writer_pb2.Shards,
+    resource,
 ):
-    rollover_datamanager.get_kb_rollover_shards.return_value = shards
+    resource_ids = ["1", "2", "3"]
 
-    indexed_res = await rollover.validate_indexed_data(app_context, "kbid")
-    assert len(indexed_res) == len(resource_ids)
-    [
-        resources_datamanager.get_resource_index_message.assert_any_call(
-            ANY, kbid="kbid", rid=res_id, reindex=False
-        )
-        for res_id in resource_ids
-    ]
+    KnowledgeBox_obj_mock = Mock()
+    KnowledgeBox_obj_mock.get = AsyncMock(return_value=resource)
+    KnowledgeBox_mock = Mock(return_value=KnowledgeBox_obj_mock)
+
+    with (
+        setup_mocks(kb_shards=shards, kb_rollover_shards=shards),
+        # we need to patch KnowledgeBox so we can assert on the calls
+        patch("nucliadb.ingest.orm.knowledgebox.KnowledgeBox", new=KnowledgeBox_mock),
+        patch("nucliadb.common.cluster.rollover.KnowledgeBox", new=KnowledgeBox_mock),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.resources._iter_resource_slugs",
+            async_iterator_from(resource_ids),
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.iter_indexed_keys",
+            async_iterator_from(["1"]),
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.resources._get_resource_ids_from_slugs",
+            side_effect=lambda kbid, slugs: slugs,
+        ),
+        # indexed data is older, so we'll have to repair the resources
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.get_indexed_data",
+            AsyncMock(return_value=("1", 1)),
+        ),
+    ):
+        app_context = Mock(shard_manager=shard_manager)
+        indexed_res = await rollover.validate_indexed_data(app_context, "kbid")
+        assert len(indexed_res) == len(resource_ids)
+        for rid in resource_ids:
+            KnowledgeBox_mock.assert_any_call(ANY, ANY, "kbid")
+            KnowledgeBox_obj_mock.get.assert_any_call(rid)
+            resource.generate_index_message.assert_any_call(reindex=False)
 
 
 async def test_validate_indexed_data_handles_missing_res(
-    app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
+    shard_manager,
+    shards: writer_pb2.Shards,
 ):
-    rollover_datamanager.get_kb_rollover_shards.return_value = shards
-    resources_datamanager.get_resource_index_message.return_value = None
-    assert len(await rollover.validate_indexed_data(app_context, "kbid")) == 0
+    resource_ids = ["1", "2", "3"]
+    with (
+        setup_mocks(kb_resources=[], kb_shards=shards, kb_rollover_shards=shards),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.resources._iter_resource_slugs",
+            async_iterator_from(resource_ids),
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.iter_indexed_keys",
+            async_iterator_from(["1"]),
+        ),
+        # indexed data is older, so we'll have to repair the resources
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.get_indexed_data",
+            AsyncMock(return_value=("1", 1)),
+        ),
+    ):
+        app_context = Mock(shard_manager=shard_manager)
+        indexed_res = await rollover.validate_indexed_data(app_context, "kbid")
+        assert len(indexed_res) == 0
 
 
-async def test_rollover_shards(app_context, rollover_datamanager, shards, resource_ids):
-    rollover_datamanager.get_kb_rollover_shards.return_value = shards
-    resource_ids.clear()
+async def test_rollover_shards(
+    available_nodes,
+    shards,
+    shard_manager,
+    resource,
+):
+    with (
+        setup_mocks(
+            kb_resources=[resource], resource_shard_id="1", kb_shards=shards, kb_rollover_shards=shards
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.locking.distributed_lock",
+            return_value=AsyncMock(),
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.resources.iterate_resource_ids",
+            async_iterator_from([]),
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.rollover.iter_indexed_keys",
+            async_iterator_from(["1"]),
+        ),
+    ):
+        app_context = Mock(shard_manager=shard_manager)
+        await rollover.rollover_kb_shards(app_context, "kbid")
 
-    await rollover.rollover_kb_shards(app_context, "kbid")
+
+# Utils
+
+
+def async_iterator_from(items):
+    async def async_iterator(*args, **kwargs):
+        nonlocal items
+        for element in items:
+            yield element
+
+    return async_iterator

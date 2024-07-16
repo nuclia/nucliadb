@@ -365,10 +365,10 @@ class KnowledgeBox:
                             raise ShardNotFound(f"{exc.details()} @ {node.address}")
 
             await txn.commit()
-        await cls.delete_all_kb_keys(driver, kbid)
+        await cls._delete_all_kb_keys(driver, kbid)
 
     @classmethod
-    async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
+    async def _delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
         prefix = KB_KEYS.format(kbid=kbid)
         while True:
             async with driver.transaction(read_only=True) as txn:
@@ -409,6 +409,52 @@ class KnowledgeBox:
             disable_vectors=False,
         )
 
+    async def add_resource(self, uuid: str, slug: str, basic: Optional[Basic] = None) -> Resource:
+        if basic is None:
+            basic = Basic()
+        if slug == "":
+            slug = uuid
+        slug = await self._get_unique_slug(uuid, slug)
+        basic.slug = slug
+        fix_paragraph_annotation_keys(uuid, basic)
+        await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=uuid, basic=basic)
+        return Resource(
+            storage=self.storage,
+            txn=self.txn,
+            kb=self,
+            uuid=uuid,
+            basic=basic,
+            disable_vectors=False,
+        )
+
+    async def _get_unique_slug(self, uuid: str, slug: str) -> str:
+        key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
+        key_ok = False
+        while key_ok is False:
+            found = await self.txn.get(key)
+            if found and found.decode() != uuid:
+                slug += ".c"
+                key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
+            else:
+                key_ok = True
+        return slug
+
+    async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
+        base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
+        async for key in self.txn.keys(match=base, count=-1):
+            slug = key.split("/")[-1]
+            uuid = await datamanagers.resources.get_resource_uuid_from_slug(
+                self.txn, kbid=self.kbid, slug=slug
+            )
+            if uuid is not None:
+                yield Resource(
+                    self.txn,
+                    self.storage,
+                    self,
+                    uuid,
+                    disable_vectors=False,
+                )
+
     async def delete_resource(self, uuid: str):
         basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=uuid)
 
@@ -423,55 +469,6 @@ class KnowledgeBox:
                 pass
 
         await self.storage.delete_resource(self.kbid, uuid)
-
-    async def get_resource_uuid_by_slug(self, slug: str) -> Optional[str]:
-        return await datamanagers.resources.get_resource_uuid_from_slug(
-            self.txn, kbid=self.kbid, slug=slug
-        )
-
-    async def get_unique_slug(self, uuid: str, slug: str) -> str:
-        key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
-        key_ok = False
-        while key_ok is False:
-            found = await self.txn.get(key, for_update=False)
-            if found and found.decode() != uuid:
-                slug += ".c"
-                key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
-            else:
-                key_ok = True
-        return slug
-
-    async def add_resource(self, uuid: str, slug: str, basic: Optional[Basic] = None) -> Resource:
-        if basic is None:
-            basic = Basic()
-        if slug == "":
-            slug = uuid
-        slug = await self.get_unique_slug(uuid, slug)
-        basic.slug = slug
-        fix_paragraph_annotation_keys(uuid, basic)
-        await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=uuid, basic=basic)
-        return Resource(
-            storage=self.storage,
-            txn=self.txn,
-            kb=self,
-            uuid=uuid,
-            basic=basic,
-            disable_vectors=False,
-        )
-
-    async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
-        base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
-        async for key in self.txn.keys(match=base, count=-1):
-            slug = key.split("/")[-1]
-            uuid = await self.get_resource_uuid_by_slug(slug)
-            if uuid is not None:
-                yield Resource(
-                    self.txn,
-                    self.storage,
-                    self,
-                    uuid,
-                    disable_vectors=False,
-                )
 
     async def create_vectorset(self, config: knowledgebox_pb2.VectorSetConfig):
         if await datamanagers.vectorsets.exists(

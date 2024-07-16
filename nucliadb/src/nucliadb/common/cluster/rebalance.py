@@ -120,7 +120,7 @@ async def move_set_of_kb_resources(
                     locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=resource_id)
                 ),
             ):
-                found_shard_id = await datamanagers.resources.get_resource_shard_id(
+                found_shard_id = await datamanagers.cluster.get_resource_shard_id(
                     txn, kbid=kbid, rid=resource_id
                 )
                 if found_shard_id is None:
@@ -130,7 +130,7 @@ async def move_set_of_kb_resources(
                     # resource could have already been moved
                     continue
 
-                await datamanagers.resources.set_resource_shard_id(
+                await datamanagers.cluster.set_resource_shard_id(
                     txn, kbid=kbid, rid=resource_id, shard=to_shard_id
                 )
                 await index_resource_to_shard(context, kbid, resource_id, to_shard)
