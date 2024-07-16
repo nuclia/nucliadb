@@ -279,14 +279,22 @@ def test_raise_for_status_rate_limit():
 
 
 def test_index_name_validation():
+    # Only lowercase letters, numbers and dashes are allowed
     with pytest.raises(ValueError):
         CreateIndexRequest(
             name="foo_bar",
             dimension=1,
             metric="dot",
         )
+    # 45 characters is the maximum length
+    with pytest.raises(ValueError):
+        CreateIndexRequest(
+            name="f" * 46,
+            dimension=1,
+            metric="dot",
+        )
     CreateIndexRequest(
-        name="kbid---default",
+        name="kbid--default",
         dimension=1,
         metric="dot",
     )

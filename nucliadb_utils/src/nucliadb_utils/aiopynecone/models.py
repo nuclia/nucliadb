@@ -49,6 +49,7 @@ def validate_index_name(value, handler, info):
 IndexNameStr = Annotated[
     str,
     pydantic.StringConstraints(pattern=IndexNamePattern),
+    pydantic.StringConstraints(min_length=1, max_length=45),
     pydantic.WrapValidator(validate_index_name),
 ]
 
