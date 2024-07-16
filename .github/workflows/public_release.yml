@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Calculate short sha
         id: env-vars
@@ -54,7 +54,7 @@ jobs:
           cmd: yq -i '.appVersion = "${{ steps.version_step.outputs.version_number }}"' 'charts/nucliadb/Chart.yaml'
 
       - name: Install Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
         with:
           version: v3.4.0
 
@@ -99,7 +99,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Login to DockerHub
         uses: docker/login-action@v2
@@ -136,7 +136,7 @@ jobs:
           owner: nuclia
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
@@ -148,7 +148,7 @@ jobs:
         run: pdm sync -d --clean --no-editable
 
       - name: Setup gcloud CLI
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
@@ -167,7 +167,7 @@ jobs:
           gsutil copy /tmp/openapi/nucliadb-search.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json
 
       - name: Trigger doc update
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/docs
