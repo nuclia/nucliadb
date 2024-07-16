@@ -40,7 +40,10 @@ from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtili
 
 
 def kb_usage_report_finish_condition(kb_usage_report: KbUsageReportUtility, count_publish: int):
-    return kb_usage_report.queue.qsize() == 0 and kb_usage_report.js.publish.call_count == count_publish
+    return (
+        kb_usage_report.queue.qsize() == 0
+        and kb_usage_report.nats_connection_manager.js.publish.call_count == count_publish
+    )
 
 
 async def wait_until(condition, timeout=1):
@@ -64,7 +67,9 @@ async def wait_until(condition, timeout=1):
 async def test_kb_usage_report(natsd):
     report_util = KbUsageReportUtility(nats_subject="test-stream", nats_servers=[natsd])
     await report_util.initialize()
-    report_util.js.publish = AsyncMock(side_effect=report_util.js.publish)
+    report_util.nats_connection_manager.js.publish = AsyncMock(
+        side_effect=report_util.nats_connection_manager.js.publish
+    )
 
     report_util.send_kb_usage(
         service=Service.NUCLIA_DB,
