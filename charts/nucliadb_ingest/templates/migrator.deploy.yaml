@@ -55,19 +55,17 @@ spec:
           "nucliadb-migration-runner"
         ]
         envFrom:
-        - configMapRef:
-            name: nucliadb-config
-        - configMapRef:
-            name: {{ .Release.Name }}-config
+          - configMapRef:
+              name: {{ .Release.Name }}-config
+          {{- if .Values.envFrom }}
+          {{- toYaml .Values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: VERSION
             valueFrom:
               fieldRef:
                 fieldPath: metadata.labels['version']
-        {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-        {{- end }}
+          {{- include "toEnv" .Values.env | indent 10 }}
         ports:
         - name: metrics
           containerPort: {{ .Values.serving.metricsPort }}

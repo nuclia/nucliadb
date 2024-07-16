@@ -16,8 +16,13 @@ image_sidecar: IMAGE_SIDECAR_TO_REPLACE
 # HOWEVER, we are in a transition period where we allow
 # both until all component settings are removed from
 # settings not mapped directly through env
-env:
-  EXAMPLE: "VALUE"
+env: {}
+  # EXAMPLE: "VALUE"
+
+# Configmap and/or secrets to mount into the environment
+envFrom:
+  - configMapRef:
+      name: nucliadb-config
 
 # Kubernetes settings
 config:

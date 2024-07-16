@@ -113,10 +113,11 @@ spec:
           periodSeconds: 60
         command: ["node_writer"]
         envFrom:
-        - configMapRef:
-            name: node-config
-        - configMapRef:
-            name: nucliadb-config
+          - configMapRef:
+              name: node-config
+          {{- if $values.envFrom }}
+          {{- toYaml $values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: NODE_ROLE
             value: secondary
@@ -124,10 +125,7 @@ spec:
             value: "node-{{ $i }}.node:{{ $values.serving.grpc_writer }}"
           - name: METRICS_PORT
             value: "3032"
-          {{- range $key, $value := $values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-          {{- end }}
+          {{- include "toEnv" $values.env | indent 10 }}
         ports:
         - name: grpc-writer
           containerPort: {{ $values.serving.grpc_writer }}
@@ -159,10 +157,11 @@ spec:
         #   initialDelaySeconds: 2
         command: ["node_reader"]
         envFrom:
-        - configMapRef:
-            name: node-config
-        - configMapRef:
-            name: nucliadb-config
+          - configMapRef:
+              name: node-config
+          {{- if $values.envFrom }}
+          {{- toYaml $values.envFrom | nindent 10 }}
+          {{- end }}
         env:
           - name: NODE_ROLE
             value: secondary
