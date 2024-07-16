@@ -62,7 +62,7 @@ spec:
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.labels['version']
-              {{- include "toEnv" .Values.env | indent 10 }}
+              {{- include "toEnv" .Values.env | indent 14 }}
             imagePullPolicy: Always
             command: ["nucliadb-rebalance"]
             ports:
