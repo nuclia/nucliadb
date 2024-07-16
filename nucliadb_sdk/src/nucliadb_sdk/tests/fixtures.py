@@ -19,9 +19,6 @@
 #
 import asyncio
 import os
-import subprocess
-import sys
-import time
 import uuid
 from dataclasses import dataclass
 from typing import Optional
@@ -84,36 +81,13 @@ class NucliaFixture:
 def nucliadb():
     if os.environ.get("TEST_LOCAL_NUCLIADB"):
         host = os.environ.get("TEST_LOCAL_NUCLIADB")
-        child = None
-
-        # Start a local NucliaDB here
-        if host == "START":
-            host = "localhost"
-            child = subprocess.Popen(
-                os.path.join(os.path.dirname(sys.executable), "nucliadb"),
-                env=images.settings["nucliadb"]["env"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            # Wait for service ready
-            for _ in range(10):
-                try:
-                    if requests.get(f"http://localhost:8080").status_code == 200:
-                        break
-                except Exception:
-                    pass
-                time.sleep(1)
-
         yield NucliaFixture(
             host=host,
             port=8080,
-            grpc=8030,
+            grpc=8060,
             container="local",
             url=f"http://{host}:8080/api",
         )
-
-        if child:
-            child.kill()
     else:
         container = NucliaDB()
         host, port = container.run()
