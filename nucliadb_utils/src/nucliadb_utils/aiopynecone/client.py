@@ -163,6 +163,8 @@ class DataPlane:
         - `vectors`: The vectors to upsert.
         - `timeout`: to control the request timeout. If not set, the default timeout is used.
         """
+        if len(vectors) == 0:  # pragma: no cover
+            raise ValueError("No vectors to upsert.")
         headers = {"Api-Key": self.api_key}
         payload = UpsertRequest(vectors=vectors)
         post_kwargs: dict[str, Any] = {
