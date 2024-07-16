@@ -407,7 +407,7 @@ class Processor:
 
         if shard is not None:
             index_message = resource.indexer.brain
-            await self._maybe_external_index_resource(kbid, source, uuid, index_message)
+            await self._maybe_external_index_add_resource(kbid, source, uuid, index_message)
             await self.node_shard_manager.add_resource(
                 shard,
                 index_message,
@@ -419,7 +419,7 @@ class Processor:
         else:
             raise AttributeError("Shard is not available")
 
-    async def _maybe_external_index_resource(
+    async def _maybe_external_index_add_resource(
         self,
         kbid: str,
         source: nodewriter_pb2.IndexMessageSource.ValueType,
