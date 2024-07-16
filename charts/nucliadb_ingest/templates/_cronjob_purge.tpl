@@ -55,7 +55,9 @@ spec:
             envFrom:
               - configMapRef:
                   name: {{ .Release.Name }}-config
+              {{- if .Values.envFrom }}
               {{- toYaml .Values.envFrom | nindent 14 }}
+              {{- end }}
             imagePullPolicy: Always
             command: ["{{ .command }}"]
 {{ end }}
