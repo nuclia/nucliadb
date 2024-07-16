@@ -63,6 +63,7 @@ async def test_delete_resource(external_index_manager: PineconeIndexManager, dat
 
 async def test_index_resource(external_index_manager: PineconeIndexManager, data_plane):
     index_data = PBResourceBrain()
+    index_data.labels.extend(["/e/PERSON/John Doe", "/e/ORG/ACME", "/n/s/PROCESSED", "/t/private"])
     index_data.security.access_groups.extend(["ag1", "ag2"])
     index_paragraphs = IndexParagraphs()
     index_paragraph = IndexParagraph()
@@ -81,7 +82,11 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     metadata = vector.metadata
     assert "labels" in metadata
     labels = vector.metadata["labels"]
-    assert labels == []
+    # Check that ignored labels are not present
+    assert "/e/PERSON/John Doe" not in labels
+    assert "/e/ORG/ACME" not in labels
+    assert "/n/s/PROCESSED" not in labels
+    assert labels == ["/t/private"]
     assert "access_groups" in metadata
     access_groups = vector.metadata["access_groups"]
     assert sorted(access_groups) == ["ag1", "ag2"]

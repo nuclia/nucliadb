@@ -30,6 +30,15 @@ logger = logging.getLogger(__name__)
 manager_observer = Observer("pinecone_index_manager", labels={"operation": ""})
 
 
+DISCARDED_LABEL_PREFIXES = [
+    # NER-related labels are not supported in the Pinecone integration because right now
+    # the number of detected entities is unbounded and may exceed the vector metadata size limit.
+    "/e/",
+    # Processing status labels are only needed for the catalog endpoint.
+    "/n/s",
+]
+
+
 class PineconeIndexManager(ExternalIndexManager):
     type = "pinecone"
 
@@ -101,11 +110,17 @@ class PineconeIndexManager(ExternalIndexManager):
             for index_paragraph_id, index_paragraph in index_paragraphs.paragraphs.items():
                 paragraph_data = paragraphs_data.get(index_paragraph_id) or {}
                 for sentence_id, vector_sentence in index_paragraph.sentences.items():
-                    sentence_labels = set(index_paragraph.labels).union(
-                        paragraph_data.get("labels") or set()
+                    sentence_labels = (
+                        set(index_paragraph.labels)
+                        .union(paragraph_data.get("labels") or set())
+                        .union(resource_labels)
                     )
-                    # Filter out NER-related labels
-                    sentence_labels = {label for label in sentence_labels if not label.startswith("/e/")}
+                    # Filter out discarded labels
+                    sentence_labels = {
+                        label
+                        for label in sentence_labels
+                        if not any(label.startswith(prefix) for prefix in DISCARDED_LABEL_PREFIXES)
+                    }
                     vector_metadata = {
                         "labels": list(sentence_labels),
                     }
