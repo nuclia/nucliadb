@@ -5,7 +5,7 @@ kind: ConfigMap
 metadata:
   name: {{ .Values.configMapName | default "nucliadb-config" }}
   labels:
-    app: writer
+    app: shared
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
