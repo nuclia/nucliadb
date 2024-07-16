@@ -56,5 +56,4 @@ async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager
 
 @async_lru.alru_cache(maxsize=None)
 async def get_external_index_metadata(kbid: str) -> Optional[StoredExternalIndexProviderMetadata]:
-    async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.kb.get_external_index_provider_metadata(txn, kbid=kbid)
+    return await datamanagers.atomic.kb.get_external_index_provider_metadata(kbid=kbid)

@@ -63,13 +63,17 @@ async def test_delete_resource(external_index_manager: PineconeIndexManager, dat
 
 async def test_index_resource(external_index_manager: PineconeIndexManager, data_plane):
     index_data = PBResourceBrain()
+    index_data.texts["f/field"].text = "some text"
+    index_data.texts["f/field"].labels.append("/t/text/label")
+    index_data.paragraphs_to_delete.append("pid-foobar")
+    index_data.paragraphs_to_delete.append("rid/f/field/0-10")
     index_data.labels.extend(["/e/PERSON/John Doe", "/e/ORG/ACME", "/n/s/PROCESSED", "/t/private"])
     index_data.security.access_groups.extend(["ag1", "ag2"])
     index_paragraphs = IndexParagraphs()
     index_paragraph = IndexParagraph()
-    index_paragraph.sentences["sid"].vector.extend([1, 2, 3])
-    index_paragraphs.paragraphs["pid"].CopyFrom(index_paragraph)
-    index_data.paragraphs["pid"].CopyFrom(index_paragraphs)
+    index_paragraph.sentences["rid/f/field/0/0-10"].vector.extend([1, 2, 3])
+    index_paragraphs.paragraphs["rid/f/field/0-10"].CopyFrom(index_paragraph)
+    index_data.paragraphs["f/field"].CopyFrom(index_paragraphs)
 
     await external_index_manager._index_resource("resource_uuid", index_data)
     data_plane.upsert_in_batches.assert_awaited_once()
@@ -77,7 +81,7 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     assert len(vectors) == 1
     vector = vectors[0]
     assert isinstance(vector, Vector)
-    assert vector.id == "sid"
+    assert vector.id == "rid/f/field/0/0-10"
     assert vector.values == [1, 2, 3]
     metadata = vector.metadata
     assert "labels" in metadata
@@ -86,7 +90,7 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     assert "/e/PERSON/John Doe" not in labels
     assert "/e/ORG/ACME" not in labels
     assert "/n/s/PROCESSED" not in labels
-    assert labels == ["/t/private"]
+    assert sorted(labels) == ["/t/private", "/t/text/label"]
     assert "access_groups" in metadata
     access_groups = vector.metadata["access_groups"]
     assert sorted(access_groups) == ["ag1", "ag2"]

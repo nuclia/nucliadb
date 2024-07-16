@@ -80,6 +80,7 @@ def rw_txn_wrap(fun: P) -> P:  # type: ignore
 
 class kb:
     exists_kb = ro_txn_wrap(kb_dm.exists_kb)
+    get_external_index_provider_metadata = ro_txn_wrap(kb_dm.get_external_index_provider_metadata)
 
 
 class resources:

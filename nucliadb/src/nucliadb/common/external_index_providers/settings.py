@@ -32,13 +32,13 @@ class ExternalIndexProvidersSettings(BaseSettings):
         title="Pinecone delete parallelism",
         description="Number of parallel deletes to Pinecone on each delete resource operation",
     )
-    pinecone_upsert_timeout: int = Field(
-        default=10,
+    pinecone_upsert_timeout: float = Field(
+        default=10.0,
         title="Pinecone upsert timeout",
         description="Timeout in seconds for each upsert operation to Pinecone",
     )
-    pinecone_delete_timeout: int = Field(
-        default=10,
+    pinecone_delete_timeout: float = Field(
+        default=10.0,
         title="Pinecone delete timeout",
         description="Timeout in seconds for each delete operation to Pinecone",
     )

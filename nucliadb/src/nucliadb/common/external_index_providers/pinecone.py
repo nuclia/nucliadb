@@ -49,8 +49,8 @@ class PineconeIndexManager(ExternalIndexManager):
         index_host: str,
         upsert_parallelism: int = 3,
         delete_parallelism: int = 2,
-        upsert_timeout: int = 10,
-        delete_timeout: int = 10,
+        upsert_timeout: float = 10.0,
+        delete_timeout: float = 10.0,
     ):
         super().__init__(kbid=kbid)
         assert api_key != ""
@@ -132,7 +132,7 @@ class PineconeIndexManager(ExternalIndexManager):
                         metadata=vector_metadata,
                     )
                     vectors.append(pc_vector)
-        if len(vectors) == 0:
+        if len(vectors) == 0:  # pragma: no cover
             return
         with manager_observer({"operation": "upsert_in_batches"}):
             await self.data_plane.upsert_in_batches(

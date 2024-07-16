@@ -36,8 +36,8 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
             "Deleting resource to external index",
             extra={
                 "kbid": self.kbid,
-                "resource_uuid": resource_uuid,
-                "external_index_provider": self.type,
+                "rid": resource_uuid,
+                "provider": self.type,
             },
         )
         await self._delete_resource(resource_uuid)
@@ -47,8 +47,8 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
             "Indexing resource to external index",
             extra={
                 "kbid": self.kbid,
-                "resource_uuid": resource_uuid,
-                "external_index_provider": self.type,
+                "rid": resource_uuid,
+                "provider": self.type,
             },
         )
         await self._index_resource(resource_uuid, resource_data)
