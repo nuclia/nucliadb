@@ -298,3 +298,12 @@ def test_index_name_validation():
         dimension=1,
         metric="dot",
     )
+
+
+def test_vector_metadata_validation():
+    vec = Vector(id="foo", values=[1.0], metadata={"key": "value"})
+    assert vec.metadata == {"key": "value"}
+    with pytest.raises(ValueError):
+        # If metadata exceeds 40 kB, it should raise an error
+        big_metadata = {key: "value" * 1000 for key in range(50)}
+        Vector(id="foo", values=[1.0], metadata=big_metadata)
