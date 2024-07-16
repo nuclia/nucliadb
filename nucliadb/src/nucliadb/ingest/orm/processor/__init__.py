@@ -407,12 +407,7 @@ class Processor:
 
         if shard is not None:
             index_message = resource.indexer.brain
-            external_index_manager = await get_external_index_manager(kbid=kbid)
-            if external_index_manager:
-                await external_index_manager.index_resource(
-                    resource_uuid=uuid, resource_data=index_message
-                )
-                self.clear_external_index_fields(index_message)
+            await self._maybe_external_index_resource(kbid, source, uuid, index_message)
             await self.node_shard_manager.add_resource(
                 shard,
                 index_message,
@@ -423,6 +418,28 @@ class Processor:
             )
         else:
             raise AttributeError("Shard is not available")
+
+    async def _maybe_external_index_resource(
+        self,
+        kbid: str,
+        source: nodewriter_pb2.IndexMessageSource.ValueType,
+        resource_uuid: str,
+        index_message: PBBrainResource,
+    ):
+        if source != nodewriter_pb2.IndexMessageSource.PROCESSOR:
+            # We only want to index resources that are coming from the processor, as they are the ones
+            # that have the vectors and extracted text
+            return
+
+        external_index_manager = await get_external_index_manager(kbid=kbid)
+        if external_index_manager is None:
+            # No external index manager, nothing to do
+            return
+
+        await external_index_manager.index_resource(
+            resource_uuid=resource_uuid, resource_data=index_message
+        )
+        self.clear_external_index_fields(index_message)
 
     @staticmethod
     def clear_external_index_fields(index_message: PBBrainResource):

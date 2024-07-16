@@ -113,7 +113,9 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     rollback_learning_config = partial(_rollback_learning_config, kbid)
 
-    external_index_providers = None
+    external_index_providers = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
+        type=knowledgebox_pb2.ExternalIndexProviderType.UNSET,
+    )
     if (
         item.external_index_provider
         and item.external_index_provider.type == ExternalIndexProviderType.PINECONE

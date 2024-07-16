@@ -163,6 +163,7 @@ class KnowledgeBoxConfig(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
+        as_dict["external_index_provider"] = None
         return cls(**as_dict)
 
 
