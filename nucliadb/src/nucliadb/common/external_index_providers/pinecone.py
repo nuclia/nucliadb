@@ -21,10 +21,13 @@ import logging
 
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
 from nucliadb_utils.utilities import get_pinecone
 
 logger = logging.getLogger(__name__)
+
+manager_observer = Observer("pinecone_index_manager", labels={"operation": ""})
 
 
 class PineconeIndexManager(ExternalIndexManager):
@@ -54,11 +57,12 @@ class PineconeIndexManager(ExternalIndexManager):
         self.delete_timeout = delete_timeout
 
     async def _delete_resource(self, resource_uuid: str) -> None:
-        await self.data_plane.delete_by_id_prefix(
-            id_prefix=resource_uuid,
-            max_parallel_batches=self.delete_parallelism,
-            batch_timeout=self.delete_timeout,
-        )
+        with manager_observer({"operation": "delete_by_resource_prefix"}):
+            await self.data_plane.delete_by_id_prefix(
+                id_prefix=resource_uuid,
+                max_parallel_batches=self.delete_parallelism,
+                batch_timeout=self.delete_timeout,
+            )
 
     async def _index_resource(self, resource_uuid: str, index_data: Resource) -> None:
         # First off, delete any previously existing vectors with the same field prefixes.
@@ -69,19 +73,16 @@ class PineconeIndexManager(ExternalIndexManager):
                 field_prefixes_to_delete.add(f"{resource_uuid}/{field_type}/{field_id}")
             except ValueError:
                 continue
-
-        # TODO: run tasks while vectors payload is being built
-        for prefix in field_prefixes_to_delete:
-            await self.data_plane.delete_by_id_prefix(
-                id_prefix=prefix,
-                max_parallel_batches=self.delete_parallelism,
-                batch_timeout=self.delete_timeout,
-            )
-
+        with manager_observer({"operation": "delete_by_field_prefix"}):
+            for prefix in field_prefixes_to_delete:
+                await self.data_plane.delete_by_id_prefix(
+                    id_prefix=prefix,
+                    max_parallel_batches=self.delete_parallelism,
+                    batch_timeout=self.delete_timeout,
+                )
         access_groups = None
         if index_data.HasField("security"):
             access_groups = list(set(index_data.security.access_groups))
-
         # Iterate over paragraphs and fetch paragraph data
         resource_labels = set(index_data.labels)
         paragraphs_data = {}
@@ -119,8 +120,9 @@ class PineconeIndexManager(ExternalIndexManager):
                     vectors.append(pc_vector)
         if len(vectors) == 0:
             return
-        await self.data_plane.upsert_in_batches(
-            vectors=vectors,
-            max_parallel_batches=self.upsert_parallelism,
-            batch_timeout=self.upsert_timeout,
-        )
+        with manager_observer({"operation": "upsert_in_batches"}):
+            await self.data_plane.upsert_in_batches(
+                vectors=vectors,
+                max_parallel_batches=self.upsert_parallelism,
+                batch_timeout=self.upsert_timeout,
+            )
