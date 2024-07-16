@@ -284,34 +284,6 @@ class EntitySubgraph(BaseModel):
 #     path: List[DirectionalRelation]
 
 
-class SentenceSearch(BaseModel):
-    data: List[float] = []
-    time: float
-
-
-class Ner(BaseModel):
-    text: str
-    ner: str
-    start: int
-    end: int
-
-
-class TokenSearch(BaseModel):
-    tokens: List[Ner] = []
-    time: float
-
-
-class QueryInfo(BaseModel):
-    language: Optional[str] = None
-    stop_words: List[str] = []
-    semantic_threshold: Optional[float] = None
-    visual_llm: bool
-    max_context: int
-    entities: TokenSearch
-    sentence: SentenceSearch
-    query: str
-
-
 class Relations(BaseModel):
     entities: Dict[str, EntitySubgraph]
     # TODO: implement in the next iteration of knowledge graph search
