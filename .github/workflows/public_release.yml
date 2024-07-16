@@ -56,7 +56,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
-          version: v3.4.0
+          version: v3.15.3
 
       - name: Build helm package
         run: |-
