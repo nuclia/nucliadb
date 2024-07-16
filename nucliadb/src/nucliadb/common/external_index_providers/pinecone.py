@@ -49,7 +49,6 @@ class PineconeIndexManager(ExternalIndexManager):
         assert index_host != ""
         self.index_host = index_host
         pinecone = get_pinecone()
-        self.control_plane = pinecone.control_plane(api_key=self.api_key)
         self.data_plane = pinecone.data_plane(api_key=self.api_key, index_host=self.index_host)
         self.upsert_parallelism = upsert_parallelism
         self.delete_parallelism = delete_parallelism
