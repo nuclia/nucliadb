@@ -41,7 +41,9 @@ class PineconeIndexManager(ExternalIndexManager):
         delete_timeout: int = 10,
     ):
         super().__init__(kbid=kbid)
+        assert api_key != ""
         self.api_key = api_key
+        assert index_host != ""
         self.index_host = index_host
         pinecone = get_pinecone()
         self.control_plane = pinecone.control_plane(api_key=self.api_key)
@@ -89,9 +91,9 @@ class PineconeIndexManager(ExternalIndexManager):
             if field_paragraphs is None:
                 continue
             for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
-                pararaph_pabels = set(paragraph.labels).union(field_labels).union(resource_labels)
+                paragraph_labels = set(paragraph.labels).union(field_labels).union(resource_labels)
                 paragraphs_data[paragraph_id] = {
-                    "labels": list(pararaph_pabels),
+                    "labels": list(paragraph_labels),
                 }
         # Iterate sentences now, and compute the list of vectors to upsert
         vectors: list[PineconeVector] = []
@@ -102,6 +104,8 @@ class PineconeIndexManager(ExternalIndexManager):
                     sentence_labels = set(index_paragraph.labels).union(
                         paragraph_data.get("labels") or set()
                     )
+                    # Filter out NER-related labels
+                    sentence_labels = {label for label in sentence_labels if not label.startswith("/e/")}
                     vector_metadata = {
                         "labels": list(sentence_labels),
                     }

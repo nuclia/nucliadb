@@ -181,9 +181,7 @@ class Processor:
                 if shard_id is None:
                     logger.warning(f"Resource {uuid} does not exist")
                 else:
-                    external_index_manager = await get_external_index_manager(kbid=message.kbid)
-                    if external_index_manager:
-                        await external_index_manager.delete_resource(resource_uuid=uuid)
+                    await self._maybe_external_index_delete_resource(message.kbid, uuid)
                     shard = await kb.get_resource_shard(shard_id)
                     if shard is None:
                         raise AttributeError("Shard not available")
@@ -418,6 +416,12 @@ class Processor:
             )
         else:
             raise AttributeError("Shard is not available")
+
+    async def _maybe_external_index_delete_resource(self, kbid: str, resource_uuid: str):
+        external_index_manager = await get_external_index_manager(kbid=kbid)
+        if external_index_manager is None:
+            return
+        await external_index_manager.delete_resource(resource_uuid=resource_uuid)
 
     async def _maybe_external_index_add_resource(
         self,

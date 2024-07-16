@@ -64,6 +64,7 @@ def raise_for_status(operation: str, response: httpx.Response):
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
+        breakpoint()
         pinecone_errors_counter.inc(labels={"type": operation})
         code = None
         message = None

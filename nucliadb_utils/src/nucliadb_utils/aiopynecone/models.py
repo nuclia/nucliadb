@@ -62,7 +62,7 @@ class CreateIndexRequest(BaseModel):
 
 
 class Vector(BaseModel):
-    id: str = Field(max_length=512)
+    id: str = Field(min_length=1, max_length=512)
     values: list[float]
     metadata: dict[str, Any] = {}
 
@@ -72,6 +72,7 @@ class Vector(BaseModel):
         json_value = json.dumps(value)
         if len(json_value) > MAX_METADATA_SIZE:
             raise ValueError("metadata size is too large")
+        return value
 
 
 class UpsertRequest(BaseModel):
