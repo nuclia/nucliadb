@@ -167,6 +167,9 @@ class KnowledgeBox:
                         request=external_index_provider,
                         vector_dimension=semantic_model.vector_dimension,
                     )
+                    rollback_ops.append(
+                        partial(cls._maybe_delete_external_index, kbid, stored_external_index_provider)
+                    )
                 else:
                     stored_external_index_provider = StoredExternalIndexProviderMetadata(
                         type=external_index_provider.type
