@@ -151,7 +151,7 @@ class QueryParser:
 
     @property
     def has_vector_search(self) -> bool:
-        return SearchOptions.SEMANTIC in self.features
+        return SearchOptions.VECTOR in self.features
 
     @property
     def has_relations_search(self) -> bool:
@@ -358,12 +358,12 @@ class QueryParser:
         request.min_score_bm25 = self.min_score.bm25
 
     def parse_document_search(self, request: nodereader_pb2.SearchRequest) -> None:
-        if SearchOptions.FULLTEXT in self.features:
+        if SearchOptions.DOCUMENT in self.features:
             request.document = True
             node_features.inc({"type": "documents"})
 
     def parse_paragraph_search(self, request: nodereader_pb2.SearchRequest) -> None:
-        if SearchOptions.KEYWORD in self.features:
+        if SearchOptions.PARAGRAPH in self.features:
             request.paragraph = True
             node_features.inc({"type": "paragraphs"})
 
@@ -529,7 +529,7 @@ async def paragraph_query_to_pb(
     if range_modification_end is not None:
         request.timestamps.to_modified.FromDatetime(range_modification_end)
 
-    if SearchOptions.KEYWORD in features:
+    if SearchOptions.PARAGRAPH in features:
         request.uuid = rid
         request.body = query
         if len(filters) > 0:

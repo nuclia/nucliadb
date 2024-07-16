@@ -92,7 +92,7 @@ async def resource_search(
     try:
         pb_query = await paragraph_query_to_pb(
             kbid,
-            [SearchOptions.KEYWORD],
+            [SearchOptions.PARAGRAPH],
             rid,
             query,
             fields,
