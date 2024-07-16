@@ -26,6 +26,7 @@ from typing_extensions import Annotated
 
 KILO_BYTE = 1024
 MAX_METADATA_SIZE = 40 * KILO_BYTE
+MAX_INDEX_NAME_LENGTH = 45
 
 
 # Requests
@@ -49,7 +50,7 @@ def validate_index_name(value, handler, info):
 IndexNameStr = Annotated[
     str,
     pydantic.StringConstraints(pattern=IndexNamePattern),
-    pydantic.StringConstraints(min_length=1, max_length=45),
+    pydantic.StringConstraints(min_length=1, max_length=MAX_INDEX_NAME_LENGTH),
     pydantic.WrapValidator(validate_index_name),
 ]
 
