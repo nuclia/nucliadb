@@ -57,6 +57,8 @@ def external_index_manager(data_plane):
 async def test_delete_resource(external_index_manager: PineconeIndexManager, data_plane):
     await external_index_manager._delete_resource("resource_uuid")
     data_plane.delete_by_id_prefix.assert_awaited_once()
+    resource_uuid = data_plane.delete_by_id_prefix.call_args[1]["id_prefix"]
+    assert resource_uuid == "resource_uuid"
 
 
 async def test_index_resource(external_index_manager: PineconeIndexManager, data_plane):
