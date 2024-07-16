@@ -88,7 +88,7 @@ async def test_kb_creation(
     response: NewKnowledgeBoxResponse = await nucliadb_grpc.NewKnowledgeBox(request, timeout=None)  # type: ignore
     assert response.status == KnowledgeBoxResponseStatus.OK
 
-    mock_pinecone_client.create_index.assert_awaited_once_with(name=f"{kbid}_default", dimension=128)
+    mock_pinecone_client.create_index.assert_awaited_once_with(name=f"{kbid}--default", dimension=128)
 
     # Check that external index provider metadata was properly stored
     async with datamanagers.with_ro_transaction() as txn:
@@ -104,10 +104,10 @@ async def test_kb_creation(
         assert decrypted_api_key == "my-pinecone-api-key"
 
         # Check that the rest of the config was stored
-        assert external_index_provider.pinecone_config.index_hosts[f"{kbid}_default"] == "pinecone-host"
+        assert external_index_provider.pinecone_config.index_hosts[f"{kbid}--default"] == "pinecone-host"
 
     # Deleting a knowledge box should delete the Pinecone index
     response = await nucliadb_grpc.DeleteKnowledgeBox(KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None)  # type: ignore
     assert response.status == KnowledgeBoxResponseStatus.OK
 
-    mock_pinecone_client.delete_index.assert_awaited_once_with(name=f"{kbid}_default")
+    mock_pinecone_client.delete_index.assert_awaited_once_with(name=f"{kbid}--default")
