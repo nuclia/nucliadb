@@ -19,9 +19,15 @@
 #
 import logging
 
-from nucliadb.common.external_index_providers.base import ExternalIndexManager
+from nucliadb.common.external_index_providers.base import (
+    ExternalIndexManager,
+    ExternalIndexProviderType,
+    QueryResults,
+)
+from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_telemetry.metrics import Observer
+from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
 from nucliadb_utils.utilities import get_pinecone
 
@@ -39,8 +45,13 @@ DISCARDED_LABEL_PREFIXES = [
 ]
 
 
+class PineconeQueryResults(QueryResults):
+    type: ExternalIndexProviderType = ExternalIndexProviderType.PINECONE
+    results: QueryResponse
+
+
 class PineconeIndexManager(ExternalIndexManager):
-    type = "pinecone"
+    type = ExternalIndexProviderType.PINECONE
 
     def __init__(
         self,
@@ -51,6 +62,7 @@ class PineconeIndexManager(ExternalIndexManager):
         delete_parallelism: int = 2,
         upsert_timeout: float = 10.0,
         delete_timeout: float = 10.0,
+        query_timeout: float = 10.0,
     ):
         super().__init__(kbid=kbid)
         assert api_key != ""
@@ -63,6 +75,7 @@ class PineconeIndexManager(ExternalIndexManager):
         self.delete_parallelism = delete_parallelism
         self.upsert_timeout = upsert_timeout
         self.delete_timeout = delete_timeout
+        self.query_timeout = query_timeout
 
     async def _delete_resource(self, resource_uuid: str) -> None:
         with manager_observer({"operation": "delete_by_resource_prefix"}):
@@ -140,3 +153,15 @@ class PineconeIndexManager(ExternalIndexManager):
                 max_parallel_batches=self.upsert_parallelism,
                 batch_timeout=self.upsert_timeout,
             )
+
+    async def _query(self, request: SearchRequest) -> PineconeQueryResults:
+        top_k = request.page_number * request.result_per_page
+        query_results = await self.data_plane.query(
+            vector=list(request.vector),
+            top_k=top_k,
+            include_values=False,
+            include_metadata=True,
+            filter=None,  # TODO: add filter support
+            timeout=self.query_timeout,
+        )
+        return PineconeQueryResults(results=query_results)

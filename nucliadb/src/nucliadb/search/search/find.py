@@ -22,7 +22,9 @@ from time import time
 from typing import Optional
 
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
-from nucliadb.common.external_index_providers.manager import get_external_index_manager, get_external_index_metadata
+from nucliadb.common.external_index_providers.manager import (
+    get_external_index_manager,
+)
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.metrics import RAGMetrics
@@ -38,9 +40,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     SearchOptions,
 )
-from nucliadb_protos.knowledgebox_pb2 import StoredExternalIndexProviderMetadata
 from nucliadb_utils.utilities import get_audit
-from pygments import highlight
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +196,9 @@ async def _external_index_retrieval(
     external_index_manager: ExternalIndexManager,
     generative_model: Optional[str] = None,
 ) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+    """
+    Parse the query, query the external index, and hydrate the results.
+    """
     # Parse query
     item.min_score = min_score_from_payload(item.min_score)
     query_parser = QueryParser(
@@ -226,19 +229,19 @@ async def _external_index_retrieval(
     search_request, incomplete_results, _ = await query_parser.parse()
 
     # Query index
-    query_results = await external_index_manager.query_index(search_request)
+    query_results = await external_index_manager.query(search_request)  # noqa
 
-    # Merge results
-    merger = ExternalIndexRetrievalQueryResultsMerger.from_type(external_index_manager.type)
-    retrieval_results = await merger.merge(
-        query_results,
-        kbid=kbid,
-        show=item.show,
-        extracted=item.extracted,
-        field_type_filter=item.field_type_filter,
-        highlight=item.highlight,
-        min_score_bm25=query_parser.min_score.bm25,
-        min_score_semantic=query_parser.min_score.semantic,
-        requested_relations=search_request.relation_subgraph,
-    )
-    return retrieval_results, incomplete_results, query_parser 
+    # Hydrate results
+    retrieval_results = KnowledgeboxFindResults(resources={})
+    # retrieval_results = await external_index_results_hydrator.hydrate(
+    #     query_results,
+    #     kbid=kbid,
+    #     show=item.show,
+    #     extracted=item.extracted,
+    #     field_type_filter=item.field_type_filter,
+    #     highlight=item.highlight,
+    #     min_score_bm25=query_parser.min_score.bm25,
+    #     min_score_semantic=query_parser.min_score.semantic,
+    #     requested_relations=search_request.relation_subgraph,
+    # )
+    return retrieval_results, incomplete_results, query_parser
