@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
 import asyncio
 import logging
 
@@ -61,7 +59,7 @@ async def hydrate_external(
     rcache = get_resource_cache(clear=True)
     try:
         resource_ids = set()
-        for text_block in query_results.iter_text_blocks():
+        for text_block in query_results.iter_matching_text_blocks():
             resource_id = text_block.resource_id
             resource_ids.add(resource_id)
             find_resource = retrieval_results.resources.setdefault(

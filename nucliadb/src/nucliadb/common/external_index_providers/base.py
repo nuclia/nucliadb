@@ -39,7 +39,7 @@ class ExternalIndexProviderType(Enum):
     PINECONE = "pinecone"
 
 
-class TextBlock(BaseModel):
+class TextBlockMatch(BaseModel):
     """
     Model a text block/paragraph retrieved from an external index with all the information
     needed in order to later hydrate retrieval results.
@@ -63,11 +63,12 @@ class QueryResults(BaseModel):
     type: ExternalIndexProviderType
     results: Any
 
-    def iter_text_blocks(self) -> Iterator[TextBlock]:
+    def iter_matching_text_blocks(self) -> Iterator[TextBlockMatch]:
         """
-        Iterates over the paragraphs in the results.
+        Iterates over the paragraphs in the results
+        This should be implemented by the specific external index provider.
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
 
 class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
