@@ -33,6 +33,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.external_index_providers import ExternalIndexProviderType
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
@@ -114,6 +115,20 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     semantic_model = learning_config.into_semantic_model_metadata()
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
+
+    external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
+        type=knowledgebox_pb2.ExternalIndexProviderType.UNSET,
+    )
+    if (
+        item.external_index_provider
+        and item.external_index_provider.type == ExternalIndexProviderType.PINECONE
+    ):
+        pinecone_api_key = item.external_index_provider.api_key
+        external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
+            type=knowledgebox_pb2.ExternalIndexProviderType.PINECONE,
+            pinecone_config=knowledgebox_pb2.CreatePineconeConfig(api_key=pinecone_api_key),
+        )
+
     try:
         (kbid, slug) = await KnowledgeBox.create(
             driver,
@@ -123,6 +138,7 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
             description=item.description or "",
             semantic_model=semantic_model,
             release_channel=release_channel,
+            external_index_provider=external_index_provider,
         )
 
     except Exception as exc:

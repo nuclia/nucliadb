@@ -27,6 +27,7 @@ from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models.conversation import FieldConversation
+from nucliadb_models.external_index_providers import ExternalIndexProvider
 from nucliadb_models.extracted import (
     ExtractedText,
     FieldComputedMetadata,
@@ -120,6 +121,12 @@ class KnowledgeBoxConfig(BaseModel):
         description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",  # noqa: E501
     )
 
+    external_index_provider: Optional[ExternalIndexProvider] = Field(
+        default=None,
+        title="External Index Provider",
+        description="External index provider for the Knowledge Box.",
+    )
+
     similarity: Optional[VectorSimilarity] = Field(
         default=None,
         description="This field is deprecated. Use 'learning_configuration' instead.",
@@ -142,6 +149,7 @@ class KnowledgeBoxConfig(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
+        as_dict["external_index_provider"] = None
         return cls(**as_dict)
 
 

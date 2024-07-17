@@ -17,20 +17,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
 
-from .common import *  # noqa
-from .conversation import *  # noqa
-from .export_import import *  # noqa
-from .external_index_providers import *  # noqa
-from .extracted import *  # noqa
-from .file import *  # noqa
-from .link import *  # noqa
-from .metadata import *  # noqa
-from .notifications import *  # noqa
-from .processing import *  # noqa
-from .security import *  # noqa
-from .text import *  # noqa
-from .writer import *  # noqa
+from enum import Enum
+from typing import Union
 
-logger = logging.getLogger("nucliadb_models")
+from pydantic import BaseModel
+
+
+class ExternalIndexProviderType(str, Enum):
+    PINECONE = "pinecone"
+
+
+class ExternalIndexProviderBase(BaseModel):
+    type: ExternalIndexProviderType
+
+
+class PineconeIndexProvider(ExternalIndexProviderBase):
+    type: ExternalIndexProviderType = ExternalIndexProviderType.PINECONE
+    api_key: str
+
+
+ExternalIndexProvider = Union[PineconeIndexProvider,]
