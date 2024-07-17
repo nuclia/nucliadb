@@ -26,6 +26,7 @@ from nucliadb.common.external_index_providers.manager import (
     get_external_index_manager,
 )
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
+from nucliadb.search.search import results_hydrator
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
@@ -232,16 +233,26 @@ async def _external_index_retrieval(
     query_results = await external_index_manager.query(search_request)  # noqa
 
     # Hydrate results
-    retrieval_results = KnowledgeboxFindResults(resources={})
-    # retrieval_results = await external_index_results_hydrator.hydrate(
-    #     query_results,
-    #     kbid=kbid,
-    #     show=item.show,
-    #     extracted=item.extracted,
-    #     field_type_filter=item.field_type_filter,
-    #     highlight=item.highlight,
-    #     min_score_bm25=query_parser.min_score.bm25,
-    #     min_score_semantic=query_parser.min_score.semantic,
-    #     requested_relations=search_request.relation_subgraph,
-    # )
+    retrieval_results = KnowledgeboxFindResults(
+        resources={},
+        query=item.query,
+        total=0,
+        page_number=0,
+        page_size=item.page_number * item.page_size,
+        relations=None,
+        autofilters=[],
+        min_score=item.min_score,
+        best_matches=[],
+        shards=None,
+        nodes=None,
+    )
+    await results_hydrator.hydrate_external(
+        retrieval_results,
+        query_results,
+        kbid=kbid,
+        show=item.show,
+        extracted=item.extracted,
+        field_type_filter=item.field_type_filter,
+        max_parallel_operations=50,
+    )
     return retrieval_results, incomplete_results, query_parser

@@ -20,7 +20,7 @@
 import abc
 import logging
 from enum import Enum
-from typing import Any
+from typing import Any, Iterator, Optional
 
 from pydantic import BaseModel
 
@@ -39,6 +39,21 @@ class ExternalIndexProviderType(Enum):
     PINECONE = "pinecone"
 
 
+class TextBlock(BaseModel):
+    """
+    Model a text block/paragraph retrieved from an external index with all the information
+    needed in order to later hydrate retrieval results.
+    """
+
+    resource_id: str
+    field: str
+    position_start: int
+    position_end: int
+    split: Optional[str] = None
+    text: Optional[str] = None
+    score: float
+
+
 class QueryResults(BaseModel):
     """
     Model for the results of a query to an external index provider.
@@ -47,6 +62,12 @@ class QueryResults(BaseModel):
 
     type: ExternalIndexProviderType
     results: Any
+
+    def iter_text_blocks(self) -> Iterator[TextBlock]:
+        """
+        Iterates over the paragraphs in the results.
+        """
+        raise NotImplementedError
 
 
 class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
