@@ -18,11 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+from typing import Iterator
 
 from nucliadb.common.external_index_providers.base import (
     ExternalIndexManager,
     ExternalIndexProviderType,
     QueryResults,
+    TextBlockMatch,
 )
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.noderesources_pb2 import Resource
@@ -48,6 +50,30 @@ DISCARDED_LABEL_PREFIXES = [
 class PineconeQueryResults(QueryResults):
     type: ExternalIndexProviderType = ExternalIndexProviderType.PINECONE
     results: QueryResponse
+
+    def iter_matching_text_blocks(self) -> Iterator[TextBlockMatch]:
+        for matching_vector in self.results.matches:
+            try:
+                parts = matching_vector.id.split("/")
+                split = ""
+                if len(parts) == 5:
+                    rid, field_type, field_id, index, position = matching_vector.id.split("/")
+                elif len(parts) == 6:
+                    rid, field_type, field_id, split, index, position = matching_vector.id.split("/")
+                start, end = map(int, position.split("-"))
+            except ValueError:
+                logger.error(f"Invalid Pinecone vector id: {matching_vector.id}")
+                continue
+            yield TextBlockMatch(
+                id=matching_vector.id,
+                resource_id=rid,
+                field=f"{field_type}/{field_id}",
+                score=matching_vector.score,
+                position_start=start,
+                position_end=end,
+                split=split,
+                text=None,  # To be filled by the results hydrator
+            )
 
 
 class PineconeIndexManager(ExternalIndexManager):

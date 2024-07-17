@@ -45,6 +45,7 @@ class TextBlockMatch(BaseModel):
     needed in order to later hydrate retrieval results.
     """
 
+    id: str
     resource_id: str
     field: str
     position_start: int

@@ -21,7 +21,7 @@ import asyncio
 import logging
 
 from nucliadb.common.external_index_providers.base import QueryResults as ExternalIndexQueryResults
-from nucliadb.common.external_index_providers.base import TextBlock
+from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
@@ -30,10 +30,13 @@ from nucliadb.search.search.cache import get_resource_cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
+    SCORE_TYPE,
     FindField,
+    FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
     ResourceProperties,
+    TextPosition,
 )
 
 logger = logging.getLogger(__name__)
@@ -110,9 +113,12 @@ async def hydrate_external(
 
 
 async def hydrate_text_block(
-    kbid: str, text_block: TextBlock, extracted_text_cache: paragraphs.ExtractedTextCache
+    kbid: str,
+    text_block: TextBlockMatch,
+    extracted_text_cache: paragraphs.ExtractedTextCache,
+    field_paragraphs: dict[str, FindParagraph],
 ) -> None:
-    text_block.text = await paragraphs.get_paragraph_text(
+    text = await paragraphs.get_paragraph_text(
         kbid=kbid,
         rid=text_block.resource_id,
         field=text_block.field,
@@ -120,6 +126,25 @@ async def hydrate_text_block(
         end=text_block.position_end,
         split=text_block.split,
         extracted_text_cache=extracted_text_cache,
+    )
+    field_paragraphs[text_block.id] = FindParagraph(
+        score=text_block.score,
+        score_type=SCORE_TYPE.EXTERNAL,
+        text=text,
+        id=text_block.id,
+        labels=[],  # TODO
+        fuzzy_result=False,  # TODO
+        is_a_table=False,  # TODO
+        reference=None,  # TODO
+        page_with_visual=False,  # TODO
+        position=TextPosition(
+            page_number=None,  # TODO
+            index=0,  # TODO
+            start=text_block.position_start,
+            end=text_block.position_end,
+            start_seconds=None,  # TODO
+            end_seconds=None,  # TODO
+        ),
     )
 
 

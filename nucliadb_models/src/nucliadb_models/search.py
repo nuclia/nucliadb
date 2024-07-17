@@ -1209,6 +1209,7 @@ class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
     BOTH = "BOTH"
+    EXTERNAL = "EXTERNAL"
 
 
 class FindTextPosition(BaseModel):
