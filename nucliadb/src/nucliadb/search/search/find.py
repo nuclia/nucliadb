@@ -21,6 +21,8 @@ import logging
 from time import time
 from typing import Optional
 
+from nucliadb.common.external_index_providers.base import ExternalIndexManager
+from nucliadb.common.external_index_providers.manager import get_external_index_manager, get_external_index_metadata
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.metrics import RAGMetrics
@@ -36,12 +38,43 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     SearchOptions,
 )
+from nucliadb_protos.knowledgebox_pb2 import StoredExternalIndexProviderMetadata
 from nucliadb_utils.utilities import get_audit
+from pygments import highlight
 
 logger = logging.getLogger(__name__)
 
 
 async def find(
+    kbid: str,
+    item: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    generative_model: Optional[str] = None,
+    metrics: RAGMetrics = RAGMetrics(),
+) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+    external_index_manager = await get_external_index_manager(kbid=kbid)
+    if external_index_manager is not None:
+        return await _external_index_retrieval(
+            kbid,
+            item,
+            external_index_manager,
+            generative_model,
+        )
+    else:
+        return await _index_node_retrieval(
+            kbid,
+            item,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            generative_model,
+            metrics,
+        )
+
+
+async def _index_node_retrieval(
     kbid: str,
     item: FindRequest,
     x_ndb_client: NucliaDBClientType,
@@ -155,3 +188,57 @@ async def find(
         )
 
     return search_results, incomplete_results, query_parser
+
+
+async def _external_index_retrieval(
+    kbid: str,
+    item: FindRequest,
+    external_index_manager: ExternalIndexManager,
+    generative_model: Optional[str] = None,
+) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+    # Parse query
+    item.min_score = min_score_from_payload(item.min_score)
+    query_parser = QueryParser(
+        kbid=kbid,
+        features=item.features,
+        query=item.query,
+        filters=item.filters,
+        faceted=None,
+        sort=None,
+        page_number=item.page_number,
+        page_size=item.page_size,
+        min_score=item.min_score,
+        range_creation_start=item.range_creation_start,
+        range_creation_end=item.range_creation_end,
+        range_modification_start=item.range_modification_start,
+        range_modification_end=item.range_modification_end,
+        fields=item.fields,
+        user_vector=item.vector,
+        vectorset=item.vectorset,
+        with_duplicates=item.with_duplicates,
+        with_synonyms=item.with_synonyms,
+        autofilter=item.autofilter,
+        key_filters=item.resource_filters,
+        security=item.security,
+        generative_model=generative_model,
+        rephrase=item.rephrase,
+    )
+    search_request, incomplete_results, _ = await query_parser.parse()
+
+    # Query index
+    query_results = await external_index_manager.query_index(search_request)
+
+    # Merge results
+    merger = ExternalIndexRetrievalQueryResultsMerger.from_type(external_index_manager.type)
+    retrieval_results = await merger.merge(
+        query_results,
+        kbid=kbid,
+        show=item.show,
+        extracted=item.extracted,
+        field_type_filter=item.field_type_filter,
+        highlight=item.highlight,
+        min_score_bm25=query_parser.min_score.bm25,
+        min_score_semantic=query_parser.min_score.semantic,
+        requested_relations=search_request.relation_subgraph,
+    )
+    return retrieval_results, incomplete_results, query_parser 
