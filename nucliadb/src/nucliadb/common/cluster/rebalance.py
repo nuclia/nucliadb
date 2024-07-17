@@ -121,7 +121,7 @@ async def move_set_of_kb_resources(
                 ),
             ):
                 found_shard_id = await datamanagers.resources.get_resource_shard_id(
-                    txn, kbid=kbid, rid=resource_id
+                    txn, kbid=kbid, rid=resource_id, for_update=True
                 )
                 if found_shard_id is None:
                     # resource deleted
