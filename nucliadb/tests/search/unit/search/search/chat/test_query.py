@@ -119,29 +119,29 @@ def test_parse_status_code(chunk, status_code, error):
     [
         (
             None,  # default value will be used
-            [SearchOptions.SEMANTIC, SearchOptions.KEYWORD, SearchOptions.RELATIONS],
+            [SearchOptions.VECTOR, SearchOptions.PARAGRAPH, SearchOptions.RELATIONS],
         ),
         (
-            [ChatOptions.KEYWORD, ChatOptions.SEMANTIC, ChatOptions.RELATIONS],
-            [SearchOptions.KEYWORD, SearchOptions.SEMANTIC, SearchOptions.RELATIONS],
+            [ChatOptions.PARAGRAPHS, ChatOptions.VECTORS, ChatOptions.RELATIONS],
+            [SearchOptions.PARAGRAPH, SearchOptions.VECTOR, SearchOptions.RELATIONS],
         ),
         (
-            [ChatOptions.KEYWORD, ChatOptions.SEMANTIC],
+            [ChatOptions.PARAGRAPHS, ChatOptions.VECTORS],
             [
-                SearchOptions.KEYWORD,
-                SearchOptions.SEMANTIC,
+                SearchOptions.PARAGRAPH,
+                SearchOptions.VECTOR,
             ],
         ),
         (
-            [ChatOptions.SEMANTIC],
+            [ChatOptions.VECTORS],
             [
-                SearchOptions.SEMANTIC,
+                SearchOptions.VECTOR,
             ],
         ),
         (
-            [ChatOptions.KEYWORD],
+            [ChatOptions.PARAGRAPHS],
             [
-                SearchOptions.KEYWORD,
+                SearchOptions.PARAGRAPH,
             ],
         ),
     ],
