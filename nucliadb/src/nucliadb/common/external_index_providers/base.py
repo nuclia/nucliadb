@@ -53,6 +53,7 @@ class TextBlockMatch(BaseModel):
     split: Optional[str] = None
     text: Optional[str] = None
     score: float
+    order: int
 
 
 class QueryResults(BaseModel):
@@ -66,7 +67,7 @@ class QueryResults(BaseModel):
 
     def iter_matching_text_blocks(self) -> Iterator[TextBlockMatch]:
         """
-        Iterates over the paragraphs in the results
+        Iterates over the paragraphs in the results, by decreasing score.
         This should be implemented by the specific external index provider.
         """
         raise NotImplementedError()

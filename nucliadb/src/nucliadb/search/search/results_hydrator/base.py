@@ -118,6 +118,9 @@ async def hydrate_text_block(
     extracted_text_cache: paragraphs.ExtractedTextCache,
     field_paragraphs: dict[str, FindParagraph],
 ) -> None:
+    """
+    Fetch the text for a text block and update the FindParagraph object.
+    """
     text = await paragraphs.get_paragraph_text(
         kbid=kbid,
         rid=text_block.resource_id,
@@ -157,6 +160,9 @@ async def hydrate_resource_metadata(
     extracted: list[ExtractedDataTypeName],
     find_resources: dict[str, FindResource],
 ) -> None:
+    """
+    Fetch the various metadata fields of the resource and update the FindResource object.
+    """
     serialized_resource = await managed_serialize(
         txn=txn,
         kbid=kbid,

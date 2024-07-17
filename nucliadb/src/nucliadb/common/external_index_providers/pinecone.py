@@ -52,7 +52,7 @@ class PineconeQueryResults(QueryResults):
     results: QueryResponse
 
     def iter_matching_text_blocks(self) -> Iterator[TextBlockMatch]:
-        for matching_vector in self.results.matches:
+        for order, matching_vector in enumerate(self.results.matches):
             try:
                 parts = matching_vector.id.split("/")
                 split = ""
@@ -69,6 +69,7 @@ class PineconeQueryResults(QueryResults):
                 resource_id=rid,
                 field=f"{field_type}/{field_id}",
                 score=matching_vector.score,
+                order=order,
                 position_start=start,
                 position_end=end,
                 split=split,
