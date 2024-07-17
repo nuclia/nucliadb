@@ -46,8 +46,6 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from . import paragraphs
 from .metrics import merge_observer
@@ -263,8 +261,7 @@ def merge_paragraphs_vectors(
     flat_paragraphs = [
         paragraph for paragraph_shard in paragraphs_shards for paragraph in paragraph_shard
     ]
-    if has_feature(const.Features.FIND_MERGE_ORDER_FIX, context={"kbid": kbid}):
-        flat_paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
+    flat_paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
 
     for paragraph in flat_paragraphs:
         fuzzy_result = len(paragraph.matches) > 0
@@ -289,8 +286,7 @@ def merge_paragraphs_vectors(
     flat_vectors = [
         vector for vector_shard in vectors_shards for vector in vector_shard if vector.score >= min_score
     ]
-    if has_feature(const.Features.FIND_MERGE_ORDER_FIX, context={"kbid": kbid}):
-        flat_vectors.sort(key=lambda r: r.score, reverse=True)
+    flat_vectors.sort(key=lambda r: r.score, reverse=True)
 
     nextpos = 1
     for vector in flat_vectors:
