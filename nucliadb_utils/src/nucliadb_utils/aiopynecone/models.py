@@ -20,17 +20,49 @@
 import json
 from typing import Any, Optional
 
+import pydantic
 from pydantic import BaseModel, Field, field_validator
+from typing_extensions import Annotated
 
 KILO_BYTE = 1024
 MAX_METADATA_SIZE = 40 * KILO_BYTE
+MAX_INDEX_NAME_LENGTH = 45
 
 
 # Requests
 
+IndexNamePattern = r"^[a-z0-9-]+$"
+
+
+def validate_index_name(value, handler, info):
+    try:
+        return handler(value)
+    except pydantic.ValidationError as e:
+        if any(x["type"] == "string_pattern_mismatch" for x in e.errors()):
+            raise ValueError(
+                f"Invalid field_id: '{value}'. Pinecone index names must be a string with only "
+                "lowercase letters, numbers and dashes."
+            )
+        else:
+            raise e
+
+
+IndexNameStr = Annotated[
+    str,
+    pydantic.StringConstraints(pattern=IndexNamePattern, min_length=1, max_length=MAX_INDEX_NAME_LENGTH),
+    pydantic.WrapValidator(validate_index_name),
+]
+
+
+class CreateIndexRequest(BaseModel):
+    name: IndexNameStr
+    dimension: int
+    metric: str
+    spec: dict[str, Any] = {}
+
 
 class Vector(BaseModel):
-    id: str = Field(max_length=512)
+    id: str = Field(min_length=1, max_length=512)
     values: list[float]
     metadata: dict[str, Any] = {}
 
@@ -40,6 +72,7 @@ class Vector(BaseModel):
         json_value = json.dumps(value)
         if len(json_value) > MAX_METADATA_SIZE:
             raise ValueError("metadata size is too large")
+        return value
 
 
 class UpsertRequest(BaseModel):

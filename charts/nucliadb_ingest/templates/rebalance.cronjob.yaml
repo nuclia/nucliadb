@@ -52,19 +52,17 @@ spec:
           - name: nucliadb-rebalance
             image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
             envFrom:
-            - configMapRef:
-                name: nucliadb-config
-            - configMapRef:
-                name: {{ .Release.Name }}-config
+              - configMapRef:
+                  name: {{ .Release.Name }}-config
+              {{- if .Values.envFrom }}
+              {{- toYaml .Values.envFrom | nindent 14 }}
+              {{- end }}
             env:
               - name: VERSION
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.labels['version']
-            {{- range $key, $value := .Values.env }}
-              - name: "{{ $key }}"
-                value: {{ tpl $value $ | toJson }}
-            {{- end }}
+              {{- include "toEnv" .Values.env | indent 14 }}
             imagePullPolicy: Always
             command: ["nucliadb-rebalance"]
             ports:

@@ -35,6 +35,7 @@ from nucliadb_utils.aiopynecone.exceptions import (
     raise_for_status,
 )
 from nucliadb_utils.aiopynecone.models import (
+    CreateIndexRequest,
     CreateIndexResponse,
     ListResponse,
     QueryResponse,
@@ -63,6 +64,7 @@ BASE_API_HEADERS = {
 MEGA_BYTE = 1024 * 1024
 MAX_UPSERT_PAYLOAD_SIZE = 2 * MEGA_BYTE
 MAX_DELETE_BATCH_SIZE = 1000
+MAX_LIST_PAGE_SIZE = 100
 
 
 RETRIABLE_EXCEPTIONS = (
@@ -100,14 +102,16 @@ class ControlPlane:
         Returns:
         - The index host to be used for data plane operations.
         """
-        payload = {
-            "name": name,
-            "dimension": dimension,
-            "metric": metric,
-            "spec": {"serverless": {"cloud": "aws", "region": "us-east-1"}},
-        }
+        payload = CreateIndexRequest(
+            name=name,
+            dimension=dimension,
+            metric=metric,
+            spec={"serverless": {"cloud": "aws", "region": "us-east-1"}},
+        )
         headers = {"Api-Key": self.api_key}
-        http_response = await self.http_session.post("/indexes", json=payload, headers=headers)
+        http_response = await self.http_session.post(
+            "/indexes", json=payload.model_dump(), headers=headers
+        )
         raise_for_status("create_index", http_response)
         response = CreateIndexResponse.model_validate(http_response.json())
         return response.host
@@ -159,6 +163,9 @@ class DataPlane:
         - `vectors`: The vectors to upsert.
         - `timeout`: to control the request timeout. If not set, the default timeout is used.
         """
+        if len(vectors) == 0:
+            # Nothing to upsert.
+            return
         headers = {"Api-Key": self.api_key}
         payload = UpsertRequest(vectors=vectors)
         post_kwargs: dict[str, Any] = {
@@ -254,7 +261,7 @@ class DataPlane:
     async def list_page(
         self,
         id_prefix: Optional[str] = None,
-        limit: int = 100,
+        limit: int = MAX_LIST_PAGE_SIZE,
         pagination_token: Optional[str] = None,
         timeout: Optional[float] = None,
     ) -> ListResponse:
@@ -267,6 +274,8 @@ class DataPlane:
            if there are more pages to fetch.
         - `timeout`: to control the request timeout. If not set, the default timeout is used.
         """
+        if limit > MAX_LIST_PAGE_SIZE:  # pragma: no cover
+            raise ValueError(f"Maximum limit is {MAX_LIST_PAGE_SIZE}.")
         headers = {"Api-Key": self.api_key}
         params = {"limit": str(limit)}
         if id_prefix is not None:
@@ -289,7 +298,10 @@ class DataPlane:
         return ListResponse.model_validate(response.json())
 
     async def list_all(
-        self, id_prefix: Optional[str] = None, page_size: int = 100, page_timeout: Optional[float] = None
+        self,
+        id_prefix: Optional[str] = None,
+        page_size: int = MAX_LIST_PAGE_SIZE,
+        page_timeout: Optional[float] = None,
     ) -> AsyncGenerator[str, None]:
         """
         Iterate over all vector ids from the index in a paginated manner.
@@ -365,9 +377,7 @@ class DataPlane:
                 await self.delete(ids=batch, timeout=batch_timeout)
 
         tasks = []
-        async_iterable = self.list_all(
-            id_prefix=id_prefix, page_size=batch_size, page_timeout=batch_timeout
-        )
+        async_iterable = self.list_all(id_prefix=id_prefix, page_timeout=batch_timeout)
         async for batch in async_batchify(async_iterable, batch_size):
             tasks.append(asyncio.create_task(_delete_batch(batch)))
 

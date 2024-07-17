@@ -166,7 +166,7 @@ class TestVectorSetAndMatryoshkaParsing:
     ):
         parser = QueryParser(
             kbid="kbid",
-            features=[SearchOptions.SEMANTIC],
+            features=[SearchOptions.VECTOR],
             vectorset=vectorset,
             # irrelevant mandatory args
             query="my query",

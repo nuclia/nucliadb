@@ -10,8 +10,8 @@ lint:
 
 .PHONY: test
 test:
-	TEST_LOCAL_NUCLIADB=START pytest -rfE -s --tb=native -v tests
+	pytest -s --tb=native -v tests
 
 .PHONY: test-cov
 test-cov:
-	TEST_LOCAL_NUCLIADB=START pytest -rfE --cov=nucliadb_sdk --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml tests
+	pytest -rfE --cov=nucliadb_sdk --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml tests

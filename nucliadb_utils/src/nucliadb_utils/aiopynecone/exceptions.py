@@ -70,10 +70,11 @@ def raise_for_status(operation: str, response: httpx.Response):
         details = None
         try:
             resp_json = response.json()
-            code = resp_json.get("code")
-            message = resp_json.get("message")
-            details = resp_json.get("details")
-        except Exception:
+            error = resp_json.get("error") or {}
+            code = error.get("code")
+            message = error.get("message")
+            details = error.get("details")
+        except Exception:  # pragma: no cover
             message = response.text
         if response.status_code == 429:
             raise PineconeRateLimitError(

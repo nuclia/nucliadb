@@ -169,6 +169,9 @@ class KnowledgeBox:
                         request=external_index_provider,
                         vector_dimension=semantic_model.vector_dimension,
                     )
+                    rollback_ops.append(
+                        partial(cls._maybe_delete_external_index, kbid, stored_external_index_provider)
+                    )
                 else:
                     stored_external_index_provider = StoredExternalIndexProviderMetadata(
                         type=external_index_provider.type
@@ -506,7 +509,7 @@ class KnowledgeBox:
         if request.type != ExternalIndexProviderType.PINECONE:
             return metadata
 
-        index_name = f"{kbid}_default"
+        index_name = f"{kbid}--default"
         logger.info(
             "Creating pincone index",
             extra={"kbid": kbid, "index_name": index_name, "vector_dimension": vector_dimension},
@@ -530,7 +533,7 @@ class KnowledgeBox:
         if external_index_provider.type != ExternalIndexProviderType.PINECONE:
             return
 
-        index_name = f"{kbid}_default"
+        index_name = f"{kbid}--default"
         logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
         encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
         endecryptor = get_endecryptor()

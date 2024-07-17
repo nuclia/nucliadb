@@ -54,7 +54,7 @@ FIND_EXAMPLES = {
         description="Perform a hybrid search that will return text and semantic results matching the query",
         value={
             "query": "How can I be an effective product manager?",
-            "features": [SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
+            "features": [SearchOptions.PARAGRAPH, SearchOptions.VECTOR],
         },
     )
 }
@@ -106,8 +106,8 @@ async def find_knowledgebox(
     features: list[SearchOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
-            SearchOptions.KEYWORD,
-            SearchOptions.SEMANTIC,
+            SearchOptions.PARAGRAPH,
+            SearchOptions.VECTOR,
         ],
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug),

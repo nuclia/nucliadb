@@ -172,7 +172,7 @@ class NucliaDBDataset(NucliaDataset):
     def _computed_labels(self) -> Dict[str, LabelSetCount]:
         search_result: KnowledgeboxSearchResults = self.search_sdk.search(
             kbid=self.kbid,
-            content=SearchRequest(features=[SearchOptions.FULLTEXT], faceted=["/l"], page_size=0),
+            content=SearchRequest(features=[SearchOptions.DOCUMENT], faceted=["/l"], page_size=0),
         )
 
         response: Dict[str, LabelSetCount] = {}
@@ -196,7 +196,7 @@ class NucliaDBDataset(NucliaDataset):
             fsearch_result: KnowledgeboxSearchResults = self.search_sdk.search(
                 kbid=self.kbid,
                 content=SearchRequest(
-                    features=[SearchOptions.FULLTEXT], faceted=[base_label], page_size=0
+                    features=[SearchOptions.DOCUMENT], faceted=[base_label], page_size=0
                 ),
             )
             if fsearch_result.fulltext is None or fsearch_result.fulltext.facets is None:

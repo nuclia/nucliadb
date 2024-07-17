@@ -18,8 +18,13 @@ image: IMAGE_TO_REPLACE
 # settings not mapped directly through env
 env:
   SEARCH_TIMEOUT: "10" # seconds
-  SEARCH_CACHE_REDIS_HOST:
-  SEARCH_CACHE_REDIS_PORT:
+  SEARCH_CACHE_REDIS_HOST: "redis-master.namespace.svc"
+  SEARCH_CACHE_REDIS_PORT: "6379"
+
+# Configmap and/or secrets to mount into the environment
+envFrom:
+  - configMapRef:
+      name: nucliadb-config
 
 # Kubernetes settings
 affinity: {}
