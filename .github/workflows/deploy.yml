@@ -128,6 +128,8 @@ jobs:
 
       - name: Set helm package image
         id: version_step
+        env:
+          CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
         run: |-
           sed -i.bak "s#IMAGE_TO_REPLACE#node:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
           sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#node_sidecar:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
@@ -198,6 +200,8 @@ jobs:
 
       - name: Set helm package image
         id: version_step
+        env:
+          CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
         run: |-
           sed -i.bak "s#IMAGE_TO_REPLACE#nucliadb_hosted:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_${{ matrix.component }}/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_${{ matrix.component }}/values.yaml
