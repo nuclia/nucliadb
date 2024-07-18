@@ -315,7 +315,6 @@ async def catalog(
             # consistent and most up to date results
             use_read_replica_nodes=False,
         )
-        print(results)
 
         from nucliadb.common.maindb.utils import get_driver
         from nucliadb_protos.nodereader_pb2 import (
@@ -395,7 +394,6 @@ async def catalog(
                         facetresults=[FacetResult(tag=r["tag"], total=r["total"]) for r in row]
                     )
 
-
             #
             # Normal search
             #
@@ -411,8 +409,74 @@ async def catalog(
                 )
                 filter_params["query"] = query_parser.query
 
-            print(query_parser)
+            if query_parser.range_creation_start:
+                filter_sql.append("created_at > %(created_at_start)s")
+                filter_params["created_at_start"] = query_parser.range_creation_start
+
+            if query_parser.range_creation_end:
+                filter_sql.append("created_at < %(created_at_end)s")
+                filter_params["created_at_end"] = query_parser.range_creation_end
+
+            if query_parser.range_modification_start:
+                filter_sql.append("modified_at > %(modified_at_start)s")
+                filter_params["modified_at_start"] = query_parser.range_modification_start
+
+            if query_parser.range_modification_end:
+                filter_sql.append("modified_at < %(modified_at_end)s")
+                filter_params["modified_at_end"] = query_parser.range_modification_end
+
+            # TODO: Support arbitraty filters or at least what `convert_filter_to_node_schema` can generate
+            filter_labels = []
+            filter_types = []
+            filter_statuses = []
+            for op, operands in query_parser.filters.items():
+                if op == "literal":
+                    op = "and"
+                    operands = [{"literal": operands}]
+                elif op == "or":
+                    op = "and"
+                    operands = [{"or": operands}]
+                if op != "and":
+                    raise "Unsupported filter (no and)"
+                for o in operands:
+                    for k, v in o.items():
+                        if k == "literal":
+                            k = "or"
+                            v = [{"literal": v}]
+                        if k != "or":
+                            raise "Unsupported filter (no or)"
+
+                        for i in v:
+                            for literal, value in i.items():
+                                if literal != "literal":
+                                    raise "Unsupported filter (no literal)"
+                                value = value.replace("/classification.labels", "/l").replace(
+                                    "/metadata.status", "/n/s"
+                                )
+
+                                if value.startswith("/n/i"):
+                                    filter_types.append(value[5:])
+                                elif value.startswith("/n/s"):
+                                    filter_statuses.append(value[5:].capitalize())
+                                elif value.startswith("/l"):
+                                    filter_labels.append(value)
+                                else:
+                                    raise Exception(f"Unsupported filter {value}")
+
+            if filter_labels:
+                filter_sql.append("labels && %(labels)s")
+                filter_params["labels"] = filter_labels
+
+            if filter_types:
+                filter_sql.append("mimetype = ANY(%(mimetypes)s)")
+                filter_params["mimetypes"] = filter_types
+
+            if filter_statuses:
+                filter_sql.append("status = ANY(%(statuses)s)")
+                filter_params["statuses"] = filter_statuses
+
             print(query_parser.filters)
+            print(filter_sql, filter_params)
 
             def pg_to_pb(rows, facets, total):
                 return SearchResponse(
@@ -457,7 +521,7 @@ async def catalog(
             )
             data = await cur.fetchall()
             result = pg_to_pb(data, facets, total)
-            print(result)
+            # print(result)
             results = [result]
 
             # Hack page number so merge works
