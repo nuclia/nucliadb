@@ -328,10 +328,26 @@ async def catalog(
         from psycopg.rows import dict_row
 
         async with get_driver()._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            #
+            # Faceted search
+            #
             facets = {}
-            if query_parser.faceted == ["/metadata.status"]:
+
+            facet_status = False
+            facet_labels = []
+            facet_icon = []
+
+            for f in query_parser.faceted:
+                if f == "/metadata.status":
+                    facet_status = True
+                elif f.startswith("/icon"):
+                    facet_icon.append(f)
+                elif f.startswith("/l"):
+                    facet_labels.append(f)
+
+            if facet_status:
                 await cur.execute(
-                    "SELECT status, count(*) FROM catalog WHERE kbid = %(kbid)s GROUP BY status",
+                    "SELECT status, COUNT(*) FROM catalog WHERE kbid = %(kbid)s GROUP BY status",
                     {"kbid": query_parser.kbid},
                 )
                 facets["/n/s"] = FacetResults(
@@ -341,6 +357,59 @@ async def catalog(
                     ]
                 )
 
+            if facet_icon:
+                await cur.execute(
+                    "SELECT SPLIT_PART(mimetype, '/',1) AS facet, mimetype AS tag, COUNT(*) AS total FROM catalog WHERE kbid = %(kbid)s AND mimetype IS NOT NULL GROUP BY 1, 2 ORDER BY 1, 2",
+                    {"kbid": query_parser.kbid},
+                )
+                from collections import defaultdict
+
+                grouped = defaultdict(list)
+                for row in await cur.fetchall():
+                    grouped["/icon/" + row["facet"]].append(row)
+
+                for key, row in grouped.items():
+                    if key not in facet_icon:
+                        print(f"DIDN'T ASK FOR mime {key}")
+                        continue
+                    facets[key] = FacetResults(
+                        facetresults=[FacetResult(tag="/n/i/" + r["tag"], total=r["total"]) for r in row]
+                    )
+
+            if facet_labels:
+                await cur.execute(
+                    "SELECT SPLIT_PART(UNNEST(labels), '/', 3) AS facet, UNNEST(labels) AS tag, COUNT(*) AS total FROM catalog WHERE kbid = %(kbid)s GROUP BY 1, 2 ORDER BY 1, 2",
+                    {"kbid": query_parser.kbid},
+                )
+                from collections import defaultdict
+
+                grouped = defaultdict(list)
+                for row in await cur.fetchall():
+                    grouped["/l/" + row["facet"]].append(row)
+
+                for key, row in grouped.items():
+                    if key not in facet_labels:
+                        print(f"DIDN'T ASK FOR label {key}")
+                        continue
+                    facets[key] = FacetResults(
+                        facetresults=[FacetResult(tag=r["tag"], total=r["total"]) for r in row]
+                    )
+
+            #
+            # Normal search
+            #
+
+            # Build filters
+            filter_sql = ["kbid = %(kbid)s"]
+            filter_params = {"kbid": query_parser.kbid}
+
+            if query_parser.query:
+                # TODO: Tokenizer?
+                filter_sql.append(
+                    "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
+                )
+                filter_params["query"] = query_parser.query
+
             def pg_to_pb(rows, facets):
                 return SearchResponse(
                     document=DocumentSearchResponse(
@@ -349,20 +418,39 @@ async def catalog(
                             for r in rows
                         ],
                         facets=facets,
+                        total=100,
+                        page_number=query_parser.page_number,
                     )
                 )
 
+            if query_parser.sort.field == SortField.CREATED:
+                order_field = "created_at"
+            elif query_parser.sort.field == SortField.MODIFIED:
+                order_field = "modified_at"
+            elif query_parser.sort.field == SortField.TITLE:
+                order_field = "title"
+            else:
+                raise "Unsupported sort"
+
+            if query_parser.sort.order == SortOrder.ASC:
+                order_dir = "ASC"
+            else:
+                order_dir = "DESC"
+
             await cur.execute(
-                "SELECT * FROM catalog WHERE kbid = %(kbid)s LIMIT %(page_size)s",
-                {"kbid": query_parser.kbid, "page_size": query_parser.page_size},
+                f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)} ORDER BY {order_field} {order_dir} LIMIT %(page_size)s OFFSET %(offset)s",
+                {
+                    **filter_params,
+                    "page_size": query_parser.page_size,
+                    "offset": query_parser.page_size * query_parser.page_number,
+                },
             )
             data = await cur.fetchall()
             result = pg_to_pb(data, facets)
             print(result)
-
             results = [result]
 
-        # breakpoint()
+        # TODO: Merge results manually to avoid page juggling (we offload that to PG)
 
         # We need to merge
         search_results = await merge_results(
