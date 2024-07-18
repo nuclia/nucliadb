@@ -62,12 +62,12 @@ class PineconeQueryResults(QueryResults):
             yield TextBlockMatch(
                 id=matching_vector.id,
                 resource_id=vector_id.field_id.rid,
-                field=vector_id.field_id.full(),
+                field_id=vector_id.field_id.full(),
                 score=matching_vector.score,
                 order=order,
                 position_start=vector_id.vector_start,
                 position_end=vector_id.vector_end,
-                split=vector_id.field_id.subfield_id,
+                subfield_id=vector_id.field_id.subfield_id,
                 index=vector_id.index,
                 text=None,  # To be filled by the results hydrator
             )

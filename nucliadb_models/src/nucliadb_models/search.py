@@ -1237,7 +1237,6 @@ class FindRequest(BaseSearchRequest):
     def fulltext_not_supported(cls, v):
         # features are already normalized in the BaseSearchRequest model
         if SearchOptions.DOCUMENT in v or SearchOptions.DOCUMENT == v:
-
             raise ValueError("fulltext search not supported")
         return v
 
@@ -1246,7 +1245,6 @@ class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
     BOTH = "BOTH"
-    EXTERNAL = "EXTERNAL"
 
 
 class FindTextPosition(BaseModel):

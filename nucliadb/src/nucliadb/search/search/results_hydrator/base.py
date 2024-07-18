@@ -99,7 +99,7 @@ async def hydrate_external(
             find_resource = retrieval_results.resources.setdefault(
                 resource_id, FindResource(id=resource_id, fields={})
             )
-            find_field = find_resource.fields.setdefault(text_block.field, FindField(paragraphs={}))
+            find_field = find_resource.fields.setdefault(text_block.field_id, FindField(paragraphs={}))
 
             async def _hydrate_text_block(**kwargs):
                 async with semaphore:
@@ -156,15 +156,15 @@ async def hydrate_text_block(
     text = await paragraphs.get_paragraph_text(
         kbid=kbid,
         rid=text_block.resource_id,
-        field=text_block.field,
+        field=text_block.field_id,
         start=text_block.position_start,
         end=text_block.position_end,
-        split=text_block.split,
+        split=text_block.subfield_id,
         extracted_text_cache=extracted_text_cache,
     )
     field_paragraphs[text_block.id] = FindParagraph(
         score=text_block.score,
-        score_type=SCORE_TYPE.EXTERNAL,
+        score_type=SCORE_TYPE.VECTOR,
         order=text_block.order,
         text=text,
         id=text_block.id,
@@ -175,7 +175,7 @@ async def hydrate_text_block(
         page_with_visual=False,  # TODO
         position=TextPosition(
             page_number=None,  # TODO
-            index=text_block.index,
+            index=text_block.index or 0,
             start=text_block.position_start,
             end=text_block.position_end,
             start_seconds=None,  # TODO

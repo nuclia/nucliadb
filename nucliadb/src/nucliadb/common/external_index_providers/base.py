@@ -47,14 +47,14 @@ class TextBlockMatch(BaseModel):
 
     id: str
     resource_id: str
-    field: str
-    index: int
+    field_id: str
+    subfield_id: Optional[str] = None
+    index: Optional[int] = None
     position_start: int
     position_end: int
-    split: Optional[str] = None
-    text: Optional[str] = None
     score: float
     order: int
+    text: Optional[str] = None
 
 
 class QueryResults(BaseModel):
