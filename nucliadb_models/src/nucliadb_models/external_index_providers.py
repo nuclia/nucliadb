@@ -25,6 +25,11 @@ from pydantic import BaseModel
 
 
 class ExternalIndexProviderType(str, Enum):
+    """
+    Enum for the different external index providers.
+    For now only Pinecone is supported, but we may add more in the future.
+    """
+
     PINECONE = "pinecone"
 
 

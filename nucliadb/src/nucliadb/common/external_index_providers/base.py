@@ -19,24 +19,15 @@
 #
 import abc
 import logging
-from enum import Enum
 from typing import Any, Iterator, Optional
 
 from pydantic import BaseModel
 
+from nucliadb_models.external_index_providers import ExternalIndexProviderType
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.noderesources_pb2 import Resource
 
 logger = logging.getLogger(__name__)
-
-
-class ExternalIndexProviderType(Enum):
-    """
-    Enum for the different external index providers.
-    For now only Pinecone is supported, but we may add more in the future.
-    """
-
-    PINECONE = "pinecone"
 
 
 class TextBlockMatch(BaseModel):
