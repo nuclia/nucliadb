@@ -395,6 +395,7 @@ async def catalog(
                         facetresults=[FacetResult(tag=r["tag"], total=r["total"]) for r in row]
                     )
 
+
             #
             # Normal search
             #
@@ -410,7 +411,10 @@ async def catalog(
                 )
                 filter_params["query"] = query_parser.query
 
-            def pg_to_pb(rows, facets):
+            print(query_parser)
+            print(query_parser.filters)
+
+            def pg_to_pb(rows, facets, total):
                 return SearchResponse(
                     document=DocumentSearchResponse(
                         results=[
@@ -418,7 +422,7 @@ async def catalog(
                             for r in rows
                         ],
                         facets=facets,
-                        total=100,
+                        total=total,
                         page_number=query_parser.page_number,
                     )
                 )
@@ -438,6 +442,12 @@ async def catalog(
                 order_dir = "DESC"
 
             await cur.execute(
+                f"SELECT COUNT(*) FROM catalog WHERE {' AND '.join(filter_sql)}",
+                filter_params,
+            )
+            total = (await cur.fetchone())["count"]
+
+            await cur.execute(
                 f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)} ORDER BY {order_field} {order_dir} LIMIT %(page_size)s OFFSET %(offset)s",
                 {
                     **filter_params,
@@ -446,9 +456,12 @@ async def catalog(
                 },
             )
             data = await cur.fetchall()
-            result = pg_to_pb(data, facets)
+            result = pg_to_pb(data, facets, total)
             print(result)
             results = [result]
+
+            # Hack page number so merge works
+            item.page_number = 0
 
         # TODO: Merge results manually to avoid page juggling (we offload that to PG)
 
