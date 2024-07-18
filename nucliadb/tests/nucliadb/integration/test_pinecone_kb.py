@@ -111,3 +111,17 @@ async def test_kb_creation(
     assert response.status == KnowledgeBoxResponseStatus.OK
 
     mock_pinecone_client.delete_index.assert_awaited_once_with(name=f"{kbid}--default")
+
+
+async def test_find_on_pinecone_kb(
+    nucliadb_reader: AsyncClient,
+    pinecone_knowledgebox: str,
+    pinecone_data_plane,
+):
+    kbid = pinecone_knowledgebox
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={"query": "own text"},
+    )
+    assert resp.status_code == 200
