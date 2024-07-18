@@ -60,9 +60,7 @@ class TextBlockHydrationOptions(BaseModel):
     Options for hydrating text blocks (aka paragraphs).
     """
 
-    highlight: bool = False
-    highlight_exact_matches: list[str] = []
-    highlight_words: list[str] = []
+    pass
 
 
 async def hydrate_external(
@@ -164,10 +162,6 @@ async def hydrate_text_block(
         split=text_block.split,
         extracted_text_cache=extracted_text_cache,
     )
-    if options.highlight and (options.highlight_exact_matches or options.highlight_words):
-        text = paragraphs.highlight_paragraph(
-            text, words=options.highlight_words, ematches=options.highlight_exact_matches
-        )
     field_paragraphs[text_block.id] = FindParagraph(
         score=text_block.score,
         score_type=SCORE_TYPE.EXTERNAL,
@@ -181,7 +175,7 @@ async def hydrate_text_block(
         page_with_visual=False,  # TODO
         position=TextPosition(
             page_number=None,  # TODO
-            index=0,  # TODO
+            index=text_block.index,
             start=text_block.position_start,
             end=text_block.position_end,
             start_seconds=None,  # TODO

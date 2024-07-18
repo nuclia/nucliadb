@@ -26,6 +26,7 @@ from nucliadb.common.external_index_providers.base import (
     QueryResults,
     TextBlockMatch,
 )
+from nucliadb.common.ids import VectorId
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_telemetry.metrics import Observer
@@ -54,26 +55,20 @@ class PineconeQueryResults(QueryResults):
     def iter_matching_text_blocks(self) -> Iterator[TextBlockMatch]:
         for order, matching_vector in enumerate(self.results.matches):
             try:
-                parts = matching_vector.id.split("/")
-                split = ""
-                if len(parts) == 5:
-                    rid, field_type, field_id, index, position = matching_vector.id.split("/")
-                elif len(parts) == 6:
-                    rid, field_type, field_id, split, index, position = matching_vector.id.split("/")
-                start, end = map(int, position.split("-"))
+                vector_id = VectorId.from_string(matching_vector.id)
             except ValueError:
                 logger.error(f"Invalid Pinecone vector id: {matching_vector.id}")
                 continue
             yield TextBlockMatch(
                 id=matching_vector.id,
-                resource_id=rid,
-                field=f"/{field_type}/{field_id}",
+                resource_id=vector_id.field_id.rid,
+                field=vector_id.field_id.field_id,
                 score=matching_vector.score,
                 order=order,
-                position_start=start,
-                position_end=end,
-                split=split,
-                index=int(index),
+                position_start=vector_id.vector_start,
+                position_end=vector_id.vector_end,
+                split=vector_id.field_id.subfield_id,
+                index=vector_id.index,
                 text=None,  # To be filled by the results hydrator
             )
 
