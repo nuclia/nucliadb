@@ -315,6 +315,54 @@ async def catalog(
             # consistent and most up to date results
             use_read_replica_nodes=False,
         )
+        print(results)
+
+        from nucliadb.common.maindb.utils import get_driver
+        from nucliadb_protos.nodereader_pb2 import (
+            SearchResponse,
+            DocumentSearchResponse,
+            DocumentResult,
+            FacetResults,
+            FacetResult,
+        )
+        from psycopg.rows import dict_row
+
+        async with get_driver()._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            facets = {}
+            if query_parser.faceted == ["/metadata.status"]:
+                await cur.execute(
+                    "SELECT status, count(*) FROM catalog WHERE kbid = %(kbid)s GROUP BY status",
+                    {"kbid": query_parser.kbid},
+                )
+                facets["/n/s"] = FacetResults(
+                    facetresults=[
+                        FacetResult(tag="/n/s/" + row["status"].upper(), total=row["count"])
+                        for row in await cur.fetchall()
+                    ]
+                )
+
+            def pg_to_pb(rows, facets):
+                return SearchResponse(
+                    document=DocumentSearchResponse(
+                        results=[
+                            DocumentResult(uuid=str(r["rid"]).replace("-", ""), field="/a/title")
+                            for r in rows
+                        ],
+                        facets=facets,
+                    )
+                )
+
+            await cur.execute(
+                "SELECT * FROM catalog WHERE kbid = %(kbid)s LIMIT %(page_size)s",
+                {"kbid": query_parser.kbid, "page_size": query_parser.page_size},
+            )
+            data = await cur.fetchall()
+            result = pg_to_pb(data, facets)
+            print(result)
+
+            results = [result]
+
+        # breakpoint()
 
         # We need to merge
         search_results = await merge_results(
@@ -336,10 +384,10 @@ async def catalog(
         search_results.sentences = None
         search_results.paragraphs = None
         search_results.relations = None
-        if item.debug:
-            search_results.nodes = debug_nodes_info(queried_nodes)
-        queried_shards = [shard_id for _, shard_id in queried_nodes]
-        search_results.shards = queried_shards
+        # if item.debug:
+        #     search_results.nodes = debug_nodes_info(queried_nodes)
+        # queried_shards = [shard_id for _, shard_id in queried_nodes]
+        # search_results.shards = queried_shards
         return search_results
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
