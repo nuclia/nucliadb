@@ -48,6 +48,7 @@ class TextBlockMatch(BaseModel):
     id: str
     resource_id: str
     field: str
+    index: int
     position_start: int
     position_end: int
     split: Optional[str] = None

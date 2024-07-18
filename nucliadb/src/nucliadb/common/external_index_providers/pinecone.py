@@ -67,12 +67,13 @@ class PineconeQueryResults(QueryResults):
             yield TextBlockMatch(
                 id=matching_vector.id,
                 resource_id=rid,
-                field=f"{field_type}/{field_id}",
+                field=f"/{field_type}/{field_id}",
                 score=matching_vector.score,
                 order=order,
                 position_start=start,
                 position_end=end,
                 split=split,
+                index=int(index),
                 text=None,  # To be filled by the results hydrator
             )
 
@@ -182,7 +183,7 @@ class PineconeIndexManager(ExternalIndexManager):
             )
 
     async def _query(self, request: SearchRequest) -> PineconeQueryResults:
-        top_k = request.page_number * request.result_per_page
+        top_k = (request.page_number + 1) * request.result_per_page
         query_results = await self.data_plane.query(
             vector=list(request.vector),
             top_k=top_k,

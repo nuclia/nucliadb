@@ -19,6 +19,9 @@
 #
 import asyncio
 import logging
+from typing import Optional
+
+from pydantic import BaseModel
 
 from nucliadb.common.external_index_providers.base import QueryResults as ExternalIndexQueryResults
 from nucliadb.common.external_index_providers.base import TextBlockMatch
@@ -42,19 +45,46 @@ from nucliadb_models.search import (
 logger = logging.getLogger(__name__)
 
 
+class ResourceHydrationOptions(BaseModel):
+    """
+    Options for hydrating resources.
+    """
+
+    show: list[ResourceProperties] = []
+    extracted: list[ExtractedDataTypeName] = []
+    field_type_filter: list[FieldTypeName] = []
+
+
+class TextBlockHydrationOptions(BaseModel):
+    """
+    Options for hydrating text blocks (aka paragraphs).
+    """
+
+    highlight: bool = False
+    highlight_exact_matches: list[str] = []
+    highlight_words: list[str] = []
+
+
 async def hydrate_external(
     retrieval_results: KnowledgeboxFindResults,
     query_results: ExternalIndexQueryResults,
     kbid: str,
-    show: list[ResourceProperties],
-    extracted: list[ExtractedDataTypeName],
-    field_type_filter: list[FieldTypeName],
+    resource_options: ResourceHydrationOptions = ResourceHydrationOptions(),
+    text_block_options: TextBlockHydrationOptions = TextBlockHydrationOptions(),
+    text_block_min_score: Optional[float] = None,
     max_parallel_operations: int = 50,
 ) -> None:
     """
-    Hydrates the results of an external index retrieval:
-    - Text for the matched text blocks.
-    - Metadata for the matched resources.
+    Hydrates the results of an external index retrieval. This includes fetching the text for the text blocks
+    and the metadata for the resources.
+
+    Parameters:
+    - retrieval_results: The results of the retrieval to be hydrated.
+    - query_results: The results of the query to the external index.
+    - kbid: The knowledge base id.
+    - resource_options: Options for hydrating resources.
+    - text_block_options: Options for hydrating text blocks.
+    - max_parallel_operations: The maximum number of hydration parallel operations to perform.
     """
     hydrate_ops = []
     semaphore = asyncio.Semaphore(max_parallel_operations)
@@ -63,12 +93,15 @@ async def hydrate_external(
     try:
         resource_ids = set()
         for text_block in query_results.iter_matching_text_blocks():
+            if text_block_min_score is not None and text_block.score < text_block_min_score:
+                # Ignore text blocks with a score lower than the minimum
+                continue
             resource_id = text_block.resource_id
             resource_ids.add(resource_id)
             find_resource = retrieval_results.resources.setdefault(
                 resource_id, FindResource(id=resource_id, fields={})
             )
-            find_resource.fields.setdefault(text_block.field, FindField(paragraphs={}))
+            find_field = find_resource.fields.setdefault(text_block.field, FindField(paragraphs={}))
 
             async def _hydrate_text_block(**kwargs):
                 async with semaphore:
@@ -79,7 +112,9 @@ async def hydrate_external(
                     _hydrate_text_block(
                         kbid=kbid,
                         text_block=text_block,
+                        options=text_block_options,
                         extracted_text_cache=extracted_text_cache,
+                        field_paragraphs=find_field.paragraphs,
                     )
                 )
             )
@@ -97,9 +132,7 @@ async def hydrate_external(
                                 txn=ro_txn,
                                 kbid=kbid,
                                 resource_id=resource_id,
-                                show=show,
-                                field_type_filter=field_type_filter,
-                                extracted=extracted,
+                                options=resource_options,
                                 find_resources=retrieval_results.resources,
                             )
                         )
@@ -115,6 +148,7 @@ async def hydrate_external(
 async def hydrate_text_block(
     kbid: str,
     text_block: TextBlockMatch,
+    options: TextBlockHydrationOptions,
     extracted_text_cache: paragraphs.ExtractedTextCache,
     field_paragraphs: dict[str, FindParagraph],
 ) -> None:
@@ -130,13 +164,18 @@ async def hydrate_text_block(
         split=text_block.split,
         extracted_text_cache=extracted_text_cache,
     )
+    if options.highlight and (options.highlight_exact_matches or options.highlight_words):
+        text = paragraphs.highlight_paragraph(
+            text, words=options.highlight_words, ematches=options.highlight_exact_matches
+        )
     field_paragraphs[text_block.id] = FindParagraph(
         score=text_block.score,
         score_type=SCORE_TYPE.EXTERNAL,
+        order=text_block.order,
         text=text,
         id=text_block.id,
         labels=[],  # TODO
-        fuzzy_result=False,  # TODO
+        fuzzy_result=False,
         is_a_table=False,  # TODO
         reference=None,  # TODO
         page_with_visual=False,  # TODO
@@ -155,9 +194,7 @@ async def hydrate_resource_metadata(
     txn: Transaction,
     kbid: str,
     resource_id: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
+    options: ResourceHydrationOptions,
     find_resources: dict[str, FindResource],
 ) -> None:
     """
@@ -167,9 +204,9 @@ async def hydrate_resource_metadata(
         txn=txn,
         kbid=kbid,
         rid=resource_id,
-        show=show,
-        field_type_filter=field_type_filter,
-        extracted=extracted,
+        show=options.show,
+        field_type_filter=options.field_type_filter,
+        extracted=options.extracted,
     )
     if serialized_resource is None:
         logger.warning(
