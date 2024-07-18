@@ -90,16 +90,41 @@ class ResourceProperties(str, Enum):
 
 
 class SearchOptions(str, Enum):
+    FULLTEXT = "fulltext"
+    KEYWORD = "keyword"
+    RELATIONS = "relations"
+    SEMANTIC = "semantic"
+
+    # DEPRECATED: use keyword, fulltext and semantic instead
     PARAGRAPH = "paragraph"
     DOCUMENT = "document"
-    RELATIONS = "relations"
     VECTOR = "vector"
+
+    def normalized(self):
+        if self.value == SearchOptions.KEYWORD:
+            return SearchOptions.PARAGRAPH
+        elif self.value == SearchOptions.FULLTEXT:
+            return SearchOptions.DOCUMENT
+        elif self.value == SearchOptions.SEMANTIC:
+            return SearchOptions.VECTOR
+        return self.value
 
 
 class ChatOptions(str, Enum):
+    KEYWORD = "keyword"
+    RELATIONS = "relations"
+    SEMANTIC = "semantic"
+
+    # DEPRECATED: use keyword, and semantic instead
     VECTORS = "vectors"
     PARAGRAPHS = "paragraphs"
-    RELATIONS = "relations"
+
+    def normalized(self):
+        if self.value == ChatOptions.KEYWORD:
+            return ChatOptions.PARAGRAPHS
+        elif self.value == ChatOptions.SEMANTIC:
+            return ChatOptions.VECTORS
+        return self.value
 
 
 class SuggestOptions(str, Enum):
@@ -548,7 +573,7 @@ class SearchParamDefaults:
     search_features = ParamDefault(
         default=None,
         title="Search features",
-        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes.",  # noqa
+        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes. `document`, `paragraph` and `vector` are deprecated, please use `fulltext`, `keyword` and `semantic` instead",  # noqa
     )
     debug = ParamDefault(
         default=False,
@@ -608,7 +633,7 @@ class SearchParamDefaults:
     chat_features = ParamDefault(
         default=[ChatOptions.VECTORS, ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
         title="Chat features",
-        description="Features enabled for the chat endpoint. Semantic search is done if `vectors` is included. If `paragraphs` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
+        description="Features enabled for the chat endpoint. Semantic search is done if `semantic` (or `vectors`) is included. If `keyword` (or `paragraphs`) is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",  # noqa
     )
     suggest_features = ParamDefault(
         default=[
@@ -753,6 +778,11 @@ class BaseSearchRequest(BaseModel):
         title="Rephrase the query to improve search",
         description="Consume LLM tokens to rephrase the query so the semantic search is better",
     )
+
+    @field_validator("features", mode="after")
+    @classmethod
+    def normalize_features(cls, features: List[SearchOptions]):
+        return [feature.normalized() for feature in features]
 
 
 class SearchRequest(BaseSearchRequest):
@@ -1118,6 +1148,11 @@ class ChatRequest(BaseModel):
                 )
         return rag_strategies
 
+    @field_validator("features", mode="after")
+    @classmethod
+    def normalize_features(cls, features: List[ChatOptions]):
+        return [feature.normalized() for feature in features]
+
 
 class SummarizeResourceModel(BaseModel):
     fields: Dict[str, str] = {}
@@ -1197,10 +1232,12 @@ class FindRequest(BaseSearchRequest):
         ]
     )
 
-    @field_validator("features")
+    @field_validator("features", mode="after")
     @classmethod
     def fulltext_not_supported(cls, v):
+        # features are already normalized in the BaseSearchRequest model
         if SearchOptions.DOCUMENT in v or SearchOptions.DOCUMENT == v:
+
             raise ValueError("fulltext search not supported")
         return v
 
