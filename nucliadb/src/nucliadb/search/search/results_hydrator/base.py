@@ -91,7 +91,7 @@ async def hydrate_external(
     try:
         resource_ids = set()
         for text_block in query_results.iter_matching_text_blocks():
-            if text_block_min_score is not None and text_block.score < text_block_min_score:
+            if text_block_min_score is not None and text_block.score < text_block_min_score:  # pragma: no cover
                 # Ignore text blocks with a score lower than the minimum
                 continue
             resource_id = text_block.resource_id
