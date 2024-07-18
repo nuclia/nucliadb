@@ -413,6 +413,40 @@ class Processor:
                 kb=kbid,
                 source=source,
             )
+
+            # Catalog
+            async with txn.connection.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO catalog
+                    (kbid, rid, status, title, mimetype, created_at, modified_at, labels)
+                    VALUES
+                    (%(kbid)s, %(rid)s, %(status)s, %(title)s, %(mimetype)s, %(created_at)s, %(modified_at)s, %(labels)s)
+                    ON CONFLICT (kbid, rid) DO UPDATE SET
+                    status = excluded.status,
+                    title = excluded.title,
+                    mimetype = excluded.mimetype,
+                    created_at = excluded.created_at,
+                    modified_at = excluded.modified_at,
+                    labels = excluded.labels""",
+                    {
+                        "kbid": resource.kb.kbid,
+                        "rid": resource.uuid,
+                        "status": "Processed"
+                        if resource.basic.metadata.status == 1
+                        else "Pending"
+                        if resource.basic.metadata.status == 0
+                        else "Error",
+                        "title": resource.basic.title,
+                        "mimetype": resource.basic.icon,
+                        "created_at": resource.basic.created.ToDatetime(),
+                        "modified_at": resource.basic.modified.ToDatetime(),
+                        "labels": [
+                            f"/l/{ll.labelset}/{ll.label}"
+                            for ll in resource.basic.usermetadata.classifications
+                        ],
+                    },
+                )
         else:
             raise AttributeError("Shard is not available")
 
