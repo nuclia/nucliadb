@@ -104,8 +104,8 @@ def test_chat_request_features_normalization():
     request = search.ChatRequest(
         query="my-query",
         features=[
-            search.ChatOptions.VECTORS,
-            search.ChatOptions.PARAGRAPHS,
+            search.ChatOptions.SEMANTIC,
+            search.ChatOptions.KEYWORD,
             search.ChatOptions.RELATIONS,
         ],
     )
