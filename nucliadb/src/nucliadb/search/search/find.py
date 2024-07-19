@@ -94,9 +94,9 @@ async def _index_node_retrieval(
 
     item.min_score = min_score_from_payload(item.min_score)
 
-    if SearchOptions.VECTOR in item.features:
+    if SearchOptions.SEMANTIC in item.features:
         if should_disable_vector_search(item):
-            item.features.remove(SearchOptions.VECTOR)
+            item.features.remove(SearchOptions.SEMANTIC)
 
     query_parser = QueryParser(
         kbid=kbid,

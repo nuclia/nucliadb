@@ -78,7 +78,7 @@ SEARCH_EXAMPLES = {
         value={
             "query": "Noam Chomsky",
             "filters": ["/icon/application/pdf"],
-            "features": [SearchOptions.DOCUMENT],
+            "features": [SearchOptions.FULLTEXT],
         },
     ),
     "get_language_counts": Example(
@@ -87,7 +87,7 @@ SEARCH_EXAMPLES = {
         value={
             "page_size": 0,
             "faceted": ["/s/p"],
-            "features": [SearchOptions.DOCUMENT],
+            "features": [SearchOptions.FULLTEXT],
         },
     ),
 }
@@ -143,9 +143,9 @@ async def search_knowledgebox(
     features: list[SearchOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.DOCUMENT,
-            SearchOptions.VECTOR,
+            SearchOptions.KEYWORD,
+            SearchOptions.FULLTEXT,
+            SearchOptions.SEMANTIC,
         ],
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
@@ -298,7 +298,7 @@ async def catalog(
 
         query_parser = QueryParser(
             kbid=kbid,
-            features=[SearchOptions.DOCUMENT],
+            features=[SearchOptions.FULLTEXT],
             query=item.query,
             filters=item.filters,
             faceted=item.faceted,
@@ -425,9 +425,9 @@ async def search(
 
     item.min_score = min_score_from_payload(item.min_score)
 
-    if SearchOptions.VECTOR in item.features:
+    if SearchOptions.SEMANTIC in item.features:
         if should_disable_vector_search(item):
-            item.features.remove(SearchOptions.VECTOR)
+            item.features.remove(SearchOptions.SEMANTIC)
 
     # We need to query all nodes
     query_parser = QueryParser(
