@@ -313,8 +313,8 @@ async def start_indexing_utility(service_name: Optional[str] = None) -> Indexing
 async def stop_indexing_utility():
     indexing_utility = get_indexing()
     if indexing_utility:
-        await indexing_utility.finalize()
         clean_utility(Utility.INDEXING)
+        await indexing_utility.finalize()
 
 
 def get_indexing() -> IndexingUtility:
