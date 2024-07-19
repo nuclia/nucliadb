@@ -42,6 +42,26 @@ class FieldId:
         else:
             return f"{self.rid}/{self.field_id}/{self.subfield_id}"
 
+    @classmethod
+    def from_string(cls, value: str) -> "FieldId":
+        """
+        Parse a FieldId from a string
+        Example:
+        >>> FieldId.from_string("rid/u/field_id")
+        FieldId(rid="rid", field_id="u/field_id")
+        >>> FieldId.from_string("rid/u/field_id/subfield_id")
+        FieldId(rid="rid", field_id="u/field_id", subfield_id="subfield_id")
+        """
+        parts = value.split("/")
+        if len(parts) == 3:
+            rid, field_type, field_id = parts
+            return cls(rid=rid, field_id=f"{field_type}/{field_id}")
+        elif len(parts) == 4:
+            rid, field_type, field_id, subfield_id = parts
+            return cls(rid=rid, field_id=f"{field_type}/{field_id}", subfield_id=subfield_id)
+        else:
+            raise ValueError(f"Invalid FieldId: {value}")
+
 
 @dataclass
 class ParagraphId:
@@ -51,6 +71,14 @@ class ParagraphId:
 
     def full(self) -> str:
         return f"{self.field_id.full()}/{self.paragraph_start}-{self.paragraph_end}"
+
+    @classmethod
+    def from_string(cls, value: str) -> "ParagraphId":
+        parts = value.split("/")
+        paragraph_range = parts[-1]
+        start, end = map(int, paragraph_range.split("-"))
+        field_id = FieldId.from_string("/".join(parts[:-1]))
+        return cls(field_id=field_id, paragraph_start=start, paragraph_end=end)
 
 
 @dataclass
@@ -62,3 +90,12 @@ class VectorId:
 
     def full(self) -> str:
         return f"{self.field_id.full()}/{self.index}/{self.vector_start}-{self.vector_end}"
+
+    @classmethod
+    def from_string(cls, value: str) -> "VectorId":
+        parts = value.split("/")
+        vector_range = parts[-1]
+        start, end = map(int, vector_range.split("-"))
+        index = int(parts[-2])
+        field_id = FieldId.from_string("/".join(parts[:-2]))
+        return cls(field_id=field_id, index=index, vector_start=start, vector_end=end)
