@@ -261,8 +261,11 @@ class TestDataPlane:
         http_response.json.return_value = {"matches": []}
         await client.query(vector=[1.0])
 
-        assert metrics_registry.get_sample_value(
-            "pinecone_client_duration_seconds_count", {"type": "query"}
+        assert (
+            metrics_registry.get_sample_value(
+                "pinecone_client_duration_seconds_count", {"type": "query"}
+            )
+            > 0
         )
 
 
