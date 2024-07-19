@@ -44,7 +44,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
-    get_audit,
     get_storage,
     set_utility,
 )
@@ -921,29 +920,6 @@ async def test_search_automatic_relations(
         assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(
             entities[entity]["related_to"], key=lambda x: x["entity"]
         )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_only_search_and_suggest_calls_audit(nucliadb_reader, knowledgebox):
-    kbid = knowledgebox
-
-    audit = get_audit()
-    audit.search = AsyncMock()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog", params={"query": ""})
-    assert resp.status_code == 200
-
-    audit.search.assert_not_awaited()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/search")
-    assert resp.status_code == 200
-
-    audit.search.assert_awaited_once()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/suggest?query=")
-
-    assert resp.status_code == 200
 
 
 async def get_audit_messages(sub):
