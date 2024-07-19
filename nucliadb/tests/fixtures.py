@@ -503,11 +503,9 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStu
 
 
 @pytest.fixture(scope="function")
-async def stream_audit(natsd: str):
+async def stream_audit(natsd: str, mocker):
     from nucliadb_utils.audit.stream import StreamAuditStorage
     from nucliadb_utils.settings import audit_settings
-
-    audit_settings.audit_driver = "basic"
 
     audit = StreamAuditStorage(
         [natsd],
@@ -516,6 +514,13 @@ async def stream_audit(natsd: str):
         audit_settings.audit_hash_seed,
     )
     await audit.initialize()
+
+    mocker.spy(audit, "send")
+    mocker.spy(audit.js, "publish")
+    mocker.spy(audit, "search")
+    mocker.spy(audit, "chat")
+
+    set_utility(Utility.AUDIT, audit)
     yield audit
     await audit.finalize()
 
