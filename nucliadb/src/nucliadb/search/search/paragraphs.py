@@ -223,21 +223,32 @@ async def get_text_sentence(
 def highlight_paragraph(
     text: str, words: Optional[list[str]] = None, ematches: Optional[list[str]] = None
 ) -> str:
+    """
+    Highlight `text` with <mark></mark> tags around the words in `words` and `ematches`.
+
+    Parameters:
+    - text: The text to highlight.
+    - words: A list of words to highlight.
+    - ematches: A list of exact matches to highlight.
+
+    Returns:
+    - The highlighted text.
+    """
     REGEX_TEMPLATE = r"(^|\s)({text})(\s|$)"
     text_lower = text.lower()
 
     marks = [0] * (len(text_lower) + 1)
-    if ematches is not None:
-        for quote in ematches:
-            quote_regex = REGEX_TEMPLATE.format(text=re.escape(quote.lower()))
-            try:
-                for match in re.finditer(quote_regex, text_lower):
-                    start, end = match.span(2)
-                    marks[start] = 1
-                    marks[end] = 2
-            except re.error:
-                logger.warning(f"Regex errors while highlighting text. Regex: {quote_regex}")
-                continue
+    ematches = ematches or []
+    for quote in ematches:
+        quote_regex = REGEX_TEMPLATE.format(text=re.escape(quote.lower()))
+        try:
+            for match in re.finditer(quote_regex, text_lower):
+                start, end = match.span(2)
+                marks[start] = 1
+                marks[end] = 2
+        except re.error:
+            logger.warning(f"Regex errors while highlighting text. Regex: {quote_regex}")
+            continue
 
     words = words or []
     for word in words:

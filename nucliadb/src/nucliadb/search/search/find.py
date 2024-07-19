@@ -18,13 +18,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+from dataclasses import dataclass
 from time import time
 from typing import Optional
 
+from nucliadb.common.external_index_providers.base import ExternalIndexManager
+from nucliadb.common.external_index_providers.manager import (
+    get_external_index_manager,
+)
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
+from nucliadb.search.search import results_hydrator
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.results_hydrator.base import (
+    ResourceHydrationOptions,
+)
 from nucliadb.search.search.utils import (
     min_score_from_payload,
     should_disable_vector_search,
@@ -33,6 +42,7 @@ from nucliadb.search.settings import settings
 from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
+    MinScore,
     NucliaDBClientType,
     SearchOptions,
 )
@@ -42,6 +52,35 @@ logger = logging.getLogger(__name__)
 
 
 async def find(
+    kbid: str,
+    item: FindRequest,
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    generative_model: Optional[str] = None,
+    metrics: RAGMetrics = RAGMetrics(),
+) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+    external_index_manager = await get_external_index_manager(kbid=kbid)
+    if external_index_manager is not None:
+        return await _external_index_retrieval(
+            kbid,
+            item,
+            external_index_manager,
+            generative_model,
+        )
+    else:
+        return await _index_node_retrieval(
+            kbid,
+            item,
+            x_ndb_client,
+            x_nucliadb_user,
+            x_forwarded_for,
+            generative_model,
+            metrics,
+        )
+
+
+async def _index_node_retrieval(
     kbid: str,
     item: FindRequest,
     x_ndb_client: NucliaDBClientType,
@@ -155,3 +194,95 @@ async def find(
         )
 
     return search_results, incomplete_results, query_parser
+
+
+async def _external_index_retrieval(
+    kbid: str,
+    item: FindRequest,
+    external_index_manager: ExternalIndexManager,
+    generative_model: Optional[str] = None,
+) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
+    """
+    Parse the query, query the external index, and hydrate the results.
+    """
+    # Parse query
+    item.min_score = min_score_from_payload(item.min_score)
+    query_parser = QueryParser(
+        kbid=kbid,
+        features=item.features,
+        query=item.query,
+        filters=item.filters,
+        faceted=None,
+        sort=None,
+        page_number=item.page_number,
+        page_size=item.page_size,
+        min_score=item.min_score,
+        range_creation_start=item.range_creation_start,
+        range_creation_end=item.range_creation_end,
+        range_modification_start=item.range_modification_start,
+        range_modification_end=item.range_modification_end,
+        fields=item.fields,
+        user_vector=item.vector,
+        vectorset=item.vectorset,
+        with_duplicates=item.with_duplicates,
+        with_synonyms=item.with_synonyms,
+        autofilter=item.autofilter,
+        key_filters=item.resource_filters,
+        security=item.security,
+        generative_model=generative_model,
+        rephrase=item.rephrase,
+    )
+    search_request, incomplete_results, _ = await query_parser.parse()
+
+    # Query index
+    query_results = await external_index_manager.query(search_request)  # noqa
+
+    # Hydrate results
+    results_min_score = MinScore(
+        bm25=0,
+        semantic=item.min_score.semantic or query_parser.min_score.semantic,
+    )
+    retrieval_results = KnowledgeboxFindResults(
+        resources={},
+        query=item.query,
+        total=0,
+        page_number=0,
+        page_size=(item.page_number + 1) * item.page_size,
+        relations=None,  # Not implemented for external indexes yet
+        autofilters=[],  # Not implemented for external indexes yet
+        min_score=results_min_score,
+        best_matches=[],
+        # These are not used for external indexes
+        shards=None,
+        nodes=None,
+    )
+    await results_hydrator.hydrate_external(
+        retrieval_results,
+        query_results,
+        kbid=kbid,
+        resource_options=ResourceHydrationOptions(
+            show=item.show,
+            extracted=item.extracted,
+            field_type_filter=item.field_type_filter,
+        ),
+        text_block_min_score=results_min_score.semantic,
+        max_parallel_operations=50,
+    )
+
+    # Once hydrated, populate best_matches with the paragraphs ids sorted by score
+    scored_paragraphs: list[ScoredParagraph] = [
+        ScoredParagraph(id=paragraph.id, score=paragraph.score)
+        for resource in retrieval_results.resources.values()
+        for field in resource.fields.values()
+        for paragraph in field.paragraphs.values()
+    ]
+    scored_paragraphs.sort(key=lambda par: par.score, reverse=True)
+    retrieval_results.best_matches = [par.id for par in scored_paragraphs]
+
+    return retrieval_results, incomplete_results, query_parser
+
+
+@dataclass
+class ScoredParagraph:
+    id: str
+    score: float

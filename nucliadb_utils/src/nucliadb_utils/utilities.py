@@ -475,3 +475,7 @@ def get_pinecone() -> PineconeSession:
     util = PineconeSession()
     set_utility(Utility.PINECONE_SESSION, util)
     return util
+
+
+def clean_pinecone():
+    clean_utility(Utility.PINECONE_SESSION)

@@ -42,6 +42,11 @@ class ExternalIndexProvidersSettings(BaseSettings):
         title="Pinecone delete timeout",
         description="Timeout in seconds for each delete operation to Pinecone",
     )
+    pinecone_query_timeout: float = Field(
+        default=10.0,
+        title="Pinecone query timeout",
+        description="Timeout in seconds for each query operation to Pinecone",
+    )
 
 
 settings = ExternalIndexProvidersSettings()
