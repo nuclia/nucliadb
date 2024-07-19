@@ -454,7 +454,7 @@ async def stream_audit(natsd: str):
     from nucliadb_utils.audit.stream import StreamAuditStorage
     from nucliadb_utils.settings import audit_settings
 
-    audit_settings.audit_driver = "stream"
+    audit_settings.audit_driver = "basic"
 
     audit = StreamAuditStorage(
         [natsd],
@@ -467,8 +467,8 @@ async def stream_audit(natsd: str):
     await audit.finalize()
 
 
-@pytest.fixture(scope="function", autouse=True)
-async def kbusage_util(natsd: str):
+@pytest.fixture(scope="function")
+async def stream_kbusage_util(natsd: str):
     from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
     from nucliadb_utils.settings import usage_settings
 

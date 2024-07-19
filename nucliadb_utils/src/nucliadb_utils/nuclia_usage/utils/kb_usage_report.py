@@ -63,7 +63,7 @@ class KbUsageReportUtility:
         self.initialized = False
 
     async def initialize(self):
-        if not self.initialized:
+        if not self.initialized and self.nats_connection_manager._nats_servers:
             await self.nats_connection_manager.initialize()
 
             if self.task is None:
@@ -93,6 +93,8 @@ class KbUsageReportUtility:
                 self.queue.task_done()
 
     def send(self, message: KbUsage):
+        if not self.initialized:
+            return
         try:
             self.queue.put_nowait(message)
         except asyncio.QueueFull:
