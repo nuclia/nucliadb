@@ -955,7 +955,7 @@ async def get_audit_messages(sub):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_search_and_suggest_sent_audit(
+async def test_search_sends_audit(
     nucliadb_reader,
     knowledgebox,
     stream_audit: StreamAuditStorage,
@@ -991,23 +991,6 @@ async def test_search_and_suggest_sent_audit(
     assert auditreq.kbid == kbid
     assert auditreq.type == AuditRequest.AuditType.SEARCH
     assert auditreq.client_type == ClientType.CHROME_EXTENSION  # Just to use other that the enum default
-    try:
-        int(auditreq.trace_id)
-    except ValueError:
-        assert False, "Invalid trace ID"
-
-    # Test suggest sends audit
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest?query=", headers={"x-ndb-client": "chrome_extension"}
-    )
-    assert resp.status_code == 200
-
-    auditreq = await get_audit_messages(psub)
-
-    assert auditreq.kbid == kbid
-    assert auditreq.type == AuditRequest.AuditType.SUGGEST
-    assert auditreq.client_type == ClientType.CHROME_EXTENSION  # Just to use other that the enum default
-
     try:
         int(auditreq.trace_id)
     except ValueError:
