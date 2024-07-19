@@ -17,16 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import Generator
+from typing import Any, Generator
+from unittest.mock import patch
 
 import pytest
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_docker_fixtures import images  # type: ignore  # type: ignore
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore  # type: ignore
 
+from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.azure import AzureStorage
-from nucliadb_utils.store import MAIN
-from nucliadb_utils.utilities import Utility
 
 images.settings["azurite"] = {
     "image": "mcr.microsoft.com/azure-storage/azurite",
@@ -107,16 +108,25 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
 
 
 @pytest.fixture(scope="function")
-async def azure_storage(azurite):
+def azure_storage_settings(azurite: AzuriteFixture) -> dict[str, Any]:
+    settings = {
+        "file_backend": FileBackendConfig.AZURE,
+        "azure_connection_string": azurite.connection_string,
+    }
+    with ExitStack() as stack:
+        for key, value in settings.items():
+            context = patch.object(storage_settings, key, value)
+            stack.enter_context(context)
+
+        yield settings
+
+
+@pytest.fixture(scope="function")
+async def azure_storage(azurite, azure_storage_settings: dict[str, Any]):
     storage = AzureStorage(
         account_url=azurite.account_url,
         connection_string=azurite.connection_string,
     )
-    MAIN[Utility.STORAGE] = storage
     await storage.initialize()
-    try:
-        yield storage
-    finally:
-        await storage.finalize()
-        if Utility.STORAGE in MAIN:
-            del MAIN[Utility.STORAGE]
+    yield storage
+    await storage.finalize()

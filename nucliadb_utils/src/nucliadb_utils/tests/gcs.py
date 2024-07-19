@@ -19,18 +19,19 @@
 #
 import re
 from concurrent.futures.thread import ThreadPoolExecutor
-from typing import Optional
+from contextlib import ExitStack
+from typing import Any, Optional
+from unittest.mock import patch
 
-import docker  # type: ignore
+import docker  # type: ignore  # type: ignore
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
+from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.gcs import GCSStorage
-from nucliadb_utils.store import MAIN
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.utilities import Utility
 
 # IMPORTANT!
 # Without this, tests running in a remote docker host won't work
@@ -77,7 +78,22 @@ def gcs():
 
 
 @pytest.fixture(scope="function")
-async def gcs_storage(gcs):
+def gcs_storage_settings(gcs) -> dict[str, Any]:
+    settings = {
+        "file_backend": FileBackendConfig.GCS,
+        "gcs_endpoint_url": gcs,
+        "gcs_bucket": "test_{kbid}",
+    }
+    with ExitStack() as stack:
+        for key, value in settings.items():
+            context = patch.object(storage_settings, key, value)
+            stack.enter_context(context)
+
+        yield settings
+
+
+@pytest.fixture(scope="function")
+async def gcs_storage(gcs, gcs_storage_settings: dict[str, Any]):
     storage = GCSStorage(
         account_credentials=None,
         bucket="test_{kbid}",
@@ -89,8 +105,6 @@ async def gcs_storage(gcs):
         labels={},
         url=gcs,
     )
-    MAIN[Utility.STORAGE] = storage
     await storage.initialize()
     yield storage
     await storage.finalize()
-    MAIN.pop(Utility.STORAGE, None)

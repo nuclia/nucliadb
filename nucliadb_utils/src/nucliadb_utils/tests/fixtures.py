@@ -22,6 +22,8 @@ import os
 import pytest
 from pytest_lazy_fixtures import lazy_fixture
 
+from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+
 
 @pytest.fixture(scope="function")
 def onprem_nucliadb():
@@ -47,17 +49,10 @@ def get_testing_storage_backend(default="gcs"):
     return os.environ.get("TESTING_STORAGE_BACKEND", default)
 
 
-def lazy_storage_fixture():
+def lazy_storage_fixture(default="gcs"):
     backend = get_testing_storage_backend()
-    if backend == "gcs":
-        return [lazy_fixture.lf("gcs_storage")]
-    elif backend == "s3":
-        return [lazy_fixture.lf("s3_storage")]
-    elif backend == "local":
-        return [lazy_fixture.lf("local_storage")]
-    else:
-        print(f"Unknown storage backend {backend}, using gcs")
-        return [lazy_fixture.lf("gcs_storage")]
+    fixture_name = f"{backend}_storage"
+    return [lazy_fixture.lf(fixture_name)]
 
 
 @pytest.fixture(scope="function", params=lazy_storage_fixture())
@@ -65,4 +60,9 @@ async def storage(request):
     """
     Generic storage fixture that allows us to run the same tests for different storage backends.
     """
-    return request.param
+    storage_driver = request.param
+    set_utility(Utility.STORAGE, storage_driver)
+
+    yield storage_driver
+
+    clean_utility(Utility.STORAGE)

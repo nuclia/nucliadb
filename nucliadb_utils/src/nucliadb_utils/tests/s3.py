@@ -17,14 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from contextlib import ExitStack
+from typing import Any
+from unittest.mock import patch
+
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
+from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.s3 import S3Storage
-from nucliadb_utils.store import MAIN
-from nucliadb_utils.utilities import Utility
 
 images.settings["s3"] = {
     "image": "localstack/localstack",
@@ -58,7 +61,24 @@ def s3():
 
 
 @pytest.fixture(scope="function")
-async def s3_storage(s3):
+async def s3_storage_settings(s3) -> dict[str, Any]:
+    settings = {
+        "file_backend": FileBackendConfig.S3,
+        "s3_endpoint": s3,
+        "s3_client_id": "",
+        "s3_client_secret": "",
+        "s3_bucket": "test-{kbid}",
+    }
+    with ExitStack() as stack:
+        for key, value in settings.items():
+            context = patch.object(storage_settings, key, value)
+            stack.enter_context(context)
+
+        yield settings
+
+
+@pytest.fixture(scope="function")
+async def s3_storage(s3, s3_storage_settings: dict[str, Any]):
     storage = S3Storage(
         aws_client_id="",
         aws_client_secret="",
@@ -72,7 +92,5 @@ async def s3_storage(s3):
         bucket_tags={"testTag": "test"},
     )
     await storage.initialize()
-    MAIN[Utility.STORAGE] = storage
     yield storage
     await storage.finalize()
-    MAIN.pop(Utility.STORAGE, None)
