@@ -17,14 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Callable
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 
 ID = ("id",)
 BASIC = (
@@ -50,280 +48,269 @@ VALUES = ("values",)
 EXTRACTED = ("extracted",)
 
 
-@pytest.mark.asyncio
-async def test_get_resource_inexistent(
-    reader_api: Callable[..., AsyncClient], knowledgebox_ingest: str
-) -> None:
-    kbid = knowledgebox_ingest
+@pytest.mark.deploy_modes("component")
+async def test_get_resource_inexistent(nucliadb_reader: AsyncClient, knowledgebox: str) -> None:
+    kbid = knowledgebox
     rid = "000000000000001"
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-        )
-        assert resp.status_code == 404
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+    )
+    assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_get_resource_default_options(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
+    nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+    )
+    assert resp.status_code == 200
 
-        resource = resp.json()
+    resource = resp.json()
 
-        expected_root_fields = set(ID + BASIC)
-        assert set(resource.keys()) == expected_root_fields
-        assert "data" not in resource
+    expected_root_fields = set(ID + BASIC)
+    assert set(resource.keys()) == expected_root_fields
+    assert "data" not in resource
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_get_resource_sequence_ids_are_set_on_resource(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
+    nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+    )
+    assert resp.status_code == 200
 
-        resource = resp.json()
+    resource = resp.json()
 
-        expected_root_fields = set(ID + BASIC)
-        assert set(resource.keys()) == expected_root_fields
+    expected_root_fields = set(ID + BASIC)
+    assert set(resource.keys()) == expected_root_fields
 
-        assert "data" not in resource
-        assert test_resource.basic is not None
-        assert resource["last_seqid"] == test_resource.basic.last_seqid
-        assert resource["last_account_seq"] == test_resource.basic.last_account_seq
-        assert resource["queue"] == "private"
+    assert "data" not in resource
+    assert test_resource.basic is not None
+    assert resource["last_seqid"] == test_resource.basic.last_seqid
+    assert resource["last_account_seq"] == test_resource.basic.last_account_seq
+    assert resource["queue"] == "private"
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_get_resource_all(
-    reader_api: Callable[..., AsyncClient],
+    nucliadb_reader: AsyncClient,
     test_resource: Resource,
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-            params={
-                "show": ["basic", "origin", "relations", "values", "extracted"],
-                "field_type": [
-                    "text",
-                    "link",
-                    "file",
-                    "conversation",
-                ],
-                "extracted": [
-                    "metadata",
-                    "vectors",
-                    "large_metadata",
-                    "text",
-                    "link",
-                    "file",
-                ],
-            },
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        params={
+            "show": ["basic", "origin", "relations", "values", "extracted"],
+            "field_type": [
+                "text",
+                "link",
+                "file",
+                "conversation",
+            ],
+            "extracted": [
+                "metadata",
+                "vectors",
+                "large_metadata",
+                "text",
+                "link",
+                "file",
+            ],
+        },
+    )
+    assert resp.status_code == 200
 
-        resource = resp.json()
+    resource = resp.json()
 
-        # DEBUG
-        # import json  # noqa
-        # print(json.dumps(data, indent=4))
+    # DEBUG
+    # import json  # noqa
+    # print(json.dumps(data, indent=4))
 
-        expected_root_fields = set(ID + BASIC + RELATIONS + ORIGIN + DATA)
-        assert set(resource.keys()) == expected_root_fields
+    expected_root_fields = set(ID + BASIC + RELATIONS + ORIGIN + DATA)
+    assert set(resource.keys()) == expected_root_fields
 
-        data = resource["data"]
-        assert set(data.keys()) == {
-            "files",
-            "texts",
-            "links",
-            "conversations",
-        }
-        texts = data["texts"]
-        assert set(texts.keys()) == {"text1"}
-        assert set(texts["text1"]["extracted"].keys()) == {
-            "metadata",
-            "vectors",
-            "large_metadata",
-            "text",
-        }
-        links = data["links"]
-        assert set(links.keys()) == {"link1"}
-        assert set(links["link1"]["extracted"].keys()) == {
-            "metadata",
-            "vectors",
-            "large_metadata",
-            "text",
-            "link",
-        }
+    data = resource["data"]
+    assert set(data.keys()) == {
+        "files",
+        "texts",
+        "links",
+        "conversations",
+    }
+    texts = data["texts"]
+    assert set(texts.keys()) == {"text1"}
+    assert set(texts["text1"]["extracted"].keys()) == {
+        "metadata",
+        "vectors",
+        "large_metadata",
+        "text",
+    }
+    links = data["links"]
+    assert set(links.keys()) == {"link1"}
+    assert set(links["link1"]["extracted"].keys()) == {
+        "metadata",
+        "vectors",
+        "large_metadata",
+        "text",
+        "link",
+    }
 
 
-@pytest.mark.asyncio
-async def test_get_resource_filter_root_fields(reader_api, test_resource):
+@pytest.mark.deploy_modes("component")
+async def test_get_resource_filter_root_fields(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-            params={"show": ["basic", "values"]},
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        params={"show": ["basic", "values"]},
+    )
+    assert resp.status_code == 200
 
-        resource = resp.json()
+    resource = resp.json()
 
-        expected_root_fields = set(ID + BASIC + DATA)
-        assert set(resource.keys()) == expected_root_fields
+    expected_root_fields = set(ID + BASIC + DATA)
+    assert set(resource.keys()) == expected_root_fields
 
-        data = resource["data"]
+    data = resource["data"]
 
-        assert set(data.keys()) == {
-            "files",
-            "texts",
-            "links",
-            "conversations",
-            "generics",
-        }
+    assert set(data.keys()) == {
+        "files",
+        "texts",
+        "links",
+        "conversations",
+        "generics",
+    }
 
-        assert set(data["files"]["file1"].keys()) == {"value"}
-        assert set(data["texts"]["text1"].keys()) == {"value"}
-        assert set(data["links"]["link1"].keys()) == {"value"}
-        assert set(data["conversations"]["conv1"].keys()) == {"value"}
+    assert set(data["files"]["file1"].keys()) == {"value"}
+    assert set(data["texts"]["text1"].keys()) == {"value"}
+    assert set(data["links"]["link1"].keys()) == {"value"}
+    assert set(data["conversations"]["conv1"].keys()) == {"value"}
 
 
-@pytest.mark.asyncio
-async def test_get_resource_filter_field_types(reader_api, test_resource):
+@pytest.mark.deploy_modes("component")
+async def test_get_resource_filter_field_types(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-            params={"show": ["values", "extracted"], "field_type": ["text", "link"]},
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        params={"show": ["values", "extracted"], "field_type": ["text", "link"]},
+    )
+    assert resp.status_code == 200
 
-        resource = resp.json()
+    resource = resp.json()
 
-        expected_root_fields = set(ID + DATA)
-        assert set(resource.keys()) == expected_root_fields
+    expected_root_fields = set(ID + DATA)
+    assert set(resource.keys()) == expected_root_fields
 
-        data = resource["data"]
+    data = resource["data"]
 
-        assert set(data.keys()) == {"texts", "links"}
-        assert set(data["texts"]["text1"].keys()) == {"value", "extracted"}
-        assert set(data["links"]["link1"].keys()) == {"value", "extracted"}
+    assert set(data.keys()) == {"texts", "links"}
+    assert set(data["texts"]["text1"].keys()) == {"value", "extracted"}
+    assert set(data["links"]["link1"].keys()) == {"value", "extracted"}
 
 
-@pytest.mark.asyncio
-async def test_get_resource_filter_field_types_and_extracted(reader_api, test_resource):
+@pytest.mark.deploy_modes("component")
+async def test_get_resource_filter_field_types_and_extracted(
+    nucliadb_reader: AsyncClient, test_resource
+):
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-            params={
-                "show": ["extracted"],
-                "field_type": ["text"],
-                "extracted": ["metadata", "vectors"],
-            },
-        )
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        params={
+            "show": ["extracted"],
+            "field_type": ["text"],
+            "extracted": ["metadata", "vectors"],
+        },
+    )
 
-        assert resp.status_code == 200
-        resource = resp.json()
+    assert resp.status_code == 200
+    resource = resp.json()
 
-        expected_root_fields = set(ID + DATA)
-        assert set(resource.keys()) == expected_root_fields
+    expected_root_fields = set(ID + DATA)
+    assert set(resource.keys()) == expected_root_fields
 
-        data = resource["data"]
+    data = resource["data"]
 
-        assert set(data.keys()) == {"texts"}
-        assert set(data["texts"]["text1"].keys()) == {"extracted"}
-        assert set(data["texts"]["text1"]["extracted"].keys()) == {
-            "metadata",
-            "vectors",
-        }
+    assert set(data.keys()) == {"texts"}
+    assert set(data["texts"]["text1"].keys()) == {"extracted"}
+    assert set(data["texts"]["text1"]["extracted"].keys()) == {
+        "metadata",
+        "vectors",
+    }
 
 
-@pytest.mark.asyncio
-async def test_resource_endpoints_by_slug(reader_api, test_resource):
+@pytest.mark.deploy_modes("component")
+async def test_resource_endpoints_by_slug(nucliadb_reader: AsyncClient, test_resource):
     rsc = test_resource
     kbid = rsc.kb.kbid
     rslug = rsc.basic.slug
 
     non_existent_slug = "foobar"
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        # Regular GET
+    # Regular GET
 
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}",
+    )
+    assert resp.status_code == 200
 
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}",
-        )
-        assert resp.status_code == 404
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}",
+    )
+    assert resp.status_code == 404
 
-        # Field endpoint
+    # Field endpoint
 
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}/text/text1",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}/text/text1",
+    )
+    assert resp.status_code == 200
 
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}/text/text1",
-        )
-        assert resp.status_code == 404
-        assert resp.json()["detail"] == "Resource does not exist"
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}/text/text1",
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Resource does not exist"
 
 
-@pytest.mark.asyncio
-async def test_get_resource_extracted_metadata(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
-):
+@pytest.mark.deploy_modes("component")
+async def test_get_resource_extracted_metadata(nucliadb_reader: AsyncClient, test_resource: Resource):
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-            params={
-                "show": ["extracted"],
-                "extracted": [
-                    "metadata",
-                ],
-            },
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        params={
+            "show": ["extracted"],
+            "extracted": [
+                "metadata",
+            ],
+        },
+    )
+    assert resp.status_code == 200
 
-        resource = resp.json()
-        metadata = resource["data"]["texts"]["text1"]["extracted"]["metadata"]["metadata"]
-        assert metadata["positions"]["ENTITY/document"]["entity"] == "document"
+    resource = resp.json()
+    metadata = resource["data"]["texts"]["text1"]["extracted"]["metadata"]["metadata"]
+    assert metadata["positions"]["ENTITY/document"]["entity"] == "document"

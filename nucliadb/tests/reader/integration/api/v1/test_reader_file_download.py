@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import os
-from typing import Callable
 
 import pytest
 from httpx import AsyncClient
@@ -27,7 +26,6 @@ import tests.ingest.fixtures
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.reader.api.v1.download import parse_media_range, safe_http_header_encode
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.resources_pb2 import FieldType
 from tests.ingest.fixtures import TEST_CLOUDFILE, THUMBNAIL
 
@@ -36,89 +34,87 @@ VALUE = ("value",)
 EXTRACTED = ("extracted",)
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_resource_download_extracted_file(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
+    nucliadb_reader: AsyncClient,
+    full_resource: Resource,
 ) -> None:
-    rsc = test_resource
-    kbid = rsc.kb.kbid
-    rid = rsc.uuid
+    resource = full_resource
+    kbid = resource.kb.kbid
+    rid = resource.uuid
     field_type = "text"
     field_id = "text1"
     download_type = "extracted"
     download_field = "thumbnail"
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",  # noqa
-        )
-        assert resp.status_code == 200
-        filename = (
-            f"{os.path.dirname(tests.ingest.fixtures.__file__)}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
-        )
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",  # noqa
+    )
+    assert resp.status_code == 200
+    filename = (
+        f"{os.path.dirname(tests.ingest.fixtures.__file__)}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
+    )
 
-        open(filename, "rb").read() == resp.content
+    open(filename, "rb").read() == resp.content
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_resource_download_field_file(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
+    nucliadb_reader: AsyncClient,
+    test_resource: Resource,
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
     field_id = "file1"
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
-        )
-        assert resp.json()["data"]["files"]["file1"]["value"]["file"]["filename"] == "text.pb"
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
+    )
+    assert resp.json()["data"]["files"]["file1"]["value"]["file"]["filename"] == "text.pb"
 
-        # Check that invalid range is handled
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
-            headers={"range": "bytes=invalid-range"},
-        )
-        assert resp.status_code == 416
-        assert resp.json()["detail"]["reason"] == "rangeNotParsable"
+    # Check that invalid range is handled
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+        headers={"range": "bytes=invalid-range"},
+    )
+    assert resp.status_code == 416
+    assert resp.json()["detail"]["reason"] == "rangeNotParsable"
 
-        # Check that multipart ranges not implemented is handled
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
-            headers={"range": "bytes=0-50, 100-150"},
-        )
-        assert resp.status_code == 416
-        assert resp.json()["detail"]["reason"] == "rangeNotSupported"
+    # Check that multipart ranges not implemented is handled
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+        headers={"range": "bytes=0-50, 100-150"},
+    )
+    assert resp.status_code == 416
+    assert resp.json()["detail"]["reason"] == "rangeNotSupported"
 
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
-            headers={"range": "bytes=0-"},
-        )
-        assert resp.status_code == 206
-        assert resp.headers["Content-Disposition"]
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+        headers={"range": "bytes=0-"},
+    )
+    assert resp.status_code == 206
+    assert resp.headers["Content-Disposition"]
 
-        filename = f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
+    filename = f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
 
-        open(filename, "rb").read() == resp.content
+    open(filename, "rb").read() == resp.content
 
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
+    )
+    assert resp.status_code == 200
 
-        assert (
-            resp.json()["data"]["texts"]["text1"]["value"]["md5"] == "74a3187271f1d526b1f6271bfb7df52e"
-        )
-        assert (
-            resp.json()["data"]["files"]["file1"]["value"]["file"]["md5"]
-            == "01cca3f53edb934a445a3112c6caa652"
-        )
+    assert resp.json()["data"]["texts"]["text1"]["value"]["md5"] == "74a3187271f1d526b1f6271bfb7df52e"
+    assert (
+        resp.json()["data"]["files"]["file1"]["value"]["file"]["md5"]
+        == "01cca3f53edb934a445a3112c6caa652"
+    )
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_resource_download_field_conversation(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
+    nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
@@ -127,15 +123,14 @@ async def test_resource_download_field_conversation(
 
     msg_id, file_id = await _get_message_with_file(test_resource)
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
-        )
-        assert resp.status_code == 200
-        filename = (
-            f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
-        )
-        assert open(filename, "rb").read() == resp.content
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
+    )
+    assert resp.status_code == 200
+    filename = (
+        f"{os.path.dirname(tests.ingest.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
+    )
+    assert open(filename, "rb").read() == resp.content
 
 
 @pytest.mark.parametrize(
@@ -152,9 +147,9 @@ async def test_resource_download_field_conversation(
         ],
     ],
 )
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_download_fields_by_resource_slug(
-    reader_api, test_resource, endpoint_part, endpoint_params
+    nucliadb_reader: AsyncClient, test_resource, endpoint_part, endpoint_params
 ):
     rsc = test_resource
     kbid = rsc.kb.kbid
@@ -165,21 +160,20 @@ async def test_download_fields_by_resource_slug(
         endpoint_params["message_id"] = msg_id
         endpoint_params["file_num"] = file_num
 
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resource_path = f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{slug}"
-        endpoint = endpoint_part.format(**endpoint_params)
-        resp = await client.get(
-            f"{resource_path}/{endpoint}",
-        )
-        assert resp.status_code == 200
+    resource_path = f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{slug}"
+    endpoint = endpoint_part.format(**endpoint_params)
+    resp = await nucliadb_reader.get(
+        f"{resource_path}/{endpoint}",
+    )
+    assert resp.status_code == 200
 
-        # Check that 404 is returned when a slug does not exist
-        unexisting_resource_path = f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/idonotexist"
-        resp = await client.get(
-            f"{unexisting_resource_path}/{endpoint}",
-        )
-        assert resp.status_code == 404
-        assert resp.json()["detail"] == "Resource does not exist"
+    # Check that 404 is returned when a slug does not exist
+    unexisting_resource_path = f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/idonotexist"
+    resp = await nucliadb_reader.get(
+        f"{unexisting_resource_path}/{endpoint}",
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Resource does not exist"
 
 
 async def _get_message_with_file(test_resource):
@@ -220,24 +214,23 @@ def test_parse_media_range(range_request, filesize, start, end, range_size, exce
             parse_media_range(range_request, filesize)
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_resource_download_field_file_content_disposition(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
+    nucliadb_reader: AsyncClient, test_resource: Resource
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
     field_id = "file1"
     download_url = f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field"
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        # Defaults to attachment
-        resp = await client.get(download_url)
-        assert resp.status_code == 200
-        assert resp.headers["Content-Disposition"].startswith("attachment; filename=")
+    # Defaults to attachment
+    resp = await nucliadb_reader.get(download_url)
+    assert resp.status_code == 200
+    assert resp.headers["Content-Disposition"].startswith("attachment; filename=")
 
-        resp = await client.get(f"{download_url}?inline=true")
-        assert resp.status_code == 200
-        assert resp.headers["Content-Disposition"] == "inline"
+    resp = await nucliadb_reader.get(f"{download_url}?inline=true")
+    assert resp.status_code == 200
+    assert resp.headers["Content-Disposition"] == "inline"
 
 
 @pytest.mark.parametrize("text", ["ÇŞĞIİÖÜ"])
