@@ -576,8 +576,13 @@ async def local_maindb_driver(local_maindb_settings) -> AsyncIterator[Driver]:
 
 
 @pytest.fixture(scope="function")
-def pg_maindb_settings(pg):
+async def pg_maindb_settings(pg):
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+
+    driver = PGDriver(url=url, connection_pool_min_size=2, connection_pool_max_size=2)
+    await driver.initialize()
+    await run_pg_schema_migrations(driver)
+
     return DriverSettings(
         driver=DriverConfig.PG,
         driver_pg_url=url,
