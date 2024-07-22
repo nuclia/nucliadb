@@ -209,12 +209,15 @@ async def run_rollovers(context: ExecutionContext) -> None:
 async def run_pg_schema_migrations(driver: PGDriver):
     migrations = get_pg_migrations()
 
+    # The migration uses two transactions. The former is only used to get a lock (pg_advisory_lock)
+    # without having to worry about correctly unlocking it (postgres unlocks it when the transaction ends)
     async with driver.transaction() as tx_lock, tx_lock.connection.cursor() as cur_lock:
         await cur_lock.execute(
             "CREATE TABLE IF NOT EXISTS migrations (version INT PRIMARY KEY, migrated_at TIMESTAMP NOT NULL DEFAULT NOW())"
         )
         await tx_lock.commit()
         await cur_lock.execute("SELECT pg_advisory_xact_lock(3116614845278015934)")
+
         await cur_lock.execute("SELECT version FROM migrations")
         migrated = [r[0] for r in await cur_lock.fetchall()]
 
@@ -222,6 +225,8 @@ async def run_pg_schema_migrations(driver: PGDriver):
             if version in migrated:
                 continue
 
+            # Gets a new transaction for each migration, so if they get interrupted we at least
+            # save the state of the last finished transaction
             async with driver.transaction() as tx, tx.connection.cursor() as cur:
                 await migration.migrate(tx)
                 await cur.execute("INSERT INTO migrations (version) VALUES (%s)", (version,))
@@ -229,8 +234,10 @@ async def run_pg_schema_migrations(driver: PGDriver):
 
 
 async def run(context: ExecutionContext, target_version: Optional[int] = None) -> None:
-    # Run schema migrations first, since they create the `resources` table
-    await run_pg_schema_migrations(context.kv_driver)
+    # Run schema migrations first, since they create the `resources` table needed for the lock below
+    # Schema migrations use their own locking system
+    if isinstance(context.kv_driver, PGDriver):
+        await run_pg_schema_migrations(context.kv_driver)
 
     async with locking.distributed_lock(locking.MIGRATIONS_LOCK):
         # before we move to managed migrations, see if there are any rollovers
