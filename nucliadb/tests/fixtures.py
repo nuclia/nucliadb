@@ -22,7 +22,7 @@ import logging
 import os
 import tempfile
 from typing import AsyncIterator
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import psycopg
 import pytest
@@ -55,13 +55,16 @@ from nucliadb_telemetry.settings import (
     LogOutputType,
     LogSettings,
 )
+from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.settings import FileBackendConfig
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.tests.azure import AzuriteFixture
 from nucliadb_utils.utilities import (
     Utility,
+    clean_pinecone,
     clean_utility,
     clear_global_cache,
+    get_pinecone,
     get_utility,
     set_utility,
 )
@@ -237,6 +240,56 @@ async def nucliadb_manager(nucliadb: Settings):
 async def knowledgebox(nucliadb_manager: AsyncClient, request):
     resp = await nucliadb_manager.post(
         "/kbs", json={"slug": "knowledgebox", "release_channel": request.param}
+    )
+    assert resp.status_code == 201
+    uuid = resp.json().get("uuid")
+
+    yield uuid
+
+    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    assert resp.status_code == 200
+
+
+@pytest.fixture(scope="function")
+def pinecone_data_plane():
+    dp = Mock()
+    dp.upsert = AsyncMock(return_value=None)
+    dp.query = AsyncMock(
+        return_value=QueryResponse(
+            matches=[],
+        )
+    )
+    return dp
+
+
+@pytest.fixture(scope="function")
+def pinecone_control_plane():
+    cp = Mock()
+    cp.create_index = AsyncMock(return_value="pinecone-host")
+    cp.delete_index = AsyncMock(return_value=None)
+    return cp
+
+
+@pytest.fixture(scope="function")
+def pinecone_mock(pinecone_data_plane, pinecone_control_plane):
+    pinecone_session = get_pinecone()
+    pinecone_session.data_plane = Mock(return_value=pinecone_data_plane)
+    pinecone_session.control_plane = Mock(return_value=pinecone_control_plane)
+    yield
+    clean_pinecone()
+
+
+@pytest.fixture(scope="function")
+async def pinecone_knowledgebox(nucliadb_manager: AsyncClient, pinecone_mock):
+    resp = await nucliadb_manager.post(
+        "/kbs",
+        json={
+            "slug": "pinecone_knowledgebox",
+            "external_index_provider": {
+                "type": "pinecone",
+                "api_key": "my-pinecone-api-key",
+            },
+        },
     )
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")

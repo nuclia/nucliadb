@@ -458,6 +458,7 @@ class Processor:
         index_message.ClearField("sentences_to_delete")
         index_message.ClearField("paragraphs_to_delete")
         index_message.ClearField("paragraphs")
+        index_message.ClearField("relations")
 
     async def multi(self, message: writer_pb2.BrokerMessage, seqid: int) -> None:
         self.messages.setdefault(message.multiid, []).append(message)
