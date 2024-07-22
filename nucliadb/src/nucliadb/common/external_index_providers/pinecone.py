@@ -29,7 +29,7 @@ from nucliadb.common.external_index_providers.base import (
     QueryResults,
     TextBlockMatch,
 )
-from nucliadb.common.ids import ParagraphId, VectorId
+from nucliadb.common.ids import FieldId, ParagraphId, VectorId
 from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
@@ -150,18 +150,22 @@ class PineconeIndexManager(ExternalIndexManager):
         field_prefixes_to_delete = set()
         for sentence_id in index_data.sentences_to_delete:
             try:
-                vid = VectorId.from_string(sentence_id)
-                field_prefixes_to_delete.add(vid.field_id.full())
+                delete_field = FieldId.from_string(sentence_id)
+                field_prefixes_to_delete.add(delete_field.full())
             except ValueError:
                 logger.warning(f"Invalid id to delete: {sentence_id}. VectorId expected.")
                 continue
         for paragraph_id in index_data.paragraphs_to_delete:
             try:
-                pid = ParagraphId.from_string(paragraph_id)
-                field_prefixes_to_delete.add(pid.field_id.full())
+                delete_pid = ParagraphId.from_string(paragraph_id)
+                field_prefixes_to_delete.add(delete_pid.field_id.full())
             except ValueError:
-                logger.warning(f"Invalid id to delete: {paragraph_id}. ParagraphId expected.")
-                continue
+                try:
+                    delete_field = FieldId.from_string(paragraph_id)
+                    field_prefixes_to_delete.add(delete_field.full())
+                except ValueError:
+                    logger.warning(f"Invalid id to delete: {paragraph_id}. ParagraphId expected.")
+                    continue
 
         with manager_observer({"operation": "delete_by_field_prefix"}):
             for prefix in field_prefixes_to_delete:

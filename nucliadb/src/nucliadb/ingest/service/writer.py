@@ -504,9 +504,16 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     )
 
                 if shard is not None:
+                    index_message = brain.brain
+                    await self.proc._maybe_external_index_add_resource(
+                        request.kbid,
+                        nodewriter_pb2.IndexMessageSource.PROCESSOR,
+                        request.rid,
+                        index_message,
+                    )
                     await self.shards_manager.add_resource(
                         shard,
-                        brain.brain,
+                        index_message,
                         0,
                         partition=self.partitions[0],
                         kb=request.kbid,
