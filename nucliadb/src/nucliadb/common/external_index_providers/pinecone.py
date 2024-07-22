@@ -63,6 +63,7 @@ class PineconeQueryResults(QueryResults):
             except ValueError:
                 logger.error(f"Invalid Pinecone vector id: {matching_vector.id}")
                 continue
+            vector_metadata = VectorMetadata.model_validate(matching_vector.metadata)  # noqa
             yield TextBlockMatch(
                 id=matching_vector.id,
                 resource_id=vector_id.field_id.rid,
@@ -74,6 +75,8 @@ class PineconeQueryResults(QueryResults):
                 subfield_id=vector_id.field_id.subfield_id,
                 index=vector_id.index,
                 text=None,  # To be filled by the results hydrator
+                # TODO: add position seconds
+                # TODO: add AI-tables metadata
             )
 
 
