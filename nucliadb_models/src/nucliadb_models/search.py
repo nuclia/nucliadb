@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
-from typing_extensions import Annotated, Self, deprecated
+from typing_extensions import Annotated, Self
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
