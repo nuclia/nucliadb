@@ -92,7 +92,7 @@ class LearningConfiguration(BaseModel):
             "dot": utils_pb2.VectorSimilarity.DOT,
         }
         semantic_model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[
-            self.semantic_vector_similarity
+            self.semantic_vector_similarity.lower()
         ]
 
         if self.semantic_vector_size is not None:
