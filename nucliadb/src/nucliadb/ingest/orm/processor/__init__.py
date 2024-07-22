@@ -51,7 +51,7 @@ from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -414,37 +414,29 @@ class Processor:
                 source=source,
             )
 
-            # Catalog
-            async with txn.connection.cursor() as cur:
-                print(f"Set labels for {resource.uuid} {index_message.labels}")
-                await cur.execute(
-                    """
-                    INSERT INTO catalog
-                    (kbid, rid, status, title, mimetype, created_at, modified_at, labels)
-                    VALUES
-                    (%(kbid)s, %(rid)s, %(status)s, %(title)s, %(mimetype)s, %(created_at)s, %(modified_at)s, %(labels)s)
-                    ON CONFLICT (kbid, rid) DO UPDATE SET
-                    status = excluded.status,
-                    title = excluded.title,
-                    mimetype = excluded.mimetype,
-                    created_at = excluded.created_at,
-                    modified_at = excluded.modified_at,
-                    labels = excluded.labels""",
-                    {
-                        "kbid": resource.kb.kbid,
-                        "rid": resource.uuid,
-                        "status": "Processed"
-                        if resource.basic.metadata.status == 1
-                        else "Pending"
-                        if resource.basic.metadata.status == 0
-                        else "Error",
-                        "title": resource.basic.title,
-                        "mimetype": resource.basic.icon,
-                        "created_at": resource.basic.created.ToDatetime(),
-                        "modified_at": resource.basic.modified.ToDatetime(),
-                        "labels": list(index_message.labels),
-                    },
-                )
+            if True or has_feature(const.Features.PG_CATALOG_WRITE, context={"kbid": kbid}):
+                async with txn.connection.cursor() as cur:
+                    print(f"Set labels for {resource.uuid} {index_message.labels}")
+                    await cur.execute(
+                        """
+                        INSERT INTO catalog
+                        (kbid, rid, title, created_at, modified_at, labels)
+                        VALUES
+                        (%(kbid)s, %(rid)s, %(title)s, %(created_at)s, %(modified_at)s, %(labels)s)
+                        ON CONFLICT (kbid, rid) DO UPDATE SET
+                        title = excluded.title,
+                        created_at = excluded.created_at,
+                        modified_at = excluded.modified_at,
+                        labels = excluded.labels""",
+                        {
+                            "kbid": resource.kb.kbid,
+                            "rid": resource.uuid,
+                            "title": resource.basic.title,
+                            "created_at": resource.basic.created.ToDatetime(),
+                            "modified_at": resource.basic.modified.ToDatetime(),
+                            "labels": list(index_message.labels),
+                        },
+                    )
         else:
             raise AttributeError("Shard is not available")
 
