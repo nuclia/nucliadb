@@ -28,6 +28,7 @@ import psycopg
 import pytest
 from grpc import aio
 from httpx import AsyncClient
+from pytest_docker_fixtures import images
 from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.common.cluster import manager as cluster_manager
@@ -38,6 +39,7 @@ from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
+from nucliadb.migrator.migrator import run_pg_schema_migrations
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
@@ -66,6 +68,11 @@ from nucliadb_utils.utilities import (
 from tests.utils import inject_message
 
 logger = logging.getLogger(__name__)
+
+# Minimum support PostgreSQL version
+# Reason: We want the btree_gin extension to support uuid's
+images.settings["postgresql"]["version"] = "11"
+images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
 
 
 @pytest.fixture(scope="function")
@@ -531,10 +538,13 @@ async def pg_maindb_driver(pg_maindb_settings):
     ingest_settings.driver_pg_url = url
 
     async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
+        await cur.execute("DROP table IF EXISTS migrations")
         await cur.execute("DROP table IF EXISTS resources")
+        await cur.execute("DROP table IF EXISTS catalog")
 
     driver = PGDriver(url=url)
     await driver.initialize()
+    await run_pg_schema_migrations(driver)
 
     yield driver
 

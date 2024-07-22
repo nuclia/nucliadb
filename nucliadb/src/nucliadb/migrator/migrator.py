@@ -24,8 +24,9 @@ from typing import Optional
 from nucliadb.common import locking
 from nucliadb.common.cluster.rollover import rollover_kb_shards
 from nucliadb.common.cluster.settings import in_standalone_mode
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb.migrator.utils import get_migrations
+from nucliadb.migrator.utils import get_migrations, get_pg_migrations
 from nucliadb_telemetry import errors, metrics
 
 migration_observer = metrics.Observer("nucliadb_migrations", labels={"type": "kb", "target_version": ""})
@@ -205,7 +206,32 @@ async def run_rollovers(context: ExecutionContext) -> None:
         raise Exception(f"Failed to migrate KBs. Failures: {failures}")
 
 
+async def run_pg_schema_migrations(driver: PGDriver):
+    migrations = get_pg_migrations()
+
+    async with driver.transaction() as tx_lock, tx_lock.connection.cursor() as cur_lock:
+        await cur_lock.execute(
+            "CREATE TABLE IF NOT EXISTS migrations (version INT PRIMARY KEY, migrated_at TIMESTAMP NOT NULL DEFAULT NOW())"
+        )
+        await tx_lock.commit()
+        await cur_lock.execute("SELECT pg_advisory_xact_lock(3116614845278015934)")
+        await cur_lock.execute("SELECT version FROM migrations")
+        migrated = [r[0] for r in await cur_lock.fetchall()]
+
+        for version, migration in migrations:
+            if version in migrated:
+                continue
+
+            async with driver.transaction() as tx, tx.connection.cursor() as cur:
+                await migration.migrate(tx)
+                await cur.execute("INSERT INTO migrations (version) VALUES (%s)", (version,))
+                await tx.commit()
+
+
 async def run(context: ExecutionContext, target_version: Optional[int] = None) -> None:
+    # Run schema migrations first, since they create the `resources` table
+    await run_pg_schema_migrations(context.kv_driver)
+
     async with locking.distributed_lock(locking.MIGRATIONS_LOCK):
         # before we move to managed migrations, see if there are any rollovers
         # scheduled and run them
