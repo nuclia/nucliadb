@@ -111,6 +111,7 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
 def azure_storage_settings(azurite: AzuriteFixture) -> dict[str, Any]:
     settings = {
         "file_backend": FileBackendConfig.AZURE,
+        "azure_account_url": azurite.account_url,
         "azure_connection_string": azurite.connection_string,
     }
     with ExitStack() as stack:
@@ -123,9 +124,11 @@ def azure_storage_settings(azurite: AzuriteFixture) -> dict[str, Any]:
 
 @pytest.fixture(scope="function")
 async def azure_storage(azurite, azure_storage_settings: dict[str, Any]):
+    assert storage_settings.azure_account_url is not None
+
     storage = AzureStorage(
-        account_url=azurite.account_url,
-        connection_string=azurite.connection_string,
+        account_url=storage_settings.azure_account_url,
+        connection_string=storage_settings.azure_connection_string,
     )
     await storage.initialize()
     yield storage

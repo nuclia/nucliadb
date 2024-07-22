@@ -31,6 +31,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.gcs import GCSStorage
+from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.tests import free_port
 
 # IMPORTANT!
@@ -82,28 +83,37 @@ def gcs_storage_settings(gcs) -> dict[str, Any]:
     settings = {
         "file_backend": FileBackendConfig.GCS,
         "gcs_endpoint_url": gcs,
+        "gcs_base64_creds": None,
         "gcs_bucket": "test_{kbid}",
+        "gcs_location": "location",
+    }
+    extended_settings = {
+        "gcs_deadletter_bucket": "deadletters",
+        "gcs_indexing_bucket": "indexing",
     }
     with ExitStack() as stack:
         for key, value in settings.items():
             context = patch.object(storage_settings, key, value)
             stack.enter_context(context)
+        for key, value in extended_settings.items():
+            context = patch.object(extended_storage_settings, key, value)
+            stack.enter_context(context)
 
-        yield settings
+        yield settings | extended_settings
 
 
 @pytest.fixture(scope="function")
 async def gcs_storage(gcs, gcs_storage_settings: dict[str, Any]):
     storage = GCSStorage(
-        account_credentials=None,
-        bucket="test_{kbid}",
-        location="location",
-        project="project",
+        url=storage_settings.gcs_endpoint_url,
+        account_credentials=storage_settings.gcs_base64_creds,
+        bucket=storage_settings.gcs_bucket,
+        location=storage_settings.gcs_location,
+        project=storage_settings.gcs_project,
         executor=ThreadPoolExecutor(1),
-        deadletter_bucket="deadletters",
-        indexing_bucket="indexing",
-        labels={},
-        url=gcs,
+        deadletter_bucket=extended_storage_settings.gcs_deadletter_bucket,
+        indexing_bucket=extended_storage_settings.gcs_indexing_bucket,
+        labels=storage_settings.gcs_bucket_labels,
     )
     await storage.initialize()
     yield storage

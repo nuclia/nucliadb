@@ -44,7 +44,9 @@ def local_storage_settings(tmp_path: Path) -> dict[str, Any]:
 
 @pytest.fixture(scope="function")
 async def local_storage(local_storage_settings: dict[str, Any]):
-    storage = LocalStorage(local_testing_files=local_storage_settings["local_files"])
+    assert storage_settings.local_files is not None
+
+    storage = LocalStorage(local_testing_files=storage_settings.local_files)
     await storage.initialize()
     yield storage
     await storage.finalize()
