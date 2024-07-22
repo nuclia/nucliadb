@@ -19,6 +19,7 @@
 #
 import asyncio
 import math
+import os
 from datetime import datetime, timedelta
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
@@ -28,6 +29,7 @@ import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
+from tests.utils import broker_resource, inject_message
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.utils import get_driver
@@ -48,7 +50,6 @@ from nucliadb_utils.utilities import (
     get_storage,
     set_utility,
 )
-from tests.utils import broker_resource, inject_message
 
 
 @pytest.mark.asyncio
@@ -340,6 +341,9 @@ async def test_paragraph_search_with_filters(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif(
+    "pg" in os.environ["TESTING_MAINDB_DRIVERS"], reason="PG catalog does not support with_status"
+)
 async def test_catalog_can_filter_by_processing_status(
     nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -664,6 +668,9 @@ async def test_search_relations(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif(
+    "pg" in os.environ["TESTING_MAINDB_DRIVERS"], reason="PG catalog does not support with_status"
+)
 async def test_processing_status_doesnt_change_on_search_after_processed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1549,6 +1556,7 @@ async def test_search_handles_limits_exceeded_error(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif("pg" in os.environ["TESTING_MAINDB_DRIVERS"], reason="PG catalog cannot do shards")
 async def test_catalog_returns_shard_and_node_data(
     nucliadb_reader: AsyncClient,
     knowledgebox,

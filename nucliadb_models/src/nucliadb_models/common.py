@@ -53,7 +53,7 @@ class ParamDefault(BaseModel):
     gt: Optional[float] = None
     max_items: Optional[int] = None
 
-    def to_pydantic_field(self, default=_NOT_SET) -> Field:  # type: ignore
+    def to_pydantic_field(self, default=_NOT_SET, **kw) -> Field:  # type: ignore
         """
         :param default: to be able to override default value - as some params
         are reused but they will have different default values depending on the endpoint.
@@ -65,6 +65,7 @@ class ParamDefault(BaseModel):
             gt=self.gt,
             le=self.le,
             max_length=self.max_items,
+            **kw,
         )
 
 

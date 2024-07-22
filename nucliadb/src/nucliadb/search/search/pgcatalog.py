@@ -157,7 +157,7 @@ async def pgcatalog_search(query_parser: QueryParser):
                 translate_label(f): [] for f in query_parser.faceted
             }
             await cur.execute(
-                f"SELECT unnest(labels) AS label, COUNT(*) FROM ({query}) GROUP BY 1 ORDER BY 1",
+                f"SELECT unnest(labels) AS label, COUNT(*) FROM ({query}) fc GROUP BY 1 ORDER BY 1",
                 query_params,
             )
             for row in await cur.fetchall():
@@ -171,18 +171,19 @@ async def pgcatalog_search(query_parser: QueryParser):
 
         # Totals
         await cur.execute(
-            f"SELECT COUNT(*) FROM ({query})",
+            f"SELECT COUNT(*) FROM ({query}) fc",
             query_params,
         )
         total = (await cur.fetchone())["count"]  # type: ignore
 
         # Query
+        offset = query_parser.page_size * query_parser.page_number
         await cur.execute(
             f"{query} LIMIT %(page_size)s OFFSET %(offset)s",
             {
                 **query_params,
                 "page_size": query_parser.page_size,
-                "offset": query_parser.page_size * query_parser.page_number,
+                "offset": offset,
             },
         )
         data = await cur.fetchall()
@@ -195,5 +196,6 @@ async def pgcatalog_search(query_parser: QueryParser):
             facets=facets,
             total=total,
             page_number=query_parser.page_number,
+            next_page=(offset + len(data) < total),
         )
     )

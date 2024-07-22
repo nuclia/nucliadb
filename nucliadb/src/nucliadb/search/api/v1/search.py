@@ -219,9 +219,11 @@ async def catalog_get(
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
-    shards: list[str] = fastapi_query(SearchParamDefaults.shards),
-    with_status: Optional[ResourceProcessingStatus] = fastapi_query(SearchParamDefaults.with_status),
-    debug: bool = fastapi_query(SearchParamDefaults.debug),
+    shards: list[str] = fastapi_query(SearchParamDefaults.shards, deprecated=True),
+    with_status: Optional[ResourceProcessingStatus] = fastapi_query(
+        SearchParamDefaults.with_status, deprecated="Use filters instead"
+    ),
+    debug: bool = fastapi_query(SearchParamDefaults.debug, include_in_schema=False),
     range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
     range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
     range_modification_start: Optional[datetime] = fastapi_query(

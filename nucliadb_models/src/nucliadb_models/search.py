@@ -24,7 +24,8 @@ from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing_extensions import Annotated, Self
+from pydantic.json_schema import SkipJsonSchema
+from typing_extensions import Annotated, Self, deprecated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
@@ -689,12 +690,13 @@ class CatalogRequest(BaseModel):
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
-    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    debug: bool = SearchParamDefaults.debug.to_pydantic_field()
+    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field(deprecated=True)
+    debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
     with_status: Optional[ResourceProcessingStatus] = Field(
         default=None,
         title="With processing status",
         description="Filter results by resource processing status",
+        deprecated="Use filters instead",
     )
     range_creation_start: Optional[datetime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
