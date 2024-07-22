@@ -336,11 +336,14 @@ def convert_to_pinecone_filter(request: SearchRequest) -> dict[str, Any]:
 def convert_label_filter_expression(
     field: str, expression: dict[str, Any], negative: bool = False
 ) -> dict[str, Any]:
+    """
+    Converts internal label filter expressions to Pinecone's metadata query language.
+    """
     if "literal" in expression:
         if negative:
-            return {field: {"$nin": [expression["literal"]]}}
+            return {field: {FilterOperator.NOT_IN: [expression["literal"]]}}
         else:
-            return {field: {"$in": [expression["literal"]]}}
+            return {field: {FilterOperator.IN: [expression["literal"]]}}
 
     if "and" in expression:
         if negative:
