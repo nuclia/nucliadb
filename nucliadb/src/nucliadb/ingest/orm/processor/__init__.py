@@ -416,6 +416,7 @@ class Processor:
 
             # Catalog
             async with txn.connection.cursor() as cur:
+                print(f"Set labels for {resource.uuid} {index_message.labels}")
                 await cur.execute(
                     """
                     INSERT INTO catalog
@@ -441,10 +442,7 @@ class Processor:
                         "mimetype": resource.basic.icon,
                         "created_at": resource.basic.created.ToDatetime(),
                         "modified_at": resource.basic.modified.ToDatetime(),
-                        "labels": [
-                            f"/l/{ll.labelset}/{ll.label}"
-                            for ll in resource.basic.usermetadata.classifications
-                        ],
+                        "labels": list(index_message.labels),
                     },
                 )
         else:

@@ -35,6 +35,7 @@ from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
+from nucliadb.search.search.pgcatalog import pgcatalog_search
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
     min_score_from_payload,
@@ -58,9 +59,10 @@ from nucliadb_models.search import (
     SortOrder,
 )
 from nucliadb_models.security import RequestSecurity
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import get_audit
+from nucliadb_utils.utilities import get_audit, has_feature
 
 SEARCH_EXAMPLES = {
     "filtering_by_icon": Example(
@@ -306,228 +308,21 @@ async def catalog(
         )
         pb_query, _, _ = await query_parser.parse()
 
-        (results, _, queried_nodes) = await node_query(
-            kbid,
-            Method.SEARCH,
-            pb_query,
-            target_shard_replicas=item.shards,
-            # Catalog should not go to read replicas because we want it to be
-            # consistent and most up to date results
-            use_read_replica_nodes=False,
-        )
-
-        from nucliadb.common.maindb.utils import get_driver
-        from nucliadb_protos.nodereader_pb2 import (
-            SearchResponse,
-            DocumentSearchResponse,
-            DocumentResult,
-            FacetResults,
-            FacetResult,
-        )
-        from psycopg.rows import dict_row
-
-        async with get_driver()._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-            #
-            # Faceted search
-            #
-            facets = {}
-
-            facet_status = False
-            facet_labels = []
-            facet_icon = []
-
-            for f in query_parser.faceted:
-                if f == "/metadata.status":
-                    facet_status = True
-                elif f.startswith("/icon"):
-                    facet_icon.append(f)
-                elif f.startswith("/l"):
-                    facet_labels.append(f)
-
-            if facet_status:
-                await cur.execute(
-                    "SELECT status, COUNT(*) FROM catalog WHERE kbid = %(kbid)s GROUP BY status",
-                    {"kbid": query_parser.kbid},
-                )
-                facets["/n/s"] = FacetResults(
-                    facetresults=[
-                        FacetResult(tag="/n/s/" + row["status"].upper(), total=row["count"])
-                        for row in await cur.fetchall()
-                    ]
-                )
-
-            if facet_icon:
-                await cur.execute(
-                    "SELECT SPLIT_PART(mimetype, '/',1) AS facet, mimetype AS tag, COUNT(*) AS total FROM catalog WHERE kbid = %(kbid)s AND mimetype IS NOT NULL GROUP BY 1, 2 ORDER BY 1, 2",
-                    {"kbid": query_parser.kbid},
-                )
-                from collections import defaultdict
-
-                grouped = defaultdict(list)
-                for row in await cur.fetchall():
-                    grouped["/icon/" + row["facet"]].append(row)
-
-                for key, row in grouped.items():
-                    if key not in facet_icon:
-                        print(f"DIDN'T ASK FOR mime {key}")
-                        continue
-                    facets[key] = FacetResults(
-                        facetresults=[FacetResult(tag="/n/i/" + r["tag"], total=r["total"]) for r in row]
-                    )
-
-            if facet_labels:
-                await cur.execute(
-                    "SELECT SPLIT_PART(UNNEST(labels), '/', 3) AS facet, UNNEST(labels) AS tag, COUNT(*) AS total FROM catalog WHERE kbid = %(kbid)s GROUP BY 1, 2 ORDER BY 1, 2",
-                    {"kbid": query_parser.kbid},
-                )
-                from collections import defaultdict
-
-                grouped = defaultdict(list)
-                for row in await cur.fetchall():
-                    grouped["/l/" + row["facet"]].append(row)
-
-                for key, row in grouped.items():
-                    if key not in facet_labels:
-                        print(f"DIDN'T ASK FOR label {key}")
-                        continue
-                    facets[key] = FacetResults(
-                        facetresults=[FacetResult(tag=r["tag"], total=r["total"]) for r in row]
-                    )
-
-            #
-            # Normal search
-            #
-
-            # Build filters
-            filter_sql = ["kbid = %(kbid)s"]
-            filter_params = {"kbid": query_parser.kbid}
-
-            if query_parser.query:
-                # TODO: Tokenizer?
-                filter_sql.append(
-                    "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
-                )
-                filter_params["query"] = query_parser.query
-
-            if query_parser.range_creation_start:
-                filter_sql.append("created_at > %(created_at_start)s")
-                filter_params["created_at_start"] = query_parser.range_creation_start
-
-            if query_parser.range_creation_end:
-                filter_sql.append("created_at < %(created_at_end)s")
-                filter_params["created_at_end"] = query_parser.range_creation_end
-
-            if query_parser.range_modification_start:
-                filter_sql.append("modified_at > %(modified_at_start)s")
-                filter_params["modified_at_start"] = query_parser.range_modification_start
-
-            if query_parser.range_modification_end:
-                filter_sql.append("modified_at < %(modified_at_end)s")
-                filter_params["modified_at_end"] = query_parser.range_modification_end
-
-            # TODO: Support arbitraty filters or at least what `convert_filter_to_node_schema` can generate
-            filter_labels = []
-            filter_types = []
-            filter_statuses = []
-            for op, operands in query_parser.filters.items():
-                if op == "literal":
-                    op = "and"
-                    operands = [{"literal": operands}]
-                elif op == "or":
-                    op = "and"
-                    operands = [{"or": operands}]
-                if op != "and":
-                    raise "Unsupported filter (no and)"
-                for o in operands:
-                    for k, v in o.items():
-                        if k == "literal":
-                            k = "or"
-                            v = [{"literal": v}]
-                        if k != "or":
-                            raise "Unsupported filter (no or)"
-
-                        for i in v:
-                            for literal, value in i.items():
-                                if literal != "literal":
-                                    raise "Unsupported filter (no literal)"
-                                value = value.replace("/classification.labels", "/l").replace(
-                                    "/metadata.status", "/n/s"
-                                )
-
-                                if value.startswith("/n/i"):
-                                    filter_types.append(value[5:])
-                                elif value.startswith("/n/s"):
-                                    filter_statuses.append(value[5:].capitalize())
-                                elif value.startswith("/l"):
-                                    filter_labels.append(value)
-                                else:
-                                    raise Exception(f"Unsupported filter {value}")
-
-            if filter_labels:
-                filter_sql.append("labels && %(labels)s")
-                filter_params["labels"] = filter_labels
-
-            if filter_types:
-                filter_sql.append("mimetype = ANY(%(mimetypes)s)")
-                filter_params["mimetypes"] = filter_types
-
-            if filter_statuses:
-                filter_sql.append("status = ANY(%(statuses)s)")
-                filter_params["statuses"] = filter_statuses
-
-            print(query_parser.filters)
-            print(filter_sql, filter_params)
-
-            def pg_to_pb(rows, facets, total):
-                return SearchResponse(
-                    document=DocumentSearchResponse(
-                        results=[
-                            DocumentResult(uuid=str(r["rid"]).replace("-", ""), field="/a/title")
-                            for r in rows
-                        ],
-                        facets=facets,
-                        total=total,
-                        page_number=query_parser.page_number,
-                    )
-                )
-
-            if query_parser.sort.field == SortField.CREATED:
-                order_field = "created_at"
-            elif query_parser.sort.field == SortField.MODIFIED:
-                order_field = "modified_at"
-            elif query_parser.sort.field == SortField.TITLE:
-                order_field = "title"
-            else:
-                raise "Unsupported sort"
-
-            if query_parser.sort.order == SortOrder.ASC:
-                order_dir = "ASC"
-            else:
-                order_dir = "DESC"
-
-            await cur.execute(
-                f"SELECT COUNT(*) FROM catalog WHERE {' AND '.join(filter_sql)}",
-                filter_params,
-            )
-            total = (await cur.fetchone())["count"]
-
-            await cur.execute(
-                f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)} ORDER BY {order_field} {order_dir} LIMIT %(page_size)s OFFSET %(offset)s",
-                {
-                    **filter_params,
-                    "page_size": query_parser.page_size,
-                    "offset": query_parser.page_size * query_parser.page_number,
-                },
-            )
-            data = await cur.fetchall()
-            result = pg_to_pb(data, facets, total)
-            # print(result)
+        if True or has_feature(const.Features.PG_CATALOG_READ, context={"kbid": kbid}):
+            result = await pgcatalog_search(query_parser)
             results = [result]
-
-            # Hack page number so merge works
             item.page_number = 0
-
-        # TODO: Merge results manually to avoid page juggling (we offload that to PG)
+            queried_nodes = []
+        else:
+            (results, _, queried_nodes) = await node_query(
+                kbid,
+                Method.SEARCH,
+                pb_query,
+                target_shard_replicas=item.shards,
+                # Catalog should not go to read replicas because we want it to be
+                # consistent and most up to date results
+                use_read_replica_nodes=False,
+            )
 
         # We need to merge
         search_results = await merge_results(
@@ -549,10 +344,10 @@ async def catalog(
         search_results.sentences = None
         search_results.paragraphs = None
         search_results.relations = None
-        # if item.debug:
-        #     search_results.nodes = debug_nodes_info(queried_nodes)
-        # queried_shards = [shard_id for _, shard_id in queried_nodes]
-        # search_results.shards = queried_shards
+        if item.debug:
+            search_results.nodes = debug_nodes_info(queried_nodes)
+        queried_shards = [shard_id for _, shard_id in queried_nodes]
+        search_results.shards = queried_shards
         return search_results
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
