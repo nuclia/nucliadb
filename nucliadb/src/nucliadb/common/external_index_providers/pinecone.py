@@ -17,8 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 import logging
-from typing import Iterator, Optional
+from typing import Any, Iterator, Optional
 
 from pydantic import BaseModel
 
@@ -29,9 +30,10 @@ from nucliadb.common.external_index_providers.base import (
     TextBlockMatch,
 )
 from nucliadb.common.ids import ParagraphId, VectorId
-from nucliadb_protos.nodereader_pb2 import SearchRequest
+from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
+from nucliadb_utils.aiopynecone.client import FilterOperator, LogicalOperator
 from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
 from nucliadb_utils.utilities import get_pinecone
@@ -77,7 +79,7 @@ class PineconeQueryResults(QueryResults):
 
 class VectorMetadata(BaseModel):
     """
-    This class models what is indexed in Pinecone's metadata attribute for each vector.
+    This class models what we index at Pinecone's metadata attribute for each vector.
     https://docs.pinecone.io/guides/data/filter-with-metadata
     """
 
@@ -194,27 +196,17 @@ class PineconeIndexManager(ExternalIndexManager):
             paragraph: IndexParagraph
             for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
                 fid = ParagraphId.from_string(paragraph_id).field_id
-                metadata = metadatas.setdefault(
-                    paragraph_id,
-                    VectorMetadata(
-                        rid=resource_uuid,
-                        field_type=fid.field_type,
-                        field_id=fid.field_id,
-                        field_labels=[],
-                        paragraph_labels=[],
-                        date_created=date_created,
-                        date_modified=date_modified,
-                        security_public=security_public,
-                        security_ids_with_access=security_ids_with_access,
-                    ),
+                metadatas[paragraph_id] = VectorMetadata(
+                    rid=resource_uuid,
+                    field_type=fid.field_type,
+                    field_id=fid.field_id,
+                    field_labels=list(resource_labels.union(field_labels)),
+                    paragraph_labels=list(paragraph.labels),
+                    date_created=date_created,
+                    date_modified=date_modified,
+                    security_public=security_public,
+                    security_ids_with_access=security_ids_with_access,
                 )
-                if metadata.field_labels is None:
-                    metadata.field_labels = []
-                metadata.field_labels.extend(resource_labels)
-                metadata.field_labels.extend(field_labels)
-                if metadata.paragraph_labels is None:
-                    metadata.paragraph_labels = []
-                metadata.paragraph_labels.extend(paragraph.labels)
 
         # Then iterate the sentences now, and compute the list of vectors to upsert, along with their metadata.
         vectors: list[PineconeVector] = []
@@ -281,13 +273,14 @@ class PineconeIndexManager(ExternalIndexManager):
             )
 
     async def _query(self, request: SearchRequest) -> PineconeQueryResults:
+        filter = convert_to_pinecone_filter(request)
         top_k = (request.page_number + 1) * request.result_per_page
         query_results = await self.data_plane.query(
             vector=list(request.vector),
             top_k=top_k,
             include_values=False,
             include_metadata=True,
-            filter=None,  # TODO: add filter support
+            filter=filter,
             timeout=self.query_timeout,
         )
         return PineconeQueryResults(results=query_results)
@@ -303,3 +296,114 @@ def discard_labels(labels: list[str]) -> list[str]:
 
 def unique(labels: list[str]) -> list[str]:
     return list(set(labels))
+
+
+def convert_to_pinecone_filter(request: SearchRequest) -> dict[str, Any]:
+    and_terms = []
+    if request.HasField("filter"):
+        if len(request.filter.paragraph_labels) > 0 and len(request.filter.field_labels) > 0:
+            raise ValueError("Cannot filter by paragraph and field labels at the same request")
+
+        decoded_expression: dict[str, Any] = json.loads(request.filter.expression)
+        if len(request.filter.paragraph_labels) > 0:
+            and_terms.append(convert_label_filter_expression("paragraph_labels", decoded_expression))
+        else:
+            and_terms.append(convert_label_filter_expression("field_labels", decoded_expression))
+    if request.HasField("timestamps"):
+        and_terms.extend(convert_timestamp_filter(request.timestamps))
+
+    if len(request.key_filters) > 0:
+        and_terms.append({"rid": {FilterOperator.IN: list(set(request.key_filters))}})
+
+    if len(request.security.access_groups):
+        security_term = {
+            LogicalOperator.OR: [
+                {"security_public": {"$eq": True}},
+                {
+                    "security_ids_with_access": {
+                        FilterOperator.IN: list(set(request.security.access_groups))
+                    }
+                },
+            ]
+        }
+        and_terms.append(security_term)
+
+    if len(and_terms) == 0:
+        return {}
+    return {LogicalOperator.AND: and_terms}
+
+
+def convert_label_filter_expression(
+    field: str, expression: dict[str, Any], negative: bool = False
+) -> dict[str, Any]:
+    if "literal" in expression:
+        if negative:
+            return {field: {"$nin": [expression["literal"]]}}
+        else:
+            return {field: {"$in": [expression["literal"]]}}
+
+    if "and" in expression:
+        if negative:
+            return {
+                LogicalOperator.OR: [
+                    convert_label_filter_expression(field, sub_expression, negative=True)
+                    for sub_expression in expression["and"]
+                ]
+            }
+        else:
+            return {
+                LogicalOperator.AND: [
+                    convert_label_filter_expression(field, sub_expression)
+                    for sub_expression in expression["and"]
+                ]
+            }
+
+    if "or" in expression:
+        if negative:
+            return {
+                LogicalOperator.AND: [
+                    convert_label_filter_expression(field, sub_expression, negative=True)
+                    for sub_expression in expression["or"]
+                ]
+            }
+        else:
+            return {
+                LogicalOperator.OR: [
+                    convert_label_filter_expression(field, sub_expression)
+                    for sub_expression in expression["or"]
+                ]
+            }
+
+    if "not" in expression:
+        return convert_label_filter_expression(field, expression["not"], negative=True)
+
+    raise ValueError(f"Invalid label filter expression: {expression}")
+
+
+def convert_timestamp_filter(timestamps: Timestamps) -> list[dict[str, Any]]:
+    """
+    Allows to filter by date_created and date_modified fields in Pinecone.
+    Powers date range filtering at NucliaDB.
+    """
+    and_terms = []
+    if timestamps.HasField("from_modified"):
+        and_terms.append(
+            {
+                "date_modified": {
+                    FilterOperator.GREATED_THAN_OR_EQUAL: timestamps.from_modified.ToSeconds()
+                }
+            }
+        )
+    if timestamps.HasField("to_modified"):
+        and_terms.append(
+            {"date_modified": {FilterOperator.LESS_THAN_OR_EQUAL: timestamps.to_modified.ToSeconds()}}
+        )
+    if timestamps.HasField("from_created"):
+        and_terms.append(
+            {"date_created": {FilterOperator.GREATED_THAN_OR_EQUAL: timestamps.from_created.ToSeconds()}}
+        )
+    if timestamps.HasField("to_created"):
+        and_terms.append(
+            {"date_created": {FilterOperator.LESS_THAN_OR_EQUAL: timestamps.to_created.ToSeconds()}}
+        )
+    return and_terms
