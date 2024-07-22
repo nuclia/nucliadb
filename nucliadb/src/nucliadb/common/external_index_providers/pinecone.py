@@ -18,7 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from typing import Iterator
+from typing import Iterator, Optional
+
+from pydantic import BaseModel
 
 from nucliadb.common.external_index_providers.base import (
     ExternalIndexManager,
@@ -26,9 +28,9 @@ from nucliadb.common.external_index_providers.base import (
     QueryResults,
     TextBlockMatch,
 )
-from nucliadb.common.ids import VectorId
+from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb_protos.nodereader_pb2 import SearchRequest
-from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
@@ -73,6 +75,39 @@ class PineconeQueryResults(QueryResults):
             )
 
 
+class VectorMetadata(BaseModel):
+    """
+    This class models what is indexed in Pinecone's metadata attribute for each vector.
+    https://docs.pinecone.io/guides/data/filter-with-metadata
+    """
+
+    # Id filtering
+    rid: str
+    field_type: str
+    field_id: str
+
+    # Date range filtering
+    date_created: Optional[int] = None
+    date_modified: Optional[int] = None
+
+    # Label filtering
+    paragraph_labels: Optional[list[str]] = None
+    field_labels: Optional[list[str]] = None
+
+    # Security
+    security_public: bool = True
+    security_ids_with_access: Optional[list[str]] = None
+
+    # Position
+    position_start_seconds: Optional[list[str]] = None
+    position_end_seconds: Optional[list[str]] = None
+
+    # AI-tables metadata
+    page_with_visual: Optional[bool] = None
+    is_a_table: Optional[bool] = None
+    representation_file: Optional[str] = None
+
+
 class PineconeIndexManager(ExternalIndexManager):
     type = ExternalIndexProviderType.PINECONE
 
@@ -111,12 +146,21 @@ class PineconeIndexManager(ExternalIndexManager):
     async def _index_resource(self, resource_uuid: str, index_data: Resource) -> None:
         # First off, delete any previously existing vectors with the same field prefixes.
         field_prefixes_to_delete = set()
-        for to_delete in list(index_data.sentences_to_delete) + list(index_data.paragraphs_to_delete):
+        for sentence_id in index_data.sentences_to_delete:
             try:
-                resource_uuid, field_type, field_id = to_delete.split("/")[:3]
-                field_prefixes_to_delete.add(f"{resource_uuid}/{field_type}/{field_id}")
+                vid = VectorId.from_string(sentence_id)
+                field_prefixes_to_delete.add(vid.field_id.full())
             except ValueError:
+                logger.warning(f"Invalid id to delete: {sentence_id}. VectorId expected.")
                 continue
+        for paragraph_id in index_data.paragraphs_to_delete:
+            try:
+                pid = ParagraphId.from_string(paragraph_id)
+                field_prefixes_to_delete.add(pid.field_id.full())
+            except ValueError:
+                logger.warning(f"Invalid id to delete: {paragraph_id}. ParagraphId expected.")
+                continue
+
         with manager_observer({"operation": "delete_by_field_prefix"}):
             for prefix in field_prefixes_to_delete:
                 await self.data_plane.delete_by_id_prefix(
@@ -124,52 +168,111 @@ class PineconeIndexManager(ExternalIndexManager):
                     max_parallel_batches=self.delete_parallelism,
                     batch_timeout=self.delete_timeout,
                 )
-        access_groups = None
+
+        security_public = True
+        security_ids_with_access = None
         if index_data.HasField("security"):
-            access_groups = list(set(index_data.security.access_groups))
-        # Iterate over paragraphs and fetch paragraph data
+            security_public = False
+            security_ids_with_access = list(set(index_data.security.access_groups))
+
         resource_labels = set(index_data.labels)
-        paragraphs_data = {}
+        date_created = index_data.metadata.created.ToSeconds()
+        date_modified = index_data.metadata.modified.ToSeconds()
+
+        metadatas: dict[str, VectorMetadata] = {}
+        metadata: Optional[VectorMetadata]
+
+        # First off, iterate the fields and the paragraphs to compute the metadata for
+        # each vector, specifically the labels that will be used for filtering.
         for field_id, text_info in index_data.texts.items():
             field_labels = set(text_info.labels)
             field_paragraphs = index_data.paragraphs.get(field_id)
             if field_paragraphs is None:
+                logger.warning(f"Paragraphs not found for field {field_id}")
                 continue
+
+            paragraph: IndexParagraph
             for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
-                paragraph_labels = set(paragraph.labels).union(field_labels).union(resource_labels)
-                paragraphs_data[paragraph_id] = {
-                    "labels": list(paragraph_labels),
-                }
-        # Iterate sentences now, and compute the list of vectors to upsert
+                fid = ParagraphId.from_string(paragraph_id).field_id
+                metadata = metadatas.setdefault(
+                    paragraph_id,
+                    VectorMetadata(
+                        rid=resource_uuid,
+                        field_type=fid.field_type,
+                        field_id=fid.field_id,
+                        field_labels=[],
+                        paragraph_labels=[],
+                        date_created=date_created,
+                        date_modified=date_modified,
+                        security_public=security_public,
+                        security_ids_with_access=security_ids_with_access,
+                    ),
+                )
+                if metadata.field_labels is None:
+                    metadata.field_labels = []
+                metadata.field_labels.extend(resource_labels)
+                metadata.field_labels.extend(field_labels)
+                if metadata.paragraph_labels is None:
+                    metadata.paragraph_labels = []
+                metadata.paragraph_labels.extend(paragraph.labels)
+
+        # Then iterate the sentences now, and compute the list of vectors to upsert, along with their metadata.
         vectors: list[PineconeVector] = []
         for _, index_paragraphs in index_data.paragraphs.items():
             for index_paragraph_id, index_paragraph in index_paragraphs.paragraphs.items():
-                paragraph_data = paragraphs_data.get(index_paragraph_id) or {}
+                metadata = metadatas.get(index_paragraph_id)
+                if metadata is None:
+                    logger.warning(f"Metadata not found for paragraph {index_paragraph_id}")
+                    continue
+
+                vector_sentence: VectorSentence
                 for sentence_id, vector_sentence in index_paragraph.sentences.items():
-                    sentence_labels = (
-                        set(index_paragraph.labels)
-                        .union(paragraph_data.get("labels") or set())
-                        .union(resource_labels)
-                    )
-                    # Filter out discarded labels
-                    sentence_labels = {
-                        label
-                        for label in sentence_labels
-                        if not any(label.startswith(prefix) for prefix in DISCARDED_LABEL_PREFIXES)
-                    }
-                    vector_metadata = {
-                        "labels": list(sentence_labels),
-                    }
-                    if access_groups is not None:
-                        vector_metadata["access_groups"] = access_groups
+                    metadata = metadatas.get(index_paragraph_id)
+                    if metadata is None:
+                        logger.warning(
+                            f"Metadata not found for sentences of paragraph {index_paragraph_id}"
+                        )
+                        continue
+
+                    # Empty lists are not supported in Pinecone metadata
+                    if metadata.paragraph_labels is not None:
+                        if len(metadata.paragraph_labels) == 0:
+                            metadata.paragraph_labels = None
+                        else:
+                            metadata.paragraph_labels = unique(discard_labels(metadata.paragraph_labels))
+                    if metadata.field_labels is not None:
+                        if len(metadata.field_labels) == 0:
+                            metadata.field_labels = None
+                        else:
+                            metadata.field_labels = unique(discard_labels(metadata.field_labels))
+
+                    # AI-tables metadata
+                    if vector_sentence.metadata.page_with_visual:
+                        metadata.page_with_visual = True
+                    if vector_sentence.metadata.representation.is_a_table:
+                        metadata.is_a_table = True
+                    if vector_sentence.metadata.representation.file:
+                        metadata.representation_file = vector_sentence.metadata.representation.file
+
+                    # Video positions
+                    if len(vector_sentence.metadata.position.start_seconds):
+                        metadata.position_start_seconds = list(
+                            map(str, vector_sentence.metadata.position.start_seconds)
+                        )
+                    if len(vector_sentence.metadata.position.end_seconds):
+                        metadata.position_end_seconds = list(
+                            map(str, vector_sentence.metadata.position.end_seconds)
+                        )
+
                     pc_vector = PineconeVector(
                         id=sentence_id,
                         values=list(vector_sentence.vector),
-                        metadata=vector_metadata,
+                        metadata=metadata.model_dump(exclude_none=True),
                     )
                     vectors.append(pc_vector)
         if len(vectors) == 0:  # pragma: no cover
             return
+
         with manager_observer({"operation": "upsert_in_batches"}):
             await self.data_plane.upsert_in_batches(
                 vectors=vectors,
@@ -188,3 +291,15 @@ class PineconeIndexManager(ExternalIndexManager):
             timeout=self.query_timeout,
         )
         return PineconeQueryResults(results=query_results)
+
+
+def discard_labels(labels: list[str]) -> list[str]:
+    return [
+        label
+        for label in labels
+        if not any(label.startswith(prefix) for prefix in DISCARDED_LABEL_PREFIXES)
+    ]
+
+
+def unique(labels: list[str]) -> list[str]:
+    return list(set(labels))

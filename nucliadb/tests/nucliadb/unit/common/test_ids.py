@@ -42,6 +42,7 @@ def test_field_ids():
     assert field_id.field_id == "u/field_id"
     assert field_id.subfield_id == "subfield_id"
     assert field_id.full() == "rid/u/field_id/subfield_id"
+    assert field_id.field_type == "u"
 
 
 def test_paragraph_ids():

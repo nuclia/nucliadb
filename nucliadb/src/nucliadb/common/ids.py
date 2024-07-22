@@ -42,6 +42,10 @@ class FieldId:
         else:
             return f"{self.rid}/{self.field_id}/{self.subfield_id}"
 
+    @property
+    def field_type(self) -> str:
+        return self.field_id.split("/")[0]
+
     @classmethod
     def from_string(cls, value: str) -> "FieldId":
         """
@@ -58,7 +62,11 @@ class FieldId:
             return cls(rid=rid, field_id=f"{field_type}/{field_id}")
         elif len(parts) == 4:
             rid, field_type, field_id, subfield_id = parts
-            return cls(rid=rid, field_id=f"{field_type}/{field_id}", subfield_id=subfield_id)
+            return cls(
+                rid=rid,
+                field_id=f"{field_type}/{field_id}",
+                subfield_id=subfield_id,
+            )
         else:
             raise ValueError(f"Invalid FieldId: {value}")
 
