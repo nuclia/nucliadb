@@ -54,9 +54,7 @@ from nucliadb_telemetry.settings import (
     LogSettings,
 )
 from nucliadb_utils.aiopynecone.models import QueryResponse
-from nucliadb_utils.settings import FileBackendConfig
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.tests.azure import AzuriteFixture
 from nucliadb_utils.utilities import (
     Utility,
     clean_pinecone,
@@ -631,43 +629,6 @@ def maindb_settings(request):
     Any test using the nucliadb fixture will be run twice, once with redis driver and once with local driver.
     """
     yield request.param
-
-
-@pytest.fixture(scope="function")
-def gcs_storage_settings(gcs):
-    return {
-        "file_backend": FileBackendConfig.GCS,
-        "gcs_endpoint_url": gcs,
-        "gcs_bucket": "test_{kbid}",
-    }
-
-
-@pytest.fixture(scope="function")
-def s3_storage_settings(s3):
-    return {
-        "file_backend": FileBackendConfig.S3,
-        "s3_endpoint": s3,
-        "s3_client_id": "",
-        "s3_client_secret": "",
-        "s3_bucket": "test-{kbid}",
-    }
-
-
-@pytest.fixture(scope="function")
-def local_storage_settings(tmpdir):
-    return {
-        "file_backend": FileBackendConfig.LOCAL,
-        "local_files": f"{tmpdir}/blob",
-    }
-
-
-@pytest.fixture(scope="function")
-def azure_storage_settings(azurite: AzuriteFixture):
-    return {
-        "file_backend": FileBackendConfig.AZURE,
-        "azure_account_url": azurite.account_url,
-        "azure_connection_string": azurite.connection_string,
-    }
 
 
 @pytest.fixture(scope="function")
