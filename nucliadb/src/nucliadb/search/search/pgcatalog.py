@@ -18,8 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Any, Optional
+
 from psycopg.rows import dict_row
 
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb_models.search import SortField, SortOrder
 from nucliadb_protos.nodereader_pb2 import (
@@ -34,7 +37,7 @@ from .filters import translate_label
 from .query import QueryParser
 
 
-def filter_operands(operands):
+def _filter_operands(operands):
     literals = []
     nonliterals = []
     for operand in operands:
@@ -47,7 +50,7 @@ def filter_operands(operands):
     return literals, nonliterals
 
 
-def convert_filter(filter, filter_params):
+def _convert_filter(filter, filter_params):
     op, operands = next(iter(filter.items()))
     if op == "literal":
         param_name = f"param{len(filter_params)}"
@@ -56,23 +59,23 @@ def convert_filter(filter, filter_params):
     elif op in ("and", "or"):
         array_op = "@>" if op == "and" else "&&"
         sql = []
-        literals, nonliterals = filter_operands(operands)
+        literals, nonliterals = _filter_operands(operands)
         if literals:
             param_name = f"param{len(filter_params)}"
             filter_params[param_name] = literals
             sql.append(f"labels {array_op} %({param_name})s")
         for nonlit in nonliterals:
-            sql.append(convert_filter(nonlit, filter_params))
+            sql.append(_convert_filter(nonlit, filter_params))
         return f" {op.upper()} ".join([f"({s})" for s in sql])
     elif op == "not":
-        return f"NOT ({convert_filter(operands[0], filter_params)})"
+        return f"NOT ({_convert_filter(operands[0], filter_params)})"
     else:
         raise ValueError(f"Invalid operator {op}")
 
 
-def prepare_query(query_parser: QueryParser):
+def _prepare_query(query_parser: QueryParser):
     filter_sql = ["kbid = %(kbid)s"]
-    filter_params = {"kbid": query_parser.kbid}
+    filter_params: dict[str, Any] = {"kbid": query_parser.kbid}
 
     if query_parser.query:
         # This is doing tokenization inside the SQL server (to keep the index updated). We could move it to
@@ -100,21 +103,22 @@ def prepare_query(query_parser: QueryParser):
         filter_params["modified_at_end"] = query_parser.range_modification_end
 
     if query_parser.filters:
-        filter_sql.append(convert_filter(query_parser.filters, filter_params))
+        filter_sql.append(_convert_filter(query_parser.filters, filter_params))
 
-    if query_parser.sort.field == SortField.CREATED:
-        order_field = "created_at"
-    elif query_parser.sort.field == SortField.MODIFIED:
-        order_field = "modified_at"
-    elif query_parser.sort.field == SortField.TITLE:
-        order_field = "title"
-    else:
-        raise "Unsupported sort"
+    if query_parser.sort:
+        if query_parser.sort.field == SortField.CREATED:
+            order_field = "created_at"
+        elif query_parser.sort.field == SortField.MODIFIED:
+            order_field = "modified_at"
+        elif query_parser.sort.field == SortField.TITLE:
+            order_field = "title"
+        else:
+            raise ValueError("Unsupported sort")
 
-    if query_parser.sort.order == SortOrder.ASC:
-        order_dir = "ASC"
-    else:
-        order_dir = "DESC"
+        if query_parser.sort.order == SortOrder.ASC:
+            order_dir = "ASC"
+        else:
+            order_dir = "DESC"
 
     return (
         f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)} ORDER BY {order_field} {order_dir}",
@@ -122,16 +126,36 @@ def prepare_query(query_parser: QueryParser):
     )
 
 
-async def pgcatalog_search(query_parser: QueryParser):
-    # Prepare SQL query
-    query, query_params = prepare_query(query_parser)
+def _pg_driver() -> Optional[PGDriver]:
+    driver = get_driver()
+    if isinstance(driver, PGDriver):
+        return driver
+    else:
+        return None
 
-    async with get_driver()._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-        facets = {}
+
+def pgcatalog_enabled(kbid):
+    return _pg_driver() is not None  # and has_feature(
+    #     const.Features.PG_CATALOG_READ, context={"kbid": kbid}
+    # )
+
+
+async def pgcatalog_search(query_parser: QueryParser):
+    driver = _pg_driver()
+    if not driver:
+        raise Exception("Cannot use PG catalog with non-PG driver")
+
+    # Prepare SQL query
+    query, query_params = _prepare_query(query_parser)
+
+    async with driver._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        facets: dict[str, FacetResults] = {}
 
         # Faceted search
         if query_parser.faceted:
-            facets = {translate_label(f): [] for f in query_parser.faceted}
+            tmp_facets: dict[str, list[FacetResult]] = {
+                translate_label(f): [] for f in query_parser.faceted
+            }
             await cur.execute(
                 f"SELECT unnest(labels) AS label, COUNT(*) FROM ({query}) GROUP BY 1 ORDER BY 1",
                 query_params,
@@ -140,17 +164,17 @@ async def pgcatalog_search(query_parser: QueryParser):
                 label = row["label"]
                 parent = "/".join(label.split("/")[:-1])
                 count = row["count"]
-                if parent in facets:
-                    facets[parent].append(FacetResult(tag=label, total=count))
+                if parent in tmp_facets:
+                    tmp_facets[parent].append(FacetResult(tag=label, total=count))
 
-            facets = {k: FacetResults(facetresults=v) for k, v in facets.items()}
+            facets = {k: FacetResults(facetresults=v) for k, v in tmp_facets.items()}
 
         # Totals
         await cur.execute(
             f"SELECT COUNT(*) FROM ({query})",
             query_params,
         )
-        total = (await cur.fetchone())["count"]
+        total = (await cur.fetchone())["count"]  # type: ignore
 
         # Query
         await cur.execute(

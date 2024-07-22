@@ -51,7 +51,9 @@ from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage, has_feature
+from nucliadb_utils.utilities import get_storage
+
+from .pgcatalog import pgcatalog_delete, pgcatalog_update
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +187,7 @@ class Processor:
                     if shard is None:
                         raise AttributeError("Shard not available")
                     await self._maybe_external_index_delete_resource(message.kbid, uuid)
+                    await pgcatalog_delete(txn, message.kbid, uuid)
                     await self.index_node_shard_manager.delete_resource(
                         shard, message.uuid, seqid, partition, message.kbid
                     )
@@ -414,29 +417,7 @@ class Processor:
                 source=source,
             )
 
-            if True or has_feature(const.Features.PG_CATALOG_WRITE, context={"kbid": kbid}):
-                async with txn.connection.cursor() as cur:
-                    print(f"Set labels for {resource.uuid} {index_message.labels}")
-                    await cur.execute(
-                        """
-                        INSERT INTO catalog
-                        (kbid, rid, title, created_at, modified_at, labels)
-                        VALUES
-                        (%(kbid)s, %(rid)s, %(title)s, %(created_at)s, %(modified_at)s, %(labels)s)
-                        ON CONFLICT (kbid, rid) DO UPDATE SET
-                        title = excluded.title,
-                        created_at = excluded.created_at,
-                        modified_at = excluded.modified_at,
-                        labels = excluded.labels""",
-                        {
-                            "kbid": resource.kb.kbid,
-                            "rid": resource.uuid,
-                            "title": resource.basic.title,
-                            "created_at": resource.basic.created.ToDatetime(),
-                            "modified_at": resource.basic.modified.ToDatetime(),
-                            "labels": list(index_message.labels),
-                        },
-                    )
+            await pgcatalog_update(txn, kbid, resource)
         else:
             raise AttributeError("Shard is not available")
 

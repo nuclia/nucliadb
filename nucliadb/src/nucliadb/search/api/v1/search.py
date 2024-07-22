@@ -35,7 +35,7 @@ from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.pgcatalog import pgcatalog_search
+from nucliadb.search.search.pgcatalog import pgcatalog_enabled, pgcatalog_search
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
     min_score_from_payload,
@@ -59,10 +59,9 @@ from nucliadb_models.search import (
     SortOrder,
 )
 from nucliadb_models.security import RequestSecurity
-from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import get_audit, has_feature
+from nucliadb_utils.utilities import get_audit
 
 SEARCH_EXAMPLES = {
     "filtering_by_icon": Example(
@@ -308,12 +307,7 @@ async def catalog(
         )
         pb_query, _, _ = await query_parser.parse()
 
-        if True or has_feature(const.Features.PG_CATALOG_READ, context={"kbid": kbid}):
-            result = await pgcatalog_search(query_parser)
-            results = [result]
-            item.page_number = 0
-            queried_nodes = []
-        else:
+        if not pgcatalog_enabled(kbid):
             (results, _, queried_nodes) = await node_query(
                 kbid,
                 Method.SEARCH,
@@ -323,6 +317,11 @@ async def catalog(
                 # consistent and most up to date results
                 use_read_replica_nodes=False,
             )
+        else:
+            result = await pgcatalog_search(query_parser)
+            results = [result]
+            item.page_number = 0
+            queried_nodes = []
 
         # We need to merge
         search_results = await merge_results(
