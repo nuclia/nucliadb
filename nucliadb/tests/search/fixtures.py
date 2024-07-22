@@ -158,7 +158,9 @@ async def test_search_resource(
     """
     Create a resource that has every possible bit of information
     """
-    message1 = broker_resource(knowledgebox_ingest, rid="foobar", slug="foobar-slug")
+    message1 = broker_resource(
+        knowledgebox_ingest, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug"
+    )
     kbid = await inject_message(processor, knowledgebox_ingest, message1)
     resource_field_count = 3
     await wait_for_shard(knowledgebox_ingest, resource_field_count)
