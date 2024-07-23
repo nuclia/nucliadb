@@ -34,6 +34,7 @@ from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import FilterOperator, LogicalOperator
+from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError
 from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
 from nucliadb_utils.utilities import get_pinecone
@@ -277,7 +278,7 @@ class PineconeIndexManager(ExternalIndexManager):
                             values=list(vector_sentence.vector),
                             metadata=metadata.model_dump(exclude_none=True),
                         )
-                    except ValueError as exc:
+                    except MetadataTooLargeError as exc:
                         logger.error(f"Invalid Pinecone vector. Skipping: {exc}")
                         continue
                     vectors.append(pc_vector)

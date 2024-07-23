@@ -24,6 +24,8 @@ import pydantic
 from pydantic import BaseModel, Field, field_validator
 from typing_extensions import Annotated
 
+from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError
+
 KILO_BYTE = 1024
 MAX_METADATA_SIZE = 40 * KILO_BYTE
 MAX_INDEX_NAME_LENGTH = 45
@@ -71,7 +73,7 @@ class Vector(BaseModel):
     def validate_metadata_size(cls, value):
         json_value = json.dumps(value)
         if len(json_value) > MAX_METADATA_SIZE:
-            raise ValueError(f"metadata size is too large: {len(json_value)} bytes")
+            raise MetadataTooLargeError(f"metadata size is too large: {len(json_value)} bytes")
         return value
 
 
