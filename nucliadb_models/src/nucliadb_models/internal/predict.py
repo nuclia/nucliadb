@@ -26,16 +26,27 @@ ATENTION! Keep these models in sync with models on Predict API
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SentenceSearch(BaseModel):
     data: List[float] = Field(deprecated=True, default_factory=list)
-    vectors: dict[str, List[float]] = Field(description="Sentence vectors for each semantic model")
+    vectors: dict[str, List[float]] = Field(
+        default_factory=dict, description="Sentence vectors for each semantic model"
+    )
     time: float = Field(deprecated=True)
     timings: dict[str, float] = Field(
-        description="Time taken to compute the sentence vector for each semantic model"
+        default_factory=dict,
+        description="Time taken to compute the sentence vector for each semantic model",
     )
+
+    @model_validator(mode="after")
+    def keep_backwards_compatibility(self):
+        if len(self.vectors) == 0:
+            self.vectors["__default__"] = self.data
+        if len(self.timings) == 0:
+            self.timings["__default__"] = self.time
+        return self
 
 
 class Ner(BaseModel):
@@ -52,14 +63,20 @@ class TokenSearch(BaseModel):
 
 
 class QueryInfo(BaseModel):
-    language: str
-    stop_words: List[str]
+    language: Optional[str]
+    stop_words: List[str] = Field(default_factory=list)
     semantic_threshold: float = Field(deprecated=True)
     semantic_thresholds: dict[str, float] = Field(
-        description="Semantic threshold for each semantic model"
+        default_factory=dict, description="Semantic threshold for each semantic model"
     )
     visual_llm: bool
     max_context: int
     entities: Optional[TokenSearch]
     sentence: Optional[SentenceSearch]
     query: str
+
+    @model_validator(mode="after")
+    def keep_backwards_compatibiliy(self):
+        if len(self.semantic_thresholds) == 0:
+            self.semantic_thresholds["__default__"] = self.semantic_threshold
+        return self
