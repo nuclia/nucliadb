@@ -534,7 +534,7 @@ class FilterOperator:
     EQUALS = "$eq"
     NOT_EQUALS = "$ne"
     GREATER_THAN = "$gt"
-    GREATED_THAN_OR_EQUAL = "$gte"
+    GREATER_THAN_OR_EQUAL = "$gte"
     LESS_THAN = "$lt"
     LESS_THAN_OR_EQUAL = "$lte"
     IN = "$in"
