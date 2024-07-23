@@ -65,6 +65,7 @@ class PineconeQueryResults(QueryResults):
                 continue
             vector_metadata = VectorMetadata.model_validate(matching_vector.metadata)  # noqa
             yield TextBlockMatch(
+                text=None,  # To be filled by the results hydrator
                 id=matching_vector.id,
                 resource_id=vector_id.field_id.rid,
                 field_id=vector_id.field_id.full(),
@@ -74,9 +75,14 @@ class PineconeQueryResults(QueryResults):
                 position_end=vector_id.vector_end,
                 subfield_id=vector_id.field_id.subfield_id,
                 index=vector_id.index,
-                text=None,  # To be filled by the results hydrator
-                # TODO: add position seconds
-                # TODO: add AI-tables metadata
+                position_start_seconds=list(map(int, vector_metadata.position_start_seconds or [])),
+                position_end_seconds=list(map(int, vector_metadata.position_end_seconds or [])),
+                is_a_table=vector_metadata.is_a_table or False,
+                page_with_visual=vector_metadata.page_with_visual or False,
+                representation_file=vector_metadata.representation_file,
+                paragraph_labels=vector_metadata.paragraph_labels or [],
+                field_labels=vector_metadata.field_labels or [],
+                page_number=vector_metadata.page_number,
             )
 
 
@@ -106,6 +112,7 @@ class VectorMetadata(BaseModel):
     # Position
     position_start_seconds: Optional[list[str]] = None
     position_end_seconds: Optional[list[str]] = None
+    page_number: Optional[int] = None
 
     # AI-tables metadata
     page_with_visual: Optional[bool] = None
@@ -262,12 +269,17 @@ class PineconeIndexManager(ExternalIndexManager):
                         metadata.position_end_seconds = list(
                             map(str, vector_sentence.metadata.position.end_seconds)
                         )
-
-                    pc_vector = PineconeVector(
-                        id=sentence_id,
-                        values=list(vector_sentence.vector),
-                        metadata=metadata.model_dump(exclude_none=True),
-                    )
+                    if vector_sentence.metadata.position.HasField("page_number"):
+                        metadata.page_number = vector_sentence.metadata.position.page_number
+                    try:
+                        pc_vector = PineconeVector(
+                            id=sentence_id,
+                            values=list(vector_sentence.vector),
+                            metadata=metadata.model_dump(exclude_none=True),
+                        )
+                    except ValueError as exc:
+                        logger.error(f"Invalid Pinecone vector. Skipping: {exc}")
+                        continue
                     vectors.append(pc_vector)
         if len(vectors) == 0:  # pragma: no cover
             return

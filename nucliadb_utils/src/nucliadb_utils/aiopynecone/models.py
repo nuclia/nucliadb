@@ -71,7 +71,7 @@ class Vector(BaseModel):
     def validate_metadata_size(cls, value):
         json_value = json.dumps(value)
         if len(json_value) > MAX_METADATA_SIZE:
-            raise ValueError("metadata size is too large")
+            raise ValueError(f"metadata size is too large: {len(json_value)} bytes")
         return value
 
 
