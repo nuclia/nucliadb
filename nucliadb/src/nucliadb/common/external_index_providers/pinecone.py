@@ -270,8 +270,7 @@ class PineconeIndexManager(ExternalIndexManager):
                         metadata.position_end_seconds = list(
                             map(str, vector_sentence.metadata.position.end_seconds)
                         )
-                    if vector_sentence.metadata.position.HasField("page_number"):
-                        metadata.page_number = vector_sentence.metadata.position.page_number
+                    metadata.page_number = vector_sentence.metadata.position.page_number
                     try:
                         pc_vector = PineconeVector(
                             id=sentence_id,

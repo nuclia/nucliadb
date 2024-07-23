@@ -27,6 +27,7 @@ import pytest
 from nucliadb.common.external_index_providers.pinecone import (
     PineconeIndexManager,
     PineconeQueryResults,
+    VectorMetadata,
     convert_label_filter_expression,
     convert_timestamp_filter,
     convert_to_pinecone_filter,
@@ -45,7 +46,13 @@ def query_response():
                 id="rid/f/field/0/0-10",
                 score=0.8,
                 values=None,
-                metadata={"labels": ["/t/text/label"], "access_groups": ["ag1", "ag2"]},
+                metadata={
+                    "rid": "rid",
+                    "field_id": "f/field",
+                    "field_type": "f",
+                    "resource_labels": ["/t/text/label"],
+                    "access_groups": ["ag1", "ag2"],
+                },
             )
         ]
     )
@@ -100,6 +107,7 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     index_data.paragraphs["f/field"].CopyFrom(index_paragraphs)
 
     await external_index_manager._index_resource("resource_uuid", index_data)
+
     data_plane.upsert_in_batches.assert_awaited_once()
     vectors = data_plane.upsert_in_batches.call_args[1]["vectors"]
     assert len(vectors) == 1
@@ -108,16 +116,13 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     assert vector.id == "rid/f/field/0/0-10"
     assert vector.values == [1, 2, 3]
     metadata = vector.metadata
-    assert "labels" in metadata
-    labels = vector.metadata["labels"]
-    # Check that ignored labels are not present
-    assert "/e/PERSON/John Doe" not in labels
-    assert "/e/ORG/ACME" not in labels
-    assert "/n/s/PROCESSED" not in labels
-    assert sorted(labels) == ["/t/private", "/t/text/label"]
-    assert "access_groups" in metadata
-    access_groups = vector.metadata["access_groups"]
-    assert sorted(access_groups) == ["ag1", "ag2"]
+    vmetadata = VectorMetadata.model_validate(metadata)
+    assert set(vmetadata.field_labels) == {  # type: ignore
+        "/t/private",
+        "/t/text/label",
+    }
+    assert not vmetadata.security_public
+    assert set(vmetadata.security_ids_with_access) == {"ag1", "ag2"}  # type: ignore
 
 
 async def test_query(external_index_manager: PineconeIndexManager, data_plane):
@@ -228,12 +233,9 @@ def test_convert_to_pinecone_filter():
     key_filter_term = and_terms[2]
     assert key_filter_term == {"rid": {"$in": ["rid"]}}
     access_groups_term = and_terms[3]
-    assert access_groups_term == {
-        "$or": [
-            {"security_public": {"$eq": True}},
-            {"security_ids_with_access": {"$in": ["ag1", "ag2"]}},
-        ]
-    }
+    assert access_groups_term["$or"][0] == {"security_public": {"$eq": True}}
+    access_groups = access_groups_term["$or"][1]["security_ids_with_access"]["$in"]
+    assert set(access_groups) == {"ag1", "ag2"}
 
 
 def test_convert_to_pinecone_filter_empty():
