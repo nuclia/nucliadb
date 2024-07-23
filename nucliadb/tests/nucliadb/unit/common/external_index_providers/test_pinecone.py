@@ -234,3 +234,9 @@ def test_convert_to_pinecone_filter():
             {"security_ids_with_access": {"$in": ["ag1", "ag2"]}},
         ]
     }
+
+
+def test_convert_to_pinecone_filter_empty():
+    request = nodereader_pb2.SearchRequest()
+    filters = convert_to_pinecone_filter(request)
+    assert filters is None

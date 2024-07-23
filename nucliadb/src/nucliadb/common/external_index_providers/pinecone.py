@@ -318,7 +318,7 @@ def unique(labels: list[str]) -> list[str]:
     return list(set(labels))
 
 
-def convert_to_pinecone_filter(request: SearchRequest) -> dict[str, Any]:
+def convert_to_pinecone_filter(request: SearchRequest) -> Optional[dict[str, Any]]:
     and_terms = []
     if request.HasField("filter"):
         if len(request.filter.paragraph_labels) > 0 and len(request.filter.field_labels) > 0:
@@ -349,7 +349,7 @@ def convert_to_pinecone_filter(request: SearchRequest) -> dict[str, Any]:
         and_terms.append(security_term)
 
     if len(and_terms) == 0:
-        return {}
+        return None
     return {LogicalOperator.AND: and_terms}
 
 
@@ -413,7 +413,7 @@ def convert_timestamp_filter(timestamps: Timestamps) -> list[dict[str, Any]]:
         and_terms.append(
             {
                 "date_modified": {
-                    FilterOperator.GREATED_THAN_OR_EQUAL: timestamps.from_modified.ToSeconds()
+                    FilterOperator.GREATER_THAN_OR_EQUAL: timestamps.from_modified.ToSeconds()
                 }
             }
         )
@@ -423,7 +423,7 @@ def convert_timestamp_filter(timestamps: Timestamps) -> list[dict[str, Any]]:
         )
     if timestamps.HasField("from_created"):
         and_terms.append(
-            {"date_created": {FilterOperator.GREATED_THAN_OR_EQUAL: timestamps.from_created.ToSeconds()}}
+            {"date_created": {FilterOperator.GREATER_THAN_OR_EQUAL: timestamps.from_created.ToSeconds()}}
         )
     if timestamps.HasField("to_created"):
         and_terms.append(
