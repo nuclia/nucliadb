@@ -1,4 +1,4 @@
-pydantic>=2.7
+pydantic>=2.6
 pydantic-settings>=2.2
 aiohttp>=3.9.4
 prometheus-client>=0.12.0

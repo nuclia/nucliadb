@@ -28,7 +28,7 @@ grpcio-testing>=1.44.0,<1.63.0
 grpcio-reflection>=1.44.0,<1.63.0
 orjson>=3.6.7
 types-setuptools
-pydantic>=2.7
+pydantic>=2.6
 pydantic-settings>=2.2
 aiobotocore>=2.9.0
 botocore>=1.34.0
