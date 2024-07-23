@@ -23,8 +23,9 @@ from nucliadb.common.maindb.pg import PGTransaction
 
 async def migrate(txn: PGTransaction) -> None:
     async with txn.connection.cursor() as cur:
+        # IF NOT EXISTS just for compatibility with older install predating the migration system
         await cur.execute("""
-            CREATE TABLE resources (
+            CREATE TABLE IF NOT EXISTS resources (
                 key TEXT PRIMARY KEY,
                 value BYTEA
             );
