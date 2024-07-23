@@ -217,6 +217,7 @@ async def usage(natsd):
     set_utility(Utility.USAGE, report_util)
     yield report_util
     await report_util.finalize()
+    clean_utility(Utility.USAGE)
 
 
 @pytest.fixture(scope="function")
