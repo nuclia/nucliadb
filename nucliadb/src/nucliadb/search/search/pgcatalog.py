@@ -24,6 +24,7 @@ from psycopg.rows import dict_row
 
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import SortField, SortOrder
 from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
@@ -32,6 +33,8 @@ from nucliadb_protos.nodereader_pb2 import (
     FacetResults,
     SearchResponse,
 )
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from .filters import translate_label
 from .query import QueryParser
@@ -120,6 +123,13 @@ def _prepare_query(query_parser: QueryParser):
         else:
             order_dir = "DESC"
 
+    if query_parser.with_status:
+        filter_sql.append("labels && %(status)s")
+        if query_parser.with_status == ResourceProcessingStatus.PROCESSED:
+            filter_params["status"] = ["/n/s/PROCESSED", "/n/s/ERROR"]
+        else:
+            filter_params["status"] = ["/n/s/PENDING"]
+
     return (
         f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)} ORDER BY {order_field} {order_dir}",
         filter_params,
@@ -135,9 +145,9 @@ def _pg_driver() -> Optional[PGDriver]:
 
 
 def pgcatalog_enabled(kbid):
-    return _pg_driver() is not None  # and has_feature(
-    #     const.Features.PG_CATALOG_READ, context={"kbid": kbid}
-    # )
+    return _pg_driver() is not None and has_feature(
+        const.Features.PG_CATALOG_READ, context={"kbid": kbid}
+    )
 
 
 async def pgcatalog_search(query_parser: QueryParser):

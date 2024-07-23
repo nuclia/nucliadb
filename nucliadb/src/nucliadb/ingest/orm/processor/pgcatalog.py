@@ -23,6 +23,8 @@ from typing import Optional
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from ..resource import Resource
 
@@ -35,9 +37,9 @@ def _pg_transaction(txn: Transaction) -> Optional[PGTransaction]:
 
 
 def pgcatalog_enabled(kbid):
-    return isinstance(get_driver(), PGDriver)  # and has_feature(
-    #     const.Features.PG_CATALOG_WRITE, context={"kbid": kbid}
-    # )
+    return isinstance(get_driver(), PGDriver) and has_feature(
+        const.Features.PG_CATALOG_WRITE, context={"kbid": kbid}
+    )
 
 
 async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
