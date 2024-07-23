@@ -35,6 +35,7 @@ from nucliadb.common.datamanagers.resources import (
     KB_RESOURCE_SLUG,
     KB_RESOURCE_SLUG_BASE,
 )
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
@@ -59,6 +60,7 @@ from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_utils import const
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KBSource, Service
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import Storage as KbUsageStorage
+from nucliadb_utils.aiopynecone.exceptions import PineconeAPIError
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
@@ -516,10 +518,13 @@ class KnowledgeBox:
         )
         api_key = request.pinecone_config.api_key
         pinecone = get_pinecone().control_plane(api_key=api_key)
-        index_host = await pinecone.create_index(
-            name=index_name,
-            dimension=vector_dimension,
-        )
+        try:
+            index_host = await pinecone.create_index(
+                name=index_name,
+                dimension=vector_dimension,
+            )
+        except PineconeAPIError as exc:
+            raise ExternalIndexCreationError("pinecone", exc.message) from exc
         endecryptor = get_endecryptor()
         encrypted_api_key = endecryptor.encrypt(api_key)
         metadata.pinecone_config.encrypted_api_key = encrypted_api_key
