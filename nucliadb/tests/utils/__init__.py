@@ -29,7 +29,7 @@ def broker_resource(kbid: str, rid=None, slug=None, title=None, summary=None) ->
     """
     Returns a broker resource with barebones metadata.
     """
-    rid = rid or str(uuid.uuid4())
+    rid = rid or str(uuid.uuid4()).replace("-", "")
     slug = slug or f"{rid}slug1"
     bm: BrokerMessage = BrokerMessage(
         kbid=kbid,

@@ -79,3 +79,5 @@ class Features:
     CORS_MIDDLEWARE = "nucliadb_cors_middleware_enabled"
     NODE_SET_RESOURCE_FROM_STORAGE = "nucliadb_node_set_resource_from_storage"
     FIND_MERGE_ORDER_FIX = "nucliadb_find_merge_order_fix"
+    PG_CATALOG_READ = "nucliadb_pg_catalog_read"
+    PG_CATALOG_WRITE = "nucliadb_pg_catalog_write"

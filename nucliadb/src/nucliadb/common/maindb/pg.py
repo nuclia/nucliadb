@@ -37,13 +37,6 @@ RETRIABLE_EXCEPTIONS = (
     ConnectionResetError,
 )
 
-CREATE_TABLE = """
-CREATE TABLE IF NOT EXISTS resources (
-    key TEXT PRIMARY KEY,
-    value BYTEA
-);
-"""
-
 logger = logging.getLogger(__name__)
 
 # Request Metrics
@@ -276,10 +269,6 @@ class PGDriver(Driver):
                     open=False,
                 )
                 await self.pool.open()
-
-                # check if table exists
-                async with self._get_connection() as conn:
-                    await conn.execute(CREATE_TABLE)
 
             self.initialized = True
             self.metrics_task = asyncio.create_task(self._report_metrics_task())

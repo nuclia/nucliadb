@@ -65,6 +65,14 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
+    const.Features.PG_CATALOG_READ: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
+    const.Features.PG_CATALOG_WRITE: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
 }
 
 

@@ -17,27 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Optional
 
-from fastapi import Query
-
-from nucliadb_models.search import ParamDefault
-
-_NOT_SET = object()
+from nucliadb.common.maindb.pg import PGTransaction
 
 
-def fastapi_query(param: ParamDefault, default: Optional[Any] = _NOT_SET, **kw) -> Query:  # type: ignore
-    # Be able to override default value
-    if default is _NOT_SET:
-        default_value = param.default
-    else:
-        default_value = default
-    return Query(
-        default=default_value,
-        title=param.title,
-        description=param.description,
-        le=param.le,
-        gt=param.gt,
-        max_length=param.max_items,
-        **kw,
-    )
+async def migrate(txn: PGTransaction) -> None:
+    async with txn.connection.cursor() as cur:
+        await cur.execute("""
+            CREATE TABLE resources (
+                key TEXT PRIMARY KEY,
+                value BYTEA
+            );
+        """)

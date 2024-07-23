@@ -19,6 +19,7 @@
 #
 import asyncio
 import math
+import os
 from datetime import datetime, timedelta
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
@@ -48,6 +49,8 @@ from nucliadb_utils.utilities import (
     set_utility,
 )
 from tests.utils import broker_resource, inject_message
+
+TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg,local").split(",")
 
 
 @pytest.mark.asyncio
@@ -339,6 +342,7 @@ async def test_paragraph_search_with_filters(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog does not support with_status")
 async def test_catalog_can_filter_by_processing_status(
     nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -663,6 +667,7 @@ async def test_search_relations(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog does not support with_status")
 async def test_processing_status_doesnt_change_on_search_after_processed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1506,6 +1511,7 @@ async def test_search_handles_limits_exceeded_error(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog cannot do shards")
 async def test_catalog_returns_shard_and_node_data(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1665,3 +1671,88 @@ async def test_catalog_date_range_filtering(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_catalog_faceted(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    valid_status = ["PROCESSED", "PENDING", "ERROR"]
+
+    for status_name, status_value in rpb.Metadata.Status.items():
+        if status_name not in valid_status:
+            continue
+        bm = broker_resource(knowledgebox)
+        bm.basic.metadata.status = status_value
+        await inject_message(nucliadb_grpc, bm)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog?faceted=/metadata.status",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 3
+    facets = body["fulltext"]["facets"]["/metadata.status"]
+    assert len(facets) == 3
+    for facet, count in facets.items():
+        assert facet.split("/")[-1] in valid_status
+        assert count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_catalog_filters(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    valid_status = ["PROCESSED", "PENDING", "ERROR"]
+
+    for status_name, status_value in rpb.Metadata.Status.items():
+        if status_name not in valid_status:
+            continue
+        bm = broker_resource(knowledgebox)
+        bm.basic.metadata.status = status_value
+        await inject_message(nucliadb_grpc, bm)
+
+    # No filters
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 3
+
+    # Simple filter
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog?filters=/metadata.status/PENDING",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+    assert list(body["resources"].values())[0]["metadata"]["status"] == "PENDING"
+
+    # AND filter
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/catalog",
+        json={"filters": [{"all": ["/metadata.status/PENDING", "/metadata.status/ERROR"]}]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0
+
+    # OR filter
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/catalog",
+        json={"filters": [{"any": ["/metadata.status/PENDING", "/metadata.status/ERROR"]}]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 2
+    for resource in body["resources"].values():
+        assert resource["metadata"]["status"] in ["PENDING", "ERROR"]
