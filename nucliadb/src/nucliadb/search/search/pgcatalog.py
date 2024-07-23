@@ -69,9 +69,9 @@ def _convert_filter(filter, filter_params):
             sql.append(f"labels {array_op} %({param_name})s")
         for nonlit in nonliterals:
             sql.append(_convert_filter(nonlit, filter_params))
-        return f" {op.upper()} ".join([f"({s})" for s in sql])
+        return "(" + f" {op.upper()} ".join(sql) + ")"
     elif op == "not":
-        return f"NOT ({_convert_filter(operands[0], filter_params)})"
+        return f"(NOT {_convert_filter(operands, filter_params)})"
     else:
         raise ValueError(f"Invalid operator {op}")
 
@@ -108,6 +108,7 @@ def _prepare_query(query_parser: QueryParser):
     if query_parser.filters:
         filter_sql.append(_convert_filter(query_parser.filters, filter_params))
 
+    order_sql = ""
     if query_parser.sort:
         if query_parser.sort.field == SortField.CREATED:
             order_field = "created_at"
@@ -124,6 +125,8 @@ def _prepare_query(query_parser: QueryParser):
         else:
             order_dir = "DESC"
 
+        order_sql = f" ORDER BY {order_field} {order_dir}"
+
     if query_parser.with_status:
         filter_sql.append("labels && %(status)s")
         if query_parser.with_status == ResourceProcessingStatus.PROCESSED:
@@ -132,7 +135,7 @@ def _prepare_query(query_parser: QueryParser):
             filter_params["status"] = ["/n/s/PENDING"]
 
     return (
-        f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)} ORDER BY {order_field} {order_dir}",
+        f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)}{order_sql}",
         filter_params,
     )
 
