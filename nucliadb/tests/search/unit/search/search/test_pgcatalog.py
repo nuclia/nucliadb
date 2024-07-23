@@ -20,15 +20,9 @@
 
 from nucliadb.search.search.pgcatalog import QueryParser, _convert_filter, _prepare_query
 from nucliadb_models.search import (
-    Filter,
-    MaxTokens,
-    MinScore,
-    QueryInfo,
-    SearchOptions,
     SortField,
-    SortOrder,
-    SortFieldMap,
     SortOptions,
+    SortOrder,
 )
 
 
