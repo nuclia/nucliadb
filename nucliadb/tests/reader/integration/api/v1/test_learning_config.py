@@ -24,8 +24,7 @@ from unittest import mock
 import pytest
 from fastapi import Response
 from fastapi.responses import StreamingResponse
-
-from nucliadb_models.resource import NucliaDBRoles
+from httpx import AsyncClient
 
 
 class MockProxy:
@@ -51,66 +50,68 @@ def learning_config_proxy_mock():
         yield proxy
 
 
-async def test_api(reader_api, knowledgebox_ingest, learning_config_proxy_mock, onprem_nucliadb):
-    kbid = knowledgebox_ingest
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        # Get configuration
-        resp = await client.get(f"/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"})
-        assert resp.status_code == 200
-        assert learning_config_proxy_mock.calls[-1][1:] == (
-            "GET",
-            f"/config/{kbid}",
-            {"X-STF-USER": "userfoo"},
-        )
+@pytest.mark.deploy_modes("component")
+async def test_api(
+    nucliadb_reader: AsyncClient, knowledgebox, learning_config_proxy_mock, onprem_nucliadb
+):
+    kbid = knowledgebox
+    # Get configuration
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/configuration", headers={"x-nucliadb-user": "userfoo"})
+    assert resp.status_code == 200
+    assert learning_config_proxy_mock.calls[-1][1:] == (
+        "GET",
+        f"/config/{kbid}",
+        {"X-STF-USER": "userfoo"},
+    )
 
-        # Download model
-        resp = await client.get(f"/kb/{kbid}/models/model1/path")
-        assert resp.status_code == 200
-        data = BytesIO()
-        for chunk in resp.iter_bytes():
-            data.write(chunk)
-        assert data.getvalue() == b"some content"
-        assert learning_config_proxy_mock.calls[-1][1:] == (
-            "GET",
-            f"/download/{kbid}/model/model1/path",
-            None,
-        )
+    # Download model
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/models/model1/path")
+    assert resp.status_code == 200
+    data = BytesIO()
+    for chunk in resp.iter_bytes():
+        data.write(chunk)
+    assert data.getvalue() == b"some content"
+    assert learning_config_proxy_mock.calls[-1][1:] == (
+        "GET",
+        f"/download/{kbid}/model/model1/path",
+        None,
+    )
 
-        # List models
-        resp = await client.get(f"/kb/{kbid}/models")
-        assert resp.status_code == 200
-        assert learning_config_proxy_mock.calls[-1][1:] == (
-            "GET",
-            f"/models/{kbid}",
-            None,
-        )
+    # List models
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/models")
+    assert resp.status_code == 200
+    assert learning_config_proxy_mock.calls[-1][1:] == (
+        "GET",
+        f"/models/{kbid}",
+        None,
+    )
 
-        # Get metadata of a model
-        resp = await client.get(f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"})
-        assert resp.status_code == 200
-        assert learning_config_proxy_mock.calls[-1][1:] == (
-            "GET",
-            f"/models/{kbid}/model/model1",
-            {"X-STF-USER": "userfoo"},
-        )
+    # Get metadata of a model
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/model/model1", headers={"x-nucliadb-user": "userfoo"})
+    assert resp.status_code == 200
+    assert learning_config_proxy_mock.calls[-1][1:] == (
+        "GET",
+        f"/models/{kbid}/model/model1",
+        {"X-STF-USER": "userfoo"},
+    )
 
-        # Get schema for updates
-        resp = await client.get(f"/kb/{kbid}/schema")
-        assert resp.status_code == 200
-        assert learning_config_proxy_mock.calls[-1][1:] == (
-            "GET",
-            f"/schema/{kbid}",
-            None,
-        )
+    # Get schema for updates
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/schema")
+    assert resp.status_code == 200
+    assert learning_config_proxy_mock.calls[-1][1:] == (
+        "GET",
+        f"/schema/{kbid}",
+        None,
+    )
 
-        # Get schema for creation
-        resp = await client.get("/nua/schema")
-        assert resp.status_code == 200
-        assert learning_config_proxy_mock.calls[-1][1:] == ("GET", "/schema", None)
+    # Get schema for creation
+    resp = await nucliadb_reader.get("/nua/schema")
+    assert resp.status_code == 200
+    assert learning_config_proxy_mock.calls[-1][1:] == ("GET", "/schema", None)
 
 
-async def test_api_restricted_for_hosted(reader_api, hosted_nucliadb):
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        # Check that getting the creation schema does not work for hosted nucliadb
-        resp = await client.get("/nua/schema")
-        assert resp.status_code == 404
+@pytest.mark.deploy_modes("component")
+async def test_api_restricted_for_hosted(nucliadb_reader: AsyncClient, hosted_nucliadb):
+    # Check that getting the creation schema does not work for hosted nucliadb
+    resp = await nucliadb_reader.get("/nua/schema")
+    assert resp.status_code == 404

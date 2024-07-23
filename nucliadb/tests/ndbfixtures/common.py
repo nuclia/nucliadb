@@ -17,15 +17,32 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = [
-    "pytest_docker_fixtures",
-    "nucliadb_utils.tests.nats",
-    "tests.ingest.fixtures",
-    "tests.fixtures",
-    "nucliadb_utils.tests.fixtures",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.s3",
-    "nucliadb_utils.tests.azure",
-    "nucliadb_utils.tests.local",
-    "nucliadb_telemetry.tests.telemetry",
-]
+from os.path import dirname
+from typing import AsyncIterator
+
+import pytest
+
+from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.maindb.driver import Driver
+from nucliadb_utils.storages.settings import settings as storage_settings
+from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    set_utility,
+)
+
+
+@pytest.fixture(scope="function")
+async def shard_manager(storage: Storage, maindb_driver: Driver) -> AsyncIterator[KBShardManager]:
+    sm = KBShardManager()
+    set_utility(Utility.SHARD_MANAGER, sm)
+
+    yield sm
+
+    clean_utility(Utility.SHARD_MANAGER)
+
+
+@pytest.fixture(scope="function")
+async def local_files():
+    storage_settings.local_testing_files = f"{dirname(__file__)}"

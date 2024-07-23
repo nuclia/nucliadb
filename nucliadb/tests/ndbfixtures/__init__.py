@@ -17,15 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = [
-    "pytest_docker_fixtures",
-    "nucliadb_utils.tests.nats",
-    "tests.ingest.fixtures",
-    "tests.fixtures",
-    "nucliadb_utils.tests.fixtures",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.s3",
-    "nucliadb_utils.tests.azure",
-    "nucliadb_utils.tests.local",
-    "nucliadb_telemetry.tests.telemetry",
-]
+
+# hacks and magic things with pytest to implement deploy mode parametrization
+
+from .magic import *  # noqa
+
+# components and deployment modes
+
+from .reader import *  # noqa
+
+# subcomponents
+
+from .common import *  # noqa
+from .maindb import *  # noqa
+from .node import *  # noqa
+
+# useful resources for tests (KBs...)
+
+from .resources import *  # noqa
