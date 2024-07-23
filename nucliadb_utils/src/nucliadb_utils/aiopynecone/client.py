@@ -60,6 +60,10 @@ INDEX_HOST_BASE_URL = "https://{index_host}/"
 BASE_API_HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
+    # This is needed so that it is easier for Pinecone to track which api requests
+    # are coming from the Nuclia integration:
+    # https://docs.pinecone.io/integrations/build-integration/attribute-usage-to-your-integration
+    "User-Agent": "source_tag=nuclia",
 }
 MEGA_BYTE = 1024 * 1024
 MAX_UPSERT_PAYLOAD_SIZE = 2 * MEGA_BYTE
@@ -71,13 +75,6 @@ RETRIABLE_EXCEPTIONS = (
     PineconeRateLimitError,
     httpx.ConnectError,
     httpx.NetworkError,
-)
-
-backoff_handler = backoff.on_exception(
-    backoff.expo,
-    RETRIABLE_EXCEPTIONS,
-    jitter=backoff.random_jitter,
-    max_tries=4,
 )
 
 
@@ -154,7 +151,12 @@ class DataPlane:
     def _get_request_timeout(self, timeout: Optional[float] = None) -> Optional[float]:
         return timeout or self.client_timeout
 
-    @backoff_handler
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "upsert"})
     async def upsert(self, vectors: list[Vector], timeout: Optional[float] = None) -> None:
         """
@@ -231,7 +233,12 @@ class DataPlane:
 
         await asyncio.gather(*tasks)
 
-    @backoff_handler
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "delete"})
     async def delete(self, ids: list[str], timeout: Optional[float] = None) -> None:
         """
@@ -256,7 +263,12 @@ class DataPlane:
         response = await self.http_session.post("/vectors/delete", **post_kwargs)
         raise_for_status("delete", response)
 
-    @backoff_handler
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "list_page"})
     async def list_page(
         self,
@@ -324,7 +336,12 @@ class DataPlane:
                 break
             pagination_token = response.pagination.next
 
-    @backoff_handler
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "delete_all"})
     async def delete_all(self, timeout: Optional[float] = None):
         """
@@ -383,7 +400,12 @@ class DataPlane:
 
         await asyncio.gather(*tasks)
 
-    @backoff_handler
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "query"})
     async def query(
         self,

@@ -52,6 +52,7 @@ class ParamDefault(BaseModel):
     le: Optional[float] = None
     gt: Optional[float] = None
     max_items: Optional[int] = None
+    deprecated: bool = False
 
     def to_pydantic_field(self, default=_NOT_SET) -> Field:  # type: ignore
         """
@@ -65,6 +66,7 @@ class ParamDefault(BaseModel):
             gt=self.gt,
             le=self.le,
             max_length=self.max_items,
+            deprecated=self.deprecated,
         )
 
 

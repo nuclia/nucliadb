@@ -39,5 +39,6 @@ def fastapi_query(param: ParamDefault, default: Optional[Any] = _NOT_SET, **kw) 
         le=param.le,
         gt=param.gt,
         max_length=param.max_items,
+        deprecated=param.deprecated,
         **kw,
     )
