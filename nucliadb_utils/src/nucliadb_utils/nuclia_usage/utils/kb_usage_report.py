@@ -22,10 +22,9 @@ import logging
 from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
-from nats.js.client import JetStreamContext
-
+from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
     KBSource,
     KbUsage,
@@ -40,29 +39,48 @@ logger = logging.getLogger(__name__)
 
 
 class KbUsageReportUtility:
+    task: Optional[asyncio.Task]
+    initialized: bool
     queue: asyncio.Queue
-    lock: asyncio.Lock
+    service: str
 
     def __init__(
         self,
-        nats_stream: JetStreamContext,
         nats_subject: str,
+        nats_servers: List[str],
+        nats_creds: Optional[str] = None,
         max_queue_size: int = 100,
+        service: str = "",
     ):
-        self.nats_stream = nats_stream
+        self.nats_connection_manager = NatsConnectionManager(
+            service_name=service,
+            nats_servers=nats_servers,
+            nats_creds=nats_creds,
+        )
         self.nats_subject = nats_subject
         self.queue = asyncio.Queue(max_queue_size)
         self.task = None
+        self.initialized = False
 
     async def initialize(self):
-        if self.task is None:
-            self.task = asyncio.create_task(self.run())
+        if not self.initialized and self.nats_connection_manager._nats_servers:
+            await self.nats_connection_manager.initialize()
+
+            if self.task is None:
+                self.task = asyncio.create_task(self.run())
+
+            self.initialized = True
 
     async def finalize(self):
-        if self.task is not None:
-            self.task.cancel()
-            with suppress(asyncio.CancelledError, asyncio.exceptions.TimeoutError):
-                await asyncio.wait_for(self.task, timeout=2)
+        if self.initialized:
+            if self.task is not None:
+                self.task.cancel()
+                with suppress(asyncio.CancelledError, asyncio.exceptions.TimeoutError):
+                    await asyncio.wait_for(self.task, timeout=2)
+
+            await self.nats_connection_manager.finalize()
+
+            self.initialized = False
 
     async def run(self) -> None:
         while True:
@@ -75,13 +93,15 @@ class KbUsageReportUtility:
                 self.queue.task_done()
 
     def send(self, message: KbUsage):
+        if not self.initialized:
+            return
         try:
             self.queue.put_nowait(message)
         except asyncio.QueueFull:
             logger.warning("KbUsage utility queue is full, dropping message")
 
     async def _send(self, message: KbUsage) -> int:
-        res = await self.nats_stream.publish(
+        res = await self.nats_connection_manager.js.publish(
             self.nats_subject,
             message.SerializeToString(),
         )

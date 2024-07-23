@@ -23,7 +23,6 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from nucliadb_protos.audit_pb2 import (
     AuditField,
-    AuditKBCounter,
     AuditRequest,
     ChatContext,
 )
@@ -32,7 +31,9 @@ from nucliadb_protos.resources_pb2 import FieldID
 
 
 class AuditStorage:
-    async def report(
+    initialized: bool = False
+
+    def report_and_send(
         self,
         *,
         kbid: str,
@@ -43,15 +44,6 @@ class AuditStorage:
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        kb_counter: Optional[AuditKBCounter] = None,
-    ):
-        raise NotImplementedError
-
-    def report_resources(
-        self,
-        *,
-        kbid: str,
-        resources: int,
     ):
         raise NotImplementedError
 
@@ -61,10 +53,19 @@ class AuditStorage:
     async def finalize(self):
         pass
 
-    async def visited(self, kbid: str, uuid: str, user: str, origin: str):
+    def visited(
+        self,
+        kbid: str,
+        uuid: str,
+        user: str,
+        origin: str,
+    ):
         raise NotImplementedError
 
-    async def search(
+    def send(self, msg: AuditRequest):
+        raise NotImplementedError
+
+    def search(
         self,
         kbid: str,
         user: str,
@@ -76,30 +77,19 @@ class AuditStorage:
     ):
         raise NotImplementedError
 
-    async def suggest(
+    def chat(
         self,
         kbid: str,
         user: str,
         client: int,
         origin: str,
-        timeit: float,
-    ):
-        raise NotImplementedError
-
-    async def chat(
-        self,
-        kbid: str,
-        user: str,
-        client: int,
-        origin: str,
-        timeit: float,
         question: str,
         rephrased_question: Optional[str],
         context: List[ChatContext],
         answer: Optional[str],
         learning_id: str,
+        rephrase_time: Optional[float] = None,
+        generative_answer_time: Optional[float] = None,
+        generative_answer_first_chunk_time: Optional[float] = None,
     ):
-        raise NotImplementedError
-
-    async def delete_kb(self, kbid):
         raise NotImplementedError

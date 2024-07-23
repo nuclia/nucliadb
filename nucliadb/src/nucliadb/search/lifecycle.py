@@ -33,7 +33,9 @@ from nucliadb_utils.utilities import (
     finalize_utilities,
     get_utility,
     start_audit_utility,
+    start_usage_utility,
     stop_audit_utility,
+    stop_usage_utility,
 )
 
 
@@ -48,6 +50,7 @@ async def lifespan(app: FastAPI):
     await setup_cluster()
 
     await start_audit_utility(SERVICE_NAME)
+    await start_usage_utility(SERVICE_NAME)
 
     yield
 
@@ -59,5 +62,6 @@ async def lifespan(app: FastAPI):
 
     await finalize_utilities()
     await stop_audit_utility()
+    await stop_usage_utility()
     await teardown_cluster()
     await clean_telemetry(SERVICE_NAME)

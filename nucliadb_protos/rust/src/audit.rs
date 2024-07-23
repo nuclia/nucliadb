@@ -104,6 +104,7 @@ pub struct AuditRequest {
     pub fields: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "7")]
     pub search: ::core::option::Option<super::nodereader::SearchRequest>,
+    #[deprecated]
     #[prost(float, tag = "8")]
     pub timeit: f32,
     #[prost(string, tag = "9")]
@@ -128,6 +129,16 @@ pub struct AuditRequest {
     pub chat: ::core::option::Option<ChatAudit>,
     #[prost(bool, tag = "20")]
     pub success: bool,
+    #[prost(float, tag = "21")]
+    pub request_time: f32,
+    #[prost(float, optional, tag = "22")]
+    pub retrieval_time: ::core::option::Option<f32>,
+    #[prost(float, optional, tag = "23")]
+    pub generative_answer_time: ::core::option::Option<f32>,
+    #[prost(float, optional, tag = "24")]
+    pub generative_answer_first_chunk_time: ::core::option::Option<f32>,
+    #[prost(float, optional, tag = "25")]
+    pub rephrase_time: ::core::option::Option<f32>,
 }
 /// Nested message and enum types in `AuditRequest`.
 pub mod audit_request {

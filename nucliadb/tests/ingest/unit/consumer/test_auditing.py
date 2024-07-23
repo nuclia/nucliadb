@@ -25,7 +25,6 @@ import pytest
 
 from nucliadb.ingest.consumer import auditing
 from nucliadb_protos import nodereader_pb2
-from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest
 from nucliadb_protos.writer_pb2 import Audit, BrokerMessage, Notification, ShardObject
 
 pytestmark = pytest.mark.asyncio
@@ -64,9 +63,10 @@ def audit():
 
 
 @pytest.fixture()
-async def index_audit_handler(pubsub, audit, shard_manager):
+async def index_audit_handler(pubsub, audit, usage, shard_manager):
     iah = auditing.IndexAuditHandler(
         audit=audit,
+        usage=usage,
         pubsub=pubsub,
         check_delay=0.05,
     )
@@ -97,12 +97,6 @@ async def test_handle_message(index_audit_handler: auditing.IndexAuditHandler, r
     await index_audit_handler.handle_message(notif.SerializeToString())
 
     await asyncio.sleep(0.06)
-
-    audit.report.assert_called_with(
-        kbid="kbid",
-        audit_type=AuditRequest.AuditType.INDEXED,
-        kb_counter=AuditKBCounter(fields=5, paragraphs=6),
-    )
 
 
 async def test_handle_message_ignore_not_indexed(index_audit_handler: auditing.IndexAuditHandler, audit):

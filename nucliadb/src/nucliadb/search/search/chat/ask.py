@@ -19,7 +19,7 @@
 #
 import functools
 import json
-from time import monotonic as time
+import time
 from typing import AsyncGenerator, Optional
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -167,6 +167,7 @@ class AskResult:
         # Then stream out the predict answer
         async for answer_chunk in self._stream_predict_answer_text():
             yield AnswerAskResponseItem(text=answer_chunk)
+        finish_predict_stream_time = time.monotonic()
 
         if self._object is not None:
             yield JSONAskResponseItem(object=self._object.object)
@@ -191,8 +192,20 @@ class AskResult:
             audit_answer = self._answer_text.encode("utf-8")
         else:
             audit_answer = json.dumps(self._object.object).encode("utf-8")
-        await self.auditor.audit(
+
+        try:
+            rephrase_time = self.metrics.elapsed("rephrase")
+        except KeyError:
+            rephrase_time = None
+
+        generative_answer_time = finish_predict_stream_time - self.metrics._start_times["stream_start"]
+        first_chunk_time = self.metrics.first_chunk_yielded_at - self.metrics.global_start
+
+        self.auditor.audit(
             text_answer=audit_answer,
+            generative_answer_time=generative_answer_time,
+            generative_answer_first_chunk_time=first_chunk_time,
+            rephrase_time=rephrase_time,
             status_code=self.status_code,
         )
 
@@ -353,7 +366,6 @@ async def ask(
     origin: str,
     resource: Optional[str] = None,
 ) -> AskResult:
-    start_time = time()
     metrics = RAGMetrics()
     chat_history = ask_request.context or []
     user_context = ask_request.extra_context or []
@@ -458,7 +470,6 @@ async def ask(
         user_id=user_id,
         client_type=client_type,
         origin=origin,
-        start_time=start_time,
         user_query=user_query,
         rephrased_query=rephrased_query,
         chat_history=chat_history,

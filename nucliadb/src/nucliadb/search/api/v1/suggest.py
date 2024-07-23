@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from time import time
 from typing import Optional, Union
 
 from fastapi import Header, Request, Response
@@ -41,7 +40,6 @@ from nucliadb_models.search import (
     SuggestOptions,
 )
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_audit
 
 
 @api.get(
@@ -128,9 +126,6 @@ async def suggest(
     highlight: bool,
 ) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
-    audit = get_audit()
-    start_time = time()
-
     # We need to query all nodes
     pb_query = suggest_query_to_pb(
         features,
@@ -159,14 +154,5 @@ async def suggest(
     queried_shards = [shard_id for _, shard_id in queried_nodes]
     if debug and queried_shards:
         search_results.shards = queried_shards
-
-    if audit is not None:
-        await audit.suggest(
-            kbid,
-            x_nucliadb_user,
-            x_ndb_client.to_proto(),
-            x_forwarded_for,
-            time() - start_time,
-        )
 
     return search_results

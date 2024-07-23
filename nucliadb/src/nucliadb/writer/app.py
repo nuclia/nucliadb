@@ -55,7 +55,6 @@ if has_feature(const.Features.CORS_MIDDLEWARE, default=False):
             allow_headers=["*", "Authorization"],
         )
     )
-
 middleware.extend([Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend())])
 
 
