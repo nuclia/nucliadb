@@ -234,6 +234,40 @@ class TestDataPlane:
         assert batch_size == 511
         client._upsert_batch_size = None
 
+    async def test_client_retries_on_rate_limit_errors(
+        self, client: DataPlane, http_session, http_response
+    ):
+        http_response.status_code = 429
+        http_response.json.return_value = {"error": {"code": 4, "message": "rate limit error"}}
+        http_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "rate limit error", request=None, response=http_response
+        )
+        with pytest.raises(PineconeRateLimitError):
+            await client.query(vector=[1.0])
+        assert http_session.post.call_count == 4
+
+    @pytest.fixture(scope="function")
+    def metrics_registry(self):
+        import prometheus_client.registry
+
+        # Clear all metrics before each test
+        for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
+            if not hasattr(collector, "_metrics"):
+                continue
+            collector._metrics.clear()
+        yield prometheus_client.registry.REGISTRY
+
+    async def test_client_records_metrics(self, client: DataPlane, metrics_registry, http_response):
+        http_response.json.return_value = {"matches": []}
+        await client.query(vector=[1.0])
+
+        assert (
+            metrics_registry.get_sample_value(
+                "pinecone_client_duration_seconds_count", {"type": "query"}
+            )
+            > 0
+        )
+
 
 def test_batchify():
     iterable = list(range(10))

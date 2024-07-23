@@ -18,8 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import time
 from dataclasses import dataclass
-from time import monotonic as time
 from typing import AsyncGenerator, AsyncIterator, Optional
 
 from nucliadb.search import logger
@@ -144,10 +144,10 @@ async def get_find_results(
     find_request = FindRequest()
     find_request.resource_filters = chat_request.resource_filters
     find_request.features = []
-    if ChatOptions.VECTORS in chat_request.features:
-        find_request.features.append(SearchOptions.VECTOR)
-    if ChatOptions.PARAGRAPHS in chat_request.features:
-        find_request.features.append(SearchOptions.PARAGRAPH)
+    if ChatOptions.SEMANTIC in chat_request.features:
+        find_request.features.append(SearchOptions.SEMANTIC)
+    if ChatOptions.KEYWORD in chat_request.features:
+        find_request.features.append(SearchOptions.KEYWORD)
     if ChatOptions.RELATIONS in chat_request.features:
         find_request.features.append(SearchOptions.RELATIONS)
     find_request.query = query
@@ -226,7 +226,6 @@ async def chat(
     resource: Optional[str] = None,
 ) -> ChatResult:
     metrics = RAGMetrics()
-    start_time = time()
     nuclia_learning_id: Optional[str] = None
     chat_history = chat_request.context or []
     user_context = chat_request.extra_context or []
@@ -330,6 +329,7 @@ async def chat(
         prefer_markdown=chat_request.prefer_markdown,
     )
     predict = get_predict()
+    generative_start = time.monotonic()
     nuclia_learning_id, predict_generator = await predict.chat_query(kbid, chat_model)
 
     async def _wrapped_stream():
@@ -341,15 +341,21 @@ async def chat(
                 metrics.record_first_chunk_yielded()
             text_answer += chunk
             yield chunk
+        try:
+            rephrase_time = metrics.elapsed("rephrase")
+        except KeyError:
+            rephrase_time = None
 
-        await maybe_audit_chat(
+        maybe_audit_chat(
             kbid=kbid,
             user_id=user_id,
             client_type=client_type,
             origin=origin,
-            duration=time() - start_time,
             user_query=user_query,
             rephrased_query=rephrased_query,
+            rephrase_time=rephrase_time,
+            generative_answer_time=time.monotonic() - generative_start,
+            generative_answer_first_chunk_time=metrics.first_chunk_yielded_at - metrics.global_start,
             text_answer=text_answer,
             status_code=status_code.value,
             chat_history=chat_history,
@@ -389,13 +395,15 @@ def _parse_answer_status_code(chunk: bytes) -> AnswerStatusCode:
         return AnswerStatusCode(chunk[-2:].decode())
 
 
-async def maybe_audit_chat(
+def maybe_audit_chat(
     *,
     kbid: str,
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
-    duration: float,
+    generative_answer_time: float,
+    generative_answer_first_chunk_time: float,
+    rephrase_time: Optional[float],
     user_query: str,
     rephrased_query: Optional[str],
     text_answer: bytes,
@@ -415,20 +423,22 @@ async def maybe_audit_chat(
     audit_context = [
         audit_pb2.ChatContext(author=message.author, text=message.text) for message in chat_history
     ]
-    query_context_paragaph_ids = list(query_context.keys())
+    query_context_paragaph_ids = list(query_context.values())
     audit_context.append(
         audit_pb2.ChatContext(
             author=Author.NUCLIA,
             text=AUDIT_TEXT_RESULT_SEP.join(query_context_paragaph_ids),
         )
     )
-    await audit.chat(
+    audit.chat(
         kbid,
         user_id,
         client_type.to_proto(),
         origin,
-        duration,
         question=user_query,
+        generative_answer_time=generative_answer_time,
+        generative_answer_first_chunk_time=generative_answer_first_chunk_time,
+        rephrase_time=rephrase_time,
         rephrased_question=rephrased_query,
         context=audit_context,
         answer=audit_answer,
@@ -462,7 +472,6 @@ class ChatAuditor:
         user_id: str,
         client_type: NucliaDBClientType,
         origin: str,
-        start_time: float,
         user_query: str,
         rephrased_query: Optional[str],
         chat_history: list[ChatContextMessage],
@@ -474,7 +483,6 @@ class ChatAuditor:
         self.user_id = user_id
         self.client_type = client_type
         self.origin = origin
-        self.start_time = start_time
         self.user_query = user_query
         self.rephrased_query = rephrased_query
         self.chat_history = chat_history
@@ -482,15 +490,24 @@ class ChatAuditor:
         self.query_context = query_context
         self.query_context_order = query_context_order
 
-    async def audit(self, text_answer: bytes, status_code: AnswerStatusCode):
-        await maybe_audit_chat(
+    def audit(
+        self,
+        text_answer: bytes,
+        generative_answer_time: float,
+        generative_answer_first_chunk_time: float,
+        rephrase_time: Optional[float],
+        status_code: AnswerStatusCode,
+    ):
+        maybe_audit_chat(
             kbid=self.kbid,
             user_id=self.user_id,
             client_type=self.client_type,
             origin=self.origin,
-            duration=time() - self.start_time,
             user_query=self.user_query,
             rephrased_query=self.rephrased_query,
+            generative_answer_time=generative_answer_time,
+            generative_answer_first_chunk_time=generative_answer_first_chunk_time,
+            rephrase_time=rephrase_time,
             text_answer=text_answer,
             status_code=status_code,
             chat_history=self.chat_history,

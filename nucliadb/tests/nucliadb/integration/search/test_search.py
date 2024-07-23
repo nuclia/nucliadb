@@ -45,7 +45,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
-    get_audit,
     get_storage,
     set_utility,
 )
@@ -928,32 +927,6 @@ async def test_search_automatic_relations(
         )
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_only_search_and_suggest_calls_audit(nucliadb_reader, knowledgebox):
-    kbid = knowledgebox
-
-    audit = get_audit()
-    audit.search = AsyncMock()
-    audit.suggest = AsyncMock()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog", params={"query": ""})
-    assert resp.status_code == 200
-
-    audit.search.assert_not_awaited()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/search")
-    assert resp.status_code == 200
-
-    audit.search.assert_awaited_once()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/suggest?query=")
-
-    assert resp.status_code == 200
-
-    audit.suggest.assert_awaited_once()
-
-
 async def get_audit_messages(sub):
     msg = await sub.fetch(1)
     auditreq = AuditRequest()
@@ -963,7 +936,7 @@ async def get_audit_messages(sub):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_search_and_suggest_sent_audit(
+async def test_search_sends_audit(
     nucliadb_reader,
     knowledgebox,
     stream_audit: StreamAuditStorage,
@@ -981,6 +954,7 @@ async def test_search_and_suggest_sent_audit(
     subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
 
     set_utility(Utility.AUDIT, stream_audit)
+
     try:
         await jetstream.delete_stream(name=audit_settings.audit_stream)
     except nats.js.errors.NotFoundError:
@@ -998,23 +972,6 @@ async def test_search_and_suggest_sent_audit(
     assert auditreq.kbid == kbid
     assert auditreq.type == AuditRequest.AuditType.SEARCH
     assert auditreq.client_type == ClientType.CHROME_EXTENSION  # Just to use other that the enum default
-    try:
-        int(auditreq.trace_id)
-    except ValueError:
-        assert False, "Invalid trace ID"
-
-    # Test suggest sends audit
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest?query=", headers={"x-ndb-client": "chrome_extension"}
-    )
-    assert resp.status_code == 200
-
-    auditreq = await get_audit_messages(psub)
-
-    assert auditreq.kbid == kbid
-    assert auditreq.type == AuditRequest.AuditType.SUGGEST
-    assert auditreq.client_type == ClientType.CHROME_EXTENSION  # Just to use other that the enum default
-
     try:
         int(auditreq.trace_id)
     except ValueError:

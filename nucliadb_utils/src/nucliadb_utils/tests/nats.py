@@ -191,7 +191,11 @@ def start_gnatsd(gnatsd: Gnatsd):  # pragma: no cover
 
 @pytest.fixture(scope="session")
 def natsd_server():  # pragma: no cover
-    if not os.path.isfile("nats-server"):
+    # Create a persistent temporary directory
+    tmpdir = tempfile.mkdtemp()
+    nats_server_path = os.path.join(tmpdir, "nats-server")
+
+    if not os.path.isfile(nats_server_path):
         version = "v2.10.12"
         arch = platform.machine()
         if arch == "x86_64":
@@ -205,13 +209,13 @@ def natsd_server():  # pragma: no cover
 
         file = zipfile.open(f"nats-server-{version}-{system}-{arch}/nats-server")
         content = file.read()
-        with open("nats-server", "wb") as f:
+        with open(nats_server_path, "wb") as f:
             f.write(content)
-        os.chmod("nats-server", 755)
+        os.chmod(nats_server_path, 0o755)
 
     server = Gnatsd(port=4222)
     server.bin_name = "nats-server"
-    server.path = os.getcwd()
+    server.path = tmpdir
     return server
 
 

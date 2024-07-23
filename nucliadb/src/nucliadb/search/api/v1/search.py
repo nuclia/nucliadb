@@ -61,7 +61,16 @@ from nucliadb_models.search import (
 from nucliadb_models.security import RequestSecurity
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.utilities import get_audit
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    ClientType as ClientTypeKbUsage,
+)
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    KBSource,
+    Search,
+    SearchType,
+    Service,
+)
+from nucliadb_utils.utilities import get_audit, get_usage_utility
 
 SEARCH_EXAMPLES = {
     "filtering_by_icon": Example(
@@ -70,7 +79,7 @@ SEARCH_EXAMPLES = {
         value={
             "query": "Noam Chomsky",
             "filters": ["/icon/application/pdf"],
-            "features": [SearchOptions.DOCUMENT],
+            "features": [SearchOptions.FULLTEXT],
         },
     ),
     "get_language_counts": Example(
@@ -79,7 +88,7 @@ SEARCH_EXAMPLES = {
         value={
             "page_size": 0,
             "faceted": ["/s/p"],
-            "features": [SearchOptions.DOCUMENT],
+            "features": [SearchOptions.FULLTEXT],
         },
     ),
 }
@@ -135,9 +144,9 @@ async def search_knowledgebox(
     features: list[SearchOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.DOCUMENT,
-            SearchOptions.VECTOR,
+            SearchOptions.KEYWORD,
+            SearchOptions.FULLTEXT,
+            SearchOptions.SEMANTIC,
         ],
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
@@ -292,7 +301,7 @@ async def catalog(
 
         query_parser = QueryParser(
             kbid=kbid,
-            features=[SearchOptions.DOCUMENT],
+            features=[SearchOptions.FULLTEXT],
             query=item.query,
             filters=item.filters,
             faceted=item.faceted,
@@ -420,13 +429,14 @@ async def search(
     with_status: Optional[ResourceProcessingStatus] = None,
 ) -> tuple[KnowledgeboxSearchResults, bool]:
     audit = get_audit()
+    usage = get_usage_utility()
     start_time = time()
 
     item.min_score = min_score_from_payload(item.min_score)
 
-    if SearchOptions.VECTOR in item.features:
+    if SearchOptions.SEMANTIC in item.features:
         if should_disable_vector_search(item):
-            item.features.remove(SearchOptions.VECTOR)
+            item.features.remove(SearchOptions.SEMANTIC)
 
     # We need to query all nodes
     query_parser = QueryParser(
@@ -477,7 +487,7 @@ async def search(
     )
 
     if audit is not None and do_audit:
-        await audit.search(
+        audit.search(
             kbid,
             x_nucliadb_user,
             x_ndb_client.to_proto(),
@@ -486,6 +496,23 @@ async def search(
             time() - start_time,
             len(search_results.resources),
         )
+    if usage is not None and do_audit:
+        usage.send_kb_usage(
+            service=Service.NUCLIA_DB,  # type: ignore
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,  # type: ignore
+            # TODO unify AuditRequest client type and Nuclia Usage client type
+            searches=[
+                Search(
+                    client=ClientTypeKbUsage.Value(x_ndb_client.name),  # type: ignore
+                    type=SearchType.SEARCH,
+                    tokens=2000,
+                    num_searches=1,
+                )
+            ],
+        )
+
     if item.debug:
         search_results.nodes = debug_nodes_info(queried_nodes)
 

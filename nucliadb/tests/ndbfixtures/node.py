@@ -17,36 +17,36 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from contextlib import ExitStack
-from pathlib import Path
-from typing import Any
+import uuid
 from unittest.mock import patch
 
 import pytest
 
-from nucliadb_utils.settings import FileBackendConfig, storage_settings
-from nucliadb_utils.storages.local import LocalStorage
+from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.settings import settings as cluster_settings
 
 
 @pytest.fixture(scope="function")
-def local_storage_settings(tmp_path: Path) -> dict[str, Any]:
-    settings = {
-        "file_backend": FileBackendConfig.LOCAL,
-        "local_files": str((tmp_path / "blob").absolute()),
-    }
-    with ExitStack() as stack:
-        for key, value in settings.items():
-            context = patch.object(storage_settings, key, value)
-            stack.enter_context(context)
-
-        yield settings
-
-
-@pytest.fixture(scope="function")
-async def local_storage(local_storage_settings: dict[str, Any]):
-    assert storage_settings.local_files is not None
-
-    storage = LocalStorage(local_testing_files=storage_settings.local_files)
-    await storage.initialize()
-    yield storage
-    await storage.finalize()
+async def dummy_index_node_cluster(
+    # TODO: change this to more explicit dummy indexing utility
+    indexing_utility,
+):
+    with (
+        patch.dict(manager.INDEX_NODES, clear=True),
+        patch.object(cluster_settings, "standalone_mode", False),
+    ):
+        manager.add_index_node(
+            id=str(uuid.uuid4()),
+            address="nohost",
+            shard_count=0,
+            available_disk=100,
+            dummy=True,
+        )
+        manager.add_index_node(
+            id=str(uuid.uuid4()),
+            address="nohost",
+            shard_count=0,
+            available_disk=100,
+            dummy=True,
+        )
+        yield

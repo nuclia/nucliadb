@@ -17,28 +17,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
+from httpx import AsyncClient
 
-from nucliadb_models.resource import NucliaDBRoles
 
+@pytest.mark.deploy_modes("component", "standalone")
+async def test_api(nucliadb_reader: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
 
-async def test_api(reader_api, knowledgebox_ingest):
-    kbid = knowledgebox_ingest
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/kb/{kbid}/export/foo")
-        assert resp.status_code < 500
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/export/foo")
+    assert resp.status_code < 500
 
-        resp = await client.get(f"/kb/{kbid}/export/foo/status")
-        assert resp.status_code < 500
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/export/foo/status")
+    assert resp.status_code < 500
 
-        resp = await client.get(f"/kb/{kbid}/import/foo/status")
-        assert resp.status_code < 500
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/import/foo/status")
+    assert resp.status_code < 500
 
-        # Check that for non-existing kbs, endpoints return a 404
-        for endpoint in (
-            "/kb/idonotexist/export/foo",
-            "/kb/idonotexist/export/foo/status",
-            "/kb/idonotexist/import/foo/status",
-        ):
-            resp = await client.get(endpoint)
-            assert resp.status_code == 404
-            assert resp.json()["detail"] == "Knowledge Box not found"
+    # Check that for non-existing kbs, endpoints return a 404
+    for endpoint in (
+        "/kb/idonotexist/export/foo",
+        "/kb/idonotexist/export/foo/status",
+        "/kb/idonotexist/import/foo/status",
+    ):
+        resp = await nucliadb_reader.get(endpoint)
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Knowledge Box not found"

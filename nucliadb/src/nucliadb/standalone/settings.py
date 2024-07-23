@@ -27,6 +27,7 @@ from nucliadb.ingest.settings import DriverSettings
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogOutputType
 from nucliadb_utils.settings import StorageSettings
+from nucliadb_utils.storages.settings import Settings as ExtendedStorageSettings
 
 
 class StandaloneDiscoveryMode(Enum):
@@ -43,7 +44,7 @@ class AuthPolicy(Enum):
     UPSTREAM_BASICAUTH = "upstream_basicauth"
 
 
-class Settings(DriverSettings, StorageSettings):
+class Settings(DriverSettings, StorageSettings, ExtendedStorageSettings):
     # be consistent here with DATA_PATH env var
     data_path: str = pydantic.Field("./data/node", description="Path to node index files")
 

@@ -56,9 +56,7 @@ from nucliadb_telemetry.settings import (
     LogSettings,
 )
 from nucliadb_utils.aiopynecone.models import QueryResponse
-from nucliadb_utils.settings import FileBackendConfig
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.tests.azure import AzuriteFixture
 from nucliadb_utils.utilities import (
     Utility,
     clean_pinecone,
@@ -510,7 +508,7 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStu
 
 
 @pytest.fixture(scope="function")
-async def stream_audit(natsd: str):
+async def stream_audit(natsd: str, mocker):
     from nucliadb_utils.audit.stream import StreamAuditStorage
     from nucliadb_utils.settings import audit_settings
 
@@ -519,6 +517,27 @@ async def stream_audit(natsd: str):
         audit_settings.audit_jetstream_target,  # type: ignore
         audit_settings.audit_partitions,
         audit_settings.audit_hash_seed,
+    )
+    await audit.initialize()
+
+    mocker.spy(audit, "send")
+    mocker.spy(audit.js, "publish")
+    mocker.spy(audit, "search")
+    mocker.spy(audit, "chat")
+
+    set_utility(Utility.AUDIT, audit)
+    yield audit
+    await audit.finalize()
+
+
+@pytest.fixture(scope="function")
+async def stream_kbusage_util(natsd: str):
+    from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
+    from nucliadb_utils.settings import usage_settings
+
+    audit = KbUsageReportUtility(
+        usage_settings.usage_jetstream_subject,  # type: ignore
+        [natsd],
     )
     await audit.initialize()
     yield audit
@@ -625,43 +644,6 @@ def maindb_settings(request):
     Any test using the nucliadb fixture will be run twice, once with redis driver and once with local driver.
     """
     yield request.param
-
-
-@pytest.fixture(scope="function")
-def gcs_storage_settings(gcs):
-    return {
-        "file_backend": FileBackendConfig.GCS,
-        "gcs_endpoint_url": gcs,
-        "gcs_bucket": "test_{kbid}",
-    }
-
-
-@pytest.fixture(scope="function")
-def s3_storage_settings(s3):
-    return {
-        "file_backend": FileBackendConfig.S3,
-        "s3_endpoint": s3,
-        "s3_client_id": "",
-        "s3_client_secret": "",
-        "s3_bucket": "test-{kbid}",
-    }
-
-
-@pytest.fixture(scope="function")
-def local_storage_settings(tmpdir):
-    return {
-        "file_backend": FileBackendConfig.LOCAL,
-        "local_files": f"{tmpdir}/blob",
-    }
-
-
-@pytest.fixture(scope="function")
-def azure_storage_settings(azurite: AzuriteFixture):
-    return {
-        "file_backend": FileBackendConfig.AZURE,
-        "azure_account_url": azurite.account_url,
-        "azure_connection_string": azurite.connection_string,
-    }
 
 
 @pytest.fixture(scope="function")

@@ -23,7 +23,6 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from nucliadb_protos.audit_pb2 import (
     AuditField,
-    AuditKBCounter,
     AuditRequest,
     ChatContext,
 )
@@ -35,10 +34,13 @@ from nucliadb_utils.audit.audit import AuditStorage
 
 
 class BasicAuditStorage(AuditStorage):
+    def __init__(self):
+        self.initialized = True
+
     def message_to_str(self, message: BrokerMessage) -> str:
         return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
 
-    async def report(
+    async def report_and_send(
         self,
         *,
         kbid: str,
@@ -49,22 +51,22 @@ class BasicAuditStorage(AuditStorage):
         rid: Optional[str] = None,
         field_metadata: Optional[List[FieldID]] = None,
         audit_fields: Optional[List[AuditField]] = None,
-        kb_counter: Optional[AuditKBCounter] = None,
     ):
-        logger.debug(f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields} {kb_counter}")
+        logger.debug(f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields}")
 
-    def report_resources(
+    async def visited(
         self,
-        *,
         kbid: str,
-        resources: int,
+        uuid: str,
+        user: str,
+        origin: str,
     ):
-        logger.debug(f"REPORT RESOURCES {kbid} {resources}")
-
-    async def visited(self, kbid: str, uuid: str, user: str, origin: str):
         logger.debug(f"VISITED {kbid} {uuid} {user} {origin}")
 
-    async def search(
+    def send(self, msg: AuditRequest):
+        logger.debug(f"sending a {msg.type} queued message")
+
+    def search(
         self,
         kbid: str,
         user: str,
@@ -76,30 +78,19 @@ class BasicAuditStorage(AuditStorage):
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
 
-    async def suggest(
-        self,
-        kbid: str,
-        user: str,
-        client: int,
-        origin: str,
-        timeit: float,
-    ):
-        logger.debug(f"SUGGEST {kbid} {user} {origin} {timeit}")
-
-    async def chat(
+    def chat(
         self,
         kbid: str,
         user: str,
         client_type: int,
         origin: str,
-        timeit: float,
         question: str,
         rephrased_question: Optional[str],
         context: List[ChatContext],
         answer: Optional[str],
         learning_id: str,
+        rephrase_time: Optional[float] = None,
+        generative_answer_time: Optional[float] = None,
+        generative_answer_first_chunk_time: Optional[float] = None,
     ):
-        logger.debug(f"CHAT {kbid} {user} {origin} {timeit}")
-
-    async def delete_kb(self, kbid):
-        logger.debug(f"KB DELETED {kbid}")
+        logger.debug(f"CHAT {kbid} {user} {origin}")

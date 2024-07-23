@@ -20,7 +20,7 @@
 import asyncio
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import Callable
+from typing import Union
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -35,7 +35,6 @@ from nucliadb_models.notifications import (
     ResourceProcessedNotification,
     ResourceWrittenNotification,
 )
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import writer_pb2
 
 
@@ -88,76 +87,75 @@ def kb_notifications():
         yield mocked
 
 
-@pytest.mark.asyncio
-async def test_activity(
-    kb_notifications,
-    reader_api,
-    knowledgebox_ingest,
-):
-    kbid = knowledgebox_ingest
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        async with client.stream(
-            method="GET",
-            url=f"/{KB_PREFIX}/{kbid}/notifications",
-        ) as resp:
-            assert resp.status_code == 200
+@pytest.mark.deploy_modes("component")
+async def test_activity(kb_notifications, nucliadb_reader: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
+    async with nucliadb_reader.stream(
+        method="GET",
+        url=f"/{KB_PREFIX}/{kbid}/notifications",
+    ) as resp:
+        assert resp.status_code == 200
 
-            notifs = []
-            async for line in resp.aiter_lines():
-                notification_type = Notification.model_validate_json(line).type
-                assert notification_type in [
-                    "resource_indexed",
-                    "resource_written",
-                    "resource_processed",
-                ]
+        notifs = []
+        async for line in resp.aiter_lines():
+            notification_type = Notification.model_validate_json(line).type
+            assert notification_type in [
+                "resource_indexed",
+                "resource_written",
+                "resource_processed",
+            ]
 
-                if notification_type == "resource_indexed":
-                    notif = ResourceIndexedNotification.model_validate_json(line)
-                    assert notif.type == "resource_indexed"
-                    assert notif.data.resource_uuid == "resource"
-                    assert notif.data.resource_title == "Resource"
-                    assert notif.data.seqid == 1
+            notif: Union[
+                ResourceIndexedNotification, ResourceWrittenNotification, ResourceProcessedNotification
+            ]
 
-                elif notification_type == "resource_written":
-                    notif = ResourceWrittenNotification.model_validate_json(line)
-                    assert notif.type == "resource_written"
-                    assert notif.data.resource_uuid == "resource"
-                    assert notif.data.resource_title == "Resource"
-                    assert notif.data.seqid == 1
-                    assert notif.data.operation == "created"
-                    assert notif.data.error is False
+            if notification_type == "resource_indexed":
+                notif = ResourceIndexedNotification.model_validate_json(line)  # type: ignore
+                assert notif.type == "resource_indexed"
+                assert notif.data.resource_uuid == "resource"
+                assert notif.data.resource_title == "Resource"
+                assert notif.data.seqid == 1
 
-                elif notification_type == "resource_processed":
-                    notif = ResourceProcessedNotification.model_validate_json(line)
-                    assert notif.type == "resource_processed"
-                    assert notif.data.resource_uuid == "resource"
-                    assert notif.data.resource_title == "Resource"
-                    assert notif.data.seqid == 1
-                    assert notif.data.ingestion_succeeded is True
-                    assert notif.data.processing_errors is True
+            elif notification_type == "resource_written":
+                notif = ResourceWrittenNotification.model_validate_json(line)
+                assert notif.type == "resource_written"
+                assert notif.data.resource_uuid == "resource"
+                assert notif.data.resource_title == "Resource"
+                assert notif.data.seqid == 1
+                assert notif.data.operation == "created"
+                assert notif.data.error is False
 
-                else:
-                    assert False, "Unexpected notification type"
+            elif notification_type == "resource_processed":
+                notif = ResourceProcessedNotification.model_validate_json(line)  # type: ignore
+                assert notif.type == "resource_processed"
+                assert notif.data.resource_uuid == "resource"
+                assert notif.data.resource_title == "Resource"
+                assert notif.data.seqid == 1
+                assert notif.data.ingestion_succeeded is True
+                assert notif.data.processing_errors is True
 
-                notifs.append(notif)
+            else:
+                assert False, "Unexpected notification type"
 
-        assert len(notifs) == 3
+            notifs.append(notif)
+
+    assert len(notifs) == 3
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_activity_kb_not_found(
-    reader_api: Callable[..., AsyncClient],
+    nucliadb_reader: AsyncClient,
 ):
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/foobar/notifications")
-        assert resp.status_code == 404
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/foobar/notifications")
+    assert resp.status_code == 404
 
 
+@pytest.mark.deploy_modes("component")
 async def test_processing_status(
-    reader_api,
-    test_resources: tuple[str, list[str]],
+    nucliadb_reader: AsyncClient,
+    simple_resources: tuple[str, list[str]],
 ):
-    kbid, resources = test_resources
+    kbid, resources = simple_resources
 
     processing_client = MagicMock()
     processing_client.__aenter__ = AsyncMock(return_value=processing_client)
@@ -182,10 +180,9 @@ async def test_processing_status(
         "nucliadb.reader.api.v1.services.processing.ProcessingHTTPClient",
         return_value=processing_client,
     ):
-        async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-            resp = await client.get(f"/{KB_PREFIX}/{kbid}/processing-status")
-            assert resp.status_code == 200
+        resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{kbid}/processing-status")
+        assert resp.status_code == 200
 
-            data = processing.RequestsResults.model_validate(resp.json())
+        data = processing.RequestsResults.model_validate(resp.json())
 
-            assert all([result.title is not None for result in data.results])
+        assert all([result.title is not None for result in data.results])

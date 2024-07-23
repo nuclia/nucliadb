@@ -102,12 +102,12 @@ class SearchOptions(str, Enum):
     VECTOR = "vector"
 
     def normalized(self):
-        if self.value == SearchOptions.KEYWORD:
-            return SearchOptions.PARAGRAPH
-        elif self.value == SearchOptions.FULLTEXT:
-            return SearchOptions.DOCUMENT
-        elif self.value == SearchOptions.SEMANTIC:
-            return SearchOptions.VECTOR
+        if self.value == SearchOptions.PARAGRAPH:
+            return SearchOptions.KEYWORD
+        elif self.value == SearchOptions.DOCUMENT:
+            return SearchOptions.FULLTEXT
+        elif self.value == SearchOptions.VECTOR:
+            return SearchOptions.SEMANTIC
         return self.value
 
 
@@ -121,10 +121,10 @@ class ChatOptions(str, Enum):
     PARAGRAPHS = "paragraphs"
 
     def normalized(self):
-        if self.value == ChatOptions.KEYWORD:
-            return ChatOptions.PARAGRAPHS
-        elif self.value == ChatOptions.SEMANTIC:
-            return ChatOptions.VECTORS
+        if self.value == ChatOptions.PARAGRAPHS:
+            return ChatOptions.KEYWORD
+        elif self.value == ChatOptions.VECTORS:
+            return ChatOptions.SEMANTIC
         return self.value
 
 
@@ -632,7 +632,7 @@ class SearchParamDefaults:
         description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa
     )
     chat_features = ParamDefault(
-        default=[ChatOptions.VECTORS, ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
+        default=[ChatOptions.SEMANTIC, ChatOptions.KEYWORD, ChatOptions.RELATIONS],
         title="Chat features",
         description="Features enabled for the chat endpoint. Semantic search is done if `semantic` (or `vectors`) is included. If `keyword` (or `paragraphs`) is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",  # noqa
     )
@@ -756,9 +756,9 @@ class BaseSearchRequest(BaseModel):
     )
     features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.DOCUMENT,
-            SearchOptions.VECTOR,
+            SearchOptions.KEYWORD,
+            SearchOptions.FULLTEXT,
+            SearchOptions.SEMANTIC,
         ]
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
@@ -1229,8 +1229,8 @@ class SummarizedResponse(BaseModel):
 class FindRequest(BaseSearchRequest):
     features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.VECTOR,
+            SearchOptions.KEYWORD,
+            SearchOptions.SEMANTIC,
         ]
     )
 
@@ -1238,7 +1238,7 @@ class FindRequest(BaseSearchRequest):
     @classmethod
     def fulltext_not_supported(cls, v):
         # features are already normalized in the BaseSearchRequest model
-        if SearchOptions.DOCUMENT in v or SearchOptions.DOCUMENT == v:
+        if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
             raise ValueError("fulltext search not supported")
         return v
 

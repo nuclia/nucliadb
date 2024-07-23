@@ -19,13 +19,14 @@
 #
 pytest_plugins = [
     "pytest_docker_fixtures",
-    "tests.fixtures",
-    "tests.ingest.fixtures",  # should be refactored out
-    "tests.reader.fixtures",
-    "nucliadb_utils.tests.nats",
+    "tests.ndbfixtures",
     "nucliadb_utils.tests.fixtures",
+    "nucliadb_utils.tests.nats",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
     "nucliadb_utils.tests.azure",
+    "nucliadb_utils.tests.local",
     "nucliadb_utils.tests.asyncbenchmark",
+    # XXX we keep needing this for dependent fixtures that haven't been moved yet
+    "tests.ingest.fixtures",
 ]

@@ -281,7 +281,7 @@ async def listeners(writer: Writer):
 @pytest.fixture(scope="function")
 async def worker(
     node_single,
-    gcs_storage,
+    storage,
     nats_manager: NatsConnectionManager,
     writer: Writer,
     writer_stub: NodeWriterStub,

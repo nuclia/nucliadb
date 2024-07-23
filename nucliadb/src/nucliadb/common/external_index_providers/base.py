@@ -26,8 +26,11 @@ from pydantic import BaseModel
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
+
+manager_observer = Observer("external_index_manager", labels={"operation": "", "provider": ""})
 
 
 class TextBlockMatch(BaseModel):
@@ -87,7 +90,8 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
                 "provider": self.type.value,
             },
         )
-        await self._delete_resource(resource_uuid)
+        with manager_observer({"operation": "delete_resource", "provider": self.type.value}):
+            await self._delete_resource(resource_uuid)
 
     async def index_resource(self, resource_uuid: str, resource_data: Resource) -> None:
         """
@@ -101,7 +105,8 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
                 "provider": self.type.value,
             },
         )
-        await self._index_resource(resource_uuid, resource_data)
+        with manager_observer({"operation": "index_resource", "provider": self.type.value}):
+            await self._index_resource(resource_uuid, resource_data)
 
     async def query(self, request: SearchRequest) -> QueryResults:
         """
@@ -114,7 +119,8 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
                 "provider": self.type.value,
             },
         )
-        return await self._query(request)
+        with manager_observer({"operation": "query", "provider": self.type.value}):
+            return await self._query(request)
 
     @abc.abstractmethod
     async def _delete_resource(self, resource_uuid: str) -> None:  # pragma: no cover

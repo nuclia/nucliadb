@@ -200,6 +200,16 @@ class AuditSettings(BaseSettings):
 audit_settings = AuditSettings()
 
 
+class UsageSettings(BaseSettings):
+    usage_jetstream_subject: Optional[str] = "kb-usage.nuclia_db"
+    usage_jetstream_servers: List[str] = []
+    usage_jetstream_auth: Optional[str] = None
+    usage_stream: str = "kb-usage"
+
+
+usage_settings = UsageSettings()
+
+
 class NATSConsumerSettings(BaseSettings):
     # Read about message ordering:
     #   https://docs.nats.io/nats-concepts/subject_mapping#when-is-deterministic-partitioning-needed
