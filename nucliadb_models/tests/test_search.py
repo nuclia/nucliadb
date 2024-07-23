@@ -63,16 +63,16 @@ def test_field_extension_strategy_fields_field_validator():
 def test_search_request_features_normalization():
     request = search.SearchRequest(
         features=[
-            search.SearchOptions.SEMANTIC,
-            search.SearchOptions.KEYWORD,
-            search.SearchOptions.FULLTEXT,
+            search.SearchOptions.VECTOR,
+            search.SearchOptions.PARAGRAPH,
+            search.SearchOptions.DOCUMENT,
             search.SearchOptions.RELATIONS,
         ]
     )
     assert request.features == [
-        search.SearchOptions.VECTOR,
-        search.SearchOptions.PARAGRAPH,
-        search.SearchOptions.DOCUMENT,
+        search.SearchOptions.SEMANTIC,
+        search.SearchOptions.KEYWORD,
+        search.SearchOptions.FULLTEXT,
         search.SearchOptions.RELATIONS,
     ]
 
@@ -80,14 +80,14 @@ def test_search_request_features_normalization():
 def test_find_request_features_normalization():
     request = search.FindRequest(
         features=[
-            search.SearchOptions.SEMANTIC,
-            search.SearchOptions.KEYWORD,
+            search.SearchOptions.VECTOR,
+            search.SearchOptions.PARAGRAPH,
             search.SearchOptions.RELATIONS,
         ]
     )
     assert request.features == [
-        search.SearchOptions.VECTOR,
-        search.SearchOptions.PARAGRAPH,
+        search.SearchOptions.SEMANTIC,
+        search.SearchOptions.KEYWORD,
         search.SearchOptions.RELATIONS,
     ]
 
@@ -97,20 +97,20 @@ def test_find_request_fulltext_feature_not_allowed():
         search.FindRequest(features=[search.SearchOptions.DOCUMENT])
 
     with pytest.raises(ValidationError):
-        search.FindRequest(features=[search.SearchOptions.DOCUMENT])
+        search.FindRequest(features=[search.SearchOptions.FULLTEXT])
 
 
 def test_chat_request_features_normalization():
     request = search.ChatRequest(
         query="my-query",
         features=[
-            search.ChatOptions.SEMANTIC,
-            search.ChatOptions.KEYWORD,
+            search.ChatOptions.VECTORS,
+            search.ChatOptions.PARAGRAPHS,
             search.ChatOptions.RELATIONS,
         ],
     )
     assert request.features == [
-        search.ChatOptions.VECTORS,
-        search.ChatOptions.PARAGRAPHS,
+        search.ChatOptions.SEMANTIC,
+        search.ChatOptions.KEYWORD,
         search.ChatOptions.RELATIONS,
     ]
