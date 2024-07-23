@@ -92,6 +92,8 @@ def nucliadb():
             child = subprocess.Popen(
                 os.path.join(os.path.dirname(sys.executable), "nucliadb"),
                 env=images.settings["nucliadb"]["env"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             # Wait for service ready
             for _ in range(10):

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
+from typing import cast
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
@@ -29,11 +29,8 @@ from nucliadb_utils.utilities import has_feature
 from ..resource import Resource
 
 
-def _pg_transaction(txn: Transaction) -> Optional[PGTransaction]:
-    if isinstance(txn, PGTransaction):
-        return txn
-    else:
-        return None
+def _pg_transaction(txn: Transaction) -> PGTransaction:
+    return cast(PGTransaction, txn)
 
 
 def pgcatalog_enabled(kbid):
@@ -49,11 +46,7 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
     if resource.basic is None:
         raise ValueError("Cannot index into the catalog a resource without basic metadata ")
 
-    tx = _pg_transaction(txn)
-    if tx is None:
-        raise Exception("Cannot use PG catalog with non-PG driver")
-
-    async with tx.connection.cursor() as cur:
+    async with _pg_transaction(txn).connection.cursor() as cur:
         await cur.execute(
             """
             INSERT INTO catalog
@@ -80,11 +73,7 @@ async def pgcatalog_delete(txn: Transaction, kbid: str, rid: str):
     if not pgcatalog_enabled(kbid):
         return
 
-    tx = _pg_transaction(txn)
-    if tx is None:
-        raise Exception("Cannot use PG catalog with non-PG driver")
-
-    async with tx.connection.cursor() as cur:
+    async with _pg_transaction(txn).connection.cursor() as cur:
         await cur.execute(
             "DELETE FROM catalog where kbid = %(kbid)s AND rid = %(rid)s", {"kbid": kbid, "rid": rid}
         )

@@ -564,7 +564,7 @@ class SearchParamDefaults:
     sort_field = ParamDefault(
         default=None,
         title="Sort field",
-        description="Field to sort results with",
+        description="Field to sort results with (Score not supported in catalog)",
     )
     sort = ParamDefault(
         default=None,

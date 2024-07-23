@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Any, Optional
+from typing import Any, cast
 
 from psycopg.rows import dict_row
 
@@ -116,7 +116,8 @@ def _prepare_query(query_parser: QueryParser):
         elif query_parser.sort.field == SortField.TITLE:
             order_field = "title"
         else:
-            raise ValueError("Unsupported sort")
+            # Deprecated order by score, use created_at instead
+            order_field = "created_at"
 
         if query_parser.sort.order == SortOrder.ASC:
             order_dir = "ASC"
@@ -136,29 +137,21 @@ def _prepare_query(query_parser: QueryParser):
     )
 
 
-def _pg_driver() -> Optional[PGDriver]:
-    driver = get_driver()
-    if isinstance(driver, PGDriver):
-        return driver
-    else:
-        return None
+def _pg_driver() -> PGDriver:
+    return cast(PGDriver, get_driver())
 
 
 def pgcatalog_enabled(kbid):
-    return _pg_driver() is not None and has_feature(
+    return isinstance(get_driver(), PGDriver) and has_feature(
         const.Features.PG_CATALOG_READ, context={"kbid": kbid}
     )
 
 
 async def pgcatalog_search(query_parser: QueryParser):
-    driver = _pg_driver()
-    if not driver:
-        raise Exception("Cannot use PG catalog with non-PG driver")
-
     # Prepare SQL query
     query, query_params = _prepare_query(query_parser)
 
-    async with driver._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+    async with _pg_driver()._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
         facets: dict[str, FacetResults] = {}
 
         # Faceted search
