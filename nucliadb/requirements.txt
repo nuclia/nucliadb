@@ -40,7 +40,7 @@ jwcrypto>=1.5.6
 fastapi-versioning>=0.10.0
 # At some point FastAPI will drop support for pydantic v1
 fastapi>=0.95.2
-sentry-sdk>=1.5.12
+sentry-sdk>=2.8.0
 pyjwt>=2.4.0
 mmh3>=3.0.0
 httpx>=0.23.0

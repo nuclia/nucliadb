@@ -1,4 +1,4 @@
-sentry-sdk>=1.5.12
+sentry-sdk>=2.8.0
 grpcio>=1.44.0,<1.63.0
 grpcio-health-checking>=1.44.0,<1.63.0
 grpcio-channelz>=1.44.0,<1.63.0
