@@ -27,6 +27,7 @@ from nucliadb.search.predict import (
     AnswerStatusCode,
     CitationsGenerativeResponse,
     GenerativeChunk,
+    JSONGenerativeResponse,
     StatusGenerativeResponse,
 )
 from nucliadb.search.utilities import get_predict
@@ -55,10 +56,6 @@ async def test_ask(
         json={
             "query": "query",
             "context": context,
-            "answer_json_schema": {
-                "type": "object",
-                "properties": {"answer": {"type": "string"}, "confidence": {"type": "number"}},
-            },
         },
     )
     assert resp.status_code == 200
@@ -466,7 +463,7 @@ async def test_ask_handles_stream_errors_on_predict(nucliadb_reader, knowledgebo
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_ask_handles_stream_unexpected_errors(nucliadb_reader, knowledgebox, resource):
+async def test_ask_handles_stream_unexpected_errors_sync(nucliadb_reader, knowledgebox, resource):
     with mock.patch(
         "nucliadb.search.search.chat.ask.AskResult._stream",
         side_effect=ValueError("foobar"),
@@ -479,6 +476,14 @@ async def test_ask_handles_stream_unexpected_errors(nucliadb_reader, knowledgebo
         )
         assert resp.status_code == 500
 
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_handles_stream_unexpected_errors_stream(nucliadb_reader, knowledgebox, resource):
+    with mock.patch(
+        "nucliadb.search.search.chat.ask.AskResult._stream",
+        side_effect=ValueError("foobar"),
+    ):
         # Stream ask -- should handle by yielding the error item
         resp = await nucliadb_reader.post(
             f"/kb/{knowledgebox}/ask",
@@ -491,3 +496,37 @@ async def test_ask_handles_stream_unexpected_errors(nucliadb_reader, knowledgebo
         assert (
             error_item.error == "Unexpected error while generating the answer. Please try again later."
         )
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_with_json_schema_output(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resource,
+):
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "query"})
+    assert resp.status_code == 200
+
+    predict = get_predict()
+
+    predict_answer = JSONGenerativeResponse(object={"answer": "valid answer to", "confidence": 0.5})
+    predict.ndjson_answer = [GenerativeChunk(chunk=predict_answer).model_dump_json() + "\n"]  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+            "answer_json_schema": {
+                "type": "object",
+                "properties": {"answer": {"type": "string"}, "confidence": {"type": "number"}},
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    results = parse_ask_response(resp)
+    assert len(results) == 4
+    assert results[1].item.type == "answer_json"
+    answer_json = results[1].item.object
+    assert answer_json["answer"] == "valid answer to"
+    assert answer_json["confidence"] == 0.5
