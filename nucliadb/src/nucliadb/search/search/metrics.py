@@ -83,6 +83,11 @@ class RAGMetrics:
         self.first_chunk_yielded_at = time.monotonic()
         generative_first_chunk_histogram.observe(self.first_chunk_yielded_at - self.global_start)
 
+    def get_first_chunk_time(self) -> Optional[float]:
+        if self.first_chunk_yielded_at is None:
+            return None
+        return self.first_chunk_yielded_at - self.global_start
+
     def _start(self, step: str):
         self._start_times[step] = time.monotonic()
 

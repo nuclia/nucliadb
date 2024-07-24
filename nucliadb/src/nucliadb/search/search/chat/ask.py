@@ -19,7 +19,6 @@
 #
 import functools
 import json
-import time
 from typing import AsyncGenerator, Optional
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -165,9 +164,9 @@ class AskResult:
         yield RetrievalAskResponseItem(results=self.find_results)
 
         # Then stream out the predict answer
-        async for answer_chunk in self._stream_predict_answer_text():
-            yield AnswerAskResponseItem(text=answer_chunk)
-        finish_predict_stream_time = time.monotonic()
+        with self.metrics.time("stream_predict_answer"):
+            async for answer_chunk in self._stream_predict_answer_text():
+                yield AnswerAskResponseItem(text=answer_chunk)
 
         if self._object is not None:
             yield JSONAskResponseItem(object=self._object.object)
@@ -196,15 +195,13 @@ class AskResult:
         try:
             rephrase_time = self.metrics.elapsed("rephrase")
         except KeyError:
+            # Not all ask requests have a rephrase step
             rephrase_time = None
-
-        generative_answer_time = finish_predict_stream_time - self.metrics._start_times["stream_start"]
-        first_chunk_time = self.metrics.first_chunk_yielded_at - self.metrics.global_start
 
         self.auditor.audit(
             text_answer=audit_answer,
-            generative_answer_time=generative_answer_time,
-            generative_answer_first_chunk_time=first_chunk_time,
+            generative_answer_time=self.metrics.elapsed("stream_predict_answer"),
+            generative_answer_first_chunk_time=self.metrics.get_first_chunk_time() or 0,
             rephrase_time=rephrase_time,
             status_code=self.status_code,
         )
@@ -307,22 +304,37 @@ class AskResult:
         the answer text is streamed in order.
         """
         first_answer_chunk_yielded = False
+
         async for generative_chunk in self.predict_answer_stream:
             item = generative_chunk.chunk
+
             if isinstance(item, TextGenerativeResponse):
                 self._answer_text += item.text
+
+                yield item.text
+
                 if not first_answer_chunk_yielded:
                     self.metrics.record_first_chunk_yielded()
                     first_answer_chunk_yielded = True
-                yield item.text
+
             elif isinstance(item, JSONGenerativeResponse):
                 self._object = item
+
+                if not first_answer_chunk_yielded:
+                    # When there is a JSON generative response, we consider the first chunk yielded
+                    # to be the moment when the JSON object is yielded, not the text
+                    self.metrics.record_first_chunk_yielded()
+                    first_answer_chunk_yielded = True
+
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
+
             elif isinstance(item, CitationsGenerativeResponse):
                 self._citations = item
+
             elif isinstance(item, MetaGenerativeResponse):
                 self._metadata = item
+
             else:
                 logger.warning(
                     f"Unexpected item in predict answer stream: {item}",
