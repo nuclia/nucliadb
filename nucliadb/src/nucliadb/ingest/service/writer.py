@@ -130,9 +130,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
 
         except ExternalIndexCreationError as exc:
-            logger.error(
+            logger.exception(
                 "Error creating external index",
-                exc_info=True,
                 extra={"slug": request.slug, "error": str(exc)},
             )
             return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
@@ -194,9 +193,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.CONFLICT)
 
         except ExternalIndexCreationError as exc:
-            logger.error(
+            logger.exception(
                 "Error creating external index",
-                exc_info=True,
                 extra={"slug": request.slug, "error": str(exc)},
             )
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.ERROR)
