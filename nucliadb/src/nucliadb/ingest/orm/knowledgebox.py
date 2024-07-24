@@ -187,9 +187,6 @@ class KnowledgeBox:
                         partial(cls._maybe_delete_external_indexes, kbid, stored_external_index_provider)
                     )
                 else:
-                    stored_external_index_provider = StoredExternalIndexProviderMetadata(
-                        type=external_index_provider.type
-                    )
                     external_indexes = []
                     for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                         # if this KB uses a matryoshka model, we can choose a different
@@ -214,14 +211,17 @@ class KnowledgeBox:
                         )
                         await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
 
-                        stored_external_index_provider = await cls._maybe_create_external_indexes(
-                            kbid, request=external_index_provider, indexes=external_indexes
+                    stored_external_index_provider = await cls._maybe_create_external_indexes(
+                        kbid, request=external_index_provider, indexes=external_indexes
+                    )
+                    rollback_ops.append(
+                        partial(
+                            cls._maybe_delete_external_indexes,
+                            kbid,
+                            stored_external_index_provider,
+                            external_indexes,
                         )
-                        rollback_ops.append(
-                            partial(
-                                cls._maybe_delete_external_indexes, kbid, stored_external_index_provider
-                            )
-                        )
+                    )
 
                 config = KnowledgeBoxConfig(
                     title=title,
@@ -556,7 +556,10 @@ class KnowledgeBox:
 
     @classmethod
     async def _maybe_delete_external_indexes(
-        cls, kbid: str, external_index_provider: StoredExternalIndexProviderMetadata
+        cls,
+        kbid: str,
+        external_index_provider: StoredExternalIndexProviderMetadata,
+        created_external_indexes: Optional[list[ExternalIndex]] = None,
     ):
         if external_index_provider.type != ExternalIndexProviderType.PINECONE:
             return
@@ -566,7 +569,12 @@ class KnowledgeBox:
         api_key = endecryptor.decrypt(encrypted_api_key)
         pinecone = get_pinecone().control_plane(api_key=api_key)
 
-        for index_name in external_index_provider.pinecone_config.indexes.keys():
+        index_names_to_delete: set[str] = set()
+        index_names_to_delete.update(
+            {index_name for index_name in external_index_provider.pinecone_config.indexes.keys()}
+        )
+        index_names_to_delete.update({ei.vectorset_id for ei in created_external_indexes or []})
+        for index_name in index_names_to_delete:
             logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
             try:
                 await pinecone.delete_index(name=index_name)

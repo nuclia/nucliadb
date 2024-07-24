@@ -143,7 +143,6 @@ class PineconeIndexManager(ExternalIndexManager):
         assert index_hosts != {}
         self.index_hosts = index_hosts
         self.pinecone = get_pinecone()
-        self._data_plane_clients: dict[str, DataPlane] = {}
         self.upsert_parallelism = upsert_parallelism
         self.delete_parallelism = delete_parallelism
         self.upsert_timeout = upsert_timeout
@@ -152,11 +151,7 @@ class PineconeIndexManager(ExternalIndexManager):
 
     def get_data_plane(self, index_name: str) -> DataPlane:
         index_host = self.index_hosts[index_name]
-        if index_host not in self._data_plane_clients:
-            self._data_plane_clients[index_host] = self.pinecone.data_plane(
-                api_key=self.api_key, index_host=index_host
-            )
-        return self._data_plane_clients[index_host]
+        return self.pinecone.data_plane(api_key=self.api_key, index_host=index_host)
 
     @classmethod
     def get_index_name(cls, kbid: str, vectorset_id: str) -> str:
