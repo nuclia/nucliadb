@@ -26,6 +26,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
+from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     CreatePineconeConfig,
@@ -104,13 +105,15 @@ async def test_kb_creation(
         assert decrypted_api_key == "my-pinecone-api-key"
 
         # Check that the rest of the config was stored
-        assert external_index_provider.pinecone_config.index_hosts[f"{kbid}--default"] == "pinecone-host"
+        index_name = PineconeIndexManager.get_index_name(kbid, "default")
+        assert external_index_provider.pinecone_config.indexes[index_name].index_host == "pinecone-host"
+        assert external_index_provider.pinecone_config.indexes[index_name].vector_dimension == 128
 
     # Deleting a knowledge box should delete the Pinecone index
     response = await nucliadb_grpc.DeleteKnowledgeBox(KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None)  # type: ignore
     assert response.status == KnowledgeBoxResponseStatus.OK
 
-    mock_pinecone_client.delete_index.assert_awaited_once_with(name=f"{kbid}--default")
+    mock_pinecone_client.delete_index.assert_awaited_once_with(name=index_name)
 
 
 async def test_find_on_pinecone_kb(

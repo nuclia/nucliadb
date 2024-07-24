@@ -131,39 +131,57 @@ class CreatePineconeConfig(google.protobuf.message.Message):
 global___CreatePineconeConfig = CreatePineconeConfig
 
 @typing.final
+class PineconeIndexMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INDEX_HOST_FIELD_NUMBER: builtins.int
+    VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
+    index_host: builtins.str
+    vector_dimension: builtins.int
+    def __init__(
+        self,
+        *,
+        index_host: builtins.str = ...,
+        vector_dimension: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["index_host", b"index_host", "vector_dimension", b"vector_dimension"]) -> None: ...
+
+global___PineconeIndexMetadata = PineconeIndexMetadata
+
+@typing.final
 class StoredPineconeConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     @typing.final
-    class IndexHostsEntry(google.protobuf.message.Message):
+    class IndexesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.str
-        value: builtins.str
+        @property
+        def value(self) -> global___PineconeIndexMetadata: ...
         def __init__(
             self,
             *,
             key: builtins.str = ...,
-            value: builtins.str = ...,
+            value: global___PineconeIndexMetadata | None = ...,
         ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
 
     ENCRYPTED_API_KEY_FIELD_NUMBER: builtins.int
-    INDEX_HOSTS_FIELD_NUMBER: builtins.int
+    INDEXES_FIELD_NUMBER: builtins.int
     encrypted_api_key: builtins.str
     @property
-    def index_hosts(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
-        """Index name to index host mapping."""
-
+    def indexes(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___PineconeIndexMetadata]: ...
     def __init__(
         self,
         *,
         encrypted_api_key: builtins.str = ...,
-        index_hosts: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        indexes: collections.abc.Mapping[builtins.str, global___PineconeIndexMetadata] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["encrypted_api_key", b"encrypted_api_key", "index_hosts", b"index_hosts"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["encrypted_api_key", b"encrypted_api_key", "indexes", b"indexes"]) -> None: ...
 
 global___StoredPineconeConfig = StoredPineconeConfig
 

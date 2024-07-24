@@ -32,11 +32,14 @@ message CreatePineconeConfig {
     string api_key = 1;
 }
 
+message PineconeIndexMetadata {
+    string index_host = 1;
+    int32 vector_dimension = 2;
+}
+
 message StoredPineconeConfig {
     string encrypted_api_key = 1;
-
-    // Index name to index host mapping.
-    map<string, string> index_hosts = 2;
+    map<string, PineconeIndexMetadata> indexes = 2;
 }
 
 // External Index node provider

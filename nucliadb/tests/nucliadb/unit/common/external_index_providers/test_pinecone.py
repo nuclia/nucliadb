@@ -78,7 +78,7 @@ def external_index_manager(data_plane):
         return PineconeIndexManager(
             kbid="kbid",
             api_key="api_key",
-            index_host="index_host",
+            index_hosts={"default": "index_host"},
             upsert_parallelism=3,
             delete_parallelism=2,
             upsert_timeout=10,

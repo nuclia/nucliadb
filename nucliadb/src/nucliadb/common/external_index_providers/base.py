@@ -86,6 +86,13 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
     def __init__(self, kbid: str):
         self.kbid = kbid
 
+    @classmethod
+    def get_index_name(cls, kbid: str, vectorset_id: str) -> str:  # pragma: no cover
+        """
+        Returns the name of the index in the external index provider.
+        """
+        raise NotImplementedError()
+
     async def delete_resource(self, resource_uuid: str) -> None:
         """
         Deletes a resource from the external index provider.

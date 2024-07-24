@@ -39,6 +39,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
     PINECONE as PINECONE,
+    PineconeIndexMetadata as PineconeIndexMetadata,
     SemanticModelMetadata as SemanticModelMetadata,
     StoredExternalIndexProviderMetadata as StoredExternalIndexProviderMetadata,
     StoredPineconeConfig as StoredPineconeConfig,

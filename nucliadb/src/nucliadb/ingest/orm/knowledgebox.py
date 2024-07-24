@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
 from typing import AsyncGenerator, Optional, Sequence, cast
@@ -36,6 +37,7 @@ from nucliadb.common.datamanagers.resources import (
     KB_RESOURCE_SLUG_BASE,
 )
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
+from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
@@ -84,6 +86,12 @@ KB_TO_DELETE_STORAGE = f"{KB_TO_DELETE_STORAGE_BASE}{{kbid}}"
 
 KB_VECTORSET_TO_DELETE_BASE = "/vectorsettodelete"
 KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}/{{vectorset}}"
+
+
+@dataclass
+class ExternalIndex:
+    vectorset_id: str
+    dimension: int
 
 
 class KnowledgeBox:
@@ -166,23 +174,23 @@ class KnowledgeBox:
                         )
                     kb_shards.similarity = semantic_model.similarity_function
                     kb_shards.model.CopyFrom(semantic_model)
-                    stored_external_index_provider = await cls._maybe_create_external_index(
+                    stored_external_index_provider = await cls._maybe_create_external_indexes(
                         kbid,
                         request=external_index_provider,
-                        vector_dimension=semantic_model.vector_dimension,
+                        indexes=[
+                            ExternalIndex(
+                                vectorset_id="default", dimension=semantic_model.vector_dimension
+                            )
+                        ],
                     )
                     rollback_ops.append(
-                        partial(cls._maybe_delete_external_index, kbid, stored_external_index_provider)
+                        partial(cls._maybe_delete_external_indexes, kbid, stored_external_index_provider)
                     )
                 else:
                     stored_external_index_provider = StoredExternalIndexProviderMetadata(
                         type=external_index_provider.type
                     )
-                    if external_index_provider.type != ExternalIndexProviderType.UNSET:
-                        raise KnowledgeBoxCreationError(
-                            "External index provider is only supported with a single semantic model for now"
-                        )
-
+                    external_indexes = []
                     for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                         # if this KB uses a matryoshka model, we can choose a different
                         # dimension
@@ -190,6 +198,9 @@ class KnowledgeBox:
                             dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
                         else:
                             dimension = semantic_model.vector_dimension
+                        external_indexes.append(
+                            ExternalIndex(vectorset_id=vectorset_id, dimension=dimension)
+                        )
                         vectorset_config = knowledgebox_pb2.VectorSetConfig(
                             vectorset_id=vectorset_id,
                             vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
@@ -202,6 +213,16 @@ class KnowledgeBox:
                             matryoshka_dimensions=semantic_model.matryoshka_dimensions,
                         )
                         await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
+
+                        stored_external_index_provider = await cls._maybe_create_external_indexes(
+                            kbid, request=external_index_provider, indexes=external_indexes
+                        )
+                        rollback_ops.append(
+                            partial(
+                                cls._maybe_delete_external_indexes, kbid, stored_external_index_provider
+                            )
+                        )
+
                 config = KnowledgeBoxConfig(
                     title=title,
                     description=description,
@@ -306,7 +327,7 @@ class KnowledgeBox:
             await txn.commit()
 
         if kb_config is not None:
-            await cls._maybe_delete_external_index(kbid, kb_config.external_index_provider)
+            await cls._maybe_delete_external_indexes(kbid, kb_config.external_index_provider)
 
         usage_utility = get_usage_utility()
         if usage_utility is not None:
@@ -501,55 +522,58 @@ class KnowledgeBox:
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
 
     @classmethod
-    async def _maybe_create_external_index(
+    async def _maybe_create_external_indexes(
         cls,
         kbid: str,
         request: CreateExternalIndexProviderMetadata,
-        vector_dimension: int,
+        indexes: list[ExternalIndex],
     ) -> StoredExternalIndexProviderMetadata:
         metadata = StoredExternalIndexProviderMetadata(type=request.type)
         if request.type != ExternalIndexProviderType.PINECONE:
             return metadata
 
-        index_name = f"{kbid}--default"
-        logger.info(
-            "Creating pincone index",
-            extra={"kbid": kbid, "index_name": index_name, "vector_dimension": vector_dimension},
-        )
         api_key = request.pinecone_config.api_key
-        pinecone = get_pinecone().control_plane(api_key=api_key)
-        try:
-            index_host = await pinecone.create_index(
-                name=index_name,
-                dimension=vector_dimension,
-            )
-        except PineconeAPIError as exc:
-            raise ExternalIndexCreationError("pinecone", exc.message) from exc
         endecryptor = get_endecryptor()
         encrypted_api_key = endecryptor.encrypt(api_key)
         metadata.pinecone_config.encrypted_api_key = encrypted_api_key
-        metadata.pinecone_config.index_hosts[index_name] = index_host
+        pinecone = get_pinecone().control_plane(api_key=api_key)
+        for index in indexes:
+            index_name = PineconeIndexManager.get_index_name(kbid, index.vectorset_id)
+            logger.info(
+                "Creating pincone index",
+                extra={"kbid": kbid, "index_name": index_name, "vector_dimension": index.dimension},
+            )
+            try:
+                index_host = await pinecone.create_index(
+                    name=index_name,
+                    dimension=index.dimension,
+                )
+            except PineconeAPIError as exc:
+                raise ExternalIndexCreationError("pinecone", exc.message) from exc
+            metadata.pinecone_config.indexes[index_name].index_host = index_host
+            metadata.pinecone_config.indexes[index_name].vector_dimension = index.dimension
         return metadata
 
     @classmethod
-    async def _maybe_delete_external_index(
+    async def _maybe_delete_external_indexes(
         cls, kbid: str, external_index_provider: StoredExternalIndexProviderMetadata
     ):
         if external_index_provider.type != ExternalIndexProviderType.PINECONE:
             return
 
-        index_name = f"{kbid}--default"
-        logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
         encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
         endecryptor = get_endecryptor()
         api_key = endecryptor.decrypt(encrypted_api_key)
         pinecone = get_pinecone().control_plane(api_key=api_key)
-        try:
-            await pinecone.delete_index(name=index_name)
-        except Exception:
-            logger.exception(
-                "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
-            )
+
+        for index_name in external_index_provider.pinecone_config.indexes.keys():
+            logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
+            try:
+                await pinecone.delete_index(name=index_name)
+            except Exception:
+                logger.exception(
+                    "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
+                )
 
 
 def release_channel_for_kb(
