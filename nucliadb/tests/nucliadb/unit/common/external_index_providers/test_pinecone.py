@@ -22,6 +22,7 @@ import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 import pytest
 
 from nucliadb.common.external_index_providers.pinecone import (
@@ -96,6 +97,8 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     index_data = PBResourceBrain()
     index_data.texts["f/field"].text = "some text"
     index_data.texts["f/field"].labels.append("/t/text/label")
+    index_data.sentences_to_delete.append("invalid-sid")
+    index_data.sentences_to_delete.append("rid/f/field/0/0-10")
     index_data.paragraphs_to_delete.append("pid-foobar")
     index_data.paragraphs_to_delete.append("rid/f/field/0-10")
     index_data.labels.extend(["/e/PERSON/John Doe", "/e/ORG/ACME", "/n/s/PROCESSED", "/t/private"])
@@ -242,3 +245,7 @@ def test_convert_to_pinecone_filter_empty():
     request = nodereader_pb2.SearchRequest()
     filters = convert_to_pinecone_filter(request)
     assert filters is None
+
+
+def test_exceptions():
+    ExternalIndexCreationError("pinecone", "foo")

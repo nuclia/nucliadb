@@ -58,9 +58,9 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_utils import const
+from nucliadb_utils.aiopynecone.exceptions import PineconeAPIError
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KBSource, Service
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import Storage as KbUsageStorage
-from nucliadb_utils.aiopynecone.exceptions import PineconeAPIError
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (

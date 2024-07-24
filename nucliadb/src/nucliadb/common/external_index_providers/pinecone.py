@@ -61,7 +61,7 @@ class PineconeQueryResults(QueryResults):
         for order, matching_vector in enumerate(self.results.matches):
             try:
                 vector_id = VectorId.from_string(matching_vector.id)
-            except ValueError:
+            except ValueError:  # pragma: no cover
                 logger.error(f"Invalid Pinecone vector id: {matching_vector.id}")
                 continue
             vector_metadata = VectorMetadata.model_validate(matching_vector.metadata)  # noqa
@@ -163,14 +163,14 @@ class PineconeIndexManager(ExternalIndexManager):
             try:
                 delete_field = FieldId.from_string(sentence_id)
                 field_prefixes_to_delete.add(delete_field.full())
-            except ValueError:
+            except ValueError:  # pragma: no cover
                 logger.warning(f"Invalid id to delete: {sentence_id}. VectorId expected.")
                 continue
         for paragraph_id in index_data.paragraphs_to_delete:
             try:
                 delete_pid = ParagraphId.from_string(paragraph_id)
                 field_prefixes_to_delete.add(delete_pid.field_id.full())
-            except ValueError:
+            except ValueError:  # pragma: no cover
                 try:
                     delete_field = FieldId.from_string(paragraph_id)
                     field_prefixes_to_delete.add(delete_field.full())
@@ -228,7 +228,7 @@ class PineconeIndexManager(ExternalIndexManager):
         for _, index_paragraphs in index_data.paragraphs.items():
             for index_paragraph_id, index_paragraph in index_paragraphs.paragraphs.items():
                 metadata = metadatas.get(index_paragraph_id)
-                if metadata is None:
+                if metadata is None:  # pragma: no cover
                     logger.warning(f"Metadata not found for paragraph {index_paragraph_id}")
                     continue
 
@@ -277,8 +277,8 @@ class PineconeIndexManager(ExternalIndexManager):
                             values=list(vector_sentence.vector),
                             metadata=metadata.model_dump(exclude_none=True),
                         )
-                    except MetadataTooLargeError as exc:
-                        logger.error(f"Invalid Pinecone vector. Skipping: {exc}")
+                    except MetadataTooLargeError as exc:  # pragma: no cover
+                        logger.error(f"Invalid Pinecone vector. Metadata is too large. Skipping: {exc}")
                         continue
                     vectors.append(pc_vector)
         if len(vectors) == 0:  # pragma: no cover

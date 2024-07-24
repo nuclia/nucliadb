@@ -25,6 +25,7 @@ from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFo
 from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.broker_message import generate_broker_message
@@ -128,6 +129,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             logger.info("KB already exists", extra={"slug": request.slug})
             return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
 
+        except ExternalIndexCreationError as exc:
+            logger.error(
+                "Error creating external index",
+                exc_info=True,
+                extra={"slug": request.slug, "error": str(exc)},
+            )
+            return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
+
         except Exception as exc:
             errors.capture_exception(exc)
             logger.exception(
@@ -183,6 +192,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except KnowledgeBoxConflict:
             logger.info("KB already exists", extra={"slug": request.slug})
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.CONFLICT)
+
+        except ExternalIndexCreationError as exc:
+            logger.error(
+                "Error creating external index",
+                exc_info=True,
+                extra={"slug": request.slug, "error": str(exc)},
+            )
+            return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.ERROR)
 
         except Exception as exc:
             errors.capture_exception(exc)
