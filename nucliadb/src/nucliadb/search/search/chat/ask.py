@@ -164,12 +164,21 @@ class AskResult:
         yield RetrievalAskResponseItem(results=self.find_results)
 
         # Then stream out the predict answer
+        first_chunk_yielded = False
         with self.metrics.time("stream_predict_answer"):
             async for answer_chunk in self._stream_predict_answer_text():
                 yield AnswerAskResponseItem(text=answer_chunk)
+                if not first_chunk_yielded:
+                    self.metrics.record_first_chunk_yielded()
+                    first_chunk_yielded = True
 
         if self._object is not None:
             yield JSONAskResponseItem(object=self._object.object)
+            if not first_chunk_yielded:
+                # When there is a JSON generative response, we consider the first chunk yielded
+                # to be the moment when the JSON object is yielded, not the text
+                self.metrics.record_first_chunk_yielded()
+                first_chunk_yielded = True
 
         # Then the status
         if self.status_code == AnswerStatusCode.ERROR:
@@ -303,38 +312,19 @@ class AskResult:
         This method does not assume any order in the stream of items, but it assumes that at least
         the answer text is streamed in order.
         """
-        first_answer_chunk_yielded = False
-
         async for generative_chunk in self.predict_answer_stream:
             item = generative_chunk.chunk
-
             if isinstance(item, TextGenerativeResponse):
                 self._answer_text += item.text
-
                 yield item.text
-
-                if not first_answer_chunk_yielded:
-                    self.metrics.record_first_chunk_yielded()
-                    first_answer_chunk_yielded = True
-
             elif isinstance(item, JSONGenerativeResponse):
                 self._object = item
-
-                if not first_answer_chunk_yielded:
-                    # When there is a JSON generative response, we consider the first chunk yielded
-                    # to be the moment when the JSON object is yielded, not the text
-                    self.metrics.record_first_chunk_yielded()
-                    first_answer_chunk_yielded = True
-
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
-
             elif isinstance(item, CitationsGenerativeResponse):
                 self._citations = item
-
             elif isinstance(item, MetaGenerativeResponse):
                 self._metadata = item
-
             else:
                 logger.warning(
                     f"Unexpected item in predict answer stream: {item}",
