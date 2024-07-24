@@ -523,3 +523,31 @@ async def async_batchify(async_iterable: AsyncIterable, batch_size: int):
             batch = []
     if batch:
         yield batch
+
+
+class FilterOperator:
+    """
+    Filter operators for metadata queries.
+    https://docs.pinecone.io/guides/data/filter-with-metadata#metadata-query-language
+    """
+
+    EQUALS = "$eq"
+    NOT_EQUALS = "$ne"
+    GREATER_THAN = "$gt"
+    GREATER_THAN_OR_EQUAL = "$gte"
+    LESS_THAN = "$lt"
+    LESS_THAN_OR_EQUAL = "$lte"
+    IN = "$in"
+    NOT_IN = "$nin"
+    EXISTS = "$exists"
+
+
+class LogicalOperator:
+    """
+    Logical operators for metadata queries.
+    https://docs.pinecone.io/guides/data/filter-with-metadata#metadata-query-language
+    """
+
+    AND = "$and"
+    OR = "$or"
+    NOT = "$not"

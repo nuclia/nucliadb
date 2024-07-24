@@ -60,6 +60,14 @@ class PineconeRateLimitError(PineconeAPIError):
     pass
 
 
+class MetadataTooLargeError(ValueError):
+    """
+    Raised when the metadata of a vector to be upserted is too large.
+    """
+
+    pass
+
+
 def raise_for_status(operation: str, response: httpx.Response):
     try:
         response.raise_for_status()

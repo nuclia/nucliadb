@@ -17,12 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import datetime
+import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager, PineconeQueryResults
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
+from nucliadb.common.external_index_providers.pinecone import (
+    PineconeIndexManager,
+    PineconeQueryResults,
+    VectorMetadata,
+    convert_label_filter_expression,
+    convert_timestamp_filter,
+    convert_to_pinecone_filter,
+)
 from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, IndexParagraphs
 from nucliadb_protos.noderesources_pb2 import Resource as PBResourceBrain
@@ -37,7 +47,13 @@ def query_response():
                 id="rid/f/field/0/0-10",
                 score=0.8,
                 values=None,
-                metadata={"labels": ["/t/text/label"], "access_groups": ["ag1", "ag2"]},
+                metadata={
+                    "rid": "rid",
+                    "field_id": "f/field",
+                    "field_type": "f",
+                    "resource_labels": ["/t/text/label"],
+                    "access_groups": ["ag1", "ag2"],
+                },
             )
         ]
     )
@@ -81,6 +97,8 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     index_data = PBResourceBrain()
     index_data.texts["f/field"].text = "some text"
     index_data.texts["f/field"].labels.append("/t/text/label")
+    index_data.sentences_to_delete.append("invalid-sid")
+    index_data.sentences_to_delete.append("rid/f/field/0/0-10")
     index_data.paragraphs_to_delete.append("pid-foobar")
     index_data.paragraphs_to_delete.append("rid/f/field/0-10")
     index_data.labels.extend(["/e/PERSON/John Doe", "/e/ORG/ACME", "/n/s/PROCESSED", "/t/private"])
@@ -92,6 +110,7 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     index_data.paragraphs["f/field"].CopyFrom(index_paragraphs)
 
     await external_index_manager._index_resource("resource_uuid", index_data)
+
     data_plane.upsert_in_batches.assert_awaited_once()
     vectors = data_plane.upsert_in_batches.call_args[1]["vectors"]
     assert len(vectors) == 1
@@ -100,16 +119,13 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     assert vector.id == "rid/f/field/0/0-10"
     assert vector.values == [1, 2, 3]
     metadata = vector.metadata
-    assert "labels" in metadata
-    labels = vector.metadata["labels"]
-    # Check that ignored labels are not present
-    assert "/e/PERSON/John Doe" not in labels
-    assert "/e/ORG/ACME" not in labels
-    assert "/n/s/PROCESSED" not in labels
-    assert sorted(labels) == ["/t/private", "/t/text/label"]
-    assert "access_groups" in metadata
-    access_groups = vector.metadata["access_groups"]
-    assert sorted(access_groups) == ["ag1", "ag2"]
+    vmetadata = VectorMetadata.model_validate(metadata)
+    assert set(vmetadata.field_labels) == {  # type: ignore
+        "/t/private",
+        "/t/text/label",
+    }
+    assert not vmetadata.security_public
+    assert set(vmetadata.security_ids_with_access) == {"ag1", "ag2"}  # type: ignore
 
 
 async def test_query(external_index_manager: PineconeIndexManager, data_plane):
@@ -140,3 +156,96 @@ def test_iter_matching_text_blocks(query_response):
     assert text_block.position_end == 10
     assert text_block.position_start == 0
     assert text_block.subfield_id is None
+
+
+def test_convert_timestamp_filter():
+    req = nodereader_pb2.SearchRequest()
+    utcnow = datetime.datetime.now(datetime.timezone.utc)
+    utcnow_as_int = int(utcnow.timestamp())
+    req.timestamps.from_created.FromDatetime(utcnow)
+    req.timestamps.to_created.FromDatetime(utcnow)
+    req.timestamps.from_modified.FromDatetime(utcnow)
+    req.timestamps.to_modified.FromDatetime(utcnow)
+    terms = convert_timestamp_filter(req.timestamps)
+    assert len(terms) == 4
+    assert terms[0] == {"date_modified": {"$gte": utcnow_as_int}}
+    assert terms[1] == {"date_modified": {"$lte": utcnow_as_int}}
+    assert terms[2] == {"date_created": {"$gte": utcnow_as_int}}
+    assert terms[3] == {"date_created": {"$lte": utcnow_as_int}}
+
+
+@pytest.mark.parametrize(
+    "expression, converted",
+    [
+        # Simple case: literal
+        ({"literal": "foo"}, {"paragraph_labels": {"$in": ["foo"]}}),
+        ({"not": {"literal": "foo"}}, {"paragraph_labels": {"$nin": ["foo"]}}),
+        # Simple case: and
+        (
+            {"and": [{"literal": "foo"}, {"literal": "bar"}]},
+            {"$and": [{"paragraph_labels": {"$in": ["foo"]}}, {"paragraph_labels": {"$in": ["bar"]}}]},
+        ),
+        (
+            {"and": [{"literal": "foo"}, {"not": {"literal": "bar"}}]},
+            {"$and": [{"paragraph_labels": {"$in": ["foo"]}}, {"paragraph_labels": {"$nin": ["bar"]}}]},
+        ),
+        # Simple case: or
+        (
+            {"or": [{"literal": "foo"}, {"literal": "bar"}]},
+            {"$or": [{"paragraph_labels": {"$in": ["foo"]}}, {"paragraph_labels": {"$in": ["bar"]}}]},
+        ),
+        (
+            {"or": [{"literal": "foo"}, {"not": {"literal": "bar"}}]},
+            {"$or": [{"paragraph_labels": {"$in": ["foo"]}}, {"paragraph_labels": {"$nin": ["bar"]}}]},
+        ),
+        # And/or negated
+        (
+            {"not": {"and": [{"literal": "foo"}, {"literal": "bar"}]}},
+            {"$or": [{"paragraph_labels": {"$nin": ["foo"]}}, {"paragraph_labels": {"$nin": ["bar"]}}]},
+        ),
+        (
+            {"not": {"or": [{"literal": "foo"}, {"literal": "bar"}]}},
+            {"$and": [{"paragraph_labels": {"$nin": ["foo"]}}, {"paragraph_labels": {"$nin": ["bar"]}}]},
+        ),
+    ],
+)
+def test_convert_label_filter_expression(expression, converted):
+    assert convert_label_filter_expression("paragraph_labels", expression) == converted
+
+
+def test_convert_to_pinecone_filter():
+    request = nodereader_pb2.SearchRequest()
+    filter_expression = json.dumps({"literal": "/t/text/label"})
+    request.filter.field_labels.append("/t/text/label")
+    request.filter.expression = filter_expression
+
+    utcnow = datetime.datetime.now(datetime.timezone.utc)
+    request.timestamps.from_created.FromDatetime(utcnow)
+
+    request.key_filters.append("rid")
+    request.security.access_groups.extend(["ag1", "ag2"])
+
+    filters = convert_to_pinecone_filter(request)
+    assert "$and" in filters
+    and_terms = filters["$and"]
+    assert len(and_terms) == 4
+    label_filter_term = and_terms[0]
+    assert label_filter_term == {"field_labels": {"$in": ["/t/text/label"]}}
+    timestamp_filter_term = and_terms[1]
+    assert timestamp_filter_term == {"date_created": {"$gte": int(utcnow.timestamp())}}
+    key_filter_term = and_terms[2]
+    assert key_filter_term == {"rid": {"$in": ["rid"]}}
+    access_groups_term = and_terms[3]
+    assert access_groups_term["$or"][0] == {"security_public": {"$eq": True}}
+    access_groups = access_groups_term["$or"][1]["security_ids_with_access"]["$in"]
+    assert set(access_groups) == {"ag1", "ag2"}
+
+
+def test_convert_to_pinecone_filter_empty():
+    request = nodereader_pb2.SearchRequest()
+    filters = convert_to_pinecone_filter(request)
+    assert filters is None
+
+
+def test_exceptions():
+    ExternalIndexCreationError("pinecone", "foo")

@@ -170,18 +170,18 @@ async def hydrate_text_block(
         order=text_block.order,
         text=text,
         id=text_block.id,
-        labels=[],  # TODO
+        labels=text_block.paragraph_labels,
         fuzzy_result=False,
-        is_a_table=False,  # TODO
-        reference=None,  # TODO
-        page_with_visual=False,  # TODO
+        is_a_table=text_block.is_a_table,
+        reference=text_block.representation_file,
+        page_with_visual=text_block.page_with_visual,
         position=TextPosition(
-            page_number=None,  # TODO
+            page_number=text_block.page_number,
             index=text_block.index or 0,
             start=text_block.position_start,
             end=text_block.position_end,
-            start_seconds=None,  # TODO
-            end_seconds=None,  # TODO
+            start_seconds=text_block.position_start_seconds,
+            end_seconds=text_block.position_end_seconds,
         ),
     )
 

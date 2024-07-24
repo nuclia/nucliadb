@@ -134,7 +134,10 @@ class KnowledgeBoxConfig(BaseModel):
 
     @field_validator("slug")
     @classmethod
-    def id_check(cls, v: str) -> str:
+    def id_check(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+
         for char in v:
             if char in string.ascii_uppercase:
                 raise ValueError("No uppercase ID")

@@ -27,6 +27,7 @@ from starlette.requests import Request
 
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -73,6 +74,8 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxO
         kbid, slug = await _create_kb(item)
     except KnowledgeBoxConflict:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
+    except ExternalIndexCreationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
     except Exception:
         raise HTTPException(status_code=500, detail="Error creating knowledge box")
     else:

@@ -22,6 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.service.writer import WriterServicer
@@ -257,6 +258,26 @@ class TestWriterServicer:
     async def test_NewKnowledgeBoxV2_handle_error(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
         knowledgebox_class.create.side_effect = Exception("error")
+
+        resp = await writer.NewKnowledgeBoxV2(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+
+    async def test_NewKnowledgeBox_handle_external_index_error(
+        self, writer: WriterServicer, knowledgebox_class
+    ):
+        request = writer_pb2.KnowledgeBoxNew(slug="slug")
+        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+
+    async def test_NewKnowledgeBoxV2_handle_external_index_error(
+        self, writer: WriterServicer, knowledgebox_class
+    ):
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
+        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
 
         resp = await writer.NewKnowledgeBoxV2(request)
 

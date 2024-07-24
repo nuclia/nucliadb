@@ -40,7 +40,7 @@ async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager
     endecryptor = get_endecryptor()
     api_key = endecryptor.decrypt(encrypted_api_key)
     main_index_name = f"{kbid}--default"
-    if main_index_name not in metadata.pinecone_config.index_hosts:
+    if main_index_name not in metadata.pinecone_config.index_hosts:  # pragma: no cover
         raise KeyError(f"Host not found for main index '{main_index_name}' in Pinecone configuration")
     main_index_host = metadata.pinecone_config.index_hosts[main_index_name]
     return PineconeIndexManager(

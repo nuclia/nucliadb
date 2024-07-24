@@ -46,8 +46,16 @@ class TextBlockMatch(BaseModel):
     index: Optional[int] = None
     position_start: int
     position_end: int
+    position_start_seconds: list[int] = []
+    position_end_seconds: list[int] = []
+    page_number: Optional[int] = None
     score: float
     order: int
+    page_with_visual: bool = False
+    is_a_table: bool = False
+    representation_file: Optional[str] = None
+    paragraph_labels: list[str] = []
+    field_labels: list[str] = []
     text: Optional[str] = None
 
 
