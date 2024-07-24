@@ -22,9 +22,9 @@ import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 import pytest
 
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.external_index_providers.pinecone import (
     PineconeIndexManager,
     PineconeQueryResults,

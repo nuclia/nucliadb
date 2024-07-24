@@ -42,7 +42,13 @@ async def test_hydrate_external():
                         id="rid/f/field/0/0-10",
                         score=0.8,
                         values=None,
-                        metadata={"labels": ["/t/text/label"], "access_groups": ["ag1", "ag2"]},
+                        metadata={
+                            "field_type": "f",
+                            "rid": "rid",
+                            "field_id": "f/field",
+                            "field_labels": ["/t/text/label"],
+                            "security_ids_with_access": ["ag1", "ag2"],
+                        },
                     )
                 ]
             )
