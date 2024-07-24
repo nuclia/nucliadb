@@ -1,0 +1,18 @@
+name: OSV scheduled Scan
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  push:
+    branches: [main]
+
+permissions:
+  actions: read
+  security-events: write
+  contents: read
+
+jobs:
+  scan-scheduled:
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v1.8.2"
+    with:
+      scan-args: Cargo.lock pdm.lock
