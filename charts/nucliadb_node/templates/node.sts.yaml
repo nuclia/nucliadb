@@ -124,10 +124,7 @@ spec:
         env:
           - name: METRICS_PORT
             value: "3032"
-          {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-          {{- end }}
+          {{- include "toEnv" .Values.env | indent 10 }}
         ports:
         - name: grpc-writer
           containerPort: {{ .Values.serving.grpc_writer }}
@@ -164,10 +161,7 @@ spec:
         env:
           - name: METRICS_PORT
             value: "3031"
-        {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-        {{- end }}
+          {{- include "toEnv" .Values.env | indent 10 }}
         ports:
         - name: grpc-reader
           containerPort: {{ .Values.serving.grpc_reader }}

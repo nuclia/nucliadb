@@ -58,6 +58,12 @@ spec:
               {{- if .Values.envFrom }}
               {{- toYaml .Values.envFrom | nindent 14 }}
               {{- end }}
+            env:
+              - name: VERSION
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.labels['version']
+              {{- include "toEnv" .Values.env | indent 14 }}
             imagePullPolicy: Always
             command: ["{{ .command }}"]
 {{ end }}
