@@ -89,7 +89,7 @@ KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}/{{vectorset}}"
 
 
 @dataclass
-class ExternalIndex:
+class VectorsetExternalIndex:
     vectorset_id: str
     dimension: int
 
@@ -178,7 +178,7 @@ class KnowledgeBox:
                         kbid,
                         request=external_index_provider,
                         indexes=[
-                            ExternalIndex(
+                            VectorsetExternalIndex(
                                 vectorset_id="default", dimension=semantic_model.vector_dimension
                             )
                         ],
@@ -187,7 +187,7 @@ class KnowledgeBox:
                         partial(cls._maybe_delete_external_indexes, kbid, stored_external_index_provider)
                     )
                 else:
-                    external_indexes = []
+                    vs_external_indexes = []
                     for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                         # if this KB uses a matryoshka model, we can choose a different
                         # dimension
@@ -195,8 +195,8 @@ class KnowledgeBox:
                             dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
                         else:
                             dimension = semantic_model.vector_dimension
-                        external_indexes.append(
-                            ExternalIndex(vectorset_id=vectorset_id, dimension=dimension)
+                        vs_external_indexes.append(
+                            VectorsetExternalIndex(vectorset_id=vectorset_id, dimension=dimension)
                         )
                         vectorset_config = knowledgebox_pb2.VectorSetConfig(
                             vectorset_id=vectorset_id,
@@ -212,14 +212,14 @@ class KnowledgeBox:
                         await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
 
                     stored_external_index_provider = await cls._maybe_create_external_indexes(
-                        kbid, request=external_index_provider, indexes=external_indexes
+                        kbid, request=external_index_provider, indexes=vs_external_indexes
                     )
                     rollback_ops.append(
                         partial(
                             cls._maybe_delete_external_indexes,
                             kbid,
                             stored_external_index_provider,
-                            external_indexes,
+                            vs_external_indexes,
                         )
                     )
 
@@ -526,10 +526,11 @@ class KnowledgeBox:
         cls,
         kbid: str,
         request: CreateExternalIndexProviderMetadata,
-        indexes: list[ExternalIndex],
+        indexes: list[VectorsetExternalIndex],
     ) -> StoredExternalIndexProviderMetadata:
         metadata = StoredExternalIndexProviderMetadata(type=request.type)
         if request.type != ExternalIndexProviderType.PINECONE:
+            # Only pinecone is supported for now
             return metadata
 
         api_key = request.pinecone_config.api_key
@@ -559,9 +560,10 @@ class KnowledgeBox:
         cls,
         kbid: str,
         external_index_provider: StoredExternalIndexProviderMetadata,
-        created_external_indexes: Optional[list[ExternalIndex]] = None,
+        created_external_indexes: Optional[list[VectorsetExternalIndex]] = None,
     ):
         if external_index_provider.type != ExternalIndexProviderType.PINECONE:
+            # Only pinecone is supported for now
             return
 
         encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
