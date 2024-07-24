@@ -2171,7 +2171,7 @@ dependencies = [
     "psutil>=5.9.7",
     "psycopg[binary,pool]",
     "pydantic-settings>=2.2",
-    "pydantic>=2.7",
+    "pydantic>=2.6",
     "pyjwt>=2.4.0",
     "sentry-sdk>=1.5.12",
     "sniffio>=1.2.0",
@@ -2226,7 +2226,7 @@ summary = ""
 groups = ["default", "dev", "sdk"]
 dependencies = [
     "nucliadb-protos",
-    "pydantic>=2.7",
+    "pydantic>=2.6",
 ]
 
 [[package]]
@@ -2265,7 +2265,7 @@ dependencies = [
     "httpx",
     "nucliadb-models",
     "orjson",
-    "pydantic>=2.7",
+    "pydantic>=2.6",
     "requests",
 ]
 
@@ -2303,7 +2303,7 @@ dependencies = [
     "orjson>=3.6.7",
     "prometheus-client>=0.12.0",
     "pydantic-settings>=2.2",
-    "pydantic>=2.7",
+    "pydantic>=2.6",
     "wrapt>=1.14.1",
 ]
 
@@ -2357,7 +2357,7 @@ dependencies = [
     "nucliadb-telemetry",
     "prometheus-client>=0.12.0",
     "pydantic-settings>=2.2",
-    "pydantic>=2.7",
+    "pydantic>=2.6",
     "pyjwt>=2.4.0",
     "types-requests>=2.27.7",
 ]
@@ -3424,16 +3424,16 @@ files = [
 
 [[package]]
 name = "pytest-lazy-fixtures"
-version = "1.0.7"
-requires_python = ">=3.8,<4.0"
+version = "1.1.1"
+requires_python = "<4.0,>=3.8"
 summary = "Allows you to use fixtures in @pytest.mark.parametrize."
 groups = ["dev"]
 dependencies = [
     "pytest>=7",
 ]
 files = [
-    {file = "pytest_lazy_fixtures-1.0.7-py3-none-any.whl", hash = "sha256:71428385b166cdb0fa3f2a3c72b5a5f95fa58f977816877b9b9c1e857143e194"},
-    {file = "pytest_lazy_fixtures-1.0.7.tar.gz", hash = "sha256:87ef7424dc0229ff9cb72d482f49b7806535c3500641f612c13ddf243c9adacb"},
+    {file = "pytest_lazy_fixtures-1.1.1-py3-none-any.whl", hash = "sha256:a4b396a361faf56c6305535fd0175ce82902ca7cf668c4d812a25ed2bcde8183"},
+    {file = "pytest_lazy_fixtures-1.1.1.tar.gz", hash = "sha256:0c561f0d29eea5b55cf29b9264a3241999ffdb74c6b6e8c4ccc0bd2c934d01ed"},
 ]
 
 [[package]]
@@ -4066,13 +4066,13 @@ files = [
 
 [[package]]
 name = "types-setuptools"
-version = "70.3.0.20240710"
+version = "71.1.0.20240724"
 requires_python = ">=3.8"
 summary = "Typing stubs for setuptools"
 groups = ["default", "dev"]
 files = [
-    {file = "types-setuptools-70.3.0.20240710.tar.gz", hash = "sha256:842cbf399812d2b65042c9d6ff35113bbf282dee38794779aa1f94e597bafc35"},
-    {file = "types_setuptools-70.3.0.20240710-py3-none-any.whl", hash = "sha256:bd0db2a4b9f2c49ac5564be4e0fb3125c4c46b1f73eafdcbceffa5b005cceca4"},
+    {file = "types-setuptools-71.1.0.20240724.tar.gz", hash = "sha256:ae61c528111a9450e149aedbc1ab0f7874f9bb0dc8f14c3cd200a1f82457050b"},
+    {file = "types_setuptools-71.1.0.20240724-py3-none-any.whl", hash = "sha256:90570f0578ed67bb25ada9b3d1432e6727178d2408a7051b27e4a712731df30a"},
 ]
 
 [[package]]
