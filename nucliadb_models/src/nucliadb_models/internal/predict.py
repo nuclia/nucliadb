@@ -26,7 +26,7 @@ ATENTION! Keep these models in sync with models on Predict API
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class SentenceSearch(BaseModel):
@@ -39,14 +39,6 @@ class SentenceSearch(BaseModel):
         default_factory=dict,
         description="Time taken to compute the sentence vector for each semantic model",
     )
-
-    @model_validator(mode="after")
-    def keep_backwards_compatibility(self):
-        if len(self.vectors) == 0:
-            self.vectors["__default__"] = self.data
-        if len(self.timings) == 0:
-            self.timings["__default__"] = self.time
-        return self
 
 
 class Ner(BaseModel):
@@ -74,9 +66,3 @@ class QueryInfo(BaseModel):
     entities: Optional[TokenSearch]
     sentence: Optional[SentenceSearch]
     query: str
-
-    @model_validator(mode="after")
-    def keep_backwards_compatibiliy(self):
-        if len(self.semantic_thresholds) == 0:
-            self.semantic_thresholds["__default__"] = self.semantic_threshold
-        return self
