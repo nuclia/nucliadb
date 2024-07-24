@@ -167,10 +167,7 @@ spec:
             value: secondary
           - name: METRICS_PORT
             value: "3031"
-        {{- range $key, $value := $values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-        {{- end }}
+          {{- include "toEnv" $values.env | indent 10 }}
         ports:
         - name: grpc-reader
           containerPort: {{ $values.serving.grpc_reader }}
