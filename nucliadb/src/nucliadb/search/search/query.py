@@ -41,13 +41,13 @@ from nucliadb.search.search.metrics import (
     query_parse_dependency_observer,
 )
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
     MaxTokens,
     MinScore,
-    QueryInfo,
     SearchOptions,
     SortField,
     SortFieldMap,

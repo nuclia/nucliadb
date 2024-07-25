@@ -29,17 +29,14 @@ from pydantic import BaseModel, Field, ValidationError
 
 from nucliadb.search import logger
 from nucliadb.tests.vectors import Q, Qm2023
+from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch
 from nucliadb_models.search import (
     ChatModel,
     FeedbackRequest,
-    Ner,
-    QueryInfo,
     RephraseModel,
-    SentenceSearch,
     SummarizedResource,
     SummarizedResponse,
     SummarizeModel,
-    TokenSearch,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
