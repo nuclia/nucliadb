@@ -54,7 +54,7 @@ class BasicAuditStorage(AuditStorage):
     ):
         logger.debug(f"AUDIT {audit_type} {kbid} {user} {origin} {rid} {audit_fields}")
 
-    async def visited(
+    def visited(
         self,
         kbid: str,
         uuid: str,
