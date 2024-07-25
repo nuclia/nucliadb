@@ -503,7 +503,7 @@ class _NucliaDBBase:
         path_template="/v1/kb/{kbid}/resources",
         method="GET",
         path_params=("kbid",),
-        request_type=ResourceListRequest,
+        request_type=Optional[ResourceListRequest],
         response_type=ResourceList,
     )
 
