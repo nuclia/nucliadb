@@ -48,24 +48,30 @@ async def get_default_vectorset(
 ) -> knowledgebox_pb2.VectorSetConfig:
     from . import kb
 
-    vectorset_id = "__default__"
-    semantic_model = await kb.get_model_metadata(txn, kbid=kbid)
-    vector_dimension = semantic_model.vector_dimension
-    similarity = semantic_model.similarity_function
-    matryoshka_dimensions = semantic_model.matryoshka_dimensions
-    normalize_vectors = len(matryoshka_dimensions) > 0
+    async for _, vectorset in iter(txn, kbid=kbid):
+        # KB with populated vectorsets, the default is the first we find
+        return vectorset
+    else:
+        # KB without populated vectorsets, we retrieve information from other
+        # maindb keys and compose a "default" vectorset
+        vectorset_id = "__default__"
+        semantic_model = await kb.get_model_metadata(txn, kbid=kbid)
+        vector_dimension = semantic_model.vector_dimension
+        similarity = semantic_model.similarity_function
+        matryoshka_dimensions = semantic_model.matryoshka_dimensions
+        normalize_vectors = len(matryoshka_dimensions) > 0
 
-    return knowledgebox_pb2.VectorSetConfig(
-        vectorset_id=vectorset_id,
-        vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
-            vector_dimension=vector_dimension,
-            similarity=similarity,
-            # we only support this for now
-            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-            normalize_vectors=normalize_vectors,
-        ),
-        matryoshka_dimensions=matryoshka_dimensions,
-    )
+        return knowledgebox_pb2.VectorSetConfig(
+            vectorset_id=vectorset_id,
+            vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+                vector_dimension=vector_dimension,
+                similarity=similarity,
+                # we only support this for now
+                vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                normalize_vectors=normalize_vectors,
+            ),
+            matryoshka_dimensions=matryoshka_dimensions,
+        )
 
 
 async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:
