@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Callable, Optional
 
 from fastapi import FastAPI
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from nucliadb.search import API_PREFIX
 
@@ -41,7 +41,8 @@ def create_api_client_factory(application: FastAPI) -> Callable[..., AsyncClient
         if root is False:
             client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
 
-        client = AsyncClient(app=application, base_url=client_base_url)
+        transport = ASGITransport(app=application)  # type: ignore
+        client = AsyncClient(transport=transport, base_url=client_base_url)
         client.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
         client.headers["X-NUCLIADB-USER"] = user
 
