@@ -309,3 +309,8 @@ class ResourcePagination(BaseModel):
 class ResourceList(BaseModel):
     resources: List[Resource]
     pagination: ResourcePagination
+
+
+class ResourceListRequest(BaseModel):
+    page: Optional[int]
+    size: Optional[int]

@@ -60,6 +60,7 @@ from nucliadb_models.resource import (
     KnowledgeBoxObj,
     Resource,
     ResourceList,
+    ResourceListRequest,
 )
 from nucliadb_models.search import (
     AnswerAskResponseItem,
@@ -502,7 +503,7 @@ class _NucliaDBBase:
         path_template="/v1/kb/{kbid}/resources",
         method="GET",
         path_params=("kbid",),
-        request_type=None,
+        request_type=ResourceListRequest,
         response_type=ResourceList,
     )
 
