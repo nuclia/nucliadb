@@ -106,13 +106,11 @@ async def maindb_driver(request: FixtureRequest) -> AsyncIterator[Driver]:
 async def pg_maindb_settings(pg):
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
 
-    driver = PGDriver(url=url, connection_pool_min_size=2, connection_pool_max_size=2)
-    await driver.initialize()
-    await run_pg_schema_migrations(driver)
-
-    return DriverSettings(
+    yield DriverSettings(
         driver=DriverConfig.PG,
         driver_pg_url=url,
+        driver_pg_connection_pool_min_size=2,
+        driver_pg_connection_pool_max_size=2,
     )
 
 
@@ -129,7 +127,11 @@ async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
             await cur.execute("DROP table IF EXISTS resources")
             await cur.execute("DROP table IF EXISTS catalog")
 
-        driver = PGDriver(url=url)
+        driver = PGDriver(
+            url=url,
+            connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
+            connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
+        )
         await driver.initialize()
         await run_pg_schema_migrations(driver)
 
