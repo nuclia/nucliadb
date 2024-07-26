@@ -18,10 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import random
 import unittest
 from unittest import mock
 from unittest.mock import call
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -71,8 +71,8 @@ async def test_kb_creation_old(
     This tests the deprecated method for creating kbs on a hosted nucliadb that
     uses the nucliadb_grpc.NewKnowledgeBox method.
     """
-    kbid = f"test_pinecone_kb_{random.randint(0, 1000000)}"
-    slug = kbid
+    kbid = str(uuid4())
+    slug = "pinecone-testing-old"
     config = KnowledgeBoxConfig(
         title="Pinecone test",
         slug=slug,
@@ -137,9 +137,8 @@ async def test_kb_creation_new(
     This tests the new method for creating kbs on a hosted nucliadb that
     uses the nucliadb_grpc.NewKnowledgeBoxV2 method.
     """
-
-    kbid = f"test_pinecone_kb_{random.randint(0, 1000000)}"
-    slug = kbid
+    kbid = str(uuid4())
+    slug = "pinecone-testing-new"
     request = NewKnowledgeBoxV2Request(
         kbid=kbid,
         slug=slug,
@@ -210,9 +209,10 @@ async def test_kb_creation_new(
     assert response.status == KnowledgeBoxResponseStatus.OK
 
     # Test that deletes all external indexes
-    mock_pinecone_client.delete_index.assert_has_calls(
-        [call(name=expected_index_names[0]), call(name=expected_index_names[1])]
-    )
+    deleted_index_names = set()
+    deleted_index_names.add(mock_pinecone_client.delete_index.call_args_list[0][1]["name"])
+    deleted_index_names.add(mock_pinecone_client.delete_index.call_args_list[1][1]["name"])
+    assert deleted_index_names == set(expected_index_names)
 
 
 async def test_find_on_pinecone_kb(
