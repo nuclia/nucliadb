@@ -32,6 +32,7 @@ from nucliadb_models.search import (
     SortField,
     SortOrder,
 )
+from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
@@ -149,6 +150,7 @@ def pgcatalog_enabled(kbid):
     )
 
 
+@metrics.Observer("pg_catalog_search").wrap()
 async def pgcatalog_search(query_parser: QueryParser) -> Resources:
     # Prepare SQL query
     query, query_params = _prepare_query(query_parser)

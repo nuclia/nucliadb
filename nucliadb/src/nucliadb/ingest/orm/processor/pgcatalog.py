@@ -23,10 +23,13 @@ from typing import cast
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_telemetry import metrics
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
 from ..resource import Resource
+
+observer = metrics.Observer("pg_catalog_write", labels={"type": ""})
 
 
 def _pg_transaction(txn: Transaction) -> PGTransaction:
@@ -39,6 +42,7 @@ def pgcatalog_enabled(kbid):
     )
 
 
+@observer.wrap({"type": "update"})
 async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
     if not pgcatalog_enabled(kbid):
         return
@@ -69,6 +73,7 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
         )
 
 
+@observer.wrap({"type": "delete"})
 async def pgcatalog_delete(txn: Transaction, kbid: str, rid: str):
     if not pgcatalog_enabled(kbid):
         return
