@@ -156,7 +156,7 @@ class PineconeIndexManager(ExternalIndexManager):
         try:
             index_host = self.index_hosts[index_name]
         except KeyError:
-            raise IndexHostNotFound()
+            raise IndexHostNotFound(index_name)
         return self.pinecone.data_plane(api_key=self.api_key, index_host=index_host)
 
     @classmethod
@@ -174,10 +174,11 @@ class PineconeIndexManager(ExternalIndexManager):
         'multilingual-2024-05-08--7b7887b4-2d78'
         """
         kbid_part = "-".join(kbid.split("-")[:2])
-        vectorset_part = vectorset_id[: MAX_INDEX_NAME_LENGTH - len(kbid_part)]
-        index_name = vectorset_part + "--" + kbid_part
+        index_name = f"{vectorset_id}--{kbid_part}"
         index_name = index_name.lower()
-        index_name = index_name[:MAX_INDEX_NAME_LENGTH]
+        index_name = index_name.replace("_", "-")
+        if len(index_name) > MAX_INDEX_NAME_LENGTH:
+            raise ValueError("Index name is too large!")
         return index_name
 
     async def _delete_resource_to_index(self, index_name: str, resource_uuid: str) -> None:

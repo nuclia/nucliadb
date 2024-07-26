@@ -80,7 +80,7 @@ def external_index_manager(data_plane):
             api_key="api_key",
             index_hosts={
                 "default--kbid": "index_host",
-                "vectorset_id--kbid": "index_host_2",
+                "vectorset-id--kbid": "index_host_2",
             },
             upsert_parallelism=3,
             delete_parallelism=2,
@@ -113,10 +113,10 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     index_paragraph.sentences["rid/f/field/0/0-10"].vector.extend([1, 2, 3])
     index_paragraph.sentences["rid/f/field/0/0-10"].metadata.page_with_visual = False
     # Add at least one vector on a vectorset with a different dimension
-    index_paragraph.vectorsets_sentences["vectorset_id"].sentences["rid/f/field/0/0-10"].vector.extend(
+    index_paragraph.vectorsets_sentences["vectorset-id"].sentences["rid/f/field/0/0-10"].vector.extend(
         [5, 6, 7, 8]
     )
-    index_paragraph.vectorsets_sentences["vectorset_id"].sentences[
+    index_paragraph.vectorsets_sentences["vectorset-id"].sentences[
         "rid/f/field/0/0-10"
     ].metadata.page_with_visual = True
     index_paragraphs.paragraphs["rid/f/field/0-10"].CopyFrom(index_paragraph)
@@ -284,3 +284,28 @@ def test_convert_to_pinecone_filter_empty():
 
 def test_exceptions():
     ExternalIndexCreationError("pinecone", "foo")
+
+
+@pytest.mark.parametrize(
+    "vectorset_id,kbid,index_name",
+    [
+        (
+            "multilingual-2023-02-02",
+            "7cd436d4-d3ff-4b36-bb43-ec107f92408d",
+            "multilingual-2023-02-02--7cd436d4-d3ff",
+        ),
+        (
+            "MultilinguaL_2023_02_02",
+            "7cd436d4-d3ff-4b36-bb43-ec107f92408d",
+            "multilingual-2023-02-02--7cd436d4-d3ff",
+        ),
+        ("very-large-model-name-2023-02-01", "7cd436d4-d3ff-4b36-bb43-ec107f92408d", ""),
+    ],
+)
+def test_get_index_name(vectorset_id, kbid, index_name):
+    if index_name == "":
+        with pytest.raises(ValueError):
+            PineconeIndexManager.get_index_name(kbid, vectorset_id)
+    else:
+        computed_index_name = PineconeIndexManager.get_index_name(kbid, vectorset_id)
+        assert computed_index_name == index_name
