@@ -24,14 +24,13 @@ from psycopg.rows import dict_row
 
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
-from nucliadb_models.search import SortField, SortOrder
-from nucliadb_protos.nodereader_pb2 import (
-    DocumentResult,
-    DocumentSearchResponse,
-    FacetResult,
-    FacetResults,
-    SearchResponse,
+from nucliadb_models.search import (
+    ResourceResult,
+    Resources,
+    SortField,
+    SortOrder,
 )
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
@@ -150,17 +149,17 @@ def pgcatalog_enabled(kbid):
     )
 
 
-async def pgcatalog_search(query_parser: QueryParser):
+async def pgcatalog_search(query_parser: QueryParser) -> Resources:
     # Prepare SQL query
     query, query_params = _prepare_query(query_parser)
 
     async with _pg_driver()._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-        facets: dict[str, FacetResults] = {}
+        facets = {}
 
         # Faceted search
         if query_parser.faceted:
-            tmp_facets: dict[str, list[FacetResult]] = {
-                translate_label(f): [] for f in query_parser.faceted
+            tmp_facets: dict[str, dict[str, int]] = {
+                translate_label(f): {} for f in query_parser.faceted
             }
             await cur.execute(
                 f"SELECT unnest(labels) AS label, COUNT(*) FROM ({query}) fc GROUP BY 1 ORDER BY 1",
@@ -171,9 +170,9 @@ async def pgcatalog_search(query_parser: QueryParser):
                 parent = "/".join(label.split("/")[:-1])
                 count = row["count"]
                 if parent in tmp_facets:
-                    tmp_facets[parent].append(FacetResult(tag=label, total=count))
+                    tmp_facets[parent][translate_system_to_alias_label(label)] = count
 
-            facets = {k: FacetResults(facetresults=v) for k, v in tmp_facets.items()}
+            facets = {translate_system_to_alias_label(k): v for k, v in tmp_facets.items()}
 
         # Totals
         await cur.execute(
@@ -194,14 +193,22 @@ async def pgcatalog_search(query_parser: QueryParser):
         )
         data = await cur.fetchall()
 
-    return SearchResponse(
-        document=DocumentSearchResponse(
-            results=[
-                DocumentResult(uuid=str(r["rid"]).replace("-", ""), field="/a/title") for r in data
-            ],
-            facets=facets,
-            total=total,
-            page_number=query_parser.page_number,
-            next_page=(offset + len(data) < total),
-        )
+    return Resources(
+        facets=facets,
+        results=[
+            ResourceResult(
+                rid=str(r["rid"]).replace("-", ""),
+                field="title",
+                field_type="a",
+                labels=[label for label in r["labels"] if label.startswith("/l/")],
+                score=0,
+            )
+            for r in data
+        ],
+        query=query_parser.query,
+        total=total,
+        page_number=query_parser.page_number,
+        page_size=query_parser.page_size,
+        next_page=(offset + len(data) < total),
+        min_score=0,
     )
