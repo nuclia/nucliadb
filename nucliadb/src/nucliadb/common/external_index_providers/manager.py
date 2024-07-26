@@ -34,8 +34,7 @@ from nucliadb_utils.utilities import get_endecryptor
 
 async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager]:
     """
-    Returns an ExternalIndexManager for the given kbid and vectorset_id.
-    If vectorset_id is None, the default index is used.
+    Returns an ExternalIndexManager for the given kbid
     """
     metadata = await get_external_index_metadata(kbid)
     if metadata is None or metadata.type != ExternalIndexProviderType.PINECONE:
