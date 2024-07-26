@@ -165,7 +165,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return writer_pb2.NewKnowledgeBoxV2Response(
                 status=KnowledgeBoxResponseStatus.ERROR,
             )
-
         # Hosted KBs are created through backend endpoints. We assume learning
         # configuration has been already created for it and we are given the
         # model metadata in the request
