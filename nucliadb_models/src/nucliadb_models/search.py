@@ -39,6 +39,9 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
+# Bw/c import to avoid breaking users
+from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
+
 _T = TypeVar("_T")
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
