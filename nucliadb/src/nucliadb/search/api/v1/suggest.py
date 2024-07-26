@@ -91,25 +91,6 @@ async def suggest_knowledgebox(
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
 ) -> Union[KnowledgeboxSuggestResults, HTTPClientError]:
     try:
-        usage = get_usage_utility()
-
-        if usage is not None:
-            usage.send_kb_usage(
-                service=Service.NUCLIA_DB,  # type: ignore
-                account_id=None,
-                kb_id=kbid,
-                kb_source=KBSource.HOSTED,  # type: ignore
-                # TODO unify AuditRequest client type and Nuclia Usage client type
-                searches=[
-                    Search(
-                        client=ClientTypeKbUsage.Value(x_ndb_client.name),  # type: ignore
-                        type=SearchType.SUGGEST,
-                        tokens=0,
-                        num_searches=1,
-                    )
-                ],
-            )
-
         return await suggest(
             response,
             kbid,
@@ -154,6 +135,7 @@ async def suggest(
     debug: bool,
     highlight: bool,
 ) -> KnowledgeboxSuggestResults:
+    usage = get_usage_utility()
     # We need the nodes/shards that are connected to the KB
     # We need to query all nodes
     pb_query = suggest_query_to_pb(
@@ -183,5 +165,22 @@ async def suggest(
     queried_shards = [shard_id for _, shard_id in queried_nodes]
     if debug and queried_shards:
         search_results.shards = queried_shards
+
+    if usage is not None:
+        usage.send_kb_usage(
+            service=Service.NUCLIA_DB,  # type: ignore
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,  # type: ignore
+            # TODO unify AuditRequest client type and Nuclia Usage client type
+            searches=[
+                Search(
+                    client=ClientTypeKbUsage.Value(x_ndb_client.name),  # type: ignore
+                    type=SearchType.SUGGEST,
+                    tokens=0,
+                    num_searches=1,
+                )
+            ],
+        )
 
     return search_results
