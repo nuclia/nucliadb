@@ -275,9 +275,10 @@ class PGDriver(Driver):
 
     async def finalize(self):
         async with self._lock:
-            await self.pool.close()
-            self.initialized = False
-            self.metrics_task.cancel()
+            if self.initialized:
+                await self.pool.close()
+                self.initialized = False
+                self.metrics_task.cancel()
 
     async def _report_metrics_task(self):
         while True:

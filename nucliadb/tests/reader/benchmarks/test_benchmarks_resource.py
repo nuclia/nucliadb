@@ -23,6 +23,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import Resource
+from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX
 from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 
 
@@ -38,36 +39,32 @@ from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 @pytest.mark.deploy_modes("component")
 async def test_get_resource_all(
     nucliadb_reader: AsyncClient,
-    test_resource: Resource,
+    full_resource: Resource,
     asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
-    # resource = full_resource
-    # kbid = resource.kb.kbid
-    # rid = resource.uuid
+    resource = full_resource
+    kbid = resource.kb.kbid
+    rid = resource.uuid
 
-    # resp = await asyncbenchmark(
-    #     nucliadb_reader.get,
-    #     f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-    #     params={
-    #         "show": ["basic", "origin", "relations", "values", "extracted"],
-    #         "field_type": [
-    #             "text",
-    #             "link",
-    #             "file",
-    #             "conversation",
-    #         ],
-    #         "extracted": [
-    #             "metadata",
-    #             "vectors",
-    #             "large_metadata",
-    #             "text",
-    #             "link",
-    #             "file",
-    #         ],
-    #     },
-    # )
-    # assert resp.status_code == 200
-    async def function(a):
-        return a
-
-    assert await asyncbenchmark(function, 10) == 10
+    resp = await asyncbenchmark(
+        nucliadb_reader.get,
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        params={
+            "show": ["basic", "origin", "relations", "values", "extracted"],
+            "field_type": [
+                "text",
+                "link",
+                "file",
+                "conversation",
+            ],
+            "extracted": [
+                "metadata",
+                "vectors",
+                "large_metadata",
+                "text",
+                "link",
+                "file",
+            ],
+        },
+    )
+    assert resp.status_code == 200
