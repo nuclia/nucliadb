@@ -22,7 +22,7 @@ import logging
 import os
 import tempfile
 from typing import AsyncIterator
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import psycopg
 import pytest
@@ -598,35 +598,47 @@ async def local_maindb_driver(local_maindb_settings) -> AsyncIterator[Driver]:
 async def pg_maindb_settings(pg):
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
 
+    # We want to be sure schema migrations are always run. As some tests use
+    # this fixture and create their own driver, we need to create one here and
+    # run the migrations, so the maindb_settings fixture can still be generic
+    # and pg migrations are run
     driver = PGDriver(url=url, connection_pool_min_size=2, connection_pool_max_size=2)
     await driver.initialize()
     await run_pg_schema_migrations(driver)
+    await driver.finalize()
 
-    return DriverSettings(
+    yield DriverSettings(
         driver=DriverConfig.PG,
         driver_pg_url=url,
+        driver_pg_connection_pool_min_size=10,
+        driver_pg_connection_pool_max_size=10,
+        driver_pg_connection_pool_acquire_timeout_ms=200,
     )
 
 
 @pytest.fixture(scope="function")
-async def pg_maindb_driver(pg_maindb_settings):
+async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
     url = pg_maindb_settings.driver_pg_url
-    ingest_settings.driver = DriverConfig.PG
-    ingest_settings.driver_pg_url = url
+    assert url is not None
+    with (
+        patch.object(ingest_settings, "driver", DriverConfig.PG),
+        patch.object(ingest_settings, "driver_pg_url", url),
+    ):
+        async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
+            await cur.execute("TRUNCATE table resources")
+            await cur.execute("TRUNCATE table catalog")
 
-    async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
-        await cur.execute("DROP table IF EXISTS migrations")
-        await cur.execute("DROP table IF EXISTS resources")
-        await cur.execute("DROP table IF EXISTS catalog")
+        driver = PGDriver(
+            url=url,
+            connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
+            connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
+            acquire_timeout_ms=pg_maindb_settings.driver_pg_connection_pool_acquire_timeout_ms,
+        )
+        await driver.initialize()
 
-    driver = PGDriver(url=url)
-    await driver.initialize()
-    await run_pg_schema_migrations(driver)
+        yield driver
 
-    yield driver
-
-    await driver.finalize()
-    ingest_settings.driver_pg_url = None
+        await driver.finalize()
 
 
 def maindb_settings_lazy_fixtures(default_drivers="local"):
