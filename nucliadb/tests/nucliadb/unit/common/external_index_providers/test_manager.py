@@ -40,20 +40,22 @@ def endecryptor():
 
 
 async def test_get_external_index_manager_pinecone(endecryptor):
+    stored_metadata = StoredExternalIndexProviderMetadata(
+        type=ExternalIndexProviderType.PINECONE,
+        pinecone_config=StoredPineconeConfig(
+            encrypted_api_key="encrypted_api_key",
+        ),
+    )
+    stored_metadata.pinecone_config.indexes["default--kbid"].index_host = "index_host"
+    stored_metadata.pinecone_config.indexes["default--kbid"].vector_dimension = 10
     with unittest.mock.patch(
         f"{MODULE}.get_external_index_metadata",
-        return_value=StoredExternalIndexProviderMetadata(
-            type=ExternalIndexProviderType.PINECONE,
-            pinecone_config=StoredPineconeConfig(
-                encrypted_api_key="encrypted_api_key",
-                index_hosts={"kbid--default": "index_host"},
-            ),
-        ),
+        return_value=stored_metadata,
     ):
         mgr = await get_external_index_manager("kbid")
         assert isinstance(mgr, PineconeIndexManager)
         assert mgr.api_key == "api_key"
-        assert mgr.index_host == "index_host"
+        assert mgr.index_hosts == {"default--kbid": "index_host"}
 
 
 async def test_get_external_index_manager_none():

@@ -33,20 +33,23 @@ from nucliadb_utils.utilities import get_endecryptor
 
 
 async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager]:
+    """
+    Returns an ExternalIndexManager for the given kbid
+    """
     metadata = await get_external_index_metadata(kbid)
     if metadata is None or metadata.type != ExternalIndexProviderType.PINECONE:
         return None
+
     encrypted_api_key = metadata.pinecone_config.encrypted_api_key
     endecryptor = get_endecryptor()
     api_key = endecryptor.decrypt(encrypted_api_key)
-    main_index_name = f"{kbid}--default"
-    if main_index_name not in metadata.pinecone_config.index_hosts:  # pragma: no cover
-        raise KeyError(f"Host not found for main index '{main_index_name}' in Pinecone configuration")
-    main_index_host = metadata.pinecone_config.index_hosts[main_index_name]
+    index_hosts: dict[str, str] = {}
+    for index_name, index_metadata in metadata.pinecone_config.indexes.items():
+        index_hosts[index_name] = index_metadata.index_host
     return PineconeIndexManager(
         kbid=kbid,
         api_key=api_key,
-        index_host=main_index_host,
+        index_hosts=index_hosts,
         upsert_parallelism=settings.pinecone_upsert_parallelism,
         delete_parallelism=settings.pinecone_delete_parallelism,
         upsert_timeout=settings.pinecone_upsert_timeout,

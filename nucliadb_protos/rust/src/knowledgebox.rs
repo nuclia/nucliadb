@@ -16,14 +16,21 @@ pub struct CreatePineconeConfig {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PineconeIndexMetadata {
+    #[prost(string, tag = "1")]
+    pub index_host: ::prost::alloc::string::String,
+    #[prost(int32, tag = "2")]
+    pub vector_dimension: i32,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StoredPineconeConfig {
     #[prost(string, tag = "1")]
     pub encrypted_api_key: ::prost::alloc::string::String,
-    /// Index name to index host mapping.
-    #[prost(map = "string, string", tag = "2")]
-    pub index_hosts: ::std::collections::HashMap<
+    #[prost(map = "string, message", tag = "2")]
+    pub indexes: ::std::collections::HashMap<
         ::prost::alloc::string::String,
-        ::prost::alloc::string::String,
+        PineconeIndexMetadata,
     >,
 }
 /// External Index node provider
