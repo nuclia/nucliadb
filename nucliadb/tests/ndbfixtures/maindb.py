@@ -106,13 +106,21 @@ async def maindb_driver(request: FixtureRequest) -> AsyncIterator[Driver]:
 async def pg_maindb_settings(pg):
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
 
+    # We want to be sure schema migrations are always run. As some tests use
+    # this fixture and create their own driver, we need to create one here and
+    # run the migrations, so the maindb_settings fixture can still be generic
+    # and pg migrations are run
     driver = PGDriver(url=url, connection_pool_min_size=2, connection_pool_max_size=2)
     await driver.initialize()
     await run_pg_schema_migrations(driver)
+    await driver.finalize()
 
-    return DriverSettings(
+    yield DriverSettings(
         driver=DriverConfig.PG,
         driver_pg_url=url,
+        driver_pg_connection_pool_min_size=10,
+        driver_pg_connection_pool_max_size=10,
+        driver_pg_connection_pool_acquire_timeout_ms=200,
     )
 
 
@@ -129,7 +137,12 @@ async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
             await cur.execute("DROP table IF EXISTS resources")
             await cur.execute("DROP table IF EXISTS catalog")
 
-        driver = PGDriver(url=url)
+        driver = PGDriver(
+            url=url,
+            connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
+            connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
+            acquire_timeout_ms=pg_maindb_settings.driver_pg_connection_pool_acquire_timeout_ms,
+        )
         await driver.initialize()
         await run_pg_schema_migrations(driver)
 
