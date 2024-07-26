@@ -1618,6 +1618,7 @@ async def test_catalog_pagination(
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["resources"]) <= page_size
+        assert body["fulltext"]["page_number"] == page_number
         for resource_id, resource_data in body["resources"].items():
             resource_created_date = datetime.fromisoformat(resource_data["created"]).timestamp()
             if resource_id in resource_uuids:

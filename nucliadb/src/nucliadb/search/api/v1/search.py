@@ -34,7 +34,7 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.exceptions import InvalidQueryError
-from nucliadb.search.search.merge import merge_results
+from nucliadb.search.search.merge import fetch_resources, merge_results
 from nucliadb.search.search.pgcatalog import pgcatalog_enabled, pgcatalog_search
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
@@ -328,26 +328,33 @@ async def catalog(
                 # consistent and most up to date results
                 use_read_replica_nodes=False,
             )
+
+            # We need to merge
+            search_results = await merge_results(
+                results,
+                count=item.page_size,
+                page=item.page_number,
+                kbid=kbid,
+                show=[ResourceProperties.BASIC],
+                field_type_filter=[],
+                extracted=[],
+                sort=sort,
+                requested_relations=pb_query.relation_subgraph,
+                min_score=query_parser.min_score,
+                highlight=False,
+            )
         else:
-            result = await pgcatalog_search(query_parser)
-            results = [result]
-            item.page_number = 0
+            search_results = KnowledgeboxSearchResults()
+            search_results.fulltext = await pgcatalog_search(query_parser)
+            search_results.resources = await fetch_resources(
+                resources=[r.rid for r in search_results.fulltext.results],
+                kbid=kbid,
+                show=[ResourceProperties.BASIC],
+                field_type_filter=[],
+                extracted=[],
+            )
             queried_nodes = []
 
-        # We need to merge
-        search_results = await merge_results(
-            results,
-            count=item.page_size,
-            page=item.page_number,
-            kbid=kbid,
-            show=[ResourceProperties.BASIC],
-            field_type_filter=[],
-            extracted=[],
-            sort=sort,
-            requested_relations=pb_query.relation_subgraph,
-            min_score=query_parser.min_score,
-            highlight=False,
-        )
         # We don't need sentences, paragraphs or relations on the catalog
         # response, so we set to None so that fastapi doesn't include them
         # in the response payload
