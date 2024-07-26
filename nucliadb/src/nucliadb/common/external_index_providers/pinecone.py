@@ -89,6 +89,9 @@ class PineconeQueryResults(QueryResults):
             )
 
 
+class IndexHostNotFound(Exception): ...
+
+
 class VectorMetadata(BaseModel):
     """
     This class models what we index at Pinecone's metadata attribute for each vector.
@@ -150,7 +153,10 @@ class PineconeIndexManager(ExternalIndexManager):
         self.query_timeout = query_timeout
 
     def get_data_plane(self, index_name: str) -> DataPlane:
-        index_host = self.index_hosts[index_name]
+        try:
+            index_host = self.index_hosts[index_name]
+        except KeyError:
+            raise IndexHostNotFound()
         return self.pinecone.data_plane(api_key=self.api_key, index_host=index_host)
 
     @classmethod
@@ -281,7 +287,20 @@ class PineconeIndexManager(ExternalIndexManager):
         if len(vectors) == 0:  # pragma: no cover
             return
         index_name = self.get_index_name(self.kbid, vectorset_id)
-        data_plane = self.get_data_plane(index_name)
+        try:
+            data_plane = self.get_data_plane(index_name)
+        except IndexHostNotFound:  # pragma: no cover
+            logger.error(
+                "Data to index for index which host could not be found",
+                extra={
+                    "kbid": self.kbid,
+                    "provider": self.type.value,
+                    "vectorset_id": vectorset_id,
+                    "index_name": index_name,
+                    "index_hosts": self.index_hosts,
+                },
+            )
+            return
         with manager_observer({"operation": "upsert_in_batches"}):
             await data_plane.upsert_in_batches(
                 vectors=vectors,

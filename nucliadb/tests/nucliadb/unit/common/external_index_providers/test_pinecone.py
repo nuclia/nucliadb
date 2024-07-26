@@ -78,7 +78,10 @@ def external_index_manager(data_plane):
         return PineconeIndexManager(
             kbid="kbid",
             api_key="api_key",
-            index_hosts={"default": "index_host"},
+            index_hosts={
+                "default--kbid": "index_host",
+                "vectorset_id--kbid": "index_host_2",
+            },
             upsert_parallelism=3,
             delete_parallelism=2,
             upsert_timeout=10,
@@ -88,9 +91,10 @@ def external_index_manager(data_plane):
 
 async def test_delete_resource(external_index_manager: PineconeIndexManager, data_plane):
     await external_index_manager._delete_resource("resource_uuid")
-    data_plane.delete_by_id_prefix.assert_awaited_once()
-    resource_uuid = data_plane.delete_by_id_prefix.call_args[1]["id_prefix"]
-    assert resource_uuid == "resource_uuid"
+    # The resource is deleted by prefix on every vectorset index
+    assert data_plane.delete_by_id_prefix.call_count == 2
+    call_0_kwargs = data_plane.delete_by_id_prefix.call_args_list[0][1]
+    assert call_0_kwargs["id_prefix"] == "resource_uuid"
 
 
 async def test_index_resource(external_index_manager: PineconeIndexManager, data_plane):
@@ -105,14 +109,27 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     index_data.security.access_groups.extend(["ag1", "ag2"])
     index_paragraphs = IndexParagraphs()
     index_paragraph = IndexParagraph()
+    # This tests the default index (previous to vectorset changes)
     index_paragraph.sentences["rid/f/field/0/0-10"].vector.extend([1, 2, 3])
+    index_paragraph.sentences["rid/f/field/0/0-10"].metadata.page_with_visual = False
+    # Add at least one vector on a vectorset with a different dimension
+    index_paragraph.vectorsets_sentences["vectorset_id"].sentences["rid/f/field/0/0-10"].vector.extend(
+        [5, 6, 7, 8]
+    )
+    index_paragraph.vectorsets_sentences["vectorset_id"].sentences[
+        "rid/f/field/0/0-10"
+    ].metadata.page_with_visual = True
     index_paragraphs.paragraphs["rid/f/field/0-10"].CopyFrom(index_paragraph)
     index_data.paragraphs["f/field"].CopyFrom(index_paragraphs)
 
     await external_index_manager._index_resource("resource_uuid", index_data)
 
-    data_plane.upsert_in_batches.assert_awaited_once()
-    vectors = data_plane.upsert_in_batches.call_args[1]["vectors"]
+    # One upsert for every vectorset in the index data
+    assert data_plane.upsert_in_batches.call_count == 2
+
+    # Check that the upsert for every vectorset holds the corresponding vectors and metadata
+    call_0_kwargs = data_plane.upsert_in_batches.call_args_list[0][1]
+    vectors = call_0_kwargs["vectors"]
     assert len(vectors) == 1
     vector = vectors[0]
     assert isinstance(vector, Vector)
@@ -126,6 +143,24 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     }
     assert not vmetadata.security_public
     assert set(vmetadata.security_ids_with_access) == {"ag1", "ag2"}  # type: ignore
+    assert vmetadata.page_with_visual is None
+
+    call_1_kwargs = data_plane.upsert_in_batches.call_args_list[1][1]
+    vectors = call_1_kwargs["vectors"]
+    assert len(vectors) == 1
+    vector = vectors[0]
+    assert isinstance(vector, Vector)
+    assert vector.id == "rid/f/field/0/0-10"
+    assert vector.values == [5, 6, 7, 8]
+    metadata = vector.metadata
+    vmetadata = VectorMetadata.model_validate(metadata)
+    assert set(vmetadata.field_labels) == {  # type: ignore
+        "/t/private",
+        "/t/text/label",
+    }
+    assert not vmetadata.security_public
+    assert set(vmetadata.security_ids_with_access) == {"ag1", "ag2"}  # type: ignore
+    assert vmetadata.page_with_visual is True
 
 
 async def test_query(external_index_manager: PineconeIndexManager, data_plane):
