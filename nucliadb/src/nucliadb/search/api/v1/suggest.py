@@ -40,6 +40,16 @@ from nucliadb_models.search import (
     SuggestOptions,
 )
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    ClientType as ClientTypeKbUsage,
+)
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    KBSource,
+    Search,
+    SearchType,
+    Service,
+)
+from nucliadb_utils.utilities import get_usage_utility
 
 
 @api.get(
@@ -81,6 +91,25 @@ async def suggest_knowledgebox(
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
 ) -> Union[KnowledgeboxSuggestResults, HTTPClientError]:
     try:
+        usage = get_usage_utility()
+
+        if usage is not None:
+            usage.send_kb_usage(
+                service=Service.NUCLIA_DB,  # type: ignore
+                account_id=None,
+                kb_id=kbid,
+                kb_source=KBSource.HOSTED,  # type: ignore
+                # TODO unify AuditRequest client type and Nuclia Usage client type
+                searches=[
+                    Search(
+                        client=ClientTypeKbUsage.Value(x_ndb_client.name),  # type: ignore
+                        type=SearchType.SUGGEST,
+                        tokens=0,
+                        num_searches=1,
+                    )
+                ],
+            )
+
         return await suggest(
             response,
             kbid,

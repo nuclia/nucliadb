@@ -34,6 +34,16 @@ from nucliadb_models.search import (
     parse_max_tokens,
 )
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    ClientType as ClientTypeKbUsage,
+)
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    KBSource,
+    Search,
+    SearchType,
+    Service,
+)
+from nucliadb_utils.utilities import get_usage_utility
 
 
 @api.post(
@@ -59,6 +69,24 @@ async def ask_knowledgebox_endpoint(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
+    usage = get_usage_utility()
+
+    if usage is not None:
+        usage.send_kb_usage(
+            service=Service.NUCLIA_DB,  # type: ignore
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,  # type: ignore
+            # TODO unify AuditRequest client type and Nuclia Usage client type
+            searches=[
+                Search(
+                    client=ClientTypeKbUsage.Value(x_ndb_client.name),  # type: ignore
+                    type=SearchType.SEARCH,
+                    tokens=2000,
+                    num_searches=1,
+                )
+            ],
+        )
     return await create_ask_response(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
     )
