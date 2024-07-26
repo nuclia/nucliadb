@@ -37,7 +37,7 @@ from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSe
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, LogicalOperator
 from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError
-from nucliadb_utils.aiopynecone.models import QueryResponse
+from nucliadb_utils.aiopynecone.models import MAX_INDEX_NAME_LENGTH, QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
 from nucliadb_utils.utilities import get_pinecone
 
@@ -162,15 +162,22 @@ class PineconeIndexManager(ExternalIndexManager):
     @classmethod
     def get_index_name(cls, kbid: str, vectorset_id: str) -> str:
         """
-        https://docs.pinecone.io/troubleshooting/restrictions-on-index-names
+        Index names can't be longer than 45 characters and can only contain
+        alphanumeric lowercase characters: https://docs.pinecone.io/troubleshooting/restrictions-on-index-names
 
+        We need to include both the kbid and the vectorset id in the index name,
+        so we don't create two conflicting Pinecone indexes for the same api_key.
+
+        Take the two left-most parts from the kbid and prepend it the vectorset_id.
         Example:
         >>> get_index_name('7b7887b4-2d78-41c7-a398-586af7d7db8b', 'multilingual-2024-05-08')
-        'multilingual-2024-05-08--7b7887b4-2d78-41c7-a'
+        'multilingual-2024-05-08--7b7887b4-2d78'
         """
-        index_name = vectorset_id + "--" + kbid
+        kbid_part = "-".join(kbid.split("-")[:2])
+        vectorset_part = vectorset_id[: MAX_INDEX_NAME_LENGTH - len(kbid_part)]
+        index_name = vectorset_part + "--" + kbid_part
         index_name = index_name.lower()
-        index_name = index_name[:45]
+        index_name = index_name[:MAX_INDEX_NAME_LENGTH]
         return index_name
 
     async def _delete_resource_to_index(self, index_name: str, resource_uuid: str) -> None:
