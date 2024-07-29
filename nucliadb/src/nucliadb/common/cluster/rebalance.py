@@ -221,8 +221,8 @@ async def run_command(context: ApplicationContext) -> None:
         errors.capture_exception(ex)
     finally:
         try:
-            await context.finalize()
             await metrics_server.shutdown()
+            await context.finalize()
         except Exception:  # pragma: no cover
             logger.exception("Error tearing down utilities on rebalance command")
             pass
