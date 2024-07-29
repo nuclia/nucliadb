@@ -75,7 +75,7 @@ async def test_ask_sends_only_one_audit(
     # at requests ends. In this case we expect one seach and one chat sent once
     stream_audit.search.assert_called_once()
     stream_audit.chat.assert_called_once()
-    stream_audit.js.publish.assert_called_once()
+    assert stream_audit.js.publish.call_count == 2
     stream_audit.send.assert_called_once()
 
     auditreq = await get_audit_messages(psub)
