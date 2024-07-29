@@ -22,9 +22,11 @@ import logging
 from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
-from nucliadb_utils.nats import NatsConnectionManager
+import nats
+
+from nucliadb_utils.nats import get_traced_jetstream
 from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
     KBSource,
     KbUsage,
@@ -42,45 +44,62 @@ class KbUsageReportUtility:
     task: Optional[asyncio.Task]
     initialized: bool
     queue: asyncio.Queue
-    service: str
 
     def __init__(
         self,
         nats_subject: str,
-        nats_servers: List[str],
-        nats_creds: Optional[str] = None,
+        nats_servers: list[str],
+        nats_creds: Optional[str],
+        service: str,
         max_queue_size: int = 100,
-        service: str = "",
     ):
-        self.nats_connection_manager = NatsConnectionManager(
-            service_name=service,
-            nats_servers=nats_servers,
-            nats_creds=nats_creds,
-        )
+        self.nats_servers = nats_servers
         self.nats_subject = nats_subject
+        self.nats_creds = nats_creds
+        self.service = service
         self.queue = asyncio.Queue(max_queue_size)
         self.task = None
         self.initialized = False
 
+    async def reconnected_cb(self):
+        # See who we are connected to on reconnect.
+        logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
+
+    async def error_cb(self, e):
+        logger.error("There was an error connecting to NATS audit: {}".format(e), exc_info=True)
+
+    async def closed_cb(self):
+        logger.info("Connection is closed on NATS")
+
     async def initialize(self):
-        if not self.initialized and self.nats_connection_manager._nats_servers:
-            await self.nats_connection_manager.initialize()
+        options = {
+            "error_cb": self.error_cb,
+            "closed_cb": self.closed_cb,
+            "reconnected_cb": self.reconnected_cb,
+        }
 
-            if self.task is None:
-                self.task = asyncio.create_task(self.run())
+        if self.nats_creds:
+            options["user_credentials"] = self.nats_creds
 
-            self.initialized = True
+        if len(self.nats_servers) > 0:
+            options["servers"] = self.nats_servers
+
+        self.nc = await nats.connect(**options)
+
+        self.nats_stream = get_traced_jetstream(self.nc, self.service)
+        self.task = asyncio.create_task(self.run())
+
+        self.initialized = True
 
     async def finalize(self):
-        if self.initialized:
-            if self.task is not None:
-                self.task.cancel()
-                with suppress(asyncio.CancelledError, asyncio.exceptions.TimeoutError):
-                    await asyncio.wait_for(self.task, timeout=2)
-
-            await self.nats_connection_manager.finalize()
-
-            self.initialized = False
+        if self.task is not None:
+            self.task.cancel()
+            with suppress(asyncio.CancelledError, asyncio.exceptions.TimeoutError):
+                await asyncio.wait_for(self.task, timeout=2)
+        if self.nc:
+            await self.nc.flush()
+            await self.nc.close()
+            self.nc = None
 
     async def run(self) -> None:
         while True:
@@ -93,15 +112,13 @@ class KbUsageReportUtility:
                 self.queue.task_done()
 
     def send(self, message: KbUsage):
-        if not self.initialized:
-            return
         try:
             self.queue.put_nowait(message)
         except asyncio.QueueFull:
             logger.warning("KbUsage utility queue is full, dropping message")
 
     async def _send(self, message: KbUsage) -> int:
-        res = await self.nats_connection_manager.js.publish(
+        res = await self.nats_stream.publish(
             self.nats_subject,
             message.SerializeToString(),
         )

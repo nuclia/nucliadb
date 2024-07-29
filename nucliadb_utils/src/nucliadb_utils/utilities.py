@@ -331,18 +331,21 @@ def get_usage_utility() -> Optional[KbUsageReportUtility]:
 
 async def start_usage_utility(service: str):
     usage_utility: Optional[KbUsageReportUtility] = get_utility(Utility.USAGE)
-    if usage_utility is not None:
+    if usage_utility is not None and usage_utility.initialized is True:
         return
 
-    usage_utility = KbUsageReportUtility(
-        nats_subject=cast(str, usage_settings.usage_jetstream_subject),
-        nats_servers=usage_settings.usage_jetstream_servers,
-        nats_creds=usage_settings.usage_jetstream_auth,
-        service=service,
-    )
-    logger.info(f"Configuring usage report utility {usage_settings.usage_jetstream_subject}")
-    await usage_utility.initialize()
-    set_utility(Utility.USAGE, usage_utility)
+    if usage_utility is None:
+        usage_utility = KbUsageReportUtility(
+            nats_subject=usage_settings.usage_jetstream_subject,
+            nats_servers=usage_settings.usage_jetstream_servers,
+            nats_creds=usage_settings.usage_jetstream_auth,
+            service=service,
+        )
+        logger.info(f"Configuring usage report utility {usage_settings.usage_jetstream_subject}")
+        await usage_utility.initialize()
+        set_utility(Utility.USAGE, usage_utility)
+    if usage_utility.initialized is False:
+        await usage_utility.initialize()
 
 
 async def stop_usage_utility():
