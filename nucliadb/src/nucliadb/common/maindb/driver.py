@@ -46,6 +46,9 @@ class Transaction:
     async def set(self, key: str, value: bytes):
         raise NotImplementedError()
 
+    async def insert(self, key: str, value: bytes):
+        return await self.set(key, value)
+
     async def delete(self, key: str):
         raise NotImplementedError()
 
