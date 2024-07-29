@@ -63,8 +63,8 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     if not cluster_settings.standalone_mode and indexing_settings.index_jetstream_servers is not None:
         await start_indexing_utility(SERVICE_NAME)
 
-    await start_audit_utility(SERVICE_NAME)
     await start_usage_utility(SERVICE_NAME)
+    await start_audit_utility(SERVICE_NAME)
 
     finalizers = [
         stop_transaction_utility,
