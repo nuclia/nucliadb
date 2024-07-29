@@ -37,7 +37,8 @@ from nucliadb.common.cluster.standalone.service import (
     start_grpc as start_standalone_grpc,
 )
 from nucliadb.common.cluster.standalone.utils import is_index_node
-from nucliadb_protos import noderesources_pb2, writer_pb2
+from nucliadb.ingest.orm.resource import Resource
+from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -125,25 +126,26 @@ async def index_resource_to_shard(
     kbid: str,
     resource_id: str,
     shard: writer_pb2.ShardObject,
-) -> Optional[noderesources_pb2.Resource]:
+) -> Optional[Resource]:
     logger.info("Indexing resource", extra={"kbid": kbid, "resource_id": resource_id})
     sm = app_context.shard_manager
     partitioning = app_context.partitioning
 
     async with datamanagers.with_ro_transaction() as txn:
-        resource_index_message = await datamanagers.resources.get_resource_index_message(
-            txn, kbid=kbid, rid=resource_id, reindex=False
-        )
+        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
 
-    if resource_index_message is None:
+    if resource is None:
         logger.warning(
-            "Resource index message not found while indexing, skipping",
+            "Resource not found while indexing, skipping",
             extra={"kbid": kbid, "resource_id": resource_id},
         )
         return None
+
+    resource_index_message = (await resource.generate_index_message(reindex=False)).brain
+
     partition = partitioning.generate_partition(kbid, resource_id)
     await sm.add_resource(shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid)
-    return resource_index_message
+    return resource
 
 
 async def delete_resource_from_shard(

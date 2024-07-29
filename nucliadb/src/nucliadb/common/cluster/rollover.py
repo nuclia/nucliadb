@@ -231,8 +231,8 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
                 f"Shard {shard_id} not found. Was a new one created during migration?"
             )
 
-        resource_index_message = await index_resource_to_shard(app_context, kbid, resource_id, shard)
-        if resource_index_message is None:
+        resource = await index_resource_to_shard(app_context, kbid, resource_id, shard)
+        if resource is None:
             # resource no longer existing, remove indexing and carry on
             async with datamanagers.with_transaction() as txn:
                 await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
@@ -245,7 +245,7 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
                 kbid=kbid,
                 resource_id=resource_id,
                 shard_id=shard_id,
-                modification_time=_to_ts(resource_index_message.metadata.modified.ToDatetime()),
+                modification_time=_to_ts(resource.basic.modified.ToDatetime()),  # type: ignore
             )
             await txn.commit()
         wait_index_batch.append(shard)
@@ -370,8 +370,8 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
             continue
 
         # resource was modified or added during rollover, reindex
-        resource_index_message = await index_resource_to_shard(app_context, kbid, resource_id, shard)
-        if resource_index_message is not None:
+        resource = await index_resource_to_shard(app_context, kbid, resource_id, shard)
+        if resource is not None:
             repaired_resources.append(resource_id)
         async with datamanagers.with_transaction() as txn:
             await datamanagers.rollover.add_indexed(
