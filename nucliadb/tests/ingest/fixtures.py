@@ -208,7 +208,7 @@ async def usage(natsd):
     from nucliadb_utils.utilities import Utility, set_utility
 
     report_util = KbUsageReportUtility(
-        nats_servers=[natsd], nats_subject=usage_settings.usage_jetstream_subject, nats_cred=None, service="",
+        nats_servers=[natsd], nats_subject=usage_settings.usage_jetstream_subject, nats_creds=None, service="",
     )
     await report_util.initialize()
     report_util.nats_stream.publish = AsyncMock(
