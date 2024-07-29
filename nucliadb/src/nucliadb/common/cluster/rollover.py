@@ -245,7 +245,7 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
                 kbid=kbid,
                 resource_id=resource_id,
                 shard_id=shard_id,
-                modification_time=_to_ts(resource.basic.modified.ToDatetime()),
+                modification_time=_to_ts(resource.basic.modified.ToDatetime()),  # type: ignore
             )
             await txn.commit()
         wait_index_batch.append(shard)
