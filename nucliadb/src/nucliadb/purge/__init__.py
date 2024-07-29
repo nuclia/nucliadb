@@ -191,15 +191,20 @@ async def main():
         await purge_kb(driver)
         await purge_kb_storage(driver, storage)
         await purge_kb_vectorsets(driver, storage)
+    except Exception as ex:  # pragma: no cover
+        logger.exception("Unhandled exception on purge command")
+        errors.capture_exception(ex)
     finally:
-        await storage.finalize()
-        await teardown_driver()
-        await teardown_cluster()
+        try:
+            await storage.finalize()
+            await teardown_driver()
+            await teardown_cluster()
+        except Exception:  # pragma: no cover
+            logger.exception("Error tearing down utilities on purge command")
+            pass
 
 
 def run() -> int:  # pragma: no cover
     setup_logging()
-
     errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
-
     return asyncio.run(main())

@@ -25,6 +25,7 @@ from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
 from nucliadb_protos import nodereader_pb2, noderesources_pb2
+from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils import const
@@ -213,13 +214,18 @@ async def run_command(context: ApplicationContext) -> None:
 
     try:
         await run(context)
-    except (asyncio.CancelledError, RuntimeError):
+    except (asyncio.CancelledError, RuntimeError):  # pragma: no cover
         return
-    except Exception:
+    except Exception as ex:  # pragma: no cover
         logger.exception("Failed to run rebalancing.")
+        errors.capture_exception(ex)
     finally:
-        await context.finalize()
-        await metrics_server.shutdown()
+        try:
+            await context.finalize()
+            await metrics_server.shutdown()
+        except Exception:  # pragma: no cover
+            logger.exception("Error tearing down utilities on rebalance command")
+            pass
 
 
 def main():
