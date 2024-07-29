@@ -131,19 +131,20 @@ async def index_resource_to_shard(
     partitioning = app_context.partitioning
 
     async with datamanagers.with_ro_transaction() as txn:
-        resource_index_message = await datamanagers.resources.get_resource_index_message(
-            txn, kbid=kbid, rid=resource_id, reindex=False
-        )
+        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
 
-    if resource_index_message is None:
+    if resource is None:
         logger.warning(
-            "Resource index message not found while indexing, skipping",
+            "Resource not found while indexing, skipping",
             extra={"kbid": kbid, "resource_id": resource_id},
         )
         return None
+
+    resource_index_message = (await resource.generate_index_message(reindex=False)).brain
+
     partition = partitioning.generate_partition(kbid, resource_id)
     await sm.add_resource(shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid)
-    return resource_index_message
+    return resource
 
 
 async def delete_resource_from_shard(

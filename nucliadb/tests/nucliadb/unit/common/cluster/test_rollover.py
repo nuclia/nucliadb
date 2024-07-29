@@ -90,10 +90,10 @@ def resources_datamanager(resource_ids):
     mock.get_resource = AsyncMock()
     mock.get_resource.return_value = res
 
-    mock.get_resource_index_message = AsyncMock()
+    res.generate_index_message = AsyncMock()
     metadata = MagicMock()
     metadata.modified.ToDatetime.return_value = datetime.now()
-    mock.get_resource_index_message.return_value = metadata
+    res.generate_index_message.return_value = metadata
 
     with patch("nucliadb.common.cluster.rollover.datamanagers.resources", mock):
         yield mock
@@ -193,7 +193,7 @@ async def test_index_rollover_shards(
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
     await rollover.index_rollover_shards(app_context, "kbid")
     rollover_datamanager.add_indexed.assert_called_with(
-        ANY, kbid="kbid", resource_id="1", shard_id="1", modification_time=1
+        ANY, kbid="kbid", resource_id="1", shard_id="1", modification_time=ANY
     )
 
 
@@ -217,7 +217,7 @@ async def test_index_rollover_shards_handles_missing_res(
     app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
-    resources_datamanager.get_resource_index_message.return_value = None
+    resources_datamanager.get_resource.return_value = None
 
     await rollover.index_rollover_shards(app_context, "kbid")
 
@@ -248,9 +248,7 @@ async def test_validate_indexed_data(
     indexed_res = await rollover.validate_indexed_data(app_context, "kbid")
     assert len(indexed_res) == len(resource_ids)
     [
-        resources_datamanager.get_resource_index_message.assert_any_call(
-            ANY, kbid="kbid", rid=res_id, reindex=False
-        )
+        resources_datamanager.get_resource.assert_any_call(ANY, kbid="kbid", rid=res_id)
         for res_id in resource_ids
     ]
 
@@ -259,7 +257,7 @@ async def test_validate_indexed_data_handles_missing_res(
     app_context, rollover_datamanager, resources_datamanager, shards, resource_ids
 ):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
-    resources_datamanager.get_resource_index_message.return_value = None
+    resources_datamanager.get_resource.return_value = None
     assert len(await rollover.validate_indexed_data(app_context, "kbid")) == 0
 
 
