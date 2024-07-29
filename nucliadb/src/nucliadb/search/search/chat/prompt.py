@@ -217,7 +217,10 @@ async def get_resource_field_extracted_text(
     try:
         field_type, field_key = field_id.strip("/").split("/")
     except ValueError:
-        logger.error(f"Invalid field id: {field_id}. Skipping getting extracted text.")
+        logger.info(
+            f"Invalid field id: {field_id}. Skipping getting extracted text.",
+            extra={"kbid": kb_obj.kbid},
+        )
         return None
     field = await resource.get_field(field_key, KB_REVERSE[field_type], load=False)
     if field is None:
@@ -389,6 +392,7 @@ async def hierarchy_prompt_context(
                 start=0,
                 end=500,
                 extracted_text_cache=etcache,
+                log_on_missing_field=False,
             )
             summary_text = await paragraphs.get_paragraph_text(
                 kbid=kbid,
@@ -397,6 +401,7 @@ async def hierarchy_prompt_context(
                 start=0,
                 end=1000,
                 extracted_text_cache=etcache,
+                log_on_missing_field=False,
             )
             resources[rid] = ExtraCharsParagraph(
                 title=title_text,

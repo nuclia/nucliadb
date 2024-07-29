@@ -117,6 +117,7 @@ async def get_paragraph_from_full_text(
     end: int,
     split: Optional[str] = None,
     extracted_text_cache: Optional[ExtractedTextCache] = None,
+    log_on_missing_field: bool = True,
 ) -> str:
     """
     Pull paragraph from full text stored in database.
@@ -125,13 +126,14 @@ async def get_paragraph_from_full_text(
     """
     extracted_text = await get_field_extracted_text(field, cache=extracted_text_cache)
     if extracted_text is None:
-        logger.warning(
-            "Extracted_text for field does not exist on DB. This should not happen.",
-            extra={
-                "field_id": field.resource_unique_id,
-                "kbid": field.kbid,
-            },
-        )
+        if log_on_missing_field:
+            logger.warning(
+                "Extracted_text for field does not exist on DB. This should not happen.",
+                extra={
+                    "field_id": field.resource_unique_id,
+                    "kbid": field.kbid,
+                },
+            )
         return ""
 
     if split not in (None, ""):
@@ -156,14 +158,16 @@ async def get_paragraph_text(
         ResourceORM
     ] = None,  # allow passing in orm_resource to avoid extra DB calls or txn issues
     extracted_text_cache: Optional[ExtractedTextCache] = None,
+    log_on_missing_field: bool = True,
 ) -> str:
     if orm_resource is None:
         orm_resource = await get_resource_from_cache(kbid, rid)
         if orm_resource is None:
-            logger.warning(
-                "Resource does not exist on DB. This should not happen.",
-                extra={"resource_id": rid, "kbid": kbid, "field": field},
-            )
+            if log_on_missing_field:
+                logger.warning(
+                    "Resource does not exist on DB. This should not happen.",
+                    extra={"resource_id": rid, "kbid": kbid, "field": field},
+                )
             return ""
 
     _, field_type, field = field.split("/")
@@ -176,6 +180,7 @@ async def get_paragraph_text(
         end=end,
         split=split,
         extracted_text_cache=extracted_text_cache,
+        log_on_missing_field=log_on_missing_field,
     )
 
     if highlight:
