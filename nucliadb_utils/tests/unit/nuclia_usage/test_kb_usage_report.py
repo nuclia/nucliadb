@@ -69,8 +69,8 @@ async def test_kb_usage_report(natsd):
         nats_subject="test-stream", nats_servers=[natsd], nats_creds=None, service=""
     )
     await report_util.initialize()
-    report_util.nats_connection_manager.js.publish = AsyncMock(
-        side_effect=report_util.nats_connection_manager.js.publish
+    report_util.nats_stream.publish = AsyncMock(
+        side_effect=report_util.nats_stream.publish
     )
 
     report_util.send_kb_usage(

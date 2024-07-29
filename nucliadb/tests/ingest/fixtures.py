@@ -211,8 +211,8 @@ async def usage(natsd):
         nats_servers=[natsd], nats_subject=usage_settings.usage_jetstream_subject, nats_cred=None, service="",
     )
     await report_util.initialize()
-    report_util.nats_connection_manager.js.publish = AsyncMock(
-        side_effect=report_util.nats_connection_manager.js.publish
+    report_util.nats_stream.publish = AsyncMock(
+        side_effect=report_util.nats_stream.publish
     )
     set_utility(Utility.USAGE, report_util)
     yield report_util
