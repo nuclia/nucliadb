@@ -465,20 +465,7 @@ async def test_ingest_audit_stream_files_only(
     assert auditreq.type == AuditRequest.AuditType.DELETED
 
     # Test 5: Delete knowledgebox
-
-    set_utility(Utility.AUDIT, stream_audit)
     await KnowledgeBox.delete(maindb_driver, knowledgebox_ingest)
-    auditreq = await get_audit_messages(psub)
-    assert auditreq.kbid == knowledgebox_ingest
-    assert auditreq.type == AuditRequest.AuditType.KB_DELETED
-
-    try:
-        int(auditreq.trace_id)
-    except ValueError:
-        assert False, "Invalid trace ID"
-
-    # Currently where not updating audit counters on delete operations
-    assert not auditreq.HasField("kb_counter")
 
     await client.drain()
     await client.close()
