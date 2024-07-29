@@ -96,7 +96,7 @@ class DataLayer:
             async with self.connection.cursor() as cur:
                 try:
                     await cur.execute(
-                        "INSERT INTO resources (key, value) " "VALUES (%s, %s) ",
+                        "INSERT INTO resources (key, value) VALUES (%s, %s) ",
                         (key, value),
                     )
                 except psycopg.errors.UniqueViolation:
