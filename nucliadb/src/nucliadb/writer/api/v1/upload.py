@@ -43,6 +43,7 @@ from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
     validate_rid_exists_or_raise_error,
 )
+from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic
@@ -836,8 +837,10 @@ async def store_file_on_nuclia_db(
 
     parse_audit(writer.audit, request)
 
+    unique_slug_context_manager = noop_context_manager()
     if item is not None:
         if item.slug:
+            unique_slug_context_manager = ensure_slug_uniqueness(kbid, item.slug)
             writer.slug = item.slug
             toprocess.slug = item.slug
 
@@ -860,54 +863,55 @@ async def store_file_on_nuclia_db(
             x_skip_store=False,
         )
 
-    if override_resource_title and filename is not None:
-        set_title(writer, toprocess, filename)
+    async with unique_slug_context_manager:
+        if override_resource_title and filename is not None:
+            set_title(writer, toprocess, filename)
 
-    writer.basic.icon = content_type
-    writer.basic.created.FromDatetime(datetime.now())
+        writer.basic.icon = content_type
+        writer.basic.created.FromDatetime(datetime.now())
 
-    # Update resource with file
-    file_field = FieldFile()
-    file_field.added.FromDatetime(datetime.now())
-    file_field.file.bucket_name = bucket
-    file_field.file.content_type = content_type
-    if filename is not None:
-        file_field.file.filename = filename
-    file_field.file.uri = path
-    file_field.file.source = source
+        # Update resource with file
+        file_field = FieldFile()
+        file_field.added.FromDatetime(datetime.now())
+        file_field.file.bucket_name = bucket
+        file_field.file.content_type = content_type
+        if filename is not None:
+            file_field.file.filename = filename
+        file_field.file.uri = path
+        file_field.file.source = source
 
-    if md5:
-        file_field.file.md5 = md5
-    if size:
-        file_field.file.size = size
-    if language:
-        file_field.language = language
-    if password:
-        file_field.password = password
+        if md5:
+            file_field.file.md5 = md5
+        if size:
+            file_field.file.size = size
+        if language:
+            file_field.language = language
+        if password:
+            file_field.password = password
 
-    writer.files[field].CopyFrom(file_field)
-    # Do not store passwords on maindb
-    writer.files[field].ClearField("password")
+        writer.files[field].CopyFrom(file_field)
+        # Do not store passwords on maindb
+        writer.files[field].ClearField("password")
 
-    toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
-        file_field, storage=storage
-    )
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    writer.basic.metadata.status = Metadata.Status.PENDING
-    writer.basic.metadata.useful = True
-    await transaction.commit(writer, partition)
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(
-            status_code=500,
-            detail="Error while sending to process. Try calling /reprocess",
+        toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
+            file_field, storage=storage
         )
 
-    return processing_info.seqid
+        writer.source = BrokerMessage.MessageSource.WRITER
+        writer.basic.metadata.status = Metadata.Status.PENDING
+        writer.basic.metadata.useful = True
+        await transaction.commit(writer, partition)
+        try:
+            processing_info = await processing.send_to_process(toprocess, partition)
+        except LimitsExceededError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+        except SendToProcessError:
+            raise HTTPException(
+                status_code=500,
+                detail="Error while sending to process. Try calling /reprocess",
+            )
+
+        return processing_info.seqid
 
 
 def maybe_b64decode(some_string: str) -> str:

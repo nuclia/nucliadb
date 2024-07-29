@@ -44,6 +44,7 @@ from nucliadb.writer.api.v1.router import (
     RSLUG_PREFIX,
     api,
 )
+from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
@@ -115,42 +116,41 @@ async def create_resource(
     toprocess.source = Source.HTTP
     toprocess.title = item.title
 
+    unique_slug_context_manager = noop_context_manager()
     if item.slug:
-        from nucliadb.common import datamanagers
-
-        if await datamanagers.atomic.resources.slug_exists(kbid=kbid, slug=item.slug):
-            raise HTTPException(status_code=409, detail=f"Resource slug {item.slug} already exists")
+        unique_slug_context_manager = ensure_slug_uniqueness(kbid, item.slug)
         writer.slug = item.slug
         toprocess.slug = item.slug
 
-    parse_audit(writer.audit, request)
-    parse_basic(writer, item, toprocess)
+    async with unique_slug_context_manager:
+        parse_audit(writer.audit, request)
+        parse_basic(writer, item, toprocess)
 
-    if item.origin is not None:
-        parse_origin(writer.origin, item.origin)
-    if item.extra is not None:
-        parse_extra(writer.extra, item.extra)
+        if item.origin is not None:
+            parse_origin(writer.origin, item.origin)
+        if item.extra is not None:
+            parse_extra(writer.extra, item.extra)
 
-    await parse_fields(
-        writer=writer,
-        item=item,
-        toprocess=toprocess,
-        kbid=kbid,
-        uuid=uuid,
-        x_skip_store=x_skip_store,
-    )
+        await parse_fields(
+            writer=writer,
+            item=item,
+            toprocess=toprocess,
+            kbid=kbid,
+            uuid=uuid,
+            x_skip_store=x_skip_store,
+        )
 
-    set_status(writer.basic, item)
+        set_status(writer.basic, item)
 
-    writer.source = BrokerMessage.MessageSource.WRITER
+        writer.source = BrokerMessage.MessageSource.WRITER
 
-    t0 = time()
-    await transaction.commit(writer, partition)
-    txn_time = time() - t0
+        t0 = time()
+        await transaction.commit(writer, partition)
+        txn_time = time() - t0
 
-    seqid = await maybe_send_to_process(toprocess, partition)
+        seqid = await maybe_send_to_process(toprocess, partition)
 
-    return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=txn_time)
+        return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=txn_time)
 
 
 @api.patch(
