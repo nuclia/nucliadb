@@ -63,10 +63,9 @@ def audit():
 
 
 @pytest.fixture()
-async def index_audit_handler(pubsub, audit, usage, shard_manager):
+async def index_audit_handler(pubsub, audit, shard_manager):
     iah = auditing.IndexAuditHandler(
         audit=audit,
-        usage=usage,
         pubsub=pubsub,
         check_delay=0.05,
     )

@@ -93,3 +93,24 @@ class AuditStorage:
         generative_answer_first_chunk_time: Optional[float] = None,
     ):
         raise NotImplementedError
+
+    def report_fields_and_paragraphs(self, kbid: str, paragraphs: int, fields: int):
+        raise NotImplementedError
+
+    def report_resources(
+        self,
+        *,
+        kbid: str,
+        resources: int,
+    ):
+        raise NotImplementedError
+
+    def delete_kb(self, kbid: str):
+        raise NotImplementedError
+
+    def suggest(
+        self,
+        kbid: str,
+        client_type: int,
+    ):
+        raise NotImplementedError

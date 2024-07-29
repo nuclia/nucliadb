@@ -35,7 +35,6 @@ from nucliadb_utils.utilities import (
     get_nats_manager,
     get_pubsub,
     get_storage,
-    get_usage_utility,
 )
 
 from .auditing import IndexAuditHandler, ResourceWritesAuditHandler
@@ -154,13 +153,11 @@ async def start_ingest_processed_consumer(
 async def start_auditor() -> Callable[[], Awaitable[None]]:
     audit = get_audit()
     assert audit is not None
-    usage = get_usage_utility()
-    assert usage is not None
 
     pubsub = await get_pubsub()
     assert pubsub is not None, "Pubsub is not configured"
     storage = await get_storage(service_name=SERVICE_NAME)
-    index_auditor = IndexAuditHandler(audit=audit, usage=usage, pubsub=pubsub)
+    index_auditor = IndexAuditHandler(audit=audit, pubsub=pubsub)
     resource_writes_auditor = ResourceWritesAuditHandler(storage=storage, audit=audit, pubsub=pubsub)
 
     await index_auditor.initialize()

@@ -94,3 +94,24 @@ class BasicAuditStorage(AuditStorage):
         generative_answer_first_chunk_time: Optional[float] = None,
     ):
         logger.debug(f"CHAT {kbid} {user} {origin}")
+
+    def report_fields_and_paragraphs(self, kbid: str, paragraphs: int, fields: int):
+        logger.debug(f"FIELDS & PARAGRAPHS {kbid} {paragraphs} {fields}")
+
+    def report_resources(
+        self,
+        *,
+        kbid: str,
+        resources: int,
+    ):
+        logger.debug(f"RESOURCES {kbid} {resources}")
+
+    def delete_kb(self, kbid: str):
+        logger.debug(f"DELETE_KB {kbid}")
+
+    def suggest(
+        self,
+        kbid: str,
+        client_type: int,
+    ):
+        logger.debug(f"SUGGEST {kbid} {client_type}")

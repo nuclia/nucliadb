@@ -65,7 +65,7 @@ async def test_materialize_kb_data(
     storage,
     fake_node,
     knowledgebox_ingest,
-    usage,
+    audit_storage,
 ):
     count = 10
     for _ in range(count):
@@ -106,10 +106,10 @@ async def test_materialize_kb_data(
         )
 
     await mz.finalize()
-    assert usage.nats_connection_manager.js.publish.call_count == 1
-    assert usage.nats_connection_manager.js.publish.call_args[0][0] == "kb-usage.nuclia_db"
+    assert audit_storage.js.publish.call_count == 1
+    assert audit_storage.js.publish.call_args[0][0] == "kb-usage.nuclia_db"
     pb = KbUsage()
-    pb.ParseFromString(usage.nats_connection_manager.js.publish.call_args[0][1])
+    pb.ParseFromString(audit_storage.js.publish.call_args[0][1])
     assert pb.storage.resources == count
     assert pb.service == Service.NUCLIA_DB
     assert pb.kb_id == knowledgebox_ingest

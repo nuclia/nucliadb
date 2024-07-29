@@ -46,12 +46,10 @@ from nucliadb_utils.utilities import (
     start_indexing_utility,
     start_nats_manager,
     start_transaction_utility,
-    start_usage_utility,
     stop_audit_utility,
     stop_indexing_utility,
     stop_nats_manager,
     stop_transaction_utility,
-    stop_usage_utility,
 )
 
 
@@ -64,13 +62,11 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
         await start_indexing_utility(SERVICE_NAME)
 
     await start_audit_utility(SERVICE_NAME)
-    await start_usage_utility(SERVICE_NAME)
 
     finalizers = [
         stop_transaction_utility,
         stop_indexing_utility,
         stop_audit_utility,
-        stop_usage_utility,
         teardown_cluster,
     ]
 

@@ -52,7 +52,11 @@ async def audit_storage(nats):
 
 
 def stream_audit_finish_condition(audit_storage: StreamAuditStorage, count_publish: int):
-    return audit_storage.queue.qsize() == 0 and audit_storage.js.publish.call_count == count_publish
+    return (
+        audit_storage.queue.qsize() == 0
+        and audit_storage.kb_usage_utility.queue.qsize() == 0
+        and audit_storage.js.publish.call_count == count_publish
+    )
 
 
 async def wait_until(condition, timeout=1):
@@ -105,6 +109,11 @@ async def test_visited(audit_storage: StreamAuditStorage, nats):
     audit_storage.send(context.audit_request)
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
+@pytest.mark.asyncio
+async def test_delete_kb(audit_storage: StreamAuditStorage, nats):
+    audit_storage.delete_kb("kbid")
+
+    await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 
 @pytest.mark.asyncio
 async def test_search(audit_storage: StreamAuditStorage, nats):

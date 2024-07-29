@@ -325,33 +325,6 @@ def get_audit() -> Optional[AuditStorage]:
     return get_utility(Utility.AUDIT)
 
 
-def get_usage_utility() -> Optional[KbUsageReportUtility]:
-    return get_utility(Utility.USAGE)
-
-
-async def start_usage_utility(service: str):
-    usage_utility: Optional[KbUsageReportUtility] = get_utility(Utility.USAGE)
-    if usage_utility is not None:
-        return
-
-    usage_utility = KbUsageReportUtility(
-        nats_subject=cast(str, usage_settings.usage_jetstream_subject),
-        nats_servers=usage_settings.usage_jetstream_servers,
-        nats_creds=usage_settings.usage_jetstream_auth,
-        service=service,
-    )
-    logger.info(f"Configuring usage report utility {usage_settings.usage_jetstream_subject}")
-    await usage_utility.initialize()
-    set_utility(Utility.USAGE, usage_utility)
-
-
-async def stop_usage_utility():
-    usage_utility = get_usage_utility()
-    if usage_utility:
-        await usage_utility.finalize()
-        clean_utility(Utility.USAGE)
-
-
 def register_audit_utility(service: str) -> AuditStorage:
     if audit_settings.audit_driver == "basic":
         b_audit_utility: AuditStorage = BasicAuditStorage()

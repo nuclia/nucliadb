@@ -30,9 +30,6 @@ from nucliadb_protos import audit_pb2, nodereader_pb2, noderesources_pb2, writer
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KBSource, Service
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import Storage as KbUsageStorage
-from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 from nucliadb_utils.storages.storage import Storage
 
 from . import metrics
@@ -61,12 +58,10 @@ class IndexAuditHandler:
         self,
         *,
         audit: AuditStorage,
-        usage: KbUsageReportUtility,
         pubsub: PubSubDriver,
         check_delay: float = 5.0,
     ):
         self.audit = audit
-        self.usage = usage
         self.pubsub = pubsub
         self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
@@ -123,12 +118,8 @@ class IndexAuditHandler:
             total_fields += shard.fields
             total_paragraphs += shard.paragraphs
 
-        self.usage.send_kb_usage(
-            service=Service.NUCLIA_DB,  # type: ignore
-            account_id=None,
-            kb_id=kbid,
-            kb_source=KBSource.HOSTED,  # type: ignore
-            storage=KbUsageStorage(paragraphs=total_paragraphs, fields=total_fields),
+        self.audit.report_fields_and_paragraphs(
+            kbid=kbid, paragraphs=total_paragraphs, fields=total_fields
         )
 
 

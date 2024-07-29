@@ -61,15 +61,13 @@ from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_utils import const
 from nucliadb_utils.aiopynecone.exceptions import PineconeAPIError
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KBSource, Service
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import Storage as KbUsageStorage
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
+    get_audit,
     get_endecryptor,
     get_pinecone,
     get_storage,
-    get_usage_utility,
     has_feature,
 )
 
@@ -329,15 +327,9 @@ class KnowledgeBox:
         if kb_config is not None:
             await cls._maybe_delete_external_indexes(kbid, kb_config.external_index_provider)
 
-        usage_utility = get_usage_utility()
-        if usage_utility is not None:
-            usage_utility.send_kb_usage(
-                service=Service.NUCLIA_DB,  # type: ignore
-                account_id=None,
-                kb_id=kbid,
-                kb_source=KBSource.HOSTED,  # type: ignore
-                storage=KbUsageStorage(paragraphs=0, fields=0, resources=0),
-            )
+        audit = get_audit()
+        if audit is not None:
+            audit.delete_kb(kbid=kbid)
 
         return kbid
 
