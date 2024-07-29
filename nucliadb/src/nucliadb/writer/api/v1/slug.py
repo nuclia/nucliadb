@@ -41,8 +41,6 @@ async def ensure_slug_uniqueness(kbid: str, slug: str):
     - Otherwise, use the transaction lock to prevent from multiple concurrent
       create resource requests having the same slug.
     """
-    if await datamanagers.atomic.resources.slug_exists(kbid=kbid, slug=slug):
-        raise HTTPException(status_code=409, detail=f"Resource slug {slug} already exists")
     try:
         async with locking.distributed_lock(
             key=locking.RESOURCE_CREATION_SLUG_LOCK.format(kbid=kbid, resource_slug=slug),
@@ -54,6 +52,8 @@ async def ensure_slug_uniqueness(kbid: str, slug: str):
             # We don't want to refresh it here
             refresh_timeout=120.0,
         ):
+            if await datamanagers.atomic.resources.slug_exists(kbid=kbid, slug=slug):
+                raise HTTPException(status_code=409, detail=f"Resource slug {slug} already exists")
             yield
     except locking.ResourceLocked:
         raise HTTPException(
