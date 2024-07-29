@@ -134,7 +134,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response.body_iterator = custom_body_iterator()
         return response
 
+
 KB_USAGE_STREAM_SUBJECT = "kb-usage.nuclia_db"
+
 
 class StreamAuditStorage(AuditStorage):
     task: Optional[asyncio.Task]

@@ -109,11 +109,13 @@ async def test_visited(audit_storage: StreamAuditStorage, nats):
     audit_storage.send(context.audit_request)
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
+
 @pytest.mark.asyncio
 async def test_delete_kb(audit_storage: StreamAuditStorage, nats):
     audit_storage.delete_kb("kbid")
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
+
 
 @pytest.mark.asyncio
 async def test_search(audit_storage: StreamAuditStorage, nats):

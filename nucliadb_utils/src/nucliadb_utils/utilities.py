@@ -40,7 +40,6 @@ from nucliadb_utils.encryption.settings import settings as encryption_settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     FileBackendConfig,
@@ -49,7 +48,6 @@ from nucliadb_utils.settings import (
     nuclia_settings,
     storage_settings,
     transaction_settings,
-    usage_settings,
 )
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.store import MAIN
