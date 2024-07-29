@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 NEW_SHARD_LOCK = "new-shard-{kbid}"
 RESOURCE_INDEX_LOCK = "resource-index-{kbid}-{resource_id}"
+RESOURCE_CREATION_SLUG_LOCK = "resource-creation-{kbid}-{resource_slug}"
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
 MIGRATIONS_LOCK = "migration"
 
@@ -83,7 +84,7 @@ class _Lock:
                     else:
                         if time.time() > lock_data.expires_at:
                             # if current time is greater than when it expires, take it over
-                            await self._set_lock_value(txn)
+                            await self._update_lock_value(txn)
                             await txn.commit()
                             break
 
@@ -105,8 +106,20 @@ class _Lock:
         else:
             return LockValue(**orjson.loads(existing_data))
 
-    async def _set_lock_value(self, txn: Transaction) -> None:
+    async def _update_lock_value(self, txn: Transaction) -> None:
+        """
+        Update the value for the lock.
+        """
         await txn.set(
+            self.key,
+            orjson.dumps(LockValue(self.value, time.time() + self.expire_timeout)),
+        )
+
+    async def _set_lock_value(self, txn: Transaction) -> None:
+        """
+        Set the value for the lock. If lock already exists, it doesn't update and raises a ConflictError.
+        """
+        await txn.insert(
             self.key,
             orjson.dumps(LockValue(self.value, time.time() + self.expire_timeout)),
         )
@@ -116,7 +129,7 @@ class _Lock:
             try:
                 await asyncio.sleep(self.refresh_timeout)
                 async with self.driver.transaction() as txn:
-                    await self._set_lock_value(txn)
+                    await self._update_lock_value(txn)
                     await txn.commit()
             except (asyncio.CancelledError, RuntimeError):
                 return
@@ -137,10 +150,19 @@ class _Lock:
 
 def distributed_lock(
     key: str,
-    lock_timeout: float = 60.0,  # max time to wait for lock
-    expire_timeout: float = 30.0,  # how long by default the lock will be held without a refresh
-    refresh_timeout: float = 10.0,  # how often to refresh
+    lock_timeout: float = 60.0,
+    expire_timeout: float = 30.0,
+    refresh_timeout: float = 10.0,
 ) -> _Lock:
+    """
+    Context manager to get a distributed lock on a key.
+
+    Params:
+    - key: the key to lock with
+    - lock_timeout: maximum time to wait for the lock before ResourceLocked is raised.
+    - expire_timeout: how long by default the lock will be held without a refresh
+    - refresh_timeout: how often to refresh the lock
+    """
     return _Lock(
         key,
         lock_timeout=lock_timeout,

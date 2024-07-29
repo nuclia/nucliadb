@@ -29,6 +29,7 @@ import psycopg
 import psycopg_pool
 
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb_telemetry import metrics
 
 RETRIABLE_EXCEPTIONS = (
@@ -89,6 +90,17 @@ class DataLayer:
                     "DO UPDATE SET value = EXCLUDED.value",
                     (key, value),
                 )
+
+    async def insert(self, key: str, value: bytes) -> None:
+        with pg_observer({"type": "insert"}):
+            async with self.connection.cursor() as cur:
+                try:
+                    await cur.execute(
+                        "INSERT INTO resources (key, value) VALUES (%s, %s) ",
+                        (key, value),
+                    )
+                except psycopg.errors.UniqueViolation:
+                    raise ConflictError(key)
 
     async def delete(self, key: str) -> None:
         with pg_observer({"type": "delete"}):
@@ -172,6 +184,9 @@ class PGTransaction(Transaction):
 
     async def set(self, key: str, value: bytes):
         await self.data_layer.set(key, value)
+
+    async def insert(self, key: str, value: bytes):
+        await self.data_layer.insert(key, value)
 
     async def delete(self, key: str):
         await self.data_layer.delete(key)
