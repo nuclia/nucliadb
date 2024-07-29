@@ -536,8 +536,10 @@ async def stream_kbusage_util(natsd: str):
     from nucliadb_utils.settings import usage_settings
 
     audit = KbUsageReportUtility(
-        usage_settings.usage_jetstream_subject,  # type: ignore
-        [natsd],
+        nats_subject=usage_settings.usage_jetstream_subject,  # type: ignore
+        nats_servers=[natsd],
+        nats_creds=None,
+        service="",
     )
     await audit.initialize()
     yield audit
