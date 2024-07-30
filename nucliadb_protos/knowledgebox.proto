@@ -11,7 +11,7 @@ enum KnowledgeBoxResponseStatus {
     CONFLICT = 1;
     NOTFOUND = 2;
     ERROR = 3;
-    EXTERNAL_PROVIDER_ERROR = 4;
+    EXTERNAL_INDEX_PROVIDER_ERROR = 4;
 }
 
 // ID

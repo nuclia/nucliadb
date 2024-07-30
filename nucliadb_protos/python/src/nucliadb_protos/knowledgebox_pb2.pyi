@@ -68,7 +68,7 @@ class _KnowledgeBoxResponseStatusEnumTypeWrapper(google.protobuf.internal.enum_t
     CONFLICT: _KnowledgeBoxResponseStatus.ValueType  # 1
     NOTFOUND: _KnowledgeBoxResponseStatus.ValueType  # 2
     ERROR: _KnowledgeBoxResponseStatus.ValueType  # 3
-    EXTERNAL_PROVIDER_ERROR: _KnowledgeBoxResponseStatus.ValueType  # 4
+    EXTERNAL_INDEX_PROVIDER_ERROR: _KnowledgeBoxResponseStatus.ValueType  # 4
 
 class KnowledgeBoxResponseStatus(_KnowledgeBoxResponseStatus, metaclass=_KnowledgeBoxResponseStatusEnumTypeWrapper): ...
 
@@ -76,7 +76,7 @@ OK: KnowledgeBoxResponseStatus.ValueType  # 0
 CONFLICT: KnowledgeBoxResponseStatus.ValueType  # 1
 NOTFOUND: KnowledgeBoxResponseStatus.ValueType  # 2
 ERROR: KnowledgeBoxResponseStatus.ValueType  # 3
-EXTERNAL_PROVIDER_ERROR: KnowledgeBoxResponseStatus.ValueType  # 4
+EXTERNAL_INDEX_PROVIDER_ERROR: KnowledgeBoxResponseStatus.ValueType  # 4
 global___KnowledgeBoxResponseStatus = KnowledgeBoxResponseStatus
 
 class _ExternalIndexProviderType:

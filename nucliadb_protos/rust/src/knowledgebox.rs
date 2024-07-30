@@ -415,7 +415,7 @@ pub enum KnowledgeBoxResponseStatus {
     Conflict = 1,
     Notfound = 2,
     Error = 3,
-    ExternalProviderError = 4,
+    ExternalIndexProviderError = 4,
 }
 impl KnowledgeBoxResponseStatus {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -428,8 +428,8 @@ impl KnowledgeBoxResponseStatus {
             KnowledgeBoxResponseStatus::Conflict => "CONFLICT",
             KnowledgeBoxResponseStatus::Notfound => "NOTFOUND",
             KnowledgeBoxResponseStatus::Error => "ERROR",
-            KnowledgeBoxResponseStatus::ExternalProviderError => {
-                "EXTERNAL_PROVIDER_ERROR"
+            KnowledgeBoxResponseStatus::ExternalIndexProviderError => {
+                "EXTERNAL_INDEX_PROVIDER_ERROR"
             }
         }
     }
@@ -440,7 +440,7 @@ impl KnowledgeBoxResponseStatus {
             "CONFLICT" => Some(Self::Conflict),
             "NOTFOUND" => Some(Self::Notfound),
             "ERROR" => Some(Self::Error),
-            "EXTERNAL_PROVIDER_ERROR" => Some(Self::ExternalProviderError),
+            "EXTERNAL_INDEX_PROVIDER_ERROR" => Some(Self::ExternalIndexProviderError),
             _ => None,
         }
     }

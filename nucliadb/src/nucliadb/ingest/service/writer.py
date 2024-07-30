@@ -135,7 +135,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 extra={"slug": request.slug, "error": str(exc)},
             )
             return knowledgebox_pb2.NewKnowledgeBoxResponse(
-                status=KnowledgeBoxResponseStatus.EXTERNAL_PROVIDER_ERROR,
+                status=KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR,
                 error_message=exc.message,
             )
 
@@ -201,7 +201,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 extra={"slug": request.slug, "error": str(exc)},
             )
             return writer_pb2.NewKnowledgeBoxV2Response(
-                status=KnowledgeBoxResponseStatus.EXTERNAL_PROVIDER_ERROR,
+                status=KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR,
                 error_message=exc.message,
             )
 
