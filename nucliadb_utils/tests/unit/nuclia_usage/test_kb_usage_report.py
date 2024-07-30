@@ -21,7 +21,7 @@ import asyncio
 import inspect
 import time
 from functools import partial
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -42,7 +42,7 @@ from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtili
 def kb_usage_report_finish_condition(kb_usage_report: KbUsageReportUtility, count_publish: int):
     return (
         kb_usage_report.queue.qsize() == 0
-        and kb_usage_report.nats_connection_manager.js.publish.call_count == count_publish
+        and kb_usage_report.nats_stream.publish.call_count == count_publish
     )
 
 
@@ -64,12 +64,11 @@ async def wait_until(condition, timeout=1):
 
 
 @pytest.mark.asyncio
-async def test_kb_usage_report(natsd):
-    report_util = KbUsageReportUtility(nats_subject="test-stream", nats_servers=[natsd])
+async def test_kb_usage_report():
+    nats_stream = Mock(publish=AsyncMock())
+    report_util = KbUsageReportUtility(nats_stream=nats_stream, nats_subject="test-stream")
+
     await report_util.initialize()
-    report_util.nats_connection_manager.js.publish = AsyncMock(
-        side_effect=report_util.nats_connection_manager.js.publish
-    )
 
     report_util.send_kb_usage(
         service=Service.NUCLIA_DB,
@@ -117,3 +116,5 @@ async def test_kb_usage_report(natsd):
 
     await wait_until(partial(kb_usage_report_finish_condition, report_util, 1))
     await report_util.finalize()
+
+    nats_stream.publish.assert_called_once()

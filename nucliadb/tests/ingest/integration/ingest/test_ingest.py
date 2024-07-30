@@ -64,8 +64,6 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KbUsage
-from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_indexing, get_storage
@@ -76,12 +74,9 @@ EXAMPLE_VECTOR = base64.b64decode(
 
 
 @pytest.fixture(autouse=True)
-async def audit_consumers(
-    storage, pubsub, stream_audit: StreamAuditStorage, usage: KbUsageReportUtility
-):
+async def audit_consumers(storage, pubsub, stream_audit: StreamAuditStorage):
     index_auditor = IndexAuditHandler(
         audit=stream_audit,
-        usage=usage,
         pubsub=pubsub,
     )
     resource_writes_auditor = ResourceWritesAuditHandler(
@@ -344,13 +339,6 @@ async def get_audit_messages(sub):
     return auditreq
 
 
-async def get_usage_messages(sub):
-    msg = await sub.fetch(1)
-    usagereq = KbUsage()
-    usagereq.ParseFromString(msg[0].data)
-    return usagereq
-
-
 @pytest.mark.asyncio
 async def test_ingest_audit_stream_files_only(
     local_files,
@@ -362,9 +350,8 @@ async def test_ingest_audit_stream_files_only(
     stream_processor,
     stream_audit: StreamAuditStorage,
     maindb_driver: Driver,
-    usage,
 ):
-    from nucliadb_utils.settings import audit_settings, usage_settings
+    from nucliadb_utils.settings import audit_settings
 
     # Prepare a test audit stream to receive our messages
     partition = stream_audit.get_partition(knowledgebox_ingest)
@@ -379,16 +366,6 @@ async def test_ingest_audit_stream_files_only(
         pass
     await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
     psub = await jetstream.pull_subscribe(subject, "psub")
-
-    if usage_settings.usage_jetstream_subject is None:
-        assert False, "Missing jetstream target in usage settings"
-    subject = usage_settings.usage_jetstream_subject
-    try:
-        await jetstream.delete_stream(name=usage_settings.usage_stream)
-    except nats.js.errors.NotFoundError:
-        pass
-    await jetstream.add_stream(name=usage_settings.usage_stream, subjects=[subject])
-    usub = await jetstream.pull_subscribe(subject, "usub")
 
     rid = str(uuid.uuid4())
 
@@ -488,15 +465,7 @@ async def test_ingest_audit_stream_files_only(
     assert auditreq.type == AuditRequest.AuditType.DELETED
 
     # Test 5: Delete knowledgebox
-
     await KnowledgeBox.delete(maindb_driver, knowledgebox_ingest)
-
-    usagereq = await get_usage_messages(usub)
-    assert usagereq.kb_id == knowledgebox_ingest
-    assert usagereq.HasField("storage") is True
-    assert usagereq.storage.paragraphs == 0
-    assert usagereq.storage.resources == 0
-    assert usagereq.storage.fields == 0
 
     await client.drain()
     await client.close()

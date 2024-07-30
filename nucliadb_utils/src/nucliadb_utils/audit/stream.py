@@ -37,12 +37,24 @@ from nucliadb_protos.audit_pb2 import (
     AuditField,
     AuditRequest,
     ChatContext,
+    ClientType,
 )
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.nats import get_traced_jetstream
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    ClientType as ClientTypeKbUsage,
+)
+from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+    KBSource,
+    Search,
+    SearchType,
+    Service,
+    Storage,
+)
+from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 
 
 class RequestContext:
@@ -123,6 +135,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return response
 
 
+KB_USAGE_STREAM_SUBJECT = "kb-usage.nuclia_db"
+
+
 class StreamAuditStorage(AuditStorage):
     task: Optional[asyncio.Task]
     initialized: bool
@@ -181,9 +196,16 @@ class StreamAuditStorage(AuditStorage):
         self.js = get_traced_jetstream(self.nc, self.service)
         self.task = asyncio.create_task(self.run())
 
+        self.kb_usage_utility = KbUsageReportUtility(
+            nats_stream=self.js, nats_subject=KB_USAGE_STREAM_SUBJECT
+        )
+        await self.kb_usage_utility.initialize()
+
         self.initialized = True
 
     async def finalize(self):
+        await self.kb_usage_utility.finalize()
+
         if self.task is not None:
             self.task.cancel()
         if self.nc:
@@ -258,6 +280,29 @@ class StreamAuditStorage(AuditStorage):
 
         self.send(auditrequest)
 
+    def report_fields_and_paragraphs(self, kbid: str, paragraphs: int, fields: int):
+        self.kb_usage_utility.send_kb_usage(
+            service=Service.NUCLIA_DB,
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,
+            storage=Storage(paragraphs=paragraphs, fields=fields),
+        )
+
+    def report_resources(
+        self,
+        *,
+        kbid: str,
+        resources: int,
+    ):
+        self.kb_usage_utility.send_kb_usage(
+            service=Service.NUCLIA_DB,
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,
+            storage=Storage(resources=resources),
+        )
+
     def visited(
         self,
         kbid: str,
@@ -276,6 +321,15 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.rid = uuid
         auditrequest.kbid = kbid
         auditrequest.type = AuditRequest.VISITED
+
+    def delete_kb(self, kbid: str):
+        self.kb_usage_utility.send_kb_usage(
+            service=Service.NUCLIA_DB,
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,
+            storage=Storage(paragraphs=0, fields=0, resources=0),
+        )
 
     def search(
         self,
@@ -301,6 +355,43 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.retrieval_time = timeit
         auditrequest.resources = resources
         auditrequest.type = AuditRequest.SEARCH
+
+        self.kb_usage_utility.send_kb_usage(
+            service=Service.NUCLIA_DB,
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,
+            # TODO unify AuditRequest client type and Nuclia Usage client type
+            searches=[
+                Search(
+                    client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
+                    type=SearchType.SEARCH,
+                    tokens=2000,
+                    num_searches=1,
+                )
+            ],
+        )
+
+    def suggest(
+        self,
+        kbid: str,
+        client_type: int,
+    ):
+        self.kb_usage_utility.send_kb_usage(
+            service=Service.NUCLIA_DB,
+            account_id=None,
+            kb_id=kbid,
+            kb_source=KBSource.HOSTED,
+            # TODO unify AuditRequest client type and Nuclia Usage client type
+            searches=[
+                Search(
+                    client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
+                    type=SearchType.SUGGEST,
+                    tokens=0,
+                    num_searches=1,
+                )
+            ],
+        )
 
     def chat(
         self,

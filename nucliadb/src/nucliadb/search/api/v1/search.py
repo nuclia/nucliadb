@@ -61,16 +61,7 @@ from nucliadb_models.search import (
 from nucliadb_models.security import RequestSecurity
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
-    ClientType as ClientTypeKbUsage,
-)
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
-    KBSource,
-    Search,
-    SearchType,
-    Service,
-)
-from nucliadb_utils.utilities import get_audit, get_usage_utility
+from nucliadb_utils.utilities import get_audit
 
 SEARCH_EXAMPLES = {
     "filtering_by_icon": Example(
@@ -436,7 +427,6 @@ async def search(
     with_status: Optional[ResourceProcessingStatus] = None,
 ) -> tuple[KnowledgeboxSearchResults, bool]:
     audit = get_audit()
-    usage = get_usage_utility()
     start_time = time()
 
     item.min_score = min_score_from_payload(item.min_score)
@@ -502,22 +492,6 @@ async def search(
             pb_query,
             time() - start_time,
             len(search_results.resources),
-        )
-    if usage is not None and do_audit:
-        usage.send_kb_usage(
-            service=Service.NUCLIA_DB,  # type: ignore
-            account_id=None,
-            kb_id=kbid,
-            kb_source=KBSource.HOSTED,  # type: ignore
-            # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=[
-                Search(
-                    client=ClientTypeKbUsage.Value(x_ndb_client.name),  # type: ignore
-                    type=SearchType.SEARCH,
-                    tokens=2000,
-                    num_searches=1,
-                )
-            ],
         )
 
     if item.debug:

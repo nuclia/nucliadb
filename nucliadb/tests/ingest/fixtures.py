@@ -47,9 +47,9 @@ from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.audit.basic import BasicAuditStorage
+from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.indexing import IndexingUtility
-from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
@@ -203,21 +203,18 @@ async def audit():
 
 
 @pytest.fixture(scope="function")
-async def usage(natsd):
-    from nucliadb_utils.settings import usage_settings
-    from nucliadb_utils.utilities import Utility, set_utility
+async def stream_audit(natsd: str):
+    from nucliadb_utils.settings import audit_settings
 
-    report_util = KbUsageReportUtility(
-        nats_servers=[natsd], nats_subject=usage_settings.usage_jetstream_subject
+    audit = StreamAuditStorage(
+        [natsd],
+        audit_settings.audit_jetstream_target,  # type: ignore
+        audit_settings.audit_partitions,
+        audit_settings.audit_hash_seed,
     )
-    await report_util.initialize()
-    report_util.nats_connection_manager.js.publish = AsyncMock(
-        side_effect=report_util.nats_connection_manager.js.publish
-    )
-    set_utility(Utility.USAGE, report_util)
-    yield report_util
-    await report_util.finalize()
-    clean_utility(Utility.USAGE)
+    await audit.initialize()
+    yield audit
+    await audit.finalize()
 
 
 @pytest.fixture(scope="function")

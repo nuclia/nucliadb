@@ -46,16 +46,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     SearchOptions,
 )
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
-    ClientType as ClientTypeKbUsage,
-)
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
-    KBSource,
-    Search,
-    SearchType,
-    Service,
-)
-from nucliadb_utils.utilities import get_audit, get_usage_utility
+from nucliadb_utils.utilities import get_audit
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +90,6 @@ async def _index_node_retrieval(
     metrics: RAGMetrics = RAGMetrics(),
 ) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
     audit = get_audit()
-    usage = get_usage_utility()
     start_time = time()
 
     item.min_score = min_score_from_payload(item.min_score)
@@ -168,23 +158,6 @@ async def _index_node_retrieval(
             pb_query,
             search_time,
             len(search_results.resources),
-        )
-
-    if usage is not None:
-        usage.send_kb_usage(
-            service=Service.NUCLIA_DB,  # type: ignore
-            account_id=None,
-            kb_id=kbid,
-            kb_source=KBSource.HOSTED,  # type: ignore
-            # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=[
-                Search(
-                    client=ClientTypeKbUsage.Value(x_ndb_client.name),  # type: ignore
-                    type=SearchType.SEARCH,
-                    tokens=2000,
-                    num_searches=1,
-                )
-            ],
         )
 
     if item.debug:
