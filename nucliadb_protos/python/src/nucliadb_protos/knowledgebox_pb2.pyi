@@ -93,6 +93,30 @@ UNSET: ExternalIndexProviderType.ValueType  # 0
 PINECONE: ExternalIndexProviderType.ValueType  # 1
 global___ExternalIndexProviderType = ExternalIndexProviderType
 
+class _PineconeServerlessCloud:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _PineconeServerlessCloudEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_PineconeServerlessCloud.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    PINECONE_UNSET: _PineconeServerlessCloud.ValueType  # 0
+    AWS_US_EAST_1: _PineconeServerlessCloud.ValueType  # 1
+    AWS_US_WEST_2: _PineconeServerlessCloud.ValueType  # 2
+    AWS_EU_WEST_1: _PineconeServerlessCloud.ValueType  # 3
+    GCP_US_CENTRAL1: _PineconeServerlessCloud.ValueType  # 4
+    AZURE_EASTUS2: _PineconeServerlessCloud.ValueType  # 5
+
+class PineconeServerlessCloud(_PineconeServerlessCloud, metaclass=_PineconeServerlessCloudEnumTypeWrapper):
+    """Pinecone"""
+
+PINECONE_UNSET: PineconeServerlessCloud.ValueType  # 0
+AWS_US_EAST_1: PineconeServerlessCloud.ValueType  # 1
+AWS_US_WEST_2: PineconeServerlessCloud.ValueType  # 2
+AWS_EU_WEST_1: PineconeServerlessCloud.ValueType  # 3
+GCP_US_CENTRAL1: PineconeServerlessCloud.ValueType  # 4
+AZURE_EASTUS2: PineconeServerlessCloud.ValueType  # 5
+global___PineconeServerlessCloud = PineconeServerlessCloud
+
 @typing.final
 class KnowledgeBoxID(google.protobuf.message.Message):
     """ID"""
@@ -115,18 +139,19 @@ global___KnowledgeBoxID = KnowledgeBoxID
 
 @typing.final
 class CreatePineconeConfig(google.protobuf.message.Message):
-    """Pinecone"""
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     API_KEY_FIELD_NUMBER: builtins.int
+    SERVERLESS_CLOUD_FIELD_NUMBER: builtins.int
     api_key: builtins.str
+    serverless_cloud: global___PineconeServerlessCloud.ValueType
     def __init__(
         self,
         *,
         api_key: builtins.str = ...,
+        serverless_cloud: global___PineconeServerlessCloud.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["api_key", b"api_key"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["api_key", b"api_key", "serverless_cloud", b"serverless_cloud"]) -> None: ...
 
 global___CreatePineconeConfig = CreatePineconeConfig
 
@@ -172,7 +197,9 @@ class StoredPineconeConfig(google.protobuf.message.Message):
 
     ENCRYPTED_API_KEY_FIELD_NUMBER: builtins.int
     INDEXES_FIELD_NUMBER: builtins.int
+    SERVERLESS_CLOUD_FIELD_NUMBER: builtins.int
     encrypted_api_key: builtins.str
+    serverless_cloud: global___PineconeServerlessCloud.ValueType
     @property
     def indexes(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___PineconeIndexMetadata]: ...
     def __init__(
@@ -180,8 +207,9 @@ class StoredPineconeConfig(google.protobuf.message.Message):
         *,
         encrypted_api_key: builtins.str = ...,
         indexes: collections.abc.Mapping[builtins.str, global___PineconeIndexMetadata] | None = ...,
+        serverless_cloud: global___PineconeServerlessCloud.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["encrypted_api_key", b"encrypted_api_key", "indexes", b"indexes"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["encrypted_api_key", b"encrypted_api_key", "indexes", b"indexes", "serverless_cloud", b"serverless_cloud"]) -> None: ...
 
 global___StoredPineconeConfig = StoredPineconeConfig
 

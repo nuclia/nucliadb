@@ -7,12 +7,13 @@ pub struct KnowledgeBoxId {
     #[prost(string, tag = "2")]
     pub uuid: ::prost::alloc::string::String,
 }
-/// Pinecone
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreatePineconeConfig {
     #[prost(string, tag = "1")]
     pub api_key: ::prost::alloc::string::String,
+    #[prost(enumeration = "PineconeServerlessCloud", tag = "2")]
+    pub serverless_cloud: i32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -32,6 +33,8 @@ pub struct StoredPineconeConfig {
         ::prost::alloc::string::String,
         PineconeIndexMetadata,
     >,
+    #[prost(enumeration = "PineconeServerlessCloud", tag = "3")]
+    pub serverless_cloud: i32,
 }
 /// External Index node provider
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -458,6 +461,45 @@ impl ExternalIndexProviderType {
         match value {
             "UNSET" => Some(Self::Unset),
             "PINECONE" => Some(Self::Pinecone),
+            _ => None,
+        }
+    }
+}
+/// Pinecone
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum PineconeServerlessCloud {
+    PineconeUnset = 0,
+    AwsUsEast1 = 1,
+    AwsUsWest2 = 2,
+    AwsEuWest1 = 3,
+    GcpUsCentral1 = 4,
+    AzureEastus2 = 5,
+}
+impl PineconeServerlessCloud {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            PineconeServerlessCloud::PineconeUnset => "PINECONE_UNSET",
+            PineconeServerlessCloud::AwsUsEast1 => "AWS_US_EAST_1",
+            PineconeServerlessCloud::AwsUsWest2 => "AWS_US_WEST_2",
+            PineconeServerlessCloud::AwsEuWest1 => "AWS_EU_WEST_1",
+            PineconeServerlessCloud::GcpUsCentral1 => "GCP_US_CENTRAL1",
+            PineconeServerlessCloud::AzureEastus2 => "AZURE_EASTUS2",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "PINECONE_UNSET" => Some(Self::PineconeUnset),
+            "AWS_US_EAST_1" => Some(Self::AwsUsEast1),
+            "AWS_US_WEST_2" => Some(Self::AwsUsWest2),
+            "AWS_EU_WEST_1" => Some(Self::AwsEuWest1),
+            "GCP_US_CENTRAL1" => Some(Self::GcpUsCentral1),
+            "AZURE_EASTUS2" => Some(Self::AzureEastus2),
             _ => None,
         }
     }

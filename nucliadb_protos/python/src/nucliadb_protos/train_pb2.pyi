@@ -13,6 +13,10 @@ import nucliadb_protos.knowledgebox_pb2
 import nucliadb_protos.resources_pb2
 import typing
 from nucliadb_protos.knowledgebox_pb2 import (
+    AWS_EU_WEST_1 as AWS_EU_WEST_1,
+    AWS_US_EAST_1 as AWS_US_EAST_1,
+    AWS_US_WEST_2 as AWS_US_WEST_2,
+    AZURE_EASTUS2 as AZURE_EASTUS2,
     CONFLICT as CONFLICT,
     CreateExternalIndexProviderMetadata as CreateExternalIndexProviderMetadata,
     CreatePineconeConfig as CreatePineconeConfig,
@@ -25,6 +29,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     Entity as Entity,
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
     ExternalIndexProviderType as ExternalIndexProviderType,
+    GCP_US_CENTRAL1 as GCP_US_CENTRAL1,
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
@@ -39,7 +44,9 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
     PINECONE as PINECONE,
+    PINECONE_UNSET as PINECONE_UNSET,
     PineconeIndexMetadata as PineconeIndexMetadata,
+    PineconeServerlessCloud as PineconeServerlessCloud,
     SemanticModelMetadata as SemanticModelMetadata,
     StoredExternalIndexProviderMetadata as StoredExternalIndexProviderMetadata,
     StoredPineconeConfig as StoredPineconeConfig,

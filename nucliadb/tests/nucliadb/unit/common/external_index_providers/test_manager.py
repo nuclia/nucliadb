@@ -25,6 +25,7 @@ from nucliadb.common.external_index_providers.manager import get_external_index_
 from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb_protos.knowledgebox_pb2 import (
     ExternalIndexProviderType,
+    PineconeServerlessCloud,
     StoredExternalIndexProviderMetadata,
     StoredPineconeConfig,
 )
@@ -44,6 +45,7 @@ async def test_get_external_index_manager_pinecone(endecryptor):
         type=ExternalIndexProviderType.PINECONE,
         pinecone_config=StoredPineconeConfig(
             encrypted_api_key="encrypted_api_key",
+            serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
         ),
     )
     stored_metadata.pinecone_config.indexes["default--kbid"].index_host = "index_host"

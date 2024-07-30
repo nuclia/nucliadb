@@ -57,6 +57,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     SemanticModelMetadata,
     StoredExternalIndexProviderMetadata,
 )
+from nucliadb_protos.knowledgebox_pb2 import PineconeServerlessCloud as PBPineconeServerlessCloud
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 from nucliadb_utils import const
@@ -527,7 +528,9 @@ class KnowledgeBox:
         request: CreateExternalIndexProviderMetadata,
         indexes: list[VectorsetExternalIndex],
     ) -> StoredExternalIndexProviderMetadata:
-        metadata = StoredExternalIndexProviderMetadata(type=request.type)
+        metadata = StoredExternalIndexProviderMetadata(
+            type=request.type,
+        )
         if request.type != ExternalIndexProviderType.PINECONE:
             # Only pinecone is supported for now
             return metadata
@@ -536,6 +539,7 @@ class KnowledgeBox:
         endecryptor = get_endecryptor()
         encrypted_api_key = endecryptor.encrypt(api_key)
         metadata.pinecone_config.encrypted_api_key = encrypted_api_key
+        metadata.pinecone_config.serverless_cloud = request.pinecone_config.serverless_cloud
         pinecone = get_pinecone().control_plane(api_key=api_key)
         for index in indexes:
             index_name = PineconeIndexManager.get_index_name(kbid, index.vectorset_id)
@@ -548,6 +552,9 @@ class KnowledgeBox:
                     name=index_name,
                     dimension=index.dimension,
                     metric=to_pinecone_index_metric(index.similarity),
+                    serverless_cloud=to_pinecone_serverless_cloud_payload(
+                        request.pinecone_config.serverless_cloud
+                    ),
                 )
             except PineconeAPIError as exc:
                 raise ExternalIndexCreationError("pinecone", exc.message) from exc
@@ -619,3 +626,30 @@ def to_pinecone_index_metric(similarity: VectorSimilarity.ValueType) -> str:
         VectorSimilarity.COSINE: "cosine",
         VectorSimilarity.DOT: "dotproduct",
     }[similarity]
+
+
+def to_pinecone_serverless_cloud_payload(
+    serverless: PBPineconeServerlessCloud.ValueType,
+) -> dict[str, str]:
+    return {
+        PBPineconeServerlessCloud.AWS_EU_WEST_1: {
+            "cloud": "aws",
+            "region": "eu-west-1",
+        },
+        PBPineconeServerlessCloud.AWS_US_EAST_1: {
+            "cloud": "aws",
+            "region": "us-east-1",
+        },
+        PBPineconeServerlessCloud.AWS_US_WEST_2: {
+            "cloud": "aws",
+            "region": "us-west-2",
+        },
+        PBPineconeServerlessCloud.AZURE_EASTUS2: {
+            "cloud": "azure",
+            "region": "eastus2",
+        },
+        PBPineconeServerlessCloud.GCP_US_CENTRAL1: {
+            "cloud": "gcp",
+            "region": "us-central1",
+        },
+    }[serverless]
