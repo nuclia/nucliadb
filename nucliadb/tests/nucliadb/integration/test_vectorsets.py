@@ -108,7 +108,7 @@ async def test_vectorsets(
 
 @pytest.mark.parametrize(
     "vectorset,expected",
-    [(None, "__default__"), ("", "__default__"), ("myvectorset", "myvectorset")],
+    [(None, ""), ("", ""), ("myvectorset", "myvectorset")],
 )
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
