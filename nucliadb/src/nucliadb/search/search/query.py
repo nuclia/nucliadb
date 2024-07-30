@@ -25,6 +25,7 @@ from typing import Any, Awaitable, Optional, Union
 from async_lru import alru_cache
 
 from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.vectorsets import BrokenInvariant
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
@@ -398,10 +399,15 @@ class QueryParser:
         else:
             # no vectorset specified, get the default one
             async with datamanagers.with_ro_transaction() as txn:
-                default_vectorset = await datamanagers.vectorsets.get_default_vectorset(
-                    txn, kbid=self.kbid
-                )
-                request.vectorset = default_vectorset.vectorset_id
+                try:
+                    default_vectorset = await datamanagers.vectorsets.get_default_vectorset(
+                        txn, kbid=self.kbid
+                    )
+                except BrokenInvariant as exc:
+                    logger.exception("KB has no default vectorset", extra={"kbid": self.kbid})
+                    raise InvalidQueryError("vectorset", f"KB has no default vectorset") from exc
+                else:
+                    request.vectorset = default_vectorset.vectorset_id
 
     async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
         if not self.has_vector_search:
