@@ -271,7 +271,8 @@ class TestWriterServicer:
 
         resp = await writer.NewKnowledgeBox(request)
 
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
+        assert resp.error_message == "foo"
 
     async def test_NewKnowledgeBoxV2_handle_external_index_error(
         self, writer: WriterServicer, knowledgebox_class
@@ -281,7 +282,8 @@ class TestWriterServicer:
 
         resp = await writer.NewKnowledgeBoxV2(request)
 
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
+        assert resp.error_message == "foo"
 
     async def test_UpdateKnowledgeBox(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
