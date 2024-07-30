@@ -141,6 +141,8 @@ pub struct NewKnowledgeBoxResponse {
     pub status: i32,
     #[prost(string, tag = "2")]
     pub uuid: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub error_message: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -413,6 +415,7 @@ pub enum KnowledgeBoxResponseStatus {
     Conflict = 1,
     Notfound = 2,
     Error = 3,
+    ExternalProviderError = 4,
 }
 impl KnowledgeBoxResponseStatus {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -425,6 +428,9 @@ impl KnowledgeBoxResponseStatus {
             KnowledgeBoxResponseStatus::Conflict => "CONFLICT",
             KnowledgeBoxResponseStatus::Notfound => "NOTFOUND",
             KnowledgeBoxResponseStatus::Error => "ERROR",
+            KnowledgeBoxResponseStatus::ExternalProviderError => {
+                "EXTERNAL_PROVIDER_ERROR"
+            }
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -434,6 +440,7 @@ impl KnowledgeBoxResponseStatus {
             "CONFLICT" => Some(Self::Conflict),
             "NOTFOUND" => Some(Self::Notfound),
             "ERROR" => Some(Self::Error),
+            "EXTERNAL_PROVIDER_ERROR" => Some(Self::ExternalProviderError),
             _ => None,
         }
     }

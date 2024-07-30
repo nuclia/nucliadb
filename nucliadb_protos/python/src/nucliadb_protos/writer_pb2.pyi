@@ -48,6 +48,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
+    EXTERNAL_PROVIDER_ERROR as EXTERNAL_PROVIDER_ERROR,
     EntitiesGroup as EntitiesGroup,
     EntitiesGroupSummary as EntitiesGroupSummary,
     EntitiesGroups as EntitiesGroups,
@@ -1717,12 +1718,15 @@ class NewKnowledgeBoxV2Response(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     STATUS_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
     status: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxResponseStatus.ValueType
+    error_message: builtins.str
     def __init__(
         self,
         *,
         status: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxResponseStatus.ValueType = ...,
+        error_message: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["status", b"status"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error_message", b"error_message", "status", b"status"]) -> None: ...
 
 global___NewKnowledgeBoxV2Response = NewKnowledgeBoxV2Response

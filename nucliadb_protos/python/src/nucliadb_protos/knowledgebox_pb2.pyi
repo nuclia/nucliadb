@@ -68,6 +68,7 @@ class _KnowledgeBoxResponseStatusEnumTypeWrapper(google.protobuf.internal.enum_t
     CONFLICT: _KnowledgeBoxResponseStatus.ValueType  # 1
     NOTFOUND: _KnowledgeBoxResponseStatus.ValueType  # 2
     ERROR: _KnowledgeBoxResponseStatus.ValueType  # 3
+    EXTERNAL_PROVIDER_ERROR: _KnowledgeBoxResponseStatus.ValueType  # 4
 
 class KnowledgeBoxResponseStatus(_KnowledgeBoxResponseStatus, metaclass=_KnowledgeBoxResponseStatusEnumTypeWrapper): ...
 
@@ -75,6 +76,7 @@ OK: KnowledgeBoxResponseStatus.ValueType  # 0
 CONFLICT: KnowledgeBoxResponseStatus.ValueType  # 1
 NOTFOUND: KnowledgeBoxResponseStatus.ValueType  # 2
 ERROR: KnowledgeBoxResponseStatus.ValueType  # 3
+EXTERNAL_PROVIDER_ERROR: KnowledgeBoxResponseStatus.ValueType  # 4
 global___KnowledgeBoxResponseStatus = KnowledgeBoxResponseStatus
 
 class _ExternalIndexProviderType:
@@ -369,15 +371,18 @@ class NewKnowledgeBoxResponse(google.protobuf.message.Message):
 
     STATUS_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
     status: global___KnowledgeBoxResponseStatus.ValueType
     uuid: builtins.str
+    error_message: builtins.str
     def __init__(
         self,
         *,
         status: global___KnowledgeBoxResponseStatus.ValueType = ...,
         uuid: builtins.str = ...,
+        error_message: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["status", b"status", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error_message", b"error_message", "status", b"status", "uuid", b"uuid"]) -> None: ...
 
 global___NewKnowledgeBoxResponse = NewKnowledgeBoxResponse
 

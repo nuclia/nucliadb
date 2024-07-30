@@ -23,6 +23,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
+    EXTERNAL_PROVIDER_ERROR as EXTERNAL_PROVIDER_ERROR,
     EntitiesGroup as EntitiesGroup,
     EntitiesGroupSummary as EntitiesGroupSummary,
     EntitiesGroups as EntitiesGroups,

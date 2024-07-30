@@ -11,7 +11,7 @@ enum KnowledgeBoxResponseStatus {
     CONFLICT = 1;
     NOTFOUND = 2;
     ERROR = 3;
-
+    EXTERNAL_PROVIDER_ERROR = 4;
 }
 
 // ID
@@ -115,6 +115,7 @@ message KnowledgeBoxNew {
 message NewKnowledgeBoxResponse {
     KnowledgeBoxResponseStatus status = 1;
     string uuid = 2;
+    string error_message = 3;
 }
 
 
