@@ -201,10 +201,16 @@ impl ShardReader {
         let info = info_span!(parent: &span, "vector count");
         let vector_task = || {
             run_with_telemetry(info, || {
-                read_rw_lock(&self.vector_readers)
-                    .get(DEFAULT_VECTORS_INDEX_NAME)
-                    .expect("Default vectors index should never be deleted (yet)")
-                    .count()
+                let vector_readers = read_rw_lock(&self.vector_readers);
+                if let Some(reader) = vector_readers.get(DEFAULT_VECTORS_INDEX_NAME) {
+                    return reader.count();
+                }
+
+                let mut count = 0;
+                for reader in vector_readers.values() {
+                    count += reader.count()?;
+                }
+                Ok(count)
             })
         };
 
@@ -673,10 +679,17 @@ impl ShardReader {
     ) -> NodeResult<VectorSearchResponse> {
         let vectorset = &request.vector_set;
         if vectorset.is_empty() {
-            read_rw_lock(&self.vector_readers)
-                .get(DEFAULT_VECTORS_INDEX_NAME)
-                .expect("Default vectors index should never be deleted (yet)")
-                .search(request, context)
+            let vector_readers = read_rw_lock(&self.vector_readers);
+            if let Some(reader) = vector_readers.get(DEFAULT_VECTORS_INDEX_NAME) {
+                reader.search(request, context)
+            } else if vector_readers.len() == 1 {
+                // no default vectorset but only one exist, consider it the
+                // default
+                let reader = vector_readers.values().next().unwrap();
+                reader.search(request, context)
+            } else {
+                Err(node_error!("Query without vectorset but shard has multiple vector indexes"))
+            }
         } else {
             let vector_readers = read_rw_lock(&self.vector_readers);
             let reader = vector_readers.get(vectorset);
