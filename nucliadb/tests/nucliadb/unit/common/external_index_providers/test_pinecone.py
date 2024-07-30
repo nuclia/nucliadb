@@ -254,6 +254,8 @@ def test_convert_to_pinecone_filter():
     request.filter.field_labels.append("/t/text/label")
     request.filter.expression = filter_expression
 
+    request.fields.extend(["t/text", "a/title"])
+
     utcnow = datetime.datetime.now(datetime.timezone.utc)
     request.timestamps.from_created.FromDatetime(utcnow)
 
@@ -263,7 +265,7 @@ def test_convert_to_pinecone_filter():
     filters = convert_to_pinecone_filter(request)
     assert "$and" in filters
     and_terms = filters["$and"]
-    assert len(and_terms) == 4
+    assert len(and_terms) == 5
     label_filter_term = and_terms[0]
     assert label_filter_term == {"field_labels": {"$in": ["/t/text/label"]}}
     timestamp_filter_term = and_terms[1]
@@ -274,6 +276,9 @@ def test_convert_to_pinecone_filter():
     assert access_groups_term["$or"][0] == {"security_public": {"$eq": True}}
     access_groups = access_groups_term["$or"][1]["security_ids_with_access"]["$in"]
     assert set(access_groups) == {"ag1", "ag2"}
+    field_filter_term = and_terms[4]
+    field_filter_terms = field_filter_term["field_id"]["$in"]
+    assert set(field_filter_terms) == {"t/text", "a/title"}
 
 
 def test_convert_to_pinecone_filter_empty():
