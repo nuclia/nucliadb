@@ -11,7 +11,7 @@ enum KnowledgeBoxResponseStatus {
     CONFLICT = 1;
     NOTFOUND = 2;
     ERROR = 3;
-
+    EXTERNAL_INDEX_PROVIDER_ERROR = 4;
 }
 
 // ID
@@ -28,8 +28,18 @@ enum ExternalIndexProviderType {
 }
 
 // Pinecone
+enum PineconeServerlessCloud {
+    PINECONE_UNSET = 0;
+    AWS_US_EAST_1 = 1;
+    AWS_US_WEST_2 = 2;
+    AWS_EU_WEST_1 = 3;
+    GCP_US_CENTRAL1 = 4;
+    AZURE_EASTUS2 = 5;
+}
+
 message CreatePineconeConfig {
     string api_key = 1;
+    PineconeServerlessCloud serverless_cloud = 2;
 }
 
 message PineconeIndexMetadata {
@@ -40,6 +50,7 @@ message PineconeIndexMetadata {
 message StoredPineconeConfig {
     string encrypted_api_key = 1;
     map<string, PineconeIndexMetadata> indexes = 2;
+    PineconeServerlessCloud serverless_cloud = 3;
 }
 
 // External Index node provider
@@ -104,6 +115,7 @@ message KnowledgeBoxNew {
 message NewKnowledgeBoxResponse {
     KnowledgeBoxResponseStatus status = 1;
     string uuid = 2;
+    string error_message = 3;
 }
 
 

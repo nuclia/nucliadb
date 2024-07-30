@@ -37,6 +37,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxNew,
     KnowledgeBoxResponseStatus,
     NewKnowledgeBoxResponse,
+    PineconeServerlessCloud,
 )
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import NewKnowledgeBoxV2Request
@@ -87,6 +88,7 @@ async def test_kb_creation_old(
             type=ExternalIndexProviderType.PINECONE,
             pinecone_config=CreatePineconeConfig(
                 api_key="my-pinecone-api-key",
+                serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
             ),
         ),
     )
@@ -97,7 +99,10 @@ async def test_kb_creation_old(
 
     expected_index_name = PineconeIndexManager.get_index_name(kbid, "default")
     mock_pinecone_client.create_index.assert_awaited_once_with(
-        name=expected_index_name, dimension=128, metric="dotproduct"
+        name=expected_index_name,
+        dimension=128,
+        metric="dotproduct",
+        serverless_cloud={"cloud": "aws", "region": "us-east-1"},
     )
 
     # Check that external index provider metadata was properly stored
@@ -150,6 +155,7 @@ async def test_kb_creation_new(
             type=ExternalIndexProviderType.PINECONE,
             pinecone_config=CreatePineconeConfig(
                 api_key="my-pinecone-api-key",
+                serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
             ),
         ),
     )
@@ -181,8 +187,18 @@ async def test_kb_creation_new(
     ]
     mock_pinecone_client.create_index.assert_has_calls(
         [
-            call(name=expected_index_names[0], dimension=128, metric="dotproduct"),
-            call(name=expected_index_names[1], dimension=3, metric="cosine"),
+            call(
+                name=expected_index_names[0],
+                dimension=128,
+                metric="dotproduct",
+                serverless_cloud={"cloud": "aws", "region": "us-east-1"},
+            ),
+            call(
+                name=expected_index_names[1],
+                dimension=3,
+                metric="cosine",
+                serverless_cloud={"cloud": "aws", "region": "us-east-1"},
+            ),
         ]
     )
 

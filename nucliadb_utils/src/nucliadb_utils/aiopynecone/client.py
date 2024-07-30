@@ -89,21 +89,29 @@ class ControlPlane:
         self.http_session = http_session
 
     @pinecone_observer.wrap({"type": "create_index"})
-    async def create_index(self, name: str, dimension: int, metric: str = "dotproduct") -> str:
+    async def create_index(
+        self,
+        name: str,
+        dimension: int,
+        metric: str = "dotproduct",
+        serverless_cloud: Optional[dict[str, str]] = None,
+    ) -> str:
         """
         Create a new index in Pinecone. It can only create serverless indexes on the AWS us-east-1 region.
         Params:
         - `name`: The name of the index.
         - `dimension`: The dimension of the vectors in the index.
         - `metric`: The similarity metric to use. Default is "dotproduct".
+        - `serverless_cloud`: The serverless provider to use. Default is AWS us-east-1.
         Returns:
         - The index host to be used for data plane operations.
         """
+        serverless_cloud = serverless_cloud or {"cloud": "aws", "region": "us-east-1"}
         payload = CreateIndexRequest(
             name=name,
             dimension=dimension,
             metric=metric,
-            spec={"serverless": {"cloud": "aws", "region": "us-east-1"}},
+            spec={"serverless": serverless_cloud},
         )
         headers = {"Api-Key": self.api_key}
         http_response = await self.http_session.post(

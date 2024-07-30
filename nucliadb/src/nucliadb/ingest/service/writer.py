@@ -134,7 +134,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 "Error creating external index",
                 extra={"slug": request.slug, "error": str(exc)},
             )
-            return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
+            return knowledgebox_pb2.NewKnowledgeBoxResponse(
+                status=KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR,
+                error_message=exc.message,
+            )
 
         except Exception as exc:
             errors.capture_exception(exc)
@@ -164,6 +167,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             )
             return writer_pb2.NewKnowledgeBoxV2Response(
                 status=KnowledgeBoxResponseStatus.ERROR,
+                error_message="This endpoint is only available for hosted. Onprem must use the REST API",
             )
         # Hosted KBs are created through backend endpoints. We assume learning
         # configuration has been already created for it and we are given the
@@ -196,7 +200,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 "Error creating external index",
                 extra={"slug": request.slug, "error": str(exc)},
             )
-            return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.ERROR)
+            return writer_pb2.NewKnowledgeBoxV2Response(
+                status=KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR,
+                error_message=exc.message,
+            )
 
         except Exception as exc:
             errors.capture_exception(exc)

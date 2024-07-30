@@ -286,6 +286,7 @@ async def pinecone_knowledgebox(nucliadb_manager: AsyncClient, pinecone_mock):
             "external_index_provider": {
                 "type": "pinecone",
                 "api_key": "my-pinecone-api-key",
+                "serverless_cloud": "aws_us_east_1",
             },
         },
     )

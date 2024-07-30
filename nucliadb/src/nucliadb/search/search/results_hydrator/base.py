@@ -41,8 +41,11 @@ from nucliadb_models.search import (
     ResourceProperties,
     TextPosition,
 )
+from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
+
+hydrator_observer = Observer("hydrator", labels={"type": ""})
 
 
 class ResourceHydrationOptions(BaseModel):
@@ -63,6 +66,7 @@ class TextBlockHydrationOptions(BaseModel):
     pass
 
 
+@hydrator_observer.wrap({"type": "hydrate_external"})
 async def hydrate_external(
     retrieval_results: KnowledgeboxFindResults,
     query_results: ExternalIndexQueryResults,
@@ -145,6 +149,7 @@ async def hydrate_external(
         rcache.clear()
 
 
+@hydrator_observer.wrap({"type": "text_block"})
 async def hydrate_text_block(
     kbid: str,
     text_block: TextBlockMatch,
@@ -186,6 +191,7 @@ async def hydrate_text_block(
     )
 
 
+@hydrator_observer.wrap({"type": "resource_metadata"})
 async def hydrate_resource_metadata(
     txn: Transaction,
     kbid: str,
