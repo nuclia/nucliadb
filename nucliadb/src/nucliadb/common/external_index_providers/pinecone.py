@@ -480,6 +480,7 @@ def convert_to_pinecone_filter(request: SearchRequest) -> Optional[dict[str, Any
     """
     and_terms = []
     if request.HasField("filter"):
+        # Label filtering
         if len(request.filter.paragraph_labels) > 0 and len(request.filter.field_labels) > 0:
             raise ValueError("Cannot filter by paragraph and field labels at the same request")
 
@@ -488,13 +489,17 @@ def convert_to_pinecone_filter(request: SearchRequest) -> Optional[dict[str, Any
             and_terms.append(convert_label_filter_expression("paragraph_labels", decoded_expression))
         else:
             and_terms.append(convert_label_filter_expression("field_labels", decoded_expression))
+
     if request.HasField("timestamps"):
+        # Date range filtering
         and_terms.extend(convert_timestamp_filter(request.timestamps))
 
     if len(request.key_filters) > 0:
+        # Filter by resource_id
         and_terms.append({"rid": {FilterOperator.IN: list(set(request.key_filters))}})
 
     if len(request.security.access_groups):
+        # Security filtering
         security_term = {
             LogicalOperator.OR: [
                 {"security_public": {"$eq": True}},
@@ -507,6 +512,12 @@ def convert_to_pinecone_filter(request: SearchRequest) -> Optional[dict[str, Any
         }
         and_terms.append(security_term)
 
+    if len(request.fields) > 0:
+        # Filter by field_id
+        fields_term = {
+            "field_id": {FilterOperator.IN: list({field_id.strip("/") for field_id in request.fields})}
+        }
+        and_terms.append(fields_term)
     if len(and_terms) == 0:
         return None
     if len(and_terms) == 1:
