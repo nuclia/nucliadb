@@ -58,7 +58,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     StoredExternalIndexProviderMetadata,
 )
 from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_protos.utils_pb2 import ReleaseChannel
+from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
 from nucliadb_utils import const
 from nucliadb_utils.aiopynecone.exceptions import PineconeAPIError
 from nucliadb_utils.settings import running_settings
@@ -90,6 +90,7 @@ KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}/{{vectorset}}"
 class VectorsetExternalIndex:
     vectorset_id: str
     dimension: int
+    similarity: VectorSimilarity.ValueType
 
 
 class KnowledgeBox:
@@ -177,7 +178,9 @@ class KnowledgeBox:
                         request=external_index_provider,
                         indexes=[
                             VectorsetExternalIndex(
-                                vectorset_id="default", dimension=semantic_model.vector_dimension
+                                vectorset_id="default",
+                                dimension=semantic_model.vector_dimension,
+                                similarity=semantic_model.similarity_function,
                             )
                         ],
                     )
@@ -194,7 +197,11 @@ class KnowledgeBox:
                         else:
                             dimension = semantic_model.vector_dimension
                         vs_external_indexes.append(
-                            VectorsetExternalIndex(vectorset_id=vectorset_id, dimension=dimension)
+                            VectorsetExternalIndex(
+                                vectorset_id=vectorset_id,
+                                dimension=dimension,
+                                similarity=semantic_model.similarity_function,
+                            )
                         )
                         vectorset_config = knowledgebox_pb2.VectorSetConfig(
                             vectorset_id=vectorset_id,
@@ -540,6 +547,7 @@ class KnowledgeBox:
                 index_host = await pinecone.create_index(
                     name=index_name,
                     dimension=index.dimension,
+                    metric=to_pinecone_index_metric(index.similarity),
                 )
             except PineconeAPIError as exc:
                 raise ExternalIndexCreationError("pinecone", exc.message) from exc
@@ -604,3 +612,10 @@ def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
         for paragraph_annotation in ufm.paragraphs:
             key = compute_paragraph_key(uuid, paragraph_annotation.key)
             paragraph_annotation.key = key
+
+
+def to_pinecone_index_metric(similarity: VectorSimilarity.ValueType) -> str:
+    return {
+        VectorSimilarity.COSINE: "cosine",
+        VectorSimilarity.DOT: "dotproduct",
+    }[similarity]
