@@ -96,7 +96,9 @@ async def test_kb_creation_old(
     assert response.status == KnowledgeBoxResponseStatus.OK
 
     expected_index_name = PineconeIndexManager.get_index_name(kbid, "default")
-    mock_pinecone_client.create_index.assert_awaited_once_with(name=expected_index_name, dimension=128)
+    mock_pinecone_client.create_index.assert_awaited_once_with(
+        name=expected_index_name, dimension=128, metric="dotproduct"
+    )
 
     # Check that external index provider metadata was properly stored
     async with datamanagers.with_ro_transaction() as txn:
@@ -163,7 +165,7 @@ async def test_kb_creation_new(
     request.vectorsets.append(
         NewKnowledgeBoxV2Request.VectorSet(
             vectorset_id=vectorset_2_id,
-            similarity=VectorSimilarity.DOT,
+            similarity=VectorSimilarity.COSINE,
             vector_dimension=3,
         )
     )
@@ -179,8 +181,8 @@ async def test_kb_creation_new(
     ]
     mock_pinecone_client.create_index.assert_has_calls(
         [
-            call(name=expected_index_names[0], dimension=128),
-            call(name=expected_index_names[1], dimension=3),
+            call(name=expected_index_names[0], dimension=128, metric="dotproduct"),
+            call(name=expected_index_names[1], dimension=3, metric="cosine"),
         ]
     )
 
