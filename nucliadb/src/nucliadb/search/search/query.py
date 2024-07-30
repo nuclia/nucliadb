@@ -167,12 +167,14 @@ class QueryParser:
 
     def _get_query_information(self) -> Awaitable[QueryInfo]:
         if self._query_information_task is None:  # pragma: no cover
-            self._query_information_task = asyncio.create_task(
-                query_information(
-                    self.kbid, self.query, self.vectorset, self.generative_model, self.rephrase
-                )
-            )
+            self._query_information_task = asyncio.create_task(self._query_information())
         return self._query_information_task
+
+    async def _query_information(self) -> QueryInfo:
+        vectorset = await self.select_vectorset()
+        return await query_information(
+            self.kbid, self.query, vectorset, self.generative_model, self.rephrase
+        )
 
     def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
         if self._get_matryoshka_dimension_task is None:
@@ -247,8 +249,6 @@ class QueryParser:
         request.with_duplicates = self.with_duplicates
 
         self.parse_sorting(request)
-        if self.has_vector_search:
-            await self.select_vectorset(request)
 
         await self._schedule_dependency_tasks()
 
@@ -379,12 +379,13 @@ class QueryParser:
             request.paragraph = True
             node_features.inc({"type": "paragraphs"})
 
-    async def select_vectorset(self, request: nodereader_pb2.SearchRequest):
+    @alru_cache(maxsize=1)
+    async def select_vectorset(self) -> Optional[str]:
         """Validate the vectorset parameter and override it with a default if
         needed.
         """
         if not has_feature(Features.VECTORSETS_V0, context={"kbid": self.kbid}):
-            return
+            return None
         if self.vectorset:
             # validate vectorset
             async with datamanagers.with_ro_transaction() as txn:
@@ -395,7 +396,7 @@ class QueryParser:
                         "vectorset",
                         f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
                     )
-            request.vectorset = self.vectorset
+            return self.vectorset
         else:
             # no vectorset specified, get the default one
             async with datamanagers.with_ro_transaction() as txn:
@@ -407,7 +408,8 @@ class QueryParser:
                     logger.exception("KB has no default vectorset", extra={"kbid": self.kbid})
                     raise InvalidQueryError("vectorset", f"KB has no default vectorset") from exc
                 else:
-                    request.vectorset = default_vectorset.vectorset_id
+                    return default_vectorset.vectorset_id
+        return None
 
     async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
         if not self.has_vector_search:
@@ -416,6 +418,11 @@ class QueryParser:
         node_features.inc({"type": "vectors"})
 
         incomplete = False
+
+        vectorset = await self.select_vectorset()
+        if vectorset is not None:
+            request.vectorset = vectorset
+
         query_vector = None
         if self.user_vector is None:
             try:
@@ -425,11 +432,9 @@ class QueryParser:
                 incomplete = True
             else:
                 if query_info and query_info.sentence:
-                    if self.vectorset and has_feature(
-                        Features.VECTORSETS_V0, context={"kbid": self.kbid}
-                    ):
-                        if self.vectorset in query_info.sentence.vectors:
-                            query_vector = query_info.sentence.vectors[self.vectorset]
+                    if vectorset and has_feature(Features.VECTORSETS_V0, context={"kbid": self.kbid}):
+                        if vectorset in query_info.sentence.vectors:
+                            query_vector = query_info.sentence.vectors[vectorset]
                         else:
                             incomplete = True
                     else:
