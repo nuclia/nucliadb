@@ -108,21 +108,38 @@ async def get_matryoshka_vector_dimension(
     vectorset_id: Optional[str] = None,
 ) -> Optional[int]:
     """Return vector dimension for matryoshka models"""
-    model_metadata = await get_model_metadata(txn, kbid=kbid)
-    dimension = None
-    if len(model_metadata.matryoshka_dimensions) > 0 and model_metadata.vector_dimension:
-        if model_metadata.vector_dimension in model_metadata.matryoshka_dimensions:
-            dimension = model_metadata.vector_dimension
+    from . import vectorsets
+
+    async for _, vs in vectorsets.iter(txn, kbid=kbid):
+        if vs.vectorset_index_config.vector_dimension in vs.matryoshka_dimensions:
+            return vs.vectorset_index_config.vector_dimension
         else:
             logger.error(
                 "KB has an invalid matryoshka dimension!",
                 extra={
                     "kbid": kbid,
-                    "vector_dimension": model_metadata.vector_dimension,
-                    "matryoshka_dimensions": model_metadata.matryoshka_dimensions,
+                    "vector_dimension": vs.vectorset_index_config.vector_dimension,
+                    "matryoshka_dimensions": vs.matryoshka_dimensions,
                 },
             )
-    return dimension
+            return None
+    else:
+        # fallback for KBs that don't have vectorset
+        model_metadata = await get_model_metadata(txn, kbid=kbid)
+        dimension = None
+        if len(model_metadata.matryoshka_dimensions) > 0 and model_metadata.vector_dimension:
+            if model_metadata.vector_dimension in model_metadata.matryoshka_dimensions:
+                dimension = model_metadata.vector_dimension
+            else:
+                logger.error(
+                    "KB has an invalid matryoshka dimension!",
+                    extra={
+                        "kbid": kbid,
+                        "vector_dimension": model_metadata.vector_dimension,
+                        "matryoshka_dimensions": model_metadata.matryoshka_dimensions,
+                    },
+                )
+        return dimension
 
 
 async def get_external_index_provider_metadata(
