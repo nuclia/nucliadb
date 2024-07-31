@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Migration #24
+"""Migration #25 (Fixed migration 24)
 
 Vectorsets are coming and we need to be ready at nucliadb. Vector index config
 shouldn't be stored anymore in the `Shards` protobuffer, we need to migrate to
@@ -62,9 +62,10 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
         return None
 
     vectorset_id = learning_config.semantic_model
-    learning_similarity = learning_config.semantic_vector_similarity
-    learning_vector_dimension = learning_config.semantic_vector_size
-    learning_matryoshka_dimensions = learning_config.semantic_matryoshka_dimensions or []
+    learning_model_metadata = learning_config.into_semantic_model_metadata()
+    learning_similarity = learning_model_metadata.similarity_function
+    learning_vector_dimension = learning_model_metadata.vector_dimension
+    learning_matryoshka_dimensions = learning_model_metadata.matryoshka_dimensions
     learning_normalize_vectors = len(learning_matryoshka_dimensions) > 0
 
     async with context.kv_driver.transaction(read_only=True) as txn:
