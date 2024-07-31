@@ -111,7 +111,18 @@ async def get_matryoshka_vector_dimension(
     from . import vectorsets
 
     async for _, vs in vectorsets.iter(txn, kbid=kbid):
-        return vs.vectorset_index_config.vector_dimension
+        if vs.vectorset_index_config.vector_dimension in vs.matryoshka_dimensions:
+            return vs.vectorset_index_config.vector_dimension
+        else:
+            logger.error(
+                "KB has an invalid matryoshka dimension!",
+                extra={
+                    "kbid": kbid,
+                    "vector_dimension": vs.vectorset_index_config.vector_dimension,
+                    "matryoshka_dimensions": vs.matryoshka_dimensions,
+                },
+            )
+            return None
     else:
         # fallback for KBs that don't have vectorset
         model_metadata = await get_model_metadata(txn, kbid=kbid)
