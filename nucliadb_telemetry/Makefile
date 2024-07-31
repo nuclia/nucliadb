@@ -19,4 +19,4 @@ test:
 
 .PHONY: test-cov
 test-cov:
-	pytest -rfE -sxv -cov=nucliadb_telemetry --cov-config=../.coveragerc --tb=native --cov-report term-missing:skip-covered --cov-report xml tests
+	pytest -rfE -sxv --cov=nucliadb_telemetry --cov-config=../.coveragerc --tb=native --cov-report term-missing:skip-covered --cov-report xml tests
