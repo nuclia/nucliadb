@@ -47,7 +47,6 @@ test-%:
 
 test-cov-%:
 	$(PYTEST) \
-		-x \
 		--cov=nucliadb \
 		--cov-config=../.coveragerc \
 		--cov-report xml \
