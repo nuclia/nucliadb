@@ -201,11 +201,13 @@ async def test_querying_kb_with_vectorsets(
             query = (spy, result, None)
             return result
 
-    def predict_query_wrapper(original, dimension):
+    def predict_query_wrapper(original, dimension: int, vectorset_dimensions: dict[str, int]):
         @functools.wraps(original)
         async def inner(*args, **kwargs):
             query_info = await original(*args, **kwargs)
             query_info.sentence.data = [1.0] * dimension
+            for vectorset_id, vectorset_dimension in vectorset_dimensions.items():
+                query_info.sentence.vectors[vectorset_id] = [1.0] * vectorset_dimension
             return query_info
 
         return inner
@@ -234,7 +236,9 @@ async def test_querying_kb_with_vectorsets(
     ):
         with (
             patch.object(
-                dummy_predict, "query", side_effect=predict_query_wrapper(dummy_predict.query, 768)
+                dummy_predict,
+                "query",
+                side_effect=predict_query_wrapper(dummy_predict.query, 768, {"model": 768}),
             ),
         ):
             resp = await nucliadb_reader.post(
@@ -246,10 +250,12 @@ async def test_querying_kb_with_vectorsets(
             assert resp.status_code == 200
 
             node_search_spy, result, error = query
+            assert result is not None
             assert error is None
 
             request = node_search_spy.call_args[0][0]
-            assert request.vectorset == ""
+            # there's only one model and we get it as the default
+            assert request.vectorset == "model"
             assert len(request.vector) == 768
 
             resp = await nucliadb_reader.post(
@@ -262,6 +268,7 @@ async def test_querying_kb_with_vectorsets(
             assert resp.status_code == 200
 
             node_search_spy, result, error = query
+            assert result is not None
             assert error is None
 
             request = node_search_spy.call_args[0][0]
@@ -297,7 +304,9 @@ async def test_querying_kb_with_vectorsets(
     ):
         with (
             patch.object(
-                dummy_predict, "query", side_effect=predict_query_wrapper(dummy_predict.query, 768)
+                dummy_predict,
+                "query",
+                side_effect=predict_query_wrapper(dummy_predict.query, 500, {"model-A": 768}),
             ),
         ):
             resp = await nucliadb_reader.post(
@@ -310,6 +319,7 @@ async def test_querying_kb_with_vectorsets(
             assert resp.status_code == 200
 
             node_search_spy, result, error = query
+            assert result is not None
             assert error is None
 
             request = node_search_spy.call_args[0][0]
@@ -318,7 +328,9 @@ async def test_querying_kb_with_vectorsets(
 
         with (
             patch.object(
-                dummy_predict, "query", side_effect=predict_query_wrapper(dummy_predict.query, 1024)
+                dummy_predict,
+                "query",
+                side_effect=predict_query_wrapper(dummy_predict.query, 500, {"model-B": 1024}),
             ),
         ):
             resp = await nucliadb_reader.post(
@@ -331,24 +343,35 @@ async def test_querying_kb_with_vectorsets(
             assert resp.status_code == 200
 
             node_search_spy, result, error = query
+            assert result is not None
             assert error is None
 
             request = node_search_spy.call_args[0][0]
             assert request.vectorset == "model-B"
             assert len(request.vector) == 1024
 
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/find",
-            params={
-                "query": "foo",
-            },
-        )
-        assert resp.status_code == 500
-        node_search_spy, result, error = query
-        request = node_search_spy.call_args[0][0]
-        assert result is None
-        assert request.vectorset == ""
-        assert "Query without vectorset but shard has multiple vector indexes" in str(error)
+        with (
+            patch.object(
+                dummy_predict,
+                "query",
+                side_effect=predict_query_wrapper(
+                    dummy_predict.query, 500, {"model-A": 768, "model-B": 1024}
+                ),
+            ),
+        ):
+            resp = await nucliadb_reader.get(
+                f"/kb/{kbid}/find",
+                params={
+                    "query": "foo",
+                },
+            )
+            assert resp.status_code == 200
+            node_search_spy, result, error = query
+            request = node_search_spy.call_args[0][0]
+            assert result is not None
+            assert error is None
+            # with more than one vectorset, we get the first one
+            assert request.vectorset == "model-A"
 
 
 @pytest.fixture(scope="function")
