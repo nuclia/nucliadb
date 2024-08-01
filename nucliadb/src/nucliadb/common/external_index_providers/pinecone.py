@@ -139,6 +139,7 @@ class PineconeIndexManager(ExternalIndexManager):
         upsert_timeout: float = 10.0,
         delete_timeout: float = 10.0,
         query_timeout: float = 10.0,
+        default_vectorset: Optional[str] = None,
     ):
         super().__init__(kbid=kbid)
         assert api_key != ""
@@ -151,6 +152,7 @@ class PineconeIndexManager(ExternalIndexManager):
         self.upsert_timeout = upsert_timeout
         self.delete_timeout = delete_timeout
         self.query_timeout = query_timeout
+        self.default_vectorset = default_vectorset
 
     def get_data_plane(self, index_name: str) -> DataPlane:
         try:
@@ -212,7 +214,8 @@ class PineconeIndexManager(ExternalIndexManager):
         for _, paragraphs in index_data.paragraphs.items():
             for _, paragraph in paragraphs.paragraphs.items():
                 if paragraph.sentences:
-                    vectorsets.add("default")
+                    if self.default_vectorset:
+                        vectorsets.add(self.default_vectorset)
                 for vectorset_id, vectorsets_sentences in paragraph.vectorsets_sentences.items():
                     if vectorsets_sentences.sentences:
                         vectorsets.add(vectorset_id)
@@ -388,15 +391,16 @@ class PineconeIndexManager(ExternalIndexManager):
         for _, index_paragraphs in index_data.paragraphs.items():
             for index_paragraph_id, index_paragraph in index_paragraphs.paragraphs.items():
                 # We must compute the vectors for each vectorset present the paragraph.
-                vectorset_iterators = []
+                vectorset_iterators = {}
                 if index_paragraph.sentences:
-                    vectorset_iterators.append(("default", index_paragraph.sentences.items()))
+                    if self.default_vectorset:
+                        vectorset_iterators[self.default_vectorset] = index_paragraph.sentences.items()
                 for vectorset_id, vector_sentences in index_paragraph.vectorsets_sentences.items():
                     if vector_sentences.sentences:
-                        vectorset_iterators.append((vectorset_id, vector_sentences.sentences.items()))
+                        vectorset_iterators[vectorset_id] = vector_sentences.sentences.items()
 
                 vector_sentence: VectorSentence
-                for vectorset_id, sentences_iterator in vectorset_iterators:
+                for vectorset_id, sentences_iterator in vectorset_iterators.items():
                     for sentence_id, vector_sentence in sentences_iterator:
                         vector_metadata_to_copy = base_vector_metadatas.get(index_paragraph_id)
                         if vector_metadata_to_copy is None:
