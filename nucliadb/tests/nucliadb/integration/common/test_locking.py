@@ -72,7 +72,7 @@ async def test_distributed_lock_in_parallel(maindb_driver):
 
     tasks = []
     for _ in range(5):
-        tasks.append(asyncio.create_task(test_lock(random.uniform(0.1, 0.2))))
+        tasks.append(asyncio.create_task(test_lock(random.uniform(0, 0.2))))
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Check that 4 out of 5 tasks returned ResourceLocked error

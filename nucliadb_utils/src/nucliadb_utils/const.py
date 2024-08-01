@@ -81,4 +81,3 @@ class Features:
     FIND_MERGE_ORDER_FIX = "nucliadb_find_merge_order_fix"
     PG_CATALOG_READ = "nucliadb_pg_catalog_read"
     PG_CATALOG_WRITE = "nucliadb_pg_catalog_write"
-    VECTORSETS_V0 = "vectorsets_v0_new_kbs_with_multiple_vectorsets"

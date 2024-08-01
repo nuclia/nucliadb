@@ -21,13 +21,9 @@ from typing import AsyncIterator, Optional
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import knowledgebox_pb2
+from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2
 
 KB_VECTORSETS = "/kbs/{kbid}/vectorsets"
-
-
-class BrokenInvariant(Exception):
-    pass
 
 
 async def initialize(txn: Transaction, *, kbid: str):
@@ -50,12 +46,26 @@ async def get_default_vectorset(
     *,
     kbid: str,
 ) -> knowledgebox_pb2.VectorSetConfig:
-    """XXX: For now, default vectorset is the first on the list, we should
-    implement an API to let users decide which is their default though
-    """
-    async for _, vectorset in iter(txn, kbid=kbid):
-        return vectorset
-    raise BrokenInvariant("KB without vectorsets this shouldn't be possible!")
+    from . import kb
+
+    vectorset_id = "__default__"
+    semantic_model = await kb.get_model_metadata(txn, kbid=kbid)
+    vector_dimension = semantic_model.vector_dimension
+    similarity = semantic_model.similarity_function
+    matryoshka_dimensions = semantic_model.matryoshka_dimensions
+    normalize_vectors = len(matryoshka_dimensions) > 0
+
+    return knowledgebox_pb2.VectorSetConfig(
+        vectorset_id=vectorset_id,
+        vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+            vector_dimension=vector_dimension,
+            similarity=similarity,
+            # we only support this for now
+            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+            normalize_vectors=normalize_vectors,
+        ),
+        matryoshka_dimensions=matryoshka_dimensions,
+    )
 
 
 async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:

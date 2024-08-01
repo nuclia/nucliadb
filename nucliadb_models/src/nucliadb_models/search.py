@@ -39,9 +39,6 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-# Bw/c import to avoid breaking users
-from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
-
 _T = TypeVar("_T")
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
@@ -285,6 +282,34 @@ class EntitySubgraph(BaseModel):
 #     origin: str
 #     destination: str
 #     path: List[DirectionalRelation]
+
+
+class SentenceSearch(BaseModel):
+    data: List[float] = []
+    time: float
+
+
+class Ner(BaseModel):
+    text: str
+    ner: str
+    start: int
+    end: int
+
+
+class TokenSearch(BaseModel):
+    tokens: List[Ner] = []
+    time: float
+
+
+class QueryInfo(BaseModel):
+    language: Optional[str] = None
+    stop_words: List[str] = []
+    semantic_threshold: Optional[float] = None
+    visual_llm: bool
+    max_context: int
+    entities: TokenSearch
+    sentence: SentenceSearch
+    query: str
 
 
 class Relations(BaseModel):

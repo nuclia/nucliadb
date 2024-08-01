@@ -29,18 +29,21 @@ from pydantic import BaseModel, Field, ValidationError
 
 from nucliadb.search import logger
 from nucliadb.tests.vectors import Q, Qm2023
-from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch
 from nucliadb_models.search import (
     ChatModel,
     FeedbackRequest,
+    Ner,
+    QueryInfo,
     RephraseModel,
+    SentenceSearch,
     SummarizedResource,
     SummarizedResponse,
     SummarizeModel,
+    TokenSearch,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
-from nucliadb_utils.const import Features
+from nucliadb_utils import const
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.utilities import Utility, has_feature, set_utility
@@ -226,7 +229,7 @@ class PredictEngine:
             # /api/v1/predict/rephrase/{kbid}
             return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}/{kbid}"
         else:
-            if has_feature(Features.VERSIONED_PRIVATE_PREDICT):
+            if has_feature(const.Features.VERSIONED_PRIVATE_PREDICT):
                 return f"{self.cluster_url}{VERSIONED_PRIVATE_PREDICT}{endpoint}"
             else:
                 return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
@@ -375,7 +378,6 @@ class PredictEngine:
         self,
         kbid: str,
         sentence: str,
-        semantic_model: Optional[str] = None,
         generative_model: Optional[str] = None,
         rephrase: Optional[bool] = False,
     ) -> QueryInfo:
@@ -386,13 +388,10 @@ class PredictEngine:
             logger.warning(error)
             raise SendToPredictError(error)
 
-        params: dict[str, Any] = {
+        params = {
             "text": sentence,
             "rephrase": str(rephrase),
         }
-        if has_feature(Features.VECTORSETS_V0, context={"kbid": kbid}):
-            if semantic_model is not None:
-                params["semantic_models"] = [semantic_model]
         if generative_model is not None:
             params["generative_model"] = generative_model
 
@@ -520,7 +519,6 @@ class DummyPredictEngine(PredictEngine):
         self,
         kbid: str,
         sentence: str,
-        semantic_model: Optional[str] = None,
         generative_model: Optional[str] = None,
         rephrase: Optional[bool] = False,
     ) -> QueryInfo:
@@ -530,20 +528,10 @@ class DummyPredictEngine(PredictEngine):
                 language="en",
                 stop_words=[],
                 semantic_threshold=0.7,
-                semantic_thresholds={semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.7},
                 visual_llm=True,
                 max_context=self.max_context,
                 entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
-                sentence=SentenceSearch(
-                    data=Qm2023,
-                    vectors={
-                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": Qm2023,
-                    },
-                    time=0.0,
-                    timings={
-                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.0,
-                    },
-                ),
+                sentence=SentenceSearch(data=Qm2023, time=0.0),
                 query=sentence,
             )
         else:
@@ -551,22 +539,10 @@ class DummyPredictEngine(PredictEngine):
                 language="en",
                 stop_words=[],
                 semantic_threshold=0.7,
-                semantic_thresholds={
-                    semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.7,
-                },
                 visual_llm=True,
                 max_context=self.max_context,
                 entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
-                sentence=SentenceSearch(
-                    data=Q,
-                    vectors={
-                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": Q,
-                    },
-                    time=0.0,
-                    timings={
-                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.0,
-                    },
-                ),
+                sentence=SentenceSearch(data=Q, time=0.0),
                 query=sentence,
             )
 
