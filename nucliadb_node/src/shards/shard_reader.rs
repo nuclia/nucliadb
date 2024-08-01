@@ -695,6 +695,10 @@ impl ShardReader {
             let reader = vector_readers.get(vectorset);
             if let Some(reader) = reader {
                 reader.search(request, context)
+            } else if vector_readers.len() == 1 && vector_readers.contains_key(DEFAULT_VECTORS_INDEX_NAME) {
+                // Only one vectorset with default name, use it!
+                // We can remove this once all vectorsets are named (there are no default vectorsets)
+                vector_readers.get(DEFAULT_VECTORS_INDEX_NAME).unwrap().search(request, context)
             } else {
                 Err(node_error!("Vectorset '{vectorset}' not found"))
             }
