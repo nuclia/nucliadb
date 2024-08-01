@@ -190,9 +190,7 @@ async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, lea
     model = SemanticModelMetadata(
         similarity_function=upb.VectorSimilarity.COSINE, vector_dimension=len(V1)
     )
-    await KnowledgeBox.create(
-        maindb_driver, kbid=kbid, slug=kbslug, semantic_models={"my-semantic-model": model}
-    )
+    await KnowledgeBox.create(maindb_driver, kbid=kbid, slug=kbslug, semantic_model=model)
 
     yield kbid
 
