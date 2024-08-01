@@ -82,7 +82,9 @@ class ASGIGetter(Getter[dict]):
         # ASGI header keys are in lower case
         key = key.lower()
         decoded = [
-            _value.decode("utf8") for (_key, _value) in headers if _key.decode("utf8").lower() == key
+            _value.decode("utf8", errors="replace")
+            for (_key, _value) in headers
+            if _key.decode("utf8", errors="replace").lower() == key
         ]
         if not decoded:
             return None
@@ -90,7 +92,7 @@ class ASGIGetter(Getter[dict]):
 
     def keys(self, carrier: dict) -> typing.List[str]:
         headers = carrier.get("headers") or []
-        return [_key.decode("utf8") for (_key, _) in headers]
+        return [_key.decode("utf8", errors="replace") for (_key, _) in headers]
 
 
 asgi_getter = ASGIGetter()
@@ -125,7 +127,7 @@ def collect_request_attributes(scope):
     query_string = scope.get("query_string")
     if query_string and http_url:
         if isinstance(query_string, bytes):
-            query_string = query_string.decode("utf8")
+            query_string = query_string.decode("utf8", errors="replace")
         http_url += "?" + urllib.parse.unquote(query_string)
 
     result = {
@@ -167,7 +169,10 @@ def collect_custom_request_headers_attributes(scope):
     )
 
     # Decode headers before processing.
-    headers = {_key.decode("utf8"): _value.decode("utf8") for (_key, _value) in scope.get("headers")}
+    headers = {
+        _key.decode("utf8", errors="replace"): _value.decode("utf8", errors="replace")
+        for (_key, _value) in scope.get("headers")
+    }
 
     return sanitize.sanitize_header_values(
         headers,
@@ -186,7 +191,10 @@ def collect_custom_response_headers_attributes(message):
     )
 
     # Decode headers before processing.
-    headers = {_key.decode("utf8"): _value.decode("utf8") for (_key, _value) in message.get("headers")}
+    headers = {
+        _key.decode("utf8", errors="replace"): _value.decode("utf8", errors="replace")
+        for (_key, _value) in message.get("headers")
+    }
 
     return sanitize.sanitize_header_values(
         headers,

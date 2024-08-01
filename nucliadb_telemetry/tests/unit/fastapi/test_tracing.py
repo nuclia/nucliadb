@@ -21,7 +21,10 @@ from unittest import mock
 import pytest
 from opentelemetry.trace import format_trace_id
 
-from nucliadb_telemetry.fastapi.tracing import CaptureTraceIdMiddleware
+from nucliadb_telemetry.fastapi.tracing import (
+    CaptureTraceIdMiddleware,
+    collect_custom_request_headers_attributes,
+)
 
 
 @pytest.fixture(scope="function")
@@ -59,3 +62,8 @@ async def test_capture_trace_id_middleware_appends_trace_id_header_to_exposed(tr
     response = await mdw.dispatch(request, call_next)
 
     assert response.headers["Access-Control-Expose-Headers"] == "Foo-Bar,X-Header,X-NUCLIA-TRACE-ID"
+
+
+def test_collect_custom_request_headers_attributes():
+    scope = {"headers": [[b"x-filename", b"Synth\xe8ses\\3229-navigation.pdf"]]}
+    collect_custom_request_headers_attributes(scope)
