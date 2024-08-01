@@ -8,7 +8,7 @@ nats-py[nkeys]>=2.6.0
 PyNaCl
 pyjwt>=2.4.0
 memorylru>=1.1.2
-mrflagly
+mrflagly>=0.2.9
 
 # automatically bumped during release
 nucliadb-protos

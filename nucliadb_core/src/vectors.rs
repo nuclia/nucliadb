@@ -107,6 +107,7 @@ pub trait VectorWriter: std::fmt::Debug + Send + Sync {
 pub struct ResourceWrapper<'a> {
     resource: &'a noderesources::Resource,
     vectorset: Option<String>,
+    fallback_to_default_vectorset: bool,
 }
 
 impl<'a> From<&'a noderesources::Resource> for ResourceWrapper<'a> {
@@ -114,15 +115,21 @@ impl<'a> From<&'a noderesources::Resource> for ResourceWrapper<'a> {
         Self {
             resource: value,
             vectorset: None,
+            fallback_to_default_vectorset: false,
         }
     }
 }
 
 impl<'a> ResourceWrapper<'a> {
-    pub fn new_vectorset_resource(resource: &'a noderesources::Resource, vectorset: &str) -> Self {
+    pub fn new_vectorset_resource(
+        resource: &'a noderesources::Resource,
+        vectorset: &str,
+        fallback_to_default_vectorset: bool,
+    ) -> Self {
         Self {
             resource,
             vectorset: Some(vectorset.to_string()),
+            fallback_to_default_vectorset,
         }
     }
 
@@ -136,7 +143,13 @@ impl<'a> ResourceWrapper<'a> {
                 let sentences = if let Some(vectorset) = &self.vectorset {
                     // indexing a vectorset, we should return only paragraphs from this vectorset.
                     // If vectorset is not found, we'll skip this paragraph
-                    paragraph.vectorsets_sentences.get(vectorset).map(|x| &x.sentences)
+                    if let Some(vectorset_sentences) = paragraph.vectorsets_sentences.get(vectorset) {
+                        Some(&vectorset_sentences.sentences)
+                    } else if self.fallback_to_default_vectorset {
+                        Some(&paragraph.sentences)
+                    } else {
+                        None
+                    }
                 } else {
                     // Default vectors index (no vectorset)
                     Some(&paragraph.sentences)
