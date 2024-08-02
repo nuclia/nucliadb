@@ -104,7 +104,6 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     # We need to be backward compatible with the old "semantic_model" field where
     # only one semantic model was allowed.
-    breakpoint()
     if "semantic_model" in user_learning_config:
         user_learning_config["semantic_models"] = [user_learning_config.pop("semantic_model")]
 

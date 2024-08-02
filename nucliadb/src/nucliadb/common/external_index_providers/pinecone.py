@@ -172,14 +172,14 @@ class PineconeIndexManager(ExternalIndexManager):
         We need to include both the kbid and the vectorset id in the formation
         of the index name, so we don't create two conflicting Pinecone indexes for
         the same api_key. So we hash the kbid and the vectorset id to generate a unique index name.
-        `nuclia--` is prepended to easily identify which indexes are created by Nuclia.
+        `nuclia-` is prepended to easily identify which indexes are created by Nuclia.
 
         Example:
         >>> get_index_name('7b7887b4-2d78-41c7-a398-586af7d7db8b', 'multilingual-2024-05-08')
-        'nuclia--2fb7ae69c227be190083cb33b32baf8307f30'
+        'nuclia-2fb7ae69c227be190083cb33b32baf8307f30'
         """
         digest = hashlib.sha256(f"{kbid}-{vectorset_id}".encode()).hexdigest()
-        index_name = f"nuclia--{digest}"[:MAX_INDEX_NAME_LENGTH]
+        index_name = f"nuclia-{digest}"[:MAX_INDEX_NAME_LENGTH]
         return index_name
 
     async def _delete_resource_to_index(self, index_host: str, resource_uuid: str) -> None:
@@ -210,14 +210,16 @@ class PineconeIndexManager(ExternalIndexManager):
 
     def get_vectorsets_in_resource(self, index_data: Resource) -> set[str]:
         vectorsets: set[str] = set()
-        for _, paragraphs in index_data.paragraphs.items():
-            for _, paragraph in paragraphs.paragraphs.items():
-                if paragraph.sentences:
-                    if self.default_vectorset:
-                        vectorsets.add(self.default_vectorset)
-                for vectorset_id, vectorsets_sentences in paragraph.vectorsets_sentences.items():
-                    if vectorsets_sentences.sentences:
-                        vectorsets.add(vectorset_id)
+        for _, paragraph in iter_paragraphs(index_data):
+            if not paragraph.sentences and not paragraph.vectorsets_sentences:
+                continue
+            if paragraph.sentences and self.default_vectorset:
+                vectorsets.add(self.default_vectorset)
+            for vectorset_id, vectorsets_sentences in paragraph.vectorsets_sentences.items():
+                if vectorsets_sentences.sentences:
+                    vectorsets.add(vectorset_id)
+            # Once we have found at least one paragraph with vectors, we can stop iterating
+            return vectorsets
         return vectorsets
 
     def get_prefixes_to_delete(self, index_data: Resource) -> set[str]:
@@ -390,64 +392,60 @@ class PineconeIndexManager(ExternalIndexManager):
         self, index_data: Resource, base_vector_metadatas: dict[str, VectorMetadata]
     ) -> dict[str, list[PineconeVector]]:
         vectorset_vectors: dict[str, list[PineconeVector]] = {}
-        for _, index_paragraphs in index_data.paragraphs.items():
-            for index_paragraph_id, index_paragraph in index_paragraphs.paragraphs.items():
-                # We must compute the vectors for each vectorset present the paragraph.
-                vectorset_iterators = {}
-                if index_paragraph.sentences:
-                    if self.default_vectorset:
-                        vectorset_iterators[self.default_vectorset] = index_paragraph.sentences.items()
-                for vectorset_id, vector_sentences in index_paragraph.vectorsets_sentences.items():
-                    if vector_sentences.sentences:
-                        vectorset_iterators[vectorset_id] = vector_sentences.sentences.items()
+        for index_paragraph_id, index_paragraph in iter_paragraphs(index_data):
+            # We must compute the vectors for each vectorset present the paragraph.
+            vectorset_iterators = {}
+            if index_paragraph.sentences and self.default_vectorset:
+                vectorset_iterators[self.default_vectorset] = index_paragraph.sentences.items()
+            for vectorset_id, vector_sentences in index_paragraph.vectorsets_sentences.items():
+                if vector_sentences.sentences:
+                    vectorset_iterators[vectorset_id] = vector_sentences.sentences.items()
 
-                vector_sentence: VectorSentence
-                for vectorset_id, sentences_iterator in vectorset_iterators.items():
-                    for sentence_id, vector_sentence in sentences_iterator:
-                        vector_metadata_to_copy = base_vector_metadatas.get(index_paragraph_id)
-                        if vector_metadata_to_copy is None:
-                            logger.warning(
-                                f"Metadata not found for sentences of paragraph {index_paragraph_id}"
-                            )
-                            continue
-                        # Copy the initial metadata collected at paragraph parsing in case
-                        # the metadata is different for each vectorset
-                        vector_metadata = deepcopy(vector_metadata_to_copy)
+            vector_sentence: VectorSentence
+            for vectorset_id, sentences_iterator in vectorset_iterators.items():
+                for sentence_id, vector_sentence in sentences_iterator:
+                    vector_metadata_to_copy = base_vector_metadatas.get(index_paragraph_id)
+                    if vector_metadata_to_copy is None:
+                        logger.warning(
+                            f"Metadata not found for sentences of paragraph {index_paragraph_id}"
+                        )
+                        continue
+                    # Copy the initial metadata collected at paragraph parsing in case
+                    # the metadata is different for each vectorset
+                    vector_metadata = deepcopy(vector_metadata_to_copy)
 
-                        # AI-tables metadata
-                        if vector_sentence.metadata.page_with_visual:
-                            vector_metadata.page_with_visual = True
-                        if vector_sentence.metadata.representation.is_a_table:
-                            vector_metadata.is_a_table = True
-                        if vector_sentence.metadata.representation.file:
-                            vector_metadata.representation_file = (
-                                vector_sentence.metadata.representation.file
-                            )
+                    # AI-tables metadata
+                    if vector_sentence.metadata.page_with_visual:
+                        vector_metadata.page_with_visual = True
+                    if vector_sentence.metadata.representation.is_a_table:
+                        vector_metadata.is_a_table = True
+                    if vector_sentence.metadata.representation.file:
+                        vector_metadata.representation_file = (
+                            vector_sentence.metadata.representation.file
+                        )
 
-                        # Video positions
-                        if len(vector_sentence.metadata.position.start_seconds):
-                            vector_metadata.position_start_seconds = list(
-                                map(str, vector_sentence.metadata.position.start_seconds)
-                            )
-                        if len(vector_sentence.metadata.position.end_seconds):
-                            vector_metadata.position_end_seconds = list(
-                                map(str, vector_sentence.metadata.position.end_seconds)
-                            )
-                        vector_metadata.page_number = vector_sentence.metadata.position.page_number
-                        try:
-                            pc_vector = PineconeVector(
-                                id=sentence_id,
-                                values=list(vector_sentence.vector),
-                                metadata=vector_metadata.model_dump(exclude_none=True),
-                            )
-                        except MetadataTooLargeError as exc:  # pragma: no cover
-                            logger.error(
-                                f"Invalid Pinecone vector. Metadata is too large. Skipping: {exc}"
-                            )
-                            continue
+                    # Video positions
+                    if len(vector_sentence.metadata.position.start_seconds):
+                        vector_metadata.position_start_seconds = list(
+                            map(str, vector_sentence.metadata.position.start_seconds)
+                        )
+                    if len(vector_sentence.metadata.position.end_seconds):
+                        vector_metadata.position_end_seconds = list(
+                            map(str, vector_sentence.metadata.position.end_seconds)
+                        )
+                    vector_metadata.page_number = vector_sentence.metadata.position.page_number
+                    try:
+                        pc_vector = PineconeVector(
+                            id=sentence_id,
+                            values=list(vector_sentence.vector),
+                            metadata=vector_metadata.model_dump(exclude_none=True),
+                        )
+                    except MetadataTooLargeError as exc:  # pragma: no cover
+                        logger.error(f"Invalid Pinecone vector. Metadata is too large. Skipping: {exc}")
+                        continue
 
-                        vectors = vectorset_vectors.setdefault(vectorset_id, [])
-                        vectors.append(pc_vector)
+                    vectors = vectorset_vectors.setdefault(vectorset_id, [])
+                    vectors.append(pc_vector)
         return vectorset_vectors
 
     async def _query(self, request: SearchRequest) -> PineconeQueryResults:
@@ -611,3 +609,9 @@ def convert_timestamp_filter(timestamps: Timestamps) -> list[dict[str, Any]]:
             {"date_created": {FilterOperator.LESS_THAN_OR_EQUAL: timestamps.to_created.ToSeconds()}}
         )
     return and_terms
+
+
+def iter_paragraphs(resource: Resource) -> Iterator[tuple[str, IndexParagraph]]:
+    for _, paragraphs in resource.paragraphs.items():
+        for paragraph_id, paragraph in paragraphs.paragraphs.items():
+            yield paragraph_id, paragraph

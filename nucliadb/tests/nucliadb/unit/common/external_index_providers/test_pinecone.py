@@ -323,7 +323,7 @@ def test_exceptions():
         (
             "multilingual-2024-05-08",
             "7b7887b4-2d78-41c7-a398-586af7d7db8b",
-            "nuclia--2fb7ae69c227be190083cb33b32baf8307f30",
+            "nuclia-2fb7ae69c227be190083cb33b32baf8307f30",
         ),
     ],
 )
