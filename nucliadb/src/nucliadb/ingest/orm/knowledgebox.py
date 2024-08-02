@@ -127,7 +127,6 @@ class KnowledgeBox:
             raise KnowledgeBoxCreationError("A kbid must be provided to create a new KB")
         if not slug:
             raise KnowledgeBoxCreationError("A slug must be provided to create a new KB")
-
         if semantic_model is None:
             if semantic_models is None or len(semantic_models) == 0:
                 raise KnowledgeBoxCreationError(
