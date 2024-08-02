@@ -301,7 +301,7 @@ class PineconeIndexManager(ExternalIndexManager):
             data_plane = self.get_data_plane(index_host=index_host)
         except KeyError:
             logger.error(
-                "Data to index for index which host could not be found",
+                "Pinecone index not found for vectorset. Data could not be indexed.",
                 extra={
                     "kbid": self.kbid,
                     "provider": self.type.value,
@@ -323,8 +323,8 @@ class PineconeIndexManager(ExternalIndexManager):
     ) -> None:
         if len(prefixes_to_delete) == 0:  # pragma: no cover
             return
-        index_name = self.get_index_name(self.kbid, vectorset_id)
-        data_plane = self.get_data_plane(index_name)
+        index_host = self.index_hosts[vectorset_id]
+        data_plane = self.get_data_plane(index_host=index_host)
         with manager_observer({"operation": "delete_by_prefix"}):
             for prefix in prefixes_to_delete:
                 await data_plane.delete_by_id_prefix(
@@ -357,7 +357,10 @@ class PineconeIndexManager(ExternalIndexManager):
             field_labels = set(text_info.labels)
             field_paragraphs = index_data.paragraphs.get(field_id)
             if field_paragraphs is None:
-                logger.warning(f"Paragraphs not found for field {field_id}")
+                logger.warning(
+                    "Paragraphs not found for field",
+                    extra={"kbid": self.kbid, "rid": resource_uuid, "field_id": field_id},
+                )
                 continue
 
             paragraph: IndexParagraph
@@ -448,9 +451,9 @@ class PineconeIndexManager(ExternalIndexManager):
         return vectorset_vectors
 
     async def _query(self, request: SearchRequest) -> PineconeQueryResults:
-        vectorset_id = request.vectorset or "default"
-        index_name = self.get_index_name(self.kbid, vectorset_id)
-        data_plane = self.get_data_plane(index_name)
+        vectorset_id = request.vectorset or self.default_vectorset or "__default__"
+        index_host = self.index_hosts[vectorset_id]
+        data_plane = self.get_data_plane(index_host=index_host)
         filter = convert_to_pinecone_filter(request)
         top_k = (request.page_number + 1) * request.result_per_page
         query_results = await data_plane.query(

@@ -59,10 +59,20 @@ async def get_external_index_metadata(kbid: str) -> Optional[StoredExternalIndex
 
 
 @async_lru.alru_cache(maxsize=None)
-async def get_default_vectorset_id(kbid: str) -> str:
+async def get_default_vectorset_id(kbid: str) -> Optional[str]:
     async with datamanagers.with_ro_transaction() as txn:
-        vs = await datamanagers.vectorsets.get_default_vectorset(txn, kbid=kbid)
-        return vs.vectorset_id
+        vss = []
+        async for vs_id, vs_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            vss.append((vs_id, vs_config))
+        if len(vss) == 0:
+            return "__default__"
+        if len(vss) == 1:
+            # If there is only one vectorset, return it as the default
+            return vss[0][0]
+        else:
+            # If there are multiple vectorsets, we don't have a default
+            # and we assume the index messages are explicit about the vectorset
+            return None
 
 
 def decrypt_api_key(encrypted_api_key: str) -> str:

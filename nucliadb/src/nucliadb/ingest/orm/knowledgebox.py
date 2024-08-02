@@ -54,6 +54,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     ExternalIndexProviderType,
     KnowledgeBoxConfig,
+    PineconeIndexMetadata,
     SemanticModelMetadata,
     StoredExternalIndexProviderMetadata,
 )
@@ -179,7 +180,7 @@ class KnowledgeBox:
                         request=external_index_provider,
                         indexes=[
                             VectorsetExternalIndex(
-                                vectorset_id="default",
+                                vectorset_id="__default__",
                                 dimension=semantic_model.vector_dimension,
                                 similarity=semantic_model.similarity_function,
                             )
@@ -542,7 +543,8 @@ class KnowledgeBox:
         metadata.pinecone_config.serverless_cloud = request.pinecone_config.serverless_cloud
         pinecone = get_pinecone().control_plane(api_key=api_key)
         for index in indexes:
-            index_name = PineconeIndexManager.get_index_name(kbid, index.vectorset_id)
+            vectorset_id = index.vectorset_id
+            index_name = PineconeIndexManager.get_index_name(kbid, vectorset_id)
             logger.info(
                 "Creating pincone index",
                 extra={"kbid": kbid, "index_name": index_name, "vector_dimension": index.dimension},
@@ -558,8 +560,14 @@ class KnowledgeBox:
                 )
             except PineconeAPIError as exc:
                 raise ExternalIndexCreationError("pinecone", exc.message) from exc
-            metadata.pinecone_config.indexes[index_name].index_host = index_host
-            metadata.pinecone_config.indexes[index_name].vector_dimension = index.dimension
+            metadata.pinecone_config.indexes[vectorset_id].CopyFrom(
+                PineconeIndexMetadata(
+                    index_name=index_name,
+                    index_host=index_host,
+                    vector_dimension=index.dimension,
+                    similarity=index.similarity,
+                )
+            )
         return metadata
 
     @classmethod

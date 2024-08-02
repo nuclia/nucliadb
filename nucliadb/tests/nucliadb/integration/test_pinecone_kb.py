@@ -46,15 +46,35 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.utilities import get_endecryptor
 
 
+@pytest.fixture()
+def data_plane():
+    mocked = mock.MagicMock()
+    mocked.delete_by_id_prefix = mock.AsyncMock(return_value=None)
+    mocked.upsert_in_batches = mock.AsyncMock(return_value=None)
+    mocked.query = mock.AsyncMock(return_value=None)
+    return mocked
+
+
+@pytest.fixture()
+def control_plane():
+    mocked = mock.MagicMock()
+    mocked.create_index = mock.AsyncMock(return_value="pinecone-host")
+    mocked.delete_index = mock.AsyncMock(return_value=None)
+    return mocked
+
+
 @pytest.fixture(autouse=True)
-def mock_pinecone_client():
+def mock_pinecone_client(data_plane, control_plane):
     session_mock = mock.MagicMock()
-    pinecone_mock = mock.MagicMock()
-    pinecone_mock.create_index = mock.AsyncMock(return_value="pinecone-host")
-    pinecone_mock.delete_index = mock.AsyncMock(return_value=None)
-    session_mock.control_plane.return_value = pinecone_mock
-    with unittest.mock.patch("nucliadb.ingest.orm.knowledgebox.get_pinecone", return_value=session_mock):
-        yield pinecone_mock
+    session_mock.control_plane.return_value = control_plane
+    session_mock.data_plane.return_value = data_plane
+    with (
+        unittest.mock.patch("nucliadb.ingest.orm.knowledgebox.get_pinecone", return_value=session_mock),
+        unittest.mock.patch(
+            "nucliadb.common.external_index_providers.pinecone.get_pinecone", return_value=session_mock
+        ),
+    ):
+        yield session_mock
 
 
 @pytest.fixture(autouse=True)
@@ -67,7 +87,7 @@ def hosted_nucliadb():
 async def test_kb_creation_old(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
-    mock_pinecone_client,
+    control_plane,
 ):
     """
     This tests the deprecated method for creating kbs on a hosted nucliadb that
@@ -99,7 +119,7 @@ async def test_kb_creation_old(
     assert response.status == KnowledgeBoxResponseStatus.OK
 
     expected_index_name = PineconeIndexManager.get_index_name(kbid, "default")
-    mock_pinecone_client.create_index.assert_awaited_once_with(
+    control_plane.create_index.assert_awaited_once_with(
         name=expected_index_name,
         dimension=128,
         metric="dotproduct",
@@ -132,14 +152,14 @@ async def test_kb_creation_old(
     response = await nucliadb_grpc.DeleteKnowledgeBox(KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None)  # type: ignore
     assert response.status == KnowledgeBoxResponseStatus.OK
 
-    mock_pinecone_client.delete_index.assert_awaited_once_with(name=expected_index_name)
+    control_plane.delete_index.assert_awaited_once_with(name=expected_index_name)
 
 
 @pytest.mark.asyncio
 async def test_kb_creation_new(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
-    mock_pinecone_client,
+    control_plane,
 ):
     """
     This tests the new method for creating kbs on a hosted nucliadb that
@@ -186,7 +206,7 @@ async def test_kb_creation_new(
         PineconeIndexManager.get_index_name(kbid, vectorset_1_id),
         PineconeIndexManager.get_index_name(kbid, vectorset_2_id),
     ]
-    mock_pinecone_client.create_index.assert_has_calls(
+    control_plane.create_index.assert_has_calls(
         [
             call(
                 name=expected_index_names[0],
@@ -229,8 +249,8 @@ async def test_kb_creation_new(
 
     # Test that deletes all external indexes
     deleted_index_names = set()
-    deleted_index_names.add(mock_pinecone_client.delete_index.call_args_list[0][1]["name"])
-    deleted_index_names.add(mock_pinecone_client.delete_index.call_args_list[1][1]["name"])
+    deleted_index_names.add(control_plane.delete_index.call_args_list[0][1]["name"])
+    deleted_index_names.add(control_plane.delete_index.call_args_list[1][1]["name"])
     assert deleted_index_names == set(expected_index_names)
 
 
@@ -253,7 +273,8 @@ async def test_ingestion_on_pinecone_kb(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     pinecone_knowledgebox: str,
-    pinecone_data_plane,
+    data_plane,
+    mock_pinecone_client,
 ):
     kbid = pinecone_knowledgebox
 
@@ -366,5 +387,7 @@ async def test_ingestion_on_pinecone_kb(
     response = await nucliadb_grpc.ProcessMessage([bm], timeout=None)  # type: ignore
     assert response.status == OpStatusWriter.Status.OK
 
-    breakpoint()
-    pass
+    assert data_plane.delete_by_id_prefix.await_count == 1
+    assert data_plane.upsert_in_batches.await_count == 1
+    upsert_call = data_plane.upsert_in_batches.call_args_list[0][1]
+    assert len(upsert_call["vectors"]) == 3

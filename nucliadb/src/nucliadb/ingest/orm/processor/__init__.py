@@ -252,7 +252,6 @@ class Processor:
 
         async with self.driver.transaction() as txn:
             try:
-                breakpoint()
                 multi = messages[0].multiid
                 kb = KnowledgeBox(txn, self.storage, kbid)
                 uuid = await self.get_resource_uuid(kb, messages[0])
