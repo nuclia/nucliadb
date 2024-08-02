@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.learning_proxy import LearningConfiguration
+from nucliadb.learning_proxy import LearningConfiguration, SemanticConfig, SimilarityFunction
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
@@ -68,6 +68,14 @@ async def test_create_knowledgebox_with_learning_config(
             semantic_vector_size=10,
             semantic_vector_similarity="cosine",
             semantic_matryoshka_dims=[10, 20, 30],
+            semantic_model_configs={
+                "multilingual": SemanticConfig(
+                    vector_size=10,
+                    threshold=-1,
+                    similarity=SimilarityFunction.COSINE,
+                    matryoshka_dims=[10, 20, 30],
+                )
+            }
         )
         learning_proxy.set_configuration.return_value = learning_config
 
@@ -108,6 +116,14 @@ async def test_create_knowledgebox_with_learning_config_with_matryoshka_dimensio
             semantic_vector_size=10,
             semantic_vector_similarity="cosine",
             semantic_matryoshka_dims=[10, 20, 30],
+            semantic_model_configs={
+                "multilingual": SemanticConfig(
+                    vector_size=10,
+                    threshold=-1,
+                    similarity=SimilarityFunction.COSINE,
+                    matryoshka_dims=[10, 20, 30],
+                )
+            }
         )
         learning_proxy.set_configuration.return_value = learning_config
 
