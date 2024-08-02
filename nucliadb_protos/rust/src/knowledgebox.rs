@@ -19,15 +19,20 @@ pub struct CreatePineconeConfig {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PineconeIndexMetadata {
     #[prost(string, tag = "1")]
+    pub index_name: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
     pub index_host: ::prost::alloc::string::String,
-    #[prost(int32, tag = "2")]
+    #[prost(int32, tag = "3")]
     pub vector_dimension: i32,
+    #[prost(enumeration = "super::utils::VectorSimilarity", tag = "4")]
+    pub similarity: i32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StoredPineconeConfig {
     #[prost(string, tag = "1")]
     pub encrypted_api_key: ::prost::alloc::string::String,
+    /// vectorset id -> PineconeIndexMetadata
     #[prost(map = "string, message", tag = "2")]
     pub indexes: ::std::collections::HashMap<
         ::prost::alloc::string::String,

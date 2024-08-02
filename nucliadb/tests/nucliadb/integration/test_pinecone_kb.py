@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 import unittest
+from datetime import datetime
 from unittest import mock
 from unittest.mock import call
 from uuid import uuid4
@@ -28,6 +28,7 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
+from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     CreatePineconeConfig,
@@ -40,7 +41,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     PineconeServerlessCloud,
 )
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import NewKnowledgeBoxV2Request
+from nucliadb_protos.writer_pb2 import BrokerMessage, NewKnowledgeBoxV2Request, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.utilities import get_endecryptor
 
@@ -245,3 +246,125 @@ async def test_find_on_pinecone_kb(
         json={"query": "own text"},
     )
     assert resp.status_code == 200
+
+
+async def test_ingestion_on_pinecone_kb(
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    pinecone_knowledgebox: str,
+    pinecone_data_plane,
+):
+    kbid = pinecone_knowledgebox
+
+    # Create a resource first
+    slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "Title Resource",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    bm = BrokerMessage(kbid=kbid, uuid=rid, slug=slug, type=BrokerMessage.AUTOCOMMIT)
+    bm.basic.icon = "text/plain"
+    bm.basic.title = "Title Resource"
+    bm.basic.summary = "Summary of document"
+    bm.basic.thumbnail = "doc"
+    bm.basic.metadata.useful = True
+    bm.basic.metadata.language = "es"
+    bm.basic.created.FromDatetime(datetime.now())
+    bm.basic.modified.FromDatetime(datetime.now())
+    bm.origin.source = rpb.Origin.Source.WEB
+
+    bm.texts["text"].body = "My own text Ramon. This is great to be here. \n Where is my beer?"
+    bm.texts["text"].format = rpb.FieldText.Format.PLAIN
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
+    etw.field.field = "text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    bm.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Summary of document"
+    etw.field.field = "summary"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Title Resource"
+    etw.field.field = "title"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.field = "text"
+    fcm.field.field_type = rpb.FieldType.TEXT
+    p1 = rpb.Paragraph(
+        start=0,
+        end=45,
+    )
+    p1.start_seconds.append(0)
+    p1.end_seconds.append(10)
+    p2 = rpb.Paragraph(
+        start=47,
+        end=64,
+    )
+    p2.start_seconds.append(10)
+    p2.end_seconds.append(20)
+    p2.start_seconds.append(20)
+    p2.end_seconds.append(30)
+
+    fcm.metadata.metadata.paragraphs.append(p1)
+    fcm.metadata.metadata.paragraphs.append(p2)
+    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
+    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
+
+    c1 = rpb.Classification()
+    c1.label = "label1"
+    c1.labelset = "labelset1"
+    fcm.metadata.metadata.classifications.append(c1)
+    bm.field_metadata.append(fcm)
+
+    ev = rpb.ExtractedVectorsWrapper()
+    ev.field.field = "text"
+    ev.field.field_type = rpb.FieldType.TEXT
+
+    v1 = rpb.Vector()
+    v1.start = 0
+    v1.end = 19
+    v1.start_paragraph = 0
+    v1.end_paragraph = 45
+    v1.vector.extend([1.0, 2.0, 3.0])
+    ev.vectors.vectors.vectors.append(v1)
+
+    v2 = rpb.Vector()
+    v2.start = 20
+    v2.end = 45
+    v2.start_paragraph = 0
+    v2.end_paragraph = 45
+    v2.vector.extend([4.0, 5.0, 6.0])
+    ev.vectors.vectors.vectors.append(v2)
+
+    v3 = rpb.Vector()
+    v3.start = 48
+    v3.end = 65
+    v3.start_paragraph = 47
+    v3.end_paragraph = 64
+    v3.vector.extend([7.0, 8.0, 9.0])
+    ev.vectors.vectors.vectors.append(v3)
+
+    bm.field_vectors.append(ev)
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+
+    response = await nucliadb_grpc.ProcessMessage([bm], timeout=None)  # type: ignore
+    assert response.status == OpStatusWriter.Status.OK
+
+    breakpoint()
+    pass

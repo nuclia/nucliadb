@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import hashlib
 import json
 import logging
 from copy import deepcopy
@@ -32,6 +33,7 @@ from nucliadb.common.external_index_providers.base import (
     TextBlockMatch,
 )
 from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb_protos.knowledgebox_pb2 import PineconeIndexMetadata
 from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
@@ -133,7 +135,7 @@ class PineconeIndexManager(ExternalIndexManager):
         self,
         kbid: str,
         api_key: str,
-        index_hosts: dict[str, str],
+        indexes: dict[str, PineconeIndexMetadata],
         upsert_parallelism: int = 3,
         delete_parallelism: int = 2,
         upsert_timeout: float = 10.0,
@@ -144,8 +146,12 @@ class PineconeIndexManager(ExternalIndexManager):
         super().__init__(kbid=kbid)
         assert api_key != ""
         self.api_key = api_key
-        assert index_hosts != {}
-        self.index_hosts = index_hosts
+        self.index_hosts = {
+            vectorset_id: index_metadata.index_host for vectorset_id, index_metadata in indexes.items()
+        }
+        self.index_names = {
+            vectorset_id: index_metadata.index_name for vectorset_id, index_metadata in indexes.items()
+        }
         self.pinecone = get_pinecone()
         self.upsert_parallelism = upsert_parallelism
         self.delete_parallelism = delete_parallelism
@@ -154,11 +160,7 @@ class PineconeIndexManager(ExternalIndexManager):
         self.query_timeout = query_timeout
         self.default_vectorset = default_vectorset
 
-    def get_data_plane(self, index_name: str) -> DataPlane:
-        try:
-            index_host = self.index_hosts[index_name]
-        except KeyError:
-            raise IndexHostNotFound(index_name)
+    def get_data_plane(self, index_host: str) -> DataPlane:
         return self.pinecone.data_plane(api_key=self.api_key, index_host=index_host)
 
     @classmethod
@@ -167,24 +169,21 @@ class PineconeIndexManager(ExternalIndexManager):
         Index names can't be longer than 45 characters and can only contain
         alphanumeric lowercase characters: https://docs.pinecone.io/troubleshooting/restrictions-on-index-names
 
-        We need to include both the kbid and the vectorset id in the index name,
-        so we don't create two conflicting Pinecone indexes for the same api_key.
+        We need to include both the kbid and the vectorset id in the formation
+        of the index name, so we don't create two conflicting Pinecone indexes for
+        the same api_key. So we hash the kbid and the vectorset id to generate a unique index name.
+        `nuclia--` is prepended to easily identify which indexes are created by Nuclia.
 
-        Take the two left-most parts from the kbid and prepend it the vectorset_id.
         Example:
         >>> get_index_name('7b7887b4-2d78-41c7-a398-586af7d7db8b', 'multilingual-2024-05-08')
-        'multilingual-2024-05-08--7b7887b4-2d78'
+        'nuclia--2fb7ae69c227be190083cb33b32baf8307f30'
         """
-        kbid_part = "-".join(kbid.split("-")[:2])
-        index_name = f"{vectorset_id}--{kbid_part}"
-        index_name = index_name.lower()
-        index_name = index_name.replace("_", "-")
-        if len(index_name) > MAX_INDEX_NAME_LENGTH:
-            raise ValueError("Index name is too large!")
+        digest = hashlib.sha256(f"{kbid}-{vectorset_id}".encode()).hexdigest()
+        index_name = f"nuclia--{digest}"[:MAX_INDEX_NAME_LENGTH]
         return index_name
 
-    async def _delete_resource_to_index(self, index_name: str, resource_uuid: str) -> None:
-        data_plane = self.get_data_plane(index_name)
+    async def _delete_resource_to_index(self, index_host: str, resource_uuid: str) -> None:
+        data_plane = self.get_data_plane(index_host=index_host)
         with manager_observer({"operation": "delete_by_resource_prefix"}):
             await data_plane.delete_by_id_prefix(
                 id_prefix=resource_uuid,
@@ -197,11 +196,11 @@ class PineconeIndexManager(ExternalIndexManager):
         Deletes by resource uuid on all indexes in parallel.
         """
         delete_tasks = []
-        for index_name in self.index_hosts:
+        for index_host in self.index_hosts.values():
             delete_tasks.append(
                 asyncio.create_task(
                     self._delete_resource_to_index(
-                        index_name=index_name,
+                        index_host=index_host,
                         resource_uuid=resource_uuid,
                     )
                 )
@@ -297,17 +296,17 @@ class PineconeIndexManager(ExternalIndexManager):
     async def _upsert_to_vectorset_index(self, vectorset_id: str, vectors: list[PineconeVector]) -> None:
         if len(vectors) == 0:  # pragma: no cover
             return
-        index_name = self.get_index_name(self.kbid, vectorset_id)
         try:
-            data_plane = self.get_data_plane(index_name)
-        except IndexHostNotFound:  # pragma: no cover
+            index_host = self.index_hosts[vectorset_id]
+            data_plane = self.get_data_plane(index_host=index_host)
+        except KeyError:
             logger.error(
                 "Data to index for index which host could not be found",
                 extra={
                     "kbid": self.kbid,
                     "provider": self.type.value,
                     "vectorset_id": vectorset_id,
-                    "index_name": index_name,
+                    "index_names": self.index_names,
                     "index_hosts": self.index_hosts,
                 },
             )

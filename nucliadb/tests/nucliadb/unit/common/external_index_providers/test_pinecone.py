@@ -34,8 +34,10 @@ from nucliadb.common.external_index_providers.pinecone import (
     convert_to_pinecone_filter,
 )
 from nucliadb_protos import nodereader_pb2
+from nucliadb_protos.knowledgebox_pb2 import PineconeIndexMetadata
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, IndexParagraphs
 from nucliadb_protos.noderesources_pb2 import Resource as PBResourceBrain
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_utils.aiopynecone.models import QueryResponse, Vector, VectorMatch
 
 
@@ -69,23 +71,46 @@ def data_plane(query_response):
 
 
 @pytest.fixture()
-def external_index_manager(data_plane):
+def vectorsets():
+    return [
+        "multilingual-2023-02-02",
+        "english-2023-02-02",
+    ]
+
+
+@pytest.fixture()
+def external_index_manager(data_plane, vectorsets):
     mock = MagicMock()
     mock.data_plane.return_value = data_plane
     with unittest.mock.patch(
         "nucliadb.common.external_index_providers.pinecone.get_pinecone", return_value=mock
     ):
+        multilingual, english = vectorsets
+        multilingual_index_name = PineconeIndexManager.get_index_name("kbid", multilingual)
+        english_index_name = PineconeIndexManager.get_index_name("kbid", english)
+        indexes = {
+            multilingual: PineconeIndexMetadata(
+                index_name=multilingual_index_name,
+                index_host="index1_host",
+                vector_dimension=10,
+                similarity=VectorSimilarity.COSINE,
+            ),
+            english: PineconeIndexMetadata(
+                index_name=english_index_name,
+                index_host="index2_host",
+                vector_dimension=10,
+                similarity=VectorSimilarity.DOT,
+            ),
+        }
         return PineconeIndexManager(
             kbid="kbid",
             api_key="api_key",
-            index_hosts={
-                "default--kbid": "index_host",
-                "vectorset-id--kbid": "index_host_2",
-            },
+            indexes=indexes,
             upsert_parallelism=3,
             delete_parallelism=2,
             upsert_timeout=10,
             delete_timeout=10,
+            default_vectorset=multilingual,
         )
 
 
@@ -97,7 +122,8 @@ async def test_delete_resource(external_index_manager: PineconeIndexManager, dat
     assert call_0_kwargs["id_prefix"] == "resource_uuid"
 
 
-async def test_index_resource(external_index_manager: PineconeIndexManager, data_plane):
+async def test_index_resource(external_index_manager: PineconeIndexManager, data_plane, vectorsets):
+    multilingual, english = vectorsets
     index_data = PBResourceBrain()
     index_data.texts["f/field"].text = "some text"
     index_data.texts["f/field"].labels.append("/t/text/label")
@@ -113,10 +139,10 @@ async def test_index_resource(external_index_manager: PineconeIndexManager, data
     index_paragraph.sentences["rid/f/field/0/0-10"].vector.extend([1, 2, 3])
     index_paragraph.sentences["rid/f/field/0/0-10"].metadata.page_with_visual = False
     # Add at least one vector on a vectorset with a different dimension
-    index_paragraph.vectorsets_sentences["vectorset-id"].sentences["rid/f/field/0/0-10"].vector.extend(
+    index_paragraph.vectorsets_sentences[english].sentences["rid/f/field/0/0-10"].vector.extend(
         [5, 6, 7, 8]
     )
-    index_paragraph.vectorsets_sentences["vectorset-id"].sentences[
+    index_paragraph.vectorsets_sentences[english].sentences[
         "rid/f/field/0/0-10"
     ].metadata.page_with_visual = True
     index_paragraphs.paragraphs["rid/f/field/0-10"].CopyFrom(index_paragraph)
@@ -295,22 +321,12 @@ def test_exceptions():
     "vectorset_id,kbid,index_name",
     [
         (
-            "multilingual-2023-02-02",
-            "7cd436d4-d3ff-4b36-bb43-ec107f92408d",
-            "multilingual-2023-02-02--7cd436d4-d3ff",
+            "multilingual-2024-05-08",
+            "7b7887b4-2d78-41c7-a398-586af7d7db8b",
+            "nuclia--2fb7ae69c227be190083cb33b32baf8307f30",
         ),
-        (
-            "MultilinguaL_2023_02_02",
-            "7cd436d4-d3ff-4b36-bb43-ec107f92408d",
-            "multilingual-2023-02-02--7cd436d4-d3ff",
-        ),
-        ("very-large-model-name-2023-02-01", "7cd436d4-d3ff-4b36-bb43-ec107f92408d", ""),
     ],
 )
 def test_get_index_name(vectorset_id, kbid, index_name):
-    if index_name == "":
-        with pytest.raises(ValueError):
-            PineconeIndexManager.get_index_name(kbid, vectorset_id)
-    else:
-        computed_index_name = PineconeIndexManager.get_index_name(kbid, vectorset_id)
-        assert computed_index_name == index_name
+    computed_index_name = PineconeIndexManager.get_index_name(kbid, vectorset_id)
+    assert computed_index_name == index_name

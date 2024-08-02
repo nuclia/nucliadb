@@ -39,26 +39,12 @@ async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager
     metadata = await get_external_index_metadata(kbid)
     if metadata is None or metadata.type != ExternalIndexProviderType.PINECONE:
         return None
-
-    encrypted_api_key = metadata.pinecone_config.encrypted_api_key
-    endecryptor = get_endecryptor()
-    api_key = endecryptor.decrypt(encrypted_api_key)
-    index_hosts: dict[str, str] = {}
-    for index_name, index_metadata in metadata.pinecone_config.indexes.items():
-        index_hosts[index_name] = index_metadata.index_host
-
-    # Due to the vectorsets migrations, some KBs in prod have indexes that have "default" in their name
-    default_vectorset = "default"
-    is_old_kb = len(index_hosts) == 1 and all(
-        index_name.startswith("default") for index_name in index_hosts
-    )
-    if not is_old_kb:
-        default_vectorset = await get_default_vectorset_id(kbid)
-
+    api_key = decrypt_api_key(metadata.pinecone_config.encrypted_api_key)
+    default_vectorset = await get_default_vectorset_id(kbid)
     return PineconeIndexManager(
         kbid=kbid,
         api_key=api_key,
-        index_hosts=index_hosts,
+        indexes=dict(metadata.pinecone_config.indexes),
         upsert_parallelism=settings.pinecone_upsert_parallelism,
         delete_parallelism=settings.pinecone_delete_parallelism,
         upsert_timeout=settings.pinecone_upsert_timeout,
@@ -77,3 +63,8 @@ async def get_default_vectorset_id(kbid: str) -> str:
     async with datamanagers.with_ro_transaction() as txn:
         vs = await datamanagers.vectorsets.get_default_vectorset(txn, kbid=kbid)
         return vs.vectorset_id
+
+
+def decrypt_api_key(encrypted_api_key: str) -> str:
+    endecryptor = get_endecryptor()
+    return endecryptor.decrypt(encrypted_api_key)
