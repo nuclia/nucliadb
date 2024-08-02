@@ -357,7 +357,7 @@ class PineconeIndexManager(ExternalIndexManager):
             field_labels = set(text_info.labels)
             field_paragraphs = index_data.paragraphs.get(field_id)
             if field_paragraphs is None:
-                logger.warning(
+                logger.info(
                     "Paragraphs not found for field",
                     extra={"kbid": self.kbid, "rid": resource_uuid, "field_id": field_id},
                 )
