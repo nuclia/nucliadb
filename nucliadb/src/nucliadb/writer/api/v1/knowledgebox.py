@@ -102,6 +102,9 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
         # learning will choose the default values
         user_learning_config = {}
 
+    if "semantic_model" in user_learning_config:
+        user_learning_config["semantic_models"] = [user_learning_config.pop("semantic_model")]
+
     # we rely on learning to return the updated configuration with defaults and
     # any other needed values (e.g. matryoshka settings if available)
     learning_config = await learning_proxy.set_configuration(kbid, config=user_learning_config)
@@ -119,7 +122,7 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     rollback_learning_config = partial(_rollback_learning_config, kbid)
 
-    semantic_model = learning_config.into_semantic_model_metadata()
+    semantic_models = learning_config.into_semantic_models_metadata()
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
 
     external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
@@ -146,7 +149,7 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
             slug=item.slug or kbid,
             title=item.title or "",
             description=item.description or "",
-            semantic_model=semantic_model,
+            semantic_models=semantic_models,
             release_channel=release_channel,
             external_index_provider=external_index_provider,
         )
