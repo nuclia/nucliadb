@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
-from typing import AsyncGenerator, Optional, Sequence, cast
+from typing import Any, AsyncGenerator, Callable, Coroutine, Optional, Sequence, cast
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -36,7 +35,7 @@ from nucliadb.common.datamanagers.resources import (
     KB_RESOURCE_SLUG,
     KB_RESOURCE_SLUG_BASE,
 )
-from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
+from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -54,21 +53,16 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     ExternalIndexProviderType,
     KnowledgeBoxConfig,
-    PineconeIndexMetadata,
     SemanticModelMetadata,
     StoredExternalIndexProviderMetadata,
 )
-from nucliadb_protos.knowledgebox_pb2 import PineconeServerlessCloud as PBPineconeServerlessCloud
 from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
+from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_utils import const
-from nucliadb_utils.aiopynecone.exceptions import PineconeAPIError
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
-    get_endecryptor,
-    get_pinecone,
     get_storage,
     has_feature,
 )
@@ -86,13 +80,6 @@ KB_TO_DELETE_STORAGE = f"{KB_TO_DELETE_STORAGE_BASE}{{kbid}}"
 
 KB_VECTORSET_TO_DELETE_BASE = "/vectorsettodelete"
 KB_VECTORSET_TO_DELETE = f"{KB_VECTORSET_TO_DELETE_BASE}/{{kbid}}/{{vectorset}}"
-
-
-@dataclass
-class VectorsetExternalIndex:
-    vectorset_id: str
-    dimension: int
-    similarity: VectorSimilarity.ValueType
 
 
 class KnowledgeBox:
@@ -140,7 +127,7 @@ class KnowledgeBox:
 
         release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
 
-        rollback_ops = []
+        rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
 
         try:
             async with driver.transaction() as txn:
@@ -272,7 +259,7 @@ class KnowledgeBox:
                     await op()
                 except Exception:
                     if isinstance(op, partial):
-                        name = op.func.__name__
+                        name: str = op.func.__name__
                     else:
                         getattr(op, "__name__", "unknown?")
                     logger.exception(f"Unexpected error rolling back {name}. Keep rolling back")
@@ -528,76 +515,22 @@ class KnowledgeBox:
         request: CreateExternalIndexProviderMetadata,
         indexes: list[VectorsetExternalIndex],
     ) -> StoredExternalIndexProviderMetadata:
-        metadata = StoredExternalIndexProviderMetadata(
-            type=request.type,
-        )
         if request.type != ExternalIndexProviderType.PINECONE:
-            # Only pinecone is supported for now
-            return metadata
-
-        api_key = request.pinecone_config.api_key
-        endecryptor = get_endecryptor()
-        encrypted_api_key = endecryptor.encrypt(api_key)
-        metadata.pinecone_config.encrypted_api_key = encrypted_api_key
-        metadata.pinecone_config.serverless_cloud = request.pinecone_config.serverless_cloud
-        pinecone = get_pinecone().control_plane(api_key=api_key)
-        for index in indexes:
-            vectorset_id = index.vectorset_id
-            index_name = PineconeIndexManager.get_index_name(kbid, vectorset_id)
-            logger.info(
-                "Creating pincone index",
-                extra={"kbid": kbid, "index_name": index_name, "vector_dimension": index.dimension},
-            )
-            try:
-                index_host = await pinecone.create_index(
-                    name=index_name,
-                    dimension=index.dimension,
-                    metric=to_pinecone_index_metric(index.similarity),
-                    serverless_cloud=to_pinecone_serverless_cloud_payload(
-                        request.pinecone_config.serverless_cloud
-                    ),
-                )
-            except PineconeAPIError as exc:
-                raise ExternalIndexCreationError("pinecone", exc.message) from exc
-            metadata.pinecone_config.indexes[vectorset_id].CopyFrom(
-                PineconeIndexMetadata(
-                    index_name=index_name,
-                    index_host=index_host,
-                    vector_dimension=index.dimension,
-                    similarity=index.similarity,
-                )
-            )
-        return metadata
+            return StoredExternalIndexProviderMetadata(type=request.type)
+        # Only pinecone is supported for now
+        return await PineconeIndexManager.create_indexes(kbid, request, indexes)
 
     @classmethod
     async def _maybe_delete_external_indexes(
         cls,
         kbid: str,
-        external_index_provider: StoredExternalIndexProviderMetadata,
-        created_external_indexes: Optional[list[VectorsetExternalIndex]] = None,
-    ):
-        if external_index_provider.type != ExternalIndexProviderType.PINECONE:
-            # Only pinecone is supported for now
+        stored: StoredExternalIndexProviderMetadata,
+        indexes: Optional[list[VectorsetExternalIndex]] = None,
+    ) -> None:
+        if stored.type != ExternalIndexProviderType.PINECONE:
             return
-
-        encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
-        endecryptor = get_endecryptor()
-        api_key = endecryptor.decrypt(encrypted_api_key)
-        pinecone = get_pinecone().control_plane(api_key=api_key)
-
-        index_names_to_delete: set[str] = set()
-        index_names_to_delete.update(
-            {index_name for index_name in external_index_provider.pinecone_config.indexes.keys()}
-        )
-        index_names_to_delete.update({ei.vectorset_id for ei in created_external_indexes or []})
-        for index_name in index_names_to_delete:
-            logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
-            try:
-                await pinecone.delete_index(name=index_name)
-            except Exception:
-                logger.exception(
-                    "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
-                )
+        # Only pinecone is supported for now
+        await PineconeIndexManager.delete_indexes(kbid, stored, indexes)
 
 
 def release_channel_for_kb(
@@ -626,37 +559,3 @@ def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
         for paragraph_annotation in ufm.paragraphs:
             key = compute_paragraph_key(uuid, paragraph_annotation.key)
             paragraph_annotation.key = key
-
-
-def to_pinecone_index_metric(similarity: VectorSimilarity.ValueType) -> str:
-    return {
-        VectorSimilarity.COSINE: "cosine",
-        VectorSimilarity.DOT: "dotproduct",
-    }[similarity]
-
-
-def to_pinecone_serverless_cloud_payload(
-    serverless: PBPineconeServerlessCloud.ValueType,
-) -> dict[str, str]:
-    return {
-        PBPineconeServerlessCloud.AWS_EU_WEST_1: {
-            "cloud": "aws",
-            "region": "eu-west-1",
-        },
-        PBPineconeServerlessCloud.AWS_US_EAST_1: {
-            "cloud": "aws",
-            "region": "us-east-1",
-        },
-        PBPineconeServerlessCloud.AWS_US_WEST_2: {
-            "cloud": "aws",
-            "region": "us-west-2",
-        },
-        PBPineconeServerlessCloud.AZURE_EASTUS2: {
-            "cloud": "azure",
-            "region": "eastus2",
-        },
-        PBPineconeServerlessCloud.GCP_US_CENTRAL1: {
-            "cloud": "gcp",
-            "region": "us-central1",
-        },
-    }[serverless]

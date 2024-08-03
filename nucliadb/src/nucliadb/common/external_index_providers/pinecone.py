@@ -31,17 +31,20 @@ from nucliadb.common.external_index_providers.base import (
     ExternalIndexProviderType,
     QueryResults,
     TextBlockMatch,
+    VectorsetExternalIndex,
 )
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.ids import FieldId, ParagraphId, VectorId
-from nucliadb_protos.knowledgebox_pb2 import PineconeIndexMetadata
+from nucliadb_protos import knowledgebox_pb2 as kb_pb2
+from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, LogicalOperator
-from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError
+from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError, PineconeAPIError
 from nucliadb_utils.aiopynecone.models import MAX_INDEX_NAME_LENGTH, QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
-from nucliadb_utils.utilities import get_pinecone
+from nucliadb_utils.utilities import decrypt, encrypt, get_pinecone
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +138,7 @@ class PineconeIndexManager(ExternalIndexManager):
         self,
         kbid: str,
         api_key: str,
-        indexes: dict[str, PineconeIndexMetadata],
+        indexes: dict[str, kb_pb2.PineconeIndexMetadata],
         upsert_parallelism: int = 3,
         delete_parallelism: int = 2,
         upsert_timeout: float = 10.0,
@@ -162,6 +165,81 @@ class PineconeIndexManager(ExternalIndexManager):
 
     def get_data_plane(self, index_host: str) -> DataPlane:
         return self.pinecone.data_plane(api_key=self.api_key, index_host=index_host)
+
+    @classmethod
+    async def create_indexes(
+        cls,
+        kbid: str,
+        request: kb_pb2.CreateExternalIndexProviderMetadata,
+        indexes: list[VectorsetExternalIndex],
+    ) -> kb_pb2.StoredExternalIndexProviderMetadata:
+        metadata = kb_pb2.StoredExternalIndexProviderMetadata(
+            type=kb_pb2.ExternalIndexProviderType.PINECONE
+        )
+        api_key = request.pinecone_config.api_key
+        metadata.pinecone_config.encrypted_api_key = encrypt(api_key)
+        metadata.pinecone_config.serverless_cloud = request.pinecone_config.serverless_cloud
+        pinecone = get_pinecone().control_plane(api_key=api_key)
+        serverless_cloud = to_pinecone_serverless_cloud_payload(request.pinecone_config.serverless_cloud)
+        for index in indexes:
+            vectorset_id = index.vectorset_id
+            index_name = PineconeIndexManager.get_index_name(kbid, vectorset_id)
+            index_dimension = index.dimension
+            similarity_metric = to_pinecone_index_metric(index.similarity)
+            logger.info(
+                "Creating pincone index",
+                extra={
+                    "kbid": kbid,
+                    "index_name": index_name,
+                    "similarity": similarity_metric,
+                    "vector_dimension": index_dimension,
+                    "vectorset_id": vectorset_id,
+                    "cloud": serverless_cloud,
+                },
+            )
+            try:
+                index_host = await pinecone.create_index(
+                    name=index_name,
+                    dimension=index_dimension,
+                    metric=similarity_metric,
+                    serverless_cloud=serverless_cloud,
+                )
+            except PineconeAPIError as exc:
+                raise ExternalIndexCreationError("pinecone", exc.message) from exc
+            metadata.pinecone_config.indexes[vectorset_id].CopyFrom(
+                kb_pb2.PineconeIndexMetadata(
+                    index_name=index_name,
+                    index_host=index_host,
+                    vector_dimension=index.dimension,
+                    similarity=index.similarity,
+                )
+            )
+        return metadata
+
+    @classmethod
+    async def delete_indexes(
+        cls,
+        kbid: str,
+        stored: kb_pb2.StoredExternalIndexProviderMetadata,
+        indexes: Optional[list[VectorsetExternalIndex]] = None,
+    ) -> None:
+        api_key = decrypt(stored.pinecone_config.encrypted_api_key)
+        control_plane = get_pinecone().control_plane(api_key=api_key)
+        # Delete all indexes stored in the config and passed as parameters
+        to_delete: set[str] = set()
+        for index_metadata in stored.pinecone_config.indexes.values():
+            to_delete.add(index_metadata.index_name)
+        for external_index in indexes or []:
+            index_name = cls.get_index_name(kbid, external_index.vectorset_id)
+            to_delete.add(index_name)
+        for index_name in to_delete:
+            try:
+                logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
+                await control_plane.delete_index(name=index_name)
+            except Exception:
+                logger.exception(
+                    "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
+                )
 
     @classmethod
     def get_index_name(cls, kbid: str, vectorset_id: str) -> str:
@@ -615,3 +693,37 @@ def iter_paragraphs(resource: Resource) -> Iterator[tuple[str, IndexParagraph]]:
     for _, paragraphs in resource.paragraphs.items():
         for paragraph_id, paragraph in paragraphs.paragraphs.items():
             yield paragraph_id, paragraph
+
+
+def to_pinecone_index_metric(similarity: utils_pb2.VectorSimilarity.ValueType) -> str:
+    return {
+        utils_pb2.VectorSimilarity.COSINE: "cosine",
+        utils_pb2.VectorSimilarity.DOT: "dotproduct",
+    }[similarity]
+
+
+def to_pinecone_serverless_cloud_payload(
+    serverless: kb_pb2.PineconeServerlessCloud.ValueType,
+) -> dict[str, str]:
+    return {
+        kb_pb2.PineconeServerlessCloud.AWS_EU_WEST_1: {
+            "cloud": "aws",
+            "region": "eu-west-1",
+        },
+        kb_pb2.PineconeServerlessCloud.AWS_US_EAST_1: {
+            "cloud": "aws",
+            "region": "us-east-1",
+        },
+        kb_pb2.PineconeServerlessCloud.AWS_US_WEST_2: {
+            "cloud": "aws",
+            "region": "us-west-2",
+        },
+        kb_pb2.PineconeServerlessCloud.AZURE_EASTUS2: {
+            "cloud": "azure",
+            "region": "eastus2",
+        },
+        kb_pb2.PineconeServerlessCloud.GCP_US_CENTRAL1: {
+            "cloud": "gcp",
+            "region": "us-central1",
+        },
+    }[serverless]
