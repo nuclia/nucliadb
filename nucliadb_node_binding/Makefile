@@ -17,7 +17,7 @@ lint:
 
 .PHONY: test
 test:
-	pytest -s --tb=native -v tests
+	pytest -sv --tb=native tests
 
 # TODO rather complex set up, needs to be done globally
 .PHONY: install-cov
@@ -28,7 +28,8 @@ install-cov:
 .PHONY: test-cov
 # test-cov:
 # 	bash ./cov.sh
-test-cov: test # Without coverage for now, since it's currently broken
+test-cov: # Without coverage for now, since it's currently broken
+	pytest -sxv --tb=native tests
 
 .PHONY: build
 build:
