@@ -372,27 +372,6 @@ class StreamAuditStorage(AuditStorage):
             ],
         )
 
-    def suggest(
-        self,
-        kbid: str,
-        client_type: int,
-    ):
-        self.kb_usage_utility.send_kb_usage(
-            service=Service.NUCLIA_DB,
-            account_id=None,
-            kb_id=kbid,
-            kb_source=KBSource.HOSTED,
-            # TODO unify AuditRequest client type and Nuclia Usage client type
-            searches=[
-                Search(
-                    client=ClientTypeKbUsage.Value(ClientType.Name(client_type)),  # type: ignore
-                    type=SearchType.SUGGEST,
-                    tokens=0,
-                    num_searches=1,
-                )
-            ],
-        )
-
     def chat(
         self,
         kbid: str,

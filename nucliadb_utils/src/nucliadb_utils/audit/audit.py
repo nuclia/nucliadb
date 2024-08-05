@@ -107,10 +107,3 @@ class AuditStorage:
 
     def delete_kb(self, kbid: str):
         raise NotImplementedError
-
-    def suggest(
-        self,
-        kbid: str,
-        client_type: int,
-    ):
-        raise NotImplementedError
