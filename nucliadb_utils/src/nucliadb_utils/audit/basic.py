@@ -108,10 +108,3 @@ class BasicAuditStorage(AuditStorage):
 
     def delete_kb(self, kbid: str):
         logger.debug(f"DELETE_KB {kbid}")
-
-    def suggest(
-        self,
-        kbid: str,
-        client_type: int,
-    ):
-        logger.debug(f"SUGGEST {kbid} {client_type}")

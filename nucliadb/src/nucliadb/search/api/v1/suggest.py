@@ -40,7 +40,6 @@ from nucliadb_models.search import (
     SuggestOptions,
 )
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import get_audit
 
 
 @api.get(
@@ -126,7 +125,6 @@ async def suggest(
     debug: bool,
     highlight: bool,
 ) -> KnowledgeboxSuggestResults:
-    audit = get_audit()
     # We need the nodes/shards that are connected to the KB
     # We need to query all nodes
     pb_query = suggest_query_to_pb(
@@ -156,11 +154,5 @@ async def suggest(
     queried_shards = [shard_id for _, shard_id in queried_nodes]
     if debug and queried_shards:
         search_results.shards = queried_shards
-
-    if audit is not None:
-        audit.suggest(
-            kbid=kbid,
-            client_type=x_ndb_client.to_proto(),
-        )
 
     return search_results
