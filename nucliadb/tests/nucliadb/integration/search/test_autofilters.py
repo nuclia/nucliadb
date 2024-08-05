@@ -57,6 +57,7 @@ async def test_autofilters_are_returned(
                 data=Q,
                 vectors={
                     "my-semantic-model": Q,
+                    "multilingual": Q,
                 },
                 time=0.1,
                 timings={
