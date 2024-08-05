@@ -44,7 +44,7 @@ from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, Logical
 from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError, PineconeAPIError
 from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
-from nucliadb_utils.utilities import decrypt, encrypt, get_pinecone
+from nucliadb_utils.utilities import get_endecryptor, get_pinecone
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ class PineconeIndexManager(ExternalIndexManager):
             type=kb_pb2.ExternalIndexProviderType.PINECONE
         )
         api_key = request.pinecone_config.api_key
-        metadata.pinecone_config.encrypted_api_key = encrypt(api_key)
+        metadata.pinecone_config.encrypted_api_key = get_endecryptor().encrypt(api_key)
         metadata.pinecone_config.serverless_cloud = request.pinecone_config.serverless_cloud
         pinecone = get_pinecone().control_plane(api_key=api_key)
         serverless_cloud = to_pinecone_serverless_cloud_payload(request.pinecone_config.serverless_cloud)
@@ -231,7 +231,7 @@ class PineconeIndexManager(ExternalIndexManager):
         kbid: str,
         stored: kb_pb2.StoredExternalIndexProviderMetadata,
     ) -> None:
-        api_key = decrypt(stored.pinecone_config.encrypted_api_key)
+        api_key = get_endecryptor().decrypt(stored.pinecone_config.encrypted_api_key)
         control_plane = get_pinecone().control_plane(api_key=api_key)
         # Delete all indexes stored in the config and passed as parameters
         for index_metadata in stored.pinecone_config.indexes.values():

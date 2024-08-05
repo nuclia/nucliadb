@@ -439,16 +439,6 @@ def get_endecryptor() -> EndecryptorUtility:
     return util
 
 
-def encrypt(text: str) -> str:
-    util = get_endecryptor()
-    return util.encrypt(text)
-
-
-def decrypt(text: str) -> str:
-    util = get_endecryptor()
-    return util.decrypt(text)
-
-
 def get_pinecone() -> PineconeSession:
     util = get_utility(Utility.PINECONE_SESSION)
     if util is not None:

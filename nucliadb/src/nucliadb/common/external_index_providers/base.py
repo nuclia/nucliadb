@@ -24,6 +24,7 @@ from typing import Any, Iterator, Optional
 
 from pydantic import BaseModel
 
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexingError
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
@@ -156,7 +157,10 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
             },
         )
         with manager_observer({"operation": "index_resource", "provider": self.type.value}):
-            await self._index_resource(resource_uuid, resource_data)
+            try:
+                await self._index_resource(resource_uuid, resource_data)
+            except Exception as ex:
+                raise ExternalIndexingError() from ex
 
     async def query(self, request: SearchRequest) -> QueryResults:
         """

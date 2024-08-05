@@ -24,3 +24,9 @@ class ExternalIndexCreationError(Exception):
         self.provider = provider
         self.message = message
         super().__init__(f"{provider} index creation error: {message}")
+
+
+class ExternalIndexingError(Exception):
+    """
+    Raised when an error occurs while indexing a resource in an external index.
+    """

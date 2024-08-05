@@ -29,7 +29,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     ExternalIndexProviderType,
     StoredExternalIndexProviderMetadata,
 )
-from nucliadb_utils.utilities import decrypt
+from nucliadb_utils.utilities import get_endecryptor
 
 
 async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager]:
@@ -39,7 +39,7 @@ async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager
     metadata = await get_external_index_metadata(kbid)
     if metadata is None or metadata.type != ExternalIndexProviderType.PINECONE:
         return None
-    api_key = decrypt(metadata.pinecone_config.encrypted_api_key)
+    api_key = get_endecryptor().decrypt(metadata.pinecone_config.encrypted_api_key)
     default_vectorset = await get_default_vectorset_id(kbid)
     return PineconeIndexManager(
         kbid=kbid,

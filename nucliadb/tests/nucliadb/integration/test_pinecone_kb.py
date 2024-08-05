@@ -276,7 +276,7 @@ async def test_get_kb(
     )
     assert resp.status_code == 200, resp.text
     config = resp.json()["config"]
-    assert "external_index_provider" not in config
+    assert not config.get("external_index_provider")
     assert config["configured_external_index_provider"]["type"] == "pinecone"
 
 
