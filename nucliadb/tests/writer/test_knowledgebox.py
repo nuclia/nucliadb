@@ -97,7 +97,7 @@ async def test_create_knowledgebox_with_learning_config(
             assert kb.new_unique_kbid.call_count == 1
             assert kb.create.call_args.kwargs["slug"] == "slug"
             assert (
-                kb.create.call_args.kwargs["semantic_model"]
+                kb.create.call_args.kwargs["semantic_models"]["multilingual"]
                 == learning_config.into_semantic_model_metadata()
             )
 
@@ -146,6 +146,6 @@ async def test_create_knowledgebox_with_learning_config_with_matryoshka_dimensio
             assert kb.new_unique_kbid.call_count == 1
             assert kb.create.call_args.kwargs["slug"] == "slug"
             assert (
-                kb.create.call_args.kwargs["semantic_model"]
+                kb.create.call_args.kwargs["semantic_models"]["multilingual"]
                 == learning_config.into_semantic_model_metadata()
             )
