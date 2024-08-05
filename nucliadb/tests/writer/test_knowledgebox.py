@@ -70,12 +70,12 @@ async def test_create_knowledgebox_with_learning_config(
             semantic_matryoshka_dims=[10, 20, 30],
             semantic_model_configs={
                 "multilingual": SemanticConfig(
-                    vector_size=10,
+                    size=10,
                     threshold=-1,
                     similarity=SimilarityFunction.COSINE,
                     matryoshka_dims=[10, 20, 30],
                 )
-            }
+            },
         )
         learning_proxy.set_configuration.return_value = learning_config
 
@@ -118,12 +118,12 @@ async def test_create_knowledgebox_with_learning_config_with_matryoshka_dimensio
             semantic_matryoshka_dims=[10, 20, 30],
             semantic_model_configs={
                 "multilingual": SemanticConfig(
-                    vector_size=10,
+                    size=10,
                     threshold=-1,
                     similarity=SimilarityFunction.COSINE,
                     matryoshka_dims=[10, 20, 30],
                 )
-            }
+            },
         )
         learning_proxy.set_configuration.return_value = learning_config
 

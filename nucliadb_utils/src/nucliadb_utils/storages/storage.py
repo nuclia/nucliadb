@@ -29,7 +29,6 @@ from typing import (
     AsyncIterator,
     List,
     Optional,
-    Tuple,
     Type,
     Union,
     cast,
@@ -495,7 +494,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def create_kb(self, kbid: str) -> bool: ...
 
     @abc.abstractmethod
-    async def delete_kb(self, kbid: str) -> Tuple[bool, bool]: ...
+    async def delete_kb(self, kbid: str) -> tuple[bool, bool]: ...
 
     @abc.abstractmethod
     async def schedule_delete_kb(self, kbid: str) -> bool: ...

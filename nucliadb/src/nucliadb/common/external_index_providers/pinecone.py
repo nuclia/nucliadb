@@ -18,11 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import hashlib
 import json
 import logging
 from copy import deepcopy
 from typing import Any, Iterator, Optional
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -31,17 +31,20 @@ from nucliadb.common.external_index_providers.base import (
     ExternalIndexProviderType,
     QueryResults,
     TextBlockMatch,
+    VectorsetExternalIndex,
 )
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.ids import FieldId, ParagraphId, VectorId
-from nucliadb_protos.knowledgebox_pb2 import PineconeIndexMetadata
+from nucliadb_protos import knowledgebox_pb2 as kb_pb2
+from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, LogicalOperator
-from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError
-from nucliadb_utils.aiopynecone.models import MAX_INDEX_NAME_LENGTH, QueryResponse
+from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError, PineconeAPIError
+from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
-from nucliadb_utils.utilities import get_pinecone
+from nucliadb_utils.utilities import decrypt, encrypt, get_pinecone
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +138,7 @@ class PineconeIndexManager(ExternalIndexManager):
         self,
         kbid: str,
         api_key: str,
-        indexes: dict[str, PineconeIndexMetadata],
+        indexes: dict[str, kb_pb2.PineconeIndexMetadata],
         upsert_parallelism: int = 3,
         delete_parallelism: int = 2,
         upsert_timeout: float = 10.0,
@@ -164,23 +167,97 @@ class PineconeIndexManager(ExternalIndexManager):
         return self.pinecone.data_plane(api_key=self.api_key, index_host=index_host)
 
     @classmethod
-    def get_index_name(cls, kbid: str, vectorset_id: str) -> str:
+    async def create_indexes(
+        cls,
+        kbid: str,
+        request: kb_pb2.CreateExternalIndexProviderMetadata,
+        indexes: list[VectorsetExternalIndex],
+    ) -> kb_pb2.StoredExternalIndexProviderMetadata:
+        created_indexes = []
+        metadata = kb_pb2.StoredExternalIndexProviderMetadata(
+            type=kb_pb2.ExternalIndexProviderType.PINECONE
+        )
+        api_key = request.pinecone_config.api_key
+        metadata.pinecone_config.encrypted_api_key = encrypt(api_key)
+        metadata.pinecone_config.serverless_cloud = request.pinecone_config.serverless_cloud
+        pinecone = get_pinecone().control_plane(api_key=api_key)
+        serverless_cloud = to_pinecone_serverless_cloud_payload(request.pinecone_config.serverless_cloud)
+        for index in indexes:
+            vectorset_id = index.vectorset_id
+            index_name = PineconeIndexManager.get_index_name()
+            index_dimension = index.dimension
+            similarity_metric = to_pinecone_index_metric(index.similarity)
+            logger.info(
+                "Creating pincone index",
+                extra={
+                    "kbid": kbid,
+                    "index_name": index_name,
+                    "similarity": similarity_metric,
+                    "vector_dimension": index_dimension,
+                    "vectorset_id": vectorset_id,
+                    "cloud": serverless_cloud,
+                },
+            )
+            try:
+                index_host = await pinecone.create_index(
+                    name=index_name,
+                    dimension=index_dimension,
+                    metric=similarity_metric,
+                    serverless_cloud=serverless_cloud,
+                )
+                created_indexes.append(index_name)
+            except PineconeAPIError as exc:
+                # Try index creation rollback
+                for index_name in created_indexes:
+                    try:
+                        await pinecone.delete_index(index_name)
+                    except Exception:
+                        logger.exception("Could not rollback created pinecone indexes")
+                        pass
+                raise ExternalIndexCreationError("pinecone", exc.message) from exc
+            metadata.pinecone_config.indexes[vectorset_id].CopyFrom(
+                kb_pb2.PineconeIndexMetadata(
+                    index_name=index_name,
+                    index_host=index_host,
+                    vector_dimension=index.dimension,
+                    similarity=index.similarity,
+                )
+            )
+        return metadata
+
+    @classmethod
+    async def delete_indexes(
+        cls,
+        kbid: str,
+        stored: kb_pb2.StoredExternalIndexProviderMetadata,
+    ) -> None:
+        api_key = decrypt(stored.pinecone_config.encrypted_api_key)
+        control_plane = get_pinecone().control_plane(api_key=api_key)
+        # Delete all indexes stored in the config and passed as parameters
+        for index_metadata in stored.pinecone_config.indexes.values():
+            index_name = index_metadata.index_name
+            try:
+                logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
+                await control_plane.delete_index(name=index_name)
+            except Exception:
+                logger.exception(
+                    "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
+                )
+
+    @classmethod
+    def get_index_name(cls) -> str:
         """
         Index names can't be longer than 45 characters and can only contain
         alphanumeric lowercase characters: https://docs.pinecone.io/troubleshooting/restrictions-on-index-names
 
-        We need to include both the kbid and the vectorset id in the formation
-        of the index name, so we don't create two conflicting Pinecone indexes for
-        the same api_key. So we hash the kbid and the vectorset id to generate a unique index name.
+        We generate a unique id for each pinecone index created.
         `nuclia-` is prepended to easily identify which indexes are created by Nuclia.
 
         Example:
-        >>> get_index_name('7b7887b4-2d78-41c7-a398-586af7d7db8b', 'multilingual-2024-05-08')
-        'nuclia-2fb7ae69c227be190083cb33b32baf8307f30'
+        >>> get_index_name()
+        'nuclia-2d899e8a0af54ac9a5addbd483d02ec9'
         """
-        digest = hashlib.sha256(f"{kbid}-{vectorset_id}".encode()).hexdigest()
-        index_name = f"nuclia-{digest}"[:MAX_INDEX_NAME_LENGTH]
-        return index_name
+        return f"nuclia-{uuid4().hex}"
 
     async def _delete_resource_to_index(self, index_host: str, resource_uuid: str) -> None:
         data_plane = self.get_data_plane(index_host=index_host)
@@ -615,3 +692,37 @@ def iter_paragraphs(resource: Resource) -> Iterator[tuple[str, IndexParagraph]]:
     for _, paragraphs in resource.paragraphs.items():
         for paragraph_id, paragraph in paragraphs.paragraphs.items():
             yield paragraph_id, paragraph
+
+
+def to_pinecone_index_metric(similarity: utils_pb2.VectorSimilarity.ValueType) -> str:
+    return {
+        utils_pb2.VectorSimilarity.COSINE: "cosine",
+        utils_pb2.VectorSimilarity.DOT: "dotproduct",
+    }[similarity]
+
+
+def to_pinecone_serverless_cloud_payload(
+    serverless: kb_pb2.PineconeServerlessCloud.ValueType,
+) -> dict[str, str]:
+    return {
+        kb_pb2.PineconeServerlessCloud.AWS_EU_WEST_1: {
+            "cloud": "aws",
+            "region": "eu-west-1",
+        },
+        kb_pb2.PineconeServerlessCloud.AWS_US_EAST_1: {
+            "cloud": "aws",
+            "region": "us-east-1",
+        },
+        kb_pb2.PineconeServerlessCloud.AWS_US_WEST_2: {
+            "cloud": "aws",
+            "region": "us-west-2",
+        },
+        kb_pb2.PineconeServerlessCloud.AZURE_EASTUS2: {
+            "cloud": "azure",
+            "region": "eastus2",
+        },
+        kb_pb2.PineconeServerlessCloud.GCP_US_CENTRAL1: {
+            "cloud": "gcp",
+            "region": "us-central1",
+        },
+    }[serverless]

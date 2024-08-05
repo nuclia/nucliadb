@@ -19,18 +19,36 @@
 #
 import abc
 import logging
+from dataclasses import dataclass
 from typing import Any, Iterator, Optional
 
 from pydantic import BaseModel
 
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
+from nucliadb_protos.knowledgebox_pb2 import (
+    CreateExternalIndexProviderMetadata,
+    StoredExternalIndexProviderMetadata,
+)
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
 
 manager_observer = Observer("external_index_manager", labels={"operation": "", "provider": ""})
+
+
+@dataclass
+class VectorsetExternalIndex:
+    """
+    Used to indicate to external index managers the required metadata
+    in order to create an external index for each vectorset
+    """
+
+    vectorset_id: str
+    dimension: int
+    similarity: VectorSimilarity.ValueType
 
 
 class TextBlockMatch(BaseModel):
@@ -87,7 +105,24 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
         self.kbid = kbid
 
     @classmethod
-    def get_index_name(cls, kbid: str, vectorset_id: str) -> str:  # pragma: no cover
+    @abc.abstractmethod
+    async def create_indexes(
+        cls,
+        kbid: str,
+        create_request: CreateExternalIndexProviderMetadata,
+        indexes: list[VectorsetExternalIndex],
+    ) -> StoredExternalIndexProviderMetadata: ...
+
+    @classmethod
+    @abc.abstractmethod
+    async def delete_indexes(
+        cls,
+        kbid: str,
+        stored: StoredExternalIndexProviderMetadata,
+    ) -> None: ...
+
+    @classmethod
+    def get_index_name(cls) -> str:  # pragma: no cover
         """
         Returns the name of the index in the external index provider.
         """

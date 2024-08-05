@@ -27,7 +27,6 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
-from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
@@ -43,7 +42,10 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import BrokerMessage, NewKnowledgeBoxV2Request, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.utilities import get_endecryptor
+
+PINECONE_MODULE = "nucliadb.common.external_index_providers.pinecone"
 
 
 @pytest.fixture()
@@ -51,7 +53,7 @@ def data_plane():
     mocked = mock.MagicMock()
     mocked.delete_by_id_prefix = mock.AsyncMock(return_value=None)
     mocked.upsert_in_batches = mock.AsyncMock(return_value=None)
-    mocked.query = mock.AsyncMock(return_value=None)
+    mocked.query = mock.AsyncMock(return_value=QueryResponse(matches=[]))
     return mocked
 
 
@@ -69,10 +71,7 @@ def mock_pinecone_client(data_plane, control_plane):
     session_mock.control_plane.return_value = control_plane
     session_mock.data_plane.return_value = data_plane
     with (
-        unittest.mock.patch("nucliadb.ingest.orm.knowledgebox.get_pinecone", return_value=session_mock),
-        unittest.mock.patch(
-            "nucliadb.common.external_index_providers.pinecone.get_pinecone", return_value=session_mock
-        ),
+        unittest.mock.patch(f"{PINECONE_MODULE}.get_pinecone", return_value=session_mock),
     ):
         yield session_mock
 
@@ -93,66 +92,74 @@ async def test_kb_creation_old(
     This tests the deprecated method for creating kbs on a hosted nucliadb that
     uses the nucliadb_grpc.NewKnowledgeBox method.
     """
-    kbid = str(uuid4())
-    slug = "pinecone-testing-old"
-    config = KnowledgeBoxConfig(
-        title="Pinecone test",
-        slug=slug,
-    )
-    request = KnowledgeBoxNew(
-        forceuuid=kbid,
-        slug=slug,
-        config=config,
-        vector_dimension=128,
-        similarity=VectorSimilarity.DOT,
-        external_index_provider=CreateExternalIndexProviderMetadata(
-            type=ExternalIndexProviderType.PINECONE,
-            pinecone_config=CreatePineconeConfig(
-                api_key="my-pinecone-api-key",
-                serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
+    expected_index_name = "nuclia-someuuid"
+    with mock.patch(
+        f"{PINECONE_MODULE}.PineconeIndexManager.get_index_name", return_value=expected_index_name
+    ):
+        kbid = str(uuid4())
+        slug = "pinecone-testing-old"
+        config = KnowledgeBoxConfig(
+            title="Pinecone test",
+            slug=slug,
+        )
+        request = KnowledgeBoxNew(
+            forceuuid=kbid,
+            slug=slug,
+            config=config,
+            vector_dimension=128,
+            similarity=VectorSimilarity.DOT,
+            external_index_provider=CreateExternalIndexProviderMetadata(
+                type=ExternalIndexProviderType.PINECONE,
+                pinecone_config=CreatePineconeConfig(
+                    api_key="my-pinecone-api-key",
+                    serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
+                ),
             ),
-        ),
-    )
-
-    # Creating a knowledge box should create a Pinecone index
-    response: NewKnowledgeBoxResponse = await nucliadb_grpc.NewKnowledgeBox(request, timeout=None)  # type: ignore
-    assert response.status == KnowledgeBoxResponseStatus.OK
-
-    expected_index_name = PineconeIndexManager.get_index_name(kbid, "default")
-    control_plane.create_index.assert_awaited_once_with(
-        name=expected_index_name,
-        dimension=128,
-        metric="dotproduct",
-        serverless_cloud={"cloud": "aws", "region": "us-east-1"},
-    )
-
-    # Check that external index provider metadata was properly stored
-    async with datamanagers.with_ro_transaction() as txn:
-        external_index_provider = await datamanagers.kb.get_external_index_provider_metadata(
-            txn, kbid=kbid
-        )
-        assert external_index_provider is not None
-        assert external_index_provider.type == ExternalIndexProviderType.PINECONE
-        # Check that the API key was encrypted
-        encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
-        endecryptor = get_endecryptor()
-        decrypted_api_key = endecryptor.decrypt(encrypted_api_key)
-        assert decrypted_api_key == "my-pinecone-api-key"
-
-        # Check that the rest of the config was stored
-        assert (
-            external_index_provider.pinecone_config.indexes[expected_index_name].index_host
-            == "pinecone-host"
-        )
-        assert (
-            external_index_provider.pinecone_config.indexes[expected_index_name].vector_dimension == 128
         )
 
-    # Deleting a knowledge box should delete the Pinecone index
-    response = await nucliadb_grpc.DeleteKnowledgeBox(KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None)  # type: ignore
-    assert response.status == KnowledgeBoxResponseStatus.OK
+        # Creating a knowledge box should create a Pinecone index
+        response: NewKnowledgeBoxResponse = await nucliadb_grpc.NewKnowledgeBox(request, timeout=None)  # type: ignore
+        assert response.status == KnowledgeBoxResponseStatus.OK
 
-    control_plane.delete_index.assert_awaited_once_with(name=expected_index_name)
+        control_plane.create_index.assert_awaited_once_with(
+            name=expected_index_name,
+            dimension=128,
+            metric="dotproduct",
+            serverless_cloud={"cloud": "aws", "region": "us-east-1"},
+        )
+
+        # Check that external index provider metadata was properly stored
+        async with datamanagers.with_ro_transaction() as txn:
+            external_index_provider = await datamanagers.kb.get_external_index_provider_metadata(
+                txn, kbid=kbid
+            )
+            assert external_index_provider is not None
+            assert external_index_provider.type == ExternalIndexProviderType.PINECONE
+            # Check that the API key was encrypted
+            encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
+            endecryptor = get_endecryptor()
+            decrypted_api_key = endecryptor.decrypt(encrypted_api_key)
+            assert decrypted_api_key == "my-pinecone-api-key"
+
+            # Check that the rest of the config was stored
+            vectorset_id = "__default__"
+            assert (
+                external_index_provider.pinecone_config.indexes[vectorset_id].index_name
+                == expected_index_name
+            )
+            assert (
+                external_index_provider.pinecone_config.indexes[vectorset_id].index_host
+                == "pinecone-host"
+            )
+            assert external_index_provider.pinecone_config.indexes[vectorset_id].vector_dimension == 128
+
+        # Deleting a knowledge box should delete the Pinecone index
+        response = await nucliadb_grpc.DeleteKnowledgeBox(
+            KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None
+        )  # type: ignore
+        assert response.status == KnowledgeBoxResponseStatus.OK
+
+        control_plane.delete_index.assert_awaited_once_with(name=expected_index_name)
 
 
 @pytest.mark.asyncio
@@ -165,93 +172,97 @@ async def test_kb_creation_new(
     This tests the new method for creating kbs on a hosted nucliadb that
     uses the nucliadb_grpc.NewKnowledgeBoxV2 method.
     """
-    kbid = str(uuid4())
-    slug = "pinecone-testing-new"
-    request = NewKnowledgeBoxV2Request(
-        kbid=kbid,
-        slug=slug,
-        title="Pinecone test",
-        description="Description",
-        external_index_provider=CreateExternalIndexProviderMetadata(
-            type=ExternalIndexProviderType.PINECONE,
-            pinecone_config=CreatePineconeConfig(
-                api_key="my-pinecone-api-key",
-                serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
+    expected_index_names = ["nuclia-someuuid1", "nuclia-someuuid2"]
+    with mock.patch(
+        f"{PINECONE_MODULE}.PineconeIndexManager.get_index_name", side_effect=expected_index_names
+    ):
+        kbid = str(uuid4())
+        slug = "pinecone-testing-new"
+        request = NewKnowledgeBoxV2Request(
+            kbid=kbid,
+            slug=slug,
+            title="Pinecone test",
+            description="Description",
+            external_index_provider=CreateExternalIndexProviderMetadata(
+                type=ExternalIndexProviderType.PINECONE,
+                pinecone_config=CreatePineconeConfig(
+                    api_key="my-pinecone-api-key",
+                    serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
+                ),
             ),
-        ),
-    )
-    vectorset_1_id = "multilingual-2024-01-01"
-    request.vectorsets.append(
-        NewKnowledgeBoxV2Request.VectorSet(
-            vectorset_id=vectorset_1_id,
-            similarity=VectorSimilarity.DOT,
-            vector_dimension=128,
         )
-    )
-    vectorset_2_id = "english-2022-01-01"
-    request.vectorsets.append(
-        NewKnowledgeBoxV2Request.VectorSet(
-            vectorset_id=vectorset_2_id,
-            similarity=VectorSimilarity.COSINE,
-            vector_dimension=3,
+        multilingual = "multilingual-2024-01-01"
+        request.vectorsets.append(
+            NewKnowledgeBoxV2Request.VectorSet(
+                vectorset_id=multilingual,
+                similarity=VectorSimilarity.DOT,
+                vector_dimension=128,
+            )
         )
-    )
-
-    # Creating a knowledge with 2 vectorsets box should create two Pinecone indexes
-    response: NewKnowledgeBoxResponse = await nucliadb_grpc.NewKnowledgeBoxV2(request, timeout=None)  # type: ignore
-    assert response.status == KnowledgeBoxResponseStatus.OK
-
-    # Should create an index for every vectorset
-    expected_index_names = [
-        PineconeIndexManager.get_index_name(kbid, vectorset_1_id),
-        PineconeIndexManager.get_index_name(kbid, vectorset_2_id),
-    ]
-    control_plane.create_index.assert_has_calls(
-        [
-            call(
-                name=expected_index_names[0],
-                dimension=128,
-                metric="dotproduct",
-                serverless_cloud={"cloud": "aws", "region": "us-east-1"},
-            ),
-            call(
-                name=expected_index_names[1],
-                dimension=3,
-                metric="cosine",
-                serverless_cloud={"cloud": "aws", "region": "us-east-1"},
-            ),
-        ]
-    )
-
-    # Check that external index provider metadata was properly stored
-    async with datamanagers.with_ro_transaction() as txn:
-        external_index_provider = await datamanagers.kb.get_external_index_provider_metadata(
-            txn, kbid=kbid
+        english = "english-2022-01-01"
+        request.vectorsets.append(
+            NewKnowledgeBoxV2Request.VectorSet(
+                vectorset_id=english,
+                similarity=VectorSimilarity.COSINE,
+                vector_dimension=3,
+            )
         )
-        assert external_index_provider is not None
-        assert external_index_provider.type == ExternalIndexProviderType.PINECONE
-        # Check that the API key was encrypted
-        encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
-        endecryptor = get_endecryptor()
-        decrypted_api_key = endecryptor.decrypt(encrypted_api_key)
-        assert decrypted_api_key == "my-pinecone-api-key"
 
-        # Check that the rest of the config was stored
-        pinecone_config = external_index_provider.pinecone_config
-        assert pinecone_config.indexes[expected_index_names[0]].index_host == "pinecone-host"
-        assert pinecone_config.indexes[expected_index_names[0]].vector_dimension == 128
-        assert pinecone_config.indexes[expected_index_names[1]].index_host == "pinecone-host"
-        assert pinecone_config.indexes[expected_index_names[1]].vector_dimension == 3
+        # Creating a knowledge with 2 vectorsets box should create two Pinecone indexes
+        response: NewKnowledgeBoxResponse = await nucliadb_grpc.NewKnowledgeBoxV2(request, timeout=None)  # type: ignore
+        assert response.status == KnowledgeBoxResponseStatus.OK
 
-    # Deleting a knowledge box should delete the Pinecone index
-    response = await nucliadb_grpc.DeleteKnowledgeBox(KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None)  # type: ignore
-    assert response.status == KnowledgeBoxResponseStatus.OK
+        # Should create an index for every vectorset
+        control_plane.create_index.assert_has_calls(
+            [
+                call(
+                    name=expected_index_names[0],
+                    dimension=128,
+                    metric="dotproduct",
+                    serverless_cloud={"cloud": "aws", "region": "us-east-1"},
+                ),
+                call(
+                    name=expected_index_names[1],
+                    dimension=3,
+                    metric="cosine",
+                    serverless_cloud={"cloud": "aws", "region": "us-east-1"},
+                ),
+            ]
+        )
 
-    # Test that deletes all external indexes
-    deleted_index_names = set()
-    deleted_index_names.add(control_plane.delete_index.call_args_list[0][1]["name"])
-    deleted_index_names.add(control_plane.delete_index.call_args_list[1][1]["name"])
-    assert deleted_index_names == set(expected_index_names)
+        # Check that external index provider metadata was properly stored
+        async with datamanagers.with_ro_transaction() as txn:
+            external_index_provider = await datamanagers.kb.get_external_index_provider_metadata(
+                txn, kbid=kbid
+            )
+            assert external_index_provider is not None
+            assert external_index_provider.type == ExternalIndexProviderType.PINECONE
+            # Check that the API key was encrypted
+            encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
+            endecryptor = get_endecryptor()
+            decrypted_api_key = endecryptor.decrypt(encrypted_api_key)
+            assert decrypted_api_key == "my-pinecone-api-key"
+
+            # Check that the rest of the config was stored
+            pinecone_config = external_index_provider.pinecone_config
+            assert pinecone_config.indexes[multilingual].index_name == expected_index_names[0]
+            assert pinecone_config.indexes[multilingual].index_host == "pinecone-host"
+            assert pinecone_config.indexes[multilingual].vector_dimension == 128
+            assert pinecone_config.indexes[english].index_name == expected_index_names[1]
+            assert pinecone_config.indexes[english].index_host == "pinecone-host"
+            assert pinecone_config.indexes[english].vector_dimension == 3
+
+        # Deleting a knowledge box should delete the Pinecone index
+        response = await nucliadb_grpc.DeleteKnowledgeBox(
+            KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None
+        )  # type: ignore
+        assert response.status == KnowledgeBoxResponseStatus.OK
+
+        # Test that deletes all external indexes
+        deleted_index_names = set()
+        deleted_index_names.add(control_plane.delete_index.call_args_list[0][1]["name"])
+        deleted_index_names.add(control_plane.delete_index.call_args_list[1][1]["name"])
+        assert deleted_index_names == set(expected_index_names)
 
 
 async def test_find_on_pinecone_kb(
@@ -265,7 +276,7 @@ async def test_find_on_pinecone_kb(
         f"/kb/{kbid}/find",
         json={"query": "own text"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
 
 
 async def test_ingestion_on_pinecone_kb(

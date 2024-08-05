@@ -263,28 +263,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
-    async def test_NewKnowledgeBox_handle_external_index_error(
-        self, writer: WriterServicer, knowledgebox_class
-    ):
-        request = writer_pb2.KnowledgeBoxNew(slug="slug")
-        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
-
-        resp = await writer.NewKnowledgeBox(request)
-
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
-        assert resp.error_message == "foo"
-
-    async def test_NewKnowledgeBoxV2_handle_external_index_error(
-        self, writer: WriterServicer, knowledgebox_class
-    ):
-        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
-        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
-
-        resp = await writer.NewKnowledgeBoxV2(request)
-
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
-        assert resp.error_message == "foo"
-
     async def test_UpdateKnowledgeBox(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
         knowledgebox_class.update.return_value = "kbid"
@@ -590,3 +568,25 @@ class TestWriterServicer:
             txn.commit.assert_called_once()
 
             assert isinstance(resp, writer_pb2.IndexStatus)
+
+    async def test_NewKnowledgeBox_handle_external_index_error(
+        self, writer: WriterServicer, knowledgebox_class
+    ):
+        request = writer_pb2.KnowledgeBoxNew(slug="slug")
+        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
+
+        resp = await writer.NewKnowledgeBox(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
+        assert resp.error_message == "foo"
+
+    async def test_NewKnowledgeBoxV2_handle_external_index_error(
+        self, writer: WriterServicer, knowledgebox_class
+    ):
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
+        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
+
+        resp = await writer.NewKnowledgeBoxV2(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
+        assert resp.error_message == "foo"
