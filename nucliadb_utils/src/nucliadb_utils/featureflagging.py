@@ -77,6 +77,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
+    const.Features.SKIP_EXTERNAL_INDEX: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
 }
 
 

@@ -127,6 +127,12 @@ class KnowledgeBoxConfig(BaseModel):
         description="External index provider for the Knowledge Box.",
     )
 
+    configured_external_index_provider: Optional[dict[str, Any]] = Field(
+        default=None,
+        title="Configured External Index Provider",
+        description="Metadata for the configured external index provider (if any)",
+    )
+
     similarity: Optional[VectorSimilarity] = Field(
         default=None,
         description="This field is deprecated. Use 'learning_configuration' instead.",
@@ -152,7 +158,11 @@ class KnowledgeBoxConfig(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-        as_dict["external_index_provider"] = None
+        # Calculate external index provider metadata
+        # that is shown on read requests
+        eip = as_dict.pop("external_index_provider", None)
+        if eip:
+            as_dict["configured_external_index_provider"] = {"type": eip["type"].lower()}
         return cls(**as_dict)
 
 

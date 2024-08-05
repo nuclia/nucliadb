@@ -37,6 +37,7 @@ from nucliadb_utils.aiopynecone.exceptions import (
 from nucliadb_utils.aiopynecone.models import (
     CreateIndexRequest,
     CreateIndexResponse,
+    IndexStats,
     ListResponse,
     QueryResponse,
     UpsertRequest,
@@ -64,6 +65,7 @@ BASE_API_HEADERS = {
     # are coming from the Nuclia integration:
     # https://docs.pinecone.io/integrations/build-integration/attribute-usage-to-your-integration
     "User-Agent": "source_tag=nuclia",
+    "X-Pinecone-API-Version": "2024-10",
 }
 MEGA_BYTE = 1024 * 1024
 MAX_UPSERT_PAYLOAD_SIZE = 2 * MEGA_BYTE
@@ -75,6 +77,7 @@ RETRIABLE_EXCEPTIONS = (
     PineconeRateLimitError,
     httpx.ConnectError,
     httpx.NetworkError,
+    httpx.WriteTimeout,
 )
 
 
@@ -158,6 +161,25 @@ class DataPlane:
 
     def _get_request_timeout(self, timeout: Optional[float] = None) -> Optional[float]:
         return timeout or self.client_timeout
+
+    @pinecone_observer.wrap({"type": "stats"})
+    async def stats(self, filter: Optional[dict[str, Any]] = None) -> IndexStats:
+        """
+        Get the index stats.
+        Params:
+        - `filter`: to filter the stats by their metadata. See:
+        https://docs.pinecone.io/reference/api/2024-07/data-plane/describeindexstats
+        """
+        post_kwargs: dict[str, Any] = {
+            "headers": {"Api-Key": self.api_key},
+        }
+        if filter is not None:
+            post_kwargs["json"] = {
+                "filter": filter,
+            }
+        response = await self.http_session.post("/describe_index_stats", **post_kwargs)
+        raise_for_status("stats", response)
+        return IndexStats.model_validate(response.json())
 
     @backoff.on_exception(
         backoff.expo,

@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.learning_proxy import LearningConfiguration
+from nucliadb.learning_proxy import LearningConfiguration, SemanticConfig, SimilarityFunction
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
 from nucliadb_protos import resources_pb2 as rpb
@@ -61,6 +61,13 @@ async def test_kb_creation_allows_setting_learning_configuration(
             semantic_model="english",
             semantic_vector_similarity="cosine",
             semantic_vector_size=384,
+            semantic_model_configs={
+                "english": SemanticConfig(
+                    similarity=SimilarityFunction.COSINE,
+                    size=384,
+                    threshold=0.7,
+                )
+            },
         )
 
         # Check that we can define it to a different semantic model
@@ -76,7 +83,7 @@ async def test_kb_creation_allows_setting_learning_configuration(
         kbid = resp.json()["uuid"]
 
         learning_proxy.set_configuration.assert_called_once_with(
-            kbid, config={"semantic_model": "english"}
+            kbid, config={"semantic_models": ["english"]}
         )
 
 

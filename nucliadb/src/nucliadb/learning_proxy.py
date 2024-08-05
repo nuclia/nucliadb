@@ -22,7 +22,7 @@ import json
 import logging
 import os
 from collections.abc import AsyncIterator
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Any, Optional, Union
 
 import backoff
@@ -56,6 +56,32 @@ class LearningService(Enum):
     COLLECTOR = "collector-api"
 
 
+class SimilarityFunction(IntEnum):
+    # Keep this in sync with learning config repo
+    # It's an IntEnum to match the protobuf definition
+    DOT = 0
+    COSINE = 1
+
+
+class SemanticConfig(BaseModel):
+    # Keep this in sync with learning config repo
+    similarity: SimilarityFunction
+    size: int
+    threshold: float
+    matryoshka_dims: list[int] = []
+
+    def into_semantic_model_metadata(self) -> knowledgebox_pb2.SemanticModelMetadata:
+        semantic_model = knowledgebox_pb2.SemanticModelMetadata()
+        LEARNING_SIMILARITY_FUNCTION_TO_PROTO = {
+            SimilarityFunction.COSINE: utils_pb2.VectorSimilarity.COSINE,
+            SimilarityFunction.DOT: utils_pb2.VectorSimilarity.DOT,
+        }
+        semantic_model.similarity_function = LEARNING_SIMILARITY_FUNCTION_TO_PROTO[self.similarity]
+        semantic_model.vector_dimension = self.size
+        semantic_model.matryoshka_dimensions.extend(self.matryoshka_dims)
+        return semantic_model
+
+
 # Subset of learning configuration of nucliadb's interest. Look at
 # learning_config models for more fields
 class LearningConfiguration(BaseModel):
@@ -72,6 +98,9 @@ class LearningConfiguration(BaseModel):
         default=None, alias="semantic_matryoshka_dims"
     )
 
+    # This is where the config for each semantic model (aka vectorsets) is returned
+    semantic_model_configs: dict[str, SemanticConfig] = Field(default={})
+
     @model_validator(mode="after")
     def validate_matryoshka_and_vector_dimension_consistency(self) -> Self:
         vector_size = self.semantic_vector_size
@@ -83,6 +112,12 @@ class LearningConfiguration(BaseModel):
         ):
             raise ValueError("Semantic vector size is inconsistent with matryoshka dimensions")
         return self
+
+    def into_semantic_models_metadata(self) -> dict[str, knowledgebox_pb2.SemanticModelMetadata]:
+        result = {}
+        for model_name, config in self.semantic_model_configs.items():
+            result[model_name] = config.into_semantic_model_metadata()
+        return result
 
     def into_semantic_model_metadata(self) -> knowledgebox_pb2.SemanticModelMetadata:
         semantic_model = knowledgebox_pb2.SemanticModelMetadata()
@@ -339,14 +374,21 @@ class DummyClient(httpx.AsyncClient):
         return self._handle_request("DELETE", *args, **kwargs)
 
     def get_config(self, *args: Any, **kwargs: Any):
+        size = 768 if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21" else 512
         lconfig = LearningConfiguration(
             semantic_model="multilingual",
             semantic_vector_similarity="cosine",
-            semantic_vector_size=(
-                768 if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21" else 512
-            ),
+            semantic_vector_size=size,
             semantic_threshold=None,
             semantic_matryoshka_dims=[],
+            semantic_model_configs={
+                "multilingual": SemanticConfig(
+                    similarity=SimilarityFunction.COSINE,
+                    size=size,
+                    threshold=0,
+                    matryoshka_dims=[],
+                )
+            },
         )
         return self._response(content=lconfig.model_dump())
 

@@ -20,7 +20,7 @@
 
 import uuid
 from dataclasses import dataclass
-from typing import AsyncIterable
+from typing import AsyncIterable, Optional
 
 import pytest
 from httpx import AsyncClient
@@ -33,7 +33,7 @@ from tests.utils import inject_message
 @dataclass
 class KbSpecs:
     kbid: str
-    default_vector_dimension: int
+    default_vector_dimension: Optional[int]
     vectorset_id: str
     vectorset_dimension: int
 
@@ -45,23 +45,20 @@ async def kb_with_vectorset(
     nucliadb_grpc: WriterStub,
     knowledgebox: str,
 ) -> AsyncIterable[KbSpecs]:
+    # Now knowledgeboxes in standalone are already created with a single vectorset.
+    # By default it's the multilingual one (see mock predict implementation).
     kbid = knowledgebox
-    vectorset_id = "my-vectorset"
-    default_vector_dimension = 512
-    vectorset_dimension = 324
-
-    await create_vectorset(nucliadb_grpc, kbid, vectorset_id, vectorset_dimension=vectorset_dimension)
+    vectorset_id = "multilingual"
+    vectorset_dimension = 512
     await inject_broker_message_with_vectorset_data(
         nucliadb_grpc,
         kbid,
         vectorset_id,
-        default_vector_dimension=default_vector_dimension,
         vectorset_dimension=vectorset_dimension,
     )
-
     yield KbSpecs(
         kbid=kbid,
-        default_vector_dimension=default_vector_dimension,
+        default_vector_dimension=None,
         vectorset_id=vectorset_id,
         vectorset_dimension=vectorset_dimension,
     )
@@ -85,7 +82,7 @@ async def inject_broker_message_with_vectorset_data(
     kbid: str,
     vectorset_id: str,
     *,
-    default_vector_dimension: int,
+    default_vector_dimension: Optional[int] = None,
     vectorset_dimension: int,
 ):
     from tests.ingest.integration.ingest.test_vectorsets import (

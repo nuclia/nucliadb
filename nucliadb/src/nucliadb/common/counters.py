@@ -18,15 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
-class ExternalIndexCreationError(Exception):
-    def __init__(self, provider: str, message: str):
-        self.provider = provider
-        self.message = message
-        super().__init__(f"{provider} index creation error: {message}")
+from dataclasses import dataclass
 
 
-class ExternalIndexingError(Exception):
-    """
-    Raised when an error occurs while indexing a resource in an external index.
-    """
+@dataclass
+class IndexCounts:
+    fields: int
+    paragraphs: int
+    sentences: int

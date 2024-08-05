@@ -652,7 +652,7 @@ class GCSStorage(Storage):
         return deleted
 
     @storage_ops_observer.wrap({"type": "delete"})
-    async def delete_kb(self, kbid: str):
+    async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         if self.session is None:
             raise AttributeError()
         bucket_name = self.get_bucket_name(kbid)

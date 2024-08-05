@@ -22,24 +22,31 @@ import json
 import logging
 from copy import deepcopy
 from typing import Any, Iterator, Optional
+from uuid import uuid4
 
+from cachetools import TTLCache
 from pydantic import BaseModel
 
+from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.base import (
     ExternalIndexManager,
     ExternalIndexProviderType,
     QueryResults,
     TextBlockMatch,
+    VectorsetExternalIndex,
 )
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb_protos import knowledgebox_pb2 as kb_pb2
+from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, LogicalOperator
-from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError
-from nucliadb_utils.aiopynecone.models import MAX_INDEX_NAME_LENGTH, QueryResponse
+from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError, PineconeAPIError
+from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
-from nucliadb_utils.utilities import get_pinecone
+from nucliadb_utils.utilities import get_endecryptor, get_pinecone
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +60,9 @@ DISCARDED_LABEL_PREFIXES = [
     # Processing status labels are only needed for the catalog endpoint.
     "/n/s",
 ]
+
+# To avoid querying the Pinecone API for the same index stats multiple times in a short period of time
+COUNTERS_CACHE = TTLCache(maxsize=1024, ttl=60)  # type: ignore
 
 
 class PineconeQueryResults(QueryResults):
@@ -133,56 +143,129 @@ class PineconeIndexManager(ExternalIndexManager):
         self,
         kbid: str,
         api_key: str,
-        index_hosts: dict[str, str],
+        indexes: dict[str, kb_pb2.PineconeIndexMetadata],
         upsert_parallelism: int = 3,
         delete_parallelism: int = 2,
         upsert_timeout: float = 10.0,
         delete_timeout: float = 10.0,
         query_timeout: float = 10.0,
+        default_vectorset: Optional[str] = None,
     ):
         super().__init__(kbid=kbid)
         assert api_key != ""
         self.api_key = api_key
-        assert index_hosts != {}
-        self.index_hosts = index_hosts
+        self.index_hosts = {
+            vectorset_id: index_metadata.index_host for vectorset_id, index_metadata in indexes.items()
+        }
+        self.index_names = {
+            vectorset_id: index_metadata.index_name for vectorset_id, index_metadata in indexes.items()
+        }
         self.pinecone = get_pinecone()
         self.upsert_parallelism = upsert_parallelism
         self.delete_parallelism = delete_parallelism
         self.upsert_timeout = upsert_timeout
         self.delete_timeout = delete_timeout
         self.query_timeout = query_timeout
+        self.default_vectorset = default_vectorset
 
-    def get_data_plane(self, index_name: str) -> DataPlane:
-        try:
-            index_host = self.index_hosts[index_name]
-        except KeyError:
-            raise IndexHostNotFound(index_name)
+    def get_data_plane(self, index_host: str) -> DataPlane:
         return self.pinecone.data_plane(api_key=self.api_key, index_host=index_host)
 
     @classmethod
-    def get_index_name(cls, kbid: str, vectorset_id: str) -> str:
+    async def create_indexes(
+        cls,
+        kbid: str,
+        request: kb_pb2.CreateExternalIndexProviderMetadata,
+        indexes: list[VectorsetExternalIndex],
+    ) -> kb_pb2.StoredExternalIndexProviderMetadata:
+        created_indexes = []
+        metadata = kb_pb2.StoredExternalIndexProviderMetadata(
+            type=kb_pb2.ExternalIndexProviderType.PINECONE
+        )
+        api_key = request.pinecone_config.api_key
+        metadata.pinecone_config.encrypted_api_key = get_endecryptor().encrypt(api_key)
+        metadata.pinecone_config.serverless_cloud = request.pinecone_config.serverless_cloud
+        pinecone = get_pinecone().control_plane(api_key=api_key)
+        serverless_cloud = to_pinecone_serverless_cloud_payload(request.pinecone_config.serverless_cloud)
+        for index in indexes:
+            vectorset_id = index.vectorset_id
+            index_name = PineconeIndexManager.get_index_name()
+            index_dimension = index.dimension
+            similarity_metric = to_pinecone_index_metric(index.similarity)
+            logger.info(
+                "Creating pincone index",
+                extra={
+                    "kbid": kbid,
+                    "index_name": index_name,
+                    "similarity": similarity_metric,
+                    "vector_dimension": index_dimension,
+                    "vectorset_id": vectorset_id,
+                    "cloud": serverless_cloud,
+                },
+            )
+            try:
+                index_host = await pinecone.create_index(
+                    name=index_name,
+                    dimension=index_dimension,
+                    metric=similarity_metric,
+                    serverless_cloud=serverless_cloud,
+                )
+                created_indexes.append(index_name)
+            except PineconeAPIError as exc:
+                # Try index creation rollback
+                for index_name in created_indexes:
+                    try:
+                        await pinecone.delete_index(index_name)
+                    except Exception:
+                        logger.exception("Could not rollback created pinecone indexes")
+                        pass
+                raise ExternalIndexCreationError("pinecone", exc.message) from exc
+            metadata.pinecone_config.indexes[vectorset_id].CopyFrom(
+                kb_pb2.PineconeIndexMetadata(
+                    index_name=index_name,
+                    index_host=index_host,
+                    vector_dimension=index.dimension,
+                    similarity=index.similarity,
+                )
+            )
+        return metadata
+
+    @classmethod
+    async def delete_indexes(
+        cls,
+        kbid: str,
+        stored: kb_pb2.StoredExternalIndexProviderMetadata,
+    ) -> None:
+        api_key = get_endecryptor().decrypt(stored.pinecone_config.encrypted_api_key)
+        control_plane = get_pinecone().control_plane(api_key=api_key)
+        # Delete all indexes stored in the config and passed as parameters
+        for index_metadata in stored.pinecone_config.indexes.values():
+            index_name = index_metadata.index_name
+            try:
+                logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
+                await control_plane.delete_index(name=index_name)
+            except Exception:
+                logger.exception(
+                    "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
+                )
+
+    @classmethod
+    def get_index_name(cls) -> str:
         """
         Index names can't be longer than 45 characters and can only contain
         alphanumeric lowercase characters: https://docs.pinecone.io/troubleshooting/restrictions-on-index-names
 
-        We need to include both the kbid and the vectorset id in the index name,
-        so we don't create two conflicting Pinecone indexes for the same api_key.
+        We generate a unique id for each pinecone index created.
+        `nuclia-` is prepended to easily identify which indexes are created by Nuclia.
 
-        Take the two left-most parts from the kbid and prepend it the vectorset_id.
         Example:
-        >>> get_index_name('7b7887b4-2d78-41c7-a398-586af7d7db8b', 'multilingual-2024-05-08')
-        'multilingual-2024-05-08--7b7887b4-2d78'
+        >>> get_index_name()
+        'nuclia-2d899e8a0af54ac9a5addbd483d02ec9'
         """
-        kbid_part = "-".join(kbid.split("-")[:2])
-        index_name = f"{vectorset_id}--{kbid_part}"
-        index_name = index_name.lower()
-        index_name = index_name.replace("_", "-")
-        if len(index_name) > MAX_INDEX_NAME_LENGTH:
-            raise ValueError("Index name is too large!")
-        return index_name
+        return f"nuclia-{uuid4().hex}"
 
-    async def _delete_resource_to_index(self, index_name: str, resource_uuid: str) -> None:
-        data_plane = self.get_data_plane(index_name)
+    async def _delete_resource_to_index(self, index_host: str, resource_uuid: str) -> None:
+        data_plane = self.get_data_plane(index_host=index_host)
         with manager_observer({"operation": "delete_by_resource_prefix"}):
             await data_plane.delete_by_id_prefix(
                 id_prefix=resource_uuid,
@@ -195,11 +278,11 @@ class PineconeIndexManager(ExternalIndexManager):
         Deletes by resource uuid on all indexes in parallel.
         """
         delete_tasks = []
-        for index_name in self.index_hosts:
+        for index_host in self.index_hosts.values():
             delete_tasks.append(
                 asyncio.create_task(
                     self._delete_resource_to_index(
-                        index_name=index_name,
+                        index_host=index_host,
                         resource_uuid=resource_uuid,
                     )
                 )
@@ -209,13 +292,16 @@ class PineconeIndexManager(ExternalIndexManager):
 
     def get_vectorsets_in_resource(self, index_data: Resource) -> set[str]:
         vectorsets: set[str] = set()
-        for _, paragraphs in index_data.paragraphs.items():
-            for _, paragraph in paragraphs.paragraphs.items():
-                if paragraph.sentences:
-                    vectorsets.add("default")
-                for vectorset_id, vectorsets_sentences in paragraph.vectorsets_sentences.items():
-                    if vectorsets_sentences.sentences:
-                        vectorsets.add(vectorset_id)
+        for _, paragraph in iter_paragraphs(index_data):
+            if not paragraph.sentences and not paragraph.vectorsets_sentences:
+                continue
+            if paragraph.sentences and self.default_vectorset:
+                vectorsets.add(self.default_vectorset)
+            for vectorset_id, vectorsets_sentences in paragraph.vectorsets_sentences.items():
+                if vectorsets_sentences.sentences:
+                    vectorsets.add(vectorset_id)
+            # Once we have found at least one paragraph with vectors, we can stop iterating
+            return vectorsets
         return vectorsets
 
     def get_prefixes_to_delete(self, index_data: Resource) -> set[str]:
@@ -294,17 +380,17 @@ class PineconeIndexManager(ExternalIndexManager):
     async def _upsert_to_vectorset_index(self, vectorset_id: str, vectors: list[PineconeVector]) -> None:
         if len(vectors) == 0:  # pragma: no cover
             return
-        index_name = self.get_index_name(self.kbid, vectorset_id)
         try:
-            data_plane = self.get_data_plane(index_name)
-        except IndexHostNotFound:  # pragma: no cover
+            index_host = self.index_hosts[vectorset_id]
+            data_plane = self.get_data_plane(index_host=index_host)
+        except KeyError:
             logger.error(
-                "Data to index for index which host could not be found",
+                "Pinecone index not found for vectorset. Data could not be indexed.",
                 extra={
                     "kbid": self.kbid,
                     "provider": self.type.value,
                     "vectorset_id": vectorset_id,
-                    "index_name": index_name,
+                    "index_names": self.index_names,
                     "index_hosts": self.index_hosts,
                 },
             )
@@ -321,8 +407,8 @@ class PineconeIndexManager(ExternalIndexManager):
     ) -> None:
         if len(prefixes_to_delete) == 0:  # pragma: no cover
             return
-        index_name = self.get_index_name(self.kbid, vectorset_id)
-        data_plane = self.get_data_plane(index_name)
+        index_host = self.index_hosts[vectorset_id]
+        data_plane = self.get_data_plane(index_host=index_host)
         with manager_observer({"operation": "delete_by_prefix"}):
             for prefix in prefixes_to_delete:
                 await data_plane.delete_by_id_prefix(
@@ -355,7 +441,10 @@ class PineconeIndexManager(ExternalIndexManager):
             field_labels = set(text_info.labels)
             field_paragraphs = index_data.paragraphs.get(field_id)
             if field_paragraphs is None:
-                logger.warning(f"Paragraphs not found for field {field_id}")
+                logger.info(
+                    "Paragraphs not found for field",
+                    extra={"kbid": self.kbid, "rid": resource_uuid, "field_id": field_id},
+                )
                 continue
 
             paragraph: IndexParagraph
@@ -385,69 +474,66 @@ class PineconeIndexManager(ExternalIndexManager):
         self, index_data: Resource, base_vector_metadatas: dict[str, VectorMetadata]
     ) -> dict[str, list[PineconeVector]]:
         vectorset_vectors: dict[str, list[PineconeVector]] = {}
-        for _, index_paragraphs in index_data.paragraphs.items():
-            for index_paragraph_id, index_paragraph in index_paragraphs.paragraphs.items():
-                # We must compute the vectors for each vectorset present the paragraph.
-                vectorset_iterators = []
-                if index_paragraph.sentences:
-                    vectorset_iterators.append(("default", index_paragraph.sentences.items()))
-                for vectorset_id, vector_sentences in index_paragraph.vectorsets_sentences.items():
-                    if vector_sentences.sentences:
-                        vectorset_iterators.append((vectorset_id, vector_sentences.sentences.items()))
+        for index_paragraph_id, index_paragraph in iter_paragraphs(index_data):
+            # We must compute the vectors for each vectorset present the paragraph.
+            vectorset_iterators = {}
+            if index_paragraph.sentences and self.default_vectorset:
+                vectorset_iterators[self.default_vectorset] = index_paragraph.sentences.items()
+            for vectorset_id, vector_sentences in index_paragraph.vectorsets_sentences.items():
+                if vector_sentences.sentences:
+                    vectorset_iterators[vectorset_id] = vector_sentences.sentences.items()
 
-                vector_sentence: VectorSentence
-                for vectorset_id, sentences_iterator in vectorset_iterators:
-                    for sentence_id, vector_sentence in sentences_iterator:
-                        vector_metadata_to_copy = base_vector_metadatas.get(index_paragraph_id)
-                        if vector_metadata_to_copy is None:
-                            logger.warning(
-                                f"Metadata not found for sentences of paragraph {index_paragraph_id}"
-                            )
-                            continue
-                        # Copy the initial metadata collected at paragraph parsing in case
-                        # the metadata is different for each vectorset
-                        vector_metadata = deepcopy(vector_metadata_to_copy)
+            vector_sentence: VectorSentence
+            for vectorset_id, sentences_iterator in vectorset_iterators.items():
+                for sentence_id, vector_sentence in sentences_iterator:
+                    vector_metadata_to_copy = base_vector_metadatas.get(index_paragraph_id)
+                    if vector_metadata_to_copy is None:
+                        logger.warning(
+                            f"Metadata not found for sentences of paragraph {index_paragraph_id}"
+                        )
+                        continue
+                    # Copy the initial metadata collected at paragraph parsing in case
+                    # the metadata is different for each vectorset
+                    vector_metadata = deepcopy(vector_metadata_to_copy)
 
-                        # AI-tables metadata
-                        if vector_sentence.metadata.page_with_visual:
-                            vector_metadata.page_with_visual = True
-                        if vector_sentence.metadata.representation.is_a_table:
-                            vector_metadata.is_a_table = True
-                        if vector_sentence.metadata.representation.file:
-                            vector_metadata.representation_file = (
-                                vector_sentence.metadata.representation.file
-                            )
+                    # AI-tables metadata
+                    if vector_sentence.metadata.page_with_visual:
+                        vector_metadata.page_with_visual = True
+                    if vector_sentence.metadata.representation.is_a_table:
+                        vector_metadata.is_a_table = True
+                    if vector_sentence.metadata.representation.file:
+                        vector_metadata.representation_file = (
+                            vector_sentence.metadata.representation.file
+                        )
 
-                        # Video positions
-                        if len(vector_sentence.metadata.position.start_seconds):
-                            vector_metadata.position_start_seconds = list(
-                                map(str, vector_sentence.metadata.position.start_seconds)
-                            )
-                        if len(vector_sentence.metadata.position.end_seconds):
-                            vector_metadata.position_end_seconds = list(
-                                map(str, vector_sentence.metadata.position.end_seconds)
-                            )
-                        vector_metadata.page_number = vector_sentence.metadata.position.page_number
-                        try:
-                            pc_vector = PineconeVector(
-                                id=sentence_id,
-                                values=list(vector_sentence.vector),
-                                metadata=vector_metadata.model_dump(exclude_none=True),
-                            )
-                        except MetadataTooLargeError as exc:  # pragma: no cover
-                            logger.error(
-                                f"Invalid Pinecone vector. Metadata is too large. Skipping: {exc}"
-                            )
-                            continue
+                    # Video positions
+                    if len(vector_sentence.metadata.position.start_seconds):
+                        vector_metadata.position_start_seconds = list(
+                            map(str, vector_sentence.metadata.position.start_seconds)
+                        )
+                    if len(vector_sentence.metadata.position.end_seconds):
+                        vector_metadata.position_end_seconds = list(
+                            map(str, vector_sentence.metadata.position.end_seconds)
+                        )
+                    vector_metadata.page_number = vector_sentence.metadata.position.page_number
+                    try:
+                        pc_vector = PineconeVector(
+                            id=sentence_id,
+                            values=list(vector_sentence.vector),
+                            metadata=vector_metadata.model_dump(exclude_none=True),
+                        )
+                    except MetadataTooLargeError as exc:  # pragma: no cover
+                        logger.error(f"Invalid Pinecone vector. Metadata is too large. Skipping: {exc}")
+                        continue
 
-                        vectors = vectorset_vectors.setdefault(vectorset_id, [])
-                        vectors.append(pc_vector)
+                    vectors = vectorset_vectors.setdefault(vectorset_id, [])
+                    vectors.append(pc_vector)
         return vectorset_vectors
 
     async def _query(self, request: SearchRequest) -> PineconeQueryResults:
-        vectorset_id = request.vectorset or "default"
-        index_name = self.get_index_name(self.kbid, vectorset_id)
-        data_plane = self.get_data_plane(index_name)
+        vectorset_id = request.vectorset or self.default_vectorset or "__default__"
+        index_host = self.index_hosts[vectorset_id]
+        data_plane = self.get_data_plane(index_host=index_host)
         filter = convert_to_pinecone_filter(request)
         top_k = (request.page_number + 1) * request.result_per_page
         query_results = await data_plane.query(
@@ -459,6 +545,48 @@ class PineconeIndexManager(ExternalIndexManager):
             timeout=self.query_timeout,
         )
         return PineconeQueryResults(results=query_results)
+
+    async def _get_index_counts(self) -> IndexCounts:
+        if self.kbid in COUNTERS_CACHE:
+            # Cache hit
+            return COUNTERS_CACHE[self.kbid]
+        total = IndexCounts(
+            fields=0,
+            paragraphs=0,
+            sentences=0,
+        )
+        tasks = []
+        vectorset_results: dict[str, IndexCounts] = {}
+        for vectorset_id in self.index_hosts.keys():
+            tasks.append(
+                asyncio.create_task(self._get_vectorset_index_counts(vectorset_id, vectorset_results))
+            )
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+
+        for _, counts in vectorset_results.items():
+            total.paragraphs += counts.paragraphs
+            total.sentences += counts.sentences
+        COUNTERS_CACHE[self.kbid] = total
+        return total
+
+    async def _get_vectorset_index_counts(
+        self, vectorset_id: str, results: dict[str, IndexCounts]
+    ) -> None:
+        index_host = self.index_hosts[vectorset_id]
+        data_plane = self.get_data_plane(index_host=index_host)
+        try:
+            index_stats = await data_plane.stats()
+            results[vectorset_id] = IndexCounts(
+                fields=0,
+                paragraphs=index_stats.totalVectorCount,
+                sentences=index_stats.totalVectorCount,
+            )
+        except Exception:
+            logger.exception(
+                "Error getting index stats",
+                extra={"kbid": self.kbid, "provider": self.type.value, "index_host": index_host},
+            )
 
 
 def discard_labels(labels: list[str]) -> list[str]:
@@ -605,3 +733,43 @@ def convert_timestamp_filter(timestamps: Timestamps) -> list[dict[str, Any]]:
             {"date_created": {FilterOperator.LESS_THAN_OR_EQUAL: timestamps.to_created.ToSeconds()}}
         )
     return and_terms
+
+
+def iter_paragraphs(resource: Resource) -> Iterator[tuple[str, IndexParagraph]]:
+    for _, paragraphs in resource.paragraphs.items():
+        for paragraph_id, paragraph in paragraphs.paragraphs.items():
+            yield paragraph_id, paragraph
+
+
+def to_pinecone_index_metric(similarity: utils_pb2.VectorSimilarity.ValueType) -> str:
+    return {
+        utils_pb2.VectorSimilarity.COSINE: "cosine",
+        utils_pb2.VectorSimilarity.DOT: "dotproduct",
+    }[similarity]
+
+
+def to_pinecone_serverless_cloud_payload(
+    serverless: kb_pb2.PineconeServerlessCloud.ValueType,
+) -> dict[str, str]:
+    return {
+        kb_pb2.PineconeServerlessCloud.AWS_EU_WEST_1: {
+            "cloud": "aws",
+            "region": "eu-west-1",
+        },
+        kb_pb2.PineconeServerlessCloud.AWS_US_EAST_1: {
+            "cloud": "aws",
+            "region": "us-east-1",
+        },
+        kb_pb2.PineconeServerlessCloud.AWS_US_WEST_2: {
+            "cloud": "aws",
+            "region": "us-west-2",
+        },
+        kb_pb2.PineconeServerlessCloud.AZURE_EASTUS2: {
+            "cloud": "azure",
+            "region": "eastus2",
+        },
+        kb_pb2.PineconeServerlessCloud.GCP_US_CENTRAL1: {
+            "cloud": "gcp",
+            "region": "us-central1",
+        },
+    }[serverless]

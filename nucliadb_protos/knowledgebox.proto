@@ -43,12 +43,15 @@ message CreatePineconeConfig {
 }
 
 message PineconeIndexMetadata {
-    string index_host = 1;
-    int32 vector_dimension = 2;
+    string index_name = 1;
+    string index_host = 2;
+    int32 vector_dimension = 3;
+    utils.VectorSimilarity similarity = 4;
 }
 
 message StoredPineconeConfig {
     string encrypted_api_key = 1;
+    // vectorset id -> PineconeIndexMetadata
     map<string, PineconeIndexMetadata> indexes = 2;
     PineconeServerlessCloud serverless_cloud = 3;
 }

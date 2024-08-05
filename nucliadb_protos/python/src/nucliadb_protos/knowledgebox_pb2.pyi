@@ -161,17 +161,23 @@ global___CreatePineconeConfig = CreatePineconeConfig
 class PineconeIndexMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    INDEX_NAME_FIELD_NUMBER: builtins.int
     INDEX_HOST_FIELD_NUMBER: builtins.int
     VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    index_name: builtins.str
     index_host: builtins.str
     vector_dimension: builtins.int
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
+        index_name: builtins.str = ...,
         index_host: builtins.str = ...,
         vector_dimension: builtins.int = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["index_host", b"index_host", "vector_dimension", b"vector_dimension"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["index_host", b"index_host", "index_name", b"index_name", "similarity", b"similarity", "vector_dimension", b"vector_dimension"]) -> None: ...
 
 global___PineconeIndexMetadata = PineconeIndexMetadata
 
@@ -203,7 +209,9 @@ class StoredPineconeConfig(google.protobuf.message.Message):
     encrypted_api_key: builtins.str
     serverless_cloud: global___PineconeServerlessCloud.ValueType
     @property
-    def indexes(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___PineconeIndexMetadata]: ...
+    def indexes(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___PineconeIndexMetadata]:
+        """vectorset id -> PineconeIndexMetadata"""
+
     def __init__(
         self,
         *,

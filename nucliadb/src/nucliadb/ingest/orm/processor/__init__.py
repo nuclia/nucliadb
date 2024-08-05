@@ -51,7 +51,7 @@ from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
 
 from .pgcatalog import pgcatalog_delete, pgcatalog_update
 
@@ -444,9 +444,27 @@ class Processor:
             # No external index manager, nothing to do
             return
 
-        await external_index_manager.index_resource(
-            resource_uuid=resource_uuid, resource_data=index_message
-        )
+        provider_type = external_index_manager.type.value
+        if has_feature(
+            const.Features.SKIP_EXTERNAL_INDEX,
+            context={"kbid": kbid, "provider": provider_type},
+            default=False,
+        ):
+            # This is a safety measure to skip external indexing in case that the external index provider is not working.
+            # As we don't want to block the ingestion pipeline, this is a temporary measure until we implement async consumers
+            # to index to external indexes.
+            logger.warning(
+                "Skipping external index for resource",
+                extra={
+                    "kbid": kbid,
+                    "rid": resource_uuid,
+                    "provider": provider_type,
+                },
+            )
+        else:
+            await external_index_manager.index_resource(
+                resource_uuid=resource_uuid, resource_data=index_message
+            )
         self._clear_external_index_fields(index_message)
 
     @staticmethod

@@ -29,6 +29,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     StoredExternalIndexProviderMetadata,
     StoredPineconeConfig,
 )
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 
 MODULE = "nucliadb.common.external_index_providers.manager"
 
@@ -48,16 +49,28 @@ async def test_get_external_index_manager_pinecone(endecryptor):
             serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
         ),
     )
-    stored_metadata.pinecone_config.indexes["default--kbid"].index_host = "index_host"
-    stored_metadata.pinecone_config.indexes["default--kbid"].vector_dimension = 10
-    with unittest.mock.patch(
-        f"{MODULE}.get_external_index_metadata",
-        return_value=stored_metadata,
+    stored_metadata.pinecone_config.indexes["multilingual-2020-05-02"].index_name = "foobar"
+    stored_metadata.pinecone_config.indexes["multilingual-2020-05-02"].index_host = "index_host"
+    stored_metadata.pinecone_config.indexes["multilingual-2020-05-02"].vector_dimension = 10
+    stored_metadata.pinecone_config.indexes[
+        "multilingual-2020-05-02"
+    ].similarity = VectorSimilarity.COSINE
+    with (
+        unittest.mock.patch(
+            f"{MODULE}.get_external_index_metadata",
+            return_value=stored_metadata,
+        ),
+        unittest.mock.patch(
+            f"{MODULE}.get_default_vectorset_id",
+            return_value="default_vectorset",
+        ),
     ):
         mgr = await get_external_index_manager("kbid")
         assert isinstance(mgr, PineconeIndexManager)
         assert mgr.api_key == "api_key"
-        assert mgr.index_hosts == {"default--kbid": "index_host"}
+        assert mgr.index_hosts == {"multilingual-2020-05-02": "index_host"}
+        assert mgr.index_names == {"multilingual-2020-05-02": "foobar"}
+        assert mgr.default_vectorset == "default_vectorset"
 
 
 async def test_get_external_index_manager_none():
