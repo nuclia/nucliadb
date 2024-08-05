@@ -75,6 +75,7 @@ RETRIABLE_EXCEPTIONS = (
     PineconeRateLimitError,
     httpx.ConnectError,
     httpx.NetworkError,
+    httpx.WriteTimeout,
 )
 
 

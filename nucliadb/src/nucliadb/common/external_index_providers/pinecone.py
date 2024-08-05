@@ -18,11 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import hashlib
 import json
 import logging
 from copy import deepcopy
 from typing import Any, Iterator, Optional
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -42,7 +42,7 @@ from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSe
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, LogicalOperator
 from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError, PineconeAPIError
-from nucliadb_utils.aiopynecone.models import MAX_INDEX_NAME_LENGTH, QueryResponse
+from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
 from nucliadb_utils.utilities import decrypt, encrypt, get_pinecone
 
@@ -173,6 +173,7 @@ class PineconeIndexManager(ExternalIndexManager):
         request: kb_pb2.CreateExternalIndexProviderMetadata,
         indexes: list[VectorsetExternalIndex],
     ) -> kb_pb2.StoredExternalIndexProviderMetadata:
+        created_indexes = []
         metadata = kb_pb2.StoredExternalIndexProviderMetadata(
             type=kb_pb2.ExternalIndexProviderType.PINECONE
         )
@@ -183,7 +184,7 @@ class PineconeIndexManager(ExternalIndexManager):
         serverless_cloud = to_pinecone_serverless_cloud_payload(request.pinecone_config.serverless_cloud)
         for index in indexes:
             vectorset_id = index.vectorset_id
-            index_name = PineconeIndexManager.get_index_name(kbid, vectorset_id)
+            index_name = PineconeIndexManager.get_index_name()
             index_dimension = index.dimension
             similarity_metric = to_pinecone_index_metric(index.similarity)
             logger.info(
@@ -204,7 +205,15 @@ class PineconeIndexManager(ExternalIndexManager):
                     metric=similarity_metric,
                     serverless_cloud=serverless_cloud,
                 )
+                created_indexes.append(index_name)
             except PineconeAPIError as exc:
+                # Try index creation rollback
+                for index_name in created_indexes:
+                    try:
+                        await pinecone.delete_index(index_name)
+                    except Exception:
+                        logger.exception("Could not rollback created pinecone indexes")
+                        pass
                 raise ExternalIndexCreationError("pinecone", exc.message) from exc
             metadata.pinecone_config.indexes[vectorset_id].CopyFrom(
                 kb_pb2.PineconeIndexMetadata(
@@ -221,18 +230,12 @@ class PineconeIndexManager(ExternalIndexManager):
         cls,
         kbid: str,
         stored: kb_pb2.StoredExternalIndexProviderMetadata,
-        indexes: Optional[list[VectorsetExternalIndex]] = None,
     ) -> None:
         api_key = decrypt(stored.pinecone_config.encrypted_api_key)
         control_plane = get_pinecone().control_plane(api_key=api_key)
         # Delete all indexes stored in the config and passed as parameters
-        to_delete: set[str] = set()
         for index_metadata in stored.pinecone_config.indexes.values():
-            to_delete.add(index_metadata.index_name)
-        for external_index in indexes or []:
-            index_name = cls.get_index_name(kbid, external_index.vectorset_id)
-            to_delete.add(index_name)
-        for index_name in to_delete:
+            index_name = index_metadata.index_name
             try:
                 logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
                 await control_plane.delete_index(name=index_name)
@@ -242,23 +245,19 @@ class PineconeIndexManager(ExternalIndexManager):
                 )
 
     @classmethod
-    def get_index_name(cls, kbid: str, vectorset_id: str) -> str:
+    def get_index_name(cls) -> str:
         """
         Index names can't be longer than 45 characters and can only contain
         alphanumeric lowercase characters: https://docs.pinecone.io/troubleshooting/restrictions-on-index-names
 
-        We need to include both the kbid and the vectorset id in the formation
-        of the index name, so we don't create two conflicting Pinecone indexes for
-        the same api_key. So we hash the kbid and the vectorset id to generate a unique index name.
+        We generate a unique id for each pinecone index created.
         `nuclia-` is prepended to easily identify which indexes are created by Nuclia.
 
         Example:
-        >>> get_index_name('7b7887b4-2d78-41c7-a398-586af7d7db8b', 'multilingual-2024-05-08')
-        'nuclia-2fb7ae69c227be190083cb33b32baf8307f30'
+        >>> get_index_name()
+        'nuclia-2d899e8a0af54ac9a5addbd483d02ec9'
         """
-        digest = hashlib.sha256(f"{kbid}-{vectorset_id}".encode()).hexdigest()
-        index_name = f"nuclia-{digest}"[:MAX_INDEX_NAME_LENGTH]
-        return index_name
+        return f"nuclia-{uuid4().hex}"
 
     async def _delete_resource_to_index(self, index_host: str, resource_uuid: str) -> None:
         data_plane = self.get_data_plane(index_host=index_host)

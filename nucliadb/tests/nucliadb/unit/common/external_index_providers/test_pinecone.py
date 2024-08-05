@@ -38,7 +38,7 @@ from nucliadb_protos.knowledgebox_pb2 import PineconeIndexMetadata
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, IndexParagraphs
 from nucliadb_protos.noderesources_pb2 import Resource as PBResourceBrain
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_utils.aiopynecone.models import QueryResponse, Vector, VectorMatch
+from nucliadb_utils.aiopynecone.models import MAX_INDEX_NAME_LENGTH, QueryResponse, Vector, VectorMatch
 
 
 @pytest.fixture()
@@ -86,8 +86,8 @@ def external_index_manager(data_plane, vectorsets):
         "nucliadb.common.external_index_providers.pinecone.get_pinecone", return_value=mock
     ):
         multilingual, english = vectorsets
-        multilingual_index_name = PineconeIndexManager.get_index_name("kbid", multilingual)
-        english_index_name = PineconeIndexManager.get_index_name("kbid", english)
+        multilingual_index_name = PineconeIndexManager.get_index_name()
+        english_index_name = PineconeIndexManager.get_index_name()
         indexes = {
             multilingual: PineconeIndexMetadata(
                 index_name=multilingual_index_name,
@@ -317,16 +317,7 @@ def test_exceptions():
     ExternalIndexCreationError("pinecone", "foo")
 
 
-@pytest.mark.parametrize(
-    "vectorset_id,kbid,index_name",
-    [
-        (
-            "multilingual-2024-05-08",
-            "7b7887b4-2d78-41c7-a398-586af7d7db8b",
-            "nuclia-2fb7ae69c227be190083cb33b32baf8307f30",
-        ),
-    ],
-)
-def test_get_index_name(vectorset_id, kbid, index_name):
-    computed_index_name = PineconeIndexManager.get_index_name(kbid, vectorset_id)
-    assert computed_index_name == index_name
+def test_get_index_name():
+    computed_index_name = PineconeIndexManager.get_index_name()
+    assert computed_index_name.startswith("nuclia-")
+    assert len(computed_index_name) <= MAX_INDEX_NAME_LENGTH

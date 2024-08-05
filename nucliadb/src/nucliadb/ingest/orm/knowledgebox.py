@@ -212,17 +212,15 @@ class KnowledgeBox:
                             cls._maybe_delete_external_indexes,
                             kbid,
                             stored_external_index_provider,
-                            vs_external_indexes,
                         )
                     )
-
                 config = KnowledgeBoxConfig(
                     title=title,
                     description=description,
                     slug=slug,
                     migration_version=get_latest_version(),
-                    external_index_provider=stored_external_index_provider,
                 )
+                config.external_index_provider.CopyFrom(stored_external_index_provider)
                 await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
                 await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 
@@ -525,12 +523,11 @@ class KnowledgeBox:
         cls,
         kbid: str,
         stored: StoredExternalIndexProviderMetadata,
-        indexes: Optional[list[VectorsetExternalIndex]] = None,
     ) -> None:
         if stored.type != ExternalIndexProviderType.PINECONE:
             return
         # Only pinecone is supported for now
-        await PineconeIndexManager.delete_indexes(kbid, stored, indexes)
+        await PineconeIndexManager.delete_indexes(kbid, stored)
 
 
 def release_channel_for_kb(

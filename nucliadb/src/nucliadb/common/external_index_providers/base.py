@@ -104,8 +104,8 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
     def __init__(self, kbid: str):
         self.kbid = kbid
 
-    @abc.abstractmethod
     @classmethod
+    @abc.abstractmethod
     async def create_indexes(
         cls,
         kbid: str,
@@ -113,17 +113,16 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
         indexes: list[VectorsetExternalIndex],
     ) -> StoredExternalIndexProviderMetadata: ...
 
-    @abc.abstractmethod
     @classmethod
+    @abc.abstractmethod
     async def delete_indexes(
         cls,
         kbid: str,
         stored: StoredExternalIndexProviderMetadata,
-        indexes: Optional[list[VectorsetExternalIndex]] = None,
     ) -> None: ...
 
     @classmethod
-    def get_index_name(cls, kbid: str, vectorset_id: str) -> str:  # pragma: no cover
+    def get_index_name(cls) -> str:  # pragma: no cover
         """
         Returns the name of the index in the external index provider.
         """
