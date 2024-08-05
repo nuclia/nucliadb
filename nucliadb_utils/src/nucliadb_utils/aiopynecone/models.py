@@ -112,3 +112,13 @@ class VectorMatch(BaseModel):
 
 class QueryResponse(BaseModel):
     matches: list[VectorMatch]
+
+
+class IndexNamespaceStats(BaseModel):
+    vectorCount: int
+
+
+class IndexStats(BaseModel):
+    dimension: int
+    namespaces: dict[str, IndexNamespaceStats] = {}
+    totalVectorCount: int
