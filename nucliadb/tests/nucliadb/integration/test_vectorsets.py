@@ -30,6 +30,7 @@ from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.common.datamanagers.vectorsets import BrokenInvariant
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import DummyPredictEngine
@@ -112,7 +113,66 @@ async def test_vectorsets(
 )
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_vectorset_parameter(
+async def test_vectorset_parameter_without_default_vectorset(
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+    vectorset,
+    expected,
+):
+    kbid = knowledgebox
+
+    calls: list[nodereader_pb2.SearchRequest] = []
+
+    async def mock_node_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
+        calls.append(pb_query)
+        results = [nodereader_pb2.SearchResponse()]
+        incomplete_results = False
+        queried_nodes = []  # type: ignore
+        return (results, incomplete_results, queried_nodes)
+
+    with (
+        patch(
+            "nucliadb.search.search.query.datamanagers.vectorsets.get_default_vectorset",
+            side_effect=BrokenInvariant(""),
+        ),
+        patch(
+            "nucliadb.search.api.v1.search.node_query",
+            new=AsyncMock(side_effect=mock_node_query),
+        ),
+        patch(
+            "nucliadb.search.search.find.node_query",
+            new=AsyncMock(side_effect=mock_node_query),
+        ),
+        patch(
+            "nucliadb.search.search.query.datamanagers.vectorsets.exists",
+            new=AsyncMock(return_value=True),
+        ),
+    ):
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/search",
+            params={"query": "foo", "vectorset": vectorset},
+        )
+        assert resp.status_code == 200
+        assert calls[-1].vectorset == expected
+
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/find",
+            params={
+                "query": "foo",
+                "vectorset": vectorset,
+            },
+        )
+        assert resp.status_code == 200
+        assert calls[-1].vectorset == expected
+
+
+@pytest.mark.parametrize(
+    "vectorset,expected",
+    [(None, "multilingual"), ("", "multilingual"), ("myvectorset", "myvectorset")],
+)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_vectorset_parameter_with_default_vectorset(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
     vectorset,
