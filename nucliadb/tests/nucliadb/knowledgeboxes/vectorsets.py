@@ -49,7 +49,6 @@ async def kb_with_vectorset(
     vectorset_id = "my-vectorset"
     default_vector_dimension = 512
     vectorset_dimension = 324
-
     await create_vectorset(nucliadb_grpc, kbid, vectorset_id, vectorset_dimension=vectorset_dimension)
     await inject_broker_message_with_vectorset_data(
         nucliadb_grpc,
