@@ -61,8 +61,9 @@ async def get_external_index_metadata(kbid: str) -> Optional[StoredExternalIndex
 @async_lru.alru_cache(maxsize=None)
 async def get_default_vectorset_id(kbid: str) -> Optional[str]:
     """
-    While we are transitioning to the new vectorset system, we need to take into account that
-    some KBs are still using the old BrokerMessage field to get processed vectors.
+    While we are transitioning to the new vectorset system, we need to take into account
+    that KBs that have only one semantic model will have the `vectorset_id` field on BrokerMessage.field_vectors
+    set to empty string -- that is the `default` vectorset concept.
     """
     async with datamanagers.with_ro_transaction() as txn:
         vss = []

@@ -265,6 +265,21 @@ async def test_kb_creation_new(
         assert deleted_index_names == set(expected_index_names)
 
 
+async def test_get_kb(
+    nucliadb_reader: AsyncClient,
+    pinecone_knowledgebox: str,
+):
+    kbid = pinecone_knowledgebox
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}",
+    )
+    assert resp.status_code == 200, resp.text
+    config = resp.json()["config"]
+    assert "external_index_provider" not in config
+    assert config["configured_external_index_provider"]["type"] == "pinecone"
+
+
 async def test_find_on_pinecone_kb(
     nucliadb_reader: AsyncClient,
     pinecone_knowledgebox: str,
