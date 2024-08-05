@@ -60,7 +60,7 @@ VECTORSET_DIMENSION = 12
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_vectorsets(
+async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -68,7 +68,6 @@ async def test_vectorsets(
 ):
     kbid = kb_with_vectorset.kbid
     vectorset_id = kb_with_vectorset.vectorset_id
-    default_vector_dimension = kb_with_vectorset.default_vector_dimension
     vectorset_dimension = kb_with_vectorset.vectorset_dimension
 
     shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
@@ -76,7 +75,9 @@ async def test_vectorsets(
     node, shard_id = manager.choose_node(logic_shard)
 
     test_cases = [
-        (default_vector_dimension, ""),
+        # If there is just one vectorset, it should be used by default when
+        # no vectorset is specified
+        (vectorset_dimension, ""),
         (vectorset_dimension, vectorset_id),
     ]
     for dimension, vectorset in test_cases:
@@ -90,9 +91,10 @@ async def test_vectorsets(
         results = await node.reader.Search(query_pb)  # type: ignore
         assert len(results.vector.documents) == 5
 
+    # Test that querying with the wrong dimension raises an exception
     test_cases = [
-        (default_vector_dimension, vectorset_id),
-        (vectorset_dimension, ""),
+        (6000, vectorset_id),
+        (6000, "multilingual"),
     ]
     for dimension, vectorset in test_cases:
         query_pb = nodereader_pb2.SearchRequest(
