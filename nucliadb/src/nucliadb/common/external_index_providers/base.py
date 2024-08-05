@@ -24,6 +24,7 @@ from typing import Any, Iterator, Optional
 
 from pydantic import BaseModel
 
+from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexingError
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -162,6 +163,20 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
             except Exception as ex:
                 raise ExternalIndexingError() from ex
 
+    async def get_index_counts(self) -> IndexCounts:
+        """
+        Returns the index counts for the external index provider.
+        """
+        logger.debug(
+            "Getting index counts from external index",
+            extra={
+                "kbid": self.kbid,
+                "provider": self.type.value,
+            },
+        )
+        with manager_observer({"operation": "get_index_counts", "provider": self.type.value}):
+            return await self._get_index_counts()
+
     async def query(self, request: SearchRequest) -> QueryResults:
         """
         Queries the external index provider and returns the results.
@@ -196,5 +211,12 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
     async def _query(self, request: SearchRequest) -> QueryResults:  # pragma: no cover
         """
         Adapts the Nucliadb's search request to the external index provider's query format and returns the results.
+        """
+        ...
+
+    @abc.abstractmethod
+    async def _get_index_counts(self) -> IndexCounts:  # pragma: no cover
+        """
+        Returns the index counts for the external index provider.
         """
         ...

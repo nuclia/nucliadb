@@ -42,7 +42,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import BrokerMessage, NewKnowledgeBoxV2Request, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.aiopynecone.models import QueryResponse
+from nucliadb_utils.aiopynecone.models import IndexStats, QueryResponse
 from nucliadb_utils.utilities import get_endecryptor
 
 PINECONE_MODULE = "nucliadb.common.external_index_providers.pinecone"
@@ -54,6 +54,7 @@ def data_plane():
     mocked.delete_by_id_prefix = mock.AsyncMock(return_value=None)
     mocked.upsert_in_batches = mock.AsyncMock(return_value=None)
     mocked.query = mock.AsyncMock(return_value=QueryResponse(matches=[]))
+    mocked.stats = mock.AsyncMock(return_value=IndexStats(dimension=10, totalVectorCount=10))
     return mocked
 
 
@@ -278,6 +279,37 @@ async def test_get_kb(
     config = resp.json()["config"]
     assert not config.get("external_index_provider")
     assert config["configured_external_index_provider"]["type"] == "pinecone"
+
+
+async def test_kb_counters(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    pinecone_knowledgebox: str,
+):
+    kbid = pinecone_knowledgebox
+
+    # Create a resource first
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": "my-resource",
+            "title": "Title Resource",
+        },
+    )
+    assert resp.status_code == 201
+
+    # Now check the counters
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/counters",
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {
+        "resources": 1,
+        "paragraphs": 10,
+        "fields": 1,
+        "sentences": 10,
+        "index_size": 100000.0,
+    }
 
 
 async def test_find_on_pinecone_kb(

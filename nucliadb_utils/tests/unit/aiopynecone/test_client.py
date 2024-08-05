@@ -132,6 +132,25 @@ class TestDataPlane:
         with pytest.raises(ValueError):
             await client.delete(["id"] * (MAX_DELETE_BATCH_SIZE + 1))
 
+    async def test_stats(self, client: DataPlane, http_session, http_response):
+        http_response.json.return_value = {
+            "dimension": 10,
+            "namespaces": {
+                "": {
+                    "vectorCount": 10,
+                },
+                "namespace": {
+                    "vectorCount": 10,
+                },
+            },
+            "totalVectorCount": 20,
+        }
+        stats = await client.stats()
+        assert stats.dimension == 10
+        assert stats.namespaces[""].vectorCount == 10
+        assert stats.namespaces["namespace"].vectorCount == 10
+        assert stats.totalVectorCount == 20
+
     async def test_query(self, client: DataPlane, http_session, http_response):
         http_response.json.return_value = {
             "matches": [{"id": "id", "score": 1.0, "values": [1.0], "metadata": {}}]

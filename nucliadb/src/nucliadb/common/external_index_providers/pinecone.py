@@ -24,8 +24,10 @@ from copy import deepcopy
 from typing import Any, Iterator, Optional
 from uuid import uuid4
 
+from cachetools import TTLCache
 from pydantic import BaseModel
 
+from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.base import (
     ExternalIndexManager,
     ExternalIndexProviderType,
@@ -58,6 +60,9 @@ DISCARDED_LABEL_PREFIXES = [
     # Processing status labels are only needed for the catalog endpoint.
     "/n/s",
 ]
+
+# To avoid querying the Pinecone API for the same index stats multiple times in a short period of time
+COUNTERS_CACHE = TTLCache(maxsize=1024, ttl=60)  # type: ignore
 
 
 class PineconeQueryResults(QueryResults):
@@ -540,6 +545,48 @@ class PineconeIndexManager(ExternalIndexManager):
             timeout=self.query_timeout,
         )
         return PineconeQueryResults(results=query_results)
+
+    async def _get_index_counts(self) -> IndexCounts:
+        if self.kbid in COUNTERS_CACHE:
+            # Cache hit
+            return COUNTERS_CACHE[self.kbid]
+        total = IndexCounts(
+            fields=0,
+            paragraphs=0,
+            sentences=0,
+        )
+        tasks = []
+        vectorset_results: dict[str, IndexCounts] = {}
+        for vectorset_id in self.index_hosts.keys():
+            tasks.append(
+                asyncio.create_task(self._get_vectorset_index_counts(vectorset_id, vectorset_results))
+            )
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+
+        for _, counts in vectorset_results.items():
+            total.paragraphs += counts.paragraphs
+            total.sentences += counts.sentences
+        COUNTERS_CACHE[self.kbid] = total
+        return total
+
+    async def _get_vectorset_index_counts(
+        self, vectorset_id: str, results: dict[str, IndexCounts]
+    ) -> None:
+        index_host = self.index_hosts[vectorset_id]
+        data_plane = self.get_data_plane(index_host=index_host)
+        try:
+            index_stats = await data_plane.stats()
+            results[vectorset_id] = IndexCounts(
+                fields=0,
+                paragraphs=index_stats.totalVectorCount,
+                sentences=index_stats.totalVectorCount,
+            )
+        except Exception:
+            logger.exception(
+                "Error getting index stats",
+                extra={"kbid": self.kbid, "provider": self.type.value, "index_host": index_host},
+            )
 
 
 def discard_labels(labels: list[str]) -> list[str]:
