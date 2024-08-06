@@ -971,9 +971,15 @@ async def test_pagination_limits(
     assert resp.status_code != 412
 
 
-async def test_dates_are_properly_validated(nucliadb_writer: AsyncClient):
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_dates_are_properly_validated(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
     resp = await nucliadb_writer.post(
-        "/kb/foo/resources",
+        f"/kb/{kbid}/resources",
         json={
             "title": "My title",
             "origin": {
@@ -984,3 +990,20 @@ async def test_dates_are_properly_validated(nucliadb_writer: AsyncClient):
     assert resp.status_code == 422
     detail = resp.json()["detail"][0]
     assert detail["loc"] == ["body", "origin", "created"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "My title",
+            "origin": {
+                "created": "0001-01-01T00:00:00Z",
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=origin")
+    assert resp.status_code == 200
+
+    assert resp.json()["origin"]["created"] == "0001-01-01T00:00:00Z"
