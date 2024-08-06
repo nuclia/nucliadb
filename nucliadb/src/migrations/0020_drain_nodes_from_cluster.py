@@ -29,7 +29,7 @@ create new shards in the remaining nodes.
 import logging
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.migrator.context import ExecutionContext
 
@@ -56,7 +56,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
         return
 
     logger.info("Rolling over affected KB", extra={"kbid": kbid})
-    await rollover_kb_shards(context, kbid, drain_nodes=drain_node_ids)
+    await rollover_kb_index(context, kbid, drain_nodes=drain_node_ids)
 
 
 async def kb_has_shards_on_drain_nodes(kbid: str, drain_node_ids: list[str]) -> bool:

@@ -142,7 +142,6 @@ async def index_resource_to_shard(
         return None
 
     resource_index_message = (await resource.generate_index_message(reindex=False)).brain
-
     partition = partitioning.generate_partition(kbid, resource_id)
     await sm.add_resource(shard, resource_index_message, txid=-1, partition=str(partition), kb=kbid)
     return resource
