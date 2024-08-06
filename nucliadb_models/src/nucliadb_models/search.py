@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
 
@@ -31,6 +30,7 @@ from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
+from nucliadb_models.utils import DateTime
 from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 from nucliadb_protos.audit_pb2 import ClientType
 from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
@@ -673,14 +673,14 @@ class CatalogRequest(BaseModel):
         description="Filter results by resource processing status",
         deprecated="Use filters instead",
     )
-    range_creation_start: Optional[datetime] = (
+    range_creation_start: Optional[DateTime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[datetime] = (
+    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[DateTime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
-    range_modification_end: Optional[datetime] = (
+    range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
 
@@ -719,14 +719,14 @@ class BaseSearchRequest(BaseModel):
         title="Minimum score",
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
     )
-    range_creation_start: Optional[datetime] = (
+    range_creation_start: Optional[DateTime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[datetime] = (
+    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[DateTime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
-    range_modification_end: Optional[datetime] = (
+    range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
     features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
@@ -1030,14 +1030,14 @@ class ChatRequest(BaseModel):
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
     )
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
-    range_creation_start: Optional[datetime] = (
+    range_creation_start: Optional[DateTime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[datetime] = (
+    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[DateTime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
-    range_modification_end: Optional[datetime] = (
+    range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
     show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()

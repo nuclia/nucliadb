@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
 from nucliadb_models.common import FIELD_TYPES_MAP
+from nucliadb_models.utils import DateTime
 from nucliadb_protos import resources_pb2, utils_pb2
 
 from .common import Classification, FieldID, QuestionAnswer, UserClassification
@@ -334,8 +335,8 @@ class Basic(BaseModel):
 class InputOrigin(BaseModel):
     source_id: Optional[str] = None
     url: Optional[str] = None
-    created: Optional[datetime] = None
-    modified: Optional[datetime] = None
+    created: Optional[DateTime] = None
+    modified: Optional[DateTime] = None
     metadata: Dict[str, str] = {}
     tags: List[str] = []
     collaborators: List[str] = []

@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
 from typing import Optional, Union
 
 from fastapi import Header, Request, Response
@@ -41,6 +40,7 @@ from nucliadb_models.search import (
     SortField,
     SortOrder,
 )
+from nucliadb_models.utils import DateTime
 from nucliadb_utils.authentication import requires_one
 
 
@@ -68,12 +68,12 @@ async def resource_search(
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
-    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[datetime] = fastapi_query(
+    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[datetime] = fastapi_query(
+    range_modification_end: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
