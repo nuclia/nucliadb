@@ -25,7 +25,7 @@ import argdantic
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.settings import Settings
 
-parser = argdantic.ArgParser()
+parser: argdantic.ArgParser = argdantic.ArgParser()
 
 
 @parser.command(singleton=True, name="NucliaDB", help="NucliaDB Starting script")
