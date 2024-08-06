@@ -39,6 +39,7 @@ from nucliadb_models.search import (
     SearchParamDefaults,
     SuggestOptions,
 )
+from nucliadb_models.utils import DateTime
 from nucliadb_utils.authentication import requires
 
 
@@ -61,12 +62,12 @@ async def suggest_knowledgebox(
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
-    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[datetime] = fastapi_query(
+    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[datetime] = fastapi_query(
+    range_modification_end: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
     features: list[SuggestOptions] = fastapi_query(SearchParamDefaults.suggest_features),

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from datetime import datetime
 from typing import Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
@@ -45,6 +44,7 @@ from nucliadb_models.search import (
     SearchParamDefaults,
 )
 from nucliadb_models.security import RequestSecurity
+from nucliadb_models.utils import DateTime
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
@@ -95,12 +95,12 @@ async def find_knowledgebox(
         ge=0,
     ),
     vectorset: Optional[str] = fastapi_query(SearchParamDefaults.vectorset),
-    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[datetime] = fastapi_query(
+    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[datetime] = fastapi_query(
+    range_modification_end: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
     features: list[SearchOptions] = fastapi_query(

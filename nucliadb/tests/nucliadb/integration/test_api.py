@@ -969,3 +969,18 @@ async def test_pagination_limits(
         },
     )
     assert resp.status_code != 412
+
+
+async def test_dates_are_properly_validated(nucliadb_writer: AsyncClient):
+    resp = await nucliadb_writer.post(
+        "/kb/foo/resources",
+        json={
+            "title": "My title",
+            "origin": {
+                "created": "0000-01-01T00:00:00Z",
+            },
+        },
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"][0]
+    assert detail["loc"] == ["body", "origin", "created"]
