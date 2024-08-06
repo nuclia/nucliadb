@@ -31,7 +31,7 @@ from nucliadb_utils.storages.azure import AzureStorage
 
 images.settings["azurite"] = {
     "image": "mcr.microsoft.com/azure-storage/azurite",
-    "version": "3.30.0",
+    "version": "3.31.0",
     "options": {
         "ports": {"10000": None},
         "command": " ".join(
@@ -51,6 +51,8 @@ class Azurite(BaseImage):
     name = "azurite"
     port = 10000
 
+    _errors = 0
+
     def check(self):
         try:
             from azure.storage.blob import BlobServiceClient  # type: ignore
@@ -58,13 +60,15 @@ class Azurite(BaseImage):
             container_port = self.port
             host_port = self.get_port(port=container_port)
             conn_string = get_connection_string(self.host, host_port)
-
             client = BlobServiceClient.from_connection_string(conn_string)
             container_client = client.get_container_client("foo")
             container_client.create_container()
             container_client.delete_container()
             return True
         except Exception as ex:
+            self._errors += 1
+            if self._errors > 10:
+                raise
             print(ex)
             return False
 
