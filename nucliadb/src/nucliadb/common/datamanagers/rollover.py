@@ -104,7 +104,9 @@ async def get_indexed_data(
     val = await txn.get(key)
     if val is not None:
         data = orjson.loads(val)
-        return tuple(data)
+        shard_id: str = data[0]
+        modification_time: int = data[1]
+        return shard_id, modification_time
     return None
 
 
@@ -136,7 +138,10 @@ async def _get_batch_indexed_data(*, kbid, batch: list[str]) -> list[tuple[str, 
     results: list[tuple[str, tuple[str, int]]] = []
     for key, val in zip(batch, values):
         if val is not None:
-            data: tuple[str, int] = tuple(orjson.loads(val))
+            shard_id: str
+            modification_time: int
+            shard_id, modification_time = orjson.loads(val)
+            data = (shard_id, modification_time)
             results.append((key.split("/")[-1], data))
     return results
 

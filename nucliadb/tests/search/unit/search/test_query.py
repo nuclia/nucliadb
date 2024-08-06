@@ -170,7 +170,7 @@ class TestVectorSetAndMatryoshkaParsing:
             vectorset=vectorset,
             # irrelevant mandatory args
             query="my query",
-            filters=[],
+            filters=[],  # type: ignore
             page_number=0,
             page_size=20,
             min_score=MinScore(bm25=0, semantic=0),

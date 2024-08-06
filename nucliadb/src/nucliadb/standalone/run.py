@@ -42,7 +42,7 @@ from nucliadb_utils.settings import nuclia_settings, storage_settings
 logger = logging.getLogger(__name__)
 
 
-parser = argdantic.ArgParser()
+parser: argdantic.ArgParser = argdantic.ArgParser()
 
 
 @parser.command(singleton=True, name="NucliaDB", help="NucliaDB Starting script")

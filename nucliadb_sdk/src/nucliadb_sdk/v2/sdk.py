@@ -229,7 +229,10 @@ def _parse_list_of_pydantic(
     return orjson.dumps(output).decode("utf-8")
 
 
-def _parse_response(response_type, resp: httpx.Response) -> Any:
+def _parse_response(
+    response_type: Optional[Union[Type[BaseModel], Callable[[httpx.Response], Any]]],
+    resp: httpx.Response,
+) -> Any:
     if response_type is not None:
         if isinstance(response_type, type) and issubclass(response_type, BaseModel):
             return response_type.model_validate_json(resp.content)
