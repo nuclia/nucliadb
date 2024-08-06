@@ -1512,7 +1512,7 @@ files = [
 
 [[package]]
 name = "kubernetes-asyncio"
-version = "30.3.0"
+version = "29.0.1"
 summary = "Kubernetes asynchronous python client"
 groups = ["default", "dev"]
 dependencies = [
@@ -1524,8 +1524,8 @@ dependencies = [
     "urllib3>=1.24.2",
 ]
 files = [
-    {file = "kubernetes_asyncio-30.3.0-py3-none-any.whl", hash = "sha256:ee3618f0fc07a51f55e53e200b0feb6e3b6a4ace16ddf25fe2504083ecee8048"},
-    {file = "kubernetes_asyncio-30.3.0.tar.gz", hash = "sha256:53c7d23389be520f85d016078fc249efe3392627215aae0a2ae834a3b99acb62"},
+    {file = "kubernetes_asyncio-29.0.1-py3-none-any.whl", hash = "sha256:6edecf15be85cb7f41137b2aa19953cc5972509361affaa0fbfc8856cdcfccfd"},
+    {file = "kubernetes_asyncio-29.0.1.tar.gz", hash = "sha256:ae3eedff97427f6a7d7b896c2cb44002ce8a2c27b5a98aa997cf25ba1c7fbf7d"},
 ]
 
 [[package]]
@@ -2017,7 +2017,7 @@ dependencies = [
     "idna>=3.3",
     "jmespath>=1.0.0",
     "jwcrypto>=1.5.6",
-    "kubernetes-asyncio",
+    "kubernetes-asyncio<30.0.0",
     "lru-dict>=1.1.7",
     "mmh3>=3.0.0",
     "multidict>=6.0.4",
