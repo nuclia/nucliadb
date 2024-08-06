@@ -19,6 +19,7 @@
 
 import json
 from datetime import datetime
+from typing import Union
 
 import pydantic
 from pydantic import BeforeValidator
@@ -75,7 +76,9 @@ def validate_json(value: str):
         raise ValueError("Invalid JSON") from exc
 
 
-def check_valid_datetime(v: str) -> datetime:
+def check_valid_datetime(v: Union[str, datetime]) -> datetime:
+    if isinstance(v, datetime):
+        return v
     try:
         return datetime.fromisoformat(v)
     except ValueError as e:
