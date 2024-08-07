@@ -25,7 +25,6 @@ from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
 
 from nucliadb_models import CloudLink, FileB64
-from nucliadb_models.utils import DateTime
 from nucliadb_protos import resources_pb2
 
 _T = TypeVar("_T")
@@ -64,7 +63,7 @@ class MessageType(Enum):
 
 
 class Message(BaseModel):
-    timestamp: Optional[DateTime] = None
+    timestamp: Optional[datetime] = None
     who: Optional[str] = None
     to: Optional[List[str]] = []
     content: MessageContent
