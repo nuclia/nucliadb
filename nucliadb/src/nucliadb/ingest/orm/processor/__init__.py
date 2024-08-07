@@ -707,7 +707,7 @@ def messages_source(messages: list[writer_pb2.BrokerMessage]):
         source = nodewriter_pb2.IndexMessageSource.WRITER
     elif from_processor:
         source = nodewriter_pb2.IndexMessageSource.PROCESSOR
-    else:  # pragma: nocover
+    else:  # pragma: no cover
         msg = "Processor received multiple broker messages with different sources in the same txn!"
         logger.error(msg)
         errors.capture_exception(Exception(msg))
