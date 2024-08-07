@@ -29,7 +29,6 @@ from nucliadb_models.metadata import (
     Extra,
     InputMetadata,
     InputOrigin,
-    Origin,
     UserFieldMetadata,
     UserMetadata,
 )
@@ -131,7 +130,7 @@ class UpdateResourcePayload(BaseModel):
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    origin: Optional[Origin] = None
+    origin: Optional[InputOrigin] = None
     extra: Optional[Extra] = None
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
