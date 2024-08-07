@@ -27,6 +27,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
 from nucliadb_protos import audit_pb2, nodereader_pb2, noderesources_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
@@ -129,7 +130,7 @@ class IndexAuditHandler:
             paragraphs=total_paragraphs,
             fields=total_fields,
             bytes=total_paragraphs  # This is an estimation of bytes stored in a KB
-            * 10000
+            * AVG_PARAGRAPH_SIZE_BYTES
             * num_vectorsets,
         )
 

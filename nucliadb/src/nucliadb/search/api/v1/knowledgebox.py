@@ -29,6 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
 from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.search import logger
@@ -48,7 +49,6 @@ from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 
-AVG_PARAGRAPH_SIZE_BYTES = 10_000
 MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
 
 
