@@ -28,7 +28,7 @@ from typing import Any, AsyncGenerator, Optional
 import backoff
 import httpx
 
-from nucliadb_telemetry.metrics import Observer
+from nucliadb_telemetry.metrics import INF, Histogram, Observer
 from nucliadb_utils.aiopynecone.exceptions import (
     PineconeAPIError,
     PineconeRateLimitError,
@@ -46,7 +46,14 @@ from nucliadb_utils.aiopynecone.models import (
 
 logger = logging.getLogger(__name__)
 
-
+upsert_batch_size_histogram = Histogram(
+    "pinecone_upsert_batch_size",
+    buckets=[10.0, 100.0, 200.0, 500.0, 1000.0, 5000.0, INF],
+)
+upsert_batch_count_histogram = Histogram(
+    "pinecone_upsert_batch_count",
+    buckets=[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0],
+)
 pinecone_observer = Observer(
     "pinecone_client",
     labels={"type": ""},
@@ -260,6 +267,9 @@ class DataPlane:
         tasks = []
         for batch in batchify(vectors, batch_size):
             tasks.append(asyncio.create_task(_upsert_batch(batch)))
+
+        upsert_batch_size_histogram.observe(batch_size)
+        upsert_batch_count_histogram.observe(len(tasks))
 
         await asyncio.gather(*tasks)
 

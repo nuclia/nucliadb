@@ -355,12 +355,12 @@ class PineconeIndexManager(ExternalIndexManager):
             await asyncio.gather(*delete_tasks)
 
         with manager_observer({"operation": "compute_base_vector_metadatas"}):
-            base_vector_metadatas: dict[str, VectorMetadata] = self.compute_base_vector_metadatas(
+            base_vector_metadatas: dict[str, VectorMetadata] = await self.compute_base_vector_metadatas(
                 index_data, resource_uuid
             )
 
         with manager_observer({"operation": "compute_vectorset_vectors"}):
-            vectorset_vectors: dict[str, list[PineconeVector]] = self.compute_vectorset_vectors(
+            vectorset_vectors: dict[str, list[PineconeVector]] = await self.compute_vectorset_vectors(
                 index_data, base_vector_metadatas
             )
 
@@ -417,7 +417,15 @@ class PineconeIndexManager(ExternalIndexManager):
                     batch_timeout=self.delete_timeout,
                 )
 
-    def compute_base_vector_metadatas(
+    async def compute_base_vector_metadatas(
+        self, index_data: Resource, resource_uuid: str
+    ) -> dict[str, VectorMetadata]:
+        # This is a CPU bound operation and when the number of vectors is large, it can take a long time.
+        return await asyncio.get_event_loop().run_in_executor(
+            None, self._compute_base_vector_metadatas, index_data, resource_uuid
+        )
+
+    def _compute_base_vector_metadatas(
         self, index_data: Resource, resource_uuid: str
     ) -> dict[str, VectorMetadata]:
         """
@@ -470,7 +478,15 @@ class PineconeIndexManager(ExternalIndexManager):
                     )
         return metadatas
 
-    def compute_vectorset_vectors(
+    async def compute_vectorset_vectors(
+        self, index_data: Resource, base_vector_metadatas: dict[str, VectorMetadata]
+    ) -> dict[str, list[PineconeVector]]:
+        # This is a CPU bound operation and when the number of vectors is large, it can take a long time.
+        return await asyncio.get_event_loop().run_in_executor(
+            None, self._compute_vectorset_vectors, index_data, base_vector_metadatas
+        )
+
+    def _compute_vectorset_vectors(
         self, index_data: Resource, base_vector_metadatas: dict[str, VectorMetadata]
     ) -> dict[str, list[PineconeVector]]:
         vectorset_vectors: dict[str, list[PineconeVector]] = {}
