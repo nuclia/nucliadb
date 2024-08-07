@@ -347,6 +347,11 @@ class InputOrigin(BaseModel):
 
 
 class Origin(InputOrigin):
+    # Created and modified are redefined to
+    # use native datetime objects and skip validation
+    created: Optional[datetime] = None
+    modified: Optional[datetime] = None
+
     class Source(Enum):
         WEB = "WEB"
         DESKTOP = "DESKTOP"
