@@ -407,7 +407,7 @@ class Processor:
 
         if shard is not None:
             index_message = resource.indexer.brain
-            await self._maybe_external_index_add_resource(kbid, source, uuid, index_message)
+            await self._maybe_external_index_add_resource(kbid, uuid, index_message)
             await self.index_node_shard_manager.add_resource(
                 shard,
                 index_message,
@@ -430,13 +430,10 @@ class Processor:
     async def _maybe_external_index_add_resource(
         self,
         kbid: str,
-        source: nodewriter_pb2.IndexMessageSource.ValueType,
         resource_uuid: str,
         index_message: PBBrainResource,
     ):
-        if source != nodewriter_pb2.IndexMessageSource.PROCESSOR:
-            # We only want to index resources that are coming from the processor, as they are the ones
-            # that have the vectors and extracted text
+        if not has_vectors_operation(index_message):
             return
 
         external_index_manager = await get_external_index_manager(kbid=kbid)
@@ -716,3 +713,19 @@ def messages_source(messages: list[writer_pb2.BrokerMessage]):
         errors.capture_exception(Exception(msg))
         source = nodewriter_pb2.IndexMessageSource.PROCESSOR
     return source
+
+
+def has_vectors_operation(index_message: PBBrainResource) -> bool:
+    """
+    Returns True if the index message has any vectors to index or to delete.
+    """
+    if len(index_message.sentences_to_delete) > 0 or len(index_message.paragraphs_to_delete) > 0:
+        return True
+    for field_paragraphs in index_message.paragraphs.values():
+        for paragraph in field_paragraphs.paragraphs.values():
+            if len(paragraph.sentences) > 0:
+                return True
+            for vectorset_sentences in paragraph.vectorsets_sentences.values():
+                if len(vectorset_sentences.sentences) > 0:
+                    return True
+    return False
