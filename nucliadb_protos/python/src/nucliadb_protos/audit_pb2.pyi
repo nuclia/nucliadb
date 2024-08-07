@@ -115,15 +115,18 @@ class ChatContext(google.protobuf.message.Message):
 
     AUTHOR_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
+    POINTER_FIELD_NUMBER: builtins.int
     author: builtins.str
     text: builtins.str
+    pointer: builtins.str
     def __init__(
         self,
         *,
         author: builtins.str = ...,
         text: builtins.str = ...,
+        pointer: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["author", b"author", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["author", b"author", "pointer", b"pointer", "text", b"text"]) -> None: ...
 
 global___ChatContext = ChatContext
 

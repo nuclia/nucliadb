@@ -423,11 +423,11 @@ def maybe_audit_chat(
     audit_context = [
         audit_pb2.ChatContext(author=message.author, text=message.text) for message in chat_history
     ]
-    query_context_paragaph_ids = list(query_context.values())
     audit_context.append(
         audit_pb2.ChatContext(
             author=Author.NUCLIA,
-            text=AUDIT_TEXT_RESULT_SEP.join(query_context_paragaph_ids),
+            text=AUDIT_TEXT_RESULT_SEP.join(list(query_context.values())),
+            pointer=AUDIT_TEXT_RESULT_SEP.join(list(query_context.keys())),
         )
     )
     audit.chat(
