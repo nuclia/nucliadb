@@ -74,6 +74,8 @@ pub struct ChatContext {
     pub author: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub text: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "3")]
+    pub pointer: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
