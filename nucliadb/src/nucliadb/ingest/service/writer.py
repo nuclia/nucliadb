@@ -528,7 +528,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     index_message = brain.brain
                     await self.proc._maybe_external_index_add_resource(
                         request.kbid,
-                        nodewriter_pb2.IndexMessageSource.PROCESSOR,
                         request.rid,
                         index_message,
                     )
