@@ -119,14 +119,18 @@ class IndexAuditHandler:
             total_fields += shard.fields
             total_paragraphs += shard.paragraphs
 
-        with datamanagers.with_ro_transaction() as txn:
-            num_vectorsets = len([vs async for vs in datamanagers.vectorsets(txn, kbid=kbid)]) or 1
+        async with datamanagers.with_ro_transaction() as txn:
+            num_vectorsets = (
+                len([vs async for vs in datamanagers.vectorsets.iter(txn=txn, kbid=kbid)]) or 1
+            )
 
         self.audit.report_storage(
             kbid=kbid,
             paragraphs=total_paragraphs,
             fields=total_fields,
-            bytes=total_paragraphs * 10000 * num_vectorsets,
+            bytes=total_paragraphs  # This is an estimation of bytes stored in a KB
+            * 10000
+            * num_vectorsets,
         )
 
 
