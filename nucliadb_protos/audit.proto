@@ -37,7 +37,7 @@ enum ClientType {
 message ChatContext {
   string author = 1;
   string text = 2;
-  string pointer = 3;
+  optional string pointer = 3;
 }
 
 message ChatAudit {

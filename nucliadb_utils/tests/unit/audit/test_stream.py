@@ -145,7 +145,7 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
         rephrase_time=1,
         question="foo",
         rephrased_question="rephrased",
-        context=[ChatContext(author="USER", text="epa")],
+        context=[ChatContext(author="USER", text="epa", poinert="/pointer/test-db")],
         answer="bar",
         learning_id="learning_id",
     )
