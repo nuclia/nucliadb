@@ -280,13 +280,13 @@ class StreamAuditStorage(AuditStorage):
 
         self.send(auditrequest)
 
-    def report_fields_and_paragraphs(self, kbid: str, paragraphs: int, fields: int):
+    def report_storage(self, kbid: str, paragraphs: int, fields: int, bytes: int):
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
             account_id=None,
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
-            storage=Storage(paragraphs=paragraphs, fields=fields),
+            storage=Storage(paragraphs=paragraphs, fields=fields, bytes=bytes),
         )
 
     def report_resources(

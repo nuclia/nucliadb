@@ -23,6 +23,7 @@ import logging
 import uuid
 from functools import partial
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
@@ -118,8 +119,14 @@ class IndexAuditHandler:
             total_fields += shard.fields
             total_paragraphs += shard.paragraphs
 
-        self.audit.report_fields_and_paragraphs(
-            kbid=kbid, paragraphs=total_paragraphs, fields=total_fields
+        with datamanagers.with_ro_transaction() as txn:
+            num_vectorsets = len([vs async for vs in datamanagers.vectorsets(txn, kbid=kbid)]) or 1
+
+        self.audit.report_storage(
+            kbid=kbid,
+            paragraphs=total_paragraphs,
+            fields=total_fields,
+            bytes=total_paragraphs * 10000 * num_vectorsets,
         )
 
 
