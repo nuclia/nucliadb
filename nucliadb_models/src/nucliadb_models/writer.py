@@ -28,7 +28,7 @@ from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     Extra,
     InputMetadata,
-    Origin,
+    InputOrigin,
     UserFieldMetadata,
     UserMetadata,
 )
@@ -85,7 +85,7 @@ class CreateResourcePayload(BaseModel):
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    origin: Optional[Origin] = None
+    origin: Optional[InputOrigin] = None
     extra: Optional[Extra] = None
 
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
@@ -130,7 +130,7 @@ class UpdateResourcePayload(BaseModel):
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    origin: Optional[Origin] = None
+    origin: Optional[InputOrigin] = None
     extra: Optional[Extra] = None
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
