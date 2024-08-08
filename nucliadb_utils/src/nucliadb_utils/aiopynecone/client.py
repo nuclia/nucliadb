@@ -308,6 +308,11 @@ class DataPlane:
 
         delete_batch_size_histogram.observe(len(ids))
         headers = {"Api-Key": self.api_key}
+
+        # This is a temporary log info to hunt down a bug.
+        rids = {vid.split("/")[0] for vid in ids}
+        logger.info(f"Deleting vectors from resources: {list(rids)}")
+
         payload = {"ids": ids}
         post_kwargs: dict[str, Any] = {
             "headers": headers,
@@ -447,13 +452,11 @@ class DataPlane:
 
         async def _delete_batch(batch):
             async with semaphore:
-                breakpoint()
                 await self.delete(ids=batch, timeout=batch_timeout)
 
         tasks = []
         async_iterable = self.list_all(id_prefix=id_prefix, page_timeout=batch_timeout)
         async for batch in async_batchify(async_iterable, batch_size):
-            breakpoint()
             tasks.append(asyncio.create_task(_delete_batch(batch)))
 
         delete_batch_count_histogram.observe(len(tasks))
