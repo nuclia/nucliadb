@@ -28,7 +28,7 @@ from typing import Any, AsyncGenerator, Optional
 import backoff
 import httpx
 
-from nucliadb_telemetry.metrics import Observer
+from nucliadb_telemetry.metrics import INF, Histogram, Observer
 from nucliadb_utils.aiopynecone.exceptions import (
     PineconeAPIError,
     PineconeRateLimitError,
@@ -46,6 +46,25 @@ from nucliadb_utils.aiopynecone.models import (
 
 logger = logging.getLogger(__name__)
 
+upsert_batch_size_histogram = Histogram(
+    "pinecone_upsert_batch_size",
+    buckets=[10.0, 100.0, 200.0, 500.0, 1000.0, 5000.0, INF],
+)
+upsert_batch_count_histogram = Histogram(
+    "pinecone_upsert_batch_count",
+    buckets=[0.0, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0, INF],
+)
+
+delete_batch_size_histogram = Histogram(
+    "pinecone_delete_batch_size",
+    buckets=[1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 150.0, INF],
+)
+
+delete_batch_count_histogram = Histogram(
+    "pinecone_delete_batch_count",
+    buckets=[0.0, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0, INF],
+)
+
 
 pinecone_observer = Observer(
     "pinecone_client",
@@ -57,7 +76,6 @@ pinecone_observer = Observer(
 
 DEFAULT_TIMEOUT = 30
 CONTROL_PLANE_BASE_URL = "https://api.pinecone.io/"
-INDEX_HOST_BASE_URL = "https://{index_host}/"
 BASE_API_HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -198,6 +216,7 @@ class DataPlane:
         if len(vectors) == 0:
             # Nothing to upsert.
             return
+        upsert_batch_size_histogram.observe(len(vectors))
         headers = {"Api-Key": self.api_key}
         payload = UpsertRequest(vectors=vectors)
         post_kwargs: dict[str, Any] = {
@@ -261,7 +280,10 @@ class DataPlane:
         for batch in batchify(vectors, batch_size):
             tasks.append(asyncio.create_task(_upsert_batch(batch)))
 
-        await asyncio.gather(*tasks)
+        upsert_batch_count_histogram.observe(len(tasks))
+
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
 
     @backoff.on_exception(
         backoff.expo,
@@ -280,8 +302,16 @@ class DataPlane:
         """
         if len(ids) > MAX_DELETE_BATCH_SIZE:
             raise ValueError(f"Maximum number of ids in a single request is {MAX_DELETE_BATCH_SIZE}.")
+        if len(ids) == 0:  # pragma: no cover
+            return
 
+        delete_batch_size_histogram.observe(len(ids))
         headers = {"Api-Key": self.api_key}
+
+        # This is a temporary log info to hunt down a bug.
+        rids = {vid.split("/")[0] for vid in ids}
+        logger.info(f"Deleting vectors from resources: {list(rids)}")
+
         payload = {"ids": ids}
         post_kwargs: dict[str, Any] = {
             "headers": headers,
@@ -428,7 +458,10 @@ class DataPlane:
         async for batch in async_batchify(async_iterable, batch_size):
             tasks.append(asyncio.create_task(_delete_batch(batch)))
 
-        await asyncio.gather(*tasks)
+        delete_batch_count_histogram.observe(len(tasks))
+
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
 
     @backoff.on_exception(
         backoff.expo,
@@ -516,8 +549,12 @@ class PineconeSession:
         if session is not None:
             return session
 
+        base_url = index_host
+        if not index_host.startswith("https://"):
+            base_url = f"https://{index_host}/"
+
         session = httpx.AsyncClient(
-            base_url=INDEX_HOST_BASE_URL.format(index_host=index_host),
+            base_url=base_url,
             headers=BASE_API_HEADERS,
             timeout=DEFAULT_TIMEOUT,
         )
