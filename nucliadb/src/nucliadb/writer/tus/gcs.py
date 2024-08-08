@@ -34,7 +34,7 @@ from urllib.parse import quote_plus
 import aiohttp
 import backoff
 import google.auth.transport.requests  # type: ignore
-from google.auth.exceptions import DefaultCredentialsError
+from google.auth.exceptions import DefaultCredentialsError  # type: ignore
 from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
 
 from nucliadb.writer import logger
