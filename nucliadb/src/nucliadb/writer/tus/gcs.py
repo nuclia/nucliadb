@@ -72,7 +72,7 @@ class GCloudBlobStore(BlobStore):
     loop = None
     upload_url: str
     object_base_url: str
-    json_credentials: str
+    json_credentials: Optional[str]
     bucket: str
     location: str
     project: str
@@ -112,21 +112,16 @@ class GCloudBlobStore(BlobStore):
         self.bucket_labels = bucket_labels
         self.object_base_url = object_base_url + "/storage/v1/b"
         self.upload_url = object_base_url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
-
+        self.json_credentials = json_credentials
         self._credentials = None
 
-        if json_credentials is None:
-            self._json_credentials = None
-        elif isinstance(json_credentials, str) and json_credentials.strip() == "":
-            self._json_credentials = None
-
-        if json_credentials is not None:
+        if self.json_credentials is not None and self.json_credentials.strip() != "":
             self._credentials = service_account.Credentials.from_service_account_info(
-                self._json_credentials, scopes=SCOPES
+                self.json_credentials, scopes=SCOPES
             )
         else:
             try:
-                self._credentials, _ = google.auth.default()
+                self._credentials, self.project = google.auth.default()
             except DefaultCredentialsError:
                 logger.warning("Setting up without credentials as couldn't find workload identity")
                 self._credentials = None
