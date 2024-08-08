@@ -52,7 +52,7 @@ upsert_batch_size_histogram = Histogram(
 )
 upsert_batch_count_histogram = Histogram(
     "pinecone_upsert_batch_count",
-    buckets=[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0, INF],
+    buckets=[0.0, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0, INF],
 )
 
 delete_batch_size_histogram = Histogram(
