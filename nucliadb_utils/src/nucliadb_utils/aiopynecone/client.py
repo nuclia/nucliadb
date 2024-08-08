@@ -551,7 +551,7 @@ class PineconeSession:
 
         base_url = index_host
         if not index_host.startswith("https://"):
-            base_url = f"https://{index_host}"
+            base_url = f"https://{index_host}/"
 
         session = httpx.AsyncClient(
             base_url=base_url,
