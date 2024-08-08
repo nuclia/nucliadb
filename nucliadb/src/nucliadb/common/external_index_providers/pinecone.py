@@ -420,10 +420,12 @@ class PineconeIndexManager(ExternalIndexManager):
     async def compute_base_vector_metadatas(
         self, index_data: Resource, resource_uuid: str
     ) -> dict[str, VectorMetadata]:
-        # This is a CPU bound operation and when the number of vectors is large, it can take a long time.
-        return await asyncio.get_event_loop().run_in_executor(
-            None, self._compute_base_vector_metadatas, index_data, resource_uuid
-        )
+        # This is a CPU bound operation and when the number of vectors is large, it can take a
+        # long time (around a second).
+        # Ideally, we would use a ProcessPoolExecutor to parallelize the computation of the metadata, but
+        # the Resource protobuf is not pickleable, so we can't use it in a ProcessPoolExecutor. This will
+        # be less of a problem when we move pinecone indexing to its own consumer.
+        return await asyncio.to_thread(self._compute_base_vector_metadatas, index_data, resource_uuid)
 
     def _compute_base_vector_metadatas(
         self, index_data: Resource, resource_uuid: str
@@ -481,9 +483,13 @@ class PineconeIndexManager(ExternalIndexManager):
     async def compute_vectorset_vectors(
         self, index_data: Resource, base_vector_metadatas: dict[str, VectorMetadata]
     ) -> dict[str, list[PineconeVector]]:
-        # This is a CPU bound operation and when the number of vectors is large, it can take a long time.
-        return await asyncio.get_event_loop().run_in_executor(
-            None, self._compute_vectorset_vectors, index_data, base_vector_metadatas
+        # This is a CPU bound operation and when the number of vectors is large, it can take a
+        # long time (around a second).
+        # Ideally, we would use a ProcessPoolExecutor to parallelize the computation of the metadata, but
+        # the Resource protobuf is not pickleable, so we can't use it in a ProcessPoolExecutor. This will
+        # be less of a problem when we move pinecone indexing to its own consumer.
+        return await asyncio.to_thread(
+            self._compute_vectorset_vectors, index_data, base_vector_metadatas
         )
 
     def _compute_vectorset_vectors(
