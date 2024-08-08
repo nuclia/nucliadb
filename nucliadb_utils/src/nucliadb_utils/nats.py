@@ -31,6 +31,7 @@ from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 
+from nucliadb_telemetry.errors import capture_exception
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 
@@ -74,7 +75,9 @@ class MessageProgressUpdater:
             await self._task
         except asyncio.CancelledError:  # pragma: no cover
             pass
-        except Exception:  # pragma: no cover
+        except Exception as exc:  # pragma: no cover
+            capture_exception(exc)
+            logger.exception("Error in MessageProgressUpdater")
             pass
 
     async def __aenter__(self):
