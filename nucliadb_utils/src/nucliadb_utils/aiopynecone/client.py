@@ -76,7 +76,6 @@ pinecone_observer = Observer(
 
 DEFAULT_TIMEOUT = 30
 CONTROL_PLANE_BASE_URL = "https://api.pinecone.io/"
-INDEX_HOST_BASE_URL = "https://{index_host}/"
 BASE_API_HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -550,8 +549,12 @@ class PineconeSession:
         if session is not None:
             return session
 
+        base_url = index_host
+        if not index_host.startswith("https://"):
+            base_url = f"https://{index_host}"
+
         session = httpx.AsyncClient(
-            base_url=INDEX_HOST_BASE_URL.format(index_host=index_host),
+            base_url=base_url,
             headers=BASE_API_HEADERS,
             timeout=DEFAULT_TIMEOUT,
         )
