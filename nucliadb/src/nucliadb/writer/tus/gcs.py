@@ -20,21 +20,19 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
-import os
 import socket
-import tempfile
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from datetime import datetime
 from typing import Optional
 from urllib.parse import quote_plus
 
 import aiohttp
 import backoff
-from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
+import google.auth.transport.requests  # type: ignore
+from google.auth.exceptions import DefaultCredentialsError  # type: ignore
+from google.oauth2 import service_account
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
@@ -88,9 +86,11 @@ class GCloudBlobStore(BlobStore):
         return {"AUTHORIZATION": f"Bearer {token}"}
 
     def _get_access_token(self):
-        access_token = self._credentials.get_access_token()
-        self._creation_access_token = datetime.now()
-        return access_token.access_token
+        if self._credentials.access_token_expired or self._credentials.invalid is True:
+            request = google.auth.transport.requests.Request()
+            self._credentials.refresh(request)
+
+        return self._credentials.token
 
     async def finalize(self):
         if self.session is not None:
@@ -115,14 +115,21 @@ class GCloudBlobStore(BlobStore):
 
         self._credentials = None
 
+        if json_credentials is None:
+            self._json_credentials = None
+        elif isinstance(json_credentials, str) and json_credentials.strip() == "":
+            self._json_credentials = None
+
         if json_credentials is not None:
-            self.json_credentials_file = os.path.join(tempfile.mkdtemp(), "gcs_credentials.json")
-            open(self.json_credentials_file, "w").write(
-                base64.b64decode(json_credentials).decode("utf-8")
+            self._credentials = service_account.Credentials.from_service_account_info(
+                self._json_credentials, scopes=SCOPES
             )
-            self._credentials = ServiceAccountCredentials.from_json_keyfile_name(
-                self.json_credentials_file, SCOPES
-            )
+        else:
+            try:
+                self._credentials, _ = google.auth.default()
+            except DefaultCredentialsError:
+                logger.warning("Setting up without credentials as couldn't find workload identity")
+                self._credentials = None
 
         loop = asyncio.get_event_loop()
         self.session = aiohttp.ClientSession(loop=loop)
@@ -132,7 +139,9 @@ class GCloudBlobStore(BlobStore):
             raise AttributeError()
 
         headers = await self.get_access_headers()
-        url = f"{self.object_base_url}/{bucket_name}?project={self.project}"
+        # Using object access url instead of bucket access to avoid
+        # giving admin permission to the SA, needed to GET a bucket
+        url = f"{self.object_base_url}/{bucket_name}/o"
         async with self.session.get(
             url,
             headers=headers,
