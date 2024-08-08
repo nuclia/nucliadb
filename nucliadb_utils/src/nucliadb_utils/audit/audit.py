@@ -94,7 +94,7 @@ class AuditStorage:
     ):
         raise NotImplementedError
 
-    def report_fields_and_paragraphs(self, kbid: str, paragraphs: int, fields: int):
+    def report_storage(self, kbid: str, paragraphs: int, fields: int, bytes: int):
         raise NotImplementedError
 
     def report_resources(
