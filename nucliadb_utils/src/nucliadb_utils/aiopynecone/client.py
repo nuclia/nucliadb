@@ -52,8 +52,20 @@ upsert_batch_size_histogram = Histogram(
 )
 upsert_batch_count_histogram = Histogram(
     "pinecone_upsert_batch_count",
-    buckets=[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0],
+    buckets=[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0, INF],
 )
+
+delete_batch_size_histogram = Histogram(
+    "pinecone_delete_batch_size",
+    buckets=[1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 150.0, INF],
+)
+
+delete_batch_count_histogram = Histogram(
+    "pinecone_delete_batch_count",
+    buckets=[0.0, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0, INF],
+)
+
+
 pinecone_observer = Observer(
     "pinecone_client",
     labels={"type": ""},
@@ -205,6 +217,7 @@ class DataPlane:
         if len(vectors) == 0:
             # Nothing to upsert.
             return
+        upsert_batch_size_histogram.observe(len(vectors))
         headers = {"Api-Key": self.api_key}
         payload = UpsertRequest(vectors=vectors)
         post_kwargs: dict[str, Any] = {
@@ -268,10 +281,10 @@ class DataPlane:
         for batch in batchify(vectors, batch_size):
             tasks.append(asyncio.create_task(_upsert_batch(batch)))
 
-        upsert_batch_size_histogram.observe(batch_size)
         upsert_batch_count_histogram.observe(len(tasks))
 
-        await asyncio.gather(*tasks)
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
 
     @backoff.on_exception(
         backoff.expo,
@@ -290,7 +303,10 @@ class DataPlane:
         """
         if len(ids) > MAX_DELETE_BATCH_SIZE:
             raise ValueError(f"Maximum number of ids in a single request is {MAX_DELETE_BATCH_SIZE}.")
+        if len(ids) == 0:  # pragma: no cover
+            return
 
+        delete_batch_size_histogram.observe(len(ids))
         headers = {"Api-Key": self.api_key}
         payload = {"ids": ids}
         post_kwargs: dict[str, Any] = {
@@ -431,14 +447,19 @@ class DataPlane:
 
         async def _delete_batch(batch):
             async with semaphore:
+                breakpoint()
                 await self.delete(ids=batch, timeout=batch_timeout)
 
         tasks = []
         async_iterable = self.list_all(id_prefix=id_prefix, page_timeout=batch_timeout)
         async for batch in async_batchify(async_iterable, batch_size):
+            breakpoint()
             tasks.append(asyncio.create_task(_delete_batch(batch)))
 
-        await asyncio.gather(*tasks)
+        delete_batch_count_histogram.observe(len(tasks))
+
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
 
     @backoff.on_exception(
         backoff.expo,
