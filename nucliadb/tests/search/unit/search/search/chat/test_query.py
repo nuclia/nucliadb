@@ -20,16 +20,12 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.search.predict import AnswerStatusCode, RephraseMissingContextError
+from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.search.chat.query import (
-    _parse_answer_status_code,
-    chat,
     get_find_results,
     parse_audit_answer,
 )
 from nucliadb_models.search import (
-    Author,
-    ChatContextMessage,
     ChatOptions,
     ChatRequest,
     KnowledgeboxFindResults,
@@ -44,74 +40,6 @@ def predict():
     predict = mock.AsyncMock()
     with mock.patch("nucliadb.search.search.chat.query.get_predict", return_value=predict):
         yield predict
-
-
-async def test_chat_does_not_call_predict_if_no_find_results(predict):
-    find_results = KnowledgeboxFindResults(
-        total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
-    )
-    chat_request = ChatRequest(query="query")
-
-    with mock.patch(
-        "nucliadb.search.search.chat.query.get_find_results",
-        return_value=(find_results, None),
-    ):
-        await chat(
-            "kbid",
-            chat_request,
-            "user_id",
-            NucliaDBClientType.API,
-            "origin",
-        )
-
-    predict.chat_query.assert_not_called()
-
-
-async def test_chat_uses_original_query_if_failed_to_rephrase(predict):
-    find_results = KnowledgeboxFindResults(
-        total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
-    )
-    chat_request = ChatRequest(
-        query="query", context=[ChatContextMessage(author=Author.NUCLIA, text="hello!")]
-    )
-
-    predict.rephrase_query.side_effect = RephraseMissingContextError()
-
-    with mock.patch(
-        "nucliadb.search.search.chat.query.get_find_results",
-        return_value=(find_results, None),
-    ) as find_mock:
-        await chat(
-            "kbid",
-            chat_request,
-            "user_id",
-            NucliaDBClientType.API,
-            "origin",
-        )
-
-        find_mock.assert_called_once()
-        assert find_mock.call_args.kwargs["query"] == "query"
-
-
-@pytest.mark.parametrize(
-    "chunk,status_code,error",
-    [
-        (b"", None, True),
-        (b"errorcodeisnotpresetn", None, True),
-        (b"0", AnswerStatusCode.SUCCESS, False),
-        (b"-1", AnswerStatusCode.ERROR, False),
-        (b"-2", AnswerStatusCode.NO_CONTEXT, False),
-        (b"foo.0", AnswerStatusCode.SUCCESS, False),
-        (b"bar.-1", AnswerStatusCode.ERROR, False),
-        (b"baz.-2", AnswerStatusCode.NO_CONTEXT, False),
-    ],
-)
-def test_parse_status_code(chunk, status_code, error):
-    if error:
-        with pytest.raises(ValueError):
-            _parse_answer_status_code(chunk)
-    else:
-        assert _parse_answer_status_code(chunk) == status_code
 
 
 @pytest.mark.parametrize(
