@@ -81,7 +81,7 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
-    const.Features.NATS_ASYNC_ACK: {
+    const.Features.NATS_SYNC_ACK: {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
