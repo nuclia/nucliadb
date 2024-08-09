@@ -145,8 +145,13 @@ class IngestConsumer:
         num_delivered = msg.metadata.num_delivered
         if num_delivered > 1:
             logger.warning(
-                f"Message has been delivered {num_delivered} times. "
-                f"seqid: {seqid}, subject: {subject}, reply: {reply}"
+                "Message has been redelivered",
+                extra={
+                    "seqid": seqid,
+                    "subject": subject,
+                    "reply": reply,
+                    "num_delivered": num_delivered,
+                },
             )
         start = time.monotonic()
 
@@ -215,6 +220,7 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.ack()
+                logger.info("Message acked", extra={"seqid": seqid})
             except (ShardsNotFound,) as e:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
                 # as we cannot do anything about it
@@ -226,6 +232,7 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.ack()
+                logger.info("Message acked", extra={"seqid": seqid})
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
                 errors.capture_exception(e)
@@ -235,10 +242,12 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.nak()
+                logger.info("Message nacked", extra={"seqid": seqid})
                 raise e
             else:
                 # Successful processing
                 await msg.ack()
+                logger.info("Message acked", extra={"seqid": seqid})
                 await self.clean_broker_message(msg)
 
 
