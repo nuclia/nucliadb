@@ -33,7 +33,6 @@ from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
-    Author,
     ChatContextMessage,
     ChatModel,
     ChatOptions,
@@ -419,17 +418,17 @@ def maybe_audit_chat(
 
     audit_answer = parse_audit_answer(text_answer, status_code)
 
-    # Append chat history and query context
-    audit_context = [
+    # Append chat history
+    chat_history_context = [
         audit_pb2.ChatContext(author=message.author, text=message.text) for message in chat_history
     ]
-    query_context_paragaph_ids = list(query_context.values())
-    audit_context.append(
-        audit_pb2.ChatContext(
-            author=Author.NUCLIA,
-            text=AUDIT_TEXT_RESULT_SEP.join(query_context_paragaph_ids),
-        )
-    )
+
+    # Append paragraphs retrieved on this chat
+    chat_retrieved_context = [
+        audit_pb2.RetrievedContext(text_block_id=paragraph_id, text=text)
+        for paragraph_id, text in query_context.items()
+    ]
+
     audit.chat(
         kbid,
         user_id,
@@ -440,7 +439,8 @@ def maybe_audit_chat(
         generative_answer_first_chunk_time=generative_answer_first_chunk_time,
         rephrase_time=rephrase_time,
         rephrased_question=rephrased_query,
-        context=audit_context,
+        chat_context=chat_history_context,
+        retrieved_context=chat_retrieved_context,
         answer=audit_answer,
         learning_id=learning_id,
     )

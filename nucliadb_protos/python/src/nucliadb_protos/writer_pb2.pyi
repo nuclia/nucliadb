@@ -34,6 +34,7 @@ from nucliadb_protos.audit_pb2 import (
     ClientType as ClientType,
     DASHBOARD as DASHBOARD,
     DESKTOP as DESKTOP,
+    RetrievedContext as RetrievedContext,
     WEB as WEB,
     WIDGET as WIDGET,
 )

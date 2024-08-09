@@ -33,12 +33,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import Response, StreamingResponse
 from starlette.types import ASGIApp
 
-from nucliadb_protos.audit_pb2 import (
-    AuditField,
-    AuditRequest,
-    ChatContext,
-    ClientType,
-)
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, ChatContext, ClientType, RetrievedContext
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_utils import logger
@@ -380,7 +375,8 @@ class StreamAuditStorage(AuditStorage):
         origin: str,
         question: str,
         rephrased_question: Optional[str],
-        context: List[ChatContext],
+        chat_context: List[ChatContext],
+        retrieved_context: List[RetrievedContext],
         answer: Optional[str],
         learning_id: str,
         rephrase_time: Optional[float] = None,
@@ -405,7 +401,8 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.generative_answer_first_chunk_time = generative_answer_first_chunk_time
         auditrequest.type = AuditRequest.CHAT
         auditrequest.chat.question = question
-        auditrequest.chat.context.extend(context)
+        auditrequest.chat.chat_context.extend(chat_context)
+        auditrequest.chat.retrieved_context.extend(retrieved_context)
         auditrequest.chat.learning_id = learning_id
         if rephrased_question is not None:
             auditrequest.chat.rephrased_question = rephrased_question
