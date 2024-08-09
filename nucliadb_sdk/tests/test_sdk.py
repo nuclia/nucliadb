@@ -85,12 +85,9 @@ def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
 def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.find(kbid=kb.uuid, query="foo")
     sdk.search(kbid=kb.uuid, query="foo")
-    sdk.chat(kbid=kb.uuid, query="foo")
     sdk.ask(kbid=kb.uuid, query="foo")
 
     resource = sdk.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
-    sdk.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
-    sdk.chat_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     sdk.ask_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
     sdk.ask_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")

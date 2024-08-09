@@ -65,7 +65,6 @@ from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,
     AskResponseItem,
-    ChatRequest,
     CitationsAskResponseItem,
     ErrorAskResponseItem,
     FeedbackRequest,
@@ -646,14 +645,6 @@ class _NucliaDBBase:
         request_type=SearchRequest,
         response_type=KnowledgeboxSearchResults,
     )
-    chat = _request_builder(
-        name="chat",
-        path_template="/v1/kb/{kbid}/chat",
-        method="POST",
-        path_params=("kbid",),
-        request_type=ChatRequest,
-        response_type=chat_response_parser,
-    )
 
     ask = _request_builder(
         name="ask",
@@ -662,24 +653,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=AskRequest,
         response_type=ask_response_parser,
-    )
-
-    chat_on_resource = _request_builder(
-        name="chat_on_resource",
-        path_template="/v1/kb/{kbid}/resource/{rid}/chat",
-        method="POST",
-        path_params=("kbid", "rid"),
-        request_type=ChatRequest,
-        response_type=chat_response_parser,
-    )
-
-    chat_on_resource_by_slug = _request_builder(
-        name="chat_on_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{slug}/chat",
-        method="POST",
-        path_params=("kbid", "slug"),
-        request_type=ChatRequest,
-        response_type=chat_response_parser,
     )
 
     ask_on_resource = _request_builder(

@@ -73,12 +73,9 @@ async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
 async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.find(kbid=kb.uuid, query="foo")
     await sdk_async.search(kbid=kb.uuid, query="foo")
-    await sdk_async.chat(kbid=kb.uuid, query="foo")
     await sdk_async.ask(kbid=kb.uuid, query="foo")
 
     resource = await sdk_async.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
-    await sdk_async.chat_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
-    await sdk_async.chat_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     await sdk_async.ask_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
     await sdk_async.ask_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     await sdk_async.feedback(
