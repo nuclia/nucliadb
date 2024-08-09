@@ -89,7 +89,7 @@ class IngestConsumer:
         context = {}
         if kbid:
             context["kbid"] = kbid
-        if has_feature(const.Features.NATS_ASYNC_ACK, default=False, context=context):
+        if has_feature(const.Features.NATS_SYNC_ACK, default=False, context=context):
             await msg.ack_sync(timeout=10)
         else:
             await msg.ack()
