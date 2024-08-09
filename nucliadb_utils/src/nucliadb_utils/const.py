@@ -83,3 +83,4 @@ class Features:
     PG_CATALOG_WRITE = "nucliadb_pg_catalog_write"
     VECTORSETS_V0 = "vectorsets_v0_new_kbs_with_multiple_vectorsets"
     SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
+    NATS_ASYNC_ACK = "nucliadb_nats_async_ack"

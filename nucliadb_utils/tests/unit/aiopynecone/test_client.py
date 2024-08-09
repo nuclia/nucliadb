@@ -34,6 +34,7 @@ from nucliadb_utils.aiopynecone.client import (
     batchify,
     raise_for_status,
 )
+from nucliadb_utils.aiopynecone.exceptions import PineconeNeedsPlanUpgradeError
 from nucliadb_utils.aiopynecone.models import CreateIndexRequest, QueryResponse, Vector
 
 
@@ -328,6 +329,27 @@ def test_raise_for_status_rate_limit():
         "message", request=request, response=response
     )
     with pytest.raises(PineconeRateLimitError):
+        raise_for_status("op", response)
+
+
+def test_raise_for_status_monthly_rate_limit():
+    request = unittest.mock.MagicMock()
+    response = unittest.mock.MagicMock(
+        status_code=429,
+        json=unittest.mock.Mock(
+            return_value={
+                "message": "Request failed. You've reached your write unit limit for the current month (2000000). To continue writing data, upgrade your plan.",  # noqa
+                "code": 8,
+                "details": [],
+            }
+        ),
+    )
+    response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "Request failed. You've reached your write unit limit for the current month (2000000). To continue writing data, upgrade your plan.",  # noqa
+        request=request,
+        response=response,
+    )
+    with pytest.raises(PineconeNeedsPlanUpgradeError):
         raise_for_status("op", response)
 
 
