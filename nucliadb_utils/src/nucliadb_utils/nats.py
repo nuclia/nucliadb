@@ -74,6 +74,7 @@ class MessageProgressUpdater:
         try:
             await self._task
         except asyncio.CancelledError:  # pragma: no cover
+            logger.info("MessageProgressUpdater cancelled")
             pass
         except Exception as exc:  # pragma: no cover
             capture_exception(exc)

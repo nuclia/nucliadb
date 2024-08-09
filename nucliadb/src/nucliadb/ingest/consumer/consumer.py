@@ -142,6 +142,17 @@ class IngestConsumer:
         reply = msg.reply
         seqid = int(reply.split(".")[5])
         message_source = "<msg source not set>"
+        num_delivered = msg.metadata.num_delivered
+        if num_delivered > 1:
+            logger.warning(
+                "Message has been redelivered",
+                extra={
+                    "seqid": seqid,
+                    "subject": subject,
+                    "reply": reply,
+                    "num_delivered": num_delivered,
+                },
+            )
         start = time.monotonic()
 
         async with (
@@ -209,6 +220,7 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.ack()
+                logger.info("Message acked because of deadletter", extra={"seqid": seqid})
             except (ShardsNotFound,) as e:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
                 # as we cannot do anything about it
@@ -220,6 +232,7 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.ack()
+                logger.info("Message acked because of drop", extra={"seqid": seqid})
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
                 errors.capture_exception(e)
@@ -229,10 +242,12 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.nak()
+                logger.info("Message nacked because of unhandled error", extra={"seqid": seqid})
                 raise e
             else:
                 # Successful processing
                 await msg.ack()
+                logger.info("Message acked because of success", extra={"seqid": seqid})
                 await self.clean_broker_message(msg)
 
 
