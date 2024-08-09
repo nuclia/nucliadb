@@ -86,11 +86,16 @@ class GCloudBlobStore(BlobStore):
         return {"AUTHORIZATION": f"Bearer {token}"}
 
     def _get_access_token(self):
-        if self._credentials.access_token_expired or self._credentials.invalid is True:
-            request = google.auth.transport.requests.Request()
-            self._credentials.refresh(request)
+        if isinstance(self._credentials, google.auth.compute_engine.credentials.Credentials):
+            # google default auth object
+            if self._credentials.expired or self._credentials.valid is False:
+                request = google.auth.transport.requests.Request()
+                self._credentials.refresh(request)
 
-        return self._credentials.token
+            return self._credentials.token
+        else:
+            access_token = self._credentials.get_access_token()
+            return access_token.access_token
 
     async def finalize(self):
         if self.session is not None:
