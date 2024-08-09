@@ -40,6 +40,7 @@ from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import MessageProgressUpdater, NatsConnectionManager
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import has_feature
 
 consumer_observer = metrics.Observer(
     "message_processor",
@@ -83,6 +84,15 @@ class IngestConsumer:
 
         self.lock = lock or asyncio.Lock()
         self.processor = Processor(driver, storage, pubsub, partition)
+
+    async def ack_message(self, msg: Msg, kbid: Optional[str] = None):
+        context = {}
+        if kbid:
+            context["kbid"] = kbid
+        if has_feature(const.Features.NATS_ASYNC_ACK, default=False, context=context):
+            await msg.ack_sync(timeout=10)
+        else:
+            await msg.ack()
 
     async def initialize(self):
         await self.setup_nats_subscription()
@@ -138,6 +148,7 @@ class IngestConsumer:
                 logger.warning("Could not delete blob reference", exc_info=True)
 
     async def subscription_worker(self, msg: Msg):
+        kbid: Optional[str] = None
         subject = msg.subject
         reply = msg.reply
         seqid = int(reply.split(".")[5])
@@ -175,7 +186,7 @@ class IngestConsumer:
                     f"Received from {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} partition {self.partition} at {time}"  # noqa
                 )
                 context.add_context({"kbid": pb.kbid, "rid": pb.uuid})
-
+                kbid = pb.kbid
                 try:
                     with consumer_observer(
                         {"source": ("writer" if pb.source == pb.MessageSource.WRITER else "processor")}
@@ -219,7 +230,7 @@ class IngestConsumer:
                     f"A copy of the message has been stored on {self.processor.storage.deadletter_bucket}. "
                     f"Check sentry for more details: {str(e)}"
                 )
-                await msg.ack()
+                await self.ack_message(msg, kbid)
                 logger.info("Message acked because of deadletter", extra={"seqid": seqid})
             except (ShardsNotFound,) as e:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
@@ -231,7 +242,7 @@ class IngestConsumer:
                     f"This message has been dropped and won't be retried again"
                     f"Check sentry for more details: {str(e)}"
                 )
-                await msg.ack()
+                await self.ack_message(msg, kbid)
                 logger.info("Message acked because of drop", extra={"seqid": seqid})
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
@@ -246,7 +257,7 @@ class IngestConsumer:
                 raise e
             else:
                 # Successful processing
-                await msg.ack()
+                await self.ack_message(msg, kbid)
                 logger.info("Message acked because of success", extra={"seqid": seqid})
                 await self.clean_broker_message(msg)
 
