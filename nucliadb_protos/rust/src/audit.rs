@@ -77,6 +77,14 @@ pub struct ChatContext {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RetrievedContext {
+    #[prost(string, tag = "1")]
+    pub text_block_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub text: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChatAudit {
     #[prost(string, tag = "1")]
     pub question: ::prost::alloc::string::String,
@@ -84,8 +92,15 @@ pub struct ChatAudit {
     pub answer: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "3")]
     pub rephrased_question: ::core::option::Option<::prost::alloc::string::String>,
+    /// Conversation from chats
+    #[deprecated]
     #[prost(message, repeated, tag = "4")]
     pub context: ::prost::alloc::vec::Vec<ChatContext>,
+    /// context retrieved on the current ask
+    #[prost(message, repeated, tag = "6")]
+    pub chat_context: ::prost::alloc::vec::Vec<ChatContext>,
+    #[prost(message, repeated, tag = "8")]
+    pub retrieved_context: ::prost::alloc::vec::Vec<RetrievedContext>,
     #[prost(string, tag = "5")]
     pub learning_id: ::prost::alloc::string::String,
 }

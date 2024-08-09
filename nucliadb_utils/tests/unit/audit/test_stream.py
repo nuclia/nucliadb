@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nucliadb_protos.audit_pb2 import AuditRequest, ChatContext
+from nucliadb_protos.audit_pb2 import AuditRequest, ChatContext, RetrievedContext
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_utils.audit.stream import StreamAuditStorage
 
@@ -145,7 +145,8 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
         rephrase_time=1,
         question="foo",
         rephrased_question="rephrased",
-        context=[ChatContext(author="USER", text="epa")],
+        chat_context=[ChatContext(author="USER", text="epa")],
+        retrieved_context=[RetrievedContext(text="epa", text_block_id="some/id/path")],
         answer="bar",
         learning_id="learning_id",
     )
@@ -161,5 +162,7 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
     assert pb.chat.rephrased_question == "rephrased"
     assert pb.chat.answer == "bar"
     assert pb.chat.learning_id == "learning_id"
-    assert pb.chat.context[0].author == "USER"
-    assert pb.chat.context[0].text == "epa"
+    assert pb.chat.chat_context[0].author == "USER"
+    assert pb.chat.chat_context[0].text == "epa"
+    assert pb.chat.retrieved_context[0].text_block_id == "some/id/path"
+    assert pb.chat.retrieved_context[0].text == "epa"

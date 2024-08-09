@@ -39,11 +39,21 @@ message ChatContext {
   string text = 2;
 }
 
+message RetrievedContext {
+  string text_block_id = 1;
+  string text = 2;
+
+}
+
 message ChatAudit {
   string question = 1;
   optional string answer = 2;
   optional string rephrased_question = 3;
-  repeated ChatContext context = 4;
+  // Conversation from chats
+  repeated ChatContext context = 4 [deprecated = true];
+  // context retrieved on the current ask
+  repeated ChatContext chat_context = 6;
+  repeated RetrievedContext retrieved_context = 8;
   string learning_id = 5;
 }
 

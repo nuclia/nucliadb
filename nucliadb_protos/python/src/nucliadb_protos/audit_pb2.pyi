@@ -128,6 +128,24 @@ class ChatContext(google.protobuf.message.Message):
 global___ChatContext = ChatContext
 
 @typing.final
+class RetrievedContext(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TEXT_BLOCK_ID_FIELD_NUMBER: builtins.int
+    TEXT_FIELD_NUMBER: builtins.int
+    text_block_id: builtins.str
+    text: builtins.str
+    def __init__(
+        self,
+        *,
+        text_block_id: builtins.str = ...,
+        text: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["text", b"text", "text_block_id", b"text_block_id"]) -> None: ...
+
+global___RetrievedContext = RetrievedContext
+
+@typing.final
 class ChatAudit(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -135,13 +153,23 @@ class ChatAudit(google.protobuf.message.Message):
     ANSWER_FIELD_NUMBER: builtins.int
     REPHRASED_QUESTION_FIELD_NUMBER: builtins.int
     CONTEXT_FIELD_NUMBER: builtins.int
+    CHAT_CONTEXT_FIELD_NUMBER: builtins.int
+    RETRIEVED_CONTEXT_FIELD_NUMBER: builtins.int
     LEARNING_ID_FIELD_NUMBER: builtins.int
     question: builtins.str
     answer: builtins.str
     rephrased_question: builtins.str
     learning_id: builtins.str
     @property
-    def context(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ChatContext]: ...
+    def context(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ChatContext]:
+        """Conversation from chats"""
+
+    @property
+    def chat_context(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ChatContext]:
+        """context retrieved on the current ask"""
+
+    @property
+    def retrieved_context(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RetrievedContext]: ...
     def __init__(
         self,
         *,
@@ -149,10 +177,12 @@ class ChatAudit(google.protobuf.message.Message):
         answer: builtins.str | None = ...,
         rephrased_question: builtins.str | None = ...,
         context: collections.abc.Iterable[global___ChatContext] | None = ...,
+        chat_context: collections.abc.Iterable[global___ChatContext] | None = ...,
+        retrieved_context: collections.abc.Iterable[global___RetrievedContext] | None = ...,
         learning_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "rephrased_question", b"rephrased_question"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "context", b"context", "learning_id", b"learning_id", "question", b"question", "rephrased_question", b"rephrased_question"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "chat_context", b"chat_context", "context", b"context", "learning_id", b"learning_id", "question", b"question", "rephrased_question", b"rephrased_question", "retrieved_context", b"retrieved_context"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_answer", b"_answer"]) -> typing.Literal["answer"] | None: ...
     @typing.overload

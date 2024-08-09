@@ -21,11 +21,7 @@ from typing import List, Optional
 
 from google.protobuf.timestamp_pb2 import Timestamp
 
-from nucliadb_protos.audit_pb2 import (
-    AuditField,
-    AuditRequest,
-    ChatContext,
-)
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, ChatContext, RetrievedContext
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
 
@@ -85,7 +81,8 @@ class AuditStorage:
         origin: str,
         question: str,
         rephrased_question: Optional[str],
-        context: List[ChatContext],
+        chat_context: List[ChatContext],
+        retrieved_context: List[RetrievedContext],
         answer: Optional[str],
         learning_id: str,
         rephrase_time: Optional[float] = None,
