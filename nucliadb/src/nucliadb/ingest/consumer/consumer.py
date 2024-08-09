@@ -142,6 +142,12 @@ class IngestConsumer:
         reply = msg.reply
         seqid = int(reply.split(".")[5])
         message_source = "<msg source not set>"
+        num_delivered = msg.metadata.num_delivered
+        if num_delivered > 1:
+            logger.warning(
+                f"Message has been delivered {num_delivered} times. "
+                f"seqid: {seqid}, subject: {subject}, reply: {reply}"
+            )
         start = time.monotonic()
 
         async with (
