@@ -220,7 +220,7 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.ack()
-                logger.info("Message acked", extra={"seqid": seqid})
+                logger.info("Message acked because of deadletter", extra={"seqid": seqid})
             except (ShardsNotFound,) as e:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
                 # as we cannot do anything about it
@@ -232,7 +232,7 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.ack()
-                logger.info("Message acked", extra={"seqid": seqid})
+                logger.info("Message acked because of drop", extra={"seqid": seqid})
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
                 errors.capture_exception(e)
@@ -242,12 +242,12 @@ class IngestConsumer:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.nak()
-                logger.info("Message nacked", extra={"seqid": seqid})
+                logger.info("Message nacked because of unhandled error", extra={"seqid": seqid})
                 raise e
             else:
                 # Successful processing
                 await msg.ack()
-                logger.info("Message acked", extra={"seqid": seqid})
+                logger.info("Message acked because of success", extra={"seqid": seqid})
                 await self.clean_broker_message(msg)
 
 
