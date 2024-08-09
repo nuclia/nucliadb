@@ -22,7 +22,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import os
 import socket
+import tempfile
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -34,7 +36,7 @@ import backoff
 import google.auth.compute_engine.credentials  # type: ignore
 import google.auth.transport.requests  # type: ignore
 from google.auth.exceptions import DefaultCredentialsError  # type: ignore
-from google.oauth2 import service_account
+from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
@@ -123,8 +125,13 @@ class GCloudBlobStore(BlobStore):
         self._credentials = None
 
         if self.json_credentials is not None and self.json_credentials.strip() != "":
-            self._credentials = service_account.Credentials.from_service_account_info(
-                base64.b64decode(self.json_credentials).decode("utf-8"), scopes=SCOPES
+            self.json_credentials_file = os.path.join(tempfile.mkdtemp(), "gcs_credentials.json")
+            with open(self.json_credentials_file, "w") as file:
+                file.write(
+                    base64.b64decode(self.json_credentials).decode("utf-8")
+                )
+            self._credentials = ServiceAccountCredentials.from_json_keyfile_name(
+                self.json_credentials_file, SCOPES
             )
         else:
             try:

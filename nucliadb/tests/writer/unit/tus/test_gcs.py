@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -26,7 +26,7 @@ from nucliadb.writer.tus.gcs import GCloudBlobStore
 
 @pytest.mark.asyncio
 @patch("nucliadb.writer.tus.gcs.aiohttp")
-@patch("nucliadb.writer.tus.gcs.service_account")
+@patch("nucliadb.writer.tus.gcs.ServiceAccountCredentials")
 async def test_tus_gcs(mock_sa, mock_aiohttp):
     mock_session = MagicMock()
     mock_aiohttp.ClientSession.return_value = mock_session
@@ -44,8 +44,8 @@ async def test_tus_gcs(mock_sa, mock_aiohttp):
         json_credentials="dGVzdC1jcmVk",
     )
 
-    mock_sa.Credentials.from_service_account_info.assert_called_once_with(
-        "test-cred", scopes=["https://www.googleapis.com/auth/devstorage.read_write"]
+    mock_sa.from_json_keyfile_name.assert_called_once_with(
+        ANY, ["https://www.googleapis.com/auth/devstorage.read_write"]
     )
 
     assert await gblobstore.check_exists("test-bucket")
