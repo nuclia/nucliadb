@@ -44,5 +44,9 @@ async def chat_knowledgebox_endpoint(
 ) -> HTTPClientError:
     return HTTPClientError(
         status_code=404,
-        detail="This endpoint has been removed deprecated. Please use /ask instead.",
+        detail=(
+            "This endpoint has been removed. Use /ask instead."
+            "For more information on how to migrate to use /ask, please refer to: "
+            "https://docs.nuclia.dev/docs/changelog/updates/2024-05-30/#migration-guide"
+        ),
     )
