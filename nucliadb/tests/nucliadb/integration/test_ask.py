@@ -530,3 +530,17 @@ async def test_ask_with_json_schema_output(
     answer_json = results[1].item.object
     assert answer_json["answer"] == "valid answer to"
     assert answer_json["confidence"] == 0.5
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_assert_audit_retrieval_contexts(
+    nucliadb_reader: AsyncClient, knowledgebox, resources, audit
+):
+    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "title", "debug": True})
+    assert resp.status_code == 200
+
+    retrieved_context = audit.chat.call_args_list[0].kwargs["retrieved_context"]
+    assert {(f"{rid}/a/title/0-11", f"The title {i}") for i, rid in enumerate(resources)} == {
+        (a.text_block_id, a.text) for a in retrieved_context
+    }

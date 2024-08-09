@@ -417,7 +417,6 @@ def maybe_audit_chat(
         return
 
     audit_answer = parse_audit_answer(text_answer, status_code)
-
     # Append chat history
     chat_history_context = [
         audit_pb2.ChatContext(author=message.author, text=message.text) for message in chat_history
