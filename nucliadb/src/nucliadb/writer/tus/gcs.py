@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import socket
 import uuid
@@ -123,7 +124,7 @@ class GCloudBlobStore(BlobStore):
 
         if self.json_credentials is not None and self.json_credentials.strip() != "":
             self._credentials = service_account.Credentials.from_service_account_info(
-                self.json_credentials, scopes=SCOPES
+                base64.b64decode(self.json_credentials).decode("utf-8"), scopes=SCOPES
             )
         else:
             try:
