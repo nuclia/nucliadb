@@ -21,6 +21,7 @@ import logging
 from typing import AsyncGenerator, Optional
 
 import orjson
+from pydantic import BaseModel
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
@@ -29,9 +30,26 @@ from .utils import get_kv_pb, with_ro_transaction
 
 logger = logging.getLogger(__name__)
 
+KB_ROLLOVER_STATE = "/kbs/{kbid}/rollover/state"
 KB_ROLLOVER_SHARDS = "/kbs/{kbid}/rollover/shards"
 KB_ROLLOVER_RESOURCES_TO_INDEX = "/kbs/{kbid}/rollover/to-index/{resource}"
 KB_ROLLOVER_RESOURCES_INDEXED = "/kbs/{kbid}/rollover/indexed/{resource}"
+
+
+class RolloverState(BaseModel):
+    rollover_shards_created: bool = False
+    resources_scheduled: bool = False
+    resources_indexed: bool = False
+    cutover: bool = False
+    resources_validated: bool = False
+
+
+class RolloverStateNotFoundError(Exception):
+    """
+    Raised when the rollover state is not found.
+    """
+
+    ...
 
 
 async def get_kb_rollover_shards(txn: Transaction, *, kbid: str) -> Optional[writer_pb2.Shards]:
@@ -163,3 +181,21 @@ async def iterate_indexed_data(*, kbid: str) -> AsyncGenerator[tuple[str, tuple[
     if len(batch) > 0:
         for key, val in await _get_batch_indexed_data(kbid=kbid, batch=batch):
             yield key, val
+
+
+async def get_rollover_state(txn: Transaction, kbid: str) -> RolloverState:
+    key = KB_ROLLOVER_STATE.format(kbid=kbid)
+    val = await txn.get(key)
+    if not val:
+        raise RolloverStateNotFoundError(kbid)
+    return RolloverState.model_validate_json(val)
+
+
+async def set_rollover_state(txn: Transaction, kbid: str, state: RolloverState) -> None:
+    key = KB_ROLLOVER_STATE.format(kbid=kbid)
+    await txn.set(key, state.model_dump_json().encode())
+
+
+async def clear_rollover_state(txn: Transaction, kbid: str) -> None:
+    key = KB_ROLLOVER_STATE.format(kbid=kbid)
+    await txn.delete(key)
