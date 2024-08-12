@@ -44,6 +44,14 @@ class RolloverState(BaseModel):
     cutover: bool = False
 
 
+class RolloverStateNotFoundError(Exception):
+    """
+    Raised when the rollover state is not found.
+    """
+
+    ...
+
+
 async def get_kb_rollover_shards(txn: Transaction, *, kbid: str) -> Optional[writer_pb2.Shards]:
     key = KB_ROLLOVER_SHARDS.format(kbid=kbid)
     return await get_kv_pb(txn, key, writer_pb2.Shards)
@@ -175,11 +183,11 @@ async def iterate_indexed_data(*, kbid: str) -> AsyncGenerator[tuple[str, tuple[
             yield key, val
 
 
-async def get_rollover_state(txn: Transaction, kbid: str) -> Optional[RolloverState]:
+async def get_rollover_state(txn: Transaction, kbid: str) -> RolloverState:
     key = KB_ROLLOVER_STATE.format(kbid=kbid)
     val = await txn.get(key)
     if not val:
-        return None
+        raise RolloverStateNotFoundError(kbid)
     return RolloverState.model_validate_json(val)
 
 

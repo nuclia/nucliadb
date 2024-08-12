@@ -52,8 +52,9 @@ async def create_rollover_shards(
     sm = app_context.shard_manager
 
     async with datamanagers.with_ro_transaction() as txn:
-        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if state is None:
+        try:
+            state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
+        except datamanagers.rollover.RolloverStateNotFoundError:
             # First time we are creating shards
             state = RolloverState()
 
@@ -135,7 +136,7 @@ async def schedule_resource_indexing(app_context: ApplicationContext, kbid: str)
     logger.info("Scheduling resources to be indexed to rollover shards", extra={"kbid": kbid})
     async with datamanagers.with_ro_transaction() as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if state is None or not state.rollover_shards_created:
+        if not state.rollover_shards_created:
             raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
         if state.resources_scheduled:
             logger.info(
@@ -175,7 +176,7 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
 
     async with datamanagers.with_ro_transaction() as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if state is None or not state.rollover_shards_created or not state.resources_scheduled:
+        if not state.rollover_shards_created or not state.resources_scheduled:
             raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
         rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
         if rollover_shards is None:
@@ -262,8 +263,7 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
 
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if (
-            state is None
-            or not state.rollover_shards_created
+            not state.rollover_shards_created
             or not state.resources_scheduled
             or not state.resources_indexed
         ):
@@ -305,8 +305,7 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
     async with datamanagers.with_ro_transaction() as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if (
-            state is None
-            or not state.rollover_shards_created
+            not state.rollover_shards_created
             or not state.resources_scheduled
             or not state.resources_indexed
             or not state.cutover
@@ -433,14 +432,25 @@ async def clean_indexed_data(app_context: ApplicationContext, kbid: str) -> None
 
 async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> None:
     async with datamanagers.with_transaction() as txn:
-        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if state is None:
+        try:
+            await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
+        except datamanagers.rollover.RolloverStateNotFoundError:
             logger.warning(
                 "No rollover state found, skipping clean rollover status", extra={"kbid": kbid}
             )
             return
         await datamanagers.rollover.clear_rollover_state(txn, kbid=kbid)
         await txn.commit()
+
+
+async def wait_for_cluster_ready() -> None:
+    node_ready_checks = 0
+    while len(cluster_manager.INDEX_NODES) == 0:
+        if node_ready_checks > 10:
+            raise Exception("No index nodes available")
+        logger.info("Waiting for index nodes to be available")
+        await asyncio.sleep(1)
+        node_ready_checks += 1
 
 
 async def rollover_kb_shards(
@@ -466,16 +476,9 @@ async def rollover_kb_shards(
     - Validate that all resources are in the new shards
     - Clean up indexed data
     """
-    node_ready_checks = 0
-    while len(cluster_manager.INDEX_NODES) == 0:
-        if node_ready_checks > 10:
-            raise Exception("No index nodes available")
-        logger.info("Waiting for index nodes to be available")
-        await asyncio.sleep(1)
-        node_ready_checks += 1
+    await wait_for_cluster_ready()
 
     logger.info("Rolling over shards", extra={"kbid": kbid})
-
     async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
         await create_rollover_shards(app_context, kbid, drain_nodes=drain_nodes)
         await schedule_resource_indexing(app_context, kbid)
