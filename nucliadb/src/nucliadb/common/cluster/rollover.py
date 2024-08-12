@@ -26,7 +26,7 @@ from typing import Optional
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.datamanagers.rollover import RolloverState
+from nucliadb.common.datamanagers.rollover import RolloverState, RolloverStateNotFoundError
 from nucliadb_protos import nodewriter_pb2, writer_pb2
 from nucliadb_telemetry import errors
 
@@ -54,7 +54,7 @@ async def create_rollover_shards(
     async with datamanagers.with_ro_transaction() as txn:
         try:
             state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        except datamanagers.rollover.RolloverStateNotFoundError:
+        except RolloverStateNotFoundError:
             # First time we are creating shards
             state = RolloverState()
 
@@ -176,7 +176,7 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
 
     async with datamanagers.with_ro_transaction() as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if not state.rollover_shards_created or not state.resources_scheduled:
+        if not all([state.rollover_shards_created, state.resources_scheduled]):
             raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
         rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
         if rollover_shards is None:
@@ -262,13 +262,14 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
         sm = app_context.shard_manager
 
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if (
-            not state.rollover_shards_created
-            or not state.resources_scheduled
-            or not state.resources_indexed
+        if not all(
+            [
+                state.rollover_shards_created,
+                state.resources_scheduled,
+                state.resources_indexed,
+            ]
         ):
             raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
-
         if state.cutover:
             logger.info("Shards already cut over, skipping", extra={"kbid": kbid})
             return
@@ -304,11 +305,13 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
 
     async with datamanagers.with_ro_transaction() as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if (
-            not state.rollover_shards_created
-            or not state.resources_scheduled
-            or not state.resources_indexed
-            or not state.cutover
+        if not all(
+            [
+                state.rollover_shards_created,
+                state.resources_scheduled,
+                state.resources_indexed,
+                state.cutover,
+            ]
         ):
             raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
 
@@ -434,7 +437,7 @@ async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> N
     async with datamanagers.with_transaction() as txn:
         try:
             await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        except datamanagers.rollover.RolloverStateNotFoundError:
+        except RolloverStateNotFoundError:
             logger.warning(
                 "No rollover state found, skipping clean rollover status", extra={"kbid": kbid}
             )
