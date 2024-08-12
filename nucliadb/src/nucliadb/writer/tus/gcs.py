@@ -127,9 +127,7 @@ class GCloudBlobStore(BlobStore):
         if self.json_credentials is not None and self.json_credentials.strip() != "":
             self.json_credentials_file = os.path.join(tempfile.mkdtemp(), "gcs_credentials.json")
             with open(self.json_credentials_file, "w") as file:
-                file.write(
-                    base64.b64decode(self.json_credentials).decode("utf-8")
-                )
+                file.write(base64.b64decode(self.json_credentials).decode("utf-8"))
             self._credentials = ServiceAccountCredentials.from_json_keyfile_name(
                 self.json_credentials_file, SCOPES
             )

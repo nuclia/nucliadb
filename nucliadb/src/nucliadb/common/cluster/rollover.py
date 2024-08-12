@@ -19,7 +19,6 @@
 #
 import argparse
 import asyncio
-import enum
 import logging
 from datetime import datetime
 from typing import Optional
@@ -27,6 +26,7 @@ from typing import Optional
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.datamanagers.rollover import RolloverState
 from nucliadb_protos import nodewriter_pb2, writer_pb2
 from nucliadb_telemetry import errors
 
@@ -35,25 +35,6 @@ from .settings import settings
 from .utils import delete_resource_from_shard, index_resource_to_shard, wait_for_node
 
 logger = logging.getLogger(__name__)
-
-
-class RolloverStatus(enum.Enum):
-    RESOURCES_SCHEDULED = "resources_scheduled"
-    RESOURCES_INDEXED = "resources_indexed"
-    RESOURCES_VALIDATED = "resources_validated"
-
-
-def _get_rollover_status(rollover_shards: writer_pb2.Shards, status: RolloverStatus) -> bool:
-    return rollover_shards.extra.get(status.value) == "true"
-
-
-def _set_rollover_status(rollover_shards: writer_pb2.Shards, status: RolloverStatus):
-    rollover_shards.extra[status.value] = "true"
-
-
-def _clear_rollover_status(rollover_shards: writer_pb2.Shards):
-    for status in RolloverStatus:
-        rollover_shards.extra.pop(status.value, None)
 
 
 class UnexpectedRolloverError(Exception):
@@ -71,14 +52,18 @@ async def create_rollover_shards(
     sm = app_context.shard_manager
 
     async with datamanagers.with_ro_transaction() as txn:
-        existing_rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
-        if existing_rollover_shards is not None:
-            logger.info("Rollover shards already exist, skipping", extra={"kbid": kbid})
-            return existing_rollover_shards
+        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
+        if state is None:
+            # First time we are creating shards
+            state = RolloverState()
 
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
             raise UnexpectedRolloverError(f"No shards found for KB {kbid}")
+
+        if state.rollover_shards_created:
+            logger.info("Rollover shards already created, skipping", extra={"kbid": kbid})
+            return kb_shards
 
     # create new shards
     created_shards = []
@@ -130,6 +115,8 @@ async def create_rollover_shards(
 
     async with datamanagers.with_transaction() as txn:
         await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=kb_shards)
+        state.rollover_shards_created = True
+        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await txn.commit()
         return kb_shards
 
@@ -145,19 +132,17 @@ async def schedule_resource_indexing(app_context: ApplicationContext, kbid: str)
     """
     Schedule indexing all data in a kb in rollover shards
     """
-    logger.info("Indexing rollover shards", extra={"kbid": kbid})
-
-    async with datamanagers.with_transaction() as txn:
-        rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
-        if rollover_shards is None:
+    logger.info("Scheduling resources to be indexed to rollover shards", extra={"kbid": kbid})
+    async with datamanagers.with_ro_transaction() as txn:
+        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
+        if state is None or not state.rollover_shards_created:
             raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
-
-    if _get_rollover_status(rollover_shards, RolloverStatus.RESOURCES_SCHEDULED):
-        logger.info(
-            "Resources already scheduled for indexing, skipping",
-            extra={"kbid": kbid},
-        )
-        return
+        if state.resources_scheduled:
+            logger.info(
+                "Resources already scheduled for indexing, skipping",
+                extra={"kbid": kbid},
+            )
+            return
 
     batch = []
     async for resource_id in datamanagers.resources.iterate_resource_ids(kbid=kbid):
@@ -174,8 +159,8 @@ async def schedule_resource_indexing(app_context: ApplicationContext, kbid: str)
             await txn.commit()
 
     async with datamanagers.with_transaction() as txn:
-        _set_rollover_status(rollover_shards, RolloverStatus.RESOURCES_SCHEDULED)
-        await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=rollover_shards)
+        state.resources_scheduled = True
+        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await txn.commit()
 
 
@@ -188,17 +173,18 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
     Indexes all data in a kb in rollover shards
     """
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
+        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
+        if state is None or not state.rollover_shards_created or not state.resources_scheduled:
+            raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
         rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
-    if rollover_shards is None:
-        raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
-
-    if _get_rollover_status(rollover_shards, RolloverStatus.RESOURCES_INDEXED):
+        if rollover_shards is None:
+            raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
+    if state.resources_indexed:
         logger.info("Resources already indexed, skipping", extra={"kbid": kbid})
         return
 
     logger.info("Indexing rollover shards", extra={"kbid": kbid})
-
     wait_index_batch: list[writer_pb2.ShardObject] = []
     # now index on all new shards only
     while True:
@@ -259,8 +245,9 @@ async def index_rollover_shards(app_context: ApplicationContext, kbid: str) -> N
                 await wait_for_node(app_context, node_id)
             wait_index_batch = []
 
-    _set_rollover_status(rollover_shards, RolloverStatus.RESOURCES_INDEXED)
     async with datamanagers.with_transaction() as txn:
+        state.resources_indexed = True
+        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=rollover_shards)
         await txn.commit()
 
@@ -273,6 +260,19 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
     async with datamanagers.with_transaction() as txn:
         sm = app_context.shard_manager
 
+        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
+        if (
+            state is None
+            or not state.rollover_shards_created
+            or not state.resources_scheduled
+            or not state.resources_indexed
+        ):
+            raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
+
+        if state.cutover:
+            logger.info("Shards already cut over, skipping", extra={"kbid": kbid})
+            return
+
         previously_active_shards = await datamanagers.cluster.get_kb_shards(
             txn, kbid=kbid, for_update=True
         )
@@ -280,12 +280,14 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
         if previously_active_shards is None or rollover_shards is None:
             raise UnexpectedRolloverError("Shards for kb not found")
 
-        _clear_rollover_status(rollover_shards)
         await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=rollover_shards)
         await datamanagers.rollover.delete_kb_rollover_shards(txn, kbid=kbid)
 
         for shard in previously_active_shards.shards:
             await sm.rollback_shard(shard)
+
+        state.cutover = True
+        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
 
         await txn.commit()
 
@@ -301,11 +303,21 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
     """
 
     async with datamanagers.with_ro_transaction() as txn:
+        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
+        if (
+            state is None
+            or not state.rollover_shards_created
+            or not state.resources_scheduled
+            or not state.resources_indexed
+            or not state.cutover
+        ):
+            raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
+
         rolled_over_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if rolled_over_shards is None:
             raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
 
-    if _get_rollover_status(rolled_over_shards, RolloverStatus.RESOURCES_VALIDATED):
+    if state.resources_validated:
         logger.info("Resources already validated, skipping", extra={"kbid": kbid})
         return []
 
@@ -396,8 +408,9 @@ async def validate_indexed_data(app_context: ApplicationContext, kbid: str) -> l
             raise UnexpectedRolloverError("Shard not found. This should not happen")
         await delete_resource_from_shard(app_context, kbid, resource_id, shard)
 
-    _set_rollover_status(rolled_over_shards, RolloverStatus.RESOURCES_VALIDATED)
     async with datamanagers.with_transaction() as txn:
+        state.resources_validated = True
+        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=rolled_over_shards)
 
     return repaired_resources
@@ -420,16 +433,14 @@ async def clean_indexed_data(app_context: ApplicationContext, kbid: str) -> None
 
 async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> None:
     async with datamanagers.with_transaction() as txn:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
-        if kb_shards is None:
+        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
+        if state is None:
             logger.warning(
-                "No shards found for KB, skipping clean rollover status",
-                extra={"kbid": kbid},
+                "No rollover state found, skipping clean rollover status", extra={"kbid": kbid}
             )
             return
-
-        _clear_rollover_status(kb_shards)
-        await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
+        await datamanagers.rollover.clear_rollover_state(txn, kbid=kbid)
+        await txn.commit()
 
 
 async def rollover_kb_shards(
