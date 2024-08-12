@@ -40,8 +40,8 @@ class RolloverState(BaseModel):
     rollover_shards_created: bool = False
     resources_scheduled: bool = False
     resources_indexed: bool = False
-    resources_validated: bool = False
     cutover: bool = False
+    resources_validated: bool = False
 
 
 class RolloverStateNotFoundError(Exception):

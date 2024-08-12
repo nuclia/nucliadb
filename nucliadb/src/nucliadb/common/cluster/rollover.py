@@ -56,7 +56,13 @@ async def create_rollover_shards(
             state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         except RolloverStateNotFoundError:
             # State is not set yet, create it
-            state = RolloverState()
+            state = RolloverState(
+                rollover_shards_created=False,
+                resources_scheduled=False,
+                resources_indexed=False,
+                cutover=False,
+                resources_validated=False,
+            )
 
         kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         if kb_shards is None:
