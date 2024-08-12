@@ -20,7 +20,6 @@ data:
   FILE_BACKEND: {{ .Values.storage.file_backend }}
   UPLOAD_TOKEN_EXPIRATION: {{ .Values.storage.upload_token_expiration | quote}}
 {{- if eq .Values.storage.file_backend "gcs" }}
-  GCS_BASE64_CREDS: {{ .Values.storage.gcs_base64_creds }}
   GCS_BUCKET: {{ .Values.storage.gcs_bucket }}
   GCS_DEADLETTER_BUCKET: {{ .Values.storage.gcs_deadletter_bucket }}
   GCS_INDEXING_BUCKET: {{ .Values.storage.gcs_indexing_bucket }}
