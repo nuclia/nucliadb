@@ -462,18 +462,6 @@ class Processor:
             await external_index_manager.index_resource(
                 resource_uuid=resource_uuid, resource_data=index_message
             )
-        self._clear_external_index_fields(index_message)
-
-    @staticmethod
-    def _clear_external_index_fields(index_message: PBBrainResource):
-        """
-        Clear the fields that are already stored in the external index,
-        and we don't want to store them again in the IndexNode cluster.
-        """
-        index_message.ClearField("sentences_to_delete")
-        index_message.ClearField("paragraphs_to_delete")
-        index_message.ClearField("paragraphs")
-        index_message.ClearField("relations")
 
     async def multi(self, message: writer_pb2.BrokerMessage, seqid: int) -> None:
         self.messages.setdefault(message.multiid, []).append(message)

@@ -150,3 +150,13 @@ async def get_external_index_provider_metadata(
     if kb_config is None:
         return None
     return kb_config.external_index_provider
+
+
+async def set_external_index_provider_metadata(
+    txn: Transaction, *, kbid: str, metadata: knowledgebox_pb2.StoredExternalIndexProviderMetadata
+):
+    kb_config = await get_config(txn, kbid=kbid)
+    if kb_config is None:
+        raise KnowledgeBoxNotFound(kbid)
+    kb_config.external_index_provider.CopyFrom(metadata)
+    await set_config(txn, kbid=kbid, config=kb_config)

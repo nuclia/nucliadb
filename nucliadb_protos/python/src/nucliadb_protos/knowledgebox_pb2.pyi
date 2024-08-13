@@ -203,8 +203,27 @@ class StoredPineconeConfig(google.protobuf.message.Message):
         def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    @typing.final
+    class RolloverIndexesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___PineconeIndexMetadata: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___PineconeIndexMetadata | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     ENCRYPTED_API_KEY_FIELD_NUMBER: builtins.int
     INDEXES_FIELD_NUMBER: builtins.int
+    ROLLOVER_INDEXES_FIELD_NUMBER: builtins.int
     SERVERLESS_CLOUD_FIELD_NUMBER: builtins.int
     encrypted_api_key: builtins.str
     serverless_cloud: global___PineconeServerlessCloud.ValueType
@@ -212,14 +231,17 @@ class StoredPineconeConfig(google.protobuf.message.Message):
     def indexes(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___PineconeIndexMetadata]:
         """vectorset id -> PineconeIndexMetadata"""
 
+    @property
+    def rollover_indexes(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___PineconeIndexMetadata]: ...
     def __init__(
         self,
         *,
         encrypted_api_key: builtins.str = ...,
         indexes: collections.abc.Mapping[builtins.str, global___PineconeIndexMetadata] | None = ...,
+        rollover_indexes: collections.abc.Mapping[builtins.str, global___PineconeIndexMetadata] | None = ...,
         serverless_cloud: global___PineconeServerlessCloud.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["encrypted_api_key", b"encrypted_api_key", "indexes", b"indexes", "serverless_cloud", b"serverless_cloud"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["encrypted_api_key", b"encrypted_api_key", "indexes", b"indexes", "rollover_indexes", b"rollover_indexes", "serverless_cloud", b"serverless_cloud"]) -> None: ...
 
 global___StoredPineconeConfig = StoredPineconeConfig
 

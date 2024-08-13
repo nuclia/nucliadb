@@ -50,6 +50,7 @@ async def get_external_index_manager(kbid: str) -> Optional[ExternalIndexManager
         upsert_timeout=settings.pinecone_upsert_timeout,
         delete_timeout=settings.pinecone_delete_timeout,
         default_vectorset=default_vectorset,
+        rollover_indexes=dict(metadata.pinecone_config.rollover_indexes),
     )
 
 

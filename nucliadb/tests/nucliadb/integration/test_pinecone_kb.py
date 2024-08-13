@@ -20,13 +20,15 @@
 import unittest
 from datetime import datetime
 from unittest import mock
-from unittest.mock import call
+from unittest.mock import AsyncMock, MagicMock, call
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
+from nucliadb.common.cluster import rollover
+from nucliadb.common.context import ApplicationContext
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
@@ -326,28 +328,7 @@ async def test_find_on_pinecone_kb(
     assert resp.status_code == 200, resp.text
 
 
-async def test_ingestion_on_pinecone_kb(
-    nucliadb_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    pinecone_knowledgebox: str,
-    data_plane,
-    mock_pinecone_client,
-):
-    kbid = pinecone_knowledgebox
-
-    # Create a resource first
-    slug = "my-resource"
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={
-            "slug": slug,
-            "title": "Title Resource",
-        },
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
+async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str, slug: str):
     bm = BrokerMessage(kbid=kbid, uuid=rid, slug=slug, type=BrokerMessage.AUTOCOMMIT)
     bm.basic.icon = "text/plain"
     bm.basic.title = "Title Resource"
@@ -445,7 +426,79 @@ async def test_ingestion_on_pinecone_kb(
     response = await nucliadb_grpc.ProcessMessage([bm], timeout=None)  # type: ignore
     assert response.status == OpStatusWriter.Status.OK
 
+
+async def test_ingestion_on_pinecone_kb(
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    pinecone_knowledgebox: str,
+    data_plane,
+    mock_pinecone_client,
+):
+    kbid = pinecone_knowledgebox
+
+    # Create a resource first
+    slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "Title Resource",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    await _inject_broker_message(nucliadb_grpc, kbid, rid, slug)
+
     assert data_plane.delete_by_id_prefix.await_count == 1
     assert data_plane.upsert_in_batches.await_count == 1
     upsert_call = data_plane.upsert_in_batches.call_args_list[0][1]
     assert len(upsert_call["vectors"]) == 3
+
+
+@pytest.fixture()
+async def app_context(natsd, storage, nucliadb):
+    ctx = ApplicationContext()
+    await ctx.initialize()
+    ctx.nats_manager = MagicMock()
+    ctx.nats_manager.js.consumer_info = AsyncMock(return_value=MagicMock(num_pending=1))
+    yield ctx
+    await ctx.finalize()
+
+
+async def test_pinecone_kb_rollover_index(
+    app_context,
+    nucliadb_grpc: WriterStub,
+    nucliadb_writer: AsyncClient,
+    pinecone_knowledgebox: str,
+    data_plane,
+    mock_pinecone_client,
+):
+    kbid = pinecone_knowledgebox
+
+    # Create a resource first
+    slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "Title Resource",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Inject a broker message as if it was the result of a Nuclia processing request
+    await _inject_broker_message(nucliadb_grpc, kbid, rid, slug)
+
+    # Check that vectors were upserted to pinecone
+    assert data_plane.upsert_in_batches.await_count == 1
+    data_plane.upsert_in_batches.reset_mock()
+
+    # Rollover the index
+    await rollover.rollover_kb_index(app_context, kbid)
+
+    # Check that vectors have been upserted again
+    assert data_plane.upsert_in_batches.await_count == 1
+    data_plane.upsert_in_batches.reset_mock()

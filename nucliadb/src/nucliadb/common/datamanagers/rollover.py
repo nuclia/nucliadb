@@ -38,9 +38,11 @@ KB_ROLLOVER_RESOURCES_INDEXED = "/kbs/{kbid}/rollover/indexed/{resource}"
 
 class RolloverState(BaseModel):
     rollover_shards_created: bool = False
+    external_index_created: bool = False
     resources_scheduled: bool = False
     resources_indexed: bool = False
-    cutover: bool = False
+    cutover_shards: bool = False
+    cutover_external_index: bool = False
     resources_validated: bool = False
 
 

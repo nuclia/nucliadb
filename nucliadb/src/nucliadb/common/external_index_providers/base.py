@@ -102,6 +102,7 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
     """
 
     type: ExternalIndexProviderType
+    supports_rollover: bool = False
 
     def __init__(self, kbid: str):
         self.kbid = kbid
@@ -122,6 +123,29 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
         kbid: str,
         stored: StoredExternalIndexProviderMetadata,
     ) -> None: ...
+
+    @classmethod
+    @abc.abstractmethod
+    async def create_rollover_indexes(
+        cls, kbid: str, stored: StoredExternalIndexProviderMetadata
+    ) -> StoredExternalIndexProviderMetadata:  # pragma: no cover
+        """
+        Should create the indexes for the rollover process and store the corresponding metadata in the database
+        so that we can later index into them and update the stored external index provider metadata with the new indexes.
+        It is responsible for rolling back any left over indexes on the event of error on index creation.
+        """
+        ...
+
+    @classmethod
+    @abc.abstractmethod
+    async def cutover_to_rollover_indexes(
+        cls, kbid: str, stored: StoredExternalIndexProviderMetadata
+    ) -> StoredExternalIndexProviderMetadata:  # pragma: no cover
+        """
+        Should cutover to the rollover indexes and update the metadata to be stored in pg.
+        Should also delete the old indexes.
+        """
+        ...
 
     @classmethod
     def get_index_name(cls) -> str:  # pragma: no cover
@@ -145,23 +169,50 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
         with manager_observer({"operation": "delete_resource", "provider": self.type.value}):
             await self._delete_resource(resource_uuid)
 
-    async def index_resource(self, resource_uuid: str, resource_data: Resource) -> None:
+    async def index_resource(
+        self, resource_uuid: str, resource_data: Resource, to_rollover_indexes: bool = False
+    ) -> None:
         """
         Indexes a resource to the external index provider.
         """
+        if not self.supports_rollover and to_rollover_indexes:
+            self.clean_index_message(resource_data)
+            logger.info(
+                "Indexing to rollover indexes not supported",
+                extra={
+                    "kbid": self.kbid,
+                    "rid": resource_uuid,
+                    "provider": self.type.value,
+                },
+            )
+            return
         logger.info(
             "Indexing resource to external index",
             extra={
                 "kbid": self.kbid,
                 "rid": resource_uuid,
                 "provider": self.type.value,
+                "rollover": to_rollover_indexes,
             },
         )
         with manager_observer({"operation": "index_resource", "provider": self.type.value}):
             try:
-                await self._index_resource(resource_uuid, resource_data)
+                await self._index_resource(
+                    resource_uuid, resource_data, to_rollover_indexes=to_rollover_indexes
+                )
+                self.clean_index_message(resource_data)
             except Exception as ex:
                 raise ExternalIndexingError() from ex
+
+    def clean_index_message(self, index_message: Resource) -> None:
+        """
+        Clear the fields that are already stored in the external index,
+        and we don't want to store them again in the IndexNode cluster.
+        """
+        index_message.ClearField("sentences_to_delete")
+        index_message.ClearField("paragraphs_to_delete")
+        index_message.ClearField("paragraphs")
+        index_message.ClearField("relations")
 
     async def get_index_counts(self) -> IndexCounts:
         """
@@ -200,10 +251,14 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def _index_resource(
-        self, resource_uuid: str, resource_data: Resource
+        self, resource_uuid: str, resource_data: Resource, to_rollover_indexes: bool = False
     ) -> None:  # pragma: no cover
         """
         Adapts the Resource (aka brain) to the external index provider's index format and indexes it.
+        Params:
+        - resource_uuid: the resource's UUID
+        - resource_data: the resource index data
+        - to_rollover_indexes: whether to index to the rollover indexes or the main indexes
         """
         ...
 

@@ -26,7 +26,7 @@ Targeted rollover for a specific KBs which still don't have the latest version o
 import logging
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb_protos.noderesources_pb2 import ShardCreated
 
@@ -43,7 +43,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     try:
         if await has_old_paragraphs_index(context, kbid):
             logger.info("Rolling over affected KB", extra={"kbid": kbid})
-            await rollover_kb_shards(context, kbid)
+            await rollover_kb_index(context, kbid)
         else:
             logger.info(
                 "KB already has the latest version of the paragraphs index, skipping rollover",
