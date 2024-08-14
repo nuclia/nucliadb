@@ -24,6 +24,7 @@ from copy import deepcopy
 from typing import Any, Iterator, Optional
 from uuid import uuid4
 
+import backoff
 from cachetools import TTLCache
 from pydantic import BaseModel
 
@@ -216,10 +217,9 @@ class PineconeIndexManager(ExternalIndexManager):
                 # Try index creation rollback
                 for index_name in created_indexes:
                     try:
-                        await pinecone.delete_index(index_name)
+                        await cls._delete_index(api_key, index_name)
                     except Exception:
                         logger.exception("Could not rollback created pinecone indexes")
-                        pass
                 raise ExternalIndexCreationError("pinecone", exc.message) from exc
             metadata.pinecone_config.indexes[vectorset_id].CopyFrom(
                 kb_pb2.PineconeIndexMetadata(
@@ -238,17 +238,27 @@ class PineconeIndexManager(ExternalIndexManager):
         stored: kb_pb2.StoredExternalIndexProviderMetadata,
     ) -> None:
         api_key = get_endecryptor().decrypt(stored.pinecone_config.encrypted_api_key)
-        control_plane = get_pinecone().control_plane(api_key=api_key)
         # Delete all indexes stored in the config and passed as parameters
         for index_metadata in stored.pinecone_config.indexes.values():
             index_name = index_metadata.index_name
             try:
                 logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
-                await control_plane.delete_index(name=index_name)
+                await cls._delete_index(api_key, index_name)
             except Exception:
                 logger.exception(
                     "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
                 )
+
+    @classmethod
+    @backoff.on_exception(
+        backoff.expo,
+        (PineconeAPIError,),
+        jitter=backoff.random_jitter,
+        max_tries=3,
+    )
+    async def _delete_index(cls, api_key: str, index_name: str) -> None:
+        control_plane = get_pinecone().control_plane(api_key=api_key)
+        await control_plane.delete_index(index_name)
 
     async def rollover_create_indexes(
         self, stored: kb_pb2.StoredExternalIndexProviderMetadata
@@ -296,7 +306,7 @@ class PineconeIndexManager(ExternalIndexManager):
             # Rollback any created indexes
             for index_name in created_indexes:
                 try:
-                    await control_plane.delete_index(index_name)
+                    await self.__class__._delete_index(self.api_key, index_name)
                 except Exception:
                     logger.exception(
                         f"Could not rollback created pinecone index",
@@ -305,7 +315,6 @@ class PineconeIndexManager(ExternalIndexManager):
                             "index_name": index_name,
                         },
                     )
-                    pass
             raise
         self.rollover_indexes.clear()
         self.rollover_indexes = dict(result.pinecone_config.indexes)
