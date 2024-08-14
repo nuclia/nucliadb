@@ -147,6 +147,10 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
             "nucliadb.ingest.consumer.shard_creator.locking.distributed_lock",
             return_value=AsyncMock(),
         ),
+        patch(
+            "nucliadb.common.cluster.rollover.get_external_index_manager",
+            return_value=None,
+        ),
     ):
         yield mock
 
@@ -296,7 +300,7 @@ async def test_validate_indexed_data_handles_missing_res(
     assert len(await rollover.validate_indexed_data(app_context, "kbid")) == 0
 
 
-async def test_rollover_shards(app_context, rollover_datamanager, shards, resource_ids):
+async def rollover_kb_index(app_context, rollover_datamanager, shards, resource_ids):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
     resource_ids.clear()
 
