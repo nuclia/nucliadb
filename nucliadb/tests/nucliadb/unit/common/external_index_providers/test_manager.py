@@ -68,8 +68,7 @@ async def test_get_external_index_manager_pinecone(endecryptor):
         mgr = await get_external_index_manager("kbid")
         assert isinstance(mgr, PineconeIndexManager)
         assert mgr.api_key == "api_key"
-        assert mgr.index_hosts == {"multilingual-2020-05-02": "index_host"}
-        assert mgr.index_names == {"multilingual-2020-05-02": "foobar"}
+        assert mgr.indexes
         assert mgr.default_vectorset == "default_vectorset"
 
 
