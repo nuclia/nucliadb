@@ -56,9 +56,6 @@ _lock = asyncio.Lock()
 _STANDALONE_SERVER = "_standalone_service"
 
 
-class ResourceNotFound(Exception): ...
-
-
 async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
     async with _lock:
         if get_utility(Utility.SHARD_MANAGER) is not None:

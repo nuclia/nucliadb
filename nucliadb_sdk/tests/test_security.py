@@ -36,7 +36,7 @@ CLASSIFIED_INFO = [
 
 PUBLIC_NEWS = [
     "La temperatura hoy en Sevilla será de 20 grados centígrados como máxima y 10 grados centígrados como mínima.",
-    "El Guggenhexternal de Bilbao ha sido galardonado con el premio Príncipe de Asturias de las Artes.",
+    "El Guggenheim de Bilbao ha sido galardonado con el premio Príncipe de Asturias de las Artes.",
 ]
 
 
