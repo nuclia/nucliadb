@@ -38,11 +38,6 @@ pub struct StoredPineconeConfig {
         ::prost::alloc::string::String,
         PineconeIndexMetadata,
     >,
-    #[prost(map = "string, message", tag = "4")]
-    pub rollover_indexes: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        PineconeIndexMetadata,
-    >,
     #[prost(enumeration = "PineconeServerlessCloud", tag = "3")]
     pub serverless_cloud: i32,
 }

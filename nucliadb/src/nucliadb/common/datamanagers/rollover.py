@@ -24,6 +24,7 @@ import orjson
 from pydantic import BaseModel
 
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import writer_pb2
 
 from .utils import get_kv_pb, with_ro_transaction
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 KB_ROLLOVER_STATE = "/kbs/{kbid}/rollover/state"
 KB_ROLLOVER_SHARDS = "/kbs/{kbid}/rollover/shards"
+KB_ROLLOVER_EXTERNAL_INDEX_METADATA = "/kbs/{kbid}/rollover/external_index_metadata"
 KB_ROLLOVER_RESOURCES_TO_INDEX = "/kbs/{kbid}/rollover/to-index/{resource}"
 KB_ROLLOVER_RESOURCES_INDEXED = "/kbs/{kbid}/rollover/indexed/{resource}"
 
@@ -200,4 +202,26 @@ async def set_rollover_state(txn: Transaction, kbid: str, state: RolloverState) 
 
 async def clear_rollover_state(txn: Transaction, kbid: str) -> None:
     key = KB_ROLLOVER_STATE.format(kbid=kbid)
+    await txn.delete(key)
+
+
+async def update_kb_rollover_external_index_metadata(
+    txn: Transaction, *, kbid: str, metadata: kb_pb2.StoredExternalIndexProviderMetadata
+) -> None:
+    key = KB_ROLLOVER_EXTERNAL_INDEX_METADATA.format(kbid=kbid)
+    await txn.set(key, metadata.SerializeToString())
+
+
+async def get_kb_rollover_external_index_metadata(
+    txn: Transaction, *, kbid: str
+) -> Optional[kb_pb2.StoredExternalIndexProviderMetadata]:
+    key = KB_ROLLOVER_EXTERNAL_INDEX_METADATA.format(kbid=kbid)
+    val = await txn.get(key)
+    if not val:
+        return None
+    return kb_pb2.StoredExternalIndexProviderMetadata.FromString(val)
+
+
+async def delete_kb_rollover_external_index_metadata(txn: Transaction, *, kbid: str) -> None:
+    key = KB_ROLLOVER_EXTERNAL_INDEX_METADATA.format(kbid=kbid)
     await txn.delete(key)

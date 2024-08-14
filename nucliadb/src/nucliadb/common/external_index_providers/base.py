@@ -124,26 +124,22 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
         stored: StoredExternalIndexProviderMetadata,
     ) -> None: ...
 
-    @classmethod
     @abc.abstractmethod
-    async def create_rollover_indexes(
-        cls, kbid: str, stored: StoredExternalIndexProviderMetadata
+    async def rollover_create_indexes(
+        self, stored: StoredExternalIndexProviderMetadata
     ) -> StoredExternalIndexProviderMetadata:  # pragma: no cover
         """
-        Should create the indexes for the rollover process and store the corresponding metadata in the database
-        so that we can later index into them and update the stored external index provider metadata with the new indexes.
-        It is responsible for rolling back any left over indexes on the event of error on index creation.
+        Creates the indexes for the rollover process.
+        In the event of an error, it should rollback any left over indexes.
+        Returns a modified version of the stored external index provider metadata with the new indexes for the rollover.
         """
         ...
 
-    @classmethod
     @abc.abstractmethod
-    async def cutover_to_rollover_indexes(
-        cls, kbid: str, stored: StoredExternalIndexProviderMetadata
-    ) -> StoredExternalIndexProviderMetadata:  # pragma: no cover
+    async def rollover_cutover_indexes(self) -> None:  # pragma: no cover
         """
-        Should cutover to the rollover indexes and update the metadata to be stored in pg.
-        Should also delete the old indexes.
+        Cutover the indexes for the rollover process.
+        After this operation, the new indexes should be used for queries and the old ones should be deleted.
         """
         ...
 

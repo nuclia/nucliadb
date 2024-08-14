@@ -53,7 +53,6 @@ message StoredPineconeConfig {
     string encrypted_api_key = 1;
     // vectorset id -> PineconeIndexMetadata
     map<string, PineconeIndexMetadata> indexes = 2;
-    map<string, PineconeIndexMetadata> rollover_indexes = 4;
     PineconeServerlessCloud serverless_cloud = 3;
 }
 

@@ -250,27 +250,25 @@ class PineconeIndexManager(ExternalIndexManager):
                     "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
                 )
 
-    @classmethod
-    async def create_rollover_indexes(
-        cls, kbid: str, stored: kb_pb2.StoredExternalIndexProviderMetadata
+    async def rollover_create_indexes(
+        self, stored: kb_pb2.StoredExternalIndexProviderMetadata
     ) -> kb_pb2.StoredExternalIndexProviderMetadata:
         result = kb_pb2.StoredExternalIndexProviderMetadata()
         result.CopyFrom(stored)
-        encrypted_api_key = stored.pinecone_config.encrypted_api_key
-        api_key = get_endecryptor().decrypt(encrypted_api_key)
-        control_plane = get_pinecone().control_plane(api_key=api_key)
+        control_plane = get_pinecone().control_plane(api_key=self.api_key)
         created_indexes = []
         cloud = to_pinecone_serverless_cloud_payload(stored.pinecone_config.serverless_cloud)
         try:
             for vectorset_id, index in stored.pinecone_config.indexes.items():
-                index_name = PineconeIndexManager.get_index_name()
+                rollover_index_name = PineconeIndexManager.get_index_name()
                 index_dimension = index.vector_dimension
                 similarity_metric = to_pinecone_index_metric(index.similarity)
                 logger.info(
                     "Creating pincone rollover index",
                     extra={
-                        "kbid": kbid,
-                        "index_name": index_name,
+                        "kbid": self.kbid,
+                        "index_name": index.index_name,
+                        "rollover_index_name": rollover_index_name,
                         "similarity": similarity_metric,
                         "vector_dimension": index_dimension,
                         "vectorset_id": vectorset_id,
@@ -278,20 +276,20 @@ class PineconeIndexManager(ExternalIndexManager):
                 )
                 try:
                     index_host = await control_plane.create_index(
-                        name=index_name,
+                        name=rollover_index_name,
                         dimension=index_dimension,
                         metric=similarity_metric,
                         serverless_cloud=cloud,
                     )
-                    result.pinecone_config.rollover_indexes[vectorset_id].CopyFrom(
+                    result.pinecone_config.indexes[vectorset_id].MergeFrom(
                         kb_pb2.PineconeIndexMetadata(
-                            index_name=index_name,
+                            index_name=rollover_index_name,
                             index_host=index_host,
-                            vector_dimension=index.vector_dimension,
+                            vector_dimension=index_dimension,
                             similarity=index.similarity,
                         )
                     )
-                    created_indexes.append(index_name)
+                    created_indexes.append(rollover_index_name)
                 except PineconeAPIError as exc:
                     raise ExternalIndexCreationError("pinecone", exc.message) from exc
         except Exception:
@@ -303,35 +301,30 @@ class PineconeIndexManager(ExternalIndexManager):
                     logger.exception(
                         f"Could not rollback created pinecone index",
                         extra={
-                            "kbid": kbid,
+                            "kbid": self.kbid,
                             "index_name": index_name,
                         },
                     )
                     pass
             raise
+        self.rollover_indexes.clear()
+        self.rollover_indexes = dict(result.pinecone_config.indexes)
         return result
 
-    @classmethod
-    async def cutover_to_rollover_indexes(
-        cls, kbid: str, stored: kb_pb2.StoredExternalIndexProviderMetadata
-    ) -> kb_pb2.StoredExternalIndexProviderMetadata:
-        result = kb_pb2.StoredExternalIndexProviderMetadata()
-        result.CopyFrom(stored)
-        previous_indexes = dict(result.pinecone_config.indexes)
-        result.pinecone_config.indexes.clear()
-        result.pinecone_config.indexes.update(result.pinecone_config.rollover_indexes)
-        result.pinecone_config.rollover_indexes.clear()
-        api_key = get_endecryptor().decrypt(stored.pinecone_config.encrypted_api_key)
-        control_plane = get_pinecone().control_plane(api_key=api_key)
-        for previous_index in previous_indexes.values():
+    async def rollover_cutover_indexes(self) -> None:
+        assert len(self.rollover_indexes) > 0, "No rollover indexes to cutover to"
+        control_plane = self.pinecone.control_plane(api_key=self.api_key)
+        for index in self.indexes.values():
+            index_name = index.index_name
             try:
-                await control_plane.delete_index(previous_index.index_name)
+                await control_plane.delete_index(index.index_name)
             except Exception:
                 logger.exception(
                     "Error deleting pinecone index on cutover",
-                    extra={"kbid": kbid, "index_name": previous_index.index_name},
+                    extra={"kbid": self.kbid, "index_name": index_name},
                 )
-        return result
+        self.indexes.clear()
+        self.indexes.update(self.rollover_indexes)
 
     @classmethod
     def get_index_name(cls) -> str:

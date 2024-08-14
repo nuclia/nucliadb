@@ -473,6 +473,7 @@ async def test_pinecone_kb_rollover_index(
     nucliadb_writer: AsyncClient,
     pinecone_knowledgebox: str,
     data_plane,
+    control_plane,
     mock_pinecone_client,
 ):
     kbid = pinecone_knowledgebox
@@ -502,3 +503,8 @@ async def test_pinecone_kb_rollover_index(
     # Check that vectors have been upserted again
     assert data_plane.upsert_in_batches.await_count == 1
     data_plane.upsert_in_batches.reset_mock()
+
+    # Check that two indexes were created (the original and the rollover)
+    assert control_plane.create_index.call_count == 2
+    # Check that the original index was deleted
+    assert control_plane.delete_index.call_count == 1

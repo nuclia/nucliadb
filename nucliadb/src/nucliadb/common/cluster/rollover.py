@@ -61,8 +61,15 @@ async def create_rollover_index(
     Creates a new index for a knowledgebox in the cluster and to the external index provider if configured.
     """
     await create_rollover_shards(app_context, kbid, drain_nodes=drain_nodes)
+
     if external is not None:
-        await create_rollover_external_index(kbid, external)
+        if external.supports_rollover:
+            await create_rollover_external_index(kbid, external)
+        else:
+            logger.info(
+                "External index provider does not support rollover",
+                extra={"kbid": kbid, "external_index_provider": external.type.value},
+            )
 
 
 async def create_rollover_external_index(kbid: str, external: ExternalIndexManager) -> None:
@@ -74,17 +81,16 @@ async def create_rollover_external_index(kbid: str, external: ExternalIndexManag
             return
 
     logger.info("Creating rollover external index", extra=extra)
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         stored_metadata = await datamanagers.kb.get_external_index_provider_metadata(txn, kbid=kbid)
         if stored_metadata is None:
             raise UnexpectedRolloverError("External index metadata not found")
-        try:
-            modified_metadata = await external.__class__.create_rollover_indexes(kbid, stored_metadata)
-        except NotImplementedError:
-            logger.info("External index provider does not support rollover.", extra=extra)
-            return
-        await datamanagers.kb.set_external_index_provider_metadata(
-            txn, kbid=kbid, metadata=modified_metadata
+
+    rollover_metadata = await external.rollover_create_indexes(stored_metadata)
+
+    async with datamanagers.with_rw_transaction() as txn:
+        await datamanagers.rollover.update_kb_rollover_external_index_metadata(
+            txn, kbid=kbid, metadata=rollover_metadata
         )
         state.external_index_created = True
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
@@ -330,7 +336,13 @@ async def cutover_index(
     """
     await cutover_shards(app_context, kbid)
     if external is not None:
-        await cutover_external_index(kbid, external)
+        if external.supports_rollover:
+            await cutover_external_index(kbid, external)
+        else:
+            logger.info(
+                "External index provider does not support rollover",
+                extra={"kbid": kbid, "external_index_provider": external.type.value},
+            )
 
 
 async def cutover_external_index(kbid: str, external: ExternalIndexManager) -> None:
@@ -340,7 +352,7 @@ async def cutover_external_index(kbid: str, external: ExternalIndexManager) -> N
     """
     extra = {"kbid": kbid, "external_index_provider": external.type.value}
     logger.info("Cutting over external index", extra=extra)
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction() as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if not all(
             [
@@ -351,22 +363,22 @@ async def cutover_external_index(kbid: str, external: ExternalIndexManager) -> N
         ):
             raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
         if state.cutover_external_index:
-            logger.info("Shards already cut over, skipping", extra=extra)
+            logger.info("External index already cut over, skipping", extra=extra)
             return
 
         stored_metadata = await datamanagers.kb.get_external_index_provider_metadata(txn, kbid=kbid)
-        if stored_metadata is None:
-            raise UnexpectedRolloverError("External index metadata not found")
-        try:
-            modified_metadata = await external.__class__.cutover_to_rollover_indexes(
-                kbid, stored_metadata
-            )
-        except NotImplementedError:
-            logger.info("External index provider does not support rollover.", extra=extra)
-            return
-        await datamanagers.kb.set_external_index_provider_metadata(
-            txn, kbid=kbid, metadata=modified_metadata
+        rollover_metadata = await datamanagers.rollover.get_kb_rollover_external_index_metadata(
+            txn, kbid=kbid
         )
+        if stored_metadata is None or rollover_metadata is None:
+            raise UnexpectedRolloverError("stored or rollover external index metadata not found")
+
+        await external.rollover_cutover_indexes()
+
+        await datamanagers.kb.set_external_index_provider_metadata(
+            txn, kbid=kbid, metadata=rollover_metadata
+        )
+        await datamanagers.rollover.delete_kb_rollover_external_index_metadata(txn, kbid=kbid)
         state.cutover_external_index = True
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await txn.commit()
@@ -619,7 +631,7 @@ async def rollover_kb_index(
     await wait_for_cluster_ready()
 
     extra = {"kbid": kbid, "external_index_provider": None}
-    external = await get_external_index_manager(kbid)
+    external = await get_external_index_manager(kbid, for_rollover=True)
     if external is not None:
         extra["external_index_provider"] = external.type.value
     logger.info("Rolling over KB index", extra=extra)
