@@ -189,8 +189,7 @@ async def _index_node_retrieval(
                 "query": item.model_dump_json(),
                 "time": search_time,
                 "nodes": debug_nodes_info(queried_nodes),
-                # Include metrics in the log
-                **metrics.steps(),
+                "durations": metrics.durations(),
             },
         )
 
