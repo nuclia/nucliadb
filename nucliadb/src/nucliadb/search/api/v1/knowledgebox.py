@@ -137,7 +137,7 @@ async def _kb_counters(
 async def get_resources_count(kbid: str, force_calculate: bool = False) -> int:
     async with datamanagers.with_ro_transaction() as txn:
         if force_calculate:
-            # for small kbs, this is faster and more up to date
+            # For small kbs, this is faster and more up to date
             resource_count = await datamanagers.resources.calculate_number_of_resources(txn, kbid=kbid)
         else:
             resource_count = await datamanagers.resources.get_number_of_resources(txn, kbid=kbid)
