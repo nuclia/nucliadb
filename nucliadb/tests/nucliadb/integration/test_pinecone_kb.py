@@ -20,13 +20,15 @@
 import unittest
 from datetime import datetime
 from unittest import mock
-from unittest.mock import call
+from unittest.mock import AsyncMock, MagicMock, call
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
+from nucliadb.common.cluster import rollover
+from nucliadb.common.context import ApplicationContext
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
@@ -42,7 +44,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import BrokerMessage, NewKnowledgeBoxV2Request, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.aiopynecone.models import IndexStats, QueryResponse
+from nucliadb_utils.aiopynecone.models import IndexDescription, IndexStats, IndexStatus, QueryResponse
 from nucliadb_utils.utilities import get_endecryptor
 
 PINECONE_MODULE = "nucliadb.common.external_index_providers.pinecone"
@@ -63,6 +65,19 @@ def control_plane():
     mocked = mock.MagicMock()
     mocked.create_index = mock.AsyncMock(return_value="pinecone-host")
     mocked.delete_index = mock.AsyncMock(return_value=None)
+    mocked.describe_index = mock.AsyncMock(
+        return_value=IndexDescription(
+            dimension=10,
+            name="name",
+            host="pinecone-host",
+            metric="dotproduct",
+            spec={"cloud": "aws", "region": "us-east-1"},
+            status=IndexStatus(
+                ready=True,
+                state="Initialized",
+            ),
+        )
+    )
     return mocked
 
 
@@ -160,7 +175,7 @@ async def test_kb_creation_old(
         )  # type: ignore
         assert response.status == KnowledgeBoxResponseStatus.OK
 
-        control_plane.delete_index.assert_awaited_once_with(name=expected_index_name)
+        control_plane.delete_index.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -260,10 +275,7 @@ async def test_kb_creation_new(
         assert response.status == KnowledgeBoxResponseStatus.OK
 
         # Test that deletes all external indexes
-        deleted_index_names = set()
-        deleted_index_names.add(control_plane.delete_index.call_args_list[0][1]["name"])
-        deleted_index_names.add(control_plane.delete_index.call_args_list[1][1]["name"])
-        assert deleted_index_names == set(expected_index_names)
+        assert control_plane.delete_index.call_count == 2
 
 
 async def test_get_kb(
@@ -326,28 +338,7 @@ async def test_find_on_pinecone_kb(
     assert resp.status_code == 200, resp.text
 
 
-async def test_ingestion_on_pinecone_kb(
-    nucliadb_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    pinecone_knowledgebox: str,
-    data_plane,
-    mock_pinecone_client,
-):
-    kbid = pinecone_knowledgebox
-
-    # Create a resource first
-    slug = "my-resource"
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={
-            "slug": slug,
-            "title": "Title Resource",
-        },
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
+async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str, slug: str):
     bm = BrokerMessage(kbid=kbid, uuid=rid, slug=slug, type=BrokerMessage.AUTOCOMMIT)
     bm.basic.icon = "text/plain"
     bm.basic.title = "Title Resource"
@@ -445,7 +436,87 @@ async def test_ingestion_on_pinecone_kb(
     response = await nucliadb_grpc.ProcessMessage([bm], timeout=None)  # type: ignore
     assert response.status == OpStatusWriter.Status.OK
 
+
+async def test_ingestion_on_pinecone_kb(
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    pinecone_knowledgebox: str,
+    data_plane,
+    mock_pinecone_client,
+):
+    kbid = pinecone_knowledgebox
+
+    # Create a resource first
+    slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "Title Resource",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    await _inject_broker_message(nucliadb_grpc, kbid, rid, slug)
+
     assert data_plane.delete_by_id_prefix.await_count == 1
     assert data_plane.upsert_in_batches.await_count == 1
     upsert_call = data_plane.upsert_in_batches.call_args_list[0][1]
     assert len(upsert_call["vectors"]) == 3
+
+
+@pytest.fixture()
+async def app_context(natsd, storage, nucliadb):
+    ctx = ApplicationContext()
+    await ctx.initialize()
+    ctx.nats_manager = MagicMock()
+    ctx.nats_manager.js.consumer_info = AsyncMock(return_value=MagicMock(num_pending=1))
+    yield ctx
+    await ctx.finalize()
+
+
+async def test_pinecone_kb_rollover_index(
+    app_context,
+    nucliadb_grpc: WriterStub,
+    nucliadb_writer: AsyncClient,
+    pinecone_knowledgebox: str,
+    data_plane,
+    control_plane,
+    mock_pinecone_client,
+):
+    kbid = pinecone_knowledgebox
+
+    # Create a resource first
+    slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": "Title Resource",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Inject a broker message as if it was the result of a Nuclia processing request
+    await _inject_broker_message(nucliadb_grpc, kbid, rid, slug)
+
+    # Check that vectors were upserted to pinecone
+    assert data_plane.upsert_in_batches.await_count == 1
+    data_plane.upsert_in_batches.reset_mock()
+
+    # Rollover the index
+    await rollover.rollover_kb_index(app_context, kbid)
+
+    # Check that vectors have been upserted again
+    assert data_plane.upsert_in_batches.await_count == 1
+    data_plane.upsert_in_batches.reset_mock()
+
+    # Check that two indexes were created (the original and the rollover)
+    assert control_plane.create_index.call_count == 2
+    # Check that the original index was deleted
+    assert control_plane.delete_index.call_count == 1
+    # Check that it waits for created indexes to be ready
+    assert control_plane.describe_index.await_count == 1

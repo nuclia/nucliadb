@@ -42,7 +42,7 @@ async def app_context(natsd, storage, nucliadb):
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_rollover_kb_shards(
+async def test_rollover_kb_index(
     app_context,
     knowledgebox,
     nucliadb_writer: AsyncClient,
@@ -66,7 +66,7 @@ async def test_rollover_kb_shards(
     assert resp.status_code == 200, resp.text
     shards_body1 = resp.json()
 
-    await rollover.rollover_kb_shards(app_context, knowledgebox)
+    await rollover.rollover_kb_index(app_context, knowledgebox)
 
     resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
     assert resp.status_code == 200, resp.text
@@ -89,7 +89,7 @@ async def test_rollover_kb_shards(
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_rollover_kb_shards_does_a_clean_cutover(
+async def test_rollover_kb_index_does_a_clean_cutover(
     app_context,
     knowledgebox,
 ):
@@ -100,14 +100,14 @@ async def test_rollover_kb_shards_does_a_clean_cutover(
     shards1 = await get_kb_shards(knowledgebox)
     assert shards1.extra == {}
 
-    await rollover.rollover_kb_shards(app_context, knowledgebox)
+    await rollover.rollover_kb_index(app_context, knowledgebox)
 
     shards2 = await get_kb_shards(knowledgebox)
     assert shards2.extra == {}
 
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_rollover_kb_shards_handles_changes_in_between(
+async def test_rollover_kb_index_handles_changes_in_between(
     app_context,
     knowledgebox,
     nucliadb_writer: AsyncClient,
@@ -138,7 +138,7 @@ async def test_rollover_kb_shards_handles_changes_in_between(
 
     async def the_rollover():
         try:
-            await rollover.rollover_kb_shards(app_context, knowledgebox)
+            await rollover.rollover_kb_index(app_context, knowledgebox)
         except asyncio.CancelledError:
             pass
         rollover_finished.set()

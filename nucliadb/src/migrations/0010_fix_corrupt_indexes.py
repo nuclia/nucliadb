@@ -27,7 +27,7 @@ index data loss. Rollover affected KBs
 
 import logging
 
-from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -46,4 +46,4 @@ async def migrate(context: ExecutionContext) -> None: ...
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     if kbid in AFFECTED_KBS:
         logger.info(f"Rolling over affected KB: {kbid}")
-        await rollover_kb_shards(context, kbid)
+        await rollover_kb_index(context, kbid)

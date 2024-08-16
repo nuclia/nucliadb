@@ -75,6 +75,7 @@ class TestControlPlane:
     @pytest.fixture()
     def http_session(self, http_response):
         session_mock = unittest.mock.Mock()
+        session_mock.get = unittest.mock.AsyncMock(return_value=http_response)
         session_mock.post = unittest.mock.AsyncMock(return_value=http_response)
         session_mock.delete = unittest.mock.AsyncMock(return_value=http_response)
         return session_mock
@@ -96,6 +97,26 @@ class TestControlPlane:
         await client.delete_index(name="name")
 
         http_session.delete.assert_called_once()
+
+    async def test_describe_index(self, client: ControlPlane, http_session, http_response):
+        http_response.json.return_value = {
+            "dimension": 10,
+            "metric": "dot",
+            "host": "host",
+            "name": "index-name",
+            "spec": {},
+            "status": {
+                "ready": True,
+                "state": "Initialized",
+            },
+        }
+        index = await client.describe_index(name="index-name")
+        assert index.dimension == 10
+        assert index.host == "host"
+        assert index.metric == "dot"
+        assert index.name == "index-name"
+        assert index.spec == {}
+        assert index.status.ready is True
 
 
 class TestDataPlane:

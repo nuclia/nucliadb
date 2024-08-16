@@ -38,6 +38,7 @@ from nucliadb_utils.aiopynecone.exceptions import (
 from nucliadb_utils.aiopynecone.models import (
     CreateIndexRequest,
     CreateIndexResponse,
+    IndexDescription,
     IndexStats,
     ListResponse,
     QueryResponse,
@@ -158,6 +159,18 @@ class ControlPlane:
             logger.warning("Pinecone index not found.", extra={"index_name": name})
             return
         raise_for_status("delete_index", response)
+
+    @pinecone_observer.wrap({"type": "describe_index"})
+    async def describe_index(self, name: str) -> IndexDescription:
+        """
+        Describe an index in Pinecone.
+        Params:
+        - `name`: The name of the index to describe.
+        """
+        headers = {"Api-Key": self.api_key}
+        response = await self.http_session.get(f"/indexes/{name}", headers=headers)
+        raise_for_status("describe_index", response)
+        return IndexDescription.model_validate(response.json())
 
 
 class DataPlane:

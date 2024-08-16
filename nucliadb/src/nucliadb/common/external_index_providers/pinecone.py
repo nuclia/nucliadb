@@ -24,6 +24,7 @@ from copy import deepcopy
 from typing import Any, Iterator, Optional
 from uuid import uuid4
 
+import backoff
 from cachetools import TTLCache
 from pydantic import BaseModel
 
@@ -43,7 +44,10 @@ from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, Resource, VectorSentence
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.aiopynecone.client import DataPlane, FilterOperator, LogicalOperator
-from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError, PineconeAPIError
+from nucliadb_utils.aiopynecone.exceptions import (
+    MetadataTooLargeError,
+    PineconeAPIError,
+)
 from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.aiopynecone.models import Vector as PineconeVector
 from nucliadb_utils.utilities import get_endecryptor, get_pinecone
@@ -138,6 +142,7 @@ class VectorMetadata(BaseModel):
 
 class PineconeIndexManager(ExternalIndexManager):
     type = ExternalIndexProviderType.PINECONE
+    supports_rollover = True
 
     def __init__(
         self,
@@ -150,16 +155,13 @@ class PineconeIndexManager(ExternalIndexManager):
         delete_timeout: float = 10.0,
         query_timeout: float = 10.0,
         default_vectorset: Optional[str] = None,
+        rollover_indexes: Optional[dict[str, kb_pb2.PineconeIndexMetadata]] = None,
     ):
         super().__init__(kbid=kbid)
         assert api_key != ""
         self.api_key = api_key
-        self.index_hosts = {
-            vectorset_id: index_metadata.index_host for vectorset_id, index_metadata in indexes.items()
-        }
-        self.index_names = {
-            vectorset_id: index_metadata.index_name for vectorset_id, index_metadata in indexes.items()
-        }
+        self.indexes = indexes
+        self.rollover_indexes = rollover_indexes or {}
         self.pinecone = get_pinecone()
         self.upsert_parallelism = upsert_parallelism
         self.delete_parallelism = delete_parallelism
@@ -215,10 +217,9 @@ class PineconeIndexManager(ExternalIndexManager):
                 # Try index creation rollback
                 for index_name in created_indexes:
                     try:
-                        await pinecone.delete_index(index_name)
+                        await cls._delete_index(api_key, index_name)
                     except Exception:
                         logger.exception("Could not rollback created pinecone indexes")
-                        pass
                 raise ExternalIndexCreationError("pinecone", exc.message) from exc
             metadata.pinecone_config.indexes[vectorset_id].CopyFrom(
                 kb_pb2.PineconeIndexMetadata(
@@ -237,17 +238,141 @@ class PineconeIndexManager(ExternalIndexManager):
         stored: kb_pb2.StoredExternalIndexProviderMetadata,
     ) -> None:
         api_key = get_endecryptor().decrypt(stored.pinecone_config.encrypted_api_key)
-        control_plane = get_pinecone().control_plane(api_key=api_key)
         # Delete all indexes stored in the config and passed as parameters
         for index_metadata in stored.pinecone_config.indexes.values():
             index_name = index_metadata.index_name
             try:
                 logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
-                await control_plane.delete_index(name=index_name)
+                await cls._delete_index(api_key, index_name)
             except Exception:
                 logger.exception(
                     "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
                 )
+
+    @classmethod
+    @backoff.on_exception(
+        backoff.expo,
+        (PineconeAPIError,),
+        jitter=backoff.random_jitter,
+        max_tries=3,
+    )
+    async def _delete_index(cls, api_key: str, index_name: str) -> None:
+        control_plane = get_pinecone().control_plane(api_key=api_key)
+        await control_plane.delete_index(index_name)
+
+    async def rollover_create_indexes(
+        self, stored: kb_pb2.StoredExternalIndexProviderMetadata
+    ) -> kb_pb2.StoredExternalIndexProviderMetadata:
+        result = kb_pb2.StoredExternalIndexProviderMetadata()
+        result.CopyFrom(stored)
+        control_plane = get_pinecone().control_plane(api_key=self.api_key)
+        created_indexes = []
+        cloud = to_pinecone_serverless_cloud_payload(stored.pinecone_config.serverless_cloud)
+        try:
+            for vectorset_id, index in stored.pinecone_config.indexes.items():
+                rollover_index_name = PineconeIndexManager.get_index_name()
+                index_dimension = index.vector_dimension
+                similarity_metric = to_pinecone_index_metric(index.similarity)
+                logger.info(
+                    "Creating pincone rollover index",
+                    extra={
+                        "kbid": self.kbid,
+                        "index_name": index.index_name,
+                        "rollover_index_name": rollover_index_name,
+                        "similarity": similarity_metric,
+                        "vector_dimension": index_dimension,
+                        "vectorset_id": vectorset_id,
+                    },
+                )
+                try:
+                    index_host = await control_plane.create_index(
+                        name=rollover_index_name,
+                        dimension=index_dimension,
+                        metric=similarity_metric,
+                        serverless_cloud=cloud,
+                    )
+                    result.pinecone_config.indexes[vectorset_id].MergeFrom(
+                        kb_pb2.PineconeIndexMetadata(
+                            index_name=rollover_index_name,
+                            index_host=index_host,
+                            vector_dimension=index_dimension,
+                            similarity=index.similarity,
+                        )
+                    )
+                    created_indexes.append(rollover_index_name)
+                except PineconeAPIError as exc:
+                    raise ExternalIndexCreationError("pinecone", exc.message) from exc
+        except Exception:
+            # Rollback any created indexes
+            for index_name in created_indexes:
+                try:
+                    await self.__class__._delete_index(self.api_key, index_name)
+                except Exception:
+                    logger.exception(
+                        f"Could not rollback created pinecone index",
+                        extra={
+                            "kbid": self.kbid,
+                            "index_name": index_name,
+                        },
+                    )
+            raise
+
+        # Wait for all indexes to be in the ready state
+        wait_tasks = []
+        for index_name in created_indexes:
+            wait_tasks.append(
+                asyncio.create_task(self.wait_for_index_ready(index_name, max_wait_seconds=60))
+            )
+        if len(wait_tasks) > 0:
+            try:
+                await asyncio.gather(*wait_tasks)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Timeout waiting for pinecone indexes to be ready",
+                    extra={"kbid": self.kbid, "indexes": created_indexes},
+                )
+
+        # Clear the rollover indexes and update the stored metadata
+        self.rollover_indexes.clear()
+        self.rollover_indexes = dict(result.pinecone_config.indexes)
+        return result
+
+    async def wait_for_index_ready(self, index_name: str, max_wait_seconds: int = 10) -> None:
+        """
+        Wait for an index to be ready.
+        Params:
+        - `name`: The name of the index to wait for.
+        - `max_wait_seconds`: The maximum number of seconds to wait.
+        """
+        control_plane = self.pinecone.control_plane(api_key=self.api_key)
+        for _ in range(max_wait_seconds):
+            try:
+                index = await control_plane.describe_index(index_name)
+                if index.status.ready:
+                    return
+            except PineconeAPIError:
+                logger.exception(
+                    "Failed to describe index while waiting for it to become ready.",
+                    extra={"kbid": self.kbid, "index_name": index_name},
+                )
+            await asyncio.sleep(1)
+
+        raise TimeoutError(f"Index {index_name} did not become ready after {max_wait_seconds} seconds.")
+
+    async def rollover_cutover_indexes(self) -> None:
+        assert len(self.rollover_indexes) > 0, "No rollover indexes to cutover to"
+        control_plane = self.pinecone.control_plane(api_key=self.api_key)
+        for index in self.indexes.values():
+            index_name = index.index_name
+            try:
+                await control_plane.delete_index(index.index_name)
+            except Exception:
+                logger.exception(
+                    "Error deleting pinecone index on cutover",
+                    extra={"kbid": self.kbid, "index_name": index_name},
+                )
+        self.indexes.clear()
+        self.indexes.update(self.rollover_indexes)
 
     @classmethod
     def get_index_name(cls) -> str:
@@ -278,7 +403,8 @@ class PineconeIndexManager(ExternalIndexManager):
         Deletes by resource uuid on all indexes in parallel.
         """
         delete_tasks = []
-        for index_host in self.index_hosts.values():
+        for index in self.indexes.values():
+            index_host = index.index_host
             delete_tasks.append(
                 asyncio.create_task(
                     self._delete_resource_to_index(
@@ -304,6 +430,12 @@ class PineconeIndexManager(ExternalIndexManager):
             return vectorsets
         return vectorsets
 
+    def get_index_host(self, vectorset_id: str, rollover: bool = False) -> str:
+        if rollover:
+            return self.rollover_indexes[vectorset_id].index_host
+        else:
+            return self.indexes[vectorset_id].index_host
+
     def get_prefixes_to_delete(self, index_data: Resource) -> set[str]:
         prefixes_to_delete = set()
         for sentence_id in index_data.sentences_to_delete:
@@ -326,7 +458,9 @@ class PineconeIndexManager(ExternalIndexManager):
                     continue
         return prefixes_to_delete
 
-    async def _index_resource(self, resource_uuid: str, index_data: Resource) -> None:
+    async def _index_resource(
+        self, resource_uuid: str, index_data: Resource, to_rollover_indexes: bool = False
+    ) -> None:
         """
         Index NucliaDB resource into a Pinecone index.
         Handles multiple vectorsets.
@@ -343,10 +477,11 @@ class PineconeIndexManager(ExternalIndexManager):
         prefixes_to_delete = self.get_prefixes_to_delete(index_data)
         delete_tasks = []
         for vectorset in vectorsets:
+            index_host = self.get_index_host(vectorset_id=vectorset, rollover=to_rollover_indexes)
             delete_tasks.append(
                 asyncio.create_task(
-                    self._delete_by_prefix_to_vectorset_index(
-                        vectorset_id=vectorset,
+                    self._delete_by_prefix_to_index(
+                        index_host=index_host,
                         prefixes_to_delete=prefixes_to_delete,
                     )
                 )
@@ -366,10 +501,11 @@ class PineconeIndexManager(ExternalIndexManager):
 
         upsert_tasks = []
         for vectorset_id, vectors in vectorset_vectors.items():
+            index_host = self.get_index_host(vectorset_id=vectorset_id, rollover=to_rollover_indexes)
             upsert_tasks.append(
                 asyncio.create_task(
-                    self._upsert_to_vectorset_index(
-                        vectorset_id=vectorset_id,
+                    self._upsert_to_index(
+                        index_host=index_host,
                         vectors=vectors,
                     )
                 )
@@ -377,24 +513,10 @@ class PineconeIndexManager(ExternalIndexManager):
         if len(upsert_tasks) > 0:
             await asyncio.gather(*upsert_tasks)
 
-    async def _upsert_to_vectorset_index(self, vectorset_id: str, vectors: list[PineconeVector]) -> None:
+    async def _upsert_to_index(self, index_host: str, vectors: list[PineconeVector]) -> None:
         if len(vectors) == 0:  # pragma: no cover
             return
-        try:
-            index_host = self.index_hosts[vectorset_id]
-            data_plane = self.get_data_plane(index_host=index_host)
-        except KeyError:
-            logger.error(
-                "Pinecone index not found for vectorset. Data could not be indexed.",
-                extra={
-                    "kbid": self.kbid,
-                    "provider": self.type.value,
-                    "vectorset_id": vectorset_id,
-                    "index_names": self.index_names,
-                    "index_hosts": self.index_hosts,
-                },
-            )
-            return
+        data_plane = self.get_data_plane(index_host=index_host)
         with manager_observer({"operation": "upsert_in_batches"}):
             await data_plane.upsert_in_batches(
                 vectors=vectors,
@@ -402,12 +524,9 @@ class PineconeIndexManager(ExternalIndexManager):
                 batch_timeout=self.upsert_timeout,
             )
 
-    async def _delete_by_prefix_to_vectorset_index(
-        self, vectorset_id: str, prefixes_to_delete: set[str]
-    ) -> None:
+    async def _delete_by_prefix_to_index(self, index_host: str, prefixes_to_delete: set[str]) -> None:
         if len(prefixes_to_delete) == 0:  # pragma: no cover
             return
-        index_host = self.index_hosts[vectorset_id]
         data_plane = self.get_data_plane(index_host=index_host)
         with manager_observer({"operation": "delete_by_prefix"}):
             for prefix in prefixes_to_delete:
@@ -554,7 +673,7 @@ class PineconeIndexManager(ExternalIndexManager):
 
     async def _query(self, request: SearchRequest) -> PineconeQueryResults:
         vectorset_id = request.vectorset or self.default_vectorset or "__default__"
-        index_host = self.index_hosts[vectorset_id]
+        index_host = self.get_index_host(vectorset_id=vectorset_id)
         data_plane = self.get_data_plane(index_host=index_host)
         filter = convert_to_pinecone_filter(request)
         top_k = (request.page_number + 1) * request.result_per_page
@@ -579,7 +698,8 @@ class PineconeIndexManager(ExternalIndexManager):
         )
         tasks = []
         vectorset_results: dict[str, IndexCounts] = {}
-        for vectorset_id in self.index_hosts.keys():
+
+        for vectorset_id in self.indexes.keys():
             tasks.append(
                 asyncio.create_task(self._get_vectorset_index_counts(vectorset_id, vectorset_results))
             )
@@ -595,7 +715,7 @@ class PineconeIndexManager(ExternalIndexManager):
     async def _get_vectorset_index_counts(
         self, vectorset_id: str, results: dict[str, IndexCounts]
     ) -> None:
-        index_host = self.index_hosts[vectorset_id]
+        index_host = self.get_index_host(vectorset_id=vectorset_id)
         data_plane = self.get_data_plane(index_host=index_host)
         try:
             index_stats = await data_plane.stats()

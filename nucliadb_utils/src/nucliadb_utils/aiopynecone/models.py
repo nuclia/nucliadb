@@ -123,3 +123,17 @@ class IndexStats(BaseModel):
     dimension: int
     namespaces: dict[str, IndexNamespaceStats] = {}
     totalVectorCount: int
+
+
+class IndexStatus(BaseModel):
+    ready: bool
+    state: str
+
+
+class IndexDescription(BaseModel):
+    dimension: int
+    host: str
+    metric: str
+    name: str
+    spec: dict[str, Any]
+    status: IndexStatus

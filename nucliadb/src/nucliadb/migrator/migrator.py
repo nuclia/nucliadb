@@ -22,7 +22,7 @@ import logging
 from typing import Optional
 
 from nucliadb.common import locking
-from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.migrator.context import ExecutionContext
@@ -162,7 +162,7 @@ async def run_rollover_in_parallel(
 ) -> None:
     async with max_concurrent:
         try:
-            await rollover_kb_shards(context, kbid)
+            await rollover_kb_index(context, kbid)
             await context.data_manager.delete_kb_rollover(kbid=kbid)
         except Exception as exc:
             errors.capture_exception(exc)
