@@ -34,7 +34,10 @@ from nucliadb_utils.aiopynecone.client import (
     batchify,
     raise_for_status,
 )
-from nucliadb_utils.aiopynecone.exceptions import PineconeNeedsPlanUpgradeError
+from nucliadb_utils.aiopynecone.exceptions import (
+    PineconeNeedsPlanUpgradeError,
+    RetriablePineconeAPIError,
+)
 from nucliadb_utils.aiopynecone.models import CreateIndexRequest, QueryResponse, Vector
 
 
@@ -312,9 +315,19 @@ async def test_async_batchify():
     assert batches == 5
 
 
-def test_raise_for_status():
+def test_raise_for_status_5xx():
     request = unittest.mock.MagicMock()
     response = unittest.mock.MagicMock(status_code=500)
+    response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "message", request=request, response=response
+    )
+    with pytest.raises(RetriablePineconeAPIError):
+        raise_for_status("op", response)
+
+
+def test_raise_for_status_4xx():
+    request = unittest.mock.MagicMock()
+    response = unittest.mock.MagicMock(status_code=412)
     response.raise_for_status.side_effect = httpx.HTTPStatusError(
         "message", request=request, response=response
     )

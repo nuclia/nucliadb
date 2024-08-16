@@ -32,6 +32,7 @@ from nucliadb_telemetry.metrics import INF, Histogram, Observer
 from nucliadb_utils.aiopynecone.exceptions import (
     PineconeAPIError,
     PineconeRateLimitError,
+    RetriablePineconeAPIError,
     raise_for_status,
 )
 from nucliadb_utils.aiopynecone.models import (
@@ -93,9 +94,11 @@ MAX_LIST_PAGE_SIZE = 100
 
 RETRIABLE_EXCEPTIONS = (
     PineconeRateLimitError,
+    RetriablePineconeAPIError,
     httpx.ConnectError,
     httpx.NetworkError,
     httpx.WriteTimeout,
+    httpx.ReadTimeout,
 )
 
 

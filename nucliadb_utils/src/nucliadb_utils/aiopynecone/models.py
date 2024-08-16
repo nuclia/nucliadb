@@ -29,6 +29,7 @@ from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError
 KILO_BYTE = 1024
 MAX_METADATA_SIZE = 40 * KILO_BYTE
 MAX_INDEX_NAME_LENGTH = 45
+MAX_VECTOR_ID_LENGTH = 512
 
 
 # Requests
@@ -64,7 +65,7 @@ class CreateIndexRequest(BaseModel):
 
 
 class Vector(BaseModel):
-    id: str = Field(min_length=1, max_length=512)
+    id: str = Field(min_length=1, max_length=MAX_VECTOR_ID_LENGTH)
     values: list[float]
     metadata: dict[str, Any] = {}
 

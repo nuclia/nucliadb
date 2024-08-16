@@ -177,6 +177,7 @@ async def _index_node_retrieval(
                 "query": item.model_dump_json(),
                 "time": search_time,
                 "nodes": debug_nodes_info(queried_nodes),
+                "durations": metrics.steps(),
             },
         )
     elif search_time > settings.slow_find_log_threshold:
@@ -189,8 +190,7 @@ async def _index_node_retrieval(
                 "query": item.model_dump_json(),
                 "time": search_time,
                 "nodes": debug_nodes_info(queried_nodes),
-                # Include metrics in the log
-                **metrics.steps(),
+                "durations": metrics.steps(),
             },
         )
 
