@@ -28,7 +28,7 @@ from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search import predict
+from nucliadb.search import logger, predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
@@ -280,6 +280,7 @@ async def catalog(
     returns bm25 results on titles and it does not support vector search.
     It is useful for listing resources in a knowledge box.
     """
+    start_time = time()
     try:
         sort = item.sort
         if sort is None:
@@ -363,6 +364,17 @@ async def catalog(
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
         return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
+    finally:
+        duration = time() - start_time
+        if duration > 2:  # pragma: no cover
+            logger.warning(
+                "Slow catalog request",
+                extra={
+                    "kbid": kbid,
+                    "duration": duration,
+                    "query": item.model_dump_json(),
+                },
+            )
 
 
 @api.post(
