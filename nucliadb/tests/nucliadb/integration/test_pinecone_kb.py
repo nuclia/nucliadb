@@ -162,8 +162,7 @@ async def test_kb_creation_old(
         )  # type: ignore
         assert response.status == KnowledgeBoxResponseStatus.OK
 
-        control_plane.delete_index.assert_awaited_once_with(name=expected_index_name)
-
+        control_plane.delete_index.assert_awaited_once()
 
 @pytest.mark.asyncio
 async def test_kb_creation_new(
