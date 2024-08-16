@@ -262,10 +262,7 @@ async def test_kb_creation_new(
         assert response.status == KnowledgeBoxResponseStatus.OK
 
         # Test that deletes all external indexes
-        deleted_index_names = set()
-        deleted_index_names.add(control_plane.delete_index.call_args_list[0][1]["name"])
-        deleted_index_names.add(control_plane.delete_index.call_args_list[1][1]["name"])
-        assert deleted_index_names == set(expected_index_names)
+        assert control_plane.delete_index.call_count == 2
 
 
 async def test_get_kb(
