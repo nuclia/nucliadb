@@ -44,7 +44,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import BrokerMessage, NewKnowledgeBoxV2Request, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.aiopynecone.models import IndexStats, QueryResponse
+from nucliadb_utils.aiopynecone.models import IndexDescription, IndexStats, IndexStatus, QueryResponse
 from nucliadb_utils.utilities import get_endecryptor
 
 PINECONE_MODULE = "nucliadb.common.external_index_providers.pinecone"
@@ -65,6 +65,19 @@ def control_plane():
     mocked = mock.MagicMock()
     mocked.create_index = mock.AsyncMock(return_value="pinecone-host")
     mocked.delete_index = mock.AsyncMock(return_value=None)
+    mocked.describe_index = mock.AsyncMock(
+        return_value=IndexDescription(
+            dimension=10,
+            name="name",
+            host="pinecone-host",
+            metric="dotproduct",
+            spec={"cloud": "aws", "region": "us-east-1"},
+            status=IndexStatus(
+                ready=True,
+                state="Initialized",
+            ),
+        )
+    )
     return mocked
 
 
@@ -163,6 +176,7 @@ async def test_kb_creation_old(
         assert response.status == KnowledgeBoxResponseStatus.OK
 
         control_plane.delete_index.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_kb_creation_new(
@@ -504,3 +518,5 @@ async def test_pinecone_kb_rollover_index(
     assert control_plane.create_index.call_count == 2
     # Check that the original index was deleted
     assert control_plane.delete_index.call_count == 1
+    # Check that it waits for created indexes to be ready
+    assert control_plane.describe_index.await_count == 1

@@ -316,9 +316,48 @@ class PineconeIndexManager(ExternalIndexManager):
                         },
                     )
             raise
+
+        # Wait for all indexes to be in the ready state
+        wait_tasks = []
+        for index_name in created_indexes:
+            wait_tasks.append(
+                asyncio.create_task(self.wait_for_index_ready(index_name, max_wait_seconds=60))
+            )
+        if len(wait_tasks) > 0:
+            try:
+                await asyncio.gather(*wait_tasks)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Timeout waiting for pinecone indexes to be ready",
+                    extra={"kbid": self.kbid, "indexes": created_indexes},
+                )
+
+        # Clear the rollover indexes and update the stored metadata
         self.rollover_indexes.clear()
         self.rollover_indexes = dict(result.pinecone_config.indexes)
         return result
+
+    async def wait_for_index_ready(self, index_name: str, max_wait_seconds: int = 10) -> None:
+        """
+        Wait for an index to be ready.
+        Params:
+        - `name`: The name of the index to wait for.
+        - `max_wait_seconds`: The maximum number of seconds to wait.
+        """
+        control_plane = self.pinecone.control_plane(api_key=self.api_key)
+        for _ in range(max_wait_seconds):
+            try:
+                index = await control_plane.describe_index(index_name)
+                if index.status.ready:
+                    return
+            except PineconeAPIError:
+                logger.exception(
+                    "Failed to describe index while waiting for it to become ready.",
+                    extra={"kbid": self.kbid, "index_name": index_name},
+                )
+            await asyncio.sleep(1)
+
+        raise TimeoutError(f"Index {index_name} did not become ready after {max_wait_seconds} seconds.")
 
     async def rollover_cutover_indexes(self) -> None:
         assert len(self.rollover_indexes) > 0, "No rollover indexes to cutover to"
