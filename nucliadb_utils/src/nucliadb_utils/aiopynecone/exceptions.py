@@ -24,7 +24,7 @@ import httpx
 
 from nucliadb_telemetry.metrics import Counter
 
-pinecone_errors_counter = Counter("pinecone_errors", labels={"type": ""})
+pinecone_errors_counter = Counter("pinecone_errors", labels={"type": "", "status_code": ""})
 
 
 class PineconeAPIError(Exception):
@@ -52,7 +52,15 @@ class PineconeAPIError(Exception):
         super().__init__(exc_message)
 
 
-class PineconeRateLimitError(PineconeAPIError):
+class RetriablePineconeAPIError(PineconeAPIError):
+    """
+    Raised when the client can retry the operation.
+    """
+
+    pass
+
+
+class PineconeRateLimitError(RetriablePineconeAPIError):
     """
     Raised when the client has exceeded the rate limit to be able to backoff and retry.
     """
@@ -80,7 +88,7 @@ def raise_for_status(operation: str, response: httpx.Response):
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
-        pinecone_errors_counter.inc(labels={"type": operation})
+        pinecone_errors_counter.inc(labels={"type": operation, "status_code": str(response.status_code)})
         code = None
         message = None
         details = None
@@ -106,6 +114,15 @@ def raise_for_status(operation: str, response: httpx.Response):
                 message=message,
                 details=details,
             )
+
+        if str(response.status_code).startswith("5"):
+            raise RetriablePineconeAPIError(
+                http_status_code=response.status_code,
+                code=code,
+                message=message,
+                details=details,
+            )
+
         raise PineconeAPIError(
             http_status_code=response.status_code,
             code=code,
