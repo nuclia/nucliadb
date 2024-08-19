@@ -54,6 +54,9 @@ spec:
       topologySpreadConstraints:
 {{ toYaml $values.readReplicas.topologySpreadConstraints | indent 8 }}
 {{- end }}
+{{- with $values.readReplicas.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
 {{- if $values.readReplicas.affinity }}
       affinity:
 {{ toYaml $values.readReplicas.affinity | indent 8 }}
