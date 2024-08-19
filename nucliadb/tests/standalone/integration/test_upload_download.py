@@ -67,7 +67,9 @@ async def test_file_tus_upload_and_download(
     language = "ca"
     filename = "image.jpg"
     md5 = "7af0916dba8b70e29d99e72941923529"
-    content_type = "image/jpg"
+    # aitable is a custom content type suffix to indicate
+    # that the file must be processed with the ai tables feature...
+    content_type = "image/jpg+aitable"
 
     # Create a resource
     kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
@@ -220,3 +222,50 @@ async def test_tus_upload_handles_unknown_upload_ids(
     assert resp.status_code == 404
     error_detail = resp.json().get("detail")
     assert error_detail == "Resumable URI not found for upload_id: foobarid"
+
+
+@pytest.mark.asyncio
+async def test_content_type_validation(
+    blobstorage_settings,
+    configure_redis_dm,
+    nucliadb_writer,
+    nucliadb_reader,
+    knowledgebox_one,
+):
+    language = "ca"
+    filename = "image.jpg"
+    md5 = "7af0916dba8b70e29d99e72941923529"
+
+    # Create a resource
+    kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
+    resp = await nucliadb_writer.post(
+        f"{kb_path}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource1",
+            "title": "Resource 1",
+        },
+    )
+    assert resp.status_code == 201
+    resource = resp.json().get("uuid")
+
+    # Start TUS upload
+    url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/{TUSUPLOAD}"
+    upload_metadata = ",".join(
+        [
+            f"filename {header_encode(filename)}",
+            f"language {header_encode(language)}",
+            f"md5 {header_encode(md5)}",
+        ]
+    )
+    resp = await nucliadb_writer.post(
+        url,
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "content-type": "invalid-content-type",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 415
+    error_detail = resp.json().get("detail")
+    assert error_detail == "Unsupported content type: invalid-content-type"

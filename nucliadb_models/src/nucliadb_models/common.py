@@ -274,4 +274,6 @@ class QuestionAnswer(BaseModel):
 
 
 def valid_content_type(content_type: str) -> bool:
+    # The AI tables feature has been implemented via a custom mimetype suffix...
+    content_type = content_type.split("+aitable")[0]
     return mimetypes.guess_extension(content_type, strict=True) is not None

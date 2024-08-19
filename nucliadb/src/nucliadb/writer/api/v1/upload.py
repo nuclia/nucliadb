@@ -254,6 +254,13 @@ async def _tus_post(
         request_content_type = request.headers.get("content-type")
     if not request_content_type:
         request_content_type = guess_content_type(metadata["filename"])
+
+    if request_content_type and not valid_content_type(request_content_type):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported content type: {request_content_type}",
+        )
+
     metadata.setdefault("content_type", request_content_type)
 
     metadata["implies_resource_creation"] = implies_resource_creation
@@ -536,7 +543,7 @@ async def _tus_patch(
         if not valid_content_type(content_type):
             return HTTPClientError(
                 status_code=415,
-                detail=f"Unsupported media type: {content_type}",
+                detail=f"Unsupported content type: {content_type}",
             )
 
         try:
@@ -717,7 +724,7 @@ async def _upload(
     if not valid_content_type(content_type):
         raise HTTPException(
             status_code=415,
-            detail=f"Unsupported media type: {content_type}",
+            detail=f"Unsupported content type: {content_type}",
         )
 
     metadata = {"content_type": content_type, "filename": filename}
