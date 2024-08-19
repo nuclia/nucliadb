@@ -26,7 +26,17 @@ paragraphs... Avoiding spread of id construction and parsing everywhere
 from dataclasses import dataclass
 from typing import Optional
 
-# Index
+from nucliadb_protos.resources_pb2 import FieldType
+
+FIELD_TYPE_STR_TO_PB: dict[str, FieldType.ValueType] = {
+    "t": FieldType.TEXT,
+    "f": FieldType.FILE,
+    "u": FieldType.LINK,
+    "a": FieldType.GENERIC,
+    "c": FieldType.CONVERSATION,
+}
+
+FIELD_TYPE_PB_TO_STR = {v: k for k, v in FIELD_TYPE_STR_TO_PB.items()}
 
 
 @dataclass
@@ -35,6 +45,9 @@ class FieldId:
     field_id: str
     # also knwon as `split`, this indicates a part of a field in, for example, conversations
     subfield_id: Optional[str] = None
+
+    def __repr__(self) -> str:
+        return f"FieldId({self.full()})"
 
     def full(self) -> str:
         if self.subfield_id is None:
@@ -45,6 +58,13 @@ class FieldId:
     @property
     def field_type(self) -> str:
         return self.field_id.split("/")[0]
+
+    def __hash__(self) -> int:
+        return hash(self.full())
+
+    @property
+    def pb_type(self) -> FieldType.ValueType:
+        return FIELD_TYPE_STR_TO_PB[self.field_type]
 
     @classmethod
     def from_string(cls, value: str) -> "FieldId":
@@ -77,8 +97,14 @@ class ParagraphId:
     paragraph_start: int
     paragraph_end: int
 
+    def __repr__(self) -> str:
+        return f"ParagraphId({self.full()})"
+
     def full(self) -> str:
         return f"{self.field_id.full()}/{self.paragraph_start}-{self.paragraph_end}"
+
+    def __hash__(self) -> int:
+        return hash(self.full())
 
     @classmethod
     def from_string(cls, value: str) -> "ParagraphId":
@@ -88,16 +114,40 @@ class ParagraphId:
         field_id = FieldId.from_string("/".join(parts[:-1]))
         return cls(field_id=field_id, paragraph_start=start, paragraph_end=end)
 
+    @classmethod
+    def from_vector_key(cls, vector_key: str) -> "ParagraphId":
+        """
+        Returns a ParagraphId from a vector_key (the index part of the vector_key is ignored).
+        >>> ParagraphId.from_vector_key("rid/u/field_id/0/0-1")
+        ParagraphId("rid/u/field_id/0-1")
+        """
+        parts = vector_key.split("/")
+        vector_range = parts[-1]
+        start, end = map(int, vector_range.split("-"))
+        field_id = FieldId.from_string("/".join(parts[:-2]))
+        return cls(field_id=field_id, paragraph_start=start, paragraph_end=end)
+
 
 @dataclass
 class VectorId:
+    """
+    Ids of vectors are very similar to ParagraphIds, but for legacy reasons, they have an index
+    indicating the position of the corresponding text block in the list of text blocks for the field.
+    """
+
     field_id: FieldId
     index: int
     vector_start: int
     vector_end: int
 
+    def __repr__(self) -> str:
+        return f"VectorId({self.full()})"
+
     def full(self) -> str:
         return f"{self.field_id.full()}/{self.index}/{self.vector_start}-{self.vector_end}"
+
+    def __hash__(self) -> int:
+        return hash(self.full())
 
     @classmethod
     def from_string(cls, value: str) -> "VectorId":

@@ -21,7 +21,7 @@ from contextvars import ContextVar
 from typing import Optional
 
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
@@ -65,7 +65,7 @@ async def get_paragraph_from_resource(
     orm_resource: ResourceORM, result: ParagraphResult
 ) -> Optional[Paragraph]:
     _, field_type, field = result.field.split("/")
-    field_type_int = KB_REVERSE[field_type]
+    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     field_metadata = await field_obj.get_field_metadata()
     paragraph = None
@@ -108,7 +108,7 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> list[str]:
             labels.append(f"{classification.labelset}/{classification.label}")
 
     _, field_type, field = result.field.split("/")
-    field_type_int = KB_REVERSE[field_type]
+    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     field_metadata = await field_obj.get_field_metadata()
     if field_metadata:

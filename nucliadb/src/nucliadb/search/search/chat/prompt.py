@@ -17,19 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import copy
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, cast
 
+from nucliadb.common import datamanagers
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search import logger
-from nucliadb.search.search import paragraphs
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
+from nucliadb.search.search.paragraphs import ExtractedTextCache, get_paragraph_text
 from nucliadb_models.search import (
     SCORE_TYPE,
     FieldExtensionStrategy,
@@ -39,6 +42,7 @@ from nucliadb_models.search import (
     ImageRagStrategy,
     ImageRagStrategyName,
     KnowledgeboxFindResults,
+    NeighbouringParagraphsStrategy,
     PageImageStrategy,
     PromptContext,
     PromptContextImages,
@@ -136,7 +140,7 @@ async def get_expanded_conversation_messages(
     resource = await kb.get(rid)
     if resource is None:
         return []
-    field_obj = await resource.get_field(field_id, KB_REVERSE["c"], load=True)
+    field_obj = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)
     found_message, found_page, found_idx = await find_conversation_message(
         field_obj=field_obj, mident=mident
     )
@@ -222,7 +226,7 @@ async def get_resource_field_extracted_text(
             extra={"kbid": kb_obj.kbid},
         )
         return None
-    field = await resource.get_field(field_key, KB_REVERSE[field_type], load=False)
+    field = await resource.get_field(field_key, FIELD_TYPE_STR_TO_PB[field_type], load=False)
     if field is None:
         return None
     result = await get_field_extracted_text(field)
@@ -347,6 +351,144 @@ async def composed_prompt_context(
             context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
+async def get_paragraph_text_with_neighbours(
+    kbid: str,
+    pid: ParagraphId,
+    etcache: ExtractedTextCache,
+    field_paragraphs: list[ParagraphId],
+    before: int = 0,
+    after: int = 0,
+) -> tuple[ParagraphId, str]:
+    async def _get_paragraph_text(
+        kbid: str,
+        pid: ParagraphId,
+        etcache: ExtractedTextCache,
+    ) -> tuple[ParagraphId, str]:
+        return pid, await get_paragraph_text(
+            kbid=kbid,
+            rid=pid.field_id.rid,
+            field=pid.field_id.full(),
+            start=pid.paragraph_start,
+            end=pid.paragraph_end,
+            extracted_text_cache=etcache,
+            log_on_missing_field=False,
+        )
+
+    ops = []
+    for paragraph_index in get_neighbouring_paragraph_indexes(
+        field_paragraphs=field_paragraphs,
+        matching_paragraph=pid,
+        before=before,
+        after=after,
+    ):
+        neighbour_pid = field_paragraphs[paragraph_index]
+        ops.append(
+            asyncio.create_task(
+                _get_paragraph_text(
+                    kbid=kbid,
+                    pid=neighbour_pid,
+                    etcache=etcache,
+                )
+            )
+        )
+
+    results = []
+    if len(ops) > 0:
+        results = await asyncio.gather(*ops)
+
+    # Sort the results by the paragraph start
+    results.sort(key=lambda x: x[0].paragraph_start)
+    paragraph_texts = []
+    for _, text in results:
+        if text:
+            paragraph_texts.append(text)
+    return pid, "\n\n".join(paragraph_texts)
+
+
+async def get_field_paragraphs_list(
+    kbid: str,
+    field: FieldId,
+    paragraphs: list[ParagraphId],
+) -> None:
+    """
+    Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
+    """
+    async with datamanagers.with_ro_transaction() as txn:
+        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=field.rid)
+        if resource is None:
+            return
+    field_key = field.field_id.split("/")[-1]
+    field_obj: Field = await resource.get_field(key=field_key, type=field.pb_type, load=False)
+    field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata(
+        force=True
+    )
+    if field_metadata is None:
+        return
+    for paragraph in field_metadata.metadata.paragraphs:
+        paragraphs.append(
+            ParagraphId(
+                field_id=field,
+                paragraph_start=paragraph.start,
+                paragraph_end=paragraph.end,
+            )
+        )
+
+
+async def neighbouring_paragraphs_prompt_context(
+    context: CappedPromptContext,
+    kbid: str,
+    ordered_text_blocks: list[FindParagraph],
+    before: int = 0,
+    after: int = 0,
+) -> None:
+    """
+    This function will get the paragraph texts and then craft a context with the neighbouring paragraphs of the
+    paragraphs in the ordered_paragraphs list. The number of paragraphs to include before and after each paragraph
+    """
+    # First, get the sorted list of paragraphs for each matching field
+    # so we can know the indexes of the neighbouring paragraphs
+    unique_fields = set()
+    for text_block in ordered_text_blocks:
+        pid = ParagraphId.from_string(text_block.id)
+        unique_fields.add(pid.field_id)
+
+    paragraphs_by_field: dict[FieldId, list[ParagraphId]] = {}
+    field_ops = []
+    for field_id in unique_fields:
+        plist = paragraphs_by_field.setdefault(field_id, [])
+        field_ops.append(
+            asyncio.create_task(get_field_paragraphs_list(kbid=kbid, field=field_id, paragraphs=plist))
+        )
+    if field_ops:
+        await asyncio.gather(*field_ops)
+
+    etcache = ExtractedTextCache()
+
+    paragraph_ops = []
+    for text_block in ordered_text_blocks:
+        pid = ParagraphId.from_string(text_block.id)
+        paragraph_ops.append(
+            asyncio.create_task(
+                get_paragraph_text_with_neighbours(
+                    kbid=kbid,
+                    pid=pid,
+                    etcache=etcache,
+                    before=before,
+                    after=after,
+                    field_paragraphs=paragraphs_by_field.get(pid.field_id, []),
+                )
+            )
+        )
+    if not paragraph_ops:
+        return
+
+    results: list[tuple[ParagraphId, str]] = await asyncio.gather(*paragraph_ops)
+    # Add the paragraph texts to the context
+    for pid, text in results:
+        if text != "":
+            context[pid.full()] = text
+
+
 async def hierarchy_prompt_context(
     context: CappedPromptContext,
     kbid: str,
@@ -362,7 +504,7 @@ async def hierarchy_prompt_context(
     # Make a copy of the ordered paragraphs to avoid modifying the original list, which is returned
     # in the response to the user
     ordered_paragraphs_copy = copy.deepcopy(ordered_paragraphs)
-    etcache = paragraphs.ExtractedTextCache()
+    etcache = ExtractedTextCache()
     resources: Dict[str, ExtraCharsParagraph] = {}
 
     # Iterate paragraphs to get extended text
@@ -375,17 +517,18 @@ async def hierarchy_prompt_context(
         int_end = int(end) + paragraphs_extra_characters
         extended_paragraph_text = paragraph.text
         if paragraphs_extra_characters > 0:
-            extended_paragraph_text = await paragraphs.get_paragraph_text(
+            extended_paragraph_text = await get_paragraph_text(
                 kbid=kbid,
                 rid=rid,
                 field=field_path,
                 start=int_start,
                 end=int_end,
                 extracted_text_cache=etcache,
+                log_on_missing_field=True,
             )
         if rid not in resources:
             # Get the title and the summary of the resource
-            title_text = await paragraphs.get_paragraph_text(
+            title_text = await get_paragraph_text(
                 kbid=kbid,
                 rid=rid,
                 field="/a/title",
@@ -394,7 +537,7 @@ async def hierarchy_prompt_context(
                 extracted_text_cache=etcache,
                 log_on_missing_field=False,
             )
-            summary_text = await paragraphs.get_paragraph_text(
+            summary_text = await get_paragraph_text(
                 kbid=kbid,
                 rid=rid,
                 field="/a/summary",
@@ -522,6 +665,8 @@ class PromptContextBuilder:
         number_of_full_resources = len(self.ordered_paragraphs)
         hierarchy_strategy = False
         hierarchy_paragraphs_extended_characters = 0
+        neighbouring_paragraphs_strategy = False
+        neighbouring_paragraphs_range = (0, 0)
         extend_with_fields: list[str] = []
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
@@ -539,6 +684,10 @@ class PromptContextBuilder:
                 hierarchy_strategy = True
                 if strategy.count is not None and strategy.count > 0:
                     hierarchy_paragraphs_extended_characters = strategy.count
+            elif strategy.name == RagStrategyName.NEIGHBOURING_PARAGRAPHS:
+                strategy = cast(NeighbouringParagraphsStrategy, strategy)
+                neighbouring_paragraphs_strategy = True
+                neighbouring_paragraphs_range = (strategy.before, strategy.after)
 
         if full_resource_strategy:
             await full_resource_prompt_context(
@@ -548,24 +697,28 @@ class PromptContextBuilder:
                 self.resource,
                 number_of_full_resources,
             )
-            return
-
-        if hierarchy_strategy:
+        elif hierarchy_strategy:
             await hierarchy_prompt_context(
                 context,
                 self.kbid,
                 self.ordered_paragraphs,
                 hierarchy_paragraphs_extended_characters,
             )
-            return
-
-        await composed_prompt_context(
-            context,
-            self.kbid,
-            self.ordered_paragraphs,
-            extend_with_fields=extend_with_fields,
-        )
-        return
+        elif neighbouring_paragraphs_strategy:
+            await neighbouring_paragraphs_prompt_context(
+                context,
+                self.kbid,
+                self.ordered_paragraphs,
+                before=neighbouring_paragraphs_range[0],
+                after=neighbouring_paragraphs_range[1],
+            )
+        else:
+            await composed_prompt_context(
+                context,
+                self.kbid,
+                self.ordered_paragraphs,
+                extend_with_fields=extend_with_fields,
+            )
 
 
 @dataclass
@@ -596,3 +749,20 @@ def get_ordered_paragraphs(results: KnowledgeboxFindResults) -> list[FindParagra
         key=lambda paragraph: paragraph.order,
         reverse=False,
     )
+
+
+def get_neighbouring_paragraph_indexes(
+    field_paragraphs: list[ParagraphId],
+    matching_paragraph: ParagraphId,
+    before: int,
+    after: int,
+) -> list[int]:
+    """
+    Returns the indexes of the neighbouring paragraphs to fetch (including the matching paragraph).
+    """
+    assert before >= 0
+    assert after >= 0
+    matching_index = field_paragraphs.index(matching_paragraph)
+    start_index = max(0, matching_index - before)
+    end_index = min(len(field_paragraphs), matching_index + after + 1)
+    return list(range(start_index, end_index))

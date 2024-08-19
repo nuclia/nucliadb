@@ -24,7 +24,7 @@ import string
 from typing import Optional
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry import metrics
@@ -171,7 +171,7 @@ async def get_paragraph_text(
             return ""
 
     _, field_type, field = field.split("/")
-    field_type_int = KB_REVERSE[field_type]
+    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
 
     text = await get_paragraph_from_full_text(
@@ -208,7 +208,7 @@ async def get_text_sentence(
         logger.warning(f"{rid} does not exist on DB")
         return ""
 
-    field_type_int = KB_REVERSE[field_type]
+    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:

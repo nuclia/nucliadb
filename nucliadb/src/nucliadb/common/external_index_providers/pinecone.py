@@ -76,6 +76,7 @@ class PineconeQueryResults(QueryResults):
     def iter_matching_text_blocks(self) -> Iterator[TextBlockMatch]:
         for order, matching_vector in enumerate(self.results.matches):
             try:
+                paragraph_id = ParagraphId.from_vector_key(matching_vector.id)
                 vector_id = VectorId.from_string(matching_vector.id)
             except ValueError:  # pragma: no cover
                 logger.error(f"Invalid Pinecone vector id: {matching_vector.id}")
@@ -83,14 +84,14 @@ class PineconeQueryResults(QueryResults):
             vector_metadata = VectorMetadata.model_validate(matching_vector.metadata)  # noqa
             yield TextBlockMatch(
                 text=None,  # To be filled by the results hydrator
-                id=matching_vector.id,
-                resource_id=vector_id.field_id.rid,
-                field_id=vector_id.field_id.full(),
+                id=paragraph_id.full(),
+                resource_id=paragraph_id.field_id.rid,
+                field_id=paragraph_id.field_id.full(),
                 score=matching_vector.score,
                 order=order,
-                position_start=vector_id.vector_start,
-                position_end=vector_id.vector_end,
-                subfield_id=vector_id.field_id.subfield_id,
+                position_start=paragraph_id.paragraph_start,
+                position_end=paragraph_id.paragraph_end,
+                subfield_id=paragraph_id.field_id.subfield_id,
                 index=vector_id.index,
                 position_start_seconds=list(map(int, vector_metadata.position_start_seconds or [])),
                 position_end_seconds=list(map(int, vector_metadata.position_end_seconds or [])),
