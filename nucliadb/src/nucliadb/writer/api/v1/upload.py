@@ -61,6 +61,7 @@ from nucliadb.writer.tus.exceptions import (
 from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.common import valid_content_type
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
@@ -530,10 +531,18 @@ async def _tus_patch(
             if isinstance(item_payload, str):
                 item_payload = item_payload.encode()
             creation_payload = pickle.loads(base64.b64decode(item_payload))
+
+        content_type = dm.get("metadata", {}).get("content_type")
+        if not valid_content_type(content_type):
+            return HTTPClientError(
+                status_code=415,
+                detail=f"Unsupported media type: {content_type}",
+            )
+
         try:
             seqid = await store_file_on_nuclia_db(
                 size=dm.get("size"),
-                content_type=dm.get("metadata", {}).get("content_type"),
+                content_type=content_type,
                 override_resource_title=dm.get("metadata", {}).get("implies_resource_creation", False),
                 filename=dm.get("metadata", {}).get("filename"),
                 password=dm.get("metadata", {}).get("password"),
@@ -705,6 +714,12 @@ async def _upload(
     if not content_type:
         content_type = guess_content_type(filename)
 
+    if not valid_content_type(content_type):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported media type: {content_type}",
+        )
+
     metadata = {"content_type": content_type, "filename": filename}
 
     await dm.update(
@@ -814,7 +829,6 @@ async def store_file_on_nuclia_db(
     item: Optional[CreateResourcePayload] = None,
 ) -> Optional[int]:
     # File is on NucliaDB Storage at path
-
     partitioning = get_partitioning()
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -924,5 +938,5 @@ def maybe_b64decode(some_string: str) -> str:
 
 def guess_content_type(filename: str) -> str:
     default = "application/octet-stream"
-    guessed, _ = mimetypes.guess_type(filename)
+    guessed, _ = mimetypes.guess_type(filename, strict=True)
     return guessed or default
