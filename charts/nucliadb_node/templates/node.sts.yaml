@@ -82,6 +82,8 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          - secretRef:
+              name: node-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
           {{- end }}
@@ -121,6 +123,8 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          - secretRef:
+              name: node-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
           {{- end }}
@@ -157,6 +161,8 @@ spec:
         command: ["node_reader"]
         envFrom:
           - configMapRef:
+              name: node-config
+          - secretRef:
               name: node-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}

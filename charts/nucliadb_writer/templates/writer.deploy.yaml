@@ -80,6 +80,8 @@ spec:
         envFrom:
           - configMapRef:
               name: writer-config
+          - secretRef:
+              name: writer-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
           {{- end }}

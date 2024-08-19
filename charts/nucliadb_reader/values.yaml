@@ -22,6 +22,8 @@ env: {}
 envFrom:
   - configMapRef:
       name: nucliadb-config
+  - secretRef:
+      name: nucliadb-config
 
 # Kubernetes settings
 affinity: {}
@@ -46,8 +48,8 @@ services:
   maindb: 5432
   nats: 4222
 
-running:
-  sentry_url:
+#running:
+#  sentry_url:
 
 vs:
   gateway:

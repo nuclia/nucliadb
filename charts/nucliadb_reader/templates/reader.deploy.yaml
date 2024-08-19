@@ -80,6 +80,8 @@ spec:
         envFrom:
           - configMapRef:
               name: reader-config
+          - secretRef:
+              name: reader-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
           {{- end }}

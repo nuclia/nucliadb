@@ -25,6 +25,8 @@ env:
 envFrom:
   - configMapRef:
       name: nucliadb-config
+  - secretRef:
+      name: nucliadb-config
 
 # Kubernetes settings
 affinity: {}
