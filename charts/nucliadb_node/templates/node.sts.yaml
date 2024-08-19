@@ -53,6 +53,9 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
       serviceAccount: {{ .Values.serviceAccount | default "default" }}
 {{- if .Values.nats.secretName }}
       volumes:

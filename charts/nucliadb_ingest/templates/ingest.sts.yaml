@@ -55,6 +55,9 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
       serviceAccount: {{ ((.Values.ingest).serviceAccount) | default "default" }}
       containers:
       - name: ingest

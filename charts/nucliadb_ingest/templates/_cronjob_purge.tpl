@@ -48,6 +48,9 @@ spec:
           tolerations:
 {{ toYaml .Values.tolerations | indent 12 }}
           dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+          priorityClassName: {{ . }}
+{{- end }}
           restartPolicy: Never
           containers:
           - name: "{{ .cronname }}"
