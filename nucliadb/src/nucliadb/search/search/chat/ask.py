@@ -301,6 +301,7 @@ class AskResult:
                     kbid=self.kbid,
                     text_answer=self._answer_text,
                     target_shard_replicas=self.ask_request.shards,
+                    timeout=5.0,
                 )
         return self._relations
 
