@@ -16,11 +16,7 @@ data:
 {{- if .Values.debug }}
   LOG_LEVEL: "DEBUG"
 {{- end }}
-  SENTRY_URL: {{ .Values.running.sentry_url }}
-
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   INDEX_JETSTREAM_AUTH:  {{ .Values.indexing.index_jetstream_auth }}
-
   TOTAL_REPLICAS: {{ .Values.replicaCount | quote }}
-
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
