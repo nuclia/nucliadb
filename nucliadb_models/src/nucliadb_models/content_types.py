@@ -26,14 +26,24 @@ GENERIC_MIME_TYPE = "application/generic"
 NUCLIA_CUSTOM_CONTENT_TYPES = {
     GENERIC_MIME_TYPE,
     "application/stf-link",
+    "application/conversation",
 }
 
 EXTRA_VALID_CONTENT_TYPES = {
     "application/font-woff",
     "application/toml",
     "application/vnd.jgraph.mxfile",
+    "application/vnd.ms-excel.sheet.macroenabled.12",
     "application/vnd.ms-outlook",
     "application/vnd.rar",
+    "application/x-aportisdoc",
+    "application/x-archive",
+    "application/x-git",
+    "application/x-gzip",
+    "application/x-iwork-pages-sffpages",
+    "application/x-mach-binary",
+    "application/x-mobipocket-ebook",
+    "application/x-msdownload",
     "application/x-ndjson",
     "application/x-openscad",
     "application/x-zip-compressed",
@@ -45,10 +55,14 @@ EXTRA_VALID_CONTENT_TYPES = {
     "multipart/form-data",
     "text/jsx",
     "text/markdown",
+    "text/mdx",
     "text/rtf",
+    "text/x-c++",
+    "text/x-java-source",
     "text/x-log",
     "text/x-python-script",
     "text/yaml",
+    "video/x-m4v",
     "video/YouTube",
 } | NUCLIA_CUSTOM_CONTENT_TYPES
 
