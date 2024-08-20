@@ -103,12 +103,8 @@ class CreateResourcePayload(BaseModel):
     def icon_check(cls, v):
         if v is None:
             return v
-        if "/" not in v:
-            raise ValueError("Icon should be a MIME string")
-        if len(v.split("/")) != 2:
-            raise ValueError("Icon needs two parts of MIME string")
         if not content_types.valid(v):
-            raise ValueError("Icon is not a valid MIME string")
+            raise ValueError(f"Icon is not a valid MIME string: {v}")
         return v
 
     @field_validator("extra")
