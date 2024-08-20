@@ -36,6 +36,7 @@ from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.metrics import processor_observer
+from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_protos import utils_pb2, writer_pb2
@@ -1233,6 +1234,14 @@ def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
         return False
     if not mimetype:
         return False
+
+    if not content_types.valid(mimetype):
+        logger.warning(
+            "Invalid mimetype. Skipping icon update.",
+            extra={"mimetype": mimetype, "rid": basic.uuid, "slug": basic.slug},
+        )
+        return False
+
     basic.icon = mimetype
     return True
 

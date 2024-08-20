@@ -141,12 +141,16 @@ def test_get_text_field_mimetype(text_format, mimetype):
         (Basic(), "text/html", True),
         (Basic(icon=""), "text/html", True),
         (Basic(icon="application/octet-stream"), "text/html", True),
+        # Invalid icon should not be updated
+        (Basic(), "invalid", False),
     ],
 )
 def test_maybe_update_basic_icon(basic, icon, updated):
     assert maybe_update_basic_icon(basic, icon) == updated
     if updated:
         assert basic.icon == icon
+    else:
+        assert basic.icon != icon
 
 
 class Transaction:
