@@ -1232,6 +1232,7 @@ def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
     if basic.icon not in (None, "", "application/octet-stream", GENERIC_MIME_TYPE):
         # Icon already set or detected
         return False
+
     if not mimetype:
         return False
 
