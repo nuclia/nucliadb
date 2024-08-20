@@ -37,7 +37,7 @@ from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb_models.common import CloudLink
-from nucliadb_models.writer import GENERIC_MIME_TYPE
+from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import (
