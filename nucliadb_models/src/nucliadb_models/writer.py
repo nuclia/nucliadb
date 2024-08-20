@@ -37,8 +37,6 @@ from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdPattern, FieldIdString, SlugString
 
-GENERIC_MIME_TYPE = "application/generic"
-
 
 class FieldDefaults:
     title = Field(None, title="Title")
