@@ -251,10 +251,10 @@ async def _tus_post(
     request_content_type = None
     if item is None:
         request_content_type = request.headers.get("content-type")
-    if not request_content_type:
+    if request_content_type is None:
         request_content_type = content_types.guess(metadata["filename"]) or "application/octet-stream"
 
-    if request_content_type and not content_types.valid(request_content_type):
+    if request_content_type is not None and not content_types.valid(request_content_type):
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported content type: {request_content_type}",
@@ -717,7 +717,7 @@ async def _upload(
     # - content-type set by the user in the upload request header takes precedence.
     # - if not set, we will try to guess it from the filename and default to a generic binary content type otherwise
     content_type = request.headers.get("content-type")
-    if not content_type:
+    if content_type is None:
         content_type = content_types.guess(filename) or "application/octet-stream"
 
     if not content_types.valid(content_type):
