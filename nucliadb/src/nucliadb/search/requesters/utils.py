@@ -87,6 +87,8 @@ async def node_query(
     pb_query: SuggestRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
+    timeout: Optional[float] = None,
+    retry_on_primary: bool = True,
 ) -> tuple[list[SuggestResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -97,6 +99,8 @@ async def node_query(
     pb_query: ParagraphSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
+    timeout: Optional[float] = None,
+    retry_on_primary: bool = True,
 ) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -107,6 +111,8 @@ async def node_query(
     pb_query: SearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
+    timeout: Optional[float] = None,
+    retry_on_primary: bool = True,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -117,6 +123,8 @@ async def node_query(
     pb_query: RelationSearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
+    timeout: Optional[float] = None,
+    retry_on_primary: bool = True,
 ) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -126,7 +134,10 @@ async def node_query(
     pb_query: REQUEST_TYPE,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
+    timeout: Optional[float] = None,
+    retry_on_primary: bool = True,
 ) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
+    timeout = timeout or settings.search_timeout
     use_read_replica_nodes = use_read_replica_nodes and has_feature(
         const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
     )
@@ -171,7 +182,7 @@ async def node_query(
     try:
         results: list[Union[T, BaseException]] = await asyncio.wait_for(
             asyncio.gather(*ops, return_exceptions=True),
-            timeout=settings.search_timeout,
+            timeout=timeout,
         )
     except asyncio.TimeoutError as exc:  # pragma: no cover
         logger.warning(
@@ -195,6 +206,7 @@ async def node_query(
             error.status_code >= 500
             and use_read_replica_nodes
             and any([node.is_read_replica() for node, _ in queried_nodes])
+            and retry_on_primary
         ):
             # We had an error querying a secondary node, instead of raising an
             # error directly, retry query to primaries and hope it works
