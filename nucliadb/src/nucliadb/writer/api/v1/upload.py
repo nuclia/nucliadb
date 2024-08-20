@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-import mimetypes
 import pickle
 import uuid
 from datetime import datetime
@@ -61,7 +60,7 @@ from nucliadb.writer.tus.exceptions import (
 from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
-from nucliadb_models.common import valid_content_type
+from nucliadb_models import content_types
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
@@ -253,9 +252,9 @@ async def _tus_post(
     if item is None:
         request_content_type = request.headers.get("content-type")
     if not request_content_type:
-        request_content_type = guess_content_type(metadata["filename"])
+        request_content_type = content_types.guess(metadata["filename"]) or "application/octet-stream"
 
-    if request_content_type and not valid_content_type(request_content_type):
+    if request_content_type and not content_types.valid(request_content_type):
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported content type: {request_content_type}",
@@ -540,7 +539,7 @@ async def _tus_patch(
             creation_payload = pickle.loads(base64.b64decode(item_payload))
 
         content_type = dm.get("metadata", {}).get("content_type")
-        if not valid_content_type(content_type):
+        if not content_types.valid(content_type):
             return HTTPClientError(
                 status_code=415,
                 detail=f"Unsupported content type: {content_type}",
@@ -719,9 +718,9 @@ async def _upload(
     # - if not set, we will try to guess it from the filename and default to a generic binary content type otherwise
     content_type = request.headers.get("content-type")
     if not content_type:
-        content_type = guess_content_type(filename)
+        content_type = content_types.guess(filename) or "application/octet-stream"
 
-    if not valid_content_type(content_type):
+    if not content_types.valid(content_type):
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported content type: {content_type}",
@@ -941,9 +940,3 @@ def maybe_b64decode(some_string: str) -> str:
     except ValueError:
         # not b64encoded
         return some_string
-
-
-def guess_content_type(filename: str) -> str:
-    default = "application/octet-stream"
-    guessed, _ = mimetypes.guess_type(filename, strict=True)
-    return guessed or default

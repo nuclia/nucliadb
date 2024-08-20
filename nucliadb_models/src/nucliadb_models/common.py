@@ -19,7 +19,6 @@
 #
 import base64
 import hashlib
-import mimetypes
 import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -27,6 +26,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 from typing_extensions import Self
 
+from nucliadb_models import content_types
 from nucliadb_protos import resources_pb2
 
 FIELD_TYPE_CHAR_MAP = {
@@ -93,8 +93,8 @@ class File(BaseModel):
 
     @model_validator(mode="after")
     def _check_internal_file_fields(self) -> Self:
-        if not valid_content_type(self.content_type):
-            raise ValueError(f"Invalid content type: {self.content_type}")
+        if not content_types.valid(self.content_type):
+            raise ValueError(f"Unsupported content type: {self.content_type}")
         if self.uri:
             # Externally hosted file
             return self
@@ -125,8 +125,8 @@ class FileB64(BaseModel):
 
     @field_validator("content_type")
     def check_content_type(cls, v):
-        if not valid_content_type(v):
-            raise ValueError(f"Invalid content type: {v}")
+        if not content_types.valid(v):
+            raise ValueError(f"Unsupported content type: {v}")
         return v
 
 
@@ -271,9 +271,3 @@ class Answer(BaseModel):
 class QuestionAnswer(BaseModel):
     question: Question
     answers: List[Answer]
-
-
-def valid_content_type(content_type: str) -> bool:
-    # The AI tables feature has been implemented via a custom mimetype suffix...
-    content_type = content_type.split("+aitable")[0]
-    return mimetypes.guess_extension(content_type, strict=True) is not None
