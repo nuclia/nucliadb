@@ -1,11 +1,8 @@
-import base64
 import io
-import json
 import os
 import random
 import time
 
-from nucliadb_models.search import SyncAskResponse
 import pytest
 import requests
 
@@ -159,12 +156,12 @@ def test_search(kbid: str, resource_id: str):
     )
 
     raise_for_status(resp)
-    ask_response = SyncAskResponse.model_validate(resp.json())
-    print(f"Search results: {ask_response.retrieval_results}")
-    assert len(ask_response.retrieval_results) == 1
-    print(f"Relations payload: {ask_response.relations}")
-    print(f"Answer: {ask_response.answer}")
-    print(f"Citations: {ask_response.citations}")
+    ask_response = resp.json()
+    print(f"Search results: {ask_response["retrieval_results"]}")
+    assert len(ask_response["retrieval_results"]) == 1
+    print(f"Relations payload: {ask_response["relations"]}")
+    print(f"Answer: {ask_response["answer"]}")
+    print(f"Citations: {ask_response["citations"]}")
 
 
 def test_predict_proxy(kbid: str):
