@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 import asyncio
-import base64
 import enum
 import inspect
 import io
@@ -65,7 +64,6 @@ from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,
     AskResponseItem,
-    ChatRequest,
     CitationsAskResponseItem,
     ErrorAskResponseItem,
     FeedbackRequest,
@@ -74,7 +72,6 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
     MetadataAskResponseItem,
-    Relations,
     RelationsAskResponseItem,
     RetrievalAskResponseItem,
     SearchRequest,
@@ -101,14 +98,6 @@ class Region(enum.Enum):
     AWS_US_EAST_2_1 = "aws-us-east-2-1"
 
 
-class ChatResponse(BaseModel):
-    result: KnowledgeboxFindResults
-    answer: str
-    relations: Optional[Relations] = None
-    learning_id: Optional[str] = None
-    citations: dict[str, Any] = {}
-
-
 RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
 
 
@@ -117,38 +106,6 @@ ASK_STATUS_CODE_ERROR = "-1"
 
 def json_response_parser(response: httpx.Response) -> Any:
     return orjson.loads(response.content.decode())
-
-
-def chat_response_parser(response: httpx.Response) -> ChatResponse:
-    raw = io.BytesIO(response.content)
-    header = raw.read(4)
-    payload_size = int.from_bytes(header, byteorder="big", signed=False)
-    data = raw.read(payload_size)
-    find_result = KnowledgeboxFindResults.model_validate_json(base64.b64decode(data))
-    data = raw.read()
-    try:
-        answer, relations_payload = data.split(b"_END_")
-    except ValueError:
-        answer = data
-        relations_payload = b""
-    learning_id = response.headers.get("NUCLIA-LEARNING-ID")
-    relations_result = None
-    if len(relations_payload) > 0:
-        relations_result = Relations.model_validate_json(base64.b64decode(relations_payload))
-    try:
-        answer, tail = answer.split(b"_CIT_")
-        citations_length = int.from_bytes(tail[:4], byteorder="big", signed=False)
-        citations_bytes = tail[4 : 4 + citations_length]
-        citations = orjson.loads(base64.b64decode(citations_bytes).decode())
-    except ValueError:
-        citations = {}
-    return ChatResponse(
-        result=find_result,
-        answer=answer.decode("utf-8"),
-        relations=relations_result,
-        learning_id=learning_id,
-        citations=citations,
-    )
 
 
 def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
@@ -646,14 +603,6 @@ class _NucliaDBBase:
         request_type=SearchRequest,
         response_type=KnowledgeboxSearchResults,
     )
-    chat = _request_builder(
-        name="chat",
-        path_template="/v1/kb/{kbid}/chat",
-        method="POST",
-        path_params=("kbid",),
-        request_type=ChatRequest,
-        response_type=chat_response_parser,
-    )
 
     ask = _request_builder(
         name="ask",
@@ -662,24 +611,6 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=AskRequest,
         response_type=ask_response_parser,
-    )
-
-    chat_on_resource = _request_builder(
-        name="chat_on_resource",
-        path_template="/v1/kb/{kbid}/resource/{rid}/chat",
-        method="POST",
-        path_params=("kbid", "rid"),
-        request_type=ChatRequest,
-        response_type=chat_response_parser,
-    )
-
-    chat_on_resource_by_slug = _request_builder(
-        name="chat_on_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{slug}/chat",
-        method="POST",
-        path_params=("kbid", "slug"),
-        request_type=ChatRequest,
-        response_type=chat_response_parser,
     )
 
     ask_on_resource = _request_builder(

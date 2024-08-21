@@ -33,8 +33,10 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import ChatRequest, NucliaDBClientType
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.utilities import has_feature
 
 from ..chat import create_chat_response
 
@@ -124,6 +126,13 @@ async def resource_chat_endpoint(
     resource_id: Optional[str] = None,
     resource_slug: Optional[str] = None,
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
+    if not has_feature(const.Features.DEPRECATED_CHAT_ENABLED, default=False, context={"kbid": kbid}):
+        # We keep this for a while so we can enable back chat on a per KB basis, in case we need to
+        return HTTPClientError(
+            status_code=404,
+            detail="This endpoint has been deprecated. Please use /ask instead.",
+        )
+
     if resource_id is None:
         if resource_slug is None:
             raise ValueError("Either resource_id or resource_slug must be provided")
