@@ -158,7 +158,7 @@ def test_search(kbid: str, resource_id: str):
     raise_for_status(resp)
     ask_response = resp.json()
     print(f"Search results: {ask_response["retrieval_results"]}")
-    assert len(ask_response["retrieval_results"]) == 1
+    assert len(ask_response["retrieval_results"]["resources"]) == 1
     print(f"Relations payload: {ask_response["relations"]}")
     print(f"Answer: {ask_response["answer"]}")
     print(f"Citations: {ask_response["citations"]}")
