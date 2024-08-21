@@ -49,6 +49,7 @@ from ..chat import create_chat_response
     tags=["Search"],
     response_model=None,
     deprecated=True,
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)

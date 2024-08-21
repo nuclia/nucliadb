@@ -98,6 +98,7 @@ CHAT_EXAMPLES = {
     tags=["Search"],
     response_model=None,
     deprecated=True,
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
