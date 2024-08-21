@@ -24,6 +24,7 @@ from fastapi import HTTPException
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload
 from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
+from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
@@ -34,7 +35,6 @@ from nucliadb_models.metadata import (
 )
 from nucliadb_models.text import TEXT_FORMAT_TO_MIMETYPE, PushTextFormat, Text
 from nucliadb_models.writer import (
-    GENERIC_MIME_TYPE,
     ComingResourcePayload,
     CreateResourcePayload,
     UpdateResourcePayload,
