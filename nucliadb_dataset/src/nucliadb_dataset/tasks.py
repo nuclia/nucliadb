@@ -30,10 +30,12 @@ from nucliadb_dataset.mapping import (
     batch_to_text_classification_arrow,
     batch_to_text_classification_normalized_arrow,
     batch_to_token_classification_arrow,
+    batch_to_field_streaming_arrow,
     bytes_to_batch,
 )
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
+    FieldStreamingBatch,
     ImageClassificationBatch,
     ParagraphClassificationBatch,
     ParagraphStreamingBatch,
@@ -59,6 +61,7 @@ class Task(str, Enum):
     IMAGE_CLASSIFICATION = "IMAGE_CLASSIFICATION"
     PARAGRAPH_STREAMING = "PARAGRAPH_STREAMING"
     QUESTION_ANSWER_STREAMING = "QUESTION_ANSWER_STREAMING"
+    FIELD_STREAMING = "FIELD_STREAMING"
 
 
 @dataclass
@@ -173,6 +176,25 @@ TASK_DEFINITIONS: Dict[Task, TaskDefinition] = {
         proto=TaskType.QUESTION_ANSWER_STREAMING,
         labels=False,
     ),
+    Task.FIELD_STREAMING: TaskDefinition(
+        schema=pa.schema([
+                pa.field("split", pa.string()),
+                pa.field("rid", pa.string()),
+                pa.field("field", pa.string()),
+                pa.field("field_type", pa.string()),
+                pa.field("labels", pa.list_(pa.string())),
+                pa.field("text", pa.binary()),
+                pa.field("basic", pa.binary()),
+                pa.field("metadata", pa.binary()),
+            ]
+        ),
+        mapping=[bytes_to_batch(FieldStreamingBatch), batch_to_field_streaming_arrow()],
+        proto=TaskType.FIELD_STREAMING,
+        labels=False,
+    ),
+    ),
 }
 
-TASK_DEFINITIONS_REVERSE = {task.proto: task for task in TASK_DEFINITIONS.values()}  # noqa
+TASK_DEFINITIONS_REVERSE = {
+    task.proto: task for task in TASK_DEFINITIONS.values()
+}  # noqa

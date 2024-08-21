@@ -3,6 +3,7 @@ syntax = "proto3";
 package dataset;
 
 
+import public "nucliadb_protos/resources.proto";
 
 // Train API V2
 enum TaskType {
@@ -13,12 +14,23 @@ enum TaskType {
     IMAGE_CLASSIFICATION = 4;
     PARAGRAPH_STREAMING = 5;
     QUESTION_ANSWER_STREAMING = 6;
+    FIELD_STREAMING = 7;
+    SENTENCE_STREAMING = 8;
+    IMAGE_STREAMING = 9;
 }
 
 message TrainSet {
     TaskType type = 1;
     message Filter {
         repeated string labels = 1;
+        repeated string paths = 2;
+        repeated string rids = 3;
+        repeated string tags = 4;
+        repeated string icons = 5;
+        repeated string metadata = 6;
+        repeated string entities = 7;
+        repeated string fields = 8;
+        repeated string status = 9;
     }
     Filter filter = 2;
     int32 batch_size = 3;
@@ -109,4 +121,21 @@ message QuestionAnswerStreamItem {
 
 message QuestionAnswerStreamingBatch {
     repeated QuestionAnswerStreamItem data = 1;
+}
+
+message FieldSplitData {
+    string split = 1;
+    string rid = 2;
+    string field = 3;
+    string field_type = 4;
+    repeated string labels = 5;
+    utils.ExtractedText text = 6;
+    resources.Basic basic = 7;
+    resources.FileExtractedData file = 8;
+    resources.LinkExtractedData link = 9;
+    resources.FieldComputedMetadata metadata = 10;
+}
+
+message FieldStreamingBatch {
+    repeated FieldSplitData data = 1;
 }

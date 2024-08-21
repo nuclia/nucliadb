@@ -29,6 +29,7 @@ TrainBatch = Union[
     dpb.QuestionAnswerStreamingBatch,
     dpb.SentenceClassificationBatch,
     dpb.TokenClassificationBatch,
+    dpb.FieldStreamingBatch,
 ]
 
 TrainBatchType = Union[
@@ -39,4 +40,5 @@ TrainBatchType = Union[
     type[dpb.QuestionAnswerStreamingBatch],
     type[dpb.SentenceClassificationBatch],
     type[dpb.TokenClassificationBatch],
+    type[dpb.FieldStreamingBatch],
 ]

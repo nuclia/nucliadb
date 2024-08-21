@@ -24,6 +24,7 @@ import pyarrow as pa  # type: ignore
 
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
+    FieldStreamingBatch,
     ImageClassificationBatch,
     ParagraphClassificationBatch,
     ParagraphStreamingBatch,
@@ -51,7 +52,9 @@ def batch_to_text_classification_arrow():
         for data in batch.data:
             if data.text:
                 TEXT.append(data.text)
-                LABELS.append([f"{label.labelset}/{label.label}" for label in data.labels])
+                LABELS.append(
+                    [f"{label.labelset}/{label.label}" for label in data.labels]
+                )
         if len(TEXT):
             pa_data = [pa.array(TEXT), pa.array(LABELS)]
             output_batch = pa.record_batch(pa_data, schema=schema)
@@ -146,8 +149,12 @@ def batch_to_question_answer_streaming_arrow():
         for data in batch.data:
             QUESTION.append(data.question.text)
             ANSWER.append(data.answer.text)
-            QUESTION_PARAGRAPHS.append([paragraph for paragraph in data.question.paragraphs])
-            ANSWER_PARAGRAPHS.append([paragraph for paragraph in data.answer.paragraphs])
+            QUESTION_PARAGRAPHS.append(
+                [paragraph for paragraph in data.question.paragraphs]
+            )
+            ANSWER_PARAGRAPHS.append(
+                [paragraph for paragraph in data.answer.paragraphs]
+            )
             QUESTION_LANGUAGE.append(data.question.language)
             ANSWER_LANGUAGE.append(data.answer.language)
             CANCELLED_BY_USER.append(data.cancelled_by_user)
@@ -163,6 +170,44 @@ def batch_to_question_answer_streaming_arrow():
                 pa.array(CANCELLED_BY_USER),
             ]
             output_batch = pa.record_batch(pa_data, schema=schema)
+        else:
+            output_batch = None
+        return output_batch
+
+    return func
+
+
+def batch_to_field_streaming_arrow():
+    def func(batch: FieldStreamingBatch, schema: pa.schema):
+        SPLIT = []
+        RID = []
+        FIELD = []
+        FIELD_TYPE = []
+        LABELS = []
+        EXTRACTED_TEXT = []
+        METADATA = []
+        BASIC = []
+        for data in batch.data:
+            SPLIT.append(data.split)
+            RID.append(data.rid)
+            FIELD.append(data.field)
+            FIELD_TYPE.append(data.field_type)
+            LABELS.append([x for x in data.labels])
+            EXTRACTED_TEXT.append(data.text.SerializeToString().decode())
+            METADATA.append(data.metadata.SerializeToString().decode())
+            BASIC.append(data.basic.SerializeToString().decode())
+        if len(RID):
+            pa_data = [
+                pa.array(SPLIT),
+                pa.array(RID),
+                pa.array(FIELD),
+                pa.array(FIELD_TYPE),
+                pa.array(LABELS),
+                pa.array(EXTRACTED_TEXT),
+                pa.array(METADATA),
+                pa.array(BASIC),
+            ]
+            output_batch = pa.record_batch(pa_data, schema)
         else:
             output_batch = None
         return output_batch
