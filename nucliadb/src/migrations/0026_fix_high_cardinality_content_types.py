@@ -50,6 +50,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
             basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
             if not basic or not basic.icon:
                 continue
+            # We're aiming to fix content types like "multipart/form-data; boundary={uuid}"
             if "multipart/form-data" not in basic.icon:
                 continue
             if "boundary=" not in basic.icon:
