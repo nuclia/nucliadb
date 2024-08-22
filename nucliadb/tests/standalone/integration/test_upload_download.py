@@ -310,7 +310,7 @@ async def test_content_type_validation(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document+aitable",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
-        "application/vnd.rar",
+        "application/vnd.raro",
         "application/x-mobipocket-ebook",
         "application/x-ms-shortcut",
         "application/x-msdownload",
