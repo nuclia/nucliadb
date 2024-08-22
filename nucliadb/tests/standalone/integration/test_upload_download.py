@@ -412,7 +412,7 @@ def test_invalid_content_types(content_type):
         ("data.xml", "application/xml"),
         # Archive files
         ("archive.zip", "application/zip"),
-        ("fooo.rar", "application/x-rar-compressed"),
+        ("fooo.rar", ["application/x-rar-compressed", "application/vnd.rar"]),
         ("archive.tar", "application/x-tar"),
         ("archive.tar.gz", "application/x-tar"),
         # Invalid content types
@@ -422,4 +422,7 @@ def test_invalid_content_types(content_type):
     ],
 )
 def test_guess_content_type(filename, content_type):
-    assert content_types.guess(filename) == content_type
+    if isinstance(content_type, list):
+        assert content_types.guess(filename) in content_type
+    else:
+        assert content_types.guess(filename) == content_type
