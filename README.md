@@ -1,11 +1,9 @@
-<div style="text-align: center;">
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![License: AGPL V3](https://img.shields.io/badge/license-AGPL%20V3-blue)](LICENCE.md)
 ![Twitter Follow](https://img.shields.io/twitter/follow/nucliaAI?color=%231DA1F2&logo=Twitter&style=plastic)
 ![Rust](https://img.shields.io/badge/Rust-black?logo=rust&style=plastic)
 ![Python](https://img.shields.io/badge/Python-black?logo=python&style=plastic)
 [![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS)](https://codecov.io/gh/nuclia/nucliadb)
-</div>
 
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
