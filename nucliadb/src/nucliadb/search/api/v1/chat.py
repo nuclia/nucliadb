@@ -53,8 +53,10 @@ from nucliadb_models.search import (
     parse_max_tokens,
 )
 from nucliadb_telemetry.errors import capture_exception
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.utilities import has_feature
 
 END_OF_STREAM = "_END_"
 
@@ -96,6 +98,7 @@ CHAT_EXAMPLES = {
     tags=["Search"],
     response_model=None,
     deprecated=True,
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -112,6 +115,13 @@ async def chat_knowledgebox_endpoint(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
+    if not has_feature(const.Features.DEPRECATED_CHAT_ENABLED, default=False, context={"kbid": kbid}):
+        # We keep this for a while so we can enable back chat on a per KB basis, in case we need to
+        return HTTPClientError(
+            status_code=404,
+            detail="This endpoint has been deprecated. Please use /ask instead.",
+        )
+
     try:
         return await create_chat_response(
             kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
@@ -155,7 +165,7 @@ async def create_chat_response(
     origin: str,
     x_synchronous: bool,
     resource: Optional[str] = None,
-) -> Response:
+) -> Response:  # pragma: no cover
     chat_request.max_tokens = parse_max_tokens(chat_request.max_tokens)
     chat_result = await chat(
         kbid,

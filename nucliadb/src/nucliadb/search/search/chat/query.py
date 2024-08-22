@@ -230,7 +230,7 @@ async def chat(
     client_type: NucliaDBClientType,
     origin: str,
     resource: Optional[str] = None,
-) -> ChatResult:
+) -> ChatResult:  # pragma: no cover
     metrics = RAGMetrics()
     nuclia_learning_id: Optional[str] = None
     chat_history = chat_request.context or []

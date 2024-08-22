@@ -232,50 +232,6 @@ FIND = Docstring(
     ],
 )
 
-CHAT = Docstring(
-    doc="""Chat with your Knowledge Box""",
-    examples=[
-        Example(
-            description="Get an answer for a question that is part of the data in the Knowledge Box",
-            code=""">>> from nucliadb_sdk import *
->>> sdk = NucliaDBSDK(api_key="api-key")
->>> sdk.chat(kbid="mykbid", query="Will France be in recession in 2023?").answer
-'Yes, according to the provided context, France is expected to be in recession in 2023.'
-""",
-        ),
-        Example(
-            description="You can use the `content` parameter to pass a `ChatRequest` object",
-            code=""">>> content = ChatRequest(query="Who won the 2018 football World Cup?")
->>> sdk.chat(kbid="mykbid", content=content).answer
-'France won the 2018 football World Cup.'
-""",
-        ),
-    ],
-)
-
-RESOURCE_CHAT = Docstring(
-    doc="""Chat with your document""",
-    examples=[
-        Example(
-            description="Have a chat with your document. Generated answers are scoped to the context of the document.",
-            code=""">>> sdk.chat_on_resource(kbid="mykbid", query="What is the coldest season in Sevilla?").answer
-'January is the coldest month.'
-""",
-        ),
-        Example(
-            description="You can use the `content` parameter to pass previous context to the query",
-            code=""">>> from nucliadb_models.search import ChatRequest, ChatContextMessage
->>> content = ChatRequest()
->>> content.query = "What is the average temperature?"
->>> content.context.append(ChatContextMessage(author="USER", text="What is the coldest season in Sevilla?"))
->>> content.context.append(ChatContextMessage(author="NUCLIA", text="January is the coldest month."))
->>> sdk.chat(kbid="mykbid", content=content).answer
-'According to the context, the average temperature in January in Sevilla is 15.9 °C and 5.2 °C.'
-""",
-        ),
-    ],
-)
-
 SUMMARIZE = Docstring(
     doc="""Summarize your documents""",
     examples=[
