@@ -26,6 +26,7 @@ from pytest_lazy_fixtures import lazy_fixture
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
+from nucliadb_models import content_types
 
 
 @pytest.fixture(scope="function")
@@ -366,8 +367,6 @@ async def test_content_type_validation(
     ],
 )
 def test_valid_content_types(content_type):
-    from nucliadb_models import content_types
-
     assert content_types.valid(content_type)
 
 
@@ -378,8 +377,6 @@ def test_valid_content_types(content_type):
     ],
 )
 def test_invalid_content_types(content_type):
-    from nucliadb_models import content_types
-
     assert not content_types.valid(content_type)
 
 
@@ -425,6 +422,4 @@ def test_invalid_content_types(content_type):
     ],
 )
 def test_guess_content_type(filename, content_type):
-    from nucliadb_models import content_types
-
     assert content_types.guess(filename) == content_type
