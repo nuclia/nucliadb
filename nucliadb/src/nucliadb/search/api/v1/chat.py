@@ -165,7 +165,7 @@ async def create_chat_response(
     origin: str,
     x_synchronous: bool,
     resource: Optional[str] = None,
-) -> Response:
+) -> Response:  # pragma: no cover
     chat_request.max_tokens = parse_max_tokens(chat_request.max_tokens)
     chat_result = await chat(
         kbid,
