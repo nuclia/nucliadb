@@ -39,6 +39,8 @@ from nucliadb_utils.utilities import has_feature
 from .filters import translate_label
 from .query import QueryParser
 
+observer = metrics.Observer("pg_catalog_search", labels={"op": ""})
+
 
 def _filter_operands(operands):
     literals = []
@@ -150,7 +152,7 @@ def pgcatalog_enabled(kbid):
     )
 
 
-@metrics.Observer("pg_catalog_search").wrap()
+@observer.wrap({"op": "search"})
 async def pgcatalog_search(query_parser: QueryParser) -> Resources:
     # Prepare SQL query
     query, query_params = _prepare_query(query_parser)
@@ -160,40 +162,43 @@ async def pgcatalog_search(query_parser: QueryParser) -> Resources:
 
         # Faceted search
         if query_parser.faceted:
-            tmp_facets: dict[str, dict[str, int]] = {
-                translate_label(f): {} for f in query_parser.faceted
-            }
-            await cur.execute(
-                f"SELECT unnest(labels) AS label, COUNT(*) FROM ({query}) fc GROUP BY 1 ORDER BY 1",
-                query_params,
-            )
-            for row in await cur.fetchall():
-                label = row["label"]
-                parent = "/".join(label.split("/")[:-1])
-                count = row["count"]
-                if parent in tmp_facets:
-                    tmp_facets[parent][translate_system_to_alias_label(label)] = count
+            with observer({"op": "facets"}):
+                tmp_facets: dict[str, dict[str, int]] = {
+                    translate_label(f): {} for f in query_parser.faceted
+                }
+                await cur.execute(
+                    f"SELECT unnest(labels) AS label, COUNT(*) FROM ({query}) fc GROUP BY 1 ORDER BY 1",
+                    query_params,
+                )
+                for row in await cur.fetchall():
+                    label = row["label"]
+                    parent = "/".join(label.split("/")[:-1])
+                    count = row["count"]
+                    if parent in tmp_facets:
+                        tmp_facets[parent][translate_system_to_alias_label(label)] = count
 
-            facets = {translate_system_to_alias_label(k): v for k, v in tmp_facets.items()}
+                facets = {translate_system_to_alias_label(k): v for k, v in tmp_facets.items()}
 
         # Totals
-        await cur.execute(
-            f"SELECT COUNT(*) FROM ({query}) fc",
-            query_params,
-        )
-        total = (await cur.fetchone())["count"]  # type: ignore
+        with observer({"op": "totals"}):
+            await cur.execute(
+                f"SELECT COUNT(*) FROM ({query}) fc",
+                query_params,
+            )
+            total = (await cur.fetchone())["count"]  # type: ignore
 
         # Query
-        offset = query_parser.page_size * query_parser.page_number
-        await cur.execute(
-            f"{query} LIMIT %(page_size)s OFFSET %(offset)s",
-            {
-                **query_params,
-                "page_size": query_parser.page_size,
-                "offset": offset,
-            },
-        )
-        data = await cur.fetchall()
+        with observer({"op": "query"}):
+            offset = query_parser.page_size * query_parser.page_number
+            await cur.execute(
+                f"{query} LIMIT %(page_size)s OFFSET %(offset)s",
+                {
+                    **query_params,
+                    "page_size": query_parser.page_size,
+                    "offset": offset,
+                },
+            )
+            data = await cur.fetchall()
 
     return Resources(
         facets=facets,
