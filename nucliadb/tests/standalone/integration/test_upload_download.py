@@ -310,7 +310,7 @@ async def test_content_type_validation(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document+aitable",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
-        "application/vnd.raro",
+        "application/vnd.rar",
         "application/x-mobipocket-ebook",
         "application/x-ms-shortcut",
         "application/x-msdownload",
@@ -412,7 +412,7 @@ def test_invalid_content_types(content_type):
         ("data.xml", "application/xml"),
         # Archive files
         ("archive.zip", "application/zip"),
-        ("archive.rar", "application/x-rar-compressed"),
+        ("fooo.rar", "application/x-rar-compressed"),
         ("archive.tar", "application/x-tar"),
         ("archive.tar.gz", "application/x-tar"),
         # Invalid content types
