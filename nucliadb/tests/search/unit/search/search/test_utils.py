@@ -17,12 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import unittest
+
 import pytest
 
 from nucliadb.search.search.utils import (
     has_user_vectors,
     is_empty_query,
     is_exact_match_only_query,
+    maybe_log_request_payload,
     should_disable_vector_search,
 )
 from nucliadb_models.search import SearchRequest
@@ -80,3 +83,15 @@ def test_has_user_vectors(item, has_vectors):
 )
 def test_should_disable_vectors(item, disable_vectors):
     assert should_disable_vector_search(item) is disable_vectors
+
+
+def test_maybe_log_request_payload():
+    with unittest.mock.patch("nucliadb.search.search.utils.logger") as mock_logger:
+        with unittest.mock.patch("nucliadb.search.search.utils.has_feature") as mock_feature:
+            mock_feature.return_value = True
+            maybe_log_request_payload(
+                "kbid",
+                "/endpoint",
+                SearchRequest(query="query", vector=[1.0, 2.0]),
+            )
+            assert mock_logger.info.call_count == 1
