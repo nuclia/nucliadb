@@ -95,3 +95,12 @@ def test_maybe_log_request_payload():
                 SearchRequest(query="query", vector=[1.0, 2.0]),
             )
             assert mock_logger.info.call_count == 1
+
+            mock_feature.return_value = False
+
+            maybe_log_request_payload(
+                "kbid",
+                "/endpoint",
+                SearchRequest(query="query", vector=[1.0, 2.0]),
+            )
+            assert mock_logger.info.call_count == 1
