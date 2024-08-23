@@ -31,8 +31,9 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search import logger
+from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
-from nucliadb.search.search.paragraphs import ExtractedTextCache, get_paragraph_text
+from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.search import (
     SCORE_TYPE,
     FieldExtensionStrategy,
@@ -203,37 +204,19 @@ async def default_prompt_context(
 
 
 async def get_field_extracted_text(field: Field) -> Optional[tuple[Field, str]]:
-    extracted_text_pb = await field.get_extracted_text(force=True)
+    extracted_text_pb = await cache.get_field_extracted_text(field)
     if extracted_text_pb is None:
         return None
     return field, extracted_text_pb.text
 
 
 async def get_resource_field_extracted_text(
-    kb_obj: KnowledgeBoxORM,
-    resource_uuid,
-    field_id: str,
-) -> Optional[tuple[Field, str]]:
-    resource = await kb_obj.get(resource_uuid)
-    if resource is None:
+    kbid: str, field_id: FieldId
+) -> Optional[tuple[FieldId, str]]:
+    extracted_text = await cache.get_field_extracted_text_from_cache(kbid, field_id)
+    if extracted_text is None:
         return None
-
-    try:
-        field_type, field_key = field_id.strip("/").split("/")
-    except ValueError:
-        logger.info(
-            f"Invalid field id: {field_id}. Skipping getting extracted text.",
-            extra={"kbid": kb_obj.kbid},
-        )
-        return None
-    field = await resource.get_field(field_key, FIELD_TYPE_STR_TO_PB[field_type], load=False)
-    if field is None:
-        return None
-    result = await get_field_extracted_text(field)
-    if result is None:
-        return None
-    _, extracted_text = result
-    return field, extracted_text
+    return field_id, extracted_text.text
 
 
 async def get_resource_extracted_texts(
@@ -329,32 +312,34 @@ async def composed_prompt_context(
             ordered_resources.append(resource_uuid)
 
     # Fetch the extracted texts of the specified fields for each resource
-    async with get_driver().transaction(read_only=True) as txn:
-        kb_obj = KnowledgeBoxORM(txn, await get_storage(), kbid)
-
-        tasks = [
-            get_resource_field_extracted_text(kb_obj, resource_uuid, field_id)
-            for resource_uuid in ordered_resources
-            for field_id in extend_with_fields
-        ]
-        field_extracted_texts = await run_concurrently(tasks)
-
-        for result in field_extracted_texts:
-            if result is None:
+    extend_field_ids = []
+    for resource_uuid in ordered_resources:
+        for field_id in extend_with_fields:
+            try:
+                fid = FieldId.from_string(f"{resource_uuid}/{field_id}")
+                extend_field_ids.append(fid)
+            except ValueError:
+                logger.info("Invalid field id to extend", extra={"field_id": field_id, "kbid": kbid})
                 continue
-            # Add the extracted text of each field to the beginning of the context.
-            field, extracted_text = result
-            context[field.resource_unique_id] = extracted_text
 
-        # Add the extracted text of each paragraph to the end of the context.
-        for paragraph in ordered_paragraphs:
-            context[paragraph.id] = _clean_paragraph_text(paragraph)
+    tasks = [get_resource_field_extracted_text(kbid, fid) for fid in extend_field_ids]
+    field_extracted_texts = await run_concurrently(tasks)
+
+    for result in field_extracted_texts:
+        if result is None:
+            continue
+        # Add the extracted text of each field to the beginning of the context.
+        field, extracted_text = result
+        context[field.resource_unique_id] = extracted_text
+
+    # Add the extracted text of each paragraph to the end of the context.
+    for paragraph in ordered_paragraphs:
+        context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
 async def get_paragraph_text_with_neighbours(
     kbid: str,
     pid: ParagraphId,
-    etcache: ExtractedTextCache,
     field_paragraphs: list[ParagraphId],
     before: int = 0,
     after: int = 0,
@@ -362,7 +347,6 @@ async def get_paragraph_text_with_neighbours(
     async def _get_paragraph_text(
         kbid: str,
         pid: ParagraphId,
-        etcache: ExtractedTextCache,
     ) -> tuple[ParagraphId, str]:
         return pid, await get_paragraph_text(
             kbid=kbid,
@@ -370,8 +354,7 @@ async def get_paragraph_text_with_neighbours(
             field=pid.field_id.full(),
             start=pid.paragraph_start,
             end=pid.paragraph_end,
-            extracted_text_cache=etcache,
-            log_on_missing_field=False,
+            log_on_missing_field=True,
         )
 
     ops = []
@@ -387,7 +370,6 @@ async def get_paragraph_text_with_neighbours(
                 _get_paragraph_text(
                     kbid=kbid,
                     pid=neighbour_pid,
-                    etcache=etcache,
                 )
             )
         )
@@ -417,8 +399,7 @@ async def get_field_paragraphs_list(
         resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=field.rid)
         if resource is None:
             return
-    field_key = field.field_id.split("/")[-1]
-    field_obj: Field = await resource.get_field(key=field_key, type=field.pb_type, load=False)
+    field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
     field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata(
         force=True
     )
@@ -462,8 +443,6 @@ async def neighbouring_paragraphs_prompt_context(
     if field_ops:
         await asyncio.gather(*field_ops)
 
-    etcache = ExtractedTextCache()
-
     paragraph_ops = []
     for text_block in ordered_text_blocks:
         pid = ParagraphId.from_string(text_block.id)
@@ -472,7 +451,6 @@ async def neighbouring_paragraphs_prompt_context(
                 get_paragraph_text_with_neighbours(
                     kbid=kbid,
                     pid=pid,
-                    etcache=etcache,
                     before=before,
                     after=after,
                     field_paragraphs=paragraphs_by_field.get(pid.field_id, []),
@@ -504,7 +482,6 @@ async def hierarchy_prompt_context(
     # Make a copy of the ordered paragraphs to avoid modifying the original list, which is returned
     # in the response to the user
     ordered_paragraphs_copy = copy.deepcopy(ordered_paragraphs)
-    etcache = ExtractedTextCache()
     resources: Dict[str, ExtraCharsParagraph] = {}
 
     # Iterate paragraphs to get extended text
@@ -523,7 +500,6 @@ async def hierarchy_prompt_context(
                 field=field_path,
                 start=int_start,
                 end=int_end,
-                extracted_text_cache=etcache,
                 log_on_missing_field=True,
             )
         if rid not in resources:

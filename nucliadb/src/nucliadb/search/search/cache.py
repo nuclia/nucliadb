@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import contextlib
+import logging
 from contextvars import ContextVar
 from typing import Optional
 
@@ -28,11 +30,10 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb.search import SERVICE_NAME
+from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry import metrics
 from nucliadb_utils.utilities import get_storage
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,9 @@ RESOURCE_CACHE_OPS = metrics.Counter("nucliadb_resource_cache_ops", labels={"typ
 EXTRACTED_CACHE_OPS = metrics.Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
 
 
-def set_extracted_text_cache(cache: "ExtractedTextCache") -> None:
-    etcache.set(cache)
+def set_extracted_text_cache() -> None:
+    value = ExtractedTextCache()
+    etcache.set(value)
 
 
 def get_extracted_text_cache() -> Optional["ExtractedTextCache"]:
@@ -54,22 +56,36 @@ def get_extracted_text_cache() -> Optional["ExtractedTextCache"]:
 
 
 def clear_extracted_text_cache() -> None:
-    cache = etcache.get()
-    if cache is not None:
-        cache.clear()
+    value = etcache.get()
+    if value is not None:
+        value.clear()
+        etcache.set(None)
 
-def get_resource_cache(clear: bool = False) -> dict[str, ResourceORM]:
-    value: Optional[dict[str, ResourceORM]] = rcache.get()
-    if value is None or clear:
-        value = {}
-        rcache.set(value)
-    return value
+
+def set_resource_cache() -> None:
+    value: dict[str, ResourceORM] = {}
+    rcache.set(value)
+
+
+def get_resource_cache() -> Optional[dict[str, ResourceORM]]:
+    return rcache.get()
+
+
+def clear_resource_cache() -> None:
+    value = rcache.get()
+    if value is not None:
+        value.clear()
+        rcache.set(None)
 
 
 async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
     orm_resource: Optional[ResourceORM] = None
 
     resource_cache = get_resource_cache()
+    if resource_cache is None:
+        RESOURCE_CACHE_OPS.inc({"type": "miss"})
+        logger.warning("Resource cache not set")
+        return await _orm_get_resource(kbid, uuid)
 
     if uuid not in RESOURCE_LOCKS:
         RESOURCE_LOCKS[uuid] = asyncio.Lock()
@@ -77,10 +93,7 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
     async with RESOURCE_LOCKS[uuid]:
         if uuid not in resource_cache:
             RESOURCE_CACHE_OPS.inc({"type": "miss"})
-            async with get_driver().transaction(read_only=True) as txn:
-                storage = await get_storage(service_name=SERVICE_NAME)
-                kb = KnowledgeBoxORM(txn, storage, kbid)
-                orm_resource = await kb.get(uuid)
+            orm_resource = await _orm_get_resource(kbid, uuid)
         else:
             RESOURCE_CACHE_OPS.inc({"type": "hit"})
 
@@ -90,6 +103,13 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
             orm_resource = resource_cache.get(uuid)
 
     return orm_resource
+
+
+async def _orm_get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
+    async with get_driver().transaction(read_only=True) as txn:
+        storage = await get_storage(service_name=SERVICE_NAME)
+        kb = KnowledgeBoxORM(txn, storage, kbid)
+        return await kb.get(uuid)
 
 
 class ExtractedTextCache:
@@ -148,15 +168,36 @@ async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
         return extracted_text
 
 
-async def get_field_extracted_text_from_cache(
-    kbid: str, rid: str, field_id: str
-) -> Optional[ExtractedText]:
+async def get_field_extracted_text_from_cache(kbid: str, field: FieldId) -> Optional[ExtractedText]:
+    rid = field.rid
     orm_resource = await get_resource_from_cache(kbid, rid)
     if orm_resource is None:
         return None
-    field = await orm_resource.get_field(
-        key=field
-        type=field.pb_type(),
+    field_obj = await orm_resource.get_field(
+        key=field.key,
+        type=field.pb_type,
         load=False,
     )
-    return await get_field_extracted_text(field)
+    return await get_field_extracted_text(field_obj)
+
+
+@contextlib.contextmanager
+def request_caches():
+    """
+    This context manager sets the caches for extracted text and resources for a request.
+
+    It should used at the beginning of a request handler to avoid fetching the same
+    resources and extracted text multiple times.
+
+    Makes sure to clean the caches at the end of the context manager.
+    >>> with request_caches():
+    ...     resource = await get_resource_from_cache(kbid, uuid)
+    ...     extracted_text = await get_field_extracted_text_from_cache(kbid, rid, field_id)
+    """
+    set_resource_cache()
+    set_extracted_text_cache()
+    try:
+        yield
+    finally:
+        clear_resource_cache()
+        clear_extracted_text_cache()

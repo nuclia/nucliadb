@@ -41,8 +41,30 @@ FIELD_TYPE_PB_TO_STR = {v: k for k, v in FIELD_TYPE_STR_TO_PB.items()}
 
 @dataclass
 class FieldId:
+    """
+    Field ids are used to identify fields in resources. They usually have the following format:
+
+        `rid/field_type/field_key`
+
+    where field type is one of: `t`, `f`, `u`, `a`, `c` (text, file, link, generic, conversation)
+    and field_key is an identifier for that field type on the resource, usually chosen by the user.
+
+    In some cases, fields can have subfields, for example, in conversations, where each part of the
+    conversation is a subfield. In those cases, the id has the following format:
+
+        `rid/field_type/field_key/subfield_id`
+
+    Examples:
+
+    >>> FieldId(rid="rid", type="u", key="/my-link")
+    FieldID("rid/u/my-link")
+    >>> FieldId.from_string("rid/u/my-link")
+    FieldID("rid/u/my-link")
+    """
+
     rid: str
-    field_id: str
+    type: str
+    key: str
     # also knwon as `split`, this indicates a part of a field in, for example, conversations
     subfield_id: Optional[str] = None
 
@@ -51,40 +73,46 @@ class FieldId:
 
     def full(self) -> str:
         if self.subfield_id is None:
-            return f"{self.rid}/{self.field_id}"
+            return f"{self.rid}/{self.type}/{self.key}"
         else:
-            return f"{self.rid}/{self.field_id}/{self.subfield_id}"
-
-    @property
-    def field_type(self) -> str:
-        return self.field_id.split("/")[0]
+            return f"{self.rid}/{self.type}/{self.key}/{self.subfield_id}"
 
     def __hash__(self) -> int:
         return hash(self.full())
 
     @property
     def pb_type(self) -> FieldType.ValueType:
-        return FIELD_TYPE_STR_TO_PB[self.field_type]
+        return FIELD_TYPE_STR_TO_PB[self.type]
 
     @classmethod
     def from_string(cls, value: str) -> "FieldId":
         """
         Parse a FieldId from a string
         Example:
-        >>> FieldId.from_string("rid/u/field_id")
-        FieldId(rid="rid", field_id="u/field_id")
-        >>> FieldId.from_string("rid/u/field_id/subfield_id")
-        FieldId(rid="rid", field_id="u/field_id", subfield_id="subfield_id")
+        >>> fid = FieldId.from_string("rid/u/foo")
+        >>> fid
+        FieldId("rid/u/foo")
+        >>> fid.type
+        'u'
+        >>> fid.key
+        'foo'
+        >>> FieldId.from_string("rid/u/foo/subfield_id").subfield_id
+        'subfield_id'
         """
         parts = value.split("/")
         if len(parts) == 3:
-            rid, field_type, field_id = parts
-            return cls(rid=rid, field_id=f"{field_type}/{field_id}")
+            rid, _type, key = parts
+            if _type not in FIELD_TYPE_STR_TO_PB:
+                raise ValueError(f"Invalid FieldId: {value}")
+            return cls(rid=rid, type=_type, key=key)
         elif len(parts) == 4:
-            rid, field_type, field_id, subfield_id = parts
+            rid, _type, key, subfield_id = parts
+            if _type not in FIELD_TYPE_STR_TO_PB:
+                raise ValueError(f"Invalid FieldId: {value}")
             return cls(
                 rid=rid,
-                field_id=f"{field_type}/{field_id}",
+                type=_type,
+                key=key,
                 subfield_id=subfield_id,
             )
         else:
@@ -133,6 +161,18 @@ class VectorId:
     """
     Ids of vectors are very similar to ParagraphIds, but for legacy reasons, they have an index
     indicating the position of the corresponding text block in the list of text blocks for the field.
+
+    Examples:
+
+    >>> VectorId.from_string("rid/u/field_id/0/0-10")
+    VectorId("rid/u/field_id/0/0-10")
+    >>> VectorId(
+    ...    field_id=FieldId.from_string("rid/u/field_id"),
+    ...    index=0,
+    ...    vector_start=0,
+    ...    vector_end=10,
+    ... )
+    VectorId("rid/u/field_id/0/0-10")
     """
 
     field_id: FieldId

@@ -27,8 +27,7 @@ from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_telemetry import metrics
 
-from .cache import get_resource_from_cache, get_field_extracted_text
-
+from .cache import get_field_extracted_text, get_resource_from_cache
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
@@ -52,7 +51,6 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
     ],
     labels={"type": "full"},
 )
-
 
 
 @GET_PARAGRAPH_LATENCY.wrap({"type": "full"})

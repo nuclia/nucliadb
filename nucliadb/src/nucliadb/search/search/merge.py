@@ -69,7 +69,7 @@ from nucliadb_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from .cache import get_resource_cache, get_resource_from_cache
+from .cache import get_resource_from_cache
 from .metrics import merge_observer
 from .paragraphs import get_paragraph_text, get_text_sentence
 
@@ -206,50 +206,46 @@ async def merge_suggest_paragraph_results(
     if len(suggest_responses) > 1:
         sort_results_by_score(raw_paragraph_list)
 
-    rcache = get_resource_cache(clear=True)
-    try:
-        result_paragraph_list: list[Paragraph] = []
-        for result in raw_paragraph_list[:10]:
-            _, field_type, field = result.field.split("/")
-            text = await get_paragraph_text(
-                kbid=kbid,
-                rid=result.uuid,
-                field=result.field,
-                start=result.start,
-                end=result.end,
-                split=result.split,
-                highlight=highlight,
-                ematches=ematches,  # type: ignore
-                matches=result.matches,  # type: ignore
-            )
-            labels = await get_labels_paragraph(result, kbid)
-            new_paragraph = Paragraph(
-                score=result.score.bm25,
-                rid=result.uuid,
-                field_type=field_type,
-                field=field,
-                text=text,
-                labels=labels,
-                position=TextPosition(
-                    index=result.metadata.position.index,
-                    start=result.metadata.position.start,
-                    end=result.metadata.position.end,
-                    page_number=result.metadata.position.page_number,
-                ),
-            )
-            if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
-                new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
-                new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
-            else:
-                # TODO: Remove once we are sure all data has been migrated!
-                seconds_positions = await get_seconds_paragraph(result, kbid)
-                if seconds_positions is not None:
-                    new_paragraph.start_seconds = seconds_positions[0]
-                    new_paragraph.end_seconds = seconds_positions[1]
-            result_paragraph_list.append(new_paragraph)
-        return Paragraphs(results=result_paragraph_list, query=query, min_score=0)
-    finally:
-        rcache.clear()
+    result_paragraph_list: list[Paragraph] = []
+    for result in raw_paragraph_list[:10]:
+        _, field_type, field = result.field.split("/")
+        text = await get_paragraph_text(
+            kbid=kbid,
+            rid=result.uuid,
+            field=result.field,
+            start=result.start,
+            end=result.end,
+            split=result.split,
+            highlight=highlight,
+            ematches=ematches,  # type: ignore
+            matches=result.matches,  # type: ignore
+        )
+        labels = await get_labels_paragraph(result, kbid)
+        new_paragraph = Paragraph(
+            score=result.score.bm25,
+            rid=result.uuid,
+            field_type=field_type,
+            field=field,
+            text=text,
+            labels=labels,
+            position=TextPosition(
+                index=result.metadata.position.index,
+                start=result.metadata.position.start,
+                end=result.metadata.position.end,
+                page_number=result.metadata.position.page_number,
+            ),
+        )
+        if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
+            new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
+            new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
+        else:
+            # TODO: Remove once we are sure all data has been migrated!
+            seconds_positions = await get_seconds_paragraph(result, kbid)
+            if seconds_positions is not None:
+                new_paragraph.start_seconds = seconds_positions[0]
+                new_paragraph.end_seconds = seconds_positions[1]
+        result_paragraph_list.append(new_paragraph)
+    return Paragraphs(results=result_paragraph_list, query=query, min_score=0)
 
 
 async def merge_vectors_results(
@@ -511,36 +507,30 @@ async def merge_results(
 
     api_results = KnowledgeboxSearchResults()
 
-    rcache = get_resource_cache(clear=True)
-    try:
-        resources: list[str] = list()
-        api_results.fulltext = await merge_documents_results(
-            documents, resources, count, page, kbid, sort, min_score=min_score.bm25
-        )
+    resources: list[str] = list()
+    api_results.fulltext = await merge_documents_results(
+        documents, resources, count, page, kbid, sort, min_score=min_score.bm25
+    )
 
-        api_results.paragraphs = await merge_paragraph_results(
-            paragraphs,
-            resources,
-            kbid,
-            count,
-            page,
-            highlight,
-            sort,
-            min_score=min_score.bm25,
-        )
+    api_results.paragraphs = await merge_paragraph_results(
+        paragraphs,
+        resources,
+        kbid,
+        count,
+        page,
+        highlight,
+        sort,
+        min_score=min_score.bm25,
+    )
 
-        api_results.sentences = await merge_vectors_results(
-            vectors, resources, kbid, count, page, min_score=min_score.semantic
-        )
+    api_results.sentences = await merge_vectors_results(
+        vectors, resources, kbid, count, page, min_score=min_score.semantic
+    )
 
-        api_results.relations = await merge_relations_results(relations, requested_relations)
+    api_results.relations = await merge_relations_results(relations, requested_relations)
 
-        api_results.resources = await fetch_resources(
-            resources, kbid, show, field_type_filter, extracted
-        )
-        return api_results
-    finally:
-        rcache.clear()
+    api_results.resources = await fetch_resources(resources, kbid, show, field_type_filter, extracted)
+    return api_results
 
 
 async def merge_paragraphs_results(
@@ -560,26 +550,22 @@ async def merge_paragraphs_results(
 
     api_results = ResourceSearchResults()
 
-    rcache = get_resource_cache(clear=True)
-    try:
-        resources: list[str] = list()
-        api_results.paragraphs = await merge_paragraph_results(
-            paragraphs,
-            resources,
-            kbid,
-            count,
-            page,
-            highlight=highlight_split,
-            sort=SortOptions(
-                field=SortField.SCORE,
-                order=SortOrder.DESC,
-                limit=None,
-            ),
-            min_score=min_score,
-        )
-        return api_results
-    finally:
-        rcache.clear()
+    resources: list[str] = list()
+    api_results.paragraphs = await merge_paragraph_results(
+        paragraphs,
+        resources,
+        kbid,
+        count,
+        page,
+        highlight=highlight_split,
+        sort=SortOptions(
+            field=SortField.SCORE,
+            order=SortOrder.DESC,
+            limit=None,
+        ),
+        min_score=min_score,
+    )
+    return api_results
 
 
 async def merge_suggest_entities_results(

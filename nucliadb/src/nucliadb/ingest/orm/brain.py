@@ -228,9 +228,10 @@ class ResourceBrain:
             self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}/{paragraph_to_delete}")
 
     def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
+        ftype, fkey = field_key.split("/")
         for subfield, metadata_split in metadata.split_metadata.items():
             self.brain.paragraphs_to_delete.append(
-                ids.FieldId(rid=self.rid, field_id=field_key, subfield_id=subfield).full()
+                ids.FieldId(rid=self.rid, type=ftype, key=fkey, subfield_id=subfield).full()
             )
             # TODO: Bw/c, remove this when paragraph deletion by field_id gets
             # promoted
@@ -240,7 +241,9 @@ class ResourceBrain:
                 )
 
         for paragraph in metadata.metadata.paragraphs:
-            self.brain.paragraphs_to_delete.append(ids.FieldId(rid=self.rid, field_id=field_key).full())
+            self.brain.paragraphs_to_delete.append(
+                ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
+            )
             # TODO: Bw/c, remove this when paragraph deletion by field_id gets
             # promoted
             self.brain.paragraphs_to_delete.append(
@@ -258,11 +261,12 @@ class ResourceBrain:
         matryoshka_vector_dimension: Optional[int] = None,
     ):
         replace_splits = replace_splits or []
-
+        ftype, fkey = field_id.split("/")
         for subfield, vectors in vo.split_vectors.items():
             _field_id = ids.FieldId(
                 rid=self.rid,
-                field_id=field_id,
+                type=ftype,
+                key=fkey,
                 subfield_id=subfield,
             )
             # For each split of this field
@@ -289,7 +293,8 @@ class ResourceBrain:
 
         _field_id = ids.FieldId(
             rid=self.rid,
-            field_id=field_id,
+            type=ftype,
+            key=fkey,
         )
         for index, vector in enumerate(vo.vectors.vectors):
             paragraph_key = ids.ParagraphId(
@@ -314,15 +319,17 @@ class ResourceBrain:
 
         for split in replace_splits:
             self.brain.sentences_to_delete.append(
-                ids.FieldId(rid=self.rid, field_id=field_id, subfield_id=split).full()
+                ids.FieldId(rid=self.rid, type=ftype, key=fkey, subfield_id=split).full()
             )
             self.brain.paragraphs_to_delete.append(
-                ids.FieldId(rid=self.rid, field_id=field_id, subfield_id=split).full()
+                ids.FieldId(rid=self.rid, type=ftype, key=fkey, subfield_id=split).full()
             )
 
         if replace_field:
-            self.brain.sentences_to_delete.append(ids.FieldId(rid=self.rid, field_id=field_id).full())
-            self.brain.paragraphs_to_delete.append(ids.FieldId(rid=self.rid, field_id=field_id).full())
+            self.brain.sentences_to_delete.append(ids.FieldId(rid=self.rid, type=ftype, key=fkey).full())
+            self.brain.paragraphs_to_delete.append(
+                ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
+            )
 
     def _apply_field_vector(
         self,

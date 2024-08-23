@@ -17,14 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import contextlib
 import json
 from typing import Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
-from nucliadb.search.search.paragraphs import clear_extracted_text_cache, set_extracted_text_cache
 from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -32,6 +30,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.utils import min_score_from_query_params
@@ -193,8 +192,10 @@ async def _find_endpoint(
     x_forwarded_for: str,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        with extracted_text_cache():
-            results, incomplete, _ = await find(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
+        with cache.request_caches():
+            results, incomplete, _ = await find(
+                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+            )
             response.status_code = 206 if incomplete else 200
             return results
     except KnowledgeBoxNotFound:
@@ -208,16 +209,3 @@ async def _find_endpoint(
             status_code=err.status,
             detail=err.detail,
         )
-
-
-@contextlib.contextmanager
-def extracted_text_cache():
-    """
-    This context manager sets the extracted text cache into the context var of the request so all
-    child tasks can access it and avoid fetching the same extracted text multiple times.
-    """
-    set_extracted_text_cache()
-    try:
-        yield
-    finally:
-        clear_extracted_text_cache()

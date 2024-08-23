@@ -439,13 +439,17 @@ class PineconeIndexManager(ExternalIndexManager):
 
     def get_prefixes_to_delete(self, index_data: Resource) -> set[str]:
         prefixes_to_delete = set()
-        for sentence_id in index_data.sentences_to_delete:
+        for field_id in index_data.sentences_to_delete:
             try:
-                delete_field = FieldId.from_string(sentence_id)
-                prefixes_to_delete.add(delete_field.full())
+                delete_vid = VectorId.from_string(field_id)
+                prefixes_to_delete.add(delete_vid.field_id.full())
             except ValueError:  # pragma: no cover
-                logger.warning(f"Invalid id to delete: {sentence_id}. VectorId expected.")
-                continue
+                try:
+                    delete_field = FieldId.from_string(field_id)
+                    prefixes_to_delete.add(delete_field.full())
+                except ValueError:
+                    logger.warning(f"Invalid id to delete sentences from: {field_id}.")
+                    continue
         for paragraph_id in index_data.paragraphs_to_delete:
             try:
                 delete_pid = ParagraphId.from_string(paragraph_id)
@@ -582,8 +586,8 @@ class PineconeIndexManager(ExternalIndexManager):
                 fid = ParagraphId.from_string(paragraph_id).field_id
                 vector_metadata = VectorMetadata(
                     rid=resource_uuid,
-                    field_type=fid.field_type,
-                    field_id=fid.field_id,
+                    field_type=fid.type,
+                    field_id=fid.key,
                     date_created=date_created,
                     date_modified=date_modified,
                     security_public=security_public,

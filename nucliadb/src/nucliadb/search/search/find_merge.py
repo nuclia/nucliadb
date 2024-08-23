@@ -24,7 +24,6 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -396,7 +395,6 @@ async def find_merge_results(
     total_paragraphs = 0
     for response in search_responses:
         # Iterate over answers from different logic shards
-
         ematches.extend(response.paragraph.ematches)
         real_query = response.paragraph.query
         next_page = next_page and response.paragraph.next_page
@@ -407,38 +405,33 @@ async def find_merge_results(
 
         relations.append(response.relation)
 
-    rcache = get_resource_cache(clear=True)
+    result_paragraphs, merged_next_page = merge_paragraphs_vectors(
+        paragraphs, vectors, count, page, min_score_semantic, kbid
+    )
+    next_page = next_page or merged_next_page
 
-    try:
-        result_paragraphs, merged_next_page = merge_paragraphs_vectors(
-            paragraphs, vectors, count, page, min_score_semantic, kbid
-        )
-        next_page = next_page or merged_next_page
+    api_results = KnowledgeboxFindResults(
+        resources={},
+        query=real_query,
+        total=total_paragraphs,
+        page_number=page,
+        page_size=count,
+        next_page=next_page,
+        min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
+        best_matches=[],
+    )
 
-        api_results = KnowledgeboxFindResults(
-            resources={},
-            query=real_query,
-            total=total_paragraphs,
-            page_number=page,
-            page_size=count,
-            next_page=next_page,
-            min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
-            best_matches=[],
-        )
+    await fetch_find_metadata(
+        api_results.resources,
+        api_results.best_matches,
+        result_paragraphs,
+        kbid,
+        show,
+        field_type_filter,
+        extracted,
+        highlight,
+        ematches,
+    )
+    api_results.relations = await merge_relations_results(relations, requested_relations)
 
-        await fetch_find_metadata(
-            api_results.resources,
-            api_results.best_matches,
-            result_paragraphs,
-            kbid,
-            show,
-            field_type_filter,
-            extracted,
-            highlight,
-            ematches,
-        )
-        api_results.relations = await merge_relations_results(relations, requested_relations)
-
-        return api_results
-    finally:
-        rcache.clear()
+    return api_results
