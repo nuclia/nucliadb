@@ -71,7 +71,7 @@ from nucliadb_protos.nodereader_pb2 import (
 
 from .cache import get_resource_cache, get_resource_from_cache
 from .metrics import merge_observer
-from .paragraphs import ExtractedTextCache, get_paragraph_text, get_text_sentence
+from .paragraphs import get_paragraph_text, get_text_sentence
 
 Bm25Score = tuple[float, float]
 TimestampScore = datetime.datetime
@@ -207,7 +207,6 @@ async def merge_suggest_paragraph_results(
         sort_results_by_score(raw_paragraph_list)
 
     rcache = get_resource_cache(clear=True)
-    etcache = ExtractedTextCache()
     try:
         result_paragraph_list: list[Paragraph] = []
         for result in raw_paragraph_list[:10]:
@@ -222,7 +221,6 @@ async def merge_suggest_paragraph_results(
                 highlight=highlight,
                 ematches=ematches,  # type: ignore
                 matches=result.matches,  # type: ignore
-                extracted_text_cache=etcache,
             )
             labels = await get_labels_paragraph(result, kbid)
             new_paragraph = Paragraph(
@@ -251,7 +249,6 @@ async def merge_suggest_paragraph_results(
             result_paragraph_list.append(new_paragraph)
         return Paragraphs(results=result_paragraph_list, query=query, min_score=0)
     finally:
-        etcache.clear()
         rcache.clear()
 
 
@@ -383,64 +380,59 @@ async def merge_paragraph_results(
         next_page = True
 
     result_paragraph_list: list[Paragraph] = []
-    etcache = ExtractedTextCache()
-    try:
-        for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
-            _, field_type, field = result.field.split("/")
-            text = await get_paragraph_text(
-                kbid=kbid,
-                rid=result.uuid,
-                field=result.field,
-                start=result.start,
-                end=result.end,
-                split=result.split,
-                highlight=highlight,
-                ematches=ematches,
-                matches=result.matches,  # type: ignore
-                extracted_text_cache=etcache,
-            )
-            labels = await get_labels_paragraph(result, kbid)
-            fuzzy_result = len(result.matches) > 0
-            new_paragraph = Paragraph(
-                score=result.score.bm25,
-                rid=result.uuid,
-                field_type=field_type,
-                field=field,
-                text=text,
-                labels=labels,
-                position=TextPosition(
-                    index=result.metadata.position.index,
-                    start=result.metadata.position.start,
-                    end=result.metadata.position.end,
-                    page_number=result.metadata.position.page_number,
-                ),
-                fuzzy_result=fuzzy_result,
-            )
-            if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
-                new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
-                new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
-            else:
-                # TODO: Remove once we are sure all data has been migrated!
-                seconds_positions = await get_seconds_paragraph(result, kbid)
-                if seconds_positions is not None:
-                    new_paragraph.start_seconds = seconds_positions[0]
-                    new_paragraph.end_seconds = seconds_positions[1]
-
-            result_paragraph_list.append(new_paragraph)
-            if new_paragraph.rid not in resources:
-                resources.append(new_paragraph.rid)
-        return Paragraphs(
-            results=result_paragraph_list,
-            facets=facets,
-            query=query,
-            total=total,
-            page_number=page,
-            page_size=count,
-            next_page=next_page,
-            min_score=min_score,
+    for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
+        _, field_type, field = result.field.split("/")
+        text = await get_paragraph_text(
+            kbid=kbid,
+            rid=result.uuid,
+            field=result.field,
+            start=result.start,
+            end=result.end,
+            split=result.split,
+            highlight=highlight,
+            ematches=ematches,
+            matches=result.matches,  # type: ignore
         )
-    finally:
-        etcache.clear()
+        labels = await get_labels_paragraph(result, kbid)
+        fuzzy_result = len(result.matches) > 0
+        new_paragraph = Paragraph(
+            score=result.score.bm25,
+            rid=result.uuid,
+            field_type=field_type,
+            field=field,
+            text=text,
+            labels=labels,
+            position=TextPosition(
+                index=result.metadata.position.index,
+                start=result.metadata.position.start,
+                end=result.metadata.position.end,
+                page_number=result.metadata.position.page_number,
+            ),
+            fuzzy_result=fuzzy_result,
+        )
+        if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
+            new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
+            new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
+        else:
+            # TODO: Remove once we are sure all data has been migrated!
+            seconds_positions = await get_seconds_paragraph(result, kbid)
+            if seconds_positions is not None:
+                new_paragraph.start_seconds = seconds_positions[0]
+                new_paragraph.end_seconds = seconds_positions[1]
+
+        result_paragraph_list.append(new_paragraph)
+        if new_paragraph.rid not in resources:
+            resources.append(new_paragraph.rid)
+    return Paragraphs(
+        results=result_paragraph_list,
+        facets=facets,
+        query=query,
+        total=total,
+        page_number=page,
+        page_size=count,
+        next_page=next_page,
+        min_score=min_score,
+    )
 
 
 @merge_observer.wrap({"type": "merge_relations"})

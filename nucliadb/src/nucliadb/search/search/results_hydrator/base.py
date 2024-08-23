@@ -90,7 +90,6 @@ async def hydrate_external(
     """
     hydrate_ops = []
     semaphore = asyncio.Semaphore(max_parallel_operations)
-    extracted_text_cache = paragraphs.ExtractedTextCache()
     rcache = get_resource_cache(clear=True)
     try:
         resource_ids = set()
@@ -117,7 +116,6 @@ async def hydrate_external(
                         kbid=kbid,
                         text_block=text_block,
                         options=text_block_options,
-                        extracted_text_cache=extracted_text_cache,
                         field_paragraphs=find_field.paragraphs,
                     )
                 )
@@ -145,7 +143,6 @@ async def hydrate_external(
         if len(hydrate_ops) > 0:
             await asyncio.gather(*hydrate_ops)
     finally:
-        extracted_text_cache.clear()
         rcache.clear()
 
 
@@ -154,7 +151,6 @@ async def hydrate_text_block(
     kbid: str,
     text_block: TextBlockMatch,
     options: TextBlockHydrationOptions,
-    extracted_text_cache: paragraphs.ExtractedTextCache,
     field_paragraphs: dict[str, FindParagraph],
 ) -> None:
     """
@@ -167,7 +163,6 @@ async def hydrate_text_block(
         start=text_block.position_start,
         end=text_block.position_end,
         split=text_block.subfield_id,
-        extracted_text_cache=extracted_text_cache,
     )
     field_paragraphs[text_block.id] = FindParagraph(
         score=text_block.score,

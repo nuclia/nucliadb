@@ -69,7 +69,6 @@ async def set_text_value(
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
-    extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
 ):
     async with max_operations:
         assert result_paragraph.paragraph
@@ -84,7 +83,6 @@ async def set_text_value(
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO
-            extracted_text_cache=extracted_text_cache,
         )
 
 
@@ -162,7 +160,6 @@ async def fetch_find_metadata(
     operations = []
     max_operations = asyncio.Semaphore(50)
     orderer = Orderer()
-    etcache = paragraphs.ExtractedTextCache()
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
             find_resource = find_resources.setdefault(
@@ -212,12 +209,10 @@ async def fetch_find_metadata(
                         highlight=highlight,
                         ematches=ematches,
                         max_operations=max_operations,
-                        extracted_text_cache=etcache,
                     )
                 )
             )
             resources.add(result_paragraph.rid)
-    etcache.clear()
 
     for order, (rid, field_id, paragraph_id, _) in enumerate(orderer.sorted_by_score()):
         find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order

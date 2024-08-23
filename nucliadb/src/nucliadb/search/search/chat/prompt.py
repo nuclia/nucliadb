@@ -534,7 +534,6 @@ async def hierarchy_prompt_context(
                 field="/a/title",
                 start=0,
                 end=500,
-                extracted_text_cache=etcache,
                 log_on_missing_field=False,
             )
             summary_text = await get_paragraph_text(
@@ -543,7 +542,6 @@ async def hierarchy_prompt_context(
                 field="/a/summary",
                 start=0,
                 end=1000,
-                extracted_text_cache=etcache,
                 log_on_missing_field=False,
             )
             resources[rid] = ExtraCharsParagraph(
