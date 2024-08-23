@@ -20,6 +20,8 @@
 import unittest
 import unittest.mock
 
+import pytest
+
 import nucliadb_sdk
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.search import (
@@ -167,3 +169,18 @@ def test_ask_stream(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     )
     assert isinstance(resp, SyncAskResponse)
     sdk.session.headers.pop("X-Synchronous", None)
+
+
+@pytest.mark.parametrize(
+    "rag_strategies",
+    [
+        [{"name": "full_resource"}],
+        [{"name": "neighbouring_paragraphs", "before": 1, "after": 1}],
+        [{"name": "hierarchy", "count": 40}],
+        [{"name": "field_extension", "fields": ["a/title", "a/summary"]}],
+    ],
+)
+def test_ask_rag_strategies(docs_dataset, sdk: nucliadb_sdk.NucliaDB, rag_strategies):
+    sdk.ask(
+        kbid=docs_dataset, query="Does Nuclia offer RAG as a service?", rag_strategies=rag_strategies
+    )

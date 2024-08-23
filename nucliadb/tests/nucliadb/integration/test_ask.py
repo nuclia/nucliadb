@@ -544,3 +544,22 @@ async def test_ask_assert_audit_retrieval_contexts(
     assert {(f"{rid}/a/title/0-11", f"The title {i}") for i, rid in enumerate(resources)} == {
         (a.text_block_id, a.text) for a in retrieved_context
     }
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_rag_strategy_neighbouring_paragraphs(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.prompt_context is not None
