@@ -30,6 +30,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.utils import min_score_from_query_params
@@ -191,9 +192,12 @@ async def _find_endpoint(
     x_forwarded_for: str,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        results, incomplete, _ = await find(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
-        response.status_code = 206 if incomplete else 200
-        return results
+        with cache.request_caches():
+            results, incomplete, _ = await find(
+                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+            )
+            response.status_code = 206 if incomplete else 200
+            return results
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:

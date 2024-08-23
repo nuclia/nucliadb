@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import logging
 import re
 import string
@@ -26,10 +25,9 @@ from typing import Optional
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry import metrics
 
-from .cache import get_resource_from_cache
+from .cache import get_field_extracted_text, get_resource_from_cache
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
@@ -55,60 +53,6 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
 )
 
 
-EXTRACTED_CACHE_OPS = metrics.Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
-
-
-class ExtractedTextCache:
-    """
-    Used to cache extracted text from a resource in memory during
-    the process of search results serialization.
-    """
-
-    def __init__(self):
-        self.locks = {}
-        self.values = {}
-
-    def get_value(self, key: str) -> Optional[ExtractedText]:
-        return self.values.get(key)
-
-    def get_lock(self, key: str) -> asyncio.Lock:
-        return self.locks.setdefault(key, asyncio.Lock())
-
-    def set_value(self, key: str, value: ExtractedText) -> None:
-        self.values[key] = value
-
-    def clear(self):
-        self.values.clear()
-        self.locks.clear()
-
-
-async def get_field_extracted_text(
-    field: Field, cache: Optional[ExtractedTextCache] = None
-) -> Optional[ExtractedText]:
-    if cache is None:
-        return await field.get_extracted_text()
-
-    key = f"{field.kbid}/{field.uuid}/{field.id}"
-    extracted_text = cache.get_value(key)
-    if extracted_text is not None:
-        EXTRACTED_CACHE_OPS.inc({"type": "hit"})
-        return extracted_text
-
-    async with cache.get_lock(key):
-        # Check again in case another task already fetched it
-        extracted_text = cache.get_value(key)
-        if extracted_text is not None:
-            EXTRACTED_CACHE_OPS.inc({"type": "hit"})
-            return extracted_text
-
-        EXTRACTED_CACHE_OPS.inc({"type": "miss"})
-        extracted_text = await field.get_extracted_text()
-        if extracted_text is not None:
-            # Only cache if we actually have extracted text
-            cache.set_value(key, extracted_text)
-        return extracted_text
-
-
 @GET_PARAGRAPH_LATENCY.wrap({"type": "full"})
 async def get_paragraph_from_full_text(
     *,
@@ -116,7 +60,6 @@ async def get_paragraph_from_full_text(
     start: int,
     end: int,
     split: Optional[str] = None,
-    extracted_text_cache: Optional[ExtractedTextCache] = None,
     log_on_missing_field: bool = True,
 ) -> str:
     """
@@ -124,7 +67,7 @@ async def get_paragraph_from_full_text(
 
     This requires downloading the full text and then slicing it.
     """
-    extracted_text = await get_field_extracted_text(field, cache=extracted_text_cache)
+    extracted_text = await get_field_extracted_text(field)
     if extracted_text is None:
         if log_on_missing_field:
             logger.warning(
@@ -157,7 +100,6 @@ async def get_paragraph_text(
     orm_resource: Optional[
         ResourceORM
     ] = None,  # allow passing in orm_resource to avoid extra DB calls or txn issues
-    extracted_text_cache: Optional[ExtractedTextCache] = None,
     log_on_missing_field: bool = True,
 ) -> str:
     if orm_resource is None:
@@ -179,7 +121,6 @@ async def get_paragraph_text(
         start=start,
         end=end,
         split=split,
-        extracted_text_cache=extracted_text_cache,
         log_on_missing_field=log_on_missing_field,
     )
 

@@ -33,13 +33,15 @@ def test_field_ids():
 
     field_id = FieldId.from_string("rid/u/field_id")
     assert field_id.rid == "rid"
-    assert field_id.field_id == "u/field_id"
+    assert field_id.type == "u"
+    assert field_id.key == "field_id"
     assert field_id.subfield_id is None
     assert field_id.full() == "rid/u/field_id"
 
     field_id = FieldId.from_string("rid/u/field_id/subfield_id")
     assert field_id.rid == "rid"
-    assert field_id.field_id == "u/field_id"
+    assert field_id.type == "u"
+    assert field_id.key == "field_id"
     assert field_id.subfield_id == "subfield_id"
     assert field_id.full() == "rid/u/field_id/subfield_id"
     assert field_id.field_type == "u"
