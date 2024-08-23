@@ -264,7 +264,7 @@ def test_capped_prompt_context():
 @pytest.mark.asyncio
 async def test_hierarchy_promp_context(kb):
     with mock.patch(
-        "nucliadb.search.search.chat.prompt.paragraphs.get_paragraph_text",
+        "nucliadb.search.search.chat.prompt.get_paragraph_text",
         side_effect=["Title text", "Summary text"],
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
