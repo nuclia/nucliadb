@@ -261,12 +261,12 @@ class ResourceBrain:
         matryoshka_vector_dimension: Optional[int] = None,
     ):
         replace_splits = replace_splits or []
-        ftype, fkey = field_id.split("/")
+        fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
             _field_id = ids.FieldId(
-                rid=self.rid,
-                type=ftype,
-                key=fkey,
+                rid=fid.rid,
+                type=fid.type,
+                key=fid.key,
                 subfield_id=subfield,
             )
             # For each split of this field
@@ -292,9 +292,9 @@ class ResourceBrain:
                 )
 
         _field_id = ids.FieldId(
-            rid=self.rid,
-            type=ftype,
-            key=fkey,
+            rid=fid.rid,
+            type=fid.type,
+            key=fid.key,
         )
         for index, vector in enumerate(vo.vectors.vectors):
             paragraph_key = ids.ParagraphId(
@@ -319,16 +319,18 @@ class ResourceBrain:
 
         for split in replace_splits:
             self.brain.sentences_to_delete.append(
-                ids.FieldId(rid=self.rid, type=ftype, key=fkey, subfield_id=split).full()
+                ids.FieldId(rid=self.rid, type=fid.type, key=fid.key, subfield_id=split).full()
             )
             self.brain.paragraphs_to_delete.append(
-                ids.FieldId(rid=self.rid, type=ftype, key=fkey, subfield_id=split).full()
+                ids.FieldId(rid=self.rid, type=fid.type, key=fid.key, subfield_id=split).full()
             )
 
         if replace_field:
-            self.brain.sentences_to_delete.append(ids.FieldId(rid=self.rid, type=ftype, key=fkey).full())
+            self.brain.sentences_to_delete.append(
+                ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
+            )
             self.brain.paragraphs_to_delete.append(
-                ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
+                ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
             )
 
     def _apply_field_vector(

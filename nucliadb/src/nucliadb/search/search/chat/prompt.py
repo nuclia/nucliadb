@@ -287,9 +287,10 @@ async def full_resource_prompt_context(
     for extracted_texts in resource_extracted_texts:
         if extracted_texts is None:
             continue
+        field: FieldId
         for field, extracted_text in extracted_texts:
             # Add the extracted text of each field to the context.
-            context[field.resource_unique_id] = extracted_text
+            context[field.full()] = extracted_text
 
 
 async def composed_prompt_context(
@@ -330,7 +331,7 @@ async def composed_prompt_context(
             continue
         # Add the extracted text of each field to the beginning of the context.
         field, extracted_text = result
-        context[field.resource_unique_id] = extracted_text
+        context[field.full()] = extracted_text
 
     # Add the extracted text of each paragraph to the end of the context.
     for paragraph in ordered_paragraphs:

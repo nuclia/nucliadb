@@ -226,7 +226,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
             "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
         },
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     _ = parse_ask_response(resp)
 
     # Make sure the prompt context is properly crafted
