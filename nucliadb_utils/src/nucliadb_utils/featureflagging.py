@@ -85,6 +85,14 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
+    const.Features.LOG_REQUEST_PAYLOADS: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
+    const.Features.DEPRECATED_CHAT_ENABLED: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
 }
 
 

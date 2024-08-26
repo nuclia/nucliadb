@@ -17,9 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 from typing import Optional, Union
 
+from pydantic import BaseModel
+
 from nucliadb_models.search import BaseSearchRequest, MinScore
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
+
+logger = logging.getLogger(__name__)
 
 
 def is_empty_query(request: BaseSearchRequest) -> bool:
@@ -70,3 +77,11 @@ def min_score_from_payload(min_score: Optional[Union[float, MinScore]]) -> MinSc
     elif isinstance(min_score, float):
         return MinScore(bm25=0, semantic=min_score)
     return min_score
+
+
+def maybe_log_request_payload(kbid: str, endpoint: str, item: BaseModel):
+    if has_feature(const.Features.LOG_REQUEST_PAYLOADS, context={"kbid": kbid}, default=False):
+        logger.info(
+            "Request payload",
+            extra={"kbid": kbid, "endpoint": endpoint, "payload": item.model_dump_json()},
+        )

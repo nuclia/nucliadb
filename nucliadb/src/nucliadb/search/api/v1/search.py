@@ -38,6 +38,7 @@ from nucliadb.search.search.merge import fetch_resources, merge_results
 from nucliadb.search.search.pgcatalog import pgcatalog_enabled, pgcatalog_search
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
+    maybe_log_request_payload,
     min_score_from_payload,
     min_score_from_query_params,
     should_disable_vector_search,
@@ -281,6 +282,7 @@ async def catalog(
     returns bm25 results on titles and it does not support vector search.
     It is useful for listing resources in a knowledge box.
     """
+    maybe_log_request_payload(kbid, "/catalog", item)
     start_time = time()
     try:
         sort = item.sort
