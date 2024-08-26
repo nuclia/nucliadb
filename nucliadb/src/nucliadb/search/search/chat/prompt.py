@@ -22,7 +22,6 @@ import copy
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, cast
 
-from nucliadb.common import datamanagers
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
@@ -345,6 +344,16 @@ async def get_paragraph_text_with_neighbours(
     before: int = 0,
     after: int = 0,
 ) -> tuple[ParagraphId, str]:
+    """
+    This function will get the paragraph text of the paragraph with the neighbouring paragraphs included.
+    Parameters:
+        kbid: The knowledge box id.
+        pid: The matching paragraph id.
+        field_paragraphs: The list of paragraph ids of the field.
+        before: The number of paragraphs to include before the matching paragraph.
+        after: The number of paragraphs to include after the matching paragraph.
+    """
+
     async def _get_paragraph_text(
         kbid: str,
         pid: ParagraphId,
@@ -383,7 +392,7 @@ async def get_paragraph_text_with_neighbours(
     results.sort(key=lambda x: x[0].paragraph_start)
     paragraph_texts = []
     for _, text in results:
-        if text:
+        if text != "":
             paragraph_texts.append(text)
     return pid, "\n\n".join(paragraph_texts)
 
@@ -396,10 +405,9 @@ async def get_field_paragraphs_list(
     """
     Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
     """
-    async with datamanagers.with_ro_transaction() as txn:
-        resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=field.rid)
-        if resource is None:
-            return
+    resource = await cache.get_resource_from_cache(kbid, field.rid)
+    if resource is None:
+        return
     field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
     field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata(
         force=True
@@ -429,11 +437,9 @@ async def neighbouring_paragraphs_prompt_context(
     """
     # First, get the sorted list of paragraphs for each matching field
     # so we can know the indexes of the neighbouring paragraphs
-    unique_fields = set()
-    for text_block in ordered_text_blocks:
-        pid = ParagraphId.from_string(text_block.id)
-        unique_fields.add(pid.field_id)
-
+    unique_fields = {
+        ParagraphId.from_string(text_block.id).field_id for text_block in ordered_text_blocks
+    }
     paragraphs_by_field: dict[FieldId, list[ParagraphId]] = {}
     field_ops = []
     for field_id in unique_fields:
@@ -444,6 +450,7 @@ async def neighbouring_paragraphs_prompt_context(
     if field_ops:
         await asyncio.gather(*field_ops)
 
+    # Now, get the paragraph texts with the neighbouring paragraphs
     paragraph_ops = []
     for text_block in ordered_text_blocks:
         pid = ParagraphId.from_string(text_block.id)
