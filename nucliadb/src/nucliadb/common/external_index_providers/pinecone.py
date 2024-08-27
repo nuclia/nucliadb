@@ -77,20 +77,21 @@ class PineconeQueryResults(QueryResults):
         for order, matching_vector in enumerate(self.results.matches):
             try:
                 vector_id = VectorId.from_string(matching_vector.id)
+                paragraph_id = ParagraphId.from_vector_id(vector_id)
             except ValueError:  # pragma: no cover
                 logger.error(f"Invalid Pinecone vector id: {matching_vector.id}")
                 continue
             vector_metadata = VectorMetadata.model_validate(matching_vector.metadata)  # noqa
             yield TextBlockMatch(
                 text=None,  # To be filled by the results hydrator
-                id=matching_vector.id,
-                resource_id=vector_id.field_id.rid,
-                field_id=vector_id.field_id.full(),
+                id=paragraph_id.full(),
+                resource_id=paragraph_id.field_id.rid,
+                field_id=paragraph_id.field_id.full(),
                 score=matching_vector.score,
                 order=order,
-                position_start=vector_id.vector_start,
-                position_end=vector_id.vector_end,
-                subfield_id=vector_id.field_id.subfield_id,
+                position_start=paragraph_id.paragraph_start,
+                position_end=paragraph_id.paragraph_end,
+                subfield_id=paragraph_id.field_id.subfield_id,
                 index=vector_id.index,
                 position_start_seconds=list(map(int, vector_metadata.position_start_seconds or [])),
                 position_end_seconds=list(map(int, vector_metadata.position_end_seconds or [])),
@@ -438,13 +439,17 @@ class PineconeIndexManager(ExternalIndexManager):
 
     def get_prefixes_to_delete(self, index_data: Resource) -> set[str]:
         prefixes_to_delete = set()
-        for sentence_id in index_data.sentences_to_delete:
+        for field_id in index_data.sentences_to_delete:
             try:
-                delete_field = FieldId.from_string(sentence_id)
-                prefixes_to_delete.add(delete_field.full())
+                delete_vid = VectorId.from_string(field_id)
+                prefixes_to_delete.add(delete_vid.field_id.full())
             except ValueError:  # pragma: no cover
-                logger.warning(f"Invalid id to delete: {sentence_id}. VectorId expected.")
-                continue
+                try:
+                    delete_field = FieldId.from_string(field_id)
+                    prefixes_to_delete.add(delete_field.full())
+                except ValueError:
+                    logger.warning(f"Invalid id to delete sentences from: {field_id}.")
+                    continue
         for paragraph_id in index_data.paragraphs_to_delete:
             try:
                 delete_pid = ParagraphId.from_string(paragraph_id)
@@ -581,8 +586,8 @@ class PineconeIndexManager(ExternalIndexManager):
                 fid = ParagraphId.from_string(paragraph_id).field_id
                 vector_metadata = VectorMetadata(
                     rid=resource_uuid,
-                    field_type=fid.field_type,
-                    field_id=fid.field_id,
+                    field_type=fid.type,
+                    field_id=fid.key,
                     date_created=date_created,
                     date_modified=date_modified,
                     security_public=security_public,

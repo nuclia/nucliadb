@@ -23,7 +23,7 @@ from typing import Any, AsyncGenerator
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
+from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB, Resource
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
@@ -68,7 +68,7 @@ async def generate_image_classification_payloads(
             return
 
         _, field_type_key, field_key = item.field.split("/")
-        field_type = KB_REVERSE[field_type_key]
+        field_type = FIELD_TYPE_STR_TO_PB[field_type_key]
 
         if field_type not in VISUALLY_ANNOTABLE_FIELDS:
             continue
@@ -139,7 +139,7 @@ async def get_page_selections(resource: Resource, field: Field) -> dict[int, lis
     for fieldmetadata in basic.fieldmetadata:
         if (
             fieldmetadata.field.field == field.id
-            and fieldmetadata.field.field_type == KB_REVERSE[field.type]
+            and fieldmetadata.field.field_type == FIELD_TYPE_STR_TO_PB[field.type]
         ):
             for selection in fieldmetadata.page_selections:
                 page_selections[selection.page] = selection.visual  # type: ignore
@@ -150,7 +150,7 @@ async def get_page_selections(resource: Resource, field: Field) -> dict[int, lis
 
 async def get_page_structure(field: Field) -> list[tuple[str, PageStructure]]:
     page_structures: list[tuple[str, PageStructure]] = []
-    field_type = KB_REVERSE[field.type]
+    field_type = FIELD_TYPE_STR_TO_PB[field.type]
     if field_type == FieldType.FILE:
         fed = await field.get_file_extracted_data()  # type: ignore
         if fed is None:

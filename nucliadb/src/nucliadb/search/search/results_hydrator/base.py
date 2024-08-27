@@ -29,7 +29,6 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import paragraphs
-from nucliadb.search.search.cache import get_resource_cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
@@ -90,63 +89,56 @@ async def hydrate_external(
     """
     hydrate_ops = []
     semaphore = asyncio.Semaphore(max_parallel_operations)
-    extracted_text_cache = paragraphs.ExtractedTextCache()
-    rcache = get_resource_cache(clear=True)
-    try:
-        resource_ids = set()
-        for text_block in query_results.iter_matching_text_blocks():
-            if (
-                text_block_min_score is not None and text_block.score < text_block_min_score
-            ):  # pragma: no cover
-                # Ignore text blocks with a score lower than the minimum
-                continue
-            resource_id = text_block.resource_id
-            resource_ids.add(resource_id)
-            find_resource = retrieval_results.resources.setdefault(
-                resource_id, FindResource(id=resource_id, fields={})
-            )
-            find_field = find_resource.fields.setdefault(text_block.field_id, FindField(paragraphs={}))
+    resource_ids = set()
+    for text_block in query_results.iter_matching_text_blocks():
+        if (
+            text_block_min_score is not None and text_block.score < text_block_min_score
+        ):  # pragma: no cover
+            # Ignore text blocks with a score lower than the minimum
+            continue
+        resource_id = text_block.resource_id
+        resource_ids.add(resource_id)
+        find_resource = retrieval_results.resources.setdefault(
+            resource_id, FindResource(id=resource_id, fields={})
+        )
+        find_field = find_resource.fields.setdefault(text_block.field_id, FindField(paragraphs={}))
 
-            async def _hydrate_text_block(**kwargs):
-                async with semaphore:
-                    await hydrate_text_block(**kwargs)
+        async def _hydrate_text_block(**kwargs):
+            async with semaphore:
+                await hydrate_text_block(**kwargs)
 
-            hydrate_ops.append(
-                asyncio.create_task(
-                    _hydrate_text_block(
-                        kbid=kbid,
-                        text_block=text_block,
-                        options=text_block_options,
-                        extracted_text_cache=extracted_text_cache,
-                        field_paragraphs=find_field.paragraphs,
-                    )
+        hydrate_ops.append(
+            asyncio.create_task(
+                _hydrate_text_block(
+                    kbid=kbid,
+                    text_block=text_block,
+                    options=text_block_options,
+                    field_paragraphs=find_field.paragraphs,
                 )
             )
+        )
 
-        async def _hydrate_resource_metadata(**kwargs):
-            async with semaphore:
-                await hydrate_resource_metadata(**kwargs)
+    async def _hydrate_resource_metadata(**kwargs):
+        async with semaphore:
+            await hydrate_resource_metadata(**kwargs)
 
-        if len(resource_ids) > 0:
-            async with get_driver().transaction(read_only=True) as ro_txn:
-                for resource_id in resource_ids:
-                    hydrate_ops.append(
-                        asyncio.create_task(
-                            _hydrate_resource_metadata(
-                                txn=ro_txn,
-                                kbid=kbid,
-                                resource_id=resource_id,
-                                options=resource_options,
-                                find_resources=retrieval_results.resources,
-                            )
+    if len(resource_ids) > 0:
+        async with get_driver().transaction(read_only=True) as ro_txn:
+            for resource_id in resource_ids:
+                hydrate_ops.append(
+                    asyncio.create_task(
+                        _hydrate_resource_metadata(
+                            txn=ro_txn,
+                            kbid=kbid,
+                            resource_id=resource_id,
+                            options=resource_options,
+                            find_resources=retrieval_results.resources,
                         )
                     )
+                )
 
-        if len(hydrate_ops) > 0:
-            await asyncio.gather(*hydrate_ops)
-    finally:
-        extracted_text_cache.clear()
-        rcache.clear()
+    if len(hydrate_ops) > 0:
+        await asyncio.gather(*hydrate_ops)
 
 
 @hydrator_observer.wrap({"type": "text_block"})
@@ -154,7 +146,6 @@ async def hydrate_text_block(
     kbid: str,
     text_block: TextBlockMatch,
     options: TextBlockHydrationOptions,
-    extracted_text_cache: paragraphs.ExtractedTextCache,
     field_paragraphs: dict[str, FindParagraph],
 ) -> None:
     """
@@ -167,7 +158,6 @@ async def hydrate_text_block(
         start=text_block.position_start,
         end=text_block.position_end,
         split=text_block.subfield_id,
-        extracted_text_cache=extracted_text_cache,
     )
     field_paragraphs[text_block.id] = FindParagraph(
         score=text_block.score,
