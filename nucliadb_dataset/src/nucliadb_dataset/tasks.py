@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List
 import pyarrow as pa  # type: ignore
 
 from nucliadb_dataset.mapping import (
+    batch_to_field_streaming_arrow,
     batch_to_image_classification_arrow,
     batch_to_paragraph_streaming_arrow,
     batch_to_question_answer_streaming_arrow,
@@ -34,6 +35,7 @@ from nucliadb_dataset.mapping import (
 )
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
+    FieldStreamingBatch,
     ImageClassificationBatch,
     ParagraphClassificationBatch,
     ParagraphStreamingBatch,
@@ -59,6 +61,7 @@ class Task(str, Enum):
     IMAGE_CLASSIFICATION = "IMAGE_CLASSIFICATION"
     PARAGRAPH_STREAMING = "PARAGRAPH_STREAMING"
     QUESTION_ANSWER_STREAMING = "QUESTION_ANSWER_STREAMING"
+    FIELD_STREAMING = "FIELD_STREAMING"
 
 
 @dataclass
@@ -171,6 +174,23 @@ TASK_DEFINITIONS: Dict[Task, TaskDefinition] = {
             batch_to_question_answer_streaming_arrow(),
         ],
         proto=TaskType.QUESTION_ANSWER_STREAMING,
+        labels=False,
+    ),
+    Task.FIELD_STREAMING: TaskDefinition(
+        schema=pa.schema(
+            [
+                pa.field("split", pa.string()),
+                pa.field("rid", pa.string()),
+                pa.field("field", pa.string()),
+                pa.field("field_type", pa.string()),
+                pa.field("labels", pa.list_(pa.string())),
+                pa.field("text", pa.binary()),
+                pa.field("basic", pa.binary()),
+                pa.field("metadata", pa.binary()),
+            ]
+        ),
+        mapping=[bytes_to_batch(FieldStreamingBatch), batch_to_field_streaming_arrow()],
+        proto=TaskType.FIELD_STREAMING,
         labels=False,
     ),
 }
