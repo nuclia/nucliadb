@@ -71,7 +71,7 @@ HOMEPAGE_HTML = """
     <h2>Quick Links</h2>
     <ul>
         <li><a href="/admin">Admin UI</a></li>
-        <li><a href="https://docs.nuclia.dev/docs/guides/nucliadb/deploy/basics">NucliaDB Deployment Documentation</a></li>
+        <li><a href="https://docs.nuclia.dev/docs/management/nucliadb/deploy/basics">NucliaDB Deployment Documentation</a></li>
         <li><a href="https://docs.nuclia.dev/docs/api">API Reference</a></li>
         <li><a href="/api/v1/docs">API Explorer</a></li>
         <li><a href="/metrics">Metrics</a></li>

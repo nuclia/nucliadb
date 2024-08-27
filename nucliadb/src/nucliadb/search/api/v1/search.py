@@ -37,6 +37,7 @@ from nucliadb.search.search.merge import fetch_resources, merge_results
 from nucliadb.search.search.pgcatalog import pgcatalog_enabled, pgcatalog_search
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
+    maybe_log_request_payload,
     min_score_from_payload,
     min_score_from_query_params,
     should_disable_vector_search,
@@ -111,12 +112,12 @@ async def search_knowledgebox(
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
     min_score: Optional[float] = Query(
         default=None,
-        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
         deprecated=True,
     ),
     min_score_semantic: Optional[float] = Query(
         default=None,
-        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
     ),
     min_score_bm25: float = Query(
         default=0,
@@ -280,6 +281,7 @@ async def catalog(
     returns bm25 results on titles and it does not support vector search.
     It is useful for listing resources in a knowledge box.
     """
+    maybe_log_request_payload(kbid, "/catalog", item)
     start_time = time()
     try:
         sort = item.sort

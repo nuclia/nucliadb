@@ -45,6 +45,7 @@ async def fetch_resources(
 ) -> dict[str, Resource]:
     result = {}
     async with get_driver().transaction(read_only=True) as txn:
+        # TODO: this could be done in parallel
         for resource in resources:
             serialization = await managed_serialize(
                 txn,

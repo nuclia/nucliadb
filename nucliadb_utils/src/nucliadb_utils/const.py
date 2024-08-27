@@ -84,3 +84,5 @@ class Features:
     VECTORSETS_V0 = "vectorsets_v0_new_kbs_with_multiple_vectorsets"
     SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
     NATS_SYNC_ACK = "nucliadb_nats_sync_ack"
+    DEPRECATED_CHAT_ENABLED = "nucliadb_deprecated_chat_enabled"
+    LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"

@@ -26,6 +26,7 @@ from starlette.responses import StreamingResponse
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
+from nucliadb.search.search.utils import maybe_log_request_payload
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     AskRequest,
@@ -74,6 +75,7 @@ async def create_ask_response(
     x_synchronous: bool,
     resource: Optional[str] = None,
 ) -> Response:
+    maybe_log_request_payload(kbid, "/ask", ask_request)
     ask_request.max_tokens = parse_max_tokens(ask_request.max_tokens)
     ask_result: AskResult = await ask(
         kbid=kbid,

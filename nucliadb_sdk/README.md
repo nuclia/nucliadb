@@ -134,7 +134,7 @@ After the data is pushed, the NucliaDB SDK could also be used to find answers on
 >>> import nucliadb_sdk
 >>> 
 >>> ndb = nucliadb_sdk.NucliaDB(region="on-prem", url="http://localhost:8080")
->>> resp = ndb.chat(kbid="my-kb-id", query="What does Hakuna Matata mean?")
+>>> resp = ndb.ask(kbid="my-kb-id", query="What does Hakuna Matata mean?")
 >>> print(resp.answer)
 'Hakuna matata is actually a phrase in the East African language of Swahili that literally means “no trouble” or “no problems”.'
 ```
