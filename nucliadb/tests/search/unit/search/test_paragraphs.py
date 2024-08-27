@@ -23,7 +23,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nucliadb.search.search import paragraphs
+from nucliadb.search.search import cache, paragraphs
+from nucliadb.search.search.cache import set_extracted_text_cache
 from nucliadb_protos.utils_pb2 import ExtractedText
 
 
@@ -62,7 +63,7 @@ class TestGetParagraphText:
         mock = AsyncMock()
         mock.get_field.return_value = field
         with patch(
-            "nucliadb.search.search.paragraphs.get_resource_from_cache",
+            "nucliadb.search.search.paragraphs.cache.get_resource",
             return_value=mock,
         ):
             yield mock
@@ -99,8 +100,8 @@ async def test_get_field_extracted_text_is_cached(field):
     field.get_extracted_text = AsyncMock(side_effect=fake_get_extracted_text_from_gcloud)
 
     # Run 10 times in parallel to check that the cache is working
-    etcache = paragraphs.ExtractedTextCache()
-    futures = [paragraphs.get_field_extracted_text(field, cache=etcache) for _ in range(10)]
+    set_extracted_text_cache()
+    futures = [paragraphs.cache.get_field_extracted_text(field) for _ in range(10)]
     await asyncio.gather(*futures)
 
     field.get_extracted_text.assert_awaited_once()
@@ -109,14 +110,14 @@ async def test_get_field_extracted_text_is_cached(field):
 async def test_get_field_extracted_text_is_not_cached_when_none(field):
     field.get_extracted_text = AsyncMock(return_value=None)
 
-    await paragraphs.get_field_extracted_text(field)
-    await paragraphs.get_field_extracted_text(field)
+    await paragraphs.cache.get_field_extracted_text(field)
+    await paragraphs.cache.get_field_extracted_text(field)
 
     assert field.get_extracted_text.await_count == 2
 
 
 def test_extracted_text_cache():
-    etcache = paragraphs.ExtractedTextCache()
+    etcache = cache.ExtractedTextCache()
     assert etcache.get_value("foo") is None
 
     assert isinstance(etcache.get_lock("foo"), asyncio.Lock)

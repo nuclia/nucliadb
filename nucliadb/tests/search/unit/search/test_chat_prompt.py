@@ -21,7 +21,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.common.ids import ParagraphId
+from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -127,7 +128,7 @@ async def test_get_expanded_conversation_messages_question(kb, messages):
     )
 
     kb.get.assert_called_with("rid")
-    kb.get.return_value.get_field.assert_called_with("field_id", KB_REVERSE["c"], load=True)
+    kb.get.return_value.get_field.assert_called_with("field_id", FIELD_TYPE_STR_TO_PB["c"], load=True)
 
 
 @pytest.mark.asyncio
@@ -263,7 +264,7 @@ def test_capped_prompt_context():
 @pytest.mark.asyncio
 async def test_hierarchy_promp_context(kb):
     with mock.patch(
-        "nucliadb.search.search.chat.prompt.paragraphs.get_paragraph_text",
+        "nucliadb.search.search.chat.prompt.get_paragraph_text",
         side_effect=["Title text", "Summary text"],
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
@@ -308,3 +309,37 @@ async def test_hierarchy_promp_context(kb):
         # Chec that the original text of the paragraphs is preserved
         assert ordered_paragraphs[0].text == "First Paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
+
+
+def test_get_neighbouring_paragraph_indexes():
+    field_paragraphs = [
+        ParagraphId.from_string("r1/f/f1/0-10"),
+        ParagraphId.from_string("r1/f/f1/10-20"),
+        ParagraphId.from_string("r1/f/f1/20-30"),
+        ParagraphId.from_string("r1/f/f1/30-40"),
+        ParagraphId.from_string("r1/f/f1/40-50"),
+        ParagraphId.from_string("r1/f/f1/50-60"),
+        ParagraphId.from_string("r1/f/f1/60-70"),
+        ParagraphId.from_string("r1/f/f1/70-80"),
+    ]
+    matching_paragraph = field_paragraphs[2]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=100, after=100
+    ) == [0, 1, 2, 3, 4, 5, 6, 7]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=2, after=2
+    ) == [0, 1, 2, 3, 4]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=1, after=0
+    ) == [1, 2]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=0, after=1
+    ) == [2, 3]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=0, after=0
+    ) == [2]

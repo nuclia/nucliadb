@@ -30,7 +30,8 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
     MATRYOSHKA_DIMENSION = 10
 
     rid = uuid.uuid4().hex
-    field_id = uuid.uuid4().hex
+    field_id = f"u/{uuid.uuid4().hex}"
+    fid = ids.FieldId.from_string(f"{rid}/{field_id}")
     vectors = utils_pb2.VectorObject(
         vectors=utils_pb2.Vectors(
             vectors=[
@@ -45,18 +46,12 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
         )
     )
     paragraph_key = ids.ParagraphId(
-        field_id=ids.FieldId(
-            rid=rid,
-            field_id=field_id,
-        ),
+        field_id=fid,
         paragraph_start=0,
         paragraph_end=10,
     )
     vector_key = ids.VectorId(
-        field_id=ids.FieldId(
-            rid=rid,
-            field_id=field_id,
-        ),
+        field_id=fid,
         index=0,
         vector_start=0,
         vector_end=10,

@@ -25,6 +25,7 @@ from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.search import cache
 from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb.search.search.utils import maybe_log_request_payload
 from nucliadb_models.resource import NucliaDBRoles
@@ -77,14 +78,15 @@ async def create_ask_response(
 ) -> Response:
     maybe_log_request_payload(kbid, "/ask", ask_request)
     ask_request.max_tokens = parse_max_tokens(ask_request.max_tokens)
-    ask_result: AskResult = await ask(
-        kbid=kbid,
-        ask_request=ask_request,
-        user_id=user_id,
-        client_type=client_type,
-        origin=origin,
-        resource=resource,
-    )
+    with cache.request_caches():
+        ask_result: AskResult = await ask(
+            kbid=kbid,
+            ask_request=ask_request,
+            user_id=user_id,
+            client_type=client_type,
+            origin=origin,
+            resource=resource,
+        )
     headers = {
         "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
         "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",

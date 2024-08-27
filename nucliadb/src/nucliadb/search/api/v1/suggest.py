@@ -27,6 +27,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
@@ -126,34 +127,33 @@ async def suggest(
     debug: bool,
     highlight: bool,
 ) -> KnowledgeboxSuggestResults:
-    # We need the nodes/shards that are connected to the KB
-    # We need to query all nodes
-    pb_query = suggest_query_to_pb(
-        features,
-        query,
-        fields,
-        filters,
-        faceted,
-        range_creation_start,
-        range_creation_end,
-        range_modification_start,
-        range_modification_end,
-    )
-    results, incomplete_results, queried_nodes = await node_query(kbid, Method.SUGGEST, pb_query)
+    with cache.request_caches():
+        pb_query = suggest_query_to_pb(
+            features,
+            query,
+            fields,
+            filters,
+            faceted,
+            range_creation_start,
+            range_creation_end,
+            range_modification_start,
+            range_modification_end,
+        )
+        results, incomplete_results, queried_nodes = await node_query(kbid, Method.SUGGEST, pb_query)
 
-    # We need to merge
-    search_results = await merge_suggest_results(
-        results,
-        kbid=kbid,
-        show=show,
-        field_type_filter=field_type_filter,
-        highlight=highlight,
-    )
+        # We need to merge
+        search_results = await merge_suggest_results(
+            results,
+            kbid=kbid,
+            show=show,
+            field_type_filter=field_type_filter,
+            highlight=highlight,
+        )
 
-    response.status_code = 206 if incomplete_results else 200
+        response.status_code = 206 if incomplete_results else 200
 
-    queried_shards = [shard_id for _, shard_id in queried_nodes]
-    if debug and queried_shards:
-        search_results.shards = queried_shards
+        queried_shards = [shard_id for _, shard_id in queried_nodes]
+        if debug and queried_shards:
+            search_results.shards = queried_shards
 
-    return search_results
+        return search_results

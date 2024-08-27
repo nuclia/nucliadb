@@ -888,6 +888,7 @@ class RagStrategyName:
     FIELD_EXTENSION = "field_extension"
     FULL_RESOURCE = "full_resource"
     HIERARCHY = "hierarchy"
+    NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
 
 
 class ImageRagStrategyName:
@@ -959,6 +960,22 @@ class HierarchyResourceStrategy(RagStrategy):
     )
 
 
+class NeighbouringParagraphsStrategy(RagStrategy):
+    name: Literal["neighbouring_paragraphs"]
+    before: int = Field(
+        default=2,
+        title="Before",
+        description="Number of previous neighbouring paragraphs to add to the context, for each matching paragraph in the retrieval step.",
+        ge=0,
+    )
+    after: int = Field(
+        default=2,
+        title="After",
+        description="Number of following neighbouring paragraphs to add to the context, for each matching paragraph in the retrieval step.",
+        ge=0,
+    )
+
+
 class TableImageStrategy(ImageRagStrategy):
     name: Literal["tables"]
 
@@ -977,7 +994,12 @@ class ParagraphImageStrategy(ImageRagStrategy):
 
 
 RagStrategies = Annotated[
-    Union[FieldExtensionStrategy, FullResourceStrategy, HierarchyResourceStrategy],
+    Union[
+        FieldExtensionStrategy,
+        FullResourceStrategy,
+        HierarchyResourceStrategy,
+        NeighbouringParagraphsStrategy,
+    ],
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
@@ -1067,7 +1089,16 @@ class ChatRequest(BaseModel):
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
-        description="Options for tweaking how the context for the LLM model is crafted. `full_resource` will add the full text of the matching resources to the context. `field_extension` will add the text of the matching resource's specified fields to the context. If empty, the default strategy is used.",  # noqa
+        description=(
+            """Options for tweaking how the context for the LLM model is crafted:
+- `full_resource` will add the full text of the matching resources to the context.
+- `field_extension` will add the text of the matching resource's specified fields to the context.
+- `hierarchy` will add the title and summary text of the parent resource to the context for each matching paragraph.
+- `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
+If empty, the default strategy is used.
+`full_resource`, `hierarchy` and `neighbouring_paragraphs` are exclusive strategies: if selected, they must be the only strategy.
+"""
+        ),
     )
     rag_images_strategies: list[RagImagesStrategies] = Field(
         default=[],
@@ -1114,10 +1145,11 @@ class ChatRequest(BaseModel):
         if len(unique_strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
 
-        # If full_resource or hierarchy strategies is chosen, they must be the only strategy
+        # If any of the unique strategies are chosen, they must be the only strategy
         for unique_strategy_name in (
             RagStrategyName.FULL_RESOURCE,
             RagStrategyName.HIERARCHY,
+            RagStrategyName.NEIGHBOURING_PARAGRAPHS,
         ):
             if unique_strategy_name in unique_strategy_names and len(rag_strategies) > 1:
                 raise ValueError(

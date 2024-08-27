@@ -66,4 +66,4 @@ async def test_hydrate_external():
         assert len(fields) == 1
         paragraphs = fields["rid/f/field"].paragraphs
         assert len(paragraphs) == 1
-        assert paragraphs["rid/f/field/0/0-10"].text == "some text"
+        assert paragraphs["rid/f/field/0-10"].text == "some text"
