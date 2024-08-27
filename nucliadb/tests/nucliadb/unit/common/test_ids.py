@@ -18,10 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb_protos.resources_pb2 import FieldType
 import pytest
 
 from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb_protos.resources_pb2 import FieldType
 
 
 def test_field_ids():
