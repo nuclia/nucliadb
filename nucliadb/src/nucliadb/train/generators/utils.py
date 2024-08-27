@@ -19,14 +19,14 @@
 #
 
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Optional, Type
 
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.train import SERVICE_NAME, logger
-from nucliadb.train.types import TrainBatchType
+from nucliadb.train.types import T
 from nucliadb_utils.utilities import get_storage
 
 rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
@@ -89,7 +89,9 @@ async def get_paragraph(kbid: str, paragraph_id: str) -> str:
     return splitted_text
 
 
-async def batchify(producer: AsyncIterator[Any], size: int, batch_klass: TrainBatchType):
+async def batchify(
+    producer: AsyncIterator[Any], size: int, batch_klass: Type[T]
+) -> AsyncGenerator[T, None]:
     # NOTE: we are supposing all protobuffers have a data field
     batch = []
     async for item in producer:

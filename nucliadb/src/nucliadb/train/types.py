@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Union
+from typing import TypeVar, Union
 
 from nucliadb_protos import dataset_pb2 as dpb
 
@@ -32,13 +32,14 @@ TrainBatch = Union[
     dpb.FieldStreamingBatch,
 ]
 
-TrainBatchType = Union[
-    type[dpb.FieldClassificationBatch],
-    type[dpb.ImageClassificationBatch],
-    type[dpb.ParagraphClassificationBatch],
-    type[dpb.ParagraphStreamingBatch],
-    type[dpb.QuestionAnswerStreamingBatch],
-    type[dpb.SentenceClassificationBatch],
-    type[dpb.TokenClassificationBatch],
-    type[dpb.FieldStreamingBatch],
-]
+T = TypeVar(
+    "T",
+    dpb.FieldClassificationBatch,
+    dpb.ImageClassificationBatch,
+    dpb.ParagraphClassificationBatch,
+    dpb.ParagraphStreamingBatch,
+    dpb.QuestionAnswerStreamingBatch,
+    dpb.SentenceClassificationBatch,
+    dpb.TokenClassificationBatch,
+    dpb.FieldStreamingBatch,
+)

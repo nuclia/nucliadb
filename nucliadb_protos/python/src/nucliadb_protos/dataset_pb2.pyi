@@ -101,8 +101,6 @@ class _TaskTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumT
     PARAGRAPH_STREAMING: _TaskType.ValueType  # 5
     QUESTION_ANSWER_STREAMING: _TaskType.ValueType  # 6
     FIELD_STREAMING: _TaskType.ValueType  # 7
-    SENTENCE_STREAMING: _TaskType.ValueType  # 8
-    IMAGE_STREAMING: _TaskType.ValueType  # 9
 
 class TaskType(_TaskType, metaclass=_TaskTypeEnumTypeWrapper):
     """Train API V2"""
@@ -115,8 +113,6 @@ IMAGE_CLASSIFICATION: TaskType.ValueType  # 4
 PARAGRAPH_STREAMING: TaskType.ValueType  # 5
 QUESTION_ANSWER_STREAMING: TaskType.ValueType  # 6
 FIELD_STREAMING: TaskType.ValueType  # 7
-SENTENCE_STREAMING: TaskType.ValueType  # 8
-IMAGE_STREAMING: TaskType.ValueType  # 9
 global___TaskType = TaskType
 
 class _LabelFrom:
@@ -418,7 +414,7 @@ class ParagraphStreamingBatch(google.protobuf.message.Message):
 global___ParagraphStreamingBatch = ParagraphStreamingBatch
 
 @typing.final
-class Question(google.protobuf.message.Message):
+class QuestionDataset(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TEXT_FIELD_NUMBER: builtins.int
@@ -437,7 +433,7 @@ class Question(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["language", b"language", "paragraphs", b"paragraphs", "text", b"text"]) -> None: ...
 
-global___Question = Question
+global___QuestionDataset = QuestionDataset
 
 @typing.final
 class Answer(google.protobuf.message.Message):
@@ -470,13 +466,13 @@ class QuestionAnswerStreamItem(google.protobuf.message.Message):
     CANCELLED_BY_USER_FIELD_NUMBER: builtins.int
     cancelled_by_user: builtins.bool
     @property
-    def question(self) -> global___Question: ...
+    def question(self) -> global___QuestionDataset: ...
     @property
     def answer(self) -> global___Answer: ...
     def __init__(
         self,
         *,
-        question: global___Question | None = ...,
+        question: global___QuestionDataset | None = ...,
         answer: global___Answer | None = ...,
         cancelled_by_user: builtins.bool = ...,
     ) -> None: ...

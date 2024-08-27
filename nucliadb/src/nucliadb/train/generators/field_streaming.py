@@ -20,23 +20,18 @@
 
 from typing import AsyncGenerator, Optional
 
-from fastapi import HTTPException
-
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
-from nucliadb_models import 
 from nucliadb_protos.dataset_pb2 import (
     FieldSplitData,
     FieldStreamingBatch,
-    Label,
-    TextLabel,
     TrainSet,
 )
 from nucliadb_protos.nodereader_pb2 import StreamRequest
-from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_protos.resources_pb2 import Basic, FieldComputedMetadata
+from nucliadb_protos.utils_pb2 import ExtractedText
 
 
 def field_streaming_batch_generator(
@@ -45,9 +40,7 @@ def field_streaming_batch_generator(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[FieldStreamingBatch, None]:
-    generator = generate_field_streaming_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
+    generator = generate_field_streaming_payloads(kbid, trainset, node, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, FieldStreamingBatch)
     return batch_generator
 
@@ -90,11 +83,11 @@ async def generate_field_streaming_payloads(
         total += 1
 
         field_parts = document_item.field.split("/")
-        if len(field_parts) == 2:
-            field_type, field = field_parts
+        if len(field_parts) == 3:
+            _, field_type, field = field_parts
             split = "0"
-        elif len(field_parts) == 3:
-            field_type, field, split = field_parts
+        elif len(field_parts) == 4:
+            _, field_type, field, split = field_parts
         else:
             raise Exception(f"Invalid field definition {document_item.field}")
 
@@ -108,9 +101,9 @@ async def generate_field_streaming_payloads(
         if extracted is not None:
             tl.text.CopyFrom(extracted)
 
-        metadata = await get_field_metadata(kbid, rid, field, field_type)
-        if metadata is not None:
-            tl.metadata.CopyFrom(metadata)
+        metadata_obj = await get_field_metadata(kbid, rid, field, field_type)
+        if metadata_obj is not None:
+            tl.metadata.CopyFrom(metadata_obj)
 
         basic = await get_field_basic(kbid, rid, field, field_type)
         if basic is not None:
@@ -121,9 +114,7 @@ async def generate_field_streaming_payloads(
         yield tl
 
 
-async def get_field_text(
-    kbid: str, rid: str, field: str, field_type: str
-) -> Optional[ExtractedText]:
+async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Optional[ExtractedText]:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
@@ -153,10 +144,7 @@ async def get_field_metadata(
     return field_metadata
 
 
-
-async def get_field_basic(
-    kbid: str, rid: str, field: str, field_type: str
-) -> Optional[Basic]:
+async def get_field_basic(kbid: str, rid: str, field: str, field_type: str) -> Optional[Basic]:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
