@@ -101,7 +101,7 @@ async def test_get_field_extracted_text_is_cached(field):
 
     # Run 10 times in parallel to check that the cache is working
     set_extracted_text_cache()
-    futures = [paragraphs.get_field_extracted_text(field) for _ in range(10)]
+    futures = [paragraphs.cache.get_field_extracted_text(field) for _ in range(10)]
     await asyncio.gather(*futures)
 
     field.get_extracted_text.assert_awaited_once()
@@ -110,8 +110,8 @@ async def test_get_field_extracted_text_is_cached(field):
 async def test_get_field_extracted_text_is_not_cached_when_none(field):
     field.get_extracted_text = AsyncMock(return_value=None)
 
-    await paragraphs.get_field_extracted_text(field)
-    await paragraphs.get_field_extracted_text(field)
+    await paragraphs.cache.get_field_extracted_text(field)
+    await paragraphs.cache.get_field_extracted_text(field)
 
     assert field.get_extracted_text.await_count == 2
 
