@@ -198,8 +198,8 @@ def batch_to_field_streaming_arrow():
                 pa.array(FIELD_TYPE),
                 pa.array(LABELS),
                 pa.array(EXTRACTED_TEXT),
-                pa.array(METADATA),
                 pa.array(BASIC),
+                pa.array(METADATA),
             ]
             output_batch = pa.record_batch(pa_data, schema)
         else:

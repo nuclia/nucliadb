@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
 
 from integration.utils import export_dataset
 from nucliadb_models.resource import KnowledgeBoxObj
@@ -40,9 +39,7 @@ def test_paragraph_classification_with_labels(
         trainset.filter.ClearField("labels")
         trainset.filter.labels.extend(labels)
 
-        partitions = export_dataset(
-            sdk=sdk, trainset=trainset, kb=upload_data_paragraph_classification
-        )
+        partitions = export_dataset(sdk=sdk, trainset=trainset, kb=upload_data_paragraph_classification)
         assert len(partitions) == 1
 
         loaded_array = partitions[0]
