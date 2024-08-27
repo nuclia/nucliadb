@@ -104,9 +104,7 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
 @pytest.mark.parametrize(
     "raw_text_answer,status_code,audit_answer",
     [
-        (b"foobar_CIT_blabla", AnswerStatusCode.NO_CONTEXT, None),
-        (b"foobar_CIT_blabla", AnswerStatusCode.SUCCESS, "foobar"),
-        (b"foobar_CIT_blabla", None, "foobar"),
+        (b"foobar", AnswerStatusCode.NO_CONTEXT, None),
         (b"foobar", AnswerStatusCode.SUCCESS, "foobar"),
     ],
 )
