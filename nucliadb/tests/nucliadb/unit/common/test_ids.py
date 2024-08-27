@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from nucliadb_protos.resources_pb2 import FieldType
 import pytest
 
 from nucliadb.common.ids import FieldId, ParagraphId, VectorId
@@ -44,7 +45,8 @@ def test_field_ids():
     assert field_id.key == "field_id"
     assert field_id.subfield_id == "subfield_id"
     assert field_id.full() == "rid/u/field_id/subfield_id"
-    assert field_id.field_type == "u"
+    assert field_id.type == "u"
+    assert field_id.pb_type == FieldType.LINK
 
 
 def test_paragraph_ids():
@@ -64,6 +66,13 @@ def test_paragraph_ids():
     assert paragraph_id.field_id.full() == "rid/u/field_id/subfield_id"
     assert paragraph_id.paragraph_start == 0
     assert paragraph_id.paragraph_end == 10
+
+    vid = VectorId.from_string("rid/u/field_id/0/0-10")
+    paragraph_id = ParagraphId.from_vector_id(vid)
+    assert paragraph_id.field_id.full() == "rid/u/field_id"
+    assert paragraph_id.paragraph_start == 0
+    assert paragraph_id.paragraph_end == 10
+    assert paragraph_id.full() == "rid/u/field_id/0-10"
 
 
 def test_vector_ids():

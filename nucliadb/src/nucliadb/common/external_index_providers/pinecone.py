@@ -76,8 +76,8 @@ class PineconeQueryResults(QueryResults):
     def iter_matching_text_blocks(self) -> Iterator[TextBlockMatch]:
         for order, matching_vector in enumerate(self.results.matches):
             try:
-                paragraph_id = ParagraphId.from_vector_key(matching_vector.id)
                 vector_id = VectorId.from_string(matching_vector.id)
+                paragraph_id = ParagraphId.from_vector_id(vector_id)
             except ValueError:  # pragma: no cover
                 logger.error(f"Invalid Pinecone vector id: {matching_vector.id}")
                 continue

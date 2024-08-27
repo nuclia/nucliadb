@@ -344,7 +344,7 @@ async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox, re
         },
         headers={"X-Synchronous": "True"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     resp_data = SyncAskResponse.model_validate_json(resp.content)
     assert resp_data.prompt_context is not None
     assert len(resp_data.prompt_context) == 6

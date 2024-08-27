@@ -143,17 +143,18 @@ class ParagraphId:
         return cls(field_id=field_id, paragraph_start=start, paragraph_end=end)
 
     @classmethod
-    def from_vector_key(cls, vector_key: str) -> "ParagraphId":
+    def from_vector_id(cls, vid: "VectorId") -> "ParagraphId":
         """
         Returns a ParagraphId from a vector_key (the index part of the vector_key is ignored).
-        >>> ParagraphId.from_vector_key("rid/u/field_id/0/0-1")
+        >>> vid = VectorId.from_string("rid/u/field_id/0/0-1")
+        >>> ParagraphId.from_vector_id(vid)
         ParagraphId("rid/u/field_id/0-1")
         """
-        parts = vector_key.split("/")
-        vector_range = parts[-1]
-        start, end = map(int, vector_range.split("-"))
-        field_id = FieldId.from_string("/".join(parts[:-2]))
-        return cls(field_id=field_id, paragraph_start=start, paragraph_end=end)
+        return cls(
+            field_id=vid.field_id,
+            paragraph_start=vid.vector_start,
+            paragraph_end=vid.vector_end,
+        )
 
 
 @dataclass

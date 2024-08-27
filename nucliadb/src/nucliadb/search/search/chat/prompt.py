@@ -28,7 +28,6 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
-from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search import logger
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
@@ -222,17 +221,13 @@ async def get_resource_extracted_texts(
     kbid: str,
     resource_uuid: str,
 ) -> list[tuple[Field, str]]:
-    async with get_driver().transaction(read_only=True) as txn:
-        storage = await get_storage()
-        kb = KnowledgeBoxORM(txn, storage, kbid)
-        resource = ResourceORM(
-            txn=txn,
-            storage=storage,
-            kb=kb,
-            uuid=resource_uuid,
-        )
+    resource = await cache.get_resource_from_cache(kbid, resource_uuid)
+    if resource is None:
+        return []
 
-        # Schedule the extraction of the text of each field in the resource
+    # Schedule the extraction of the text of each field in the resource
+    async with get_driver().transaction(read_only=True) as txn:
+        resource.txn = txn
         runner = ConcurrentRunner(max_tasks=MAX_RESOURCE_FIELD_TASKS)
         for field_type, field_key in await resource.get_fields(force=True):
             field = await resource.get_field(field_key, field_type, load=False)
@@ -286,10 +281,9 @@ async def full_resource_prompt_context(
     for extracted_texts in resource_extracted_texts:
         if extracted_texts is None:
             continue
-        field: FieldId
         for field, extracted_text in extracted_texts:
             # Add the extracted text of each field to the context.
-            context[field.full()] = extracted_text
+            context[field.resource_unique_id] = extracted_text
 
 
 async def composed_prompt_context(
