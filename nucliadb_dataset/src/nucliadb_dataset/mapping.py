@@ -52,9 +52,7 @@ def batch_to_text_classification_arrow():
         for data in batch.data:
             if data.text:
                 TEXT.append(data.text)
-                LABELS.append(
-                    [f"{label.labelset}/{label.label}" for label in data.labels]
-                )
+                LABELS.append([f"{label.labelset}/{label.label}" for label in data.labels])
         if len(TEXT):
             pa_data = [pa.array(TEXT), pa.array(LABELS)]
             output_batch = pa.record_batch(pa_data, schema=schema)
@@ -149,12 +147,8 @@ def batch_to_question_answer_streaming_arrow():
         for data in batch.data:
             QUESTION.append(data.question.text)
             ANSWER.append(data.answer.text)
-            QUESTION_PARAGRAPHS.append(
-                [paragraph for paragraph in data.question.paragraphs]
-            )
-            ANSWER_PARAGRAPHS.append(
-                [paragraph for paragraph in data.answer.paragraphs]
-            )
+            QUESTION_PARAGRAPHS.append([paragraph for paragraph in data.question.paragraphs])
+            ANSWER_PARAGRAPHS.append([paragraph for paragraph in data.answer.paragraphs])
             QUESTION_LANGUAGE.append(data.question.language)
             ANSWER_LANGUAGE.append(data.answer.language)
             CANCELLED_BY_USER.append(data.cancelled_by_user)

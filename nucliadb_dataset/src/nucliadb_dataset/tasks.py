@@ -24,13 +24,13 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List
 import pyarrow as pa  # type: ignore
 
 from nucliadb_dataset.mapping import (
+    batch_to_field_streaming_arrow,
     batch_to_image_classification_arrow,
     batch_to_paragraph_streaming_arrow,
     batch_to_question_answer_streaming_arrow,
     batch_to_text_classification_arrow,
     batch_to_text_classification_normalized_arrow,
     batch_to_token_classification_arrow,
-    batch_to_field_streaming_arrow,
     bytes_to_batch,
 )
 from nucliadb_protos.dataset_pb2 import (
@@ -177,7 +177,8 @@ TASK_DEFINITIONS: Dict[Task, TaskDefinition] = {
         labels=False,
     ),
     Task.FIELD_STREAMING: TaskDefinition(
-        schema=pa.schema([
+        schema=pa.schema(
+            [
                 pa.field("split", pa.string()),
                 pa.field("rid", pa.string()),
                 pa.field("field", pa.string()),
@@ -192,9 +193,6 @@ TASK_DEFINITIONS: Dict[Task, TaskDefinition] = {
         proto=TaskType.FIELD_STREAMING,
         labels=False,
     ),
-    ),
 }
 
-TASK_DEFINITIONS_REVERSE = {
-    task.proto: task for task in TASK_DEFINITIONS.values()
-}  # noqa
+TASK_DEFINITIONS_REVERSE = {task.proto: task for task in TASK_DEFINITIONS.values()}  # noqa
