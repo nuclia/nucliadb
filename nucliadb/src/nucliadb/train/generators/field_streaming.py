@@ -21,7 +21,7 @@
 from typing import AsyncGenerator, Optional
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (
@@ -121,7 +121,7 @@ async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Op
         logger.error(f"{rid} does not exist on DB")
         return None
 
-    field_type_int = KB_REVERSE[field_type]
+    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
 
@@ -137,7 +137,7 @@ async def get_field_metadata(
         logger.error(f"{rid} does not exist on DB")
         return None
 
-    field_type_int = KB_REVERSE[field_type]
+    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     field_metadata = await field_obj.get_field_metadata()
 
