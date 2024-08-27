@@ -78,7 +78,10 @@ def clear_resource_cache() -> None:
         rcache.set(None)
 
 
-async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
+async def get_resource(kbid: str, uuid: str) -> Optional[ResourceORM]:
+    """
+    Will try to get the resource from the cache, if it's not there it will fetch it from the ORM and cache it.
+    """
     orm_resource: Optional[ResourceORM] = None
 
     resource_cache = get_resource_cache()
@@ -168,9 +171,9 @@ async def get_field_extracted_text(field: Field) -> Optional[ExtractedText]:
         return extracted_text
 
 
-async def get_field_extracted_text_from_cache(kbid: str, field: FieldId) -> Optional[ExtractedText]:
+async def get_extracted_text_from_field_id(kbid: str, field: FieldId) -> Optional[ExtractedText]:
     rid = field.rid
-    orm_resource = await get_resource_from_cache(kbid, rid)
+    orm_resource = await get_resource(kbid, rid)
     if orm_resource is None:
         return None
     field_obj = await orm_resource.get_field(
@@ -191,8 +194,8 @@ def request_caches():
 
     Makes sure to clean the caches at the end of the context manager.
     >>> with request_caches():
-    ...     resource = await get_resource_from_cache(kbid, uuid)
-    ...     extracted_text = await get_field_extracted_text_from_cache(kbid, rid, field_id)
+    ...     resource = await get_resource(kbid, uuid)
+    ...     extracted_text = await get_extracted_text_from_field_id(kbid, rid, field_id)
     """
     set_resource_cache()
     set_extracted_text_cache()

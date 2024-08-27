@@ -22,6 +22,7 @@ import datetime
 import math
 from typing import Any, Optional, Set, Union
 
+from nucliadb.search.search import cache
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
@@ -69,7 +70,6 @@ from nucliadb_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from .cache import get_resource_from_cache
 from .metrics import merge_observer
 from .paragraphs import get_paragraph_text, get_text_sentence
 
@@ -96,7 +96,7 @@ async def get_sort_value(
         return (item.score.bm25, item.score.booster)
 
     score: Any = None
-    resource = await get_resource_from_cache(kbid, item.uuid)
+    resource = await cache.get_resource(kbid, item.uuid)
     if resource is None:
         return score
 

@@ -63,7 +63,7 @@ class TestGetParagraphText:
         mock = AsyncMock()
         mock.get_field.return_value = field
         with patch(
-            "nucliadb.search.search.paragraphs.get_resource_from_cache",
+            "nucliadb.search.search.paragraphs.cache.get_resource",
             return_value=mock,
         ):
             yield mock

@@ -25,9 +25,8 @@ from typing import Optional
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
+from nucliadb.search.search import cache
 from nucliadb_telemetry import metrics
-
-from .cache import get_field_extracted_text, get_resource_from_cache
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
@@ -67,7 +66,7 @@ async def get_paragraph_from_full_text(
 
     This requires downloading the full text and then slicing it.
     """
-    extracted_text = await get_field_extracted_text(field)
+    extracted_text = await cache.get_field_extracted_text(field)
     if extracted_text is None:
         if log_on_missing_field:
             logger.warning(
@@ -103,7 +102,7 @@ async def get_paragraph_text(
     log_on_missing_field: bool = True,
 ) -> str:
     if orm_resource is None:
-        orm_resource = await get_resource_from_cache(kbid, rid)
+        orm_resource = await cache.get_resource(kbid, rid)
         if orm_resource is None:
             if log_on_missing_field:
                 logger.warning(
@@ -143,7 +142,7 @@ async def get_text_sentence(
     Leave separated from get paragraph for now until we understand the differences
     better.
     """
-    orm_resource = await get_resource_from_cache(kbid, rid)
+    orm_resource = await cache.get_resource(kbid, rid)
 
     if orm_resource is None:
         logger.warning(f"{rid} does not exist on DB")

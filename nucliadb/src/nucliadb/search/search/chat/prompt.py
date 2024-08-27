@@ -211,7 +211,7 @@ async def get_field_extracted_text(field: Field) -> Optional[tuple[Field, str]]:
 async def get_resource_field_extracted_text(
     kbid: str, field_id: FieldId
 ) -> Optional[tuple[FieldId, str]]:
-    extracted_text = await cache.get_field_extracted_text_from_cache(kbid, field_id)
+    extracted_text = await cache.get_extracted_text_from_field_id(kbid, field_id)
     if extracted_text is None:
         return None
     return field_id, extracted_text.text
@@ -221,7 +221,7 @@ async def get_resource_extracted_texts(
     kbid: str,
     resource_uuid: str,
 ) -> list[tuple[Field, str]]:
-    resource = await cache.get_resource_from_cache(kbid, resource_uuid)
+    resource = await cache.get_resource(kbid, resource_uuid)
     if resource is None:
         return []
 
@@ -399,7 +399,7 @@ async def get_field_paragraphs_list(
     """
     Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
     """
-    resource = await cache.get_resource_from_cache(kbid, field.rid)
+    resource = await cache.get_resource(kbid, field.rid)
     if resource is None:
         return
     field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
