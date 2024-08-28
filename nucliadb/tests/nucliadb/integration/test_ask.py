@@ -166,6 +166,11 @@ async def resources(nucliadb_writer, knowledgebox):
                 "title": f"The title {i}",
                 "summary": f"The summary {i}",
                 "texts": {"text_field": {"body": "The body of the text field"}},
+                "origin": {
+                    "url": f"https://example.com/{i}",
+                    "collaborators": [f"collaborator_{i}"],
+                    "metadata": {"foo": "bar"},
+                },
             },
         )
         assert resp.status_code in (200, 201)
@@ -563,3 +568,64 @@ async def test_ask_rag_strategy_neighbouring_paragraphs(
     assert resp.status_code == 200
     ask_response = SyncAskResponse.model_validate_json(resp.content)
     assert ask_response.prompt_context is not None
+
+
+pytest.mark.asyncio()
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_rag_strategy_metadata_extension(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "metadata_extension", "origin": ["url", "collaborators"]}],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.prompt_context is not None
+
+    # Make sure the text blocks of the context are extended with the metadata
+    origin_found = False
+    for text_block in ask_response.prompt_context:
+        if "ORIGIN METADATA" in text_block:
+            origin_found = True
+            assert "- url: https://example.com/" in text_block
+            assert "- collaborators: ['collaborator_" in text_block
+
+    assert origin_found, ask_response.prompt_context
+
+    # Try now combining metadata_extension with another strategy
+    for strategy in [
+        {"name": "full_resource"},
+        {"name": "neighbouring_paragraphs", "before": 1, "after": 1},
+        {"name": "hierarchy", "count": 40},
+        {"name": "field_extension", "fields": ["a/title", "a/summary"]},
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/ask",
+            json={
+                "query": "title",
+                "rag_strategies": [
+                    {"name": "metadata_extension", "origin": ["url", "collaborators"]},
+                    strategy,
+                ],
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        ask_response = SyncAskResponse.model_validate_json(resp.content)
+        assert ask_response.prompt_context is not None
+
+        # Make sure the text blocks of the context are extended with the metadata
+        origin_found = False
+        for text_block in ask_response.prompt_context:
+            if "ORIGIN METADATA" in text_block:
+                origin_found = True
+                assert "- url: https://example.com/" in text_block
+                assert "- collaborators: ['collaborator_" in text_block
+        assert origin_found, ask_response.prompt_context

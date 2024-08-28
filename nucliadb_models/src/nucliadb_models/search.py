@@ -889,6 +889,7 @@ class RagStrategyName:
     FULL_RESOURCE = "full_resource"
     HIERARCHY = "hierarchy"
     NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
+    METADATA_EXTENSION = "metadata_extension"
 
 
 class ImageRagStrategyName:
@@ -948,15 +949,17 @@ class FullResourceStrategy(RagStrategy):
         default=None,
         title="Count",
         description="Maximum number of full documents to retrieve. If not specified, all matching documents are retrieved.",
+        ge=1,
     )
 
 
 class HierarchyResourceStrategy(RagStrategy):
     name: Literal["hierarchy"]
-    count: Optional[int] = Field(
-        default=None,
+    count: int = Field(
+        default=0,
         title="Count",
         description="Number of extra characters that are added to each matching paragraph when adding to the context.",
+        ge=0,
     )
 
 
@@ -973,6 +976,35 @@ class NeighbouringParagraphsStrategy(RagStrategy):
         title="After",
         description="Number of following neighbouring paragraphs to add to the context, for each matching paragraph in the retrieval step.",
         ge=0,
+    )
+
+
+class MetadataExtensionType(str, Enum):
+    ORIGIN = "origin"
+    CLASSIFICATION_LABELS = "classification_labels"
+    NER = "ner"
+    EXTRA_METADATA = "extra_metadata"
+
+
+class MetadataExtensionStrategy(RagStrategy):
+    """
+    RAG strategy to enrich the context with metadata of the matching paragraphs or its resources.
+    This strategy can be combined with any of the other strategies.
+    """
+
+    name: Literal["metadata_extension"]
+    types: set[MetadataExtensionType] = Field(
+        min_length=1,
+        title="Types",
+        description="""
+List of resource metadata types to add to the context.
+  - 'origin': origin metadata of the resource.
+  - 'classification_labels': classification labels of the resource.
+  - 'ner': Named Entity Recognition entities detected for the resource.
+  - 'extra_metadata': extra metadata of the resource.
+
+Types for which the metadata is not found at the resource are ignored and not added to the context.
+""",
     )
 
 
@@ -999,6 +1031,7 @@ RagStrategies = Annotated[
         FullResourceStrategy,
         HierarchyResourceStrategy,
         NeighbouringParagraphsStrategy,
+        MetadataExtensionStrategy,
     ],
     Field(discriminator="name"),
 ]
@@ -1095,10 +1128,20 @@ class ChatRequest(BaseModel):
 - `field_extension` will add the text of the matching resource's specified fields to the context.
 - `hierarchy` will add the title and summary text of the parent resource to the context for each matching paragraph.
 - `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
-If empty, the default strategy is used.
-`full_resource`, `hierarchy` and `neighbouring_paragraphs` are exclusive strategies: if selected, they must be the only strategy.
+- `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context. This strategy can be combined with any other strategy.
+
+If empty, the default strategy is used. `full_resource`, `hierarchy` and `neighbouring_paragraphs` are exclusive strategies: if selected, they must be the only strategy.
 """
         ),
+        examples=[
+            [{"name": "full_resource", "count": 2}],
+            [
+                {"name": "field_extension", "fields": ["t/amend", "a/title"]},
+            ],
+            [{"name": "hierarchy", "count": 2}],
+            [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
+            [{"name": "metadata_extension", "origin": ["tags", "metadata.author", "created", "url"]}],
+        ],
     )
     rag_images_strategies: list[RagImagesStrategies] = Field(
         default=[],
@@ -1134,26 +1177,32 @@ If empty, the default strategy is used.
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
-        unique_strategy_names: set[str] = set()
+        strategy_names: set[str] = set()
         for strategy in rag_strategies or []:
             if not isinstance(strategy, dict):
                 raise ValueError("RAG strategies must be defined using an object")
             strategy_name = strategy.get("name")
             if strategy_name is None:
                 raise ValueError(f"Invalid strategy '{strategy}'")
-            unique_strategy_names.add(strategy_name)
-        if len(unique_strategy_names) != len(rag_strategies):
+            strategy_names.add(strategy_name)
+        if len(strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
 
+        # metadata extension can be combined with other strategies
+        try:
+            strategy_names.remove(RagStrategyName.METADATA_EXTENSION)
+        except KeyError:
+            pass
+
         # If any of the unique strategies are chosen, they must be the only strategy
-        for unique_strategy_name in (
+        for strategy_name in (
             RagStrategyName.FULL_RESOURCE,
             RagStrategyName.HIERARCHY,
             RagStrategyName.NEIGHBOURING_PARAGRAPHS,
         ):
-            if unique_strategy_name in unique_strategy_names and len(rag_strategies) > 1:
+            if strategy_name in strategy_names and len(strategy_names) > 1:
                 raise ValueError(
-                    f"If '{unique_strategy_name}' strategy is chosen, it must be the only strategy."
+                    f"If '{strategy_name}' strategy is chosen, it must be the only strategy."
                 )
         return rag_strategies
 
