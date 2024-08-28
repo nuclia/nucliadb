@@ -1556,7 +1556,7 @@ class AskResponseItem(BaseModel):
     item: AskResponseItemType = Field(..., discriminator="type")
 
 
-def parse_custom_prompt(item: ChatRequest) -> CustomPrompt:
+def parse_custom_prompt(item: AskRequest) -> CustomPrompt:
     prompt = CustomPrompt()
     if item.prompt is not None:
         if isinstance(item.prompt, str):

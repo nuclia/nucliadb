@@ -29,9 +29,9 @@ from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
+    AskRequest,
     ChatContextMessage,
     ChatOptions,
-    ChatRequest,
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
@@ -72,39 +72,39 @@ async def get_find_results(
     *,
     kbid: str,
     query: str,
-    chat_request: ChatRequest,
+    item: AskRequest,
     ndb_client: NucliaDBClientType,
     user: str,
     origin: str,
     metrics: RAGMetrics = RAGMetrics(),
 ) -> tuple[KnowledgeboxFindResults, QueryParser]:
     find_request = FindRequest()
-    find_request.resource_filters = chat_request.resource_filters
+    find_request.resource_filters = item.resource_filters
     find_request.features = []
-    if ChatOptions.SEMANTIC in chat_request.features:
+    if ChatOptions.SEMANTIC in item.features:
         find_request.features.append(SearchOptions.SEMANTIC)
-    if ChatOptions.KEYWORD in chat_request.features:
+    if ChatOptions.KEYWORD in item.features:
         find_request.features.append(SearchOptions.KEYWORD)
-    if ChatOptions.RELATIONS in chat_request.features:
+    if ChatOptions.RELATIONS in item.features:
         find_request.features.append(SearchOptions.RELATIONS)
     find_request.query = query
-    find_request.fields = chat_request.fields
-    find_request.filters = chat_request.filters
-    find_request.field_type_filter = chat_request.field_type_filter
-    find_request.min_score = chat_request.min_score
-    find_request.vectorset = chat_request.vectorset
-    find_request.range_creation_start = chat_request.range_creation_start
-    find_request.range_creation_end = chat_request.range_creation_end
-    find_request.range_modification_start = chat_request.range_modification_start
-    find_request.range_modification_end = chat_request.range_modification_end
-    find_request.show = chat_request.show
-    find_request.extracted = chat_request.extracted
-    find_request.shards = chat_request.shards
-    find_request.autofilter = chat_request.autofilter
-    find_request.highlight = chat_request.highlight
-    find_request.security = chat_request.security
-    find_request.debug = chat_request.debug
-    find_request.rephrase = chat_request.rephrase
+    find_request.fields = item.fields
+    find_request.filters = item.filters
+    find_request.field_type_filter = item.field_type_filter
+    find_request.min_score = item.min_score
+    find_request.vectorset = item.vectorset
+    find_request.range_creation_start = item.range_creation_start
+    find_request.range_creation_end = item.range_creation_end
+    find_request.range_modification_start = item.range_modification_start
+    find_request.range_modification_end = item.range_modification_end
+    find_request.show = item.show
+    find_request.extracted = item.extracted
+    find_request.shards = item.shards
+    find_request.autofilter = item.autofilter
+    find_request.highlight = item.highlight
+    find_request.security = item.security
+    find_request.debug = item.debug
+    find_request.rephrase = item.rephrase
 
     find_results, incomplete, query_parser = await find(
         kbid,
@@ -112,7 +112,7 @@ async def get_find_results(
         ndb_client,
         user,
         origin,
-        generative_model=chat_request.generative_model,
+        generative_model=item.generative_model,
         metrics=metrics,
     )
     if incomplete:

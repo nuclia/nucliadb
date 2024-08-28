@@ -26,8 +26,8 @@ from nucliadb.search.search.chat.query import (
     parse_audit_answer,
 )
 from nucliadb_models.search import (
+    AskRequest,
     ChatOptions,
-    ChatRequest,
     KnowledgeboxFindResults,
     MinScore,
     NucliaDBClientType,
@@ -79,9 +79,9 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
         total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
     )
 
-    chat_request = ChatRequest(query="query")
+    ask_request = AskRequest(query="query")
     if chat_features is not None:
-        chat_request.features = chat_features
+        ask_request.features = chat_features
 
     query_parser = mock.AsyncMock()
 
@@ -92,7 +92,7 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
         await get_find_results(
             kbid="kbid",
             query="query",
-            chat_request=chat_request,
+            ask_request=ask_request,
             ndb_client=NucliaDBClientType.API,
             user="user_id",
             origin="origin",

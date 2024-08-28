@@ -101,7 +101,7 @@ def test_find_request_fulltext_feature_not_allowed():
 
 
 def test_chat_request_features_normalization():
-    request = search.ChatRequest(
+    request = search.AskRequest(
         query="my-query",
         features=[
             search.ChatOptions.VECTORS,
