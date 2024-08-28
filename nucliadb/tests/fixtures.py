@@ -631,6 +631,7 @@ async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
 # Coma separated list of drivers
 DEFAULT_MAINDB_DRIVER = "pg"
 
+
 def maindb_settings_lazy_fixtures(default_drivers: str = DEFAULT_MAINDB_DRIVER):
     driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
     return [lazy_fixture.lf(f"{driver_type}_maindb_settings") for driver_type in driver_types.split(",")]

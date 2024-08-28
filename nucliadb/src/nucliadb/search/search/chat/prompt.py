@@ -322,12 +322,16 @@ def _parse_text_block_ids(context: CappedPromptContext) -> list[TextBlockId]:
     tb_ids: list[TextBlockId] = []
     for text_block_id in context.output.keys():
         try:
+            # Typically, the text block id is a paragraph id
             tb_ids.append(ParagraphId.from_string(text_block_id))
         except ValueError:
+            # When we're doing `full_resource` or `hierarchy` strategies,the text block id
+            # is a field id
             try:
                 tb_ids.append(FieldId.from_string(text_block_id))
             except ValueError:
                 # Some text block ids are not paragraphs nor fields, so they are skipped
+                # (e.g. USER_CONTEXT_0, when the user provides extra context)
                 continue
     return tb_ids
 
@@ -342,7 +346,6 @@ async def extend_prompt_context_with_origin_metadata(context, kbid, text_block_i
                 origin = Origin.from_message(pb_origin)
         return rid, origin
 
-    # Fetch the origin metadata for the resource of the matching paragraphs
     rids = {tb_id.rid for tb_id in text_block_ids}
     origins = await run_concurrently([_get_origin(kbid, rid) for rid in rids])
     rid_to_origin = {rid: origin for rid, origin in origins if origin is not None}
@@ -365,7 +368,7 @@ async def extend_prompt_context_with_classification_labels(
                 # Add the classification labels of the resource
                 for classif in pb_basic.usermetadata.classifications:
                     labels.add((classif.labelset, classif.label))
-                # ADd the classifications labels of the field
+                # Add the classifications labels of the field
                 for fc in pb_basic.computedmetadata.field_classifications:
                     if fc.field.field == fid.key and fc.field.field_type == fid.pb_type:
                         for classif in fc.classifications:
@@ -374,7 +377,6 @@ async def extend_prompt_context_with_classification_labels(
                             labels.add((classif.labelset, classif.label))
         return _id, list(labels)
 
-    # Fetch the resource labels of each matching paragraph
     classif_labels = await run_concurrently([_get_labels(kbid, tb_id) for tb_id in text_block_ids])
     tb_id_to_labels = {tb_id: labels for tb_id, labels in classif_labels if len(labels) > 0}
     for tb_id in text_block_ids:
@@ -399,7 +401,6 @@ async def extend_prompt_context_with_ner(context, kbid, text_block_ids: list[Tex
                     ners.add(f"{family}/{token}")
         return _id, list(ners)
 
-    # Fetch the resource labels of each matching paragraph
     nerss = await run_concurrently([_get_ners(kbid, tb_id) for tb_id in text_block_ids])
     tb_id_to_ners = {tb_id: ners for tb_id, ners in nerss if len(ners) > 0}
     for tb_id in text_block_ids:
@@ -422,7 +423,6 @@ async def extend_prompt_context_with_extra_metadata(context, kbid, text_block_id
                 extra = Extra.from_message(pb_extra)
         return rid, extra
 
-    # Fetch the extra metadata for the resource of the matching paragraphs
     rids = {tb_id.rid for tb_id in text_block_ids}
     extras = await run_concurrently([_get_extra(kbid, rid) for rid in rids])
     rid_to_extra = {rid: extra for rid, extra in extras if extra is not None}
