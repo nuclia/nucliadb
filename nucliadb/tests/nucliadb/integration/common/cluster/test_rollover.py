@@ -43,8 +43,32 @@ async def app_context(natsd, storage, nucliadb):
 
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_rollover_kb_index(
-    app_context,
+    app_context: ApplicationContext,
     knowledgebox,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_manager: AsyncClient,
+):
+    await _test_rollover_kb_index(
+        app_context, knowledgebox, nucliadb_writer, nucliadb_reader, nucliadb_manager
+    )
+
+
+async def test_rollover_kb_index_with_vectorsets(
+    app_context: ApplicationContext,
+    knowledgebox_with_vectorsets: str,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_manager: AsyncClient,
+):
+    await _test_rollover_kb_index(
+        app_context, knowledgebox_with_vectorsets, nucliadb_writer, nucliadb_reader, nucliadb_manager
+    )
+
+
+async def _test_rollover_kb_index(
+    app_context: ApplicationContext,
+    kbid: str,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_manager: AsyncClient,
@@ -52,7 +76,7 @@ async def test_rollover_kb_index(
     count = 20
     for i in range(count):
         resp = await nucliadb_writer.post(
-            f"/kb/{knowledgebox}/resources",
+            f"/kb/{kbid}/resources",
             json={
                 "slug": f"myresource-{i}",
                 "title": f"My Title {i}",
@@ -62,13 +86,13 @@ async def test_rollover_kb_index(
         )
         assert resp.status_code == 201
 
-    resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    resp = await nucliadb_manager.get(f"/kb/{kbid}/shards")
     assert resp.status_code == 200, resp.text
     shards_body1 = resp.json()
 
-    await rollover.rollover_kb_index(app_context, knowledgebox)
+    await rollover.rollover_kb_index(app_context, kbid)
 
-    resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    resp = await nucliadb_manager.get(f"/kb/{kbid}/shards")
     assert resp.status_code == 200, resp.text
     shards_body2 = resp.json()
     # check that shards have changed
@@ -78,9 +102,10 @@ async def test_rollover_kb_index(
     )
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{kbid}/find",
         json={
             "query": "title",
+            "min_score": -100,
         },
     )
     assert resp.status_code == 200
