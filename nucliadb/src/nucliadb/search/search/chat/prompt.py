@@ -34,7 +34,6 @@ from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
 from nucliadb.search.search.paragraphs import get_paragraph_text
-from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -356,7 +355,7 @@ async def extend_prompt_context_with_origin_metadata(context, kbid, text_block_i
 async def extend_prompt_context_with_classification_labels(
     context, kbid, text_block_ids: list[TextBlockId]
 ):
-    async def _get_labels(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, list[str]]:
+    async def _get_labels(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, list[tuple[str, str]]]:
         fid = _id if isinstance(_id, FieldId) else _id.field_id
         labels = set()
         resource = await cache.get_resource(kbid, fid.rid)
@@ -365,14 +364,14 @@ async def extend_prompt_context_with_classification_labels(
             if pb_basic is not None:
                 # Add the classification labels of the resource
                 for classif in pb_basic.usermetadata.classifications:
-                    labels.add(f"/l/{classif.labelset}/{classif.label}")
+                    labels.add((classif.labelset, classif.label))
                 # ADd the classifications labels of the field
                 for fc in pb_basic.computedmetadata.field_classifications:
                     if fc.field.field == fid.key and fc.field.field_type == fid.pb_type:
                         for classif in fc.classifications:
                             if classif.cancelled_by_user:
                                 continue
-                            labels.add(f"/l/{classif.labelset}/{classif.label}")
+                            labels.add((classif.labelset, classif.label))
         return _id, list(labels)
 
     # Fetch the resource labels of each matching paragraph
@@ -381,10 +380,9 @@ async def extend_prompt_context_with_classification_labels(
     for tb_id in text_block_ids:
         labels = tb_id_to_labels.get(tb_id)
         if labels is not None and tb_id.full() in context.output:
-            translated_labels = [translate_system_to_alias_label(label) for label in labels]
             labels_text = "DOCUMENT CLASSIFICATION LABELS:"
-            for label in translated_labels:
-                labels_text += f"\n- {label}"
+            for labelset, label in labels:
+                labels_text += f"\n - {label} ({labelset})"
             context[tb_id.full()] += "\n\n" + labels_text
 
 
