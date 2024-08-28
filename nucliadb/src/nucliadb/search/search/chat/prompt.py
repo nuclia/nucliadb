@@ -397,7 +397,7 @@ async def extend_prompt_context_with_ner(context, kbid, text_block_ids: list[Tex
             field = await resource.get_field(fid.key, fid.pb_type, load=False)
             fcm = await field.get_field_metadata()
             if fcm is not None:
-                for token, family in fcm.metadata.ner.values():
+                for token, family in fcm.metadata.ner.items():
                     ners.add(f"{family}/{token}")
         return _id, list(ners)
 
