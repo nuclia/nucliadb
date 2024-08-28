@@ -350,7 +350,7 @@ async def extend_prompt_context_with_origin_metadata(context, kbid, text_block_i
     for tb_id in text_block_ids:
         origin = rid_to_origin.get(tb_id.rid)
         if origin is not None and tb_id.full() in context.output:
-            context[tb_id.full()] += f"\n\\DOCUMENT METADATA AT ORIGIN:\n{to_yaml(origin)}"
+            context[tb_id.full()] += f"\n\n\\DOCUMENT METADATA AT ORIGIN:\n{to_yaml(origin)}"
 
 
 async def extend_prompt_context_with_classification_labels(
@@ -431,7 +431,7 @@ async def extend_prompt_context_with_extra_metadata(context, kbid, text_block_id
     for tb_id in text_block_ids:
         extra = rid_to_extra.get(tb_id.rid)
         if extra is not None and tb_id.full() in context.output:
-            context[tb_id.full()] += f"\n\\DOCUMENT EXTRA METADATA:\n{to_yaml(extra)}"
+            context[tb_id.full()] += f"\n\n\\DOCUMENT EXTRA METADATA:\n{to_yaml(extra)}"
 
 
 def to_yaml(obj: BaseModel) -> str:
