@@ -181,7 +181,7 @@ def test_ask_stream(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         [
             {
                 "name": "metadata_extension",
-                "types": ["origin", "classification_labels", "ner", "extra_metadata"],
+                "types": ["origin", "classification_labels", "ners", "extra_metadata"],
             }
         ],
     ],
