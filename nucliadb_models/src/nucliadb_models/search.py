@@ -31,7 +31,6 @@ from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.utils import DateTime
-from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 from nucliadb_protos.audit_pb2 import ClientType
 from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
 from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
@@ -435,10 +434,7 @@ class ShardObject(BaseModel):
 
 class KnowledgeboxShards(BaseModel):
     kbid: str
-    actual: int
-    similarity: VectorSimilarity
     shards: List[ShardObject]
-    model: Optional[SemanticModelMetadata] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: PBShards) -> _T:
@@ -447,9 +443,6 @@ class KnowledgeboxShards(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-        as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
-        if message.HasField("model"):
-            as_dict["model"] = SemanticModelMetadata.from_message(message.model)
         return cls(**as_dict)
 
 
