@@ -133,6 +133,13 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
 
     mock.iter_indexed_keys = _mock_indexed_keys
 
+    def async_iterable(sequence):
+        async def inner():
+            for i in sequence:
+                yield i
+
+        return inner()
+
     with (
         patch("nucliadb.common.cluster.rollover.datamanagers.rollover", mock),
         patch(
@@ -150,6 +157,10 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
         patch(
             "nucliadb.common.cluster.rollover.get_external_index_manager",
             return_value=None,
+        ),
+        patch(
+            "nucliadb.common.cluster.rollover.datamanagers.vectorsets.iter",
+            return_value=async_iterable([]),
         ),
     ):
         yield mock

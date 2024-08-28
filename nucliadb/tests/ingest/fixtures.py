@@ -200,6 +200,36 @@ async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, lea
 
 
 @pytest.fixture(scope="function")
+async def knowledgebox_with_vectorsets(storage, maindb_driver: Driver, shard_manager, learning_config):
+    kbid = KnowledgeBox.new_unique_kbid()
+    kbslug = "slug-" + str(uuid.uuid4())
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=kbslug,
+        semantic_models={
+            "my-semantic-model-A": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.COSINE,
+                vector_dimension=len(V1),
+            ),
+            "my-semantic-model-B": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.COSINE,
+                vector_dimension=512,
+                matryoshka_dimensions=[3072, 512, 128],
+            ),
+            "my-semantic-model-C": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.DOT,
+                vector_dimension=1024,
+            ),
+        },
+    )
+
+    yield kbid
+
+    await KnowledgeBox.delete(maindb_driver, kbid)
+
+
+@pytest.fixture(scope="function")
 async def audit():
     return BasicAuditStorage()
 
