@@ -299,22 +299,22 @@ async def full_resource_prompt_context(
 async def extend_prompt_context_with_metadata(
     context: CappedPromptContext,
     kbid: str,
-    metadata_extension: MetadataExtensionStrategy,
+    strategy: MetadataExtensionStrategy,
 ) -> None:
     parsed_text_block_ids = _parse_text_block_ids(context)
     if len(parsed_text_block_ids) == 0:
         return
 
-    if MetadataExtensionType.ORIGIN in metadata_extension.types:
+    if MetadataExtensionType.ORIGIN in strategy.types:
         await extend_prompt_context_with_origin_metadata(context, kbid, parsed_text_block_ids)
 
-    if MetadataExtensionType.CLASSIFICATION_LABELS in metadata_extension.types:
+    if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
         await extend_prompt_context_with_classification_labels(context, kbid, parsed_text_block_ids)
 
-    if MetadataExtensionType.NERS in metadata_extension.types:
+    if MetadataExtensionType.NERS in strategy.types:
         await extend_prompt_context_with_ner(context, kbid, parsed_text_block_ids)
 
-    if MetadataExtensionType.EXTRA_METADATA in metadata_extension.types:
+    if MetadataExtensionType.EXTRA_METADATA in strategy.types:
         await extend_prompt_context_with_extra_metadata(context, kbid, parsed_text_block_ids)
 
 

@@ -31,29 +31,31 @@ from nucliadb_models.search import (
     FindResource,
     HierarchyResourceStrategy,
     KnowledgeboxFindResults,
+    MetadataExtensionStrategy,
+    MetadataExtensionType,
     MinScore,
 )
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import resources_pb2 as rpb2
 
 
 @pytest.fixture()
 def messages():
     msgs = [
-        resources_pb2.Message(ident="1", content=resources_pb2.MessageContent(text="Message 1")),
-        resources_pb2.Message(ident="2", content=resources_pb2.MessageContent(text="Message 2")),
-        resources_pb2.Message(
+        rpb2.Message(ident="1", content=rpb2.MessageContent(text="Message 1")),
+        rpb2.Message(ident="2", content=rpb2.MessageContent(text="Message 2")),
+        rpb2.Message(
             ident="3",
             who="1",
-            content=resources_pb2.MessageContent(text="Message 3"),
-            type=resources_pb2.Message.MessageType.QUESTION,
+            content=rpb2.MessageContent(text="Message 3"),
+            type=rpb2.Message.MessageType.QUESTION,
         ),
-        resources_pb2.Message(
+        rpb2.Message(
             ident="4",
-            content=resources_pb2.MessageContent(text="Message 4"),
-            type=resources_pb2.Message.MessageType.ANSWER,
+            content=rpb2.MessageContent(text="Message 4"),
+            type=rpb2.Message.MessageType.ANSWER,
             to=["1"],
         ),
-        resources_pb2.Message(ident="5", content=resources_pb2.MessageContent(text="Message 5")),
+        rpb2.Message(ident="5", content=rpb2.MessageContent(text="Message 5")),
     ]
     yield msgs
 
@@ -61,8 +63,8 @@ def messages():
 @pytest.fixture()
 def field_obj(messages):
     mock = AsyncMock()
-    mock.get_metadata.return_value = resources_pb2.FieldConversation(pages=1, total=5)
-    mock.db_get_value.return_value = resources_pb2.Conversation(messages=messages)
+    mock.get_metadata.return_value = rpb2.FieldConversation(pages=1, total=5)
+    mock.db_get_value.return_value = rpb2.Conversation(messages=messages)
 
     yield mock
 
@@ -98,7 +100,7 @@ async def test_get_next_conversation_messages(field_obj, messages):
         page=1,
         start_idx=0,
         num_messages=1,
-        message_type=resources_pb2.Message.MessageType.ANSWER,
+        message_type=rpb2.Message.MessageType.ANSWER,
         msg_to="1",
     ) == [messages[3]]
 
@@ -341,3 +343,44 @@ def test_get_neighbouring_paragraph_indexes():
     assert chat_prompt.get_neighbouring_paragraph_indexes(
         field_paragraphs, matching_paragraph, before=0, after=0
     ) == [2]
+
+
+async def test_extend_prompt_context_with_metadata():
+    origin = rpb2.Origin()
+    origin.tags.extend(["tag1", "tag2"])
+    origin.metadata.update({"foo": "bar"})
+    basic = rpb2.Basic()
+    basic.usermetadata.classifications.append(rpb2.Classification(labelset="ls", label="l1"))
+    basic.computedmetadata.field_classifications.append(
+        rpb2.FieldClassifications(field=rpb2.FieldID(field="f1", field_type=rpb2.FieldType.FILE))
+    )
+    basic.computedmetadata.field_classifications[0].classifications.append(
+        rpb2.Classification(labelset="ls", label="l2")
+    )
+    extra = rpb2.Extra()
+    extra.metadata.update({"key": "value"})
+    resource = mock.Mock()
+    resource.get_origin = AsyncMock(return_value=origin)
+    resource.get_basic = AsyncMock(return_value=basic)
+    field = mock.Mock()
+    fcm = rpb2.FieldComputedMetadata()
+    fcm.metadata.ner.update({"Barcelona": "LOCATION"})
+    field.get_field_metadata = AsyncMock(return_value=fcm)
+    resource.get_field = AsyncMock(return_value=field)
+    resource.get_extra = AsyncMock(return_value=extra)
+    with mock.patch(
+        "nucliadb.search.search.chat.prompt.cache.get_resource",
+        return_value=resource,
+    ):
+        paragraph_id = ParagraphId.from_string("r1/f/f1/0-10")
+        context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+        context[paragraph_id.full()] = "Paragraph text"
+        kbid = "foo"
+        strategy = MetadataExtensionStrategy(types=list(MetadataExtensionType))
+        await chat_prompt.extend_prompt_context_with_metadata(context, kbid, strategy)
+
+        text_block = context.output[paragraph_id.full()]
+        assert "DOCUMENT METADATA AT ORIGIN" in text_block
+        assert "DOCUMENT CLASSIFICATION LABELS" in text_block
+        assert "DOCUMENT NERS" in text_block
+        assert "DOCUMENT EXTRA METADATA" in text_block
