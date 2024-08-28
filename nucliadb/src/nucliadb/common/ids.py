@@ -134,6 +134,10 @@ class ParagraphId:
     def __hash__(self) -> int:
         return hash(self.full())
 
+    @property
+    def rid(self) -> str:
+        return self.field_id.rid
+
     @classmethod
     def from_string(cls, value: str) -> "ParagraphId":
         parts = value.split("/")
@@ -189,6 +193,10 @@ class VectorId:
 
     def __hash__(self) -> int:
         return hash(self.full())
+
+    @property
+    def rid(self) -> str:
+        return self.field_id.rid
 
     @classmethod
     def from_string(cls, value: str) -> "VectorId":

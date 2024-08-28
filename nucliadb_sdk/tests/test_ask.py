@@ -178,6 +178,12 @@ def test_ask_stream(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
         [{"name": "neighbouring_paragraphs", "before": 1, "after": 1}],
         [{"name": "hierarchy", "count": 40}],
         [{"name": "field_extension", "fields": ["a/title", "a/summary"]}],
+        [
+            {
+                "name": "metadata_extension",
+                "types": ["origin", "classification_labels", "ners", "extra_metadata"],
+            }
+        ],
     ],
 )
 def test_ask_rag_strategies(docs_dataset, sdk: nucliadb_sdk.NucliaDB, rag_strategies):
