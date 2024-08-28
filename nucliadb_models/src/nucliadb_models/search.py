@@ -37,6 +37,16 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 # Bw/c import to avoid breaking users
 from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
+from nucliadb_models.internal.shards import (  # noqa isort: skip
+    DocumentServiceEnum,
+    ParagraphServiceEnum,
+    VectorServiceEnum,
+    RelationServiceEnum,
+    ShardCreated,
+    ShardObject,
+    ShardReplica,
+    KnowledgeboxShards,
+)
 
 
 _T = TypeVar("_T")
