@@ -628,7 +628,10 @@ async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
         await driver.finalize()
 
 
-def maindb_settings_lazy_fixtures(default_drivers="local"):
+# Coma separated list of drivers
+DEFAULT_MAINDB_DRIVER = "pg"
+
+def maindb_settings_lazy_fixtures(default_drivers: str = DEFAULT_MAINDB_DRIVER):
     driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
     return [lazy_fixture.lf(f"{driver_type}_maindb_settings") for driver_type in driver_types.split(",")]
 
@@ -654,7 +657,7 @@ def blobstorage_settings(local_storage_settings):
     yield local_storage_settings
 
 
-def maindb_driver_lazy_fixtures(default_drivers: str = "pg"):
+def maindb_driver_lazy_fixtures(default_drivers: str = DEFAULT_MAINDB_DRIVER):
     """
     Allows running tests using maindb_driver for each supported driver type via env vars.
 
