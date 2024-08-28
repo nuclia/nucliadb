@@ -37,10 +37,10 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
+from nucliadb_models.internal.shards import KnowledgeboxShards
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxCounters,
-    KnowledgeboxShards,
     SearchParamDefaults,
 )
 from nucliadb_protos.noderesources_pb2 import Shard

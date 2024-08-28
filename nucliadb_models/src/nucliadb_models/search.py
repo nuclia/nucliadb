@@ -19,9 +19,8 @@
 #
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Set, TypeVar, Union
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self
@@ -31,16 +30,24 @@ from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.utils import DateTime
-from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 from nucliadb_protos.audit_pb2 import ClientType
 from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
 from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 # Bw/c import to avoid breaking users
 from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
+from nucliadb_models.internal.shards import (  # noqa isort: skip
+    DocumentServiceEnum,
+    ParagraphServiceEnum,
+    VectorServiceEnum,
+    RelationServiceEnum,
+    ShardCreated,
+    ShardObject,
+    ShardReplica,
+    KnowledgeboxShards,
+)
+
 
 _T = TypeVar("_T")
 
@@ -379,78 +386,6 @@ class KnowledgeBoxCount(BaseModel):
     paragraphs: int
     fields: int
     sentences: int
-
-
-class DocumentServiceEnum(str, Enum):
-    DOCUMENT_V0 = "DOCUMENT_V0"
-    DOCUMENT_V1 = "DOCUMENT_V1"
-    DOCUMENT_V2 = "DOCUMENT_V2"
-
-
-class ParagraphServiceEnum(str, Enum):
-    PARAGRAPH_V0 = "PARAGRAPH_V0"
-    PARAGRAPH_V1 = "PARAGRAPH_V1"
-    PARAGRAPH_V2 = "PARAGRAPH_V2"
-    PARAGRAPH_V3 = "PARAGRAPH_V3"
-
-
-class VectorServiceEnum(str, Enum):
-    VECTOR_V0 = "VECTOR_V0"
-    VECTOR_V1 = "VECTOR_V1"
-
-
-class RelationServiceEnum(str, Enum):
-    RELATION_V0 = "RELATION_V0"
-    RELATION_V1 = "RELATION_V1"
-    RELATION_V2 = "RELATION_V2"
-
-
-class ShardCreated(BaseModel):
-    id: str
-    document_service: DocumentServiceEnum
-    paragraph_service: ParagraphServiceEnum
-    vector_service: VectorServiceEnum
-    relation_service: RelationServiceEnum
-
-
-class ShardReplica(BaseModel):
-    node: str
-    shard: ShardCreated
-
-
-class ShardObject(BaseModel):
-    shard: str
-    replicas: List[ShardReplica]
-
-    @classmethod
-    def from_message(cls: Type[_T], message: PBShardObject) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-
-
-class KnowledgeboxShards(BaseModel):
-    kbid: str
-    actual: int
-    similarity: VectorSimilarity
-    shards: List[ShardObject]
-    model: Optional[SemanticModelMetadata] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: PBShards) -> _T:
-        as_dict = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
-        if message.HasField("model"):
-            as_dict["model"] = SemanticModelMetadata.from_message(message.model)
-        return cls(**as_dict)
 
 
 class SearchParamDefaults:
