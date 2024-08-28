@@ -581,22 +581,27 @@ async def test_ask_rag_strategy_metadata_extension(
         f"/kb/{knowledgebox}/ask",
         json={
             "query": "title",
-            "rag_strategies": [{"name": "metadata_extension", "origin": ["url", "collaborators"]}],
+            "rag_strategies": [
+                {
+                    "name": "metadata_extension",
+                    "types": ["origin", "extra_metadata", "classification_labels", "ners"],
+                }
+            ],
             "debug": True,
         },
         headers={"X-Synchronous": "True"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     ask_response = SyncAskResponse.model_validate_json(resp.content)
     assert ask_response.prompt_context is not None
 
     # Make sure the text blocks of the context are extended with the metadata
     origin_found = False
     for text_block in ask_response.prompt_context:
-        if "ORIGIN METADATA" in text_block:
+        if "DOCUMENT METADATA AT ORIGIN" in text_block:
             origin_found = True
-            assert "- url: https://example.com/" in text_block
-            assert "- collaborators: ['collaborator_" in text_block
+            assert "https://example.com/" in text_block
+            assert "collaborator_" in text_block
 
     assert origin_found, ask_response.prompt_context
 
@@ -612,10 +617,12 @@ async def test_ask_rag_strategy_metadata_extension(
             json={
                 "query": "title",
                 "rag_strategies": [
-                    {"name": "metadata_extension", "origin": ["url", "collaborators"]},
+                    {"name": "metadata_extension", "types": ["origin"]},
                     strategy,
                 ],
+                "debug": True,
             },
+            headers={"X-Synchronous": "True"},
         )
         assert resp.status_code == 200, resp.text
         ask_response = SyncAskResponse.model_validate_json(resp.content)
@@ -624,8 +631,8 @@ async def test_ask_rag_strategy_metadata_extension(
         # Make sure the text blocks of the context are extended with the metadata
         origin_found = False
         for text_block in ask_response.prompt_context:
-            if "ORIGIN METADATA" in text_block:
+            if "DOCUMENT METADATA AT ORIGIN" in text_block:
                 origin_found = True
-                assert "- url: https://example.com/" in text_block
-                assert "- collaborators: ['collaborator_" in text_block
+                assert "https://example.com/" in text_block
+                assert "collaborator_" in text_block
         assert origin_found, ask_response.prompt_context

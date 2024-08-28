@@ -312,7 +312,7 @@ async def extend_prompt_context_with_metadata(
     if MetadataExtensionType.CLASSIFICATION_LABELS in metadata_extension.types:
         await extend_prompt_context_with_classification_labels(context, kbid, parsed_text_block_ids)
 
-    if MetadataExtensionType.NER in metadata_extension.types:
+    if MetadataExtensionType.NERS in metadata_extension.types:
         await extend_prompt_context_with_ner(context, kbid, parsed_text_block_ids)
 
     if MetadataExtensionType.EXTRA_METADATA in metadata_extension.types:

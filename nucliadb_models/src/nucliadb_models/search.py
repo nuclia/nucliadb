@@ -982,7 +982,7 @@ class NeighbouringParagraphsStrategy(RagStrategy):
 class MetadataExtensionType(str, Enum):
     ORIGIN = "origin"
     CLASSIFICATION_LABELS = "classification_labels"
-    NER = "ner"
+    NERS = "ners"
     EXTRA_METADATA = "extra_metadata"
 
 
@@ -1005,6 +1005,10 @@ List of resource metadata types to add to the context.
 
 Types for which the metadata is not found at the resource are ignored and not added to the context.
 """,
+        examples=[
+            ["origin", "classification_labels"],
+            ["ners"],
+        ],
     )
 
 
@@ -1140,7 +1144,7 @@ If empty, the default strategy is used. `full_resource`, `hierarchy` and `neighb
             ],
             [{"name": "hierarchy", "count": 2}],
             [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
-            [{"name": "metadata_extension", "origin": ["tags", "metadata.author", "created", "url"]}],
+            [{"name": "metadata_extension", "types": ["origin", "classification_labels"]}],
         ],
     )
     rag_images_strategies: list[RagImagesStrategies] = Field(
