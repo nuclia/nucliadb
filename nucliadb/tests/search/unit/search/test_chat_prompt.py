@@ -29,6 +29,7 @@ from nucliadb_models.search import (
     FindField,
     FindParagraph,
     FindResource,
+    HierarchyResourceStrategy,
     KnowledgeboxFindResults,
     MinScore,
 )
@@ -297,10 +298,7 @@ async def test_hierarchy_promp_context(kb):
         )
         ordered_paragraphs = chat_prompt.get_ordered_paragraphs(find_results)
         await chat_prompt.hierarchy_prompt_context(
-            context,
-            "kbid",
-            ordered_paragraphs,
-            paragraphs_extra_characters=0,
+            context, "kbid", ordered_paragraphs, HierarchyResourceStrategy()
         )
         assert (
             context.output["r1/f/f1/0-10"]

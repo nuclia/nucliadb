@@ -850,7 +850,7 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 
 
 class FieldExtensionStrategy(RagStrategy):
-    name: Literal["field_extension"]
+    name: Literal["field_extension"] = "field_extension"
     fields: Set[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
@@ -879,7 +879,7 @@ class FieldExtensionStrategy(RagStrategy):
 
 
 class FullResourceStrategy(RagStrategy):
-    name: Literal["full_resource"]
+    name: Literal["full_resource"] = "full_resource"
     count: Optional[int] = Field(
         default=None,
         title="Count",
@@ -889,7 +889,7 @@ class FullResourceStrategy(RagStrategy):
 
 
 class HierarchyResourceStrategy(RagStrategy):
-    name: Literal["hierarchy"]
+    name: Literal["hierarchy"] = "hierarchy"
     count: int = Field(
         default=0,
         title="Count",
@@ -899,7 +899,7 @@ class HierarchyResourceStrategy(RagStrategy):
 
 
 class NeighbouringParagraphsStrategy(RagStrategy):
-    name: Literal["neighbouring_paragraphs"]
+    name: Literal["neighbouring_paragraphs"] = "neighbouring_paragraphs"
     before: int = Field(
         default=2,
         title="Before",
@@ -927,7 +927,7 @@ class MetadataExtensionStrategy(RagStrategy):
     This strategy can be combined with any of the other strategies.
     """
 
-    name: Literal["metadata_extension"]
+    name: Literal["metadata_extension"] = "metadata_extension"
     types: set[MetadataExtensionType] = Field(
         min_length=1,
         title="Types",
