@@ -1011,6 +1011,13 @@ class CustomPrompt(BaseModel):
 
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
+    top_k: int = Field(
+        default=20,
+        title="Top k",
+        ge=1,
+        le=100,
+        description="The top most relevant results to fetch at the retrieval step.",
+    )
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[List[str], List[Filter]] = Field(
         default=[],

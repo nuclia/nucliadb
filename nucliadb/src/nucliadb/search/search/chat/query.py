@@ -105,6 +105,9 @@ async def get_find_results(
     find_request.security = item.security
     find_request.debug = item.debug
     find_request.rephrase = item.rephrase
+    # We don't support pagination, we always get the top_k results.
+    find_request.page_size = item.top_k
+    find_request.page_number = 0
 
     find_results, incomplete, query_parser = await find(
         kbid,
