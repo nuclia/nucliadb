@@ -29,6 +29,7 @@ import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
+from tests.utils import broker_resource, inject_message
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.utils import get_driver
@@ -48,7 +49,6 @@ from nucliadb_utils.utilities import (
     get_storage,
     set_utility,
 )
-from tests.utils import broker_resource, inject_message
 
 TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg,local").split(",")
 
