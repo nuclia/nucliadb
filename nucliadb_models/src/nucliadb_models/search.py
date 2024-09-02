@@ -1011,6 +1011,13 @@ class CustomPrompt(BaseModel):
 
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
+    top_k: int = Field(
+        default=20,
+        title="Top k",
+        ge=1,
+        le=200,
+        description="The top most relevant results to fetch at the retrieval step. The maximum number of results allowed is 200.",
+    )
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[List[str], List[Filter]] = Field(
         default=[],
@@ -1556,7 +1563,7 @@ class AskResponseItem(BaseModel):
     item: AskResponseItemType = Field(..., discriminator="type")
 
 
-def parse_custom_prompt(item: ChatRequest) -> CustomPrompt:
+def parse_custom_prompt(item: AskRequest) -> CustomPrompt:
     prompt = CustomPrompt()
     if item.prompt is not None:
         if isinstance(item.prompt, str):

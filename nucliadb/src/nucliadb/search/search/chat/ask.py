@@ -405,7 +405,7 @@ async def ask(
                 kbid=kbid,
                 # Prefer the rephrased query if available
                 query=rephrased_query or user_query,
-                chat_request=ask_request,
+                item=ask_request,
                 ndb_client=client_type,
                 user=user_id,
                 origin=origin,
