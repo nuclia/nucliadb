@@ -35,7 +35,7 @@ from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
-from nucliadb.search.search.cache import RequestCachesMiddleware
+from nucliadb.search.search.cache import request_caches_middleware
 from nucliadb.standalone.lifecycle import lifespan
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
@@ -96,7 +96,6 @@ def application_factory(settings: Settings) -> FastAPI:
             backend=get_auth_backend(settings),
         ),
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
-        Middleware(RequestCachesMiddleware),
     ]
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))
@@ -126,6 +125,9 @@ def application_factory(settings: Settings) -> FastAPI:
         enable_latest=False,
         kwargs=fastapi_settings,
     )
+
+    # Proper way to add middlewares
+    application.middleware("http")(request_caches_middleware)
 
     for route in application.routes:
         if isinstance(route, Mount):

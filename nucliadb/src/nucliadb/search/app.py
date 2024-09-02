@@ -32,7 +32,7 @@ from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import lifespan
-from nucliadb.search.search.cache import RequestCachesMiddleware
+from nucliadb.search.search.cache import request_caches_middleware
 from nucliadb.search.settings import settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.utils import (
@@ -65,7 +65,6 @@ middleware.extend(
     [
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
-        Middleware(RequestCachesMiddleware),
     ]
 )
 
@@ -99,6 +98,9 @@ application = VersionedFastAPI(
     enable_latest=False,
     kwargs=fastapi_settings,
 )
+
+# Proper way to add middlewares
+application.middleware("http")(request_caches_middleware)
 
 
 async def homepage(request: Request) -> HTMLResponse:

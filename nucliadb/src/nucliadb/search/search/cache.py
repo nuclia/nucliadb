@@ -24,7 +24,7 @@ from contextvars import ContextVar
 from typing import Optional
 
 from lru import LRU
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.middleware.base import RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -209,7 +209,6 @@ def request_caches():
         clear_extracted_text_cache()
 
 
-class RequestCachesMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        with request_caches():
-            return await call_next(request)
+async def request_caches_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    with request_caches():
+        return await call_next(request)
