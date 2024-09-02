@@ -149,6 +149,7 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
         retrieved_context=[RetrievedContext(text="epa", text_block_id="some/id/path")],
         answer="bar",
         learning_id="learning_id",
+        status_code=0,
     )
 
     audit_storage.send(context.audit_request)
@@ -162,6 +163,7 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
     assert pb.chat.rephrased_question == "rephrased"
     assert pb.chat.answer == "bar"
     assert pb.chat.learning_id == "learning_id"
+    assert pb.chat.status_code == 0
     assert pb.chat.chat_context[0].author == "USER"
     assert pb.chat.chat_context[0].text == "epa"
     assert pb.chat.retrieved_context[0].text_block_id == "some/id/path"

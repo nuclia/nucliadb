@@ -156,10 +156,12 @@ class ChatAudit(google.protobuf.message.Message):
     CHAT_CONTEXT_FIELD_NUMBER: builtins.int
     RETRIEVED_CONTEXT_FIELD_NUMBER: builtins.int
     LEARNING_ID_FIELD_NUMBER: builtins.int
+    STATUS_CODE_FIELD_NUMBER: builtins.int
     question: builtins.str
     answer: builtins.str
     rephrased_question: builtins.str
     learning_id: builtins.str
+    status_code: builtins.int
     @property
     def context(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ChatContext]:
         """Conversation from chats"""
@@ -180,9 +182,10 @@ class ChatAudit(google.protobuf.message.Message):
         chat_context: collections.abc.Iterable[global___ChatContext] | None = ...,
         retrieved_context: collections.abc.Iterable[global___RetrievedContext] | None = ...,
         learning_id: builtins.str = ...,
+        status_code: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "rephrased_question", b"rephrased_question"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "chat_context", b"chat_context", "context", b"context", "learning_id", b"learning_id", "question", b"question", "rephrased_question", b"rephrased_question", "retrieved_context", b"retrieved_context"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_answer", b"_answer", "_rephrased_question", b"_rephrased_question", "answer", b"answer", "chat_context", b"chat_context", "context", b"context", "learning_id", b"learning_id", "question", b"question", "rephrased_question", b"rephrased_question", "retrieved_context", b"retrieved_context", "status_code", b"status_code"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_answer", b"_answer"]) -> typing.Literal["answer"] | None: ...
     @typing.overload
