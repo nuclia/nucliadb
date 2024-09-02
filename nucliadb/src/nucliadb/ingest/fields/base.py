@@ -31,10 +31,10 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedVectorsWrapper,
     FieldComputedMetadata,
     FieldComputedMetadataWrapper,
+    FieldQuestionAnswers,
     FieldQuestionAnswerWrapper,
     LargeComputedMetadata,
     LargeComputedMetadataWrapper,
-    QuestionAnswers,
 )
 from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error
@@ -54,14 +54,14 @@ class FieldTypes(str, enum.Enum):
 
 
 class Field:
-    pbklass: Optional[Type] = None
+    pbklass: Type
     type: str = "x"
     value: Optional[Any]
     extracted_text: Optional[ExtractedText]
     extracted_vectors: Optional[VectorObject]
     computed_metadata: Optional[FieldComputedMetadata]
     large_computed_metadata: Optional[LargeComputedMetadata]
-    question_answers: Optional[QuestionAnswers]
+    question_answers: Optional[FieldQuestionAnswers]
 
     def __init__(
         self,
@@ -110,14 +110,20 @@ class Field:
         return f"{self.uuid}/{self.type}/{self.id}"
 
     def get_storage_field(self, field_type: FieldTypes) -> StorageField:
-        return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, field_type.value)
+        return self.storage.file_extracted(
+            self.kbid, self.uuid, self.type, self.id, field_type.value
+        )
 
-    def _get_extracted_vectors_storage_field(self, vectorset: Optional[str] = None) -> StorageField:
+    def _get_extracted_vectors_storage_field(
+        self, vectorset: Optional[str] = None
+    ) -> StorageField:
         if vectorset:
             key = FieldTypes.FIELD_VECTORSET.value.format(vectorset=vectorset)
         else:
             key = FieldTypes.FIELD_VECTORS.value
-        return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, key)
+        return self.storage.file_extracted(
+            self.kbid, self.uuid, self.type, self.id, key
+        )
 
     async def db_get_value(self):
         if self.value is None:
@@ -208,32 +214,59 @@ class Field:
             error=error,
         )
 
-    async def get_question_answers(self) -> Optional[QuestionAnswers]:
-        if self.question_answers is None:
+    async def get_question_answers(self, force=False) -> Optional[FieldQuestionAnswers]:
+        if self.question_answers is None or force:
             sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
-            payload = await self.storage.download_pb(sf, QuestionAnswers)
+            payload = await self.storage.download_pb(sf, FieldQuestionAnswers)
             if payload is not None:
                 self.question_answers = payload
         return self.question_answers
 
     async def set_question_answers(self, payload: FieldQuestionAnswerWrapper) -> None:
+        if self.type in SUBFIELDFIELDS:
+            try:
+                actual_payload: Optional[
+                    FieldQuestionAnswers
+                ] = await self.get_question_answers(force=True)
+            except KeyError:
+                actual_payload = None
+        else:
+            actual_payload = None
         sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
 
-        if payload.HasField("file"):
-            raw_payload = await self.storage.downloadbytescf(payload.file)
-            pb = QuestionAnswers()
-            pb.ParseFromString(raw_payload.read())
-            raw_payload.flush()
-            self.question_answers = pb
+        if actual_payload is None:
+            # Its first extracted text
+            if payload.HasField("file"):
+                await self.storage.normalize_binary(payload.file, sf)
+            else:
+                await self.storage.upload_pb(sf, payload.question_answers)
+                self.question_answers = payload.question_answers
         else:
-            self.question_answers = payload.question_answers
-
-        await self.storage.upload_pb(sf, self.question_answers)
+            if payload.HasField("file"):
+                raw_payload = await self.storage.downloadbytescf(payload.file)
+                pb = FieldQuestionAnswers()
+                pb.ParseFromString(raw_payload.read())
+                raw_payload.flush()
+                payload.question_answers.CopyFrom(pb)
+            # We know its payload.body
+            for key, value in payload.question_answers.split_question_answers.items():
+                actual_payload.split_question_answers[key] = value
+            for key in payload.question_answers.deleted_splits:
+                if key in actual_payload.split_question_answers:
+                    del actual_payload.split_question_answers[key]
+            if payload.question_answers.HasField("question_answers") != "":
+                actual_payload.question_answers.CopyFrom(
+                    payload.question_answers.question_answers
+                )
+            await self.storage.upload_pb(sf, actual_payload)
+            self.question_answers = actual_payload
 
     async def set_extracted_text(self, payload: ExtractedTextWrapper) -> None:
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[ExtractedText] = await self.get_extracted_text(force=True)
+                actual_payload: Optional[ExtractedText] = await self.get_extracted_text(
+                    force=True
+                )
             except KeyError:
                 actual_payload = None
         else:
@@ -338,9 +371,9 @@ class Field:
     ) -> tuple[FieldComputedMetadata, list[str], dict[str, list[str]]]:
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[FieldComputedMetadata] = await self.get_field_metadata(
-                    force=True
-                )
+                actual_payload: Optional[
+                    FieldComputedMetadata
+                ] = await self.get_field_metadata(force=True)
             except KeyError:
                 actual_payload = None
         else:
@@ -378,18 +411,23 @@ class Field:
             for key in payload.metadata.deleted_splits:
                 if key in actual_payload.split_metadata:
                     replace_splits[key] = [
-                        f"{x.start}-{x.end}" for x in actual_payload.split_metadata[key].paragraphs
+                        f"{x.start}-{x.end}"
+                        for x in actual_payload.split_metadata[key].paragraphs
                     ]
                     del actual_payload.split_metadata[key]
             if payload.metadata.metadata:
                 actual_payload.metadata.CopyFrom(payload.metadata.metadata)
-                paragraphs_to_replace = [f"{x.start}-{x.end}" for x in metadata.paragraphs]
+                paragraphs_to_replace = [
+                    f"{x.start}-{x.end}" for x in metadata.paragraphs
+                ]
             await self.storage.upload_pb(sf, actual_payload)
             self.computed_metadata = actual_payload
 
         return self.computed_metadata, paragraphs_to_replace, replace_splits
 
-    async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
+    async def get_field_metadata(
+        self, force: bool = False
+    ) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:
             sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
             payload = await self.storage.download_pb(sf, FieldComputedMetadata)
@@ -400,9 +438,9 @@ class Field:
     async def set_large_field_metadata(self, payload: LargeComputedMetadataWrapper):
         if self.type in SUBFIELDFIELDS:
             try:
-                actual_payload: Optional[LargeComputedMetadata] = await self.get_large_field_metadata(
-                    force=True
-                )
+                actual_payload: Optional[
+                    LargeComputedMetadata
+                ] = await self.get_large_field_metadata(force=True)
             except KeyError:
                 actual_payload = None
         else:
@@ -437,7 +475,9 @@ class Field:
 
         return self.large_computed_metadata
 
-    async def get_large_field_metadata(self, force: bool = False) -> Optional[LargeComputedMetadata]:
+    async def get_large_field_metadata(
+        self, force: bool = False
+    ) -> Optional[LargeComputedMetadata]:
         if self.large_computed_metadata is None or force:
             sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
             payload = await self.storage.download_pb(

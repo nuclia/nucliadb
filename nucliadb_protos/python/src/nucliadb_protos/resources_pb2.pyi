@@ -1264,7 +1264,7 @@ class QuestionAnswers(google.protobuf.message.Message):
 global___QuestionAnswers = QuestionAnswers
 
 @typing.final
-class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
+class FieldQuestionAnswers(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     @typing.final
@@ -1286,29 +1286,48 @@ class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
 
     QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
-    FILE_FIELD_NUMBER: builtins.int
     SPLIT_QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
-    FIELD_FIELD_NUMBER: builtins.int
+    DELETED_SPLITS_FIELD_NUMBER: builtins.int
     @property
     def question_answers(self) -> global___QuestionAnswers: ...
     @property
-    def file(self) -> global___CloudFile: ...
+    def split_question_answers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___QuestionAnswers]: ...
     @property
-    def split_question_answers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___QuestionAnswers]:
-        """Its not ideal but to not change the model that is wrong"""
+    def deleted_splits(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        question_answers: global___QuestionAnswers | None = ...,
+        split_question_answers: collections.abc.Mapping[builtins.str, global___QuestionAnswers] | None = ...,
+        deleted_splits: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["question_answers", b"question_answers"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["deleted_splits", b"deleted_splits", "question_answers", b"question_answers", "split_question_answers", b"split_question_answers"]) -> None: ...
 
+global___FieldQuestionAnswers = FieldQuestionAnswers
+
+@typing.final
+class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
+    FILE_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    @property
+    def question_answers(self) -> global___FieldQuestionAnswers: ...
+    @property
+    def file(self) -> global___CloudFile: ...
     @property
     def field(self) -> global___FieldID: ...
     def __init__(
         self,
         *,
-        question_answers: global___QuestionAnswers | None = ...,
+        question_answers: global___FieldQuestionAnswers | None = ...,
         file: global___CloudFile | None = ...,
-        split_question_answers: collections.abc.Mapping[builtins.str, global___QuestionAnswers] | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "question_answers", b"question_answers"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "question_answers", b"question_answers", "split_question_answers", b"split_question_answers"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "question_answers", b"question_answers"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["file_or_data", b"file_or_data"]) -> typing.Literal["question_answers", "file"] | None: ...
 
 global___FieldQuestionAnswerWrapper = FieldQuestionAnswerWrapper

@@ -23,7 +23,13 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 from typing_extensions import Self
 
 from nucliadb_models import content_types
@@ -41,7 +47,9 @@ STORAGE_FILE_MATCH = re.compile(
     r"/?kbs/(?P<kbid>[^/]+)/r/(?P<rid>[^/]+)/(?P<download_type>[fe])/(?P<field_type>\w)/(?P<field_id>[^/]+)/?(?P<key>.*)?"  # noqa
 )
 DOWNLOAD_TYPE_MAP = {"f": "field", "e": "extracted"}
-DOWNLOAD_URI = "/kb/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{key}"
+DOWNLOAD_URI = (
+    "/kb/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{key}"
+)
 
 _NOT_SET = object()
 
@@ -271,3 +279,7 @@ class Answer(BaseModel):
 class QuestionAnswer(BaseModel):
     question: Question
     answers: List[Answer]
+
+
+class QuestionAnswers(BaseModel):
+    question_answer: List[QuestionAnswer]

@@ -34,7 +34,7 @@ from nucliadb_models.extracted import (
     FileExtractedData,
     LargeComputedMetadata,
     LinkExtractedData,
-    QuestionAnswers,
+    FieldQuestionAnswers,
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
@@ -104,7 +104,9 @@ class KnowledgeBoxConfig(BaseModel):
     slug: Optional[SlugString] = Field(
         default=None, title="Slug", description="Slug for the Knowledge Box."
     )
-    title: Optional[str] = Field(default=None, title="Title", description="Title for the Knowledge Box.")
+    title: Optional[str] = Field(
+        default=None, title="Title", description="Title for the Knowledge Box."
+    )
     description: Optional[str] = Field(
         default=None,
         title="Description",
@@ -162,7 +164,9 @@ class KnowledgeBoxConfig(BaseModel):
         # that is shown on read requests
         eip = as_dict.pop("external_index_provider", None)
         if eip:
-            as_dict["configured_external_index_provider"] = {"type": eip["type"].lower()}
+            as_dict["configured_external_index_provider"] = {
+                "type": eip["type"].lower()
+            }
         return cls(**as_dict)
 
 
@@ -198,7 +202,7 @@ class ExtractedData(BaseModel):
     metadata: Optional[FieldComputedMetadata] = None
     large_metadata: Optional[LargeComputedMetadata] = None
     vectors: Optional[VectorObject] = None
-    question_answers: Optional[QuestionAnswers] = None
+    question_answers: Optional[FieldQuestionAnswers] = None
 
 
 class TextFieldExtractedData(ExtractedData):
@@ -232,7 +236,8 @@ class Error(BaseModel):
     code: int
 
 
-class FieldData(BaseModel): ...
+class FieldData(BaseModel):
+    ...
 
 
 class TextFieldData(BaseModel):
