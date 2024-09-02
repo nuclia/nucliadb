@@ -426,6 +426,7 @@ async def ask(
         if len(main_results.resources) == 0 and all(
             len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
         ):
+            breakpoint()
             return NotEnoughContextAskResult(
                 main_results=main_results,
                 prequeries_results=prequeries_results,

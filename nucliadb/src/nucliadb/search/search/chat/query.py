@@ -312,50 +312,39 @@ async def run_prequeries(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    generative_model: str | None = None,
+    generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
 ) -> list[PreQueryResult]:
     """
     Runs simultaneous find requests for each prequery and returns the merged results according to the normalized weights.
     """
     results: list[PreQueryResult] = []
-
     max_parallel_prequeries = asyncio.Semaphore(2)
-
     async def _prequery_find(
-        index: int,
-        item: FindRequest,
+        prequery: PreQuery,
     ):
         async with max_parallel_prequeries:
             find_results, _, _ = await find(
                 kbid,
-                item,
+                prequery.request,
                 x_ndb_client,
                 x_nucliadb_user,
                 x_forwarded_for,
                 generative_model=generative_model,
                 metrics=metrics,
             )
-            return index, find_results
+            return prequery, find_results
 
-    indexed = {i: prequery.query for i, prequery in enumerate(prequeries)}
     ops = []
-    for prequery_index, query in indexed.items():
+    for prequery in prequeries:
         ops.append(
             asyncio.create_task(
                 _prequery_find(
-                    prequery_index,
-                    kbid,
-                    query,
-                    x_ndb_client,
-                    x_nucliadb_user,
-                    x_forwarded_for,
-                    generative_model=generative_model,
-                    metrics=metrics,
+                    prequery
                 )
             )
         )
-    results = await asyncio.gather(*ops)
-    for index, find_results in results:
-        results.append((indexed[index], find_results))
+    ops_results = await asyncio.gather(*ops)
+    for prequery, find_results in ops_results:
+        results.append((prequery, find_results))
     return results
