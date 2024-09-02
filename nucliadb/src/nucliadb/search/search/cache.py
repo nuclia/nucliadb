@@ -24,6 +24,9 @@ from contextvars import ContextVar
 from typing import Optional
 
 from lru import LRU
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import Response
 
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
@@ -204,3 +207,9 @@ def request_caches():
     finally:
         clear_resource_cache()
         clear_extracted_text_cache()
+
+
+class RequestCachesMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        with request_caches():
+            return await call_next(request)

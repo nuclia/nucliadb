@@ -32,7 +32,6 @@ from nucliadb.search import logger, predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
-from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import fetch_resources, merge_results
 from nucliadb.search.search.pgcatalog import pgcatalog_enabled, pgcatalog_search
@@ -413,12 +412,11 @@ async def _search_endpoint(
     **kwargs,
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     try:
-        with cache.request_caches():
-            results, incomplete = await search(
-                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, **kwargs
-            )
-            response.status_code = 206 if incomplete else 200
-            return results
+        results, incomplete = await search(
+            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, **kwargs
+        )
+        response.status_code = 206 if incomplete else 200
+        return results
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:
