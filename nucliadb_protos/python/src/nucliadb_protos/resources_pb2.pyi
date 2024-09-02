@@ -1294,7 +1294,9 @@ class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
     @property
     def file(self) -> global___CloudFile: ...
     @property
-    def split_question_answers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___QuestionAnswers]: ...
+    def split_question_answers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___QuestionAnswers]:
+        """Its not ideal but to not change the model that is wrong"""
+
     @property
     def field(self) -> global___FieldID: ...
     def __init__(

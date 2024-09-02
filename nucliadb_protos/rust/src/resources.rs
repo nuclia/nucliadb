@@ -759,6 +759,7 @@ pub struct QuestionAnswers {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldQuestionAnswerWrapper {
+    /// Its not ideal but to not change the model that is wrong
     #[prost(map = "string, message", tag = "4")]
     pub split_question_answers: ::std::collections::HashMap<
         ::prost::alloc::string::String,
