@@ -86,6 +86,7 @@ class BasicAuditStorage(AuditStorage):
         retrieved_context: List[RetrievedContext],
         answer: Optional[str],
         learning_id: str,
+        status_code: int,
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,

@@ -170,7 +170,7 @@ def maybe_audit_chat(
     user_query: str,
     rephrased_query: Optional[str],
     text_answer: bytes,
-    status_code: Optional[AnswerStatusCode],
+    status_code: AnswerStatusCode,
     chat_history: list[ChatContextMessage],
     query_context: PromptContext,
     query_context_order: PromptContextOrder,
@@ -206,10 +206,11 @@ def maybe_audit_chat(
         retrieved_context=chat_retrieved_context,
         answer=audit_answer,
         learning_id=learning_id,
+        status_code=int(status_code.value),
     )
 
 
-def parse_audit_answer(raw_text_answer: bytes, status_code: Optional[AnswerStatusCode]) -> Optional[str]:
+def parse_audit_answer(raw_text_answer: bytes, status_code: AnswerStatusCode) -> Optional[str]:
     if status_code == AnswerStatusCode.NO_CONTEXT:
         # We don't want to audit "Not enough context to answer this." and instead set a None.
         return None
