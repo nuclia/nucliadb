@@ -1015,8 +1015,8 @@ class ChatRequest(BaseModel):
         default=20,
         title="Top k",
         ge=1,
-        le=100,
-        description="The top most relevant results to fetch at the retrieval step.",
+        le=200,
+        description="The top most relevant results to fetch at the retrieval step. The maximum number of results allowed is 200.",
     )
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[List[str], List[Filter]] = Field(

@@ -636,3 +636,32 @@ async def test_ask_rag_strategy_metadata_extension(
                 assert "https://example.com/" in text_block
                 assert "collaborator_" in text_block
         assert origin_found, ask_response.prompt_context
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox, resources):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_response.retrieval_results.best_matches) > 1
+    prev_best_matches = ask_response.retrieval_results.best_matches
+
+    # Check that the top_k is respected
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+            "top_k": 1,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_response.retrieval_results.best_matches) == 1
+    assert ask_response.retrieval_results.best_matches[0] == prev_best_matches[0]

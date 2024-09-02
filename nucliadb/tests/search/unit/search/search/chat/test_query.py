@@ -92,7 +92,7 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
         await get_find_results(
             kbid="kbid",
             query="query",
-            ask_request=ask_request,
+            item=ask_request,
             ndb_client=NucliaDBClientType.API,
             user="user_id",
             origin="origin",
