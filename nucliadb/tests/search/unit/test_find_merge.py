@@ -28,37 +28,19 @@ from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 def test_orderer():
     orderer = Orderer()
 
-    items = {}
+    items = []
     for i in range(30):
         key = str(i)
-        score = random.random() * 25
-        items[key] = score
+        score = i
+        items.append((key, score))
 
-    boosted = {4, 10, 28}
+    random.shuffle(items)
 
-    boosted_items = []
-    regular_items = []
+    for item in items:
+        orderer.add(item[0], item[1])
 
-    for i, (key, score) in enumerate(items.items()):
-        if i in boosted:
-            boosted_items.append(key)
-            orderer.add_boosted(key)
-        else:
-            regular_items.append(key)
-            orderer.add(key)
-
-    sorted_items = list(orderer.sorted_by_insertion())
-    assert sorted_items == boosted_items + regular_items
-
-
-def test_orderer_handles_duplicate_insertions():
-    orderer = Orderer()
-    orderer.add_boosted("a")
-    orderer.add_boosted("b")
-    orderer.add_boosted("a")
-    orderer.add_boosted("c")
-    orderer.add("a")
-    assert list(orderer.sorted_by_insertion()) == ["a", "b", "c"]
+    sorted_items = list(orderer.sorted_by_score())
+    assert sorted_items == sorted(items, key=lambda x: x[1], reverse=True)
 
 
 def get_paragraph_result(score):

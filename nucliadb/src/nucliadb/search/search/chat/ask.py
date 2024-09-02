@@ -68,6 +68,7 @@ from nucliadb_models.search import (
     MetadataAskResponseItem,
     MinScore,
     NucliaDBClientType,
+    PrequeriesAskResponseItem,
     PreQueriesStrategy,
     PreQuery,
     PreQueryResult,
@@ -168,6 +169,12 @@ class AskResult:
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First stream out the find results
         yield RetrievalAskResponseItem(results=self.main_results)
+
+        if len(self.prequeries_results) > 0:
+            item = PrequeriesAskResponseItem()
+            for prequery, result in self.prequeries_results:
+                item.results[prequery.name] = result
+            yield item
 
         # Then stream out the predict answer
         first_chunk_yielded = False
@@ -281,12 +288,19 @@ class AskResult:
         if self._object is not None:
             answer_json = self._object.object
 
+        prequeries_results = None
+        if self.prequeries_results:
+            prequeries_results = {}
+            for prequery, result in self.prequeries_results:
+                prequeries_results[prequery.name] = result
+
         response = SyncAskResponse(
             answer=self._answer_text,
             answer_json=answer_json,
             status=self.status_code.prettify(),
             relations=self._relations,
             retrieval_results=self.main_results,
+            prequeries_retrieval_results=prequeries_results,
             citations=citations,
             metadata=metadata,
             learning_id=self.nuclia_learning_id or "",
@@ -404,7 +418,9 @@ async def ask(
     needs_retrieval = True
     if resource is not None:
         if prequeries is not None:
-            raise InvalidQueryError("Prequeries are not supported when asking on a specific resource")
+            raise InvalidQueryError(
+                "rag_strategies", "Prequeries are not supported when asking on a specific resource"
+            )
         ask_request.resource_filters = [resource]
         if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
             needs_retrieval = False
@@ -426,7 +442,6 @@ async def ask(
         if len(main_results.resources) == 0 and all(
             len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
         ):
-            breakpoint()
             return NotEnoughContextAskResult(
                 main_results=main_results,
                 prequeries_results=prequeries_results,
@@ -556,4 +571,8 @@ def parse_prequeries(ask_request: AskRequest) -> Optional[list[PreQuery]]:
     for rag_strategy in ask_request.rag_strategies:
         if rag_strategy.name == RagStrategyName.PREQUERIES:
             rag_strategy = cast(PreQueriesStrategy, rag_strategy)
-            return rag_strategy.queries
+            queries = rag_strategy.queries
+            for index, query in enumerate(queries):
+                if query.name is None:
+                    query.name = f"prequery_{index}"
+            return queries

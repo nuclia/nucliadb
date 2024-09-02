@@ -320,6 +320,7 @@ async def run_prequeries(
     """
     results: list[PreQueryResult] = []
     max_parallel_prequeries = asyncio.Semaphore(2)
+
     async def _prequery_find(
         prequery: PreQuery,
     ):
@@ -337,13 +338,7 @@ async def run_prequeries(
 
     ops = []
     for prequery in prequeries:
-        ops.append(
-            asyncio.create_task(
-                _prequery_find(
-                    prequery
-                )
-            )
-        )
+        ops.append(asyncio.create_task(_prequery_find(prequery)))
     ops_results = await asyncio.gather(*ops)
     for prequery, find_results in ops_results:
         results.append((prequery, find_results))

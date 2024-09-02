@@ -865,18 +865,36 @@ def get_ordered_paragraphs(
 ) -> list[FindParagraph]:
     """
     Returns the list of paragraphs in the results, ordered by relevance.
+    Prequeries results, if provided, are always considered more relevant than the main results.
     """
-    prequeries_results = prequeries_results or []
-    # (prequery TODO: apply weights of each prequery)
+
+    def iter_paragraphs(results: KnowledgeboxFindResults):
+        for resource in results.resources.values():
+            for field in resource.fields.values():
+                for paragraph in field.paragraphs.values():
+                    yield paragraph
+
+    paragraph_id_to_score = {}
+    for paragraph in iter_paragraphs(main_results):
+        paragraph_id_to_score[paragraph.id] = paragraph
+
+    total_weights = sum(prequery.weight for prequery, _ in prequeries_results or [])
+    for prequery, prequery_results in prequeries_results or []:
+        for paragraph in iter_paragraphs(prequery_results):
+            normalize_weight = (prequery.weight / total_weights) * 100
+            weighted_score = paragraph.score * normalize_weight
+            if paragraph.id in paragraph_id_to_score:
+                # If a paragraph is matched in various prequeries, the final score is the
+                # sum of the weighted scores
+                paragraph_id_to_score[paragraph.id].score += weighted_score
+            else:
+                paragraph.score = weighted_score
+                paragraph_id_to_score[paragraph.id] = paragraph
+
     return sorted(
-        [
-            paragraph
-            for resource in main_results.resources.values()
-            for field in resource.fields.values()
-            for paragraph in field.paragraphs.values()
-        ],
-        key=lambda paragraph: paragraph.order,
-        reverse=False,
+        paragraph_id_to_score.values(),
+        key=lambda paragraph: paragraph.score,
+        reverse=True,
     )
 
 

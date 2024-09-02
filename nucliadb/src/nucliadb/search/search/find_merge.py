@@ -115,31 +115,13 @@ async def set_resource_metadata_value(
 
 class Orderer:
     def __init__(self):
-        self.boosted_items = []
-        self.items = []
+        self.items = {}
 
-    def add(self, key: Any):
-        self.items.append(key)
-
-    def add_boosted(self, key: Any):
-        self.boosted_items.append(key)
+    def add(self, key: Any, score: float):
+        self.items[key] = score
 
     def sorted_by_score(self) -> Iterator[Any]:
-        for key in sorted(self.items, key=lambda value: value[3], reverse=True):
-            yield key
-
-    def sorted_by_insertion(self) -> Iterator[Any]:
-        returned = set()
-        for key in self.boosted_items:
-            if key in returned:
-                continue
-            returned.add(key)
-            yield key
-
-        for key in self.items:
-            if key in returned:
-                continue
-            returned.add(key)
+        for key, _ in sorted(self.items.items(), key=lambda value: value[1], reverse=True):
             yield key
 
 
@@ -184,8 +166,8 @@ async def fetch_find_metadata(
                             result_paragraph.rid,
                             result_paragraph.field,
                             result_paragraph.paragraph.id,
-                            result_paragraph.paragraph.score,
-                        )
+                        ),
+                        score=result_paragraph.paragraph.score,
                     )
                 find_field.paragraphs[result_paragraph.paragraph.id].score_type = SCORE_TYPE.BOTH
 
@@ -196,8 +178,8 @@ async def fetch_find_metadata(
                         result_paragraph.rid,
                         result_paragraph.field,
                         result_paragraph.paragraph.id,
-                        result_paragraph.paragraph.score,
-                    )
+                    ),
+                    score=result_paragraph.paragraph.score,
                 )
 
             operations.append(
@@ -213,7 +195,7 @@ async def fetch_find_metadata(
             )
             resources.add(result_paragraph.rid)
 
-    for order, (rid, field_id, paragraph_id, _) in enumerate(orderer.sorted_by_score()):
+    for order, (rid, field_id, paragraph_id) in enumerate(orderer.sorted_by_score()):
         find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
         best_matches.append(paragraph_id)
 
