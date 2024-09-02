@@ -48,6 +48,7 @@ from nucliadb_models.search import (
     MetadataExtensionType,
     NeighbouringParagraphsStrategy,
     PageImageStrategy,
+    PreQueryResult,
     PromptContext,
     PromptContextImages,
     PromptContextOrder,
@@ -721,7 +722,8 @@ class PromptContextBuilder:
     def __init__(
         self,
         kbid: str,
-        find_results: KnowledgeboxFindResults,
+        main_results: KnowledgeboxFindResults,
+        prequeries_results: Optional[list[PreQueryResult]] = None,
         resource: Optional[str] = None,
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
@@ -730,7 +732,7 @@ class PromptContextBuilder:
         visual_llm: bool = False,
     ):
         self.kbid = kbid
-        self.ordered_paragraphs = get_ordered_paragraphs(find_results)
+        self.ordered_paragraphs = get_ordered_paragraphs(main_results, prequeries_results)
         self.resource = resource
         self.user_context = user_context
         self.strategies = strategies
@@ -857,14 +859,19 @@ def _clean_paragraph_text(paragraph: FindParagraph) -> str:
     return text
 
 
-def get_ordered_paragraphs(results: KnowledgeboxFindResults) -> list[FindParagraph]:
+def get_ordered_paragraphs(
+    main_results: KnowledgeboxFindResults,
+    prequeries_results: Optional[list[PreQueryResult]] = None,
+) -> list[FindParagraph]:
     """
     Returns the list of paragraphs in the results, ordered by relevance.
     """
+    prequeries_results = prequeries_results or []
+    # (prequery TODO: apply weights of each prequery)
     return sorted(
         [
             paragraph
-            for resource in results.resources.values()
+            for resource in main_results.resources.values()
             for field in resource.fields.values()
             for paragraph in field.paragraphs.values()
         ],

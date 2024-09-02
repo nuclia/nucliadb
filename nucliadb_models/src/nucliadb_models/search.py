@@ -825,6 +825,7 @@ class RagStrategyName:
     HIERARCHY = "hierarchy"
     NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
     METADATA_EXTENSION = "metadata_extension"
+    PREQUERIES = "prequeries"
 
 
 class ImageRagStrategyName:
@@ -947,6 +948,35 @@ Types for which the metadata is not found at the resource are ignored and not ad
     )
 
 
+class PreQuery(BaseModel):
+    request: "FindRequest" = Field(
+        title="Request",
+        description="The request to be executed before the main query.",
+    )
+    weight: float = Field(
+        default=1.0,
+        title="Weight",
+        description=(
+            "Weight of the prequery in the context. The weight is used to scale the results of the prequery before adding them to the context."
+            "The weight should be a positive number, and they are normalized so that the sum of all weights for all prequeries is 1."
+        ),
+        ge=0,
+    )
+
+
+class PreQueriesStrategy(RagStrategy):
+    name: Literal["prequeries"] = "prequeries"
+    queries: list[PreQuery] = Field(
+        title="Queries",
+        description="List of queries to run before the main query. The results are added to the context with the specified weights for each query. There is a limit of 10 prequeries per request.",
+        min_length=1,
+        max_length=10,
+    )
+
+
+PreQueryResult = tuple[PreQuery, "KnowledgeboxFindResults"]
+
+
 class TableImageStrategy(ImageRagStrategy):
     name: Literal["tables"]
 
@@ -971,6 +1001,7 @@ RagStrategies = Annotated[
         HierarchyResourceStrategy,
         NeighbouringParagraphsStrategy,
         MetadataExtensionStrategy,
+        PreQueriesStrategy,
     ],
     Field(discriminator="name"),
 ]
@@ -1145,6 +1176,7 @@ If empty, the default strategy is used. `full_resource`, `hierarchy` and `neighb
             RagStrategyName.FULL_RESOURCE,
             RagStrategyName.HIERARCHY,
             RagStrategyName.NEIGHBOURING_PARAGRAPHS,
+            RagStrategyName.PREQUERIES,
         ):
             if strategy_name in strategy_names and len(strategy_names) > 1:
                 raise ValueError(

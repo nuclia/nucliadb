@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from typing import Optional
 
 from nucliadb.search import logger
@@ -35,6 +36,8 @@ from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
+    PreQuery,
+    PreQueryResult,
     PromptContext,
     PromptContextOrder,
     Relations,
@@ -77,7 +80,9 @@ async def get_find_results(
     user: str,
     origin: str,
     metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, QueryParser]:
+    prequeries: Optional[list[PreQuery]] = None,
+) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], QueryParser]:
+    prequeries = prequeries or []
     find_request = FindRequest()
     find_request.resource_filters = item.resource_filters
     find_request.features = []
@@ -120,7 +125,20 @@ async def get_find_results(
     )
     if incomplete:
         raise IncompleteFindResultsError()
-    return find_results, query_parser
+
+    prequeries_results = None
+    if len(prequeries) > 0:
+        prequeries_results = await run_prequeries(
+            kbid,
+            prequeries,
+            x_ndb_client=ndb_client,
+            x_nucliadb_user=user,
+            x_forwarded_for=origin,
+            generative_model=item.generative_model,
+            metrics=metrics,
+        )
+
+    return find_results, prequeries_results, query_parser
 
 
 async def get_relations_results(
@@ -286,3 +304,58 @@ def sorted_prompt_context_list(context: PromptContext, order: PromptContextOrder
         key=lambda item: order.get(item[0], float("inf")),
     )
     return list(map(lambda item: item[1], sorted_items))
+
+
+async def run_prequeries(
+    kbid: str,
+    prequeries: list[PreQuery],
+    x_ndb_client: NucliaDBClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+    generative_model: str | None = None,
+    metrics: RAGMetrics = RAGMetrics(),
+) -> list[PreQueryResult]:
+    """
+    Runs simultaneous find requests for each prequery and returns the merged results according to the normalized weights.
+    """
+    results: list[PreQueryResult] = []
+
+    max_parallel_prequeries = asyncio.Semaphore(2)
+
+    async def _prequery_find(
+        index: int,
+        item: FindRequest,
+    ):
+        async with max_parallel_prequeries:
+            find_results, _, _ = await find(
+                kbid,
+                item,
+                x_ndb_client,
+                x_nucliadb_user,
+                x_forwarded_for,
+                generative_model=generative_model,
+                metrics=metrics,
+            )
+            return index, find_results
+
+    indexed = {i: prequery.query for i, prequery in enumerate(prequeries)}
+    ops = []
+    for prequery_index, query in indexed.items():
+        ops.append(
+            asyncio.create_task(
+                _prequery_find(
+                    prequery_index,
+                    kbid,
+                    query,
+                    x_ndb_client,
+                    x_nucliadb_user,
+                    x_forwarded_for,
+                    generative_model=generative_model,
+                    metrics=metrics,
+                )
+            )
+        )
+    results = await asyncio.gather(*ops)
+    for index, find_results in results:
+        results.append((indexed[index], find_results))
+    return results
