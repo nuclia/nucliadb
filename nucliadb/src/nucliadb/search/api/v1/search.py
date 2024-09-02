@@ -285,82 +285,83 @@ async def catalog(
     maybe_log_request_payload(kbid, "/catalog", item)
     start_time = time()
     try:
-        sort = item.sort
-        if sort is None:
-            # By default we sort by creation date (most recent first)
-            sort = SortOptions(
-                field=SortField.CREATED,
-                order=SortOrder.DESC,
-                limit=None,
-            )
+        with cache.request_caches():
+            sort = item.sort
+            if sort is None:
+                # By default we sort by creation date (most recent first)
+                sort = SortOptions(
+                    field=SortField.CREATED,
+                    order=SortOrder.DESC,
+                    limit=None,
+                )
 
-        query_parser = QueryParser(
-            kbid=kbid,
-            features=[SearchOptions.FULLTEXT],
-            query=item.query,
-            filters=item.filters,
-            faceted=item.faceted,
-            sort=sort,
-            page_number=item.page_number,
-            page_size=item.page_size,
-            min_score=MinScore(bm25=0, semantic=0),
-            fields=["a/title"],
-            with_status=item.with_status,
-            range_creation_start=item.range_creation_start,
-            range_creation_end=item.range_creation_end,
-            range_modification_start=item.range_modification_start,
-            range_modification_end=item.range_modification_end,
-        )
-        pb_query, _, _ = await query_parser.parse()
-
-        if not pgcatalog_enabled(kbid):
-            (results, _, queried_nodes) = await node_query(
-                kbid,
-                Method.SEARCH,
-                pb_query,
-                target_shard_replicas=item.shards,
-                # Catalog should not go to read replicas because we want it to be
-                # consistent and most up to date results
-                use_read_replica_nodes=False,
-            )
-
-            # We need to merge
-            search_results = await merge_results(
-                results,
-                count=item.page_size,
-                page=item.page_number,
+            query_parser = QueryParser(
                 kbid=kbid,
-                show=[ResourceProperties.BASIC],
-                field_type_filter=[],
-                extracted=[],
+                features=[SearchOptions.FULLTEXT],
+                query=item.query,
+                filters=item.filters,
+                faceted=item.faceted,
                 sort=sort,
-                requested_relations=pb_query.relation_subgraph,
-                min_score=query_parser.min_score,
-                highlight=False,
+                page_number=item.page_number,
+                page_size=item.page_size,
+                min_score=MinScore(bm25=0, semantic=0),
+                fields=["a/title"],
+                with_status=item.with_status,
+                range_creation_start=item.range_creation_start,
+                range_creation_end=item.range_creation_end,
+                range_modification_start=item.range_modification_start,
+                range_modification_end=item.range_modification_end,
             )
-        else:
-            search_results = KnowledgeboxSearchResults()
-            search_results.fulltext = await pgcatalog_search(query_parser)
-            search_results.resources = await fetch_resources(
-                resources=[r.rid for r in search_results.fulltext.results],
-                kbid=kbid,
-                show=[ResourceProperties.BASIC],
-                field_type_filter=[],
-                extracted=[],
-            )
-            queried_nodes = []
+            pb_query, _, _ = await query_parser.parse()
 
-        # We don't need sentences, paragraphs or relations on the catalog
-        # response, so we set to None so that fastapi doesn't include them
-        # in the response payload
-        search_results.sentences = None
-        search_results.paragraphs = None
-        search_results.relations = None
-        if item.debug:
-            search_results.nodes = debug_nodes_info(queried_nodes)
-        queried_shards = [shard_id for _, shard_id in queried_nodes]
-        search_results.shards = queried_shards
-        return search_results
+            if not pgcatalog_enabled(kbid):
+                (results, _, queried_nodes) = await node_query(
+                    kbid,
+                    Method.SEARCH,
+                    pb_query,
+                    target_shard_replicas=item.shards,
+                    # Catalog should not go to read replicas because we want it to be
+                    # consistent and most up to date results
+                    use_read_replica_nodes=False,
+                )
+
+                # We need to merge
+                search_results = await merge_results(
+                    results,
+                    count=item.page_size,
+                    page=item.page_number,
+                    kbid=kbid,
+                    show=[ResourceProperties.BASIC],
+                    field_type_filter=[],
+                    extracted=[],
+                    sort=sort,
+                    requested_relations=pb_query.relation_subgraph,
+                    min_score=query_parser.min_score,
+                    highlight=False,
+                )
+            else:
+                search_results = KnowledgeboxSearchResults()
+                search_results.fulltext = await pgcatalog_search(query_parser)
+                search_results.resources = await fetch_resources(
+                    resources=[r.rid for r in search_results.fulltext.results],
+                    kbid=kbid,
+                    show=[ResourceProperties.BASIC],
+                    field_type_filter=[],
+                    extracted=[],
+                )
+                queried_nodes = []
+
+            # We don't need sentences, paragraphs or relations on the catalog
+            # response, so we set to None so that fastapi doesn't include them
+            # in the response payload
+            search_results.sentences = None
+            search_results.paragraphs = None
+            search_results.relations = None
+            if item.debug:
+                search_results.nodes = debug_nodes_info(queried_nodes)
+            queried_shards = [shard_id for _, shard_id in queried_nodes]
+            search_results.shards = queried_shards
+            return search_results
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
     except KnowledgeBoxNotFound:
