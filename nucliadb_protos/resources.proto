@@ -285,6 +285,7 @@ message FieldMetadata {
     string summary = 11;
     map<string, Positions> positions = 12;  // Document
     repeated Relations relations = 13;
+    string mime_type = 14;
 }
 
 message Question {
@@ -313,6 +314,7 @@ message FieldQuestionAnswerWrapper {
         QuestionAnswers question_answers = 1;
         CloudFile file = 2;
     }
+    map<string, QuestionAnswers> split_question_answers = 4;  // Its not ideal but to not change the model that is wrong
     FieldID field = 3;
 }
 

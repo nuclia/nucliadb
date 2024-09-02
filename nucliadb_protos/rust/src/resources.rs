@@ -719,6 +719,8 @@ pub struct FieldMetadata {
     >,
     #[prost(message, repeated, tag = "13")]
     pub relations: ::prost::alloc::vec::Vec<Relations>,
+    #[prost(string, tag = "14")]
+    pub mime_type: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -757,6 +759,11 @@ pub struct QuestionAnswers {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldQuestionAnswerWrapper {
+    #[prost(map = "string, message", tag = "4")]
+    pub split_question_answers: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        QuestionAnswers,
+    >,
     #[prost(message, optional, tag = "3")]
     pub field: ::core::option::Option<FieldId>,
     #[prost(oneof = "field_question_answer_wrapper::FileOrData", tags = "1, 2")]
