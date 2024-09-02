@@ -65,7 +65,7 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
                 "confidence": {"type": "number"},
             },
         },
-        top_k=200,
+        top_k=20,
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"
