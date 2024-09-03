@@ -32,11 +32,13 @@ from nucliadb.search import logger, predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
+from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import fetch_resources, merge_results
 from nucliadb.search.search.pgcatalog import pgcatalog_enabled, pgcatalog_search
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
+    maybe_log_request_payload,
     min_score_from_payload,
     min_score_from_query_params,
     should_disable_vector_search,
@@ -111,12 +113,12 @@ async def search_knowledgebox(
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
     min_score: Optional[float] = Query(
         default=None,
-        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
         deprecated=True,
     ),
     min_score_semantic: Optional[float] = Query(
         default=None,
-        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
     ),
     min_score_bm25: float = Query(
         default=0,
@@ -280,84 +282,86 @@ async def catalog(
     returns bm25 results on titles and it does not support vector search.
     It is useful for listing resources in a knowledge box.
     """
+    maybe_log_request_payload(kbid, "/catalog", item)
     start_time = time()
     try:
-        sort = item.sort
-        if sort is None:
-            # By default we sort by creation date (most recent first)
-            sort = SortOptions(
-                field=SortField.CREATED,
-                order=SortOrder.DESC,
-                limit=None,
-            )
+        with cache.request_caches():
+            sort = item.sort
+            if sort is None:
+                # By default we sort by creation date (most recent first)
+                sort = SortOptions(
+                    field=SortField.CREATED,
+                    order=SortOrder.DESC,
+                    limit=None,
+                )
 
-        query_parser = QueryParser(
-            kbid=kbid,
-            features=[SearchOptions.FULLTEXT],
-            query=item.query,
-            filters=item.filters,
-            faceted=item.faceted,
-            sort=sort,
-            page_number=item.page_number,
-            page_size=item.page_size,
-            min_score=MinScore(bm25=0, semantic=0),
-            fields=["a/title"],
-            with_status=item.with_status,
-            range_creation_start=item.range_creation_start,
-            range_creation_end=item.range_creation_end,
-            range_modification_start=item.range_modification_start,
-            range_modification_end=item.range_modification_end,
-        )
-        pb_query, _, _ = await query_parser.parse()
-
-        if not pgcatalog_enabled(kbid):
-            (results, _, queried_nodes) = await node_query(
-                kbid,
-                Method.SEARCH,
-                pb_query,
-                target_shard_replicas=item.shards,
-                # Catalog should not go to read replicas because we want it to be
-                # consistent and most up to date results
-                use_read_replica_nodes=False,
-            )
-
-            # We need to merge
-            search_results = await merge_results(
-                results,
-                count=item.page_size,
-                page=item.page_number,
+            query_parser = QueryParser(
                 kbid=kbid,
-                show=[ResourceProperties.BASIC],
-                field_type_filter=[],
-                extracted=[],
+                features=[SearchOptions.FULLTEXT],
+                query=item.query,
+                filters=item.filters,
+                faceted=item.faceted,
                 sort=sort,
-                requested_relations=pb_query.relation_subgraph,
-                min_score=query_parser.min_score,
-                highlight=False,
+                page_number=item.page_number,
+                page_size=item.page_size,
+                min_score=MinScore(bm25=0, semantic=0),
+                fields=["a/title"],
+                with_status=item.with_status,
+                range_creation_start=item.range_creation_start,
+                range_creation_end=item.range_creation_end,
+                range_modification_start=item.range_modification_start,
+                range_modification_end=item.range_modification_end,
             )
-        else:
-            search_results = KnowledgeboxSearchResults()
-            search_results.fulltext = await pgcatalog_search(query_parser)
-            search_results.resources = await fetch_resources(
-                resources=[r.rid for r in search_results.fulltext.results],
-                kbid=kbid,
-                show=[ResourceProperties.BASIC],
-                field_type_filter=[],
-                extracted=[],
-            )
-            queried_nodes = []
+            pb_query, _, _ = await query_parser.parse()
 
-        # We don't need sentences, paragraphs or relations on the catalog
-        # response, so we set to None so that fastapi doesn't include them
-        # in the response payload
-        search_results.sentences = None
-        search_results.paragraphs = None
-        search_results.relations = None
-        if item.debug:
-            search_results.nodes = debug_nodes_info(queried_nodes)
-        queried_shards = [shard_id for _, shard_id in queried_nodes]
-        search_results.shards = queried_shards
-        return search_results
+            if not pgcatalog_enabled(kbid):
+                (results, _, queried_nodes) = await node_query(
+                    kbid,
+                    Method.SEARCH,
+                    pb_query,
+                    target_shard_replicas=item.shards,
+                    # Catalog should not go to read replicas because we want it to be
+                    # consistent and most up to date results
+                    use_read_replica_nodes=False,
+                )
+
+                # We need to merge
+                search_results = await merge_results(
+                    results,
+                    count=item.page_size,
+                    page=item.page_number,
+                    kbid=kbid,
+                    show=[ResourceProperties.BASIC],
+                    field_type_filter=[],
+                    extracted=[],
+                    sort=sort,
+                    requested_relations=pb_query.relation_subgraph,
+                    min_score=query_parser.min_score,
+                    highlight=False,
+                )
+            else:
+                search_results = KnowledgeboxSearchResults()
+                search_results.fulltext = await pgcatalog_search(query_parser)
+                search_results.resources = await fetch_resources(
+                    resources=[r.rid for r in search_results.fulltext.results],
+                    kbid=kbid,
+                    show=[ResourceProperties.BASIC],
+                    field_type_filter=[],
+                    extracted=[],
+                )
+                queried_nodes = []
+
+            # We don't need sentences, paragraphs or relations on the catalog
+            # response, so we set to None so that fastapi doesn't include them
+            # in the response payload
+            search_results.sentences = None
+            search_results.paragraphs = None
+            search_results.relations = None
+            if item.debug:
+                search_results.nodes = debug_nodes_info(queried_nodes)
+            queried_shards = [shard_id for _, shard_id in queried_nodes]
+            search_results.shards = queried_shards
+            return search_results
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
     except KnowledgeBoxNotFound:
@@ -409,13 +413,13 @@ async def _search_endpoint(
     x_forwarded_for: str,
     **kwargs,
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
-    # All endpoint logic should be here
     try:
-        results, incomplete = await search(
-            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, **kwargs
-        )
-        response.status_code = 206 if incomplete else 200
-        return results
+        with cache.request_caches():
+            results, incomplete = await search(
+                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, **kwargs
+            )
+            response.status_code = 206 if incomplete else 200
+            return results
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:

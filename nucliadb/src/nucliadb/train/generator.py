@@ -25,6 +25,7 @@ from fastapi import HTTPException
 from nucliadb.train.generators.field_classifier import (
     field_classification_batch_generator,
 )
+from nucliadb.train.generators.field_streaming import field_streaming_batch_generator
 from nucliadb.train.generators.image_classifier import (
     image_classification_batch_generator,
 )
@@ -75,6 +76,8 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
 
     elif trainset.type == TaskType.QUESTION_ANSWER_STREAMING:
         batch_generator = question_answer_batch_generator(kbid, trainset, node, shard_replica_id)
+    elif trainset.type == TaskType.FIELD_STREAMING:
+        batch_generator = field_streaming_batch_generator(kbid, trainset, node, shard_replica_id)
 
     if batch_generator is None:
         raise HTTPException(

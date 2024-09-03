@@ -36,7 +36,7 @@ from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.orm.resource import KB_REVERSE, Resource
+from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB, Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
 from nucliadb.tests.vectors import V1, V2, V3
@@ -192,6 +192,36 @@ async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, lea
     )
     await KnowledgeBox.create(
         maindb_driver, kbid=kbid, slug=kbslug, semantic_models={"my-semantic-model": model}
+    )
+
+    yield kbid
+
+    await KnowledgeBox.delete(maindb_driver, kbid)
+
+
+@pytest.fixture(scope="function")
+async def knowledgebox_with_vectorsets(storage, maindb_driver: Driver, shard_manager, learning_config):
+    kbid = KnowledgeBox.new_unique_kbid()
+    kbslug = "slug-" + str(uuid.uuid4())
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=kbslug,
+        semantic_models={
+            "my-semantic-model-A": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.COSINE,
+                vector_dimension=len(V1),
+            ),
+            "my-semantic-model-B": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.COSINE,
+                vector_dimension=512,
+                matryoshka_dimensions=[3072, 512, 128],
+            ),
+            "my-semantic-model-C": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.DOT,
+                vector_dimension=1024,
+            ),
+        },
     )
 
     yield kbid
@@ -672,7 +702,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest:
 
 
 async def add_field_id(resource: Resource, field: Field):
-    field_type = KB_REVERSE[field.type]
+    field_type = FIELD_TYPE_STR_TO_PB[field.type]
     field_id = rpb.FieldID(field_type=field_type, field=field.id)
     await resource.update_all_field_ids(updated=[field_id])
 

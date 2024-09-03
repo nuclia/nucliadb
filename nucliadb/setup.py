@@ -37,7 +37,7 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3 :: Only",
     ],
-    url="https://docs.nuclia.dev/docs/guides/nucliadb/intro",
+    url="https://docs.nuclia.dev/docs/management/nucliadb/intro",
     author="NucliaDB Community",
     keywords="search, semantic, AI",
     author_email="nucliadb@nuclia.com",
@@ -89,7 +89,7 @@ setup(
     project_urls={
         "Nuclia": "https://nuclia.com",
         "Github": "https://github.com/nuclia/nucliadb",
-        "Discord": "https://discord.gg/8EvQwmsbzf",
+        "Slack": "https://nuclia-community.slack.com",
         "API Reference": "https://docs.nuclia.dev/docs/api",
     },
     extras_require={

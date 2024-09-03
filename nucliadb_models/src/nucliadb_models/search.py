@@ -19,9 +19,8 @@
 #
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Set, TypeVar, Union
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self
@@ -31,16 +30,24 @@ from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.utils import DateTime
-from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 from nucliadb_protos.audit_pb2 import ClientType
 from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
 from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 # Bw/c import to avoid breaking users
 from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
+from nucliadb_models.internal.shards import (  # noqa isort: skip
+    DocumentServiceEnum,
+    ParagraphServiceEnum,
+    VectorServiceEnum,
+    RelationServiceEnum,
+    ShardCreated,
+    ShardObject,
+    ShardReplica,
+    KnowledgeboxShards,
+)
+
 
 _T = TypeVar("_T")
 
@@ -381,78 +388,6 @@ class KnowledgeBoxCount(BaseModel):
     sentences: int
 
 
-class DocumentServiceEnum(str, Enum):
-    DOCUMENT_V0 = "DOCUMENT_V0"
-    DOCUMENT_V1 = "DOCUMENT_V1"
-    DOCUMENT_V2 = "DOCUMENT_V2"
-
-
-class ParagraphServiceEnum(str, Enum):
-    PARAGRAPH_V0 = "PARAGRAPH_V0"
-    PARAGRAPH_V1 = "PARAGRAPH_V1"
-    PARAGRAPH_V2 = "PARAGRAPH_V2"
-    PARAGRAPH_V3 = "PARAGRAPH_V3"
-
-
-class VectorServiceEnum(str, Enum):
-    VECTOR_V0 = "VECTOR_V0"
-    VECTOR_V1 = "VECTOR_V1"
-
-
-class RelationServiceEnum(str, Enum):
-    RELATION_V0 = "RELATION_V0"
-    RELATION_V1 = "RELATION_V1"
-    RELATION_V2 = "RELATION_V2"
-
-
-class ShardCreated(BaseModel):
-    id: str
-    document_service: DocumentServiceEnum
-    paragraph_service: ParagraphServiceEnum
-    vector_service: VectorServiceEnum
-    relation_service: RelationServiceEnum
-
-
-class ShardReplica(BaseModel):
-    node: str
-    shard: ShardCreated
-
-
-class ShardObject(BaseModel):
-    shard: str
-    replicas: List[ShardReplica]
-
-    @classmethod
-    def from_message(cls: Type[_T], message: PBShardObject) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-
-
-class KnowledgeboxShards(BaseModel):
-    kbid: str
-    actual: int
-    similarity: VectorSimilarity
-    shards: List[ShardObject]
-    model: Optional[SemanticModelMetadata] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: PBShards) -> _T:
-        as_dict = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
-        if message.HasField("model"):
-            as_dict["model"] = SemanticModelMetadata.from_message(message.model)
-        return cls(**as_dict)
-
-
 class SearchParamDefaults:
     query = ParamDefault(default="", title="Query", description="The query to search for")
     suggest_query = ParamDefault(
@@ -461,12 +396,12 @@ class SearchParamDefaults:
     fields = ParamDefault(
         default=[],
         title="Fields",
-        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details on filtering by field, see: https://docs.nuclia.dev/docs/docs/using/search/#search-in-a-specific-field",  # noqa: E501
+        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details on filtering by field, see: https://docs.nuclia.dev/docs/rag/advanced/search/#search-in-a-specific-field",  # noqa: E501
     )
     filters = ParamDefault(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
     resource_filters = ParamDefault(
         default=[],
@@ -476,7 +411,7 @@ class SearchParamDefaults:
     faceted = ParamDefault(
         default=[],
         title="Faceted",
-        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
         max_items=50,
     )
     autofilter = ParamDefault(
@@ -659,7 +594,7 @@ class CatalogRequest(BaseModel):
     filters: Union[List[str], List[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
@@ -694,12 +629,12 @@ class MinScore(BaseModel):
     semantic: Optional[float] = Field(
         default=None,
         title="Minimum semantic score",
-        description="Minimum semantic similarity score used to filter vector index search. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum semantic similarity score used to filter vector index search. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
     )
     bm25: float = Field(
         default=0,
         title="Minimum bm25 score",
-        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
         ge=0,
     )
 
@@ -710,7 +645,7 @@ class BaseSearchRequest(BaseModel):
     filters: Union[List[str], List[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
@@ -888,6 +823,8 @@ class RagStrategyName:
     FIELD_EXTENSION = "field_extension"
     FULL_RESOURCE = "full_resource"
     HIERARCHY = "hierarchy"
+    NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
+    METADATA_EXTENSION = "metadata_extension"
 
 
 class ImageRagStrategyName:
@@ -913,7 +850,7 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 
 
 class FieldExtensionStrategy(RagStrategy):
-    name: Literal["field_extension"]
+    name: Literal["field_extension"] = "field_extension"
     fields: Set[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
@@ -942,20 +879,71 @@ class FieldExtensionStrategy(RagStrategy):
 
 
 class FullResourceStrategy(RagStrategy):
-    name: Literal["full_resource"]
+    name: Literal["full_resource"] = "full_resource"
     count: Optional[int] = Field(
         default=None,
         title="Count",
         description="Maximum number of full documents to retrieve. If not specified, all matching documents are retrieved.",
+        ge=1,
     )
 
 
 class HierarchyResourceStrategy(RagStrategy):
-    name: Literal["hierarchy"]
-    count: Optional[int] = Field(
-        default=None,
+    name: Literal["hierarchy"] = "hierarchy"
+    count: int = Field(
+        default=0,
         title="Count",
         description="Number of extra characters that are added to each matching paragraph when adding to the context.",
+        ge=0,
+    )
+
+
+class NeighbouringParagraphsStrategy(RagStrategy):
+    name: Literal["neighbouring_paragraphs"] = "neighbouring_paragraphs"
+    before: int = Field(
+        default=2,
+        title="Before",
+        description="Number of previous neighbouring paragraphs to add to the context, for each matching paragraph in the retrieval step.",
+        ge=0,
+    )
+    after: int = Field(
+        default=2,
+        title="After",
+        description="Number of following neighbouring paragraphs to add to the context, for each matching paragraph in the retrieval step.",
+        ge=0,
+    )
+
+
+class MetadataExtensionType(str, Enum):
+    ORIGIN = "origin"
+    CLASSIFICATION_LABELS = "classification_labels"
+    NERS = "ners"
+    EXTRA_METADATA = "extra_metadata"
+
+
+class MetadataExtensionStrategy(RagStrategy):
+    """
+    RAG strategy to enrich the context with metadata of the matching paragraphs or its resources.
+    This strategy can be combined with any of the other strategies.
+    """
+
+    name: Literal["metadata_extension"] = "metadata_extension"
+    types: set[MetadataExtensionType] = Field(
+        min_length=1,
+        title="Types",
+        description="""
+List of resource metadata types to add to the context.
+  - 'origin': origin metadata of the resource.
+  - 'classification_labels': classification labels of the resource.
+  - 'ner': Named Entity Recognition entities detected for the resource.
+  - 'extra_metadata': extra metadata of the resource.
+
+Types for which the metadata is not found at the resource are ignored and not added to the context.
+""",
+        examples=[
+            ["origin", "classification_labels"],
+            ["ners"],
+        ],
     )
 
 
@@ -977,7 +965,13 @@ class ParagraphImageStrategy(ImageRagStrategy):
 
 
 RagStrategies = Annotated[
-    Union[FieldExtensionStrategy, FullResourceStrategy, HierarchyResourceStrategy],
+    Union[
+        FieldExtensionStrategy,
+        FullResourceStrategy,
+        HierarchyResourceStrategy,
+        NeighbouringParagraphsStrategy,
+        MetadataExtensionStrategy,
+    ],
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
@@ -1017,11 +1011,18 @@ class CustomPrompt(BaseModel):
 
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
+    top_k: int = Field(
+        default=20,
+        title="Top k",
+        ge=1,
+        le=200,
+        description="The top most relevant results to fetch at the retrieval step. The maximum number of results allowed is 200.",
+    )
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[List[str], List[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
@@ -1067,7 +1068,26 @@ class ChatRequest(BaseModel):
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
-        description="Options for tweaking how the context for the LLM model is crafted. `full_resource` will add the full text of the matching resources to the context. `field_extension` will add the text of the matching resource's specified fields to the context. If empty, the default strategy is used.",  # noqa
+        description=(
+            """Options for tweaking how the context for the LLM model is crafted:
+- `full_resource` will add the full text of the matching resources to the context.
+- `field_extension` will add the text of the matching resource's specified fields to the context.
+- `hierarchy` will add the title and summary text of the parent resource to the context for each matching paragraph.
+- `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
+- `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context. This strategy can be combined with any other strategy.
+
+If empty, the default strategy is used. `full_resource`, `hierarchy` and `neighbouring_paragraphs` are exclusive strategies: if selected, they must be the only strategy.
+"""
+        ),
+        examples=[
+            [{"name": "full_resource", "count": 2}],
+            [
+                {"name": "field_extension", "fields": ["t/amend", "a/title"]},
+            ],
+            [{"name": "hierarchy", "count": 2}],
+            [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
+            [{"name": "metadata_extension", "types": ["origin", "classification_labels"]}],
+        ],
     )
     rag_images_strategies: list[RagImagesStrategies] = Field(
         default=[],
@@ -1103,25 +1123,32 @@ class ChatRequest(BaseModel):
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
-        unique_strategy_names: set[str] = set()
+        strategy_names: set[str] = set()
         for strategy in rag_strategies or []:
             if not isinstance(strategy, dict):
                 raise ValueError("RAG strategies must be defined using an object")
             strategy_name = strategy.get("name")
             if strategy_name is None:
                 raise ValueError(f"Invalid strategy '{strategy}'")
-            unique_strategy_names.add(strategy_name)
-        if len(unique_strategy_names) != len(rag_strategies):
+            strategy_names.add(strategy_name)
+        if len(strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
 
-        # If full_resource or hierarchy strategies is chosen, they must be the only strategy
-        for unique_strategy_name in (
+        # metadata extension can be combined with other strategies
+        try:
+            strategy_names.remove(RagStrategyName.METADATA_EXTENSION)
+        except KeyError:
+            pass
+
+        # If any of the unique strategies are chosen, they must be the only strategy
+        for strategy_name in (
             RagStrategyName.FULL_RESOURCE,
             RagStrategyName.HIERARCHY,
+            RagStrategyName.NEIGHBOURING_PARAGRAPHS,
         ):
-            if unique_strategy_name in unique_strategy_names and len(rag_strategies) > 1:
+            if strategy_name in strategy_names and len(strategy_names) > 1:
                 raise ValueError(
-                    f"If '{unique_strategy_name}' strategy is chosen, it must be the only strategy."
+                    f"If '{strategy_name}' strategy is chosen, it must be the only strategy."
                 )
         return rag_strategies
 
@@ -1536,7 +1563,7 @@ class AskResponseItem(BaseModel):
     item: AskResponseItemType = Field(..., discriminator="type")
 
 
-def parse_custom_prompt(item: ChatRequest) -> CustomPrompt:
+def parse_custom_prompt(item: AskRequest) -> CustomPrompt:
     prompt = CustomPrompt()
     if item.prompt is not None:
         if isinstance(item.prompt, str):

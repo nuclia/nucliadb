@@ -21,37 +21,41 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.common.ids import ParagraphId
+from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
     FindParagraph,
     FindResource,
+    HierarchyResourceStrategy,
     KnowledgeboxFindResults,
+    MetadataExtensionStrategy,
+    MetadataExtensionType,
     MinScore,
 )
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import resources_pb2 as rpb2
 
 
 @pytest.fixture()
 def messages():
     msgs = [
-        resources_pb2.Message(ident="1", content=resources_pb2.MessageContent(text="Message 1")),
-        resources_pb2.Message(ident="2", content=resources_pb2.MessageContent(text="Message 2")),
-        resources_pb2.Message(
+        rpb2.Message(ident="1", content=rpb2.MessageContent(text="Message 1")),
+        rpb2.Message(ident="2", content=rpb2.MessageContent(text="Message 2")),
+        rpb2.Message(
             ident="3",
             who="1",
-            content=resources_pb2.MessageContent(text="Message 3"),
-            type=resources_pb2.Message.MessageType.QUESTION,
+            content=rpb2.MessageContent(text="Message 3"),
+            type=rpb2.Message.MessageType.QUESTION,
         ),
-        resources_pb2.Message(
+        rpb2.Message(
             ident="4",
-            content=resources_pb2.MessageContent(text="Message 4"),
-            type=resources_pb2.Message.MessageType.ANSWER,
+            content=rpb2.MessageContent(text="Message 4"),
+            type=rpb2.Message.MessageType.ANSWER,
             to=["1"],
         ),
-        resources_pb2.Message(ident="5", content=resources_pb2.MessageContent(text="Message 5")),
+        rpb2.Message(ident="5", content=rpb2.MessageContent(text="Message 5")),
     ]
     yield msgs
 
@@ -59,8 +63,8 @@ def messages():
 @pytest.fixture()
 def field_obj(messages):
     mock = AsyncMock()
-    mock.get_metadata.return_value = resources_pb2.FieldConversation(pages=1, total=5)
-    mock.db_get_value.return_value = resources_pb2.Conversation(messages=messages)
+    mock.get_metadata.return_value = rpb2.FieldConversation(pages=1, total=5)
+    mock.db_get_value.return_value = rpb2.Conversation(messages=messages)
 
     yield mock
 
@@ -96,7 +100,7 @@ async def test_get_next_conversation_messages(field_obj, messages):
         page=1,
         start_idx=0,
         num_messages=1,
-        message_type=resources_pb2.Message.MessageType.ANSWER,
+        message_type=rpb2.Message.MessageType.ANSWER,
         msg_to="1",
     ) == [messages[3]]
 
@@ -127,7 +131,7 @@ async def test_get_expanded_conversation_messages_question(kb, messages):
     )
 
     kb.get.assert_called_with("rid")
-    kb.get.return_value.get_field.assert_called_with("field_id", KB_REVERSE["c"], load=True)
+    kb.get.return_value.get_field.assert_called_with("field_id", FIELD_TYPE_STR_TO_PB["c"], load=True)
 
 
 @pytest.mark.asyncio
@@ -263,7 +267,7 @@ def test_capped_prompt_context():
 @pytest.mark.asyncio
 async def test_hierarchy_promp_context(kb):
     with mock.patch(
-        "nucliadb.search.search.chat.prompt.paragraphs.get_paragraph_text",
+        "nucliadb.search.search.chat.prompt.get_paragraph_text",
         side_effect=["Title text", "Summary text"],
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
@@ -296,10 +300,7 @@ async def test_hierarchy_promp_context(kb):
         )
         ordered_paragraphs = chat_prompt.get_ordered_paragraphs(find_results)
         await chat_prompt.hierarchy_prompt_context(
-            context,
-            "kbid",
-            ordered_paragraphs,
-            paragraphs_extra_characters=0,
+            context, "kbid", ordered_paragraphs, HierarchyResourceStrategy()
         )
         assert (
             context.output["r1/f/f1/0-10"]
@@ -308,3 +309,78 @@ async def test_hierarchy_promp_context(kb):
         # Chec that the original text of the paragraphs is preserved
         assert ordered_paragraphs[0].text == "First Paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
+
+
+def test_get_neighbouring_paragraph_indexes():
+    field_paragraphs = [
+        ParagraphId.from_string("r1/f/f1/0-10"),
+        ParagraphId.from_string("r1/f/f1/10-20"),
+        ParagraphId.from_string("r1/f/f1/20-30"),
+        ParagraphId.from_string("r1/f/f1/30-40"),
+        ParagraphId.from_string("r1/f/f1/40-50"),
+        ParagraphId.from_string("r1/f/f1/50-60"),
+        ParagraphId.from_string("r1/f/f1/60-70"),
+        ParagraphId.from_string("r1/f/f1/70-80"),
+    ]
+    matching_paragraph = field_paragraphs[2]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=100, after=100
+    ) == [0, 1, 2, 3, 4, 5, 6, 7]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=2, after=2
+    ) == [0, 1, 2, 3, 4]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=1, after=0
+    ) == [1, 2]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=0, after=1
+    ) == [2, 3]
+
+    assert chat_prompt.get_neighbouring_paragraph_indexes(
+        field_paragraphs, matching_paragraph, before=0, after=0
+    ) == [2]
+
+
+async def test_extend_prompt_context_with_metadata():
+    origin = rpb2.Origin()
+    origin.tags.extend(["tag1", "tag2"])
+    origin.metadata.update({"foo": "bar"})
+    basic = rpb2.Basic()
+    basic.usermetadata.classifications.append(rpb2.Classification(labelset="ls", label="l1"))
+    basic.computedmetadata.field_classifications.append(
+        rpb2.FieldClassifications(field=rpb2.FieldID(field="f1", field_type=rpb2.FieldType.FILE))
+    )
+    basic.computedmetadata.field_classifications[0].classifications.append(
+        rpb2.Classification(labelset="ls", label="l2")
+    )
+    extra = rpb2.Extra()
+    extra.metadata.update({"key": "value"})
+    resource = mock.Mock()
+    resource.get_origin = AsyncMock(return_value=origin)
+    resource.get_basic = AsyncMock(return_value=basic)
+    field = mock.Mock()
+    fcm = rpb2.FieldComputedMetadata()
+    fcm.metadata.ner.update({"Barcelona": "LOCATION"})
+    field.get_field_metadata = AsyncMock(return_value=fcm)
+    resource.get_field = AsyncMock(return_value=field)
+    resource.get_extra = AsyncMock(return_value=extra)
+    with mock.patch(
+        "nucliadb.search.search.chat.prompt.cache.get_resource",
+        return_value=resource,
+    ):
+        paragraph_id = ParagraphId.from_string("r1/f/f1/0-10")
+        context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+        context[paragraph_id.full()] = "Paragraph text"
+        kbid = "foo"
+        strategy = MetadataExtensionStrategy(types=list(MetadataExtensionType))
+        await chat_prompt.extend_prompt_context_with_metadata(context, kbid, strategy)
+
+        text_block = context.output[paragraph_id.full()]
+        assert "DOCUMENT METADATA AT ORIGIN" in text_block
+        assert "DOCUMENT CLASSIFICATION LABELS" in text_block
+        assert "DOCUMENT NERS" in text_block
+        assert "DOCUMENT EXTRA METADATA" in text_block

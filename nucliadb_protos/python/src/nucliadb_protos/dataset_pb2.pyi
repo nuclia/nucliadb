@@ -9,6 +9,8 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import nucliadb_protos.resources_pb2
+import nucliadb_protos.utils_pb2
 import sys
 import typing
 
@@ -16,6 +18,72 @@ if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
+from nucliadb_protos.resources_pb2 import (
+    AllFieldIDs as AllFieldIDs,
+    Answers as Answers,
+    Basic as Basic,
+    Block as Block,
+    CONVERSATION as CONVERSATION,
+    Classification as Classification,
+    CloudFile as CloudFile,
+    ComputedMetadata as ComputedMetadata,
+    Conversation as Conversation,
+    Entity as Entity,
+    Extra as Extra,
+    ExtractedTextWrapper as ExtractedTextWrapper,
+    ExtractedVectorsWrapper as ExtractedVectorsWrapper,
+    FILE as FILE,
+    FieldClassifications as FieldClassifications,
+    FieldComputedMetadata as FieldComputedMetadata,
+    FieldComputedMetadataWrapper as FieldComputedMetadataWrapper,
+    FieldConversation as FieldConversation,
+    FieldFile as FieldFile,
+    FieldID as FieldID,
+    FieldLargeMetadata as FieldLargeMetadata,
+    FieldLink as FieldLink,
+    FieldMetadata as FieldMetadata,
+    FieldQuestionAnswerWrapper as FieldQuestionAnswerWrapper,
+    FieldText as FieldText,
+    FieldType as FieldType,
+    FileExtractedData as FileExtractedData,
+    FilePages as FilePages,
+    GENERIC as GENERIC,
+    LINK as LINK,
+    LargeComputedMetadata as LargeComputedMetadata,
+    LargeComputedMetadataWrapper as LargeComputedMetadataWrapper,
+    LinkExtractedData as LinkExtractedData,
+    Message as Message,
+    MessageContent as MessageContent,
+    Metadata as Metadata,
+    NestedListPosition as NestedListPosition,
+    NestedPosition as NestedPosition,
+    Origin as Origin,
+    PageInformation as PageInformation,
+    PagePositions as PagePositions,
+    PageSelections as PageSelections,
+    PageStructure as PageStructure,
+    PageStructurePage as PageStructurePage,
+    PageStructureToken as PageStructureToken,
+    Paragraph as Paragraph,
+    ParagraphAnnotation as ParagraphAnnotation,
+    ParagraphRelations as ParagraphRelations,
+    Position as Position,
+    Positions as Positions,
+    Question as Question,
+    QuestionAnswer as QuestionAnswer,
+    QuestionAnswerAnnotation as QuestionAnswerAnnotation,
+    QuestionAnswers as QuestionAnswers,
+    Relations as Relations,
+    Representation as Representation,
+    RowsPreview as RowsPreview,
+    Sentence as Sentence,
+    TEXT as TEXT,
+    TokenSplit as TokenSplit,
+    UserFieldMetadata as UserFieldMetadata,
+    UserMetadata as UserMetadata,
+    UserVectorsWrapper as UserVectorsWrapper,
+    VisualSelection as VisualSelection,
+)
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -32,6 +100,7 @@ class _TaskTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumT
     IMAGE_CLASSIFICATION: _TaskType.ValueType  # 4
     PARAGRAPH_STREAMING: _TaskType.ValueType  # 5
     QUESTION_ANSWER_STREAMING: _TaskType.ValueType  # 6
+    FIELD_STREAMING: _TaskType.ValueType  # 7
 
 class TaskType(_TaskType, metaclass=_TaskTypeEnumTypeWrapper):
     """Train API V2"""
@@ -43,6 +112,7 @@ TOKEN_CLASSIFICATION: TaskType.ValueType  # 3
 IMAGE_CLASSIFICATION: TaskType.ValueType  # 4
 PARAGRAPH_STREAMING: TaskType.ValueType  # 5
 QUESTION_ANSWER_STREAMING: TaskType.ValueType  # 6
+FIELD_STREAMING: TaskType.ValueType  # 7
 global___TaskType = TaskType
 
 class _LabelFrom:
@@ -71,14 +141,46 @@ class TrainSet(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         LABELS_FIELD_NUMBER: builtins.int
+        PATHS_FIELD_NUMBER: builtins.int
+        RIDS_FIELD_NUMBER: builtins.int
+        TAGS_FIELD_NUMBER: builtins.int
+        ICONS_FIELD_NUMBER: builtins.int
+        METADATA_FIELD_NUMBER: builtins.int
+        ENTITIES_FIELD_NUMBER: builtins.int
+        FIELDS_FIELD_NUMBER: builtins.int
+        STATUS_FIELD_NUMBER: builtins.int
         @property
         def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        @property
+        def paths(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        @property
+        def rids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        @property
+        def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        @property
+        def icons(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        @property
+        def metadata(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        @property
+        def entities(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        @property
+        def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        @property
+        def status(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
         def __init__(
             self,
             *,
             labels: collections.abc.Iterable[builtins.str] | None = ...,
+            paths: collections.abc.Iterable[builtins.str] | None = ...,
+            rids: collections.abc.Iterable[builtins.str] | None = ...,
+            tags: collections.abc.Iterable[builtins.str] | None = ...,
+            icons: collections.abc.Iterable[builtins.str] | None = ...,
+            metadata: collections.abc.Iterable[builtins.str] | None = ...,
+            entities: collections.abc.Iterable[builtins.str] | None = ...,
+            fields: collections.abc.Iterable[builtins.str] | None = ...,
+            status: collections.abc.Iterable[builtins.str] | None = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing.Literal["labels", b"labels"]) -> None: ...
+        def ClearField(self, field_name: typing.Literal["entities", b"entities", "fields", b"fields", "icons", b"icons", "labels", b"labels", "metadata", b"metadata", "paths", b"paths", "rids", b"rids", "status", b"status", "tags", b"tags"]) -> None: ...
 
     TYPE_FIELD_NUMBER: builtins.int
     FILTER_FIELD_NUMBER: builtins.int
@@ -312,7 +414,7 @@ class ParagraphStreamingBatch(google.protobuf.message.Message):
 global___ParagraphStreamingBatch = ParagraphStreamingBatch
 
 @typing.final
-class Question(google.protobuf.message.Message):
+class QuestionDataset(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TEXT_FIELD_NUMBER: builtins.int
@@ -331,7 +433,7 @@ class Question(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["language", b"language", "paragraphs", b"paragraphs", "text", b"text"]) -> None: ...
 
-global___Question = Question
+global___QuestionDataset = QuestionDataset
 
 @typing.final
 class Answer(google.protobuf.message.Message):
@@ -364,13 +466,13 @@ class QuestionAnswerStreamItem(google.protobuf.message.Message):
     CANCELLED_BY_USER_FIELD_NUMBER: builtins.int
     cancelled_by_user: builtins.bool
     @property
-    def question(self) -> global___Question: ...
+    def question(self) -> global___QuestionDataset: ...
     @property
     def answer(self) -> global___Answer: ...
     def __init__(
         self,
         *,
-        question: global___Question | None = ...,
+        question: global___QuestionDataset | None = ...,
         answer: global___Answer | None = ...,
         cancelled_by_user: builtins.bool = ...,
     ) -> None: ...
@@ -394,3 +496,68 @@ class QuestionAnswerStreamingBatch(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
 
 global___QuestionAnswerStreamingBatch = QuestionAnswerStreamingBatch
+
+@typing.final
+class FieldSplitData(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPLIT_FIELD_NUMBER: builtins.int
+    RID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    FIELD_TYPE_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
+    TEXT_FIELD_NUMBER: builtins.int
+    BASIC_FIELD_NUMBER: builtins.int
+    FILE_FIELD_NUMBER: builtins.int
+    LINK_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    split: builtins.str
+    rid: builtins.str
+    field: builtins.str
+    field_type: builtins.str
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def text(self) -> nucliadb_protos.utils_pb2.ExtractedText: ...
+    @property
+    def basic(self) -> nucliadb_protos.resources_pb2.Basic: ...
+    @property
+    def file(self) -> nucliadb_protos.resources_pb2.FileExtractedData: ...
+    @property
+    def link(self) -> nucliadb_protos.resources_pb2.LinkExtractedData: ...
+    @property
+    def metadata(self) -> nucliadb_protos.resources_pb2.FieldComputedMetadata: ...
+    def __init__(
+        self,
+        *,
+        split: builtins.str = ...,
+        rid: builtins.str = ...,
+        field: builtins.str = ...,
+        field_type: builtins.str = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
+        text: nucliadb_protos.utils_pb2.ExtractedText | None = ...,
+        basic: nucliadb_protos.resources_pb2.Basic | None = ...,
+        file: nucliadb_protos.resources_pb2.FileExtractedData | None = ...,
+        link: nucliadb_protos.resources_pb2.LinkExtractedData | None = ...,
+        metadata: nucliadb_protos.resources_pb2.FieldComputedMetadata | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["basic", b"basic", "file", b"file", "link", b"link", "metadata", b"metadata", "text", b"text"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["basic", b"basic", "field", b"field", "field_type", b"field_type", "file", b"file", "labels", b"labels", "link", b"link", "metadata", b"metadata", "rid", b"rid", "split", b"split", "text", b"text"]) -> None: ...
+
+global___FieldSplitData = FieldSplitData
+
+@typing.final
+class FieldStreamingBatch(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldSplitData]: ...
+    def __init__(
+        self,
+        *,
+        data: collections.abc.Iterable[global___FieldSplitData] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
+
+global___FieldStreamingBatch = FieldStreamingBatch

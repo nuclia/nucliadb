@@ -62,7 +62,7 @@ async def test_dummy_predict_engine():
     await pe.finalize()
     await pe.send_feedback("kbid", Mock(), "", "", "")
     assert await pe.rephrase_query("kbid", Mock())
-    assert await pe.chat_query("kbid", Mock())
+    assert await pe.chat_query_ndjson("kbid", Mock())
     assert await pe.detect_entities("kbid", "some sentence")
     assert await pe.summarize("kbid", Mock(resources={}))
 
@@ -144,7 +144,7 @@ def session_limits_exceeded():
     "method,args",
     [
         ("detect_entities", ["kbid", "sentence"]),
-        ("chat_query", ["kbid", ChatModel(question="foo", user_id="bar")]),
+        ("chat_query_ndjson", ["kbid", ChatModel(question="foo", user_id="bar")]),
         (
             "send_feedback",
             [
@@ -173,7 +173,7 @@ async def test_predict_engine_handles_limits_exceeded_error(session_limits_excee
 @pytest.mark.parametrize(
     "method,args,exception,output",
     [
-        ("chat_query", ["kbid", Mock()], True, None),
+        ("chat_query_ndjson", ["kbid", Mock()], True, None),
         ("rephrase_query", ["kbid", Mock()], True, None),
         ("send_feedback", ["kbid", MagicMock(), "", "", ""], False, None),
         ("detect_entities", ["kbid", "sentence"], False, []),

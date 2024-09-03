@@ -166,6 +166,11 @@ async def resources(nucliadb_writer, knowledgebox):
                 "title": f"The title {i}",
                 "summary": f"The summary {i}",
                 "texts": {"text_field": {"body": "The body of the text field"}},
+                "origin": {
+                    "url": f"https://example.com/{i}",
+                    "collaborators": [f"collaborator_{i}"],
+                    "metadata": {"foo": "bar"},
+                },
             },
         )
         assert resp.status_code in (200, 201)
@@ -226,7 +231,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
             "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
         },
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     _ = parse_ask_response(resp)
 
     # Make sure the prompt context is properly crafted
@@ -344,7 +349,7 @@ async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox, re
         },
         headers={"X-Synchronous": "True"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     resp_data = SyncAskResponse.model_validate_json(resp.content)
     assert resp_data.prompt_context is not None
     assert len(resp_data.prompt_context) == 6
@@ -544,3 +549,119 @@ async def test_ask_assert_audit_retrieval_contexts(
     assert {(f"{rid}/a/title/0-11", f"The title {i}") for i, rid in enumerate(resources)} == {
         (a.text_block_id, a.text) for a in retrieved_context
     }
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_rag_strategy_neighbouring_paragraphs(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+            "rag_strategies": [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.prompt_context is not None
+
+
+pytest.mark.asyncio()
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_rag_strategy_metadata_extension(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+            "rag_strategies": [
+                {
+                    "name": "metadata_extension",
+                    "types": ["origin", "extra_metadata", "classification_labels", "ners"],
+                }
+            ],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.prompt_context is not None
+
+    # Make sure the text blocks of the context are extended with the metadata
+    origin_found = False
+    for text_block in ask_response.prompt_context:
+        if "DOCUMENT METADATA AT ORIGIN" in text_block:
+            origin_found = True
+            assert "https://example.com/" in text_block
+            assert "collaborator_" in text_block
+
+    assert origin_found, ask_response.prompt_context
+
+    # Try now combining metadata_extension with another strategy
+    for strategy in [
+        {"name": "full_resource"},
+        {"name": "neighbouring_paragraphs", "before": 1, "after": 1},
+        {"name": "hierarchy", "count": 40},
+        {"name": "field_extension", "fields": ["a/title", "a/summary"]},
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/ask",
+            json={
+                "query": "title",
+                "rag_strategies": [
+                    {"name": "metadata_extension", "types": ["origin"]},
+                    strategy,
+                ],
+                "debug": True,
+            },
+            headers={"X-Synchronous": "True"},
+        )
+        assert resp.status_code == 200, resp.text
+        ask_response = SyncAskResponse.model_validate_json(resp.content)
+        assert ask_response.prompt_context is not None
+
+        # Make sure the text blocks of the context are extended with the metadata
+        origin_found = False
+        for text_block in ask_response.prompt_context:
+            if "DOCUMENT METADATA AT ORIGIN" in text_block:
+                origin_found = True
+                assert "https://example.com/" in text_block
+                assert "collaborator_" in text_block
+        assert origin_found, ask_response.prompt_context
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox, resources):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_response.retrieval_results.best_matches) > 1
+    prev_best_matches = ask_response.retrieval_results.best_matches
+
+    # Check that the top_k is respected
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+            "top_k": 1,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert len(ask_response.retrieval_results.best_matches) == 1
+    assert ask_response.retrieval_results.best_matches[0] == prev_best_matches[0]

@@ -24,7 +24,7 @@ from typing import AsyncIterator
 import aiohttp
 import pytest
 
-from nucliadb.ingest.orm.resource import FIELD_TYPE_TO_ID
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
 from nucliadb_protos import resources_pb2 as rpb
@@ -126,11 +126,11 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
 
     start = 0
     end = len(paragraphs[0])
-    paragraph_0_id = f"{rid}/{FIELD_TYPE_TO_ID[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
+    paragraph_0_id = f"{rid}/{FIELD_TYPE_PB_TO_STR[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
 
     start = len(paragraphs[0])
     end = len(paragraphs[0]) + len(paragraphs[1])
-    paragraph_1_id = f"{rid}/{FIELD_TYPE_TO_ID[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
+    paragraph_1_id = f"{rid}/{FIELD_TYPE_PB_TO_STR[rpb.FieldType.FILE]}/smb-wonder/{start}-{end}"
 
     question = "What is SMB Wonder?"
     field_builder.add_question_answer(

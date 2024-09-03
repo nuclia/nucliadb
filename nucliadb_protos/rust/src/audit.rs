@@ -103,6 +103,8 @@ pub struct ChatAudit {
     pub retrieved_context: ::prost::alloc::vec::Vec<RetrievedContext>,
     #[prost(string, tag = "5")]
     pub learning_id: ::prost::alloc::string::String,
+    #[prost(int32, tag = "9")]
+    pub status_code: i32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

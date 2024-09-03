@@ -24,6 +24,7 @@ import pyarrow as pa  # type: ignore
 
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
+    FieldStreamingBatch,
     ImageClassificationBatch,
     ParagraphClassificationBatch,
     ParagraphStreamingBatch,
@@ -163,6 +164,44 @@ def batch_to_question_answer_streaming_arrow():
                 pa.array(CANCELLED_BY_USER),
             ]
             output_batch = pa.record_batch(pa_data, schema=schema)
+        else:
+            output_batch = None
+        return output_batch
+
+    return func
+
+
+def batch_to_field_streaming_arrow():
+    def func(batch: FieldStreamingBatch, schema: pa.schema):
+        SPLIT = []
+        RID = []
+        FIELD = []
+        FIELD_TYPE = []
+        LABELS = []
+        EXTRACTED_TEXT = []
+        METADATA = []
+        BASIC = []
+        for data in batch.data:
+            SPLIT.append(data.split)
+            RID.append(data.rid)
+            FIELD.append(data.field)
+            FIELD_TYPE.append(data.field_type)
+            LABELS.append([x for x in data.labels])
+            EXTRACTED_TEXT.append(data.text.SerializeToString().decode())
+            METADATA.append(data.metadata.SerializeToString().decode())
+            BASIC.append(data.basic.SerializeToString().decode())
+        if len(RID):
+            pa_data = [
+                pa.array(SPLIT),
+                pa.array(RID),
+                pa.array(FIELD),
+                pa.array(FIELD_TYPE),
+                pa.array(LABELS),
+                pa.array(EXTRACTED_TEXT),
+                pa.array(BASIC),
+                pa.array(METADATA),
+            ]
+            output_batch = pa.record_batch(pa_data, schema)
         else:
             output_batch = None
         return output_batch

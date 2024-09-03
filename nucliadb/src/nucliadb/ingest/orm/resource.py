@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_FIELDS, KB_RESOURCE_SLUG
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -91,16 +92,6 @@ KB_FIELDS: dict[int, Type] = {
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
 }
-
-KB_REVERSE: dict[str, FieldType.ValueType] = {
-    "t": FieldType.TEXT,
-    "f": FieldType.FILE,
-    "u": FieldType.LINK,
-    "a": FieldType.GENERIC,
-    "c": FieldType.CONVERSATION,
-}
-
-FIELD_TYPE_TO_ID = {v: k for k, v in KB_REVERSE.items()}
 
 _executor = ThreadPoolExecutor(10)
 
@@ -407,7 +398,7 @@ class Resource:
             # The [6:8] `slicing purpose is to match exactly the two
             # splitted parts corresponding to type and field, and nothing else!
             type, field = key.split("/")[6:8]
-            type_id = KB_REVERSE.get(type)
+            type_id = FIELD_TYPE_STR_TO_PB.get(type)
             if type_id is None:
                 raise AttributeError("Invalid field type")
             result = (type_id, field)
@@ -823,7 +814,7 @@ class Resource:
         await field_obj.set_large_field_metadata(field_large_metadata)
 
     def generate_field_id(self, field: FieldID) -> str:
-        return f"{FIELD_TYPE_TO_ID[field.field_type]}/{field.field}"
+        return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
 
     async def compute_security(self, brain: ResourceBrain):
         security = await self.get_security()
