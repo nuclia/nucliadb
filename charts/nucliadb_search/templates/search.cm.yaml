@@ -10,7 +10,6 @@ metadata:
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
 data:
-  SENTRY_URL: {{ .Values.running.sentry_url }}
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
   SERVING_PORT: {{ .Values.serving.port | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
