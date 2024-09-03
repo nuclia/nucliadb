@@ -408,7 +408,7 @@ async def extend_prompt_context_with_ner(context, kbid, text_block_ids: list[Tex
         if ners is not None and tb_id.full() in context.output:
             ners_text = "DOCUMENT NERS:"
             for ner_label in ners:
-                token, family = ner_label.split("/")
+                token, family = ner_label.split("/", 1)
                 ners_text += f"\n- {token} ({family})"
             context[tb_id.full()] += "\n\n" + ners_text
 
