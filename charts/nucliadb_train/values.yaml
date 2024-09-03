@@ -21,9 +21,9 @@ env: {}
 # Additional environment variables to provided via envFrom reference
 envFrom:
   - configMapRef:
-      name: nucliadb-config
+      name: nucliadb-config #  Nucliadb-shared configMap
   - secretRef:
-      name: nucliadb-config
+      name: nucliadb-config #  Nucliadb-shared secret
 
 # Kubernetes settings
 affinity: {}
