@@ -91,7 +91,8 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     kbid = KnowledgeBox.new_unique_kbid()
 
-    # Onprem KBs have to call learning proxy to create it's own configuration.
+    # Onprem KB creation doesn't have an existing learning configuration yet, so
+    # we need to call learning proxy to create it
     if item.learning_configuration:
         user_learning_config = item.learning_configuration
     else:

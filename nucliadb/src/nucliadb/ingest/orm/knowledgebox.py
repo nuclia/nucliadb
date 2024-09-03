@@ -103,7 +103,6 @@ class KnowledgeBox:
         slug: str,
         title: str = "",
         description: str = "",
-        semantic_model: Optional[SemanticModelMetadata] = None,
         semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
         release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
@@ -114,16 +113,8 @@ class KnowledgeBox:
             raise KnowledgeBoxCreationError("A kbid must be provided to create a new KB")
         if not slug:
             raise KnowledgeBoxCreationError("A slug must be provided to create a new KB")
-        if semantic_model is None:
-            if semantic_models is None or len(semantic_models) == 0:
-                raise KnowledgeBoxCreationError(
-                    "KB must only define semantic_model or semantic_models, not both"
-                )
-        else:
-            if semantic_models is not None and len(semantic_models) > 0:
-                raise KnowledgeBoxCreationError(
-                    "KB must only define semantic_model or semantic_models, not both"
-                )
+        if semantic_models is None or len(semantic_models) == 0:
+            raise KnowledgeBoxCreationError("KB must define at least one semantic model")
 
         release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
 
@@ -149,71 +140,48 @@ class KnowledgeBox:
                 # B/c with Shards.actual
                 kb_shards.actual = -1
                 kb_shards.release_channel = release_channel
-                if semantic_model is not None:
-                    # bw/c we keep populating the deprecated fields for KBs with
-                    # only one vectorset
 
+                vs_external_indexes = []
+                for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                     # if this KB uses a matryoshka model, we can choose a different
                     # dimension
                     if len(semantic_model.matryoshka_dimensions) > 0:
-                        semantic_model.vector_dimension = choose_matryoshka_dimension(
-                            semantic_model.matryoshka_dimensions  # type: ignore
-                        )
-                    kb_shards.similarity = semantic_model.similarity_function
-                    kb_shards.model.CopyFrom(semantic_model)
-                    stored_external_index_provider = await cls._maybe_create_external_indexes(
-                        kbid,
-                        request=external_index_provider,
-                        indexes=[
-                            VectorsetExternalIndex(
-                                vectorset_id="__default__",
-                                dimension=semantic_model.vector_dimension,
-                                similarity=semantic_model.similarity_function,
-                            )
-                        ],
-                    )
-                    rollback_ops.append(
-                        partial(cls._maybe_delete_external_indexes, kbid, stored_external_index_provider)
-                    )
-                else:
-                    vs_external_indexes = []
-                    for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
-                        # if this KB uses a matryoshka model, we can choose a different
-                        # dimension
-                        if len(semantic_model.matryoshka_dimensions) > 0:
-                            dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
-                        else:
-                            dimension = semantic_model.vector_dimension
-                        vs_external_indexes.append(
-                            VectorsetExternalIndex(
-                                vectorset_id=vectorset_id,
-                                dimension=dimension,
-                                similarity=semantic_model.similarity_function,
-                            )
-                        )
-                        vectorset_config = knowledgebox_pb2.VectorSetConfig(
-                            vectorset_id=vectorset_id,
-                            vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
-                                similarity=semantic_model.similarity_function,
-                                # XXX: hardcoded value
-                                vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-                                normalize_vectors=len(semantic_model.matryoshka_dimensions) > 0,
-                                vector_dimension=dimension,
-                            ),
-                            matryoshka_dimensions=semantic_model.matryoshka_dimensions,
-                        )
-                        await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
+                        dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
+                    else:
+                        dimension = semantic_model.vector_dimension
 
-                    stored_external_index_provider = await cls._maybe_create_external_indexes(
-                        kbid, request=external_index_provider, indexes=vs_external_indexes
-                    )
-                    rollback_ops.append(
-                        partial(
-                            cls._maybe_delete_external_indexes,
-                            kbid,
-                            stored_external_index_provider,
+                    vs_external_indexes.append(
+                        VectorsetExternalIndex(
+                            vectorset_id=vectorset_id,
+                            dimension=dimension,
+                            similarity=semantic_model.similarity_function,
                         )
                     )
+
+                    vectorset_config = knowledgebox_pb2.VectorSetConfig(
+                        vectorset_id=vectorset_id,
+                        vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+                            similarity=semantic_model.similarity_function,
+                            # XXX: hardcoded value
+                            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                            normalize_vectors=len(semantic_model.matryoshka_dimensions) > 0,
+                            vector_dimension=dimension,
+                        ),
+                        matryoshka_dimensions=semantic_model.matryoshka_dimensions,
+                    )
+                    await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
+
+                stored_external_index_provider = await cls._maybe_create_external_indexes(
+                    kbid, request=external_index_provider, indexes=vs_external_indexes
+                )
+                rollback_ops.append(
+                    partial(
+                        cls._maybe_delete_external_indexes,
+                        kbid,
+                        stored_external_index_provider,
+                    )
+                )
+
                 config = KnowledgeBoxConfig(
                     title=title,
                     description=description,

@@ -34,15 +34,17 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     CreatePineconeConfig,
     ExternalIndexProviderType,
-    KnowledgeBoxConfig,
     KnowledgeBoxID,
-    KnowledgeBoxNew,
     KnowledgeBoxResponseStatus,
-    NewKnowledgeBoxResponse,
     PineconeServerlessCloud,
 )
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import BrokerMessage, NewKnowledgeBoxV2Request, OpStatusWriter
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    NewKnowledgeBoxV2Request,
+    NewKnowledgeBoxV2Response,
+    OpStatusWriter,
+)
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.aiopynecone.models import IndexDescription, IndexStats, IndexStatus, QueryResponse
 from nucliadb_utils.utilities import get_endecryptor
@@ -99,87 +101,7 @@ def hosted_nucliadb():
 
 
 @pytest.mark.asyncio
-async def test_kb_creation_old(
-    nucliadb_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    control_plane,
-):
-    """
-    This tests the deprecated method for creating kbs on a hosted nucliadb that
-    uses the nucliadb_grpc.NewKnowledgeBox method.
-    """
-    expected_index_name = "nuclia-someuuid"
-    with mock.patch(
-        f"{PINECONE_MODULE}.PineconeIndexManager.get_index_name", return_value=expected_index_name
-    ):
-        kbid = str(uuid4())
-        slug = "pinecone-testing-old"
-        config = KnowledgeBoxConfig(
-            title="Pinecone test",
-            slug=slug,
-        )
-        request = KnowledgeBoxNew(
-            forceuuid=kbid,
-            slug=slug,
-            config=config,
-            vector_dimension=128,
-            similarity=VectorSimilarity.DOT,
-            external_index_provider=CreateExternalIndexProviderMetadata(
-                type=ExternalIndexProviderType.PINECONE,
-                pinecone_config=CreatePineconeConfig(
-                    api_key="my-pinecone-api-key",
-                    serverless_cloud=PineconeServerlessCloud.AWS_US_EAST_1,
-                ),
-            ),
-        )
-
-        # Creating a knowledge box should create a Pinecone index
-        response: NewKnowledgeBoxResponse = await nucliadb_grpc.NewKnowledgeBox(request, timeout=None)  # type: ignore
-        assert response.status == KnowledgeBoxResponseStatus.OK
-
-        control_plane.create_index.assert_awaited_once_with(
-            name=expected_index_name,
-            dimension=128,
-            metric="dotproduct",
-            serverless_cloud={"cloud": "aws", "region": "us-east-1"},
-        )
-
-        # Check that external index provider metadata was properly stored
-        async with datamanagers.with_ro_transaction() as txn:
-            external_index_provider = await datamanagers.kb.get_external_index_provider_metadata(
-                txn, kbid=kbid
-            )
-            assert external_index_provider is not None
-            assert external_index_provider.type == ExternalIndexProviderType.PINECONE
-            # Check that the API key was encrypted
-            encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
-            endecryptor = get_endecryptor()
-            decrypted_api_key = endecryptor.decrypt(encrypted_api_key)
-            assert decrypted_api_key == "my-pinecone-api-key"
-
-            # Check that the rest of the config was stored
-            vectorset_id = "__default__"
-            assert (
-                external_index_provider.pinecone_config.indexes[vectorset_id].index_name
-                == expected_index_name
-            )
-            assert (
-                external_index_provider.pinecone_config.indexes[vectorset_id].index_host
-                == "pinecone-host"
-            )
-            assert external_index_provider.pinecone_config.indexes[vectorset_id].vector_dimension == 128
-
-        # Deleting a knowledge box should delete the Pinecone index
-        response = await nucliadb_grpc.DeleteKnowledgeBox(
-            KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None
-        )  # type: ignore
-        assert response.status == KnowledgeBoxResponseStatus.OK
-
-        control_plane.delete_index.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_kb_creation_new(
+async def test_kb_creation(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     control_plane,
@@ -225,7 +147,9 @@ async def test_kb_creation_new(
         )
 
         # Creating a knowledge with 2 vectorsets box should create two Pinecone indexes
-        response: NewKnowledgeBoxResponse = await nucliadb_grpc.NewKnowledgeBoxV2(request, timeout=None)  # type: ignore
+        response: NewKnowledgeBoxV2Response = await nucliadb_grpc.NewKnowledgeBoxV2(
+            request, timeout=None
+        )  # type: ignore
         assert response.status == KnowledgeBoxResponseStatus.OK
 
         # Should create an index for every vectorset

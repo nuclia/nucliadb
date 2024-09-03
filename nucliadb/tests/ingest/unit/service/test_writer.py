@@ -29,7 +29,7 @@ from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb_protos import writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.resources_pb2 import FieldText
-from nucliadb_protos.utils_pb2 import ReleaseChannel, VectorSimilarity
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 
 
 class TestWriterServicer:
@@ -70,26 +70,6 @@ class TestWriterServicer:
         with patch("nucliadb.ingest.service.writer.ResourceORM", return_value=mock):
             yield mock
 
-    async def test_NewKnowledgeBox(self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class):
-        request = writer_pb2.KnowledgeBoxNew(
-            slug="slug",
-            forceuuid="kbid",
-            similarity=VectorSimilarity.DOT,
-            vector_dimension=200,
-        )
-
-        resp = await writer.NewKnowledgeBox(request)
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
-        assert knowledgebox_class.create.call_count == 1
-        assert knowledgebox_class.create.call_args.kwargs["slug"] == request.slug
-        assert knowledgebox_class.create.call_args.kwargs["semantic_model"] == SemanticModelMetadata(
-            similarity_function=request.similarity,
-            vector_dimension=request.vector_dimension,
-        )
-        assert knowledgebox_class.create.call_args.kwargs["title"] == request.config.title
-        assert knowledgebox_class.create.call_args.kwargs["description"] == request.config.description
-        assert knowledgebox_class.create.call_args.kwargs["release_channel"] == request.release_channel
-
     async def test_NewKnowledgeBoxV2(self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class):
         request = writer_pb2.NewKnowledgeBoxV2Request(
             kbid="kbid",
@@ -121,38 +101,6 @@ class TestWriterServicer:
             for vs in request.vectorsets
         }
         assert "release_channel" not in knowledgebox_class.create.call_args.kwargs
-
-    async def test_NewKnowledgeBox_experimental_channel(
-        self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
-    ):
-        request = writer_pb2.KnowledgeBoxNew(
-            slug="slug", release_channel=ReleaseChannel.EXPERIMENTAL, forceuuid="kbid"
-        )
-
-        resp = await writer.NewKnowledgeBox(request)
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
-        assert (
-            knowledgebox_class.create.call_args.kwargs["release_channel"] == ReleaseChannel.EXPERIMENTAL
-        )
-
-    async def test_NewKnowledgeBox_with_matryoshka_dimensions(
-        self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
-    ):
-        request = writer_pb2.KnowledgeBoxNew(
-            slug="slug",
-            forceuuid="kbid",
-            similarity=VectorSimilarity.COSINE,
-            vector_dimension=200,
-            matryoshka_dimensions=[200, 400],
-        )
-
-        resp = await writer.NewKnowledgeBox(request)
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.OK
-        assert knowledgebox_class.create.call_args.kwargs["semantic_model"] == SemanticModelMetadata(
-            similarity_function=request.similarity,
-            vector_dimension=request.vector_dimension,
-            matryoshka_dimensions=request.matryoshka_dimensions,
-        )
 
     async def test_NewKnowledgeBoxV2_with_matryoshka_dimensions(
         self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
@@ -227,16 +175,6 @@ class TestWriterServicer:
             for vs in request.vectorsets
         }
 
-    async def test_NewKnowledgeBox_handle_conflict_error(
-        self, writer: WriterServicer, knowledgebox_class
-    ):
-        request = writer_pb2.KnowledgeBoxNew(slug="slug")
-        knowledgebox_class.create.side_effect = KnowledgeBoxConflict()
-
-        resp = await writer.NewKnowledgeBox(request)
-
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.CONFLICT
-
     async def test_NewKnowledgeBoxV2_handle_conflict_error(
         self, writer: WriterServicer, knowledgebox_class
     ):
@@ -247,14 +185,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.CONFLICT
 
-    async def test_NewKnowledgeBox_handle_error(self, writer: WriterServicer, knowledgebox_class):
-        request = writer_pb2.KnowledgeBoxNew(slug="slug")
-        knowledgebox_class.create.side_effect = Exception("error")
-
-        resp = await writer.NewKnowledgeBox(request)
-
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
-
     async def test_NewKnowledgeBoxV2_handle_error(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
         knowledgebox_class.create.side_effect = Exception("error")
@@ -262,6 +192,17 @@ class TestWriterServicer:
         resp = await writer.NewKnowledgeBoxV2(request)
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+
+    async def test_NewKnowledgeBoxV2_handle_external_index_error(
+        self, writer: WriterServicer, knowledgebox_class
+    ):
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
+        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
+
+        resp = await writer.NewKnowledgeBoxV2(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
+        assert resp.error_message == "foo"
 
     async def test_UpdateKnowledgeBox(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
@@ -311,8 +252,8 @@ class TestWriterServicer:
     async def test_NewKnowledgeBox_not_available_for_onprem(
         self, writer: WriterServicer, onprem_nucliadb
     ):
-        request = writer_pb2.KnowledgeBoxNew(slug="slug", forceuuid="kbid")
-        resp = await writer.NewKnowledgeBox(request)
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
+        resp = await writer.NewKnowledgeBoxV2(request)
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
 
     async def test_UpdateKnowledgeBox_not_available_for_onprem(
@@ -568,25 +509,3 @@ class TestWriterServicer:
             txn.commit.assert_called_once()
 
             assert isinstance(resp, writer_pb2.IndexStatus)
-
-    async def test_NewKnowledgeBox_handle_external_index_error(
-        self, writer: WriterServicer, knowledgebox_class
-    ):
-        request = writer_pb2.KnowledgeBoxNew(slug="slug")
-        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
-
-        resp = await writer.NewKnowledgeBox(request)
-
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
-        assert resp.error_message == "foo"
-
-    async def test_NewKnowledgeBoxV2_handle_external_index_error(
-        self, writer: WriterServicer, knowledgebox_class
-    ):
-        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
-        knowledgebox_class.create.side_effect = ExternalIndexCreationError("pinecone", "foo")
-
-        resp = await writer.NewKnowledgeBoxV2(request)
-
-        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
-        assert resp.error_message == "foo"

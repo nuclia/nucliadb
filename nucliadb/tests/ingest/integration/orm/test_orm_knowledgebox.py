@@ -69,7 +69,7 @@ async def test_create_knowledgebox(
         slug=slug,
         title=title,
         description=description,
-        semantic_model=SemanticModelMetadata(),
+        semantic_models={"my-semantic-model": SemanticModelMetadata()},
     )
     assert result == (kbid, slug)
     async with maindb_driver.transaction(read_only=True) as txn:
@@ -164,7 +164,7 @@ async def test_create_knowledgebox_with_release_channel(
             maindb_driver,
             kbid=KnowledgeBox.new_unique_kbid(),
             slug="mykbslug",
-            semantic_model=SemanticModelMetadata(),
+            semantic_models={"my-semantic-model": SemanticModelMetadata()},
         )
 
     async with maindb_driver.transaction(read_only=True) as txn:

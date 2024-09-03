@@ -32,14 +32,25 @@ async def test_create_entities_group(
 ):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
-    kb_id = str(uuid4())
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kb_id)
-    pb.config.title = "My Title"
-    result = await stub.NewKnowledgeBox(pb)  # type: ignore
+    kbid = str(uuid4())
+    slug = "test"
+    result = await stub.NewKnowledgeBoxV2(  # type: ignore
+        writer_pb2.NewKnowledgeBoxV2Request(
+            kbid=kbid,
+            slug=slug,
+            title="My title",
+            vectorsets=[
+                writer_pb2.NewKnowledgeBoxV2Request.VectorSet(
+                    vectorset_id="my-semantic-model",
+                    vector_dimension=1024,
+                )
+            ],
+        )
+    )
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
     pb_ser = writer_pb2.SetEntitiesRequest(
-        kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kb_id, slug="test"),
+        kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid, slug=slug),
         group="0",
         entities=knowledgebox_pb2.EntitiesGroup(
             title="zero",
@@ -52,6 +63,6 @@ async def test_create_entities_group(
     assert result.status == writer_pb2.OpStatusWriter.OK
 
     pb_ger = writer_pb2.GetEntitiesRequest(
-        kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kb_id, slug="test"),
+        kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid, slug=slug),
     )
     result = await stub.GetEntities(pb_ger)  # type: ignore
