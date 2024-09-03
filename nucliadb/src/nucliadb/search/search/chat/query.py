@@ -129,15 +129,16 @@ async def get_find_results(
 
     prequeries_results = None
     if len(prequeries) > 0:
-        prequeries_results = await run_prequeries(
-            kbid,
-            prequeries,
-            x_ndb_client=ndb_client,
-            x_nucliadb_user=user,
-            x_forwarded_for=origin,
-            generative_model=item.generative_model,
-            metrics=metrics,
-        )
+        with metrics.time("prequeries"):
+            prequeries_results = await run_prequeries(
+                kbid,
+                prequeries,
+                x_ndb_client=ndb_client,
+                x_nucliadb_user=user,
+                x_forwarded_for=origin,
+                generative_model=item.generative_model,
+                metrics=metrics,
+            )
 
     return find_results, prequeries_results, query_parser
 
