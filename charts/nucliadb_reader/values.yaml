@@ -48,8 +48,8 @@ services:
   maindb: 5432
   nats: 4222
 
-#running:
-#  sentry_url:
+running:
+  sentry_url:
 
 vs:
   gateway:
