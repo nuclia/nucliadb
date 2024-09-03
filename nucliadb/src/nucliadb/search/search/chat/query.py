@@ -28,6 +28,7 @@ from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AskRequest,
@@ -319,7 +320,7 @@ async def run_prequeries(
     Runs simultaneous find requests for each prequery and returns the merged results according to the normalized weights.
     """
     results: list[PreQueryResult] = []
-    max_parallel_prequeries = asyncio.Semaphore(2)
+    max_parallel_prequeries = asyncio.Semaphore(settings.prequeries_max_parallel)
 
     async def _prequery_find(
         prequery: PreQuery,

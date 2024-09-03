@@ -36,6 +36,11 @@ class Settings(DriverSettings):
         title="Slow node query log threshold",
         description="The threshold in seconds for logging slow node queries",
     )
+    prequeries_max_parallel: int = Field(
+        default=2,
+        title="Prequeries max parallel",
+        description="The maximum number of prequeries to run in parallel per /ask request",
+    )
 
 
 settings = Settings()
