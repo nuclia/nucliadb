@@ -862,6 +862,7 @@ def _clean_paragraph_text(paragraph: FindParagraph) -> str:
 def get_ordered_paragraphs(
     main_results: KnowledgeboxFindResults,
     prequeries_results: Optional[list[PreQueryResult]] = None,
+    main_query_weight: float = 1.0,
 ) -> list[FindParagraph]:
     """
     Returns the list of paragraphs in the results, ordered by relevance (descending score).
@@ -872,7 +873,7 @@ def get_ordered_paragraphs(
 
     If a paragraph is matched in various prequeries, the final weighted score is the sum of the weighted scores for each prequery.
 
-    Prequeries results, if provided, are always considered more relevant than the main results.
+    `main_query_weight` is the weight given to the paragraphs matching the main query when calculating the final score.
     """
 
     def iter_paragraphs(results: KnowledgeboxFindResults):
@@ -881,13 +882,15 @@ def get_ordered_paragraphs(
                 for paragraph in field.paragraphs.values():
                     yield paragraph
 
+    total_weights = main_query_weight + sum(prequery.weight for prequery, _ in prequeries_results or [])
+
     paragraph_id_to_paragraph = {}
     paragraph_id_to_score = {}
     for paragraph in iter_paragraphs(main_results):
         paragraph_id_to_paragraph[paragraph.id] = paragraph
-        paragraph_id_to_score[paragraph.id] = paragraph.score
+        weighted_score = paragraph.score * (main_query_weight / total_weights) * 100
+        paragraph_id_to_score[paragraph.id] = weighted_score
 
-    total_weights = sum(prequery.weight for prequery, _ in prequeries_results or [])
     for prequery, prequery_results in prequeries_results or []:
         for paragraph in iter_paragraphs(prequery_results):
             normalize_weight = (prequery.weight / total_weights) * 100

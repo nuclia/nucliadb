@@ -395,20 +395,20 @@ async def test_extend_prompt_context_with_metadata():
 def test_get_ordered_paragraphs():
     main_results = KnowledgeboxFindResults(
         resources={
-            "r0": FindResource(
-                id="r0",
+            "main-result": FindResource(
+                id="main-result",
                 fields={
                     "f/f1": FindField(
                         paragraphs={
-                            "r0/f/f1/0-10": FindParagraph(
-                                id="r0/f/f1/0-10",
+                            "main-result/f/f1/0-10": FindParagraph(
+                                id="main-result/f/f1/0-10",
                                 score=2,
                                 score_type=SCORE_TYPE.BM25,
                                 order=0,
                                 text="First Paragraph text",
                             ),
-                            "r0/f/f1/10-20": FindParagraph(
-                                id="r0/f/f1/10-20",
+                            "main-result/f/f1/10-20": FindParagraph(
+                                id="main-result/f/f1/10-20",
                                 score=1,
                                 score_type=SCORE_TYPE.BM25,
                                 order=1,
@@ -426,20 +426,20 @@ def test_get_ordered_paragraphs():
     )
     prequery_1_results = KnowledgeboxFindResults(
         resources={
-            "r1": FindResource(
-                id="r1",
+            "prequery-1-result": FindResource(
+                id="prequery-1-result",
                 fields={
                     "f/f1": FindField(
                         paragraphs={
-                            "r1/f/f1/0-10": FindParagraph(
-                                id="r1/f/f1/0-10",
+                            "prequery-1-result/f/f1/0-10": FindParagraph(
+                                id="prequery-1-result/f/f1/0-10",
                                 score=2,
                                 score_type=SCORE_TYPE.BM25,
                                 order=0,
                                 text="First Paragraph text",
                             ),
-                            "r1/f/f1/10-20": FindParagraph(
-                                id="r1/f/f1/10-20",
+                            "prequery-1-result/f/f1/10-20": FindParagraph(
+                                id="prequery-1-result/f/f1/10-20",
                                 score=1,
                                 score_type=SCORE_TYPE.BM25,
                                 order=1,
@@ -457,20 +457,20 @@ def test_get_ordered_paragraphs():
     )
     prequery_2_results = KnowledgeboxFindResults(
         resources={
-            "r2": FindResource(
-                id="r2",
+            "prequery-2-result": FindResource(
+                id="prequery-2-result",
                 fields={
                     "f/f1": FindField(
                         paragraphs={
-                            "r2/f/f1/0-10": FindParagraph(
-                                id="r2/f/f1/0-10",
+                            "prequery-2-result/f/f1/0-10": FindParagraph(
+                                id="prequery-2-result/f/f1/0-10",
                                 score=2,
                                 score_type=SCORE_TYPE.BM25,
                                 order=0,
                                 text="First Paragraph text",
                             ),
-                            "r2/f/f1/10-20": FindParagraph(
-                                id="r2/f/f1/10-20",
+                            "prequery-2-result/f/f1/10-20": FindParagraph(
+                                id="prequery-2-result/f/f1/10-20",
                                 score=1,
                                 score_type=SCORE_TYPE.BM25,
                                 order=1,
@@ -491,17 +491,29 @@ def test_get_ordered_paragraphs():
     )
     assert len(ordered_paragraphs) == 6
     # The first paragraphs come from the prequery with the highest weight
-    assert ordered_paragraphs[0].id == "r2/f/f1/0-10"
-    assert ordered_paragraphs[0].score == 90 * 2
-    assert ordered_paragraphs[1].id == "r2/f/f1/10-20"
-    assert ordered_paragraphs[1].score == 90 * 1
+    assert ordered_paragraphs[0].id == "prequery-2-result/f/f1/0-10"
+    assert ordered_paragraphs[1].id == "prequery-2-result/f/f1/10-20"
     # The second paragraphs come from the prequery with the lowest weight
-    assert ordered_paragraphs[2].id == "r1/f/f1/0-10"
-    assert ordered_paragraphs[2].score == 10 * 2
-    assert ordered_paragraphs[3].id == "r1/f/f1/10-20"
-    assert ordered_paragraphs[3].score == 10 * 1
+    assert ordered_paragraphs[2].id == "prequery-1-result/f/f1/0-10"
+    assert ordered_paragraphs[3].id == "prequery-1-result/f/f1/10-20"
     # The last paragraphs come from the main results
-    assert ordered_paragraphs[4].id == "r0/f/f1/0-10"
-    assert ordered_paragraphs[4].score == 2
-    assert ordered_paragraphs[5].id == "r0/f/f1/10-20"
-    assert ordered_paragraphs[5].score == 1
+    assert ordered_paragraphs[4].id == "main-result/f/f1/0-10"
+    assert ordered_paragraphs[5].id == "main-result/f/f1/10-20"
+
+    # Test that the main query weight can be set to a huge
+    # value so that the main results are always at the beginning
+    ordered_paragraphs = chat_prompt.get_ordered_paragraphs(
+        main_results=main_results,
+        prequeries_results=[
+            (prequery_1, prequery_1_results),
+            (prequery_2, prequery_2_results),
+        ],
+        main_query_weight=1000,
+    )
+    assert len(ordered_paragraphs) == 6
+    assert ordered_paragraphs[0].id == "main-result/f/f1/0-10"
+    assert ordered_paragraphs[1].id == "main-result/f/f1/10-20"
+    assert ordered_paragraphs[2].id == "prequery-2-result/f/f1/0-10"
+    assert ordered_paragraphs[3].id == "prequery-2-result/f/f1/10-20"
+    assert ordered_paragraphs[4].id == "prequery-1-result/f/f1/0-10"
+    assert ordered_paragraphs[5].id == "prequery-1-result/f/f1/10-20"

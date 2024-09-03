@@ -173,7 +173,7 @@ class AskResult:
         if len(self.prequeries_results) > 0:
             item = PrequeriesAskResponseItem()
             for index, (prequery, result) in enumerate(self.prequeries_results):
-                prequery_id = prequery.id or str(index)
+                prequery_id = prequery.id or f"prequery_{index}"
                 item.results[prequery_id] = result
             yield item
 
@@ -293,7 +293,7 @@ class AskResult:
         if self.prequeries_results:
             prequeries_results = {}
             for index, (prequery, result) in enumerate(self.prequeries_results):
-                prequery_id = prequery.id or str(index)
+                prequery_id = prequery.id or f"prequery_{index}"
                 prequeries_results[prequery_id] = result
 
         response = SyncAskResponse(
@@ -302,7 +302,7 @@ class AskResult:
             status=self.status_code.prettify(),
             relations=self._relations,
             retrieval_results=self.main_results,
-            prequeries_retrieval_results=prequeries_results,
+            prequeries=prequeries_results,
             citations=citations,
             metadata=metadata,
             learning_id=self.nuclia_learning_id or "",
@@ -577,6 +577,6 @@ def parse_prequeries(ask_request: AskRequest) -> Optional[list[PreQuery]]:
             # Give each query a unique id if they don't have one
             for index, query in enumerate(queries):
                 if query.id is None:
-                    query.id = str(index)
+                    query.id = f"prequery_{index}"
             return queries
     return None

@@ -684,6 +684,7 @@ async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowled
                         {
                             "request": {"query": "title", "fields": ["a/title"]},
                             "weight": 1,
+                            "id": "title_query",
                         },
                     ],
                 }
@@ -694,7 +695,8 @@ async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowled
     )
     assert resp.status_code == 200, resp.text
     ask_response = SyncAskResponse.model_validate_json(resp.content)
-    assert ask_response.prequeries_retrieval_results is not None
-    assert len(ask_response.prequeries_retrieval_results) == 2
-    assert len(ask_response.prequeries_retrieval_results["prequery_0"].best_matches) > 1
-    assert len(ask_response.prequeries_retrieval_results["prequery_1"].best_matches) > 1
+    assert ask_response.prequeries is not None
+    assert len(ask_response.prequeries) == 2
+    print(ask_response.prequeries.keys())
+    assert len(ask_response.prequeries["prequery_0"].best_matches) > 1
+    assert len(ask_response.prequeries["title_query"].best_matches) > 1
