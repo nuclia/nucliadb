@@ -39,6 +39,8 @@ use crate::{io_maps, schema};
 
 const FUZZY_DISTANCE: u8 = 1;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
+// Hard limit until we have pagination in place
+const MAX_NUM_RELATIONS_RESULTS: usize = 500;
 
 pub struct RelationsReaderService {
     index: Index,
@@ -258,10 +260,12 @@ impl RelationsReaderService {
 
         let query = BooleanQuery::from(queries);
         let searcher = self.reader.searcher();
-        let matching_docs = searcher.search(&query, &DocSetCollector)?;
+
+        let topdocs = TopDocs::with_limit(MAX_NUM_RELATIONS_RESULTS);
+        let matching_docs = searcher.search(&query, &topdocs)?;
         let mut response = EntitiesSubgraphResponse::default();
 
-        for doc_addr in matching_docs {
+        for (_, doc_addr) in matching_docs {
             let source = searcher.doc(doc_addr)?;
             let relation = io_maps::doc_to_relation(&self.schema, &source);
             response.relations.push(relation);

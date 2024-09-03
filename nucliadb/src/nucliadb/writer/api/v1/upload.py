@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-import mimetypes
 import pickle
 import uuid
 from datetime import datetime
@@ -61,6 +60,7 @@ from nucliadb.writer.tus.exceptions import (
 from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models import content_types
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
@@ -251,8 +251,15 @@ async def _tus_post(
     request_content_type = None
     if item is None:
         request_content_type = request.headers.get("content-type")
-    if not request_content_type:
-        request_content_type = guess_content_type(metadata["filename"])
+    if request_content_type is None:
+        request_content_type = content_types.guess(metadata["filename"]) or "application/octet-stream"
+
+    if request_content_type is not None and not content_types.valid(request_content_type):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported content type: {request_content_type}",
+        )
+
     metadata.setdefault("content_type", request_content_type)
 
     metadata["implies_resource_creation"] = implies_resource_creation
@@ -530,10 +537,18 @@ async def _tus_patch(
             if isinstance(item_payload, str):
                 item_payload = item_payload.encode()
             creation_payload = pickle.loads(base64.b64decode(item_payload))
+
+        content_type = dm.get("metadata", {}).get("content_type")
+        if content_type is not None and not content_types.valid(content_type):
+            return HTTPClientError(
+                status_code=415,
+                detail=f"Unsupported content type: {content_type}",
+            )
+
         try:
             seqid = await store_file_on_nuclia_db(
                 size=dm.get("size"),
-                content_type=dm.get("metadata", {}).get("content_type"),
+                content_type=content_type,
                 override_resource_title=dm.get("metadata", {}).get("implies_resource_creation", False),
                 filename=dm.get("metadata", {}).get("filename"),
                 password=dm.get("metadata", {}).get("password"),
@@ -702,8 +717,14 @@ async def _upload(
     # - content-type set by the user in the upload request header takes precedence.
     # - if not set, we will try to guess it from the filename and default to a generic binary content type otherwise
     content_type = request.headers.get("content-type")
-    if not content_type:
-        content_type = guess_content_type(filename)
+    if content_type is None:
+        content_type = content_types.guess(filename) or "application/octet-stream"
+
+    if not content_types.valid(content_type):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported content type: {content_type}",
+        )
 
     metadata = {"content_type": content_type, "filename": filename}
 
@@ -814,7 +835,6 @@ async def store_file_on_nuclia_db(
     item: Optional[CreateResourcePayload] = None,
 ) -> Optional[int]:
     # File is on NucliaDB Storage at path
-
     partitioning = get_partitioning()
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -920,9 +940,3 @@ def maybe_b64decode(some_string: str) -> str:
     except ValueError:
         # not b64encoded
         return some_string
-
-
-def guess_content_type(filename: str) -> str:
-    default = "application/octet-stream"
-    guessed, _ = mimetypes.guess_type(filename)
-    return guessed or default

@@ -183,7 +183,11 @@ async def get_find_results(
 
 
 async def get_relations_results(
-    *, kbid: str, text_answer: str, target_shard_replicas: Optional[list[str]]
+    *,
+    kbid: str,
+    text_answer: str,
+    target_shard_replicas: Optional[list[str]],
+    timeout: Optional[float] = None,
 ) -> Relations:
     try:
         predict = get_predict()
@@ -202,6 +206,9 @@ async def get_relations_results(
             Method.RELATIONS,
             relation_request,
             target_shard_replicas=target_shard_replicas,
+            timeout=timeout,
+            use_read_replica_nodes=True,
+            retry_on_primary=False,
         )
         return await merge_relations_results(relations_results, relation_request.subgraph)
     except Exception as exc:
