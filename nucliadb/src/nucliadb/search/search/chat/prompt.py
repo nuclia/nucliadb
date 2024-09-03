@@ -874,9 +874,11 @@ def get_ordered_paragraphs(
                 for paragraph in field.paragraphs.values():
                     yield paragraph
 
+    paragraph_id_to_paragraph = {}
     paragraph_id_to_score = {}
     for paragraph in iter_paragraphs(main_results):
-        paragraph_id_to_score[paragraph.id] = paragraph
+        paragraph_id_to_paragraph[paragraph.id] = paragraph
+        paragraph_id_to_score[paragraph.id] = paragraph.score
 
     total_weights = sum(prequery.weight for prequery, _ in prequeries_results or [])
     for prequery, prequery_results in prequeries_results or []:
@@ -886,16 +888,16 @@ def get_ordered_paragraphs(
             if paragraph.id in paragraph_id_to_score:
                 # If a paragraph is matched in various prequeries, the final score is the
                 # sum of the weighted scores
-                paragraph_id_to_score[paragraph.id].score += weighted_score
+                paragraph_id_to_paragraph[paragraph.id] = paragraph
+                paragraph_id_to_score[paragraph.id] += weighted_score
             else:
-                paragraph.score = weighted_score
-                paragraph_id_to_score[paragraph.id] = paragraph
+                paragraph_id_to_paragraph[paragraph.id] = paragraph
+                paragraph_id_to_score[paragraph.id] = weighted_score
 
-    return sorted(
-        paragraph_id_to_score.values(),
-        key=lambda paragraph: paragraph.score,
-        reverse=True,
+    ids_ordered_by_score = sorted(
+        paragraph_id_to_paragraph.keys(), key=lambda pid: paragraph_id_to_score[pid], reverse=True
     )
+    return [paragraph_id_to_paragraph[pid] for pid in ids_ordered_by_score]
 
 
 def get_neighbouring_paragraph_indexes(

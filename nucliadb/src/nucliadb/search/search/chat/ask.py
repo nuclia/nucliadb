@@ -172,8 +172,9 @@ class AskResult:
 
         if len(self.prequeries_results) > 0:
             item = PrequeriesAskResponseItem()
-            for prequery, result in self.prequeries_results:
-                item.results[prequery.name] = result
+            for index, (prequery, result) in enumerate(self.prequeries_results):
+                prequery_id = prequery.id or str(index)
+                item.results[prequery_id] = result
             yield item
 
         # Then stream out the predict answer
@@ -288,11 +289,12 @@ class AskResult:
         if self._object is not None:
             answer_json = self._object.object
 
-        prequeries_results = None
+        prequeries_results: Optional[dict[str, KnowledgeboxFindResults]] = None
         if self.prequeries_results:
             prequeries_results = {}
-            for prequery, result in self.prequeries_results:
-                prequeries_results[prequery.name] = result
+            for index, (prequery, result) in enumerate(self.prequeries_results):
+                prequery_id = prequery.id or str(index)
+                prequeries_results[prequery_id] = result
 
         response = SyncAskResponse(
             answer=self._answer_text,
@@ -572,7 +574,9 @@ def parse_prequeries(ask_request: AskRequest) -> Optional[list[PreQuery]]:
         if rag_strategy.name == RagStrategyName.PREQUERIES:
             rag_strategy = cast(PreQueriesStrategy, rag_strategy)
             queries = rag_strategy.queries
+            # Give each query a unique id if they don't have one
             for index, query in enumerate(queries):
-                if query.name is None:
-                    query.name = f"prequery_{index}"
+                if query.id is None:
+                    query.id = str(index)
             return queries
+    return None

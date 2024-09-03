@@ -229,7 +229,7 @@ async def test_prompt_context_builder_prepends_user_context(
     find_results: KnowledgeboxFindResults,
 ):
     builder = chat_prompt.PromptContextBuilder(
-        kbid="kbid", find_results=find_results, user_context=["Carrots are orange"]
+        kbid="kbid", main_results=find_results, user_context=["Carrots are orange"]
     )
 
     async def _mock_build_context(context, *args, **kwargs):
