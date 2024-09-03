@@ -37,10 +37,11 @@ def test_orderer():
     random.shuffle(items)
 
     for item in items:
-        orderer.add(item[0], item[1])
+        orderer.add(item[0], score=item[1])
 
     sorted_items = list(orderer.sorted_by_score())
-    assert sorted_items == sorted(items, key=lambda x: x[1], reverse=True)
+    keys, _ = zip(*list(sorted(items, key=lambda x: x[1], reverse=True)))
+    assert sorted_items == list(keys)
 
 
 def get_paragraph_result(score):
