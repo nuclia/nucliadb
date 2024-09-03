@@ -70,7 +70,6 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     PrequeriesAskResponseItem,
     PreQueriesStrategy,
-    PreQuery,
     PreQueryResult,
     PromptContext,
     PromptContextOrder,
@@ -470,6 +469,7 @@ async def ask(
             kbid=kbid,
             main_results=main_results,
             prequeries_results=prequeries_results,
+            main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
             resource=resource,
             user_context=user_context,
             strategies=ask_request.rag_strategies,
@@ -569,14 +569,13 @@ def handled_ask_exceptions(func):
     return wrapper
 
 
-def parse_prequeries(ask_request: AskRequest) -> Optional[list[PreQuery]]:
+def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
     for rag_strategy in ask_request.rag_strategies:
         if rag_strategy.name == RagStrategyName.PREQUERIES:
-            rag_strategy = cast(PreQueriesStrategy, rag_strategy)
-            queries = rag_strategy.queries
+            prequeries = cast(PreQueriesStrategy, rag_strategy)
             # Give each query a unique id if they don't have one
-            for index, query in enumerate(queries):
+            for index, query in enumerate(prequeries.queries):
                 if query.id is None:
                     query.id = f"prequery_{index}"
-            return queries
+            return prequeries
     return None

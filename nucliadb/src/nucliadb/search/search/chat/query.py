@@ -37,6 +37,7 @@ from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
+    PreQueriesStrategy,
     PreQuery,
     PreQueryResult,
     PromptContext,
@@ -81,9 +82,8 @@ async def get_find_results(
     user: str,
     origin: str,
     metrics: RAGMetrics = RAGMetrics(),
-    prequeries: Optional[list[PreQuery]] = None,
+    prequeries: Optional[PreQueriesStrategy] = None,
 ) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], QueryParser]:
-    prequeries = prequeries or []
     find_request = FindRequest()
     find_request.resource_filters = item.resource_filters
     find_request.features = []
@@ -128,7 +128,7 @@ async def get_find_results(
         raise IncompleteFindResultsError()
 
     prequeries_results = None
-    if len(prequeries) > 0:
+    if prequeries is not None:
         with metrics.time("prequeries"):
             prequeries_results = await run_prequeries(
                 kbid,
@@ -310,7 +310,7 @@ def sorted_prompt_context_list(context: PromptContext, order: PromptContextOrder
 
 async def run_prequeries(
     kbid: str,
-    prequeries: list[PreQuery],
+    prequeries: PreQueriesStrategy,
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
@@ -339,7 +339,7 @@ async def run_prequeries(
             return prequery, find_results
 
     ops = []
-    for prequery in prequeries:
+    for prequery in prequeries.queries:
         ops.append(asyncio.create_task(_prequery_find(prequery)))
     ops_results = await asyncio.gather(*ops)
     for prequery, find_results in ops_results:

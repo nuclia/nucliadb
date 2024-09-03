@@ -185,6 +185,15 @@ def test_ask_stream(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
                 "types": ["origin", "classification_labels", "ners", "extra_metadata"],
             }
         ],
+        [
+            {
+                "name": "prequeries",
+                "queries": [
+                    {"request": {"query": "Nuclia loves Semantic Search"}, "weight": 1.0},
+                    {"request": {"query": "Nuclia is a powerful AI search platform"}, "weight": 3.0},
+                ],
+            }
+        ],
     ],
 )
 def test_ask_rag_strategies(docs_dataset, sdk: nucliadb_sdk.NucliaDB, rag_strategies):

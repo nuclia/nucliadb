@@ -724,6 +724,7 @@ class PromptContextBuilder:
         kbid: str,
         main_results: KnowledgeboxFindResults,
         prequeries_results: Optional[list[PreQueryResult]] = None,
+        main_query_weight: float = 1.0,
         resource: Optional[str] = None,
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
@@ -732,7 +733,9 @@ class PromptContextBuilder:
         visual_llm: bool = False,
     ):
         self.kbid = kbid
-        self.ordered_paragraphs = get_ordered_paragraphs(main_results, prequeries_results)
+        self.ordered_paragraphs = get_ordered_paragraphs(
+            main_results, prequeries_results, main_query_weight
+        )
         self.resource = resource
         self.user_context = user_context
         self.strategies = strategies
