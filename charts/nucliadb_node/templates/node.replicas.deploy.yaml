@@ -118,6 +118,8 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          - secretRef:
+              name: node-config
           {{- if $values.envFrom }}
           {{- toYaml $values.envFrom | nindent 10 }}
           {{- end }}

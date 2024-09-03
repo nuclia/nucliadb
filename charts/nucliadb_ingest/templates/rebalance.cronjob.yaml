@@ -57,6 +57,8 @@ spec:
             envFrom:
               - configMapRef:
                   name: {{ .Release.Name }}-config
+              - secretRef:
+                  name: {{ .Release.Name }}-config
               {{- if .Values.envFrom }}
               {{- toYaml .Values.envFrom | nindent 14 }}
               {{- end }}

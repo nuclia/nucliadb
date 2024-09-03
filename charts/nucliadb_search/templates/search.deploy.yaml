@@ -80,6 +80,8 @@ spec:
         envFrom:
           - configMapRef:
               name: search-config
+          - secretRef:
+              name: search-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
           {{- end }}

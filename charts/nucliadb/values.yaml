@@ -26,6 +26,12 @@ env:
   log_output_type: stdout
   log_format_type: structured
 
+envFrom: # Additonal configmaps and secrets to mount into the environment
+  # - configMapRef:
+  #     name: configMapName
+  # - secretRef:
+  #     name: secretName
+
 envSecrets:
   # - name: NUA_API_KEY
   #   valueFrom:

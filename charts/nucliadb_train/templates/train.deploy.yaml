@@ -78,6 +78,8 @@ spec:
         envFrom:
           - configMapRef:
               name: train-config
+          - secretRef:
+              name: train-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
           {{- end }}
