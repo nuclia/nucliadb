@@ -864,7 +864,14 @@ def get_ordered_paragraphs(
     prequeries_results: Optional[list[PreQueryResult]] = None,
 ) -> list[FindParagraph]:
     """
-    Returns the list of paragraphs in the results, ordered by relevance.
+    Returns the list of paragraphs in the results, ordered by relevance (descending score).
+
+    If prequeries_results is provided, the paragraphs of the prequeries are weighted according to the
+    normalized weight of the prequery. The paragraph score is not modified, but it is used to determine the order in which they
+    are presented in the LLM prompt context.
+
+    If a paragraph is matched in various prequeries, the final weighted score is the sum of the weighted scores for each prequery.
+
     Prequeries results, if provided, are always considered more relevant than the main results.
     """
 
