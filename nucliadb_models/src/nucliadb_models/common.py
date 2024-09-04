@@ -23,7 +23,13 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 from typing_extensions import Self
 
 from nucliadb_models import content_types
@@ -271,3 +277,7 @@ class Answer(BaseModel):
 class QuestionAnswer(BaseModel):
     question: Question
     answers: List[Answer]
+
+
+class QuestionAnswers(BaseModel):
+    question_answer: List[QuestionAnswer]

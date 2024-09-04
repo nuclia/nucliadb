@@ -179,11 +179,11 @@ class FieldBuilder:
         )
 
         # check if is another answer for an already added question
-        for question_answer in self._question_answers.question_answers.question_answer:
+        for question_answer in self._question_answers.question_answers.question_answers.question_answer:
             if question_answer.question == question_pb:
                 question_answer.answers.append(answer_pb)
                 return
 
         question_answer = rpb.QuestionAnswer(question=question_pb)
         question_answer.answers.append(answer_pb)
-        self._question_answers.question_answers.question_answer.append(question_answer)
+        self._question_answers.question_answers.question_answers.question_answer.append(question_answer)

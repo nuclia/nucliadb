@@ -22,7 +22,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.learning_proxy import LearningConfiguration, SemanticConfig, SimilarityFunction
+from nucliadb.learning_proxy import (
+    LearningConfiguration,
+    SemanticConfig,
+    SimilarityFunction,
+)
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
 from nucliadb_protos import resources_pb2 as rpb
@@ -751,7 +755,7 @@ async def test_question_answer(
             answer.ids_paragraphs.extend([f"id1/{i}{x}", f"id2/{i}{x}"])
             qa.answers.append(answer)
 
-        qaw.question_answers.question_answer.append(qa)
+        qaw.question_answers.question_answers.question_answer.append(qa)
 
     message.question_answers.append(qaw)
     message.uuid = rid

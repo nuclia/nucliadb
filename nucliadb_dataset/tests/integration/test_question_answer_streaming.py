@@ -75,7 +75,9 @@ def test_question_answer_streaming(sdk: NucliaDB, qa_kb: KnowledgeBoxObj):
 
 
 @pytest.fixture
-def qa_kb(sdk: NucliaDB, kb: KnowledgeBoxObj, ingest_stub_sync: WriterStub) -> KnowledgeBoxObj:
+def qa_kb(
+    sdk: NucliaDB, kb: KnowledgeBoxObj, ingest_stub_sync: WriterStub
+) -> KnowledgeBoxObj:
     bm = smb_wonder_bm(kb.uuid)
 
     inject_message(ingest_stub_sync, bm)
@@ -196,7 +198,9 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     start = 0
     for paragraph in paragraphs:
         end = start + len(paragraph)
-        file_field_fcmw.metadata.metadata.paragraphs.append(Paragraph(start=start, end=end))
+        file_field_fcmw.metadata.metadata.paragraphs.append(
+            Paragraph(start=start, end=end)
+        )
         start = end
     bm.field_metadata.append(file_field_fcmw)
 
@@ -231,7 +235,7 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     qa1_a2.ids_paragraphs.append(paragraph_0_id)
     qa1.answers.append(qa1_a2)
 
-    fqaw.question_answers.question_answer.append(qa1)
+    fqaw.question_answers.question_answers.question_answer.append(qa1)
 
     qa2 = QuestionAnswer()
     qa2.question.text = "Give me an example of side-scrolling game"
@@ -243,7 +247,7 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     qa2_a1.ids_paragraphs.append(paragraph_1_id)
     qa2.answers.append(qa2_a1)
 
-    fqaw.question_answers.question_answer.append(qa2)
+    fqaw.question_answers.question_answers.question_answer.append(qa2)
 
     bm.question_answers.append(fqaw)
 

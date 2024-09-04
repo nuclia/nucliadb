@@ -191,7 +191,10 @@ async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, lea
         similarity_function=upb.VectorSimilarity.COSINE, vector_dimension=len(V1)
     )
     await KnowledgeBox.create(
-        maindb_driver, kbid=kbid, slug=kbslug, semantic_models={"my-semantic-model": model}
+        maindb_driver,
+        kbid=kbid,
+        slug=kbslug,
+        semantic_models={"my-semantic-model": model},
     )
 
     yield kbid
@@ -693,7 +696,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest:
             answer.language = "catalan"
             answer.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
             qa.answers.append(answer)
-            question_answers.question_answers.question_answer.append(qa)
+            question_answers.question_answers.question_answers.question_answer.append(qa)
 
         await field_obj.set_question_answers(question_answers)
 

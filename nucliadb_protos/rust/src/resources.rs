@@ -719,6 +719,8 @@ pub struct FieldMetadata {
     >,
     #[prost(message, repeated, tag = "13")]
     pub relations: ::prost::alloc::vec::Vec<Relations>,
+    #[prost(string, tag = "14")]
+    pub mime_type: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -756,6 +758,19 @@ pub struct QuestionAnswers {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldQuestionAnswers {
+    #[prost(message, optional, tag = "1")]
+    pub question_answers: ::core::option::Option<QuestionAnswers>,
+    #[prost(map = "string, message", tag = "2")]
+    pub split_question_answers: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        QuestionAnswers,
+    >,
+    #[prost(string, repeated, tag = "3")]
+    pub deleted_splits: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldQuestionAnswerWrapper {
     #[prost(message, optional, tag = "3")]
     pub field: ::core::option::Option<FieldId>,
@@ -768,7 +783,7 @@ pub mod field_question_answer_wrapper {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum FileOrData {
         #[prost(message, tag = "1")]
-        QuestionAnswers(super::QuestionAnswers),
+        QuestionAnswers(super::FieldQuestionAnswers),
         #[prost(message, tag = "2")]
         File(super::CloudFile),
     }

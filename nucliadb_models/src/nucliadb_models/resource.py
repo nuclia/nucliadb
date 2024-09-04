@@ -31,10 +31,10 @@ from nucliadb_models.external_index_providers import ExternalIndexProvider
 from nucliadb_models.extracted import (
     ExtractedText,
     FieldComputedMetadata,
+    FieldQuestionAnswers,
     FileExtractedData,
     LargeComputedMetadata,
     LinkExtractedData,
-    QuestionAnswers,
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
@@ -198,7 +198,7 @@ class ExtractedData(BaseModel):
     metadata: Optional[FieldComputedMetadata] = None
     large_metadata: Optional[LargeComputedMetadata] = None
     vectors: Optional[VectorObject] = None
-    question_answers: Optional[QuestionAnswers] = None
+    question_answers: Optional[FieldQuestionAnswers] = None
 
 
 class TextFieldExtractedData(ExtractedData):

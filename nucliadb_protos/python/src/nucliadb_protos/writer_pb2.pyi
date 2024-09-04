@@ -134,6 +134,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldLink as FieldLink,
     FieldMetadata as FieldMetadata,
     FieldQuestionAnswerWrapper as FieldQuestionAnswerWrapper,
+    FieldQuestionAnswers as FieldQuestionAnswers,
     FieldText as FieldText,
     FieldType as FieldType,
     FileExtractedData as FileExtractedData,
@@ -268,11 +269,13 @@ class Error(google.protobuf.message.Message):
         GENERIC: Error._ErrorCode.ValueType  # 0
         EXTRACT: Error._ErrorCode.ValueType  # 1
         PROCESS: Error._ErrorCode.ValueType  # 2
+        DATAAUGMENTATION: Error._ErrorCode.ValueType  # 3
 
     class ErrorCode(_ErrorCode, metaclass=_ErrorCodeEnumTypeWrapper): ...
     GENERIC: Error.ErrorCode.ValueType  # 0
     EXTRACT: Error.ErrorCode.ValueType  # 1
     PROCESS: Error.ErrorCode.ValueType  # 2
+    DATAAUGMENTATION: Error.ErrorCode.ValueType  # 3
 
     FIELD_FIELD_NUMBER: builtins.int
     FIELD_TYPE_FIELD_NUMBER: builtins.int
