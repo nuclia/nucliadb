@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Any, Iterator, Optional, cast
+from dataclasses import dataclass
+from typing import Optional, cast
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
@@ -59,6 +60,14 @@ FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
 
 def _round(x: float) -> float:
     return round(x, ndigits=3)
+
+
+@dataclass
+class SortableParagraph:
+    rid: str
+    fid: str
+    pid: str
+    score: float
 
 
 @merge_observer.wrap({"type": "set_text_value"})
@@ -113,18 +122,6 @@ async def set_resource_metadata_value(
             find_resources.pop(resource, None)
 
 
-class Orderer:
-    def __init__(self):
-        self.items = {}
-
-    def add(self, key: Any, score: float):
-        self.items[key] = score
-
-    def sorted_by_score(self) -> Iterator[Any]:
-        for key, _ in sorted(self.items.items(), key=lambda value: value[1], reverse=True):
-            yield key
-
-
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
     find_resources: dict[str, FindResource],
@@ -140,7 +137,7 @@ async def fetch_find_metadata(
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
-    orderer = Orderer()
+    paragraphs_to_sort: list[SortableParagraph] = []
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
             find_resource = find_resources.setdefault(
@@ -151,8 +148,7 @@ async def fetch_find_metadata(
             )
 
             if result_paragraph.paragraph.id in find_field.paragraphs:
-                # Its a multiple match, push the score
-                # find_field.paragraphs[result_paragraph.paragraph.id].score = 25
+                # Its a multiple match, boost the score
                 if (
                     find_field.paragraphs[result_paragraph.paragraph.id].score
                     < result_paragraph.paragraph.score
@@ -161,27 +157,26 @@ async def fetch_find_metadata(
                     find_field.paragraphs[result_paragraph.paragraph.id].score = (
                         result_paragraph.paragraph.score * 2
                     )
-                    orderer.add(
-                        (
-                            result_paragraph.rid,
-                            result_paragraph.field,
-                            result_paragraph.paragraph.id,
-                        ),
-                        score=result_paragraph.paragraph.score,
+                    paragraphs_to_sort.append(
+                        SortableParagraph(
+                            rid=result_paragraph.rid,
+                            fid=result_paragraph.field,
+                            pid=result_paragraph.paragraph.id,
+                            score=result_paragraph.paragraph.score,
+                        )
                     )
                 find_field.paragraphs[result_paragraph.paragraph.id].score_type = SCORE_TYPE.BOTH
 
             else:
                 find_field.paragraphs[result_paragraph.paragraph.id] = result_paragraph.paragraph
-                orderer.add(
-                    (
-                        result_paragraph.rid,
-                        result_paragraph.field,
-                        result_paragraph.paragraph.id,
-                    ),
-                    score=result_paragraph.paragraph.score,
+                paragraphs_to_sort.append(
+                    SortableParagraph(
+                        rid=result_paragraph.rid,
+                        fid=result_paragraph.field,
+                        pid=result_paragraph.paragraph.id,
+                        score=result_paragraph.paragraph.score,
+                    )
                 )
-
             operations.append(
                 asyncio.create_task(
                     set_text_value(
@@ -195,9 +190,11 @@ async def fetch_find_metadata(
             )
             resources.add(result_paragraph.rid)
 
-    for order, (rid, field_id, paragraph_id) in enumerate(orderer.sorted_by_score()):
-        find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
-        best_matches.append(paragraph_id)
+    for order, paragraph in enumerate(
+        sorted(paragraphs_to_sort, key=lambda par: par.score, reverse=True)
+    ):
+        find_resources[paragraph.rid].fields[paragraph.fid].paragraphs[paragraph.pid].order = order
+        best_matches.append(paragraph.pid)
 
     async with get_driver().transaction(read_only=True) as txn:
         for resource in resources:

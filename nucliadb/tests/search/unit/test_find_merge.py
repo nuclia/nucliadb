@@ -20,28 +20,9 @@
 
 import random
 
-from nucliadb.search.search.find_merge import Orderer, merge_paragraphs_vectors
+from nucliadb.search.search.find_merge import merge_paragraphs_vectors
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
-
-
-def test_orderer():
-    orderer = Orderer()
-
-    items = []
-    for i in range(30):
-        key = str(i)
-        score = i
-        items.append((key, score))
-
-    random.shuffle(items)
-
-    for item in items:
-        orderer.add(item[0], score=item[1])
-
-    sorted_items = list(orderer.sorted_by_score())
-    keys, _ = zip(*list(sorted(items, key=lambda x: x[1], reverse=True)))
-    assert sorted_items == list(keys)
 
 
 def get_paragraph_result(score):
