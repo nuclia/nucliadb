@@ -389,27 +389,28 @@ async def extend_prompt_context_with_classification_labels(
 
 
 async def extend_prompt_context_with_ner(context, kbid, text_block_ids: list[TextBlockId]):
-    async def _get_ners(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, list[str]]:
+    async def _get_ners(kbid: str, _id: TextBlockId) -> tuple[TextBlockId, dict[str, set[str]]]:
         fid = _id if isinstance(_id, FieldId) else _id.field_id
-        ners = set()
+        ners: dict[str, set[str]] = {}
         resource = await cache.get_resource(kbid, fid.rid)
         if resource is not None:
             field = await resource.get_field(fid.key, fid.pb_type, load=False)
             fcm = await field.get_field_metadata()
             if fcm is not None:
                 for token, family in fcm.metadata.ner.items():
-                    ners.add(f"{family}/{token}")
-        return _id, list(ners)
+                    ners.setdefault(family, set()).add(token)
+        return _id, ners
 
     nerss = await run_concurrently([_get_ners(kbid, tb_id) for tb_id in text_block_ids])
     tb_id_to_ners = {tb_id: ners for tb_id, ners in nerss if len(ners) > 0}
     for tb_id in text_block_ids:
         ners = tb_id_to_ners.get(tb_id)
         if ners is not None and tb_id.full() in context.output:
-            ners_text = "DOCUMENT NERS:"
-            for ner_label in ners:
-                token, family = ner_label.split("/", 1)
-                ners_text += f"\n- {token} ({family})"
+            ners_text = "DOCUMENT NAMED ENTITIES (NERs):"
+            for family, tokens in ners.items():
+                ners_text += f"\n - {family}:"
+                for token in sorted(list(tokens)):
+                    ners_text += f"\n   - {token}"
             context[tb_id.full()] += "\n\n" + ners_text
 
 
