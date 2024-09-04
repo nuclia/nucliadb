@@ -242,7 +242,7 @@ class Field:
         sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
 
         if actual_payload is None:
-            # Its first extracted text
+            # Its first question answer
             if payload.HasField("file"):
                 await self.storage.normalize_binary(payload.file, sf)
             else:
@@ -255,7 +255,7 @@ class Field:
                 pb.ParseFromString(raw_payload.read())
                 raw_payload.flush()
                 payload.question_answers.CopyFrom(pb)
-            # We know its payload.body
+            # We know its payload.question_answers
             for key, value in payload.question_answers.split_question_answers.items():
                 actual_payload.split_question_answers[key] = value
             for key in payload.question_answers.deleted_splits:
