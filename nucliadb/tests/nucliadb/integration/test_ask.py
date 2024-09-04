@@ -665,3 +665,38 @@ async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox, resources):
     ask_response = SyncAskResponse.model_validate_json(resp.content)
     assert len(ask_response.retrieval_results.best_matches) == 1
     assert ask_response.retrieval_results.best_matches[0] == prev_best_matches[0]
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowledgebox, resources):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "",
+            "rag_strategies": [
+                {
+                    "name": "prequeries",
+                    "queries": [
+                        {
+                            "request": {"query": "summary", "fields": ["a/summary"]},
+                            "weight": 20,
+                        },
+                        {
+                            "request": {"query": "title", "fields": ["a/title"]},
+                            "weight": 1,
+                            "id": "title_query",
+                        },
+                    ],
+                }
+            ],
+            "debug": True,
+        },
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.prequeries is not None
+    assert len(ask_response.prequeries) == 2
+    print(ask_response.prequeries.keys())
+    assert len(ask_response.prequeries["prequery_0"].best_matches) > 1
+    assert len(ask_response.prequeries["title_query"].best_matches) > 1

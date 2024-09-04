@@ -28,12 +28,14 @@ from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
     FindParagraph,
+    FindRequest,
     FindResource,
     HierarchyResourceStrategy,
     KnowledgeboxFindResults,
     MetadataExtensionStrategy,
     MetadataExtensionType,
     MinScore,
+    PreQuery,
 )
 from nucliadb_protos import resources_pb2 as rpb2
 
@@ -144,7 +146,9 @@ async def test_get_expanded_conversation_messages_missing(kb, messages):
     )
 
 
-def _create_find_result(_id: str, result_text: str, score_type: SCORE_TYPE = SCORE_TYPE.BM25, order=1):
+def _create_find_result(
+    _id: str, result_text: str, score_type: SCORE_TYPE = SCORE_TYPE.BM25, order=1, score=1
+):
     return FindResource(
         id=_id.split("/")[0],
         fields={
@@ -152,7 +156,7 @@ def _create_find_result(_id: str, result_text: str, score_type: SCORE_TYPE = SCO
                 paragraphs={
                     _id: FindParagraph(
                         id=_id,
-                        score=1.0,
+                        score=score,
                         score_type=score_type,
                         order=order,
                         text=result_text,
@@ -175,12 +179,14 @@ async def test_default_prompt_context(kb):
         find_results = KnowledgeboxFindResults(
             facets={},
             resources={
-                "bmid": _create_find_result("bmid/c/conv/ident", result_text, SCORE_TYPE.BM25, order=1),
+                "bmid": _create_find_result(
+                    "bmid/c/conv/ident", result_text, SCORE_TYPE.BM25, score=1, order=1
+                ),
                 "vecid": _create_find_result(
-                    "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR, order=2
+                    "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR, score=0, order=2
                 ),
                 "both_id": _create_find_result(
-                    "both_id/c/conv/ident", result_text, SCORE_TYPE.BOTH, order=0
+                    "both_id/c/conv/ident", result_text, SCORE_TYPE.BOTH, score=2, order=0
                 ),
             },
         )
@@ -223,7 +229,7 @@ async def test_prompt_context_builder_prepends_user_context(
     find_results: KnowledgeboxFindResults,
 ):
     builder = chat_prompt.PromptContextBuilder(
-        kbid="kbid", find_results=find_results, user_context=["Carrots are orange"]
+        kbid="kbid", main_results=find_results, user_context=["Carrots are orange"]
     )
 
     async def _mock_build_context(context, *args, **kwargs):
@@ -384,3 +390,130 @@ async def test_extend_prompt_context_with_metadata():
         assert "DOCUMENT CLASSIFICATION LABELS" in text_block
         assert "DOCUMENT NERS" in text_block
         assert "DOCUMENT EXTRA METADATA" in text_block
+
+
+def test_get_ordered_paragraphs():
+    main_results = KnowledgeboxFindResults(
+        resources={
+            "main-result": FindResource(
+                id="main-result",
+                fields={
+                    "f/f1": FindField(
+                        paragraphs={
+                            "main-result/f/f1/0-10": FindParagraph(
+                                id="main-result/f/f1/0-10",
+                                score=2,
+                                score_type=SCORE_TYPE.BM25,
+                                order=0,
+                                text="First Paragraph text",
+                            ),
+                            "main-result/f/f1/10-20": FindParagraph(
+                                id="main-result/f/f1/10-20",
+                                score=1,
+                                score_type=SCORE_TYPE.BM25,
+                                order=1,
+                                text="Second paragraph text",
+                            ),
+                        }
+                    )
+                },
+            )
+        },
+    )
+    prequery_1 = PreQuery(
+        request=FindRequest(query="prequery_1"),
+        weight=10,
+    )
+    prequery_1_results = KnowledgeboxFindResults(
+        resources={
+            "prequery-1-result": FindResource(
+                id="prequery-1-result",
+                fields={
+                    "f/f1": FindField(
+                        paragraphs={
+                            "prequery-1-result/f/f1/0-10": FindParagraph(
+                                id="prequery-1-result/f/f1/0-10",
+                                score=2,
+                                score_type=SCORE_TYPE.BM25,
+                                order=0,
+                                text="First Paragraph text",
+                            ),
+                            "prequery-1-result/f/f1/10-20": FindParagraph(
+                                id="prequery-1-result/f/f1/10-20",
+                                score=1,
+                                score_type=SCORE_TYPE.BM25,
+                                order=1,
+                                text="Second paragraph text",
+                            ),
+                        }
+                    )
+                },
+            )
+        },
+    )
+    prequery_2 = PreQuery(
+        request=FindRequest(query="prequery_2"),
+        weight=90,
+    )
+    prequery_2_results = KnowledgeboxFindResults(
+        resources={
+            "prequery-2-result": FindResource(
+                id="prequery-2-result",
+                fields={
+                    "f/f1": FindField(
+                        paragraphs={
+                            "prequery-2-result/f/f1/0-10": FindParagraph(
+                                id="prequery-2-result/f/f1/0-10",
+                                score=2,
+                                score_type=SCORE_TYPE.BM25,
+                                order=0,
+                                text="First Paragraph text",
+                            ),
+                            "prequery-2-result/f/f1/10-20": FindParagraph(
+                                id="prequery-2-result/f/f1/10-20",
+                                score=1,
+                                score_type=SCORE_TYPE.BM25,
+                                order=1,
+                                text="Second paragraph text",
+                            ),
+                        }
+                    )
+                },
+            )
+        },
+    )
+    ordered_paragraphs = chat_prompt.get_ordered_paragraphs(
+        main_results=main_results,
+        prequeries_results=[
+            (prequery_1, prequery_1_results),
+            (prequery_2, prequery_2_results),
+        ],
+    )
+    assert len(ordered_paragraphs) == 6
+    # The first paragraphs come from the prequery with the highest weight
+    assert ordered_paragraphs[0].id == "prequery-2-result/f/f1/0-10"
+    assert ordered_paragraphs[1].id == "prequery-2-result/f/f1/10-20"
+    # The second paragraphs come from the prequery with the lowest weight
+    assert ordered_paragraphs[2].id == "prequery-1-result/f/f1/0-10"
+    assert ordered_paragraphs[3].id == "prequery-1-result/f/f1/10-20"
+    # The last paragraphs come from the main results
+    assert ordered_paragraphs[4].id == "main-result/f/f1/0-10"
+    assert ordered_paragraphs[5].id == "main-result/f/f1/10-20"
+
+    # Test that the main query weight can be set to a huge
+    # value so that the main results are always at the beginning
+    ordered_paragraphs = chat_prompt.get_ordered_paragraphs(
+        main_results=main_results,
+        prequeries_results=[
+            (prequery_1, prequery_1_results),
+            (prequery_2, prequery_2_results),
+        ],
+        main_query_weight=1000,
+    )
+    assert len(ordered_paragraphs) == 6
+    assert ordered_paragraphs[0].id == "main-result/f/f1/0-10"
+    assert ordered_paragraphs[1].id == "main-result/f/f1/10-20"
+    assert ordered_paragraphs[2].id == "prequery-2-result/f/f1/0-10"
+    assert ordered_paragraphs[3].id == "prequery-2-result/f/f1/10-20"
+    assert ordered_paragraphs[4].id == "prequery-1-result/f/f1/0-10"
+    assert ordered_paragraphs[5].id == "prequery-1-result/f/f1/10-20"
