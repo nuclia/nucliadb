@@ -67,9 +67,7 @@ async def set_resource_field_extracted_data(
             field_data.text = models.ExtractedText.from_message(data_et)
 
     metadata_wanted = ExtractedDataTypeName.METADATA in wanted_extracted_data
-    shortened_metadata_wanted = (
-        ExtractedDataTypeName.SHORTENED_METADATA in wanted_extracted_data
-    )
+    shortened_metadata_wanted = ExtractedDataTypeName.SHORTENED_METADATA in wanted_extracted_data
     if metadata_wanted or shortened_metadata_wanted:
         data_fcm = await field.get_field_metadata()
 
@@ -81,9 +79,7 @@ async def set_resource_field_extracted_data(
     if ExtractedDataTypeName.LARGE_METADATA in wanted_extracted_data:
         data_lcm = await field.get_large_field_metadata()
         if data_lcm is not None:
-            field_data.large_metadata = models.LargeComputedMetadata.from_message(
-                data_lcm
-            )
+            field_data.large_metadata = models.LargeComputedMetadata.from_message(data_lcm)
 
     if ExtractedDataTypeName.VECTOR in wanted_extracted_data:
         data_vec = await field.get_vectors()
@@ -147,9 +143,7 @@ async def managed_serialize(
     service_name: Optional[str] = None,
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
-    orm_resource = await get_orm_resource(
-        txn, kbid, rid=rid, slug=slug, service_name=service_name
-    )
+    orm_resource = await get_orm_resource(txn, kbid, rid=rid, slug=slug, service_name=service_name)
     if orm_resource is None:
         return None
 
@@ -157,9 +151,7 @@ async def managed_serialize(
 
     include_values = ResourceProperties.VALUES in show
 
-    include_extracted_data = (
-        ResourceProperties.EXTRACTED in show and extracted is not []
-    )
+    include_extracted_data = ResourceProperties.EXTRACTED in show and extracted is not []
 
     if ResourceProperties.BASIC in show:
         await orm_resource.get_basic()
@@ -181,15 +173,10 @@ async def managed_serialize(
                 else None
             )
 
-            resource.metadata = models.Metadata.from_message(
-                orm_resource.basic.metadata
-            )
-            resource.usermetadata = models.UserMetadata.from_message(
-                orm_resource.basic.usermetadata
-            )
+            resource.metadata = models.Metadata.from_message(orm_resource.basic.metadata)
+            resource.usermetadata = models.UserMetadata.from_message(orm_resource.basic.usermetadata)
             resource.fieldmetadata = [
-                models.UserFieldMetadata.from_message(fm)
-                for fm in orm_resource.basic.fieldmetadata
+                models.UserFieldMetadata.from_message(fm) for fm in orm_resource.basic.fieldmetadata
             ]
             resource.computedmetadata = models.ComputedMetadata.from_message(
                 orm_resource.basic.computedmetadata
@@ -199,20 +186,15 @@ async def managed_serialize(
 
             # 0 on the proto means it was not ever set, as first valid value for this field will allways be 1
             resource.last_account_seq = (
-                orm_resource.basic.last_account_seq
-                if orm_resource.basic.last_account_seq != 0
-                else None
+                orm_resource.basic.last_account_seq if orm_resource.basic.last_account_seq != 0 else None
             )
-            resource.queue = QueueType[
-                orm_resource.basic.QueueType.Name(orm_resource.basic.queue)
-            ]
+            resource.queue = QueueType[orm_resource.basic.QueueType.Name(orm_resource.basic.queue)]
 
     if ResourceProperties.RELATIONS in show:
         await orm_resource.get_relations()
         if orm_resource.relations is not None:
             resource.relations = [
-                models.Relation.from_message(relation)
-                for relation in orm_resource.relations.relations
+                models.Relation.from_message(relation) for relation in orm_resource.relations.relations
             ]
 
     if ResourceProperties.ORIGIN in show:
@@ -254,17 +236,13 @@ async def managed_serialize(
                     resource.data.texts[field.id] = TextFieldData()
                 if include_value:
                     serialized_value = (
-                        models.FieldText.from_message(value)
-                        if value is not None
-                        else None
+                        models.FieldText.from_message(value) if value is not None else None
                     )
                     resource.data.texts[field.id].value = serialized_value
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:
-                        resource.data.texts[field.id].error = Error(
-                            body=error.error, code=error.code
-                        )
+                        resource.data.texts[field.id].error = Error(body=error.error, code=error.code)
                 if include_extracted_data:
                     resource.data.texts[field.id].extracted = TextFieldExtractedData()
                     await set_resource_field_extracted_data(
@@ -280,18 +258,14 @@ async def managed_serialize(
                     resource.data.files[field.id] = FileFieldData()
                 if include_value:
                     if value is not None:
-                        resource.data.files[
-                            field.id
-                        ].value = models.FieldFile.from_message(value)
+                        resource.data.files[field.id].value = models.FieldFile.from_message(value)
                     else:
                         resource.data.files[field.id].value = None
 
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:
-                        resource.data.files[field.id].error = Error(
-                            body=error.error, code=error.code
-                        )
+                        resource.data.files[field.id].error = Error(body=error.error, code=error.code)
 
                 if include_extracted_data:
                     resource.data.files[field.id].extracted = FileFieldExtractedData()
@@ -307,16 +281,12 @@ async def managed_serialize(
                 if field.id not in resource.data.links:
                     resource.data.links[field.id] = LinkFieldData()
                 if include_value and value is not None:
-                    resource.data.links[field.id].value = models.FieldLink.from_message(
-                        value
-                    )
+                    resource.data.links[field.id].value = models.FieldLink.from_message(value)
 
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:
-                        resource.data.links[field.id].error = Error(
-                            body=error.error, code=error.code
-                        )
+                        resource.data.links[field.id].error = Error(body=error.error, code=error.code)
 
                 if include_extracted_data:
                     resource.data.links[field.id].extracted = LinkFieldExtractedData()
@@ -339,13 +309,11 @@ async def managed_serialize(
                         )
                 if include_value and isinstance(field, Conversation):
                     value = await field.get_metadata()
-                    resource.data.conversations[
-                        field.id
-                    ].value = models.FieldConversation.from_message(value)
+                    resource.data.conversations[field.id].value = models.FieldConversation.from_message(
+                        value
+                    )
                 if include_extracted_data:
-                    resource.data.conversations[
-                        field.id
-                    ].extracted = ConversationFieldExtractedData()
+                    resource.data.conversations[field.id].extracted = ConversationFieldExtractedData()
                     await set_resource_field_extracted_data(
                         field,
                         resource.data.conversations[field.id].extracted,
@@ -362,14 +330,10 @@ async def managed_serialize(
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:
-                        resource.data.generics[field.id].error = Error(
-                            body=error.error, code=error.code
-                        )
+                        resource.data.generics[field.id].error = Error(body=error.error, code=error.code)
                 if include_extracted_data:
                     resource.data.generics[field.id].extracted = TextFieldExtractedData(
-                        text=models.ExtractedText(
-                            text=resource.data.generics[field.id].value
-                        )
+                        text=models.ExtractedText(text=resource.data.generics[field.id].value)
                     )
     return resource
 

@@ -71,9 +71,7 @@ class FieldBuilder:
                 field=self._field_id,
             )
             self.__extracted_metadata.metadata.metadata.last_index.FromDatetime(now)
-            self.__extracted_metadata.metadata.metadata.last_understanding.FromDatetime(
-                now
-            )
+            self.__extracted_metadata.metadata.metadata.last_understanding.FromDatetime(now)
             self.__extracted_metadata.metadata.metadata.last_extract.FromDatetime(now)
         return self.__extracted_metadata
 
@@ -92,9 +90,7 @@ class FieldBuilder:
     @property
     def _question_answers(self) -> rpb.FieldQuestionAnswerWrapper:
         if self.__question_answers is None:
-            self.__question_answers = rpb.FieldQuestionAnswerWrapper(
-                field=self._field_id
-            )
+            self.__question_answers = rpb.FieldQuestionAnswerWrapper(field=self._field_id)
         return self.__question_answers
 
     @property
@@ -130,9 +126,7 @@ class FieldBuilder:
 
     def with_extracted_labels(self, labelset: str, labels: list[str]):
         classifications = labels_to_classifications(labelset, labels)
-        self._extracted_metadata.metadata.metadata.classifications.extend(
-            classifications
-        )
+        self._extracted_metadata.metadata.metadata.classifications.extend(classifications)
 
     def with_extracted_text(self, text: str):
         self._extracted_text.body.text = text
@@ -152,9 +146,7 @@ class FieldBuilder:
         )
         self._user_metadata.token.append(entity)
 
-    def with_extracted_entity(
-        self, klass: str, name: str, *, positions: list[rpb.Position]
-    ):
+    def with_extracted_entity(self, klass: str, name: str, *, positions: list[rpb.Position]):
         entity = self._extracted_metadata.metadata.metadata.positions[f"{klass}/{name}"]
         entity.entity = name
         entity.position.extend(positions)
@@ -187,15 +179,11 @@ class FieldBuilder:
         )
 
         # check if is another answer for an already added question
-        for (
-            question_answer
-        ) in self._question_answers.question_answers.question_answers.question_answer:
+        for question_answer in self._question_answers.question_answers.question_answers.question_answer:
             if question_answer.question == question_pb:
                 question_answer.answers.append(answer_pb)
                 return
 
         question_answer = rpb.QuestionAnswer(question=question_pb)
         question_answer.answers.append(answer_pb)
-        self._question_answers.question_answers.question_answers.question_answer.append(
-            question_answer
-        )
+        self._question_answers.question_answers.question_answers.question_answer.append(question_answer)

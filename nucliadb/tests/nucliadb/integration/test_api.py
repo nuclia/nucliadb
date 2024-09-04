@@ -57,9 +57,7 @@ async def test_kb_creation_allows_setting_learning_configuration(
     nucliadb_reader,
     onprem_nucliadb,
 ):
-    with patch(
-        "nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()
-    ) as learning_proxy:
+    with patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy:
         # We set this to None to test the case where the user has not
         # defined a learning configuration yet before creating the KB.
         learning_proxy.get_configuration.return_value = None
@@ -155,9 +153,9 @@ async def test_creation(
     )
     assert resp.status_code == 200
     assert (
-        resp.json()["data"]["texts"]["text1"]["extracted"]["metadata"]["metadata"][
-            "paragraphs"
-        ][0]["end"]
+        resp.json()["data"]["texts"]["text1"]["extracted"]["metadata"]["metadata"]["paragraphs"][0][
+            "end"
+        ]
         == 7
     )
 
@@ -222,9 +220,7 @@ async def test_creation(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("channel", ("EXPERIMENTAL", "STABLE"))
-async def test_can_create_knowledgebox_with_colon_in_slug(
-    nucliadb_manager: AsyncClient, channel
-):
+async def test_can_create_knowledgebox_with_colon_in_slug(nucliadb_manager: AsyncClient, channel):
     resp = await nucliadb_manager.post(
         "/kbs",
         json={"slug": "something:else", "release_channel": channel},
@@ -309,9 +305,7 @@ async def test_entitygroups(
             "spoon": {"value": "Spoon"},
         },
     }
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/entitiesgroups", json=entitygroup
-    )
+    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/entitiesgroups", json=entitygroup)
     assert resp.status_code == 200
 
     # Entities are not returned by default
@@ -324,9 +318,7 @@ async def test_entitygroups(
     assert groups["group1"]["custom"] is True
 
     # show_entities=true returns a http 400
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/entitiesgroups?show_entities=true"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/entitiesgroups?show_entities=true")
     assert resp.status_code == 400
 
 
@@ -472,10 +464,7 @@ async def test_extra(
     error_detail = resp.json()["detail"][0]
     assert error_detail["loc"] == ["body", "extra"]
     assert error_detail["type"] == "value_error"
-    assert (
-        "metadata should be less than 400000 bytes when serialized to JSON"
-        in error_detail["msg"]
-    )
+    assert "metadata should be less than 400000 bytes when serialized to JSON" in error_detail["msg"]
     extra = {
         "metadata": {
             "str": "str",
@@ -518,9 +507,7 @@ async def test_extra(
 
     # Check modification of extra metadata
     extra["metadata"].pop("dict")
-    resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{rid}", json={"extra": extra}
-    )
+    resp = await nucliadb_writer.patch(f"/kb/{kbid}/resource/{rid}", json={"extra": extra})
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=extra")
@@ -549,9 +536,7 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     # A partial patch should not change the icon
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/resource/{uuid}",
-        json={
-            "usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}
-        },
+        json={"usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}},
     )
     assert resp.status_code == 200
 
@@ -577,12 +562,8 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
         ("foo/bar", False),  # with slash
     ],
 )
-async def test_resource_slug_validation(
-    nucliadb_writer, nucliadb_reader, knowledgebox, slug, valid
-):
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources", json={"slug": slug}
-    )
+async def test_resource_slug_validation(nucliadb_writer, nucliadb_reader, knowledgebox, slug, valid):
+    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resources", json={"slug": slug})
     if valid:
         assert resp.status_code == 201
         resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/slug/{slug}")
@@ -668,9 +649,7 @@ async def test_language_metadata(
     resp = await nucliadb_grpc.ProcessMessage([bm])
     assert resp.status == OpStatusWriter.Status.OK
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
-    )
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]})
     assert resp.status_code == 200
     res = resp.json()
     assert res["metadata"]["language"] == "ca"
@@ -683,9 +662,7 @@ async def test_language_metadata(
     assert resp.status_code == 201
     uuid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
-    )
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]})
     assert resp.status_code == 200
     res = resp.json()
     assert res["metadata"]["language"] == "en"
@@ -697,9 +674,7 @@ async def test_language_metadata(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]}
-    )
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]})
     assert resp.status_code == 200
     res = resp.json()
     assert res["metadata"]["language"] == "de"
@@ -797,9 +772,7 @@ async def test_question_answer(
     assert resp.status_code == 200
     data = resp.json()
 
-    assert data["data"]["texts"]["text1"]["extracted"]["question_answers"][
-        "question_answer"
-    ][0] == {
+    assert data["data"]["texts"]["text1"]["extracted"]["question_answers"]["question_answer"][0] == {
         "question": {
             "text": "My question 0",
             "language": "catalan",
