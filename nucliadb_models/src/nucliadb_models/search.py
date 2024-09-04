@@ -982,6 +982,7 @@ class PreQueriesStrategy(RagStrategy):
     It allows to give more importance to some queries over others by setting the weight of each query.
     The weight of the main query can also be set with the `main_query_weight` parameter.
     """
+
     name: Literal["prequeries"] = "prequeries"
     queries: list[PreQuery] = Field(
         title="Queries",
