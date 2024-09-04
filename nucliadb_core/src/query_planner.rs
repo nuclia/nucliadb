@@ -52,7 +52,8 @@ pub struct TimestampFilter {
 pub struct PreFilterRequest {
     pub timestamp_filters: Vec<TimestampFilter>,
     pub security: Option<Security>,
-    pub formula: Option<BooleanExpression>,
+    pub labels_formula: Option<BooleanExpression>,
+    pub keyword_formula: Option<BooleanExpression>,
 }
 
 /// Represents a field that has met all of the
@@ -199,8 +200,9 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
 fn compute_prefilters(search_request: &SearchRequest, query: Option<BooleanExpression>) -> Option<PreFilterRequest> {
     let mut prefilter_request = PreFilterRequest {
         timestamp_filters: vec![],
-        formula: query,
+        labels_formula: query,
         security: None,
+        keyword_formula: None,
     };
 
     // Security filters
@@ -216,7 +218,7 @@ fn compute_prefilters(search_request: &SearchRequest, query: Option<BooleanExpre
         prefilter_request.timestamp_filters.extend(timestamp_filters);
     }
 
-    let request_has_labels_filters = prefilter_request.formula.is_some();
+    let request_has_labels_filters = prefilter_request.labels_formula.is_some();
 
     if !request_has_timestamp_filters && !request_has_labels_filters && !request_has_security_filters {
         None
@@ -359,7 +361,7 @@ mod tests {
         let Some(prefilter) = query_plan.prefilter else {
             panic!("There should be a prefilter");
         };
-        let Some(formula) = prefilter.formula else {
+        let Some(formula) = prefilter.labels_formula else {
             panic!("The prefilter should have a formula");
         };
         let BooleanExpression::Literal(literal) = formula else {

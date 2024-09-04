@@ -1293,6 +1293,17 @@ class FindRequest(BaseSearchRequest):
         if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
             raise ValueError("fulltext search not supported")
         return v
+    
+    keyword_filters: list[Filter] = Field(
+        default=[],
+        min_length=1,
+        max_length=100,
+        title="Keyword filters",
+        description=(
+            "List of keyword terms to filter your query with."
+            "The retrieval will only return text blocks from resources that contain any of the specified terms."
+        )
+    ) 
 
 
 class SCORE_TYPE(str, Enum):

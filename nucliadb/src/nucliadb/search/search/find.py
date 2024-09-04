@@ -103,6 +103,7 @@ async def _index_node_retrieval(
         features=item.features,
         query=item.query,
         filters=item.filters,
+        keyword_filters=item.keyword_filters,
         faceted=None,
         sort=None,
         page_number=item.page_number,

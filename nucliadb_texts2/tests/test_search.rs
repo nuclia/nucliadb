@@ -81,8 +81,9 @@ fn test_prefilter_all_search() {
     let reader = common::test_reader();
     let request = PreFilterRequest {
         security: None,
-        formula: None,
+        labels_formula: None,
         timestamp_filters: vec![],
+        keyword_formula: None,
     };
     let response = reader.prefilter(&request).unwrap();
     assert!(matches!(response.valid_fields, ValidFieldCollector::All));
@@ -101,9 +102,10 @@ fn test_prefilter_not_search() {
     let request = PreFilterRequest {
         security: None,
         timestamp_filters: vec![],
-        formula: expression.prefilter_query,
+        labels_formula: expression.prefilter_query,
+        keyword_formula: None,
     };
-    println!("expression: {:?}", request.formula);
+    println!("expression: {:?}", request.labels_formula);
     let response = reader.prefilter(&request).unwrap();
     let valid_fields = &response.valid_fields;
     let ValidFieldCollector::Some(fields) = valid_fields else {
@@ -124,8 +126,9 @@ fn test_prefilter_search() {
     let expression = nucliadb_core::query_language::translate(query, &context).unwrap();
     let request = PreFilterRequest {
         security: None,
-        formula: expression.prefilter_query,
+        labels_formula: expression.prefilter_query,
         timestamp_filters: vec![],
+        keyword_formula: None,
     };
     let response = reader.prefilter(&request).unwrap();
     let ValidFieldCollector::Some(fields) = response.valid_fields else {

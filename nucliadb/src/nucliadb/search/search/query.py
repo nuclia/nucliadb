@@ -99,6 +99,7 @@ class QueryParser:
         features: list[SearchOptions],
         query: str,
         filters: Union[list[str], list[Filter]],
+        keyword_filters: list[Filter],
         page_number: int,
         page_size: int,
         min_score: MinScore,
@@ -126,6 +127,7 @@ class QueryParser:
         self.query = query
         self.filters: dict[str, Any] = convert_to_node_filters(filters)
         self.flat_filter_labels: list[str] = []
+        self.keyword_filters = convert_to_node_filters(keyword_filters)
         self.faceted = faceted or []
         self.page_number = page_number
         self.page_size = page_size

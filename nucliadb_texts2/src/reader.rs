@@ -148,7 +148,7 @@ impl FieldReader for TextReaderService {
             let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
             subqueries.push(modified_query);
         }
-        if let Some(formula) = request.formula.as_ref() {
+        if let Some(formula) = request.labels_formula.as_ref() {
             let formula_query = query_io::translate_expression(formula, schema);
             subqueries.push(formula_query);
         }
