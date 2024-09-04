@@ -382,5 +382,5 @@ async def test_extend_prompt_context_with_metadata():
         text_block = context.output[paragraph_id.full()]
         assert "DOCUMENT METADATA AT ORIGIN" in text_block
         assert "DOCUMENT CLASSIFICATION LABELS" in text_block
-        assert "DOCUMENT NERS" in text_block
+        assert "DOCUMENT NAMED ENTITIES (NERs)" in text_block
         assert "DOCUMENT EXTRA METADATA" in text_block
