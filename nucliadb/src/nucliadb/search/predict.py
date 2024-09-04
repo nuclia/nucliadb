@@ -370,9 +370,8 @@ class PredictEngine:
             "text": sentence,
             "rephrase": str(rephrase),
         }
-        if has_feature(Features.VECTORSETS_V0, context={"kbid": kbid}):
-            if semantic_model is not None:
-                params["semantic_models"] = [semantic_model]
+        if semantic_model is not None:
+            params["semantic_models"] = [semantic_model]
         if generative_model is not None:
             params["generative_model"] = generative_model
 
