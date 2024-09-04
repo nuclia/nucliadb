@@ -379,7 +379,7 @@ impl ShardReader {
                     timestamp_filters: vec![],
                     security: None,
                     labels_formula: Some(BooleanExpression::Operation(op)),
-                    keyword_formula: None,
+                    keywords_formula: None,
                 };
 
                 let prefiltered = read_rw_lock(&self.text_reader).prefilter(&prefilter)?;

@@ -148,9 +148,14 @@ impl FieldReader for TextReaderService {
             let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
             subqueries.push(modified_query);
         }
-        if let Some(formula) = request.labels_formula.as_ref() {
-            let formula_query = query_io::translate_expression(formula, schema);
-            subqueries.push(formula_query);
+        if let Some(labels_formula) = request.labels_formula.as_ref() {
+            let labels_formula_query = query_io::translate_labels_expression(labels_formula, schema);
+            subqueries.push(labels_formula_query);
+        }
+
+        if let Some(keywords_formula) = request.keywords_formula.as_ref() {
+            let keywords_formula_query = query_io::translate_keywords_expression(keywords_formula, schema);
+            subqueries.push(keywords_formula_query);
         }
 
         if subqueries.is_empty() {

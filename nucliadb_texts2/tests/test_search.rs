@@ -83,7 +83,7 @@ fn test_prefilter_all_search() {
         security: None,
         labels_formula: None,
         timestamp_filters: vec![],
-        keyword_formula: None,
+        keywords_formula: None,
     };
     let response = reader.prefilter(&request).unwrap();
     assert!(matches!(response.valid_fields, ValidFieldCollector::All));
@@ -103,7 +103,7 @@ fn test_prefilter_not_search() {
         security: None,
         timestamp_filters: vec![],
         labels_formula: expression.prefilter_query,
-        keyword_formula: None,
+        keywords_formula: None,
     };
     println!("expression: {:?}", request.labels_formula);
     let response = reader.prefilter(&request).unwrap();
@@ -128,7 +128,7 @@ fn test_prefilter_search() {
         security: None,
         labels_formula: expression.prefilter_query,
         timestamp_filters: vec![],
-        keyword_formula: None,
+        keywords_formula: None,
     };
     let response = reader.prefilter(&request).unwrap();
     let ValidFieldCollector::Some(fields) = response.valid_fields else {

@@ -190,27 +190,54 @@ pub struct QueryAnalysis {
     pub search_query: Option<BooleanExpression>,
 }
 
-pub fn translate(query: &str, context: &QueryContext) -> NodeResult<QueryAnalysis> {
-    let Json::Object(subexpressions) = serde_json::from_str(query)? else {
+pub fn translate(
+    labels_query: Option<&str>,
+    keywords_query: Option<&str>,
+    context: &QueryContext,
+) -> NodeResult<QueryAnalysis> {
+    if labels_query.is_none() && keywords_query.is_none() {
         #[rustfmt::skip] return Err(node_error!(
-            "Unexpected query format {query}"
+            "At least one query is required"
         ));
-    };
+    }
 
     let mut prefilter_queries = Vec::new();
     let mut search_queries = Vec::new();
 
-    for (root_id, expression) in subexpressions {
-        let as_json_expression = serde_json::json!({ root_id: expression });
-        let translation_report = translate_expression(as_json_expression, context)?;
-        if translation_report.has_field_labels && translation_report.has_paragraph_labels {
-            let splitted = split_mixed(translation_report.expression, context)?;
-            prefilter_queries.push(splitted.fields_only);
-            search_queries.push(splitted.paragraphs_only);
-        } else if translation_report.has_field_labels {
+    // Translate labels query. Some of the labels are paragraph-type labels that need to be passed a search query.
+    if let Some(labels_query) = labels_query {
+        let Json::Object(labels_subexpressions) = serde_json::from_str(labels_query)? else {
+            #[rustfmt::skip] return Err(node_error!(
+                "Unexpected labels query format {labels_query}"
+            ));
+        };
+
+        for (root_id, expression) in labels_subexpressions {
+            let as_json_expression = serde_json::json!({ root_id: expression });
+            let translation_report = translate_expression(as_json_expression, context)?;
+            if translation_report.has_field_labels && translation_report.has_paragraph_labels {
+                let splitted = split_mixed(translation_report.expression, context)?;
+                prefilter_queries.push(splitted.fields_only);
+                search_queries.push(splitted.paragraphs_only);
+            } else if translation_report.has_field_labels {
+                prefilter_queries.push(translation_report.expression);
+            } else if translation_report.has_paragraph_labels {
+                search_queries.push(translation_report.expression);
+            }
+        }
+    }
+
+    // Translate keywords query. All the labels are field-type labels that need to be passed a prefilter query.
+    if let Some(keywords_query) = keywords_query {
+        let Json::Object(keywords_subexpressions) = serde_json::from_str(keywords_query)? else {
+            #[rustfmt::skip] return Err(node_error!(
+                "Unexpected keywords query format {keywords_query}"
+            ));
+        };
+        for (root_id, expression) in keywords_subexpressions {
+            let as_json_expression = serde_json::json!({ root_id: expression });
+            let translation_report = translate_expression(as_json_expression, context)?;
             prefilter_queries.push(translation_report.expression);
-        } else if translation_report.has_paragraph_labels {
-            search_queries.push(translation_report.expression);
         }
     }
 
@@ -249,7 +276,7 @@ mod tests {
                 "var".to_string(),
             ]),
         };
-        let query = serde_json::json!({
+        let labels_query = serde_json::json!({
             "and": [
                 { "not": {"literal": "var"}},
                 {"literal": "foo"},
@@ -264,7 +291,7 @@ mod tests {
         });
         let expected_search = BooleanExpression::Literal("foo".to_string());
 
-        let analysis = translate(&query.to_string(), &context).unwrap();
+        let analysis = translate(Some(&labels_query.to_string()), None, &context).unwrap();
         let Some(prefilter_query) = analysis.prefilter_query else {
             panic!("The json used should produce a prefilter")
         };

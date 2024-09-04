@@ -6,9 +6,12 @@ pub struct Filter {
     pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, repeated, tag = "2")]
     pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    /// JSON string with the filter expression
+    /// JSON string with the filter expression for labels
     #[prost(string, tag = "3")]
-    pub expression: ::prost::alloc::string::String,
+    pub labels_expression: ::prost::alloc::string::String,
+    /// JSON string with the filter expression for keywords
+    #[prost(string, tag = "4")]
+    pub keywords_expression: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

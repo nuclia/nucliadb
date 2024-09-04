@@ -53,7 +53,7 @@ pub struct PreFilterRequest {
     pub timestamp_filters: Vec<TimestampFilter>,
     pub security: Option<Security>,
     pub labels_formula: Option<BooleanExpression>,
-    pub keyword_formula: Option<BooleanExpression>,
+    pub keywords_formula: Option<BooleanExpression>,
 }
 
 /// Represents a field that has met all of the
@@ -164,7 +164,7 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
         paragraph_labels: filter.paragraph_labels.iter().cloned().collect(),
     };
 
-    query_language::translate(&filter.expression, &context)
+    query_language::translate(Some(&filter.labels_expression), None, &context)
 }
 
 pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) -> NodeResult<QueryPlan> {
@@ -202,7 +202,7 @@ fn compute_prefilters(search_request: &SearchRequest, query: Option<BooleanExpre
         timestamp_filters: vec![],
         labels_formula: query,
         security: None,
-        keyword_formula: None,
+        keywords_formula: None,
     };
 
     // Security filters
@@ -353,7 +353,8 @@ mod tests {
             filter: Some(Filter {
                 field_labels: vec!["this".to_string()],
                 paragraph_labels: vec!["and".to_string(), "that".to_string()],
-                expression: expression.to_string(),
+                labels_expression: expression.to_string(),
+                keywords_expression: "".to_string(),
             }),
             ..Default::default()
         };

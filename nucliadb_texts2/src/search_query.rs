@@ -97,10 +97,10 @@ pub fn create_query(
             field_labels: filter.field_labels.iter().cloned().collect(),
         };
 
-        let analysis = query_language::translate(&filter.expression, &context)?;
+        let analysis = query_language::translate_expression(&filter.labels_expression, &context)?;
 
         if let Some(expression) = analysis.prefilter_query {
-            let query = query_io::translate_expression(&expression, schema);
+            let query = query_io::translate_labels_expression(&expression, schema);
             queries.push((Occur::Must, query));
         }
     }
