@@ -30,7 +30,7 @@ fn translate_literal_to_facet_query(literal: &str, schema: &TextSchema) -> Box<d
 }
 
 fn translate_literal_to_text_query(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
-    let term = Term::from_field_text(schema.text, literal);
+    let term = Term::from_field_text(schema.text, &literal.to_lowercase());
     Box::new(TermQuery::new(term, IndexRecordOption::Basic))
 }
 

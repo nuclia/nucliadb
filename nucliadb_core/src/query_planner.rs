@@ -163,8 +163,7 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
         field_labels: filter.field_labels.iter().cloned().collect(),
         paragraph_labels: filter.paragraph_labels.iter().cloned().collect(),
     };
-
-    query_language::translate(Some(&filter.labels_expression), None, &context)
+    query_language::translate(Some(&filter.labels_expression), Some(&filter.keywords_expression), &context)
 }
 
 pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) -> NodeResult<QueryPlan> {
@@ -226,8 +225,12 @@ fn compute_prefilters(
     }
 
     let request_has_labels_filters = prefilter_request.labels_formula.is_some();
-
-    if !request_has_timestamp_filters && !request_has_labels_filters && !request_has_security_filters {
+    let request_has_keywords_filters = prefilter_request.keywords_formula.is_some();
+    if !request_has_timestamp_filters
+        && !request_has_labels_filters
+        && !request_has_keywords_filters
+        && !request_has_security_filters
+    {
         None
     } else {
         Some(prefilter_request)

@@ -393,6 +393,8 @@ async def test_find_keyword_filters(
         },
     )
     assert resp.status_code == 201
+    nietzsche_rid = resp.json()["uuid"]
+
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
@@ -401,17 +403,8 @@ async def test_find_keyword_filters(
             "icon": "text/plain",
         },
     )
-
-    # Find paragraphs with the word 'treatise'
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "query": "treatise",
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 2
+    assert resp.status_code == 201
+    kant_rid = resp.json()["uuid"]
 
     # Find paragraphs with the word 'treatise' but filtering by the keyword 'Nietzsche'
     resp = await nucliadb_reader.post(
@@ -421,9 +414,10 @@ async def test_find_keyword_filters(
             "keyword_filters": ["Nietzsche"],
         },
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.json()
     body = resp.json()
     assert len(body["resources"]) == 1
+    assert nietzsche_rid in body["resources"]
 
     # Check that keyword filters are case insensitive
     resp = await nucliadb_reader.post(
@@ -436,6 +430,7 @@ async def test_find_keyword_filters(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 1
+    assert nietzsche_rid in body["resources"]
 
     # Check that if the keyword is not present, no results are returned
     resp = await nucliadb_reader.post(
@@ -448,3 +443,16 @@ async def test_find_keyword_filters(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 0
+
+    # Find paragraphs with the word 'treatise' should return 2 results
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 2
+    assert kant_rid in body["resources"]
+    assert nietzsche_rid in body["resources"]

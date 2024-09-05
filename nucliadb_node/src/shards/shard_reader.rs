@@ -475,9 +475,7 @@ impl ShardReader {
     #[measure(actor = "shard", metric = "request/search")]
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
-        eprintln!("Doing search: {:?}", search_request);
         let query_plan = query_planner::build_query_plan(self.versions.paragraphs, search_request)?;
-
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
         let mut index_queries = query_plan.index_queries;
@@ -485,7 +483,6 @@ impl ShardReader {
         // Apply pre-filtering to the query plan
         if let Some(prefilter) = &query_plan.prefilter {
             let prefiltered = read_rw_lock(&self.text_reader).prefilter(prefilter)?;
-            eprintln!("Applying prefilter: {:?}", prefiltered);
             index_queries.apply_prefilter(prefiltered);
         }
 

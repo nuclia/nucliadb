@@ -47,10 +47,10 @@ def test_parse_entities_to_filters():
 
     request = SearchRequest()
     request.filter.field_labels.append("/e/person/Austin")
-    request.filter.expression = json.dumps({"and": [{"literal": "/e/person/Austin"}]})
+    request.filter.labels_expression = json.dumps({"and": [{"literal": "/e/person/Austin"}]})
     assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
     assert request.filter.field_labels == ["/e/person/Austin", "/e/person/John"]
-    assert json.loads(request.filter.expression) == {
+    assert json.loads(request.filter.labels_expression) == {
         "and": [
             {"literal": "/e/person/John"},
             {"and": [{"literal": "/e/person/Austin"}]},
