@@ -173,7 +173,6 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
     let texts_request = compute_texts_request(&search_request);
     let relations_request = compute_relations_request(&search_request);
     let query_analysis = analyze_filter(&search_request)?;
-    let prefilter_query = query_analysis.prefilter_query;
     let search_query = query_analysis.search_query;
     let vectors_context = VectorsContext {
         filtering_formula: search_query.clone(),
@@ -181,7 +180,11 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
     let paragraphs_context = ParagraphsContext {
         filtering_formula: search_query,
     };
-    let prefilter = compute_prefilters(&search_request, prefilter_query);
+    let prefilter = compute_prefilters(
+        &search_request,
+        query_analysis.labels_prefilter_query,
+        query_analysis.keywords_prefilter_query,
+    );
 
     Ok(QueryPlan {
         prefilter,
@@ -197,12 +200,16 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
     })
 }
 
-fn compute_prefilters(search_request: &SearchRequest, query: Option<BooleanExpression>) -> Option<PreFilterRequest> {
+fn compute_prefilters(
+    search_request: &SearchRequest,
+    labels: Option<BooleanExpression>,
+    keywords: Option<BooleanExpression>,
+) -> Option<PreFilterRequest> {
     let mut prefilter_request = PreFilterRequest {
         timestamp_filters: vec![],
-        labels_formula: query,
+        labels_formula: labels,
         security: None,
-        keywords_formula: None,
+        keywords_formula: keywords,
     };
 
     // Security filters

@@ -65,6 +65,7 @@ fn translate_operation(operation: &BooleanOperation, schema: &TextSchema, to_fac
 }
 
 pub fn translate_expression(expression: &BooleanExpression, schema: &TextSchema, to_facet: bool) -> Box<dyn Query> {
+    // to_facet is used to determine if the query should be translated to a facet query or a text query
     match expression {
         BooleanExpression::Not(inner) => translate_not(inner, schema, to_facet),
         BooleanExpression::Literal(literal) => match to_facet {
