@@ -22,7 +22,7 @@ from uuid import uuid4
 import pytest
 
 from nucliadb.common import datamanagers
-from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
@@ -30,9 +30,19 @@ async def test_create_cleansup_on_error(grpc_servicer, fake_node, hosted_nucliad
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     # Create a KB
     kbid = str(uuid4())
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kbid)
-    pb.config.title = "My Title"
-    result = await stub.NewKnowledgeBox(pb)
+    result = await stub.NewKnowledgeBoxV2(
+        writer_pb2.NewKnowledgeBoxV2Request(
+            kbid=kbid,
+            slug="test",
+            title="My Title",
+            vectorsets=[
+                writer_pb2.NewKnowledgeBoxV2Request.VectorSet(
+                    vectorset_id="my-semantic-model",
+                    vector_dimension=1024,
+                )
+            ],
+        )
+    )
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
     # Get current shards object
