@@ -47,12 +47,8 @@ def question_answer_batch_generator(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[QuestionAnswerStreamingBatch, None]:
-    generator = generate_question_answer_streaming_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
-    batch_generator = batchify(
-        generator, trainset.batch_size, QuestionAnswerStreamingBatch
-    )
+    generator = generate_question_answer_streaming_payloads(kbid, trainset, node, shard_replica_id)
+    batch_generator = batchify(generator, trainset.batch_size, QuestionAnswerStreamingBatch)
     return batch_generator
 
 
@@ -94,14 +90,10 @@ async def generate_question_answer_streaming_payloads(
 
         question_answers_pb = await field_obj.get_question_answers()
         if question_answers_pb is not None:
-            for (
-                question_answer_pb
-            ) in question_answers_pb.question_answers.question_answer:
+            for question_answer_pb in question_answers_pb.question_answers.question_answer:
                 async for item in iter_stream_items(kbid, question_answer_pb):
                     yield item
-            for (
-                question_answer_pb
-            ) in question_answers_pb.split_question_answers.values():
+            for question_answer_pb in question_answers_pb.split_question_answers.values():
                 for split_question_answer_pb in question_answer_pb.question_answer:
                     async for item in iter_stream_items(kbid, split_question_answer_pb):
                         yield item
@@ -148,6 +140,4 @@ async def iter_stream_items(
 
 
 def is_same_field(field: FieldID, field_id: str, field_type: str) -> bool:
-    return (
-        field.field == field_id and FIELD_TYPE_PB_TO_STR[field.field_type] == field_type
-    )
+    return field.field == field_id and FIELD_TYPE_PB_TO_STR[field.field_type] == field_type
