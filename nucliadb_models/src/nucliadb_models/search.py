@@ -1081,7 +1081,6 @@ class ChatRequest(BaseModel):
     )
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
-        min_length=1,
         max_length=100,
         title="Keyword filters",
         description=(
@@ -1338,13 +1337,12 @@ class FindRequest(BaseSearchRequest):
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
-        min_length=1,
         max_length=100,
         title="Keyword filters",
         description=(
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
-            "The filters are case-insensitive"
+            "The filters are case-insensitive. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
         ),
         examples=[
             ["NLP", "BERT"],
