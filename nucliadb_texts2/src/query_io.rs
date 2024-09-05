@@ -30,6 +30,16 @@ fn translate_literal_to_facet_query(literal: &str, schema: &TextSchema) -> Box<d
 }
 
 fn translate_literal_to_text_query(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
+    // If the literal has spaces, convert them to multiple queries with an AND operator
+    if literal.contains(' ') {
+        let mut operands: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+        for word in literal.split_whitespace() {
+            let term = Term::from_field_text(schema.text, &word.to_lowercase());
+            operands.push((Occur::Must, Box::new(TermQuery::new(term, IndexRecordOption::Basic))));
+        }
+        return Box::new(BooleanQuery::new(operands));
+    }
+
     let term = Term::from_field_text(schema.text, &literal.to_lowercase());
     Box::new(TermQuery::new(term, IndexRecordOption::Basic))
 }

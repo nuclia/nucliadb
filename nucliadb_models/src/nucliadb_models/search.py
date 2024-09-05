@@ -1081,7 +1081,6 @@ class ChatRequest(BaseModel):
     )
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
-        max_length=100,
         title="Keyword filters",
         description=(
             "List of keyword filter expressions to apply to the retrieval step. "
@@ -1337,7 +1336,6 @@ class FindRequest(BaseSearchRequest):
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
-        max_length=100,
         title="Keyword filters",
         description=(
             "List of keyword filter expressions to apply to the retrieval step. "

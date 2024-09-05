@@ -456,3 +456,45 @@ async def test_find_keyword_filters(
     assert len(body["resources"]) == 2
     assert kant_rid in body["resources"]
     assert nietzsche_rid in body["resources"]
+
+    # Make sure that it works with keywords formed by multiple words
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+            "keyword_filters": ["Friedrich Nietzsche"],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+    assert nietzsche_rid in body["resources"]
+
+    # Test that more complex filter expressions work
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+            "keyword_filters": [
+                {"all": ["Friedrich Nietzsche", "Immanuel Kant"]},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+            "keyword_filters": [
+                {"any": ["Friedrich Nietzsche", "Immanuel Kant"]},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 2
+    assert kant_rid in body["resources"]
+    assert nietzsche_rid in body["resources"]
