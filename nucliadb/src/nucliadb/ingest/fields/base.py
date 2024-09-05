@@ -23,6 +23,8 @@ import enum
 from datetime import datetime
 from typing import Any, Optional, Type
 
+from google.protobuf.message import DecodeError
+
 from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
 from nucliadb_protos.resources_pb2 import (
@@ -31,6 +33,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedVectorsWrapper,
     FieldComputedMetadata,
     FieldComputedMetadataWrapper,
+    FieldQuestionAnswers,
     FieldQuestionAnswerWrapper,
     LargeComputedMetadata,
     LargeComputedMetadataWrapper,
@@ -54,14 +57,14 @@ class FieldTypes(str, enum.Enum):
 
 
 class Field:
-    pbklass: Optional[Type] = None
+    pbklass: Type
     type: str = "x"
     value: Optional[Any]
     extracted_text: Optional[ExtractedText]
     extracted_vectors: Optional[VectorObject]
     computed_metadata: Optional[FieldComputedMetadata]
     large_computed_metadata: Optional[LargeComputedMetadata]
-    question_answers: Optional[QuestionAnswers]
+    question_answers: Optional[FieldQuestionAnswers]
 
     def __init__(
         self,
@@ -208,27 +211,56 @@ class Field:
             error=error,
         )
 
-    async def get_question_answers(self) -> Optional[QuestionAnswers]:
-        if self.question_answers is None:
+    async def get_question_answers(self, force=False) -> Optional[FieldQuestionAnswers]:
+        if self.question_answers is None or force:
             sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
-            payload = await self.storage.download_pb(sf, QuestionAnswers)
+            try:
+                payload = await self.storage.download_pb(sf, FieldQuestionAnswers)
+            except DecodeError:
+                deprecated_payload = await self.storage.download_pb(sf, QuestionAnswers)
+                if deprecated_payload is not None:
+                    payload = FieldQuestionAnswers()
+                    payload.question_answers.CopyFrom(deprecated_payload)
             if payload is not None:
                 self.question_answers = payload
         return self.question_answers
 
     async def set_question_answers(self, payload: FieldQuestionAnswerWrapper) -> None:
+        if self.type in SUBFIELDFIELDS:
+            try:
+                actual_payload: Optional[FieldQuestionAnswers] = await self.get_question_answers(
+                    force=True
+                )
+            except KeyError:
+                actual_payload = None
+        else:
+            actual_payload = None
         sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
 
-        if payload.HasField("file"):
-            raw_payload = await self.storage.downloadbytescf(payload.file)
-            pb = QuestionAnswers()
-            pb.ParseFromString(raw_payload.read())
-            raw_payload.flush()
-            self.question_answers = pb
+        if actual_payload is None:
+            # Its first question answer
+            if payload.HasField("file"):
+                await self.storage.normalize_binary(payload.file, sf)
+            else:
+                await self.storage.upload_pb(sf, payload.question_answers)
+                self.question_answers = payload.question_answers
         else:
-            self.question_answers = payload.question_answers
-
-        await self.storage.upload_pb(sf, self.question_answers)
+            if payload.HasField("file"):
+                raw_payload = await self.storage.downloadbytescf(payload.file)
+                pb = FieldQuestionAnswers()
+                pb.ParseFromString(raw_payload.read())
+                raw_payload.flush()
+                payload.question_answers.CopyFrom(pb)
+            # We know its payload.question_answers
+            for key, value in payload.question_answers.split_question_answers.items():
+                actual_payload.split_question_answers[key] = value
+            for key in payload.question_answers.deleted_splits:
+                if key in actual_payload.split_question_answers:
+                    del actual_payload.split_question_answers[key]
+            if payload.question_answers.HasField("question_answers") != "":
+                actual_payload.question_answers.CopyFrom(payload.question_answers.question_answers)
+            await self.storage.upload_pb(sf, actual_payload)
+            self.question_answers = actual_payload
 
     async def set_extracted_text(self, payload: ExtractedTextWrapper) -> None:
         if self.type in SUBFIELDFIELDS:

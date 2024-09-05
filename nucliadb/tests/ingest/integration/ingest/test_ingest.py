@@ -509,7 +509,7 @@ async def test_qa(
         answer.language = "catalan"
         answer.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
         qa.answers.append(answer)
-        qaw.question_answers.question_answer.append(qa)
+        qaw.question_answers.question_answers.question_answer.append(qa)
 
     message.question_answers.append(qaw)
 
@@ -749,7 +749,10 @@ async def test_ingest_delete_field(
         # Field is deleted
         brain_mock.assert_called_once()
         brain = brain_mock.call_args[0][0]
-        assert set(brain.paragraphs_to_delete) == {f"{rid}/f/some_text", f"{rid}/f/some_text/0-5"}
+        assert set(brain.paragraphs_to_delete) == {
+            f"{rid}/f/some_text",
+            f"{rid}/f/some_text/0-5",
+        }
         assert brain.sentences_to_delete == [f"{rid}/f/some_text"]
 
 
@@ -800,6 +803,9 @@ async def test_ingest_update_labels(
         # Field is reindexed
         brain_mock.assert_called_once()
         brain = brain_mock.call_args[0][0]
-        assert set(brain.paragraphs_to_delete) == {f"{rid}/f/some_text", f"{rid}/f/some_text/0-5"}
+        assert set(brain.paragraphs_to_delete) == {
+            f"{rid}/f/some_text",
+            f"{rid}/f/some_text/0-5",
+        }
         assert f"{rid}/f/some_text" in brain.sentences_to_delete
         assert "/l/names/john" in brain.labels

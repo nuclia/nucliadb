@@ -36,6 +36,7 @@ message Error {
         GENERIC = 0;
         EXTRACT = 1;
         PROCESS = 2;
+        DATAAUGMENTATION = 3;
     }
     ErrorCode code = 4;
 }

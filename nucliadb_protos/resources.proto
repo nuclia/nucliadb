@@ -285,6 +285,7 @@ message FieldMetadata {
     string summary = 11;
     map<string, Positions> positions = 12;  // Document
     repeated Relations relations = 13;
+    string mime_type = 14;
 }
 
 message Question {
@@ -308,9 +309,15 @@ message QuestionAnswers {
     repeated QuestionAnswer question_answer = 1;
 }
 
+message FieldQuestionAnswers {
+    QuestionAnswers question_answers = 1;
+    map<string, QuestionAnswers> split_question_answers = 2;
+    repeated string deleted_splits = 3;
+}
+
 message FieldQuestionAnswerWrapper {
     oneof file_or_data {
-        QuestionAnswers question_answers = 1;
+        FieldQuestionAnswers question_answers = 1;
         CloudFile file = 2;
     }
     FieldID field = 3;

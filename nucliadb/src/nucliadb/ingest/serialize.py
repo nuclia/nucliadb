@@ -89,7 +89,7 @@ async def set_resource_field_extracted_data(
     if ExtractedDataTypeName.QA in wanted_extracted_data:
         qa = await field.get_question_answers()
         if qa is not None:
-            field_data.question_answers = models.QuestionAnswers.from_message(qa)
+            field_data.question_answers = models.FieldQuestionAnswers.from_message(qa)
 
     if (
         isinstance(field, File)

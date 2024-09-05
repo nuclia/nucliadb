@@ -977,6 +977,12 @@ class PreQuery(BaseModel):
 
 
 class PreQueriesStrategy(RagStrategy):
+    """
+    This strategy allows to run a set of queries before the main query and add the results to the context.
+    It allows to give more importance to some queries over others by setting the weight of each query.
+    The weight of the main query can also be set with the `main_query_weight` parameter.
+    """
+
     name: Literal["prequeries"] = "prequeries"
     queries: list[PreQuery] = Field(
         title="Queries",
@@ -1139,8 +1145,9 @@ class ChatRequest(BaseModel):
 - `hierarchy` will add the title and summary text of the parent resource to the context for each matching paragraph.
 - `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
 - `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context. This strategy can be combined with any other strategy.
+- `prequeries` allows to run additional queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights.
 
-If empty, the default strategy is used. `full_resource`, `hierarchy` and `neighbouring_paragraphs` are exclusive strategies: if selected, they must be the only strategy.
+If empty, the default strategy is used. `full_resource`, `hierarchy`, `prequeries` and `neighbouring_paragraphs` are exclusive strategies: if selected, they must be the only strategy.
 """
         ),
         examples=[
@@ -1151,6 +1158,26 @@ If empty, the default strategy is used. `full_resource`, `hierarchy` and `neighb
             [{"name": "hierarchy", "count": 2}],
             [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
             [{"name": "metadata_extension", "types": ["origin", "classification_labels"]}],
+            [
+                {
+                    "name": "prequeries",
+                    "queries": [
+                        {
+                            "request": {
+                                "query": "What is the capital of France?",
+                                "features": ["keyword"],
+                            },
+                            "weight": 0.5,
+                        },
+                        {
+                            "request": {
+                                "query": "What is the capital of Germany?",
+                            },
+                            "weight": 0.5,
+                        },
+                    ],
+                }
+            ],
         ],
     )
     rag_images_strategies: list[RagImagesStrategies] = Field(

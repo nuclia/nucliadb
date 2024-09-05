@@ -1129,8 +1129,10 @@ class FieldMetadata(google.protobuf.message.Message):
     SUMMARY_FIELD_NUMBER: builtins.int
     POSITIONS_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
+    MIME_TYPE_FIELD_NUMBER: builtins.int
     language: builtins.str
     summary: builtins.str
+    mime_type: builtins.str
     @property
     def links(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
@@ -1173,9 +1175,10 @@ class FieldMetadata(google.protobuf.message.Message):
         summary: builtins.str = ...,
         positions: collections.abc.Mapping[builtins.str, global___Positions] | None = ...,
         relations: collections.abc.Iterable[global___Relations] | None = ...,
+        mime_type: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "thumbnail", b"thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["classifications", b"classifications", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "relations", b"relations", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["classifications", b"classifications", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "mime_type", b"mime_type", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "relations", b"relations", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
 
 global___FieldMetadata = FieldMetadata
 
@@ -1261,6 +1264,49 @@ class QuestionAnswers(google.protobuf.message.Message):
 global___QuestionAnswers = QuestionAnswers
 
 @typing.final
+class FieldQuestionAnswers(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class SplitQuestionAnswersEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___QuestionAnswers: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___QuestionAnswers | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
+    SPLIT_QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
+    DELETED_SPLITS_FIELD_NUMBER: builtins.int
+    @property
+    def question_answers(self) -> global___QuestionAnswers: ...
+    @property
+    def split_question_answers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___QuestionAnswers]: ...
+    @property
+    def deleted_splits(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        question_answers: global___QuestionAnswers | None = ...,
+        split_question_answers: collections.abc.Mapping[builtins.str, global___QuestionAnswers] | None = ...,
+        deleted_splits: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["question_answers", b"question_answers"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["deleted_splits", b"deleted_splits", "question_answers", b"question_answers", "split_question_answers", b"split_question_answers"]) -> None: ...
+
+global___FieldQuestionAnswers = FieldQuestionAnswers
+
+@typing.final
 class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1268,7 +1314,7 @@ class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
     FILE_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
     @property
-    def question_answers(self) -> global___QuestionAnswers: ...
+    def question_answers(self) -> global___FieldQuestionAnswers: ...
     @property
     def file(self) -> global___CloudFile: ...
     @property
@@ -1276,7 +1322,7 @@ class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        question_answers: global___QuestionAnswers | None = ...,
+        question_answers: global___FieldQuestionAnswers | None = ...,
         file: global___CloudFile | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
