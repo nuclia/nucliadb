@@ -83,7 +83,8 @@ class TestApplySynonymsToRequest:
             kbid="kbid",
             features=[],
             query="query",
-            filters=[],
+            label_filters=[],
+            keyword_filters=[],
             faceted=[],
             page_number=0,
             page_size=10,
@@ -170,7 +171,8 @@ class TestVectorSetAndMatryoshkaParsing:
             vectorset=vectorset,
             # irrelevant mandatory args
             query="my query",
-            filters=[],  # type: ignore
+            label_filters=[],  # type: ignore
+            keyword_filters=[],  # type: ignore
             page_number=0,
             page_size=20,
             min_score=MinScore(bm25=0, semantic=0),

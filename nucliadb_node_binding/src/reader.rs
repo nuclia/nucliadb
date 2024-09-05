@@ -146,6 +146,7 @@ impl NodeReader {
     }
 
     pub fn search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        eprintln!("Binding search");
         let search_request = SearchRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard_id = search_request.shard.clone();
         let shard = self.obtain_shard(shard_id)?;
