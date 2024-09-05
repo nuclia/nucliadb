@@ -98,8 +98,8 @@ class QueryParser:
         kbid: str,
         features: list[SearchOptions],
         query: str,
-        filters: Union[list[str], list[Filter]],
-        keyword_filters: list[Filter],
+        label_filters: Union[list[str], list[Filter]],
+        keyword_filters: Union[list[str], list[Filter]],
         page_number: int,
         page_size: int,
         min_score: MinScore,
@@ -125,9 +125,9 @@ class QueryParser:
         self.kbid = kbid
         self.features = features
         self.query = query
-        self.filters: dict[str, Any] = convert_to_node_filters(filters)
-        self.flat_filter_labels: list[str] = []
-        self.keyword_filters = convert_to_node_filters(keyword_filters)
+        self.label_filters: dict[str, Any] = convert_to_node_filters(label_filters)
+        self.flat_label_filters: list[str] = []
+        self.keyword_filters: dict[str, Any] = convert_to_node_filters(keyword_filters)
         self.faceted = faceted or []
         self.page_number = page_number
         self.page_size = page_size
@@ -154,9 +154,9 @@ class QueryParser:
         self.generative_model = generative_model
         self.rephrase = rephrase
         self.query_endpoint_used = False
-        if len(self.filters) > 0:
-            self.filters = translate_label_filters(self.filters)
-            self.flat_filter_labels = flat_filter_labels(self.filters)
+        if len(self.label_filters) > 0:
+            self.label_filters = translate_label_filters(self.label_filters)
+            self.flat_label_filters = flat_filter_labels(self.label_filters)
         self.max_tokens = max_tokens
 
     @property
@@ -221,7 +221,7 @@ class QueryParser:
         This will schedule concurrent tasks for different data that needs to be pulled
         for the sake of the query being performed
         """
-        if len(self.filters) > 0 and has_classification_label_filters(self.flat_filter_labels):
+        if len(self.label_filters) > 0 and has_classification_label_filters(self.flat_label_filters):
             asyncio.ensure_future(self._get_classification_labels())
 
         if self.has_vector_search and self.user_vector is None:
@@ -264,19 +264,20 @@ class QueryParser:
         return request, incomplete, autofilters
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
-        if len(self.filters) > 0:
-            field_labels = self.flat_filter_labels
+        if len(self.label_filters) > 0:
+            field_labels = self.flat_label_filters
             paragraph_labels: list[str] = []
-            if has_classification_label_filters(self.flat_filter_labels):
+            if has_classification_label_filters(self.flat_label_filters):
                 classification_labels = await self._get_classification_labels()
                 field_labels, paragraph_labels = split_labels_by_type(
-                    self.flat_filter_labels, classification_labels
+                    self.flat_label_filters, classification_labels
                 )
-                check_supported_filters(self.filters, paragraph_labels)
+                check_supported_filters(self.label_filters, paragraph_labels)
 
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
-            request.filter.expression = json.dumps(self.filters)
+            request.filter.labels_expression = json.dumps(self.label_filters)
+            request.filter.keywords_expression = json.dumps(self.keyword_filters)
 
         request.faceted.labels.extend([translate_label(facet) for facet in self.faceted])
         request.fields.extend(self.fields)
@@ -687,10 +688,10 @@ def parse_entities_to_filters(
         # So far, autofilters feature will only yield 'and' expressions with the detected entities.
         # More complex autofilters can be added here if we leverage the query endpoint.
         expanded_expression = {"and": [{"literal": entity} for entity in added_filters]}
-        if request.filter.expression:
-            expression = json.loads(request.filter.expression)
+        if request.filter.labels_expression:
+            expression = json.loads(request.filter.labels_expression)
             expanded_expression["and"].append(expression)
-        request.filter.expression = json.dumps(expanded_expression)
+        request.filter.labels_expression = json.dumps(expanded_expression)
     return added_filters
 
 

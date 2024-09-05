@@ -759,7 +759,7 @@ def convert_to_pinecone_filter(request: SearchRequest) -> Optional[dict[str, Any
         if len(request.filter.paragraph_labels) > 0 and len(request.filter.field_labels) > 0:
             raise ValueError("Cannot filter by paragraph and field labels at the same request")
 
-        decoded_expression: dict[str, Any] = json.loads(request.filter.expression)
+        decoded_expression: dict[str, Any] = json.loads(request.filter.labels_expression)
         if len(request.filter.paragraph_labels) > 0:
             and_terms.append(convert_label_filter_expression("paragraph_labels", decoded_expression))
         else:

@@ -374,3 +374,77 @@ async def test_find_handles_limits_exceeded_error(
     resp = await nucliadb_reader.post(f"/kb/{kb}/find", json={})
     assert resp.status_code == 402
     assert resp.json() == {"detail": "over the quota"}
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_find_keyword_filters(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    # Create a couple of resources with different keywords in the title
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Friedrich Nietzsche. Beyond Good and Evil",
+            "summary": "The book is a treatise on the nature of morality and ethics.",
+            "icon": "text/plain",
+        },
+    )
+    assert resp.status_code == 201
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Immanuel Kant. Critique of Pure Reason",
+            "summary": "The book is a treatise on metaphysics.",
+            "icon": "text/plain",
+        },
+    )
+
+    # Find paragraphs with the word 'treatise'
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 2
+
+    # Find paragraphs with the word 'treatise' but filtering by the keyword 'Nietzsche'
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+            "keyword_filters": ["Nietzsche"],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+
+    # Check that keyword filters are case insensitive
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+            "keyword_filters": ["nietzsche"],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+
+    # Check that if the keyword is not present, no results are returned
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+            "keyword_filters": ["Kant"],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0

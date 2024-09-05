@@ -107,8 +107,8 @@ def _prepare_query(query_parser: QueryParser):
         filter_sql.append("modified_at < %(modified_at_end)s")
         filter_params["modified_at_end"] = query_parser.range_modification_end
 
-    if query_parser.filters:
-        filter_sql.append(_convert_filter(query_parser.filters, filter_params))
+    if query_parser.label_filters:
+        filter_sql.append(_convert_filter(query_parser.label_filters, filter_params))
 
     order_sql = ""
     if query_parser.sort:
