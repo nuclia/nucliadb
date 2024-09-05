@@ -388,7 +388,7 @@ async def test_find_keyword_filters(
         f"/kb/{kbid}/resources",
         json={
             "title": "Friedrich Nietzsche. Beyond Good and Evil",
-            "summary": "The book is a treatise on the nature of morality and ethics.",
+            "summary": "The book is a treatise on the nature of morality and ethics. It was written by Friedrich Nietzsche.",
             "icon": "text/plain",
         },
     )
@@ -397,7 +397,7 @@ async def test_find_keyword_filters(
         f"/kb/{kbid}/resources",
         json={
             "title": "Immanuel Kant. Critique of Pure Reason",
-            "summary": "The book is a treatise on metaphysics.",
+            "summary": "The book is a treatise on metaphysics. It was written by Immanuel Kant.",
             "icon": "text/plain",
         },
     )
@@ -442,7 +442,7 @@ async def test_find_keyword_filters(
         f"/kb/{kbid}/find",
         json={
             "query": "treatise",
-            "keyword_filters": ["Kant"],
+            "keyword_filters": ["Foucault"],
         },
     )
     assert resp.status_code == 200

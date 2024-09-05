@@ -277,6 +277,8 @@ class QueryParser:
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
             request.filter.labels_expression = json.dumps(self.label_filters)
+
+        if len(self.keyword_filters) > 0:
             request.filter.keywords_expression = json.dumps(self.keyword_filters)
 
         request.faceted.labels.extend([translate_label(facet) for facet in self.faceted])

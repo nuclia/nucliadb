@@ -98,12 +98,12 @@ fn test_prefilter_not_search() {
         paragraph_labels: HashSet::with_capacity(0),
     };
     let query = "{ \"not\": { \"literal\": \"/l/mylabel\" } }";
-    let expression = nucliadb_core::query_language::translate(query, &context).unwrap();
+    let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
     let request = PreFilterRequest {
         security: None,
         timestamp_filters: vec![],
-        labels_formula: expression.prefilter_query,
-        keywords_formula: None,
+        labels_formula: expression.labels_prefilter_query,
+        keywords_formula: expression.keywords_prefilter_query,
     };
     println!("expression: {:?}", request.labels_formula);
     let response = reader.prefilter(&request).unwrap();
@@ -123,12 +123,12 @@ fn test_prefilter_search() {
         paragraph_labels: HashSet::with_capacity(0),
     };
     let query = "{ \"literal\": \"/l/mylabel\" }";
-    let expression = nucliadb_core::query_language::translate(query, &context).unwrap();
+    let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
     let request = PreFilterRequest {
         security: None,
-        labels_formula: expression.prefilter_query,
+        labels_formula: expression.labels_prefilter_query,
         timestamp_filters: vec![],
-        keywords_formula: None,
+        keywords_formula: expression.keywords_prefilter_query,
     };
     let response = reader.prefilter(&request).unwrap();
     let ValidFieldCollector::Some(fields) = response.valid_fields else {
@@ -165,7 +165,8 @@ fn test_filtered_search() {
         Filter {
             paragraph_labels: vec![],
             field_labels: vec!["/l/mylabel".to_string()],
-            expression: "{ \"literal\": \"/l/mylabel\" }".to_string(),
+            labels_expression: "{ \"literal\": \"/l/mylabel\" }".to_string(),
+            ..Default::default()
         },
         1,
     );
@@ -175,7 +176,8 @@ fn test_filtered_search() {
         Filter {
             paragraph_labels: vec![],
             field_labels: vec!["/e/myentity".to_string()],
-            expression: "{ \"literal\": \"/e/myentity\" }".to_string(),
+            labels_expression: "{ \"literal\": \"/e/myentity\" }".to_string(),
+            ..Default::default()
         },
         1,
     );
@@ -185,7 +187,8 @@ fn test_filtered_search() {
         Filter {
             paragraph_labels: vec![],
             field_labels: vec!["/l/fakelabel".to_string()],
-            expression: "{ \"literal\": \"/l/fakelabel\" }".to_string(),
+            labels_expression: "{ \"literal\": \"/l/fakelabel\" }".to_string(),
+            ..Default::default()
         },
         0,
     );
