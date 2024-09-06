@@ -94,7 +94,8 @@ def test_prepare_query_sort():
         kbid="84ed9257-04ef-41d1-b1d2-26286b92777f",
         features=[],  # Ignored by pgcatalog
         query="",
-        filters=[],
+        label_filters=[],
+        keyword_filters=[],
         page_number=0,
         page_size=25,
         sort=SortOptions(field=SortField.CREATED, order=SortOrder.ASC),
@@ -107,7 +108,8 @@ def test_prepare_query_sort():
         kbid="84ed9257-04ef-41d1-b1d2-26286b92777f",
         features=[],  # Ignored by pgcatalog
         query="",
-        filters=[],
+        label_filters=[],
+        keyword_filters=[],
         page_number=0,
         page_size=25,
         sort=SortOptions(field=SortField.MODIFIED, order=SortOrder.DESC),
@@ -122,7 +124,8 @@ def test_prepare_query_filters_kbid():
         kbid="84ed9257-04ef-41d1-b1d2-26286b92777f",
         features=[],  # Ignored by pgcatalog
         query="",
-        filters=[],
+        label_filters=[],
+        keyword_filters=[],
         page_number=0,
         page_size=25,
         min_score=0,  # Ignored by pgcatalog
@@ -137,7 +140,8 @@ def test_prepare_query_fulltext():
         kbid="84ed9257-04ef-41d1-b1d2-26286b92777f",
         features=[],  # Ignored by pgcatalog
         query="This is my query",
-        filters=[],
+        label_filters=[],
+        keyword_filters=[],
         page_number=0,
         page_size=25,
         min_score=0,  # Ignored by pgcatalog

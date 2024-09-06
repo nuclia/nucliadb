@@ -44,7 +44,8 @@ async def test_vector_result_metadata(
         kbid=kbid,
         query="own text",
         features=[SearchOptions.SEMANTIC],
-        filters=[],  # type: ignore
+        label_filters=[],  # type: ignore
+        keyword_filters=[],  # type: ignore
         faceted=[],
         page_number=0,
         page_size=20,

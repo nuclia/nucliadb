@@ -81,8 +81,9 @@ fn test_prefilter_all_search() {
     let reader = common::test_reader();
     let request = PreFilterRequest {
         security: None,
-        formula: None,
+        labels_formula: None,
         timestamp_filters: vec![],
+        keywords_formula: None,
     };
     let response = reader.prefilter(&request).unwrap();
     assert!(matches!(response.valid_fields, ValidFieldCollector::All));
@@ -97,13 +98,14 @@ fn test_prefilter_not_search() {
         paragraph_labels: HashSet::with_capacity(0),
     };
     let query = "{ \"not\": { \"literal\": \"/l/mylabel\" } }";
-    let expression = nucliadb_core::query_language::translate(query, &context).unwrap();
+    let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
     let request = PreFilterRequest {
         security: None,
         timestamp_filters: vec![],
-        formula: expression.prefilter_query,
+        labels_formula: expression.labels_prefilter_query,
+        keywords_formula: expression.keywords_prefilter_query,
     };
-    println!("expression: {:?}", request.formula);
+    println!("expression: {:?}", request.labels_formula);
     let response = reader.prefilter(&request).unwrap();
     let valid_fields = &response.valid_fields;
     let ValidFieldCollector::Some(fields) = valid_fields else {
@@ -113,7 +115,7 @@ fn test_prefilter_not_search() {
 }
 
 #[test]
-fn test_prefilter_search() {
+fn test_labels_prefilter_search() {
     let reader = common::test_reader();
 
     let context = nucliadb_core::query_language::QueryContext {
@@ -121,11 +123,47 @@ fn test_prefilter_search() {
         paragraph_labels: HashSet::with_capacity(0),
     };
     let query = "{ \"literal\": \"/l/mylabel\" }";
-    let expression = nucliadb_core::query_language::translate(query, &context).unwrap();
+    let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
     let request = PreFilterRequest {
         security: None,
-        formula: expression.prefilter_query,
+        labels_formula: expression.labels_prefilter_query,
         timestamp_filters: vec![],
+        keywords_formula: expression.keywords_prefilter_query,
+    };
+    let response = reader.prefilter(&request).unwrap();
+    let ValidFieldCollector::Some(fields) = response.valid_fields else {
+        panic!("Response is not on the right variant");
+    };
+    assert_eq!(fields.len(), 1);
+}
+
+#[test]
+fn test_keywords_prefilter_search() {
+    let reader = common::test_reader();
+    let context = nucliadb_core::query_language::QueryContext {
+        field_labels: HashSet::from(["/l/mylabel".to_string()]),
+        paragraph_labels: HashSet::with_capacity(0),
+    };
+    let labels = "{ \"literal\": \"/l/mylabel\" }";
+    let keywords = "{ \"literal\": \"foobar\" }";
+    let expression = nucliadb_core::query_language::translate(Some(labels), Some(keywords), &context).unwrap();
+    let request = PreFilterRequest {
+        security: None,
+        labels_formula: expression.labels_prefilter_query,
+        timestamp_filters: vec![],
+        keywords_formula: expression.keywords_prefilter_query,
+    };
+    let response = reader.prefilter(&request).unwrap();
+    let ValidFieldCollector::None = response.valid_fields else {
+        panic!("Response is not on the right variant");
+    };
+
+    let expression = nucliadb_core::query_language::translate(Some(labels), None, &context).unwrap();
+    let request = PreFilterRequest {
+        security: None,
+        labels_formula: expression.labels_prefilter_query,
+        timestamp_filters: vec![],
+        keywords_formula: expression.keywords_prefilter_query,
     };
     let response = reader.prefilter(&request).unwrap();
     let ValidFieldCollector::Some(fields) = response.valid_fields else {
@@ -162,7 +200,8 @@ fn test_filtered_search() {
         Filter {
             paragraph_labels: vec![],
             field_labels: vec!["/l/mylabel".to_string()],
-            expression: "{ \"literal\": \"/l/mylabel\" }".to_string(),
+            labels_expression: "{ \"literal\": \"/l/mylabel\" }".to_string(),
+            ..Default::default()
         },
         1,
     );
@@ -172,7 +211,8 @@ fn test_filtered_search() {
         Filter {
             paragraph_labels: vec![],
             field_labels: vec!["/e/myentity".to_string()],
-            expression: "{ \"literal\": \"/e/myentity\" }".to_string(),
+            labels_expression: "{ \"literal\": \"/e/myentity\" }".to_string(),
+            ..Default::default()
         },
         1,
     );
@@ -182,7 +222,8 @@ fn test_filtered_search() {
         Filter {
             paragraph_labels: vec![],
             field_labels: vec!["/l/fakelabel".to_string()],
-            expression: "{ \"literal\": \"/l/fakelabel\" }".to_string(),
+            labels_expression: "{ \"literal\": \"/l/fakelabel\" }".to_string(),
+            ..Default::default()
         },
         0,
     );

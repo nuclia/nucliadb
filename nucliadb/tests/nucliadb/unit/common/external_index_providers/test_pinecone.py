@@ -278,7 +278,7 @@ def test_convert_to_pinecone_filter():
     request = nodereader_pb2.SearchRequest()
     filter_expression = json.dumps({"literal": "/t/text/label"})
     request.filter.field_labels.append("/t/text/label")
-    request.filter.expression = filter_expression
+    request.filter.labels_expression = filter_expression
 
     request.fields.extend(["t/text", "a/title"])
 

@@ -1079,6 +1079,20 @@ class ChatRequest(BaseModel):
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
+    keyword_filters: Union[list[str], list[Filter]] = Field(
+        default=[],
+        title="Keyword filters",
+        description=(
+            "List of keyword filter expressions to apply to the retrieval step. "
+            "The text block search will only be performed on the documents that contain the specified keywords. "
+            "The filters are case-insensitive. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
+        ),
+        examples=[
+            ["NLP", "BERT"],
+            [Filter(all=["NLP", "BERT"])],
+            ["Friedrich Nietzsche", "Immanuel Kant"],
+        ],
+    )
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
         default=None,
@@ -1320,6 +1334,21 @@ class FindRequest(BaseSearchRequest):
         if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
             raise ValueError("fulltext search not supported")
         return v
+
+    keyword_filters: Union[list[str], list[Filter]] = Field(
+        default=[],
+        title="Keyword filters",
+        description=(
+            "List of keyword filter expressions to apply to the retrieval step. "
+            "The text block search will only be performed on the documents that contain the specified keywords. "
+            "The filters are case-insensitive. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
+        ),
+        examples=[
+            ["NLP", "BERT"],
+            [Filter(all=["NLP", "BERT"])],
+            ["Friedrich Nietzsche", "Immanuel Kant"],
+        ],
+    )
 
 
 class SCORE_TYPE(str, Enum):

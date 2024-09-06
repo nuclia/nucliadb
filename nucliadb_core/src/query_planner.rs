@@ -52,7 +52,8 @@ pub struct TimestampFilter {
 pub struct PreFilterRequest {
     pub timestamp_filters: Vec<TimestampFilter>,
     pub security: Option<Security>,
-    pub formula: Option<BooleanExpression>,
+    pub labels_formula: Option<BooleanExpression>,
+    pub keywords_formula: Option<BooleanExpression>,
 }
 
 /// Represents a field that has met all of the
@@ -162,8 +163,7 @@ fn analyze_filter(search_request: &SearchRequest) -> NodeResult<QueryAnalysis> {
         field_labels: filter.field_labels.iter().cloned().collect(),
         paragraph_labels: filter.paragraph_labels.iter().cloned().collect(),
     };
-
-    query_language::translate(&filter.expression, &context)
+    query_language::translate(Some(&filter.labels_expression), Some(&filter.keywords_expression), &context)
 }
 
 pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) -> NodeResult<QueryPlan> {
@@ -172,7 +172,6 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
     let texts_request = compute_texts_request(&search_request);
     let relations_request = compute_relations_request(&search_request);
     let query_analysis = analyze_filter(&search_request)?;
-    let prefilter_query = query_analysis.prefilter_query;
     let search_query = query_analysis.search_query;
     let vectors_context = VectorsContext {
         filtering_formula: search_query.clone(),
@@ -180,7 +179,11 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
     let paragraphs_context = ParagraphsContext {
         filtering_formula: search_query,
     };
-    let prefilter = compute_prefilters(&search_request, prefilter_query);
+    let prefilter = compute_prefilters(
+        &search_request,
+        query_analysis.labels_prefilter_query,
+        query_analysis.keywords_prefilter_query,
+    );
 
     Ok(QueryPlan {
         prefilter,
@@ -196,11 +199,16 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
     })
 }
 
-fn compute_prefilters(search_request: &SearchRequest, query: Option<BooleanExpression>) -> Option<PreFilterRequest> {
+fn compute_prefilters(
+    search_request: &SearchRequest,
+    labels: Option<BooleanExpression>,
+    keywords: Option<BooleanExpression>,
+) -> Option<PreFilterRequest> {
     let mut prefilter_request = PreFilterRequest {
         timestamp_filters: vec![],
-        formula: query,
+        labels_formula: labels,
         security: None,
+        keywords_formula: keywords,
     };
 
     // Security filters
@@ -216,9 +224,13 @@ fn compute_prefilters(search_request: &SearchRequest, query: Option<BooleanExpre
         prefilter_request.timestamp_filters.extend(timestamp_filters);
     }
 
-    let request_has_labels_filters = prefilter_request.formula.is_some();
-
-    if !request_has_timestamp_filters && !request_has_labels_filters && !request_has_security_filters {
+    let request_has_labels_filters = prefilter_request.labels_formula.is_some();
+    let request_has_keywords_filters = prefilter_request.keywords_formula.is_some();
+    if !request_has_timestamp_filters
+        && !request_has_labels_filters
+        && !request_has_keywords_filters
+        && !request_has_security_filters
+    {
         None
     } else {
         Some(prefilter_request)
@@ -351,7 +363,8 @@ mod tests {
             filter: Some(Filter {
                 field_labels: vec!["this".to_string()],
                 paragraph_labels: vec!["and".to_string(), "that".to_string()],
-                expression: expression.to_string(),
+                labels_expression: expression.to_string(),
+                keywords_expression: "".to_string(),
             }),
             ..Default::default()
         };
@@ -359,7 +372,7 @@ mod tests {
         let Some(prefilter) = query_plan.prefilter else {
             panic!("There should be a prefilter");
         };
-        let Some(formula) = prefilter.formula else {
+        let Some(formula) = prefilter.labels_formula else {
             panic!("The prefilter should have a formula");
         };
         let BooleanExpression::Literal(literal) = formula else {

@@ -378,7 +378,8 @@ impl ShardReader {
                 let prefilter = PreFilterRequest {
                     timestamp_filters: vec![],
                     security: None,
-                    formula: Some(BooleanExpression::Operation(op)),
+                    labels_formula: Some(BooleanExpression::Operation(op)),
+                    keywords_formula: None,
                 };
 
                 let prefiltered = read_rw_lock(&self.text_reader).prefilter(&prefilter)?;
@@ -475,7 +476,6 @@ impl ShardReader {
     #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
         let query_plan = query_planner::build_query_plan(self.versions.paragraphs, search_request)?;
-
         let search_id = uuid::Uuid::new_v4().to_string();
         let span = tracing::Span::current();
         let mut index_queries = query_plan.index_queries;
