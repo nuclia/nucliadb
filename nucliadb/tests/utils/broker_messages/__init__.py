@@ -125,14 +125,12 @@ class BrokerMessageBuilder:
         self.bm.origin.modified.FromDatetime(datetime.now())
 
     def _apply_fields(self):
-        def replace_if_exists(mut_iterable, field_id: rpb.FieldID, item):
-            for obj in mut_iterable:
-                if obj.field == field_id:
-                    obj.Clear()
-                    obj.CopyFrom(item)
-                    break
-            else:
-                mut_iterable.append(item)
+        # clear broker message fields before adding data
+        self.bm.basic.ClearField("fieldmetadata")
+        self.bm.ClearField("field_metadata")
+        self.bm.ClearField("extracted_text")
+        self.bm.ClearField("field_vectors")
+        self.bm.ClearField("question_answers")
 
         for field_builder in self.fields.values():
             field = field_builder.build()
@@ -147,12 +145,12 @@ class BrokerMessageBuilder:
                 raise Exception("Unsupported field type")
 
             if field.user.metadata is not None:
-                replace_if_exists(self.bm.basic.fieldmetadata, field.id, field.user.metadata)
+                self.bm.basic.fieldmetadata.append(field.user.metadata)
             if field.extracted.metadata is not None:
-                replace_if_exists(self.bm.field_metadata, field.id, field.extracted.metadata)
+                self.bm.field_metadata.append(field.extracted.metadata)
             if field.extracted.text is not None:
-                replace_if_exists(self.bm.extracted_text, field.id, field.extracted.text)
+                self.bm.extracted_text.append(field.extracted.text)
             if field.extracted.vectors is not None:
-                replace_if_exists(self.bm.field_vectors, field.id, field.extracted.vectors)
+                self.bm.field_vectors.extend(field.extracted.vectors)
             if field.extracted.question_answers is not None:
-                replace_if_exists(self.bm.question_answers, field.id, field.extracted.question_answers)
+                self.bm.question_answers.append(field.extracted.question_answers)
