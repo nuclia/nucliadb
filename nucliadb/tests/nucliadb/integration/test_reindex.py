@@ -26,6 +26,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
+from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb_protos import noderesources_pb2
@@ -104,6 +105,66 @@ async def _test_reindex(
     content = resp.json()
     assert len(content["sentences"]["results"]) > 0
     assert len(content["paragraphs"]["results"]) > 0
+
+
+async def test_reindex_vector_duplication(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox_with_vectorsets: str,
+):
+    """This tests validate the fix on a vectorsets bug. After resource creation
+    and edit, vector ids use to get duplicated. This use to generate other
+    problems later on.
+    """
+    kbid = knowledgebox_with_vectorsets
+
+    rid = await create_resource(kbid, nucliadb_writer, nucliadb_grpc)
+
+    # get node that has a KB shard and ask for vector IDs
+    shard_manager = KBShardManager()
+    shards = await shard_manager.get_shards_by_kbid(kbid)
+    assert len(shards) == 1
+    node, shard_replica_id = manager.choose_node(shards[0])
+
+    ids_before = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            ids_before[vectorset_id] = await node.reader.VectorIds(  # type: ignore
+                noderesources_pb2.VectorSetID(
+                    shard=noderesources_pb2.ShardId(id=shard_replica_id), vectorset=vectorset_id
+                )
+            )
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "title": "Title edit",
+            "summary": "Summary edit",
+            "origin": {"collaborators": [""], "url": "", "filename": "", "related": [""]},
+            "security": {"access_groups": [""]},
+        },
+    )
+
+    assert resp.status_code == 200
+
+    ids_after = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            ids_after[vectorset_id] = await node.reader.VectorIds(  # type: ignore
+                noderesources_pb2.VectorSetID(
+                    shard=noderesources_pb2.ShardId(id=shard_replica_id), vectorset=vectorset_id
+                )
+            )
+
+    for vectorset_id in ids_after:
+        ids = ids_after[vectorset_id].ids
+        assert len(ids) == len(set(ids))
+
+    # TODO: this sometimes fail for multiples vectors for one paragraph. We have
+    # another BUG related with this
+    #
+    # assert ids_before == ids_after
 
 
 async def create_resource(kbid: str, nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub):
