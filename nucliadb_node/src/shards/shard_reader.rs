@@ -249,11 +249,12 @@ impl ShardReader {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn get_vectors_keys(&self) -> NodeResult<Vec<String>> {
-        read_rw_lock(&self.vector_readers)
-            .get(DEFAULT_VECTORS_INDEX_NAME)
-            .expect("Default vectors index should never be deleted (yet)")
-            .stored_ids()
+    pub fn get_vectors_keys(&self, vectorset_id: &str) -> NodeResult<Vec<String>> {
+        if let Some(reader) = read_rw_lock(&self.vector_readers).get(vectorset_id) {
+            reader.stored_ids()
+        } else {
+            Err(node_error!("Vectorset {vectorset_id} does not exist"))
+        }
     }
 
     #[tracing::instrument(skip_all)]

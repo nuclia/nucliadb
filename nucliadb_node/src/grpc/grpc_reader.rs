@@ -366,15 +366,25 @@ impl NodeReader for NodeReaderGRPCDriver {
 
     async fn vector_ids(
         &self,
-        request: tonic::Request<ShardId>,
+        request: tonic::Request<VectorSetId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
         let span = Span::current();
-        let shard_id = request.into_inner().id;
         let info = info_span!(parent: &span, "vector ids");
+
+        let request = request.into_inner();
+        let VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id,
+            }),
+            vectorset: vectorset_id,
+        } = request
+        else {
+            return Err(tonic::Status::invalid_argument("Shard ID must be provided"));
+        };
         let shards = Arc::clone(&self.shards);
         let task = move || {
             let shard = obtain_shard(shards, shard_id)?;
-            run_with_telemetry(info, move || shard.get_vectors_keys())
+            run_with_telemetry(info, move || shard.get_vectors_keys(&vectorset_id))
         };
         let response = tokio::task::spawn_blocking(task)
             .await
