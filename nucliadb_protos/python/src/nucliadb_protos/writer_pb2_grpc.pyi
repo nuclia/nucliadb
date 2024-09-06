@@ -47,7 +47,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
-    KnowledgeBoxNew as KnowledgeBoxNew,
     KnowledgeBoxResponseStatus as KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate as KnowledgeBoxUpdate,
     KnowledgeBoxVectorSetsConfig as KnowledgeBoxVectorSetsConfig,
@@ -55,7 +54,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     LabelSet as LabelSet,
     Labels as Labels,
     NOTFOUND as NOTFOUND,
-    NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
     PINECONE as PINECONE,
     PINECONE_UNSET as PINECONE_UNSET,
@@ -173,11 +171,6 @@ class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type:
 
 class WriterStub:
     def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
-    NewKnowledgeBox: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
-        nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
-    ]
-
     NewKnowledgeBoxV2: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response,
@@ -265,11 +258,6 @@ class WriterStub:
     ]
 
 class WriterAsyncStub:
-    NewKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
-        nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
-    ]
-
     NewKnowledgeBoxV2: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response,
@@ -357,13 +345,6 @@ class WriterAsyncStub:
     ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def NewKnowledgeBox(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse]]: ...
-
     @abc.abstractmethod
     def NewKnowledgeBoxV2(
         self,

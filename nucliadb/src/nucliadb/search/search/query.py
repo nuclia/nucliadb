@@ -60,8 +60,6 @@ from nucliadb_models.search import (
 from nucliadb_models.security import RequestSecurity
 from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
-from nucliadb_utils.const import Features
-from nucliadb_utils.utilities import has_feature
 
 from .exceptions import InvalidQueryError
 
@@ -137,12 +135,7 @@ class QueryParser:
         self.range_modification_end = range_modification_end
         self.fields = fields or []
         self.user_vector = user_vector
-        # until vectorsets is properly implemented, we'll have this parameter
-        # under FF and always set None for anyone else
-        if has_feature(Features.VECTORSETS_V0, context={"kbid": kbid}):
-            self.vectorset = vectorset
-        else:
-            self.vectorset = None
+        self.vectorset = vectorset
         self.with_duplicates = with_duplicates
         self.with_status = with_status
         self.with_synonyms = with_synonyms
@@ -384,8 +377,6 @@ class QueryParser:
         """Validate the vectorset parameter and override it with a default if
         needed.
         """
-        if not has_feature(Features.VECTORSETS_V0, context={"kbid": self.kbid}):
-            return None
         if self.vectorset:
             # validate vectorset
             async with datamanagers.with_ro_transaction() as txn:
@@ -435,7 +426,7 @@ class QueryParser:
                 incomplete = True
             else:
                 if query_info and query_info.sentence:
-                    if vectorset and has_feature(Features.VECTORSETS_V0, context={"kbid": self.kbid}):
+                    if vectorset:
                         if vectorset in query_info.sentence.vectors:
                             query_vector = query_info.sentence.vectors[vectorset]
                         else:

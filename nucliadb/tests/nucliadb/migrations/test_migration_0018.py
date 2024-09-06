@@ -59,7 +59,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
             maindb_driver,
             kbid=KnowledgeBox.new_unique_kbid(),
             slug=real_kb_slug,
-            semantic_model=knowledgebox_pb2.SemanticModelMetadata(),
+            semantic_models={"my-semantic-model": knowledgebox_pb2.SemanticModelMetadata()},
         )
         assert await datamanagers.atomic.kb.exists_kb(kbid=real_kb_id)
 

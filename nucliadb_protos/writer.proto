@@ -470,7 +470,6 @@ message NewKnowledgeBoxV2Response {
 
 
 service Writer {
-    rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
     rpc NewKnowledgeBoxV2(NewKnowledgeBoxV2Request) returns (NewKnowledgeBoxV2Response) {}
     rpc DeleteKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.DeleteKnowledgeBoxResponse) {}
     rpc UpdateKnowledgeBox(knowledgebox.KnowledgeBoxUpdate) returns (knowledgebox.UpdateKnowledgeBoxResponse) {}

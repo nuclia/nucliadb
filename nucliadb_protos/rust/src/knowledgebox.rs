@@ -107,50 +107,6 @@ pub struct KnowledgeBoxConfig {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct KnowledgeBoxNew {
-    #[prost(string, tag = "1")]
-    pub slug: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub config: ::core::option::Option<KnowledgeBoxConfig>,
-    /// this fields are only set by backend when creating hosted KBs
-    #[prost(string, tag = "3")]
-    pub forceuuid: ::prost::alloc::string::String,
-    #[prost(enumeration = "super::utils::VectorSimilarity", tag = "4")]
-    pub similarity: i32,
-    #[prost(int32, optional, tag = "5")]
-    pub vector_dimension: ::core::option::Option<i32>,
-    #[deprecated]
-    #[prost(float, optional, tag = "6")]
-    pub default_min_score: ::core::option::Option<f32>,
-    #[prost(uint32, repeated, tag = "9")]
-    pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
-    #[prost(message, optional, tag = "10")]
-    pub external_index_provider: ::core::option::Option<
-        CreateExternalIndexProviderMetadata,
-    >,
-    /// this field are only used by NucliaDB Writer API when creating a KB. Used
-    /// in onprem scenarios
-    /// DEPRECATED: onprem don't forward requests to ingest gRPC anymore
-    #[deprecated]
-    #[prost(string, tag = "8")]
-    pub learning_config: ::prost::alloc::string::String,
-    /// release channel, although not used when backend creates hosted KBs, it's
-    /// recomputed and changed depending on the environment
-    #[prost(enumeration = "super::utils::ReleaseChannel", tag = "7")]
-    pub release_channel: i32,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct NewKnowledgeBoxResponse {
-    #[prost(enumeration = "KnowledgeBoxResponseStatus", tag = "1")]
-    pub status: i32,
-    #[prost(string, tag = "2")]
-    pub uuid: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub error_message: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KnowledgeBoxUpdate {
     #[prost(string, tag = "1")]
     pub slug: ::prost::alloc::string::String,

@@ -89,39 +89,6 @@ message KnowledgeBoxConfig {
     utils.ReleaseChannel release_channel = 8 [deprecated = true];
 }
 
-// NEW
-
-message KnowledgeBoxNew {
-    string slug = 1;
-    KnowledgeBoxConfig config = 2;
-
-    // this fields are only set by backend when creating hosted KBs
-    string forceuuid = 3;
-    utils.VectorSimilarity similarity = 4;
-    optional int32 vector_dimension = 5;
-    optional float default_min_score = 6  [deprecated = true];
-    repeated uint32 matryoshka_dimensions = 9;
-
-    CreateExternalIndexProviderMetadata external_index_provider = 10;
-
-    // this field are only used by NucliaDB Writer API when creating a KB. Used
-    // in onprem scenarios
-    // DEPRECATED: onprem don't forward requests to ingest gRPC anymore
-    string learning_config = 8 [deprecated = true];
-
-    // release channel, although not used when backend creates hosted KBs, it's
-    // recomputed and changed depending on the environment
-    utils.ReleaseChannel release_channel = 7;
-}
-
-
-message NewKnowledgeBoxResponse {
-    KnowledgeBoxResponseStatus status = 1;
-    string uuid = 2;
-    string error_message = 3;
-}
-
-
 // UPDATE
 
 message KnowledgeBoxUpdate {

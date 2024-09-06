@@ -15,11 +15,6 @@ class WriterStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.NewKnowledgeBox = channel.unary_unary(
-                '/fdbwriter.Writer/NewKnowledgeBox',
-                request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxNew.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_knowledgebox__pb2.NewKnowledgeBoxResponse.FromString,
-                )
         self.NewKnowledgeBoxV2 = channel.unary_unary(
                 '/fdbwriter.Writer/NewKnowledgeBoxV2',
                 request_serializer=nucliadb__protos_dot_writer__pb2.NewKnowledgeBoxV2Request.SerializeToString,
@@ -109,12 +104,6 @@ class WriterStub(object):
 
 class WriterServicer(object):
     """Missing associated documentation comment in .proto file."""
-
-    def NewKnowledgeBox(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
 
     def NewKnowledgeBoxV2(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -222,11 +211,6 @@ class WriterServicer(object):
 
 def add_WriterServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'NewKnowledgeBox': grpc.unary_unary_rpc_method_handler(
-                    servicer.NewKnowledgeBox,
-                    request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxNew.FromString,
-                    response_serializer=nucliadb__protos_dot_knowledgebox__pb2.NewKnowledgeBoxResponse.SerializeToString,
-            ),
             'NewKnowledgeBoxV2': grpc.unary_unary_rpc_method_handler(
                     servicer.NewKnowledgeBoxV2,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.NewKnowledgeBoxV2Request.FromString,
@@ -321,23 +305,6 @@ def add_WriterServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class Writer(object):
     """Missing associated documentation comment in .proto file."""
-
-    @staticmethod
-    def NewKnowledgeBox(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/NewKnowledgeBox',
-            nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxNew.SerializeToString,
-            nucliadb__protos_dot_knowledgebox__pb2.NewKnowledgeBoxResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def NewKnowledgeBoxV2(request,
