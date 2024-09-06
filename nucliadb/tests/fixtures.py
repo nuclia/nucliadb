@@ -56,6 +56,7 @@ from nucliadb_telemetry.settings import (
     LogSettings,
 )
 from nucliadb_utils.aiopynecone.models import QueryResponse
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     Utility,
@@ -153,6 +154,7 @@ async def nucliadb(
     dummy_processing,
     analytics_disabled,
     maindb_settings,
+    storage: Storage,
     blobstorage_settings,
     tmpdir,
     learning_config,
