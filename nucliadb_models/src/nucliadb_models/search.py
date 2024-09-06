@@ -1090,6 +1090,7 @@ class ChatRequest(BaseModel):
         examples=[
             ["NLP", "BERT"],
             [Filter(all=["NLP", "BERT"])],
+            ["Friedrich Nietzsche", "Immanuel Kant"],
         ],
     )
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
@@ -1345,6 +1346,7 @@ class FindRequest(BaseSearchRequest):
         examples=[
             ["NLP", "BERT"],
             [Filter(all=["NLP", "BERT"])],
+            ["Friedrich Nietzsche", "Immanuel Kant"],
         ],
     )
 

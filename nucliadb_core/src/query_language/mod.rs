@@ -203,7 +203,6 @@ pub fn translate(
     // Translate labels query. Some of the labels are paragraph-type labels that need to be passed a search query.
     if let Some(labels_query) = labels_query {
         if !labels_query.is_empty() {
-            eprintln!("Labels query parsing: {labels_query}");
             let Json::Object(labels_subexpressions) = serde_json::from_str(labels_query)? else {
                 #[rustfmt::skip] return Err(node_error!(
                     "Unexpected labels query format {labels_query}"

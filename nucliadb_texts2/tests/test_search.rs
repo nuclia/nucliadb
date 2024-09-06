@@ -115,7 +115,7 @@ fn test_prefilter_not_search() {
 }
 
 #[test]
-fn test_prefilter_search() {
+fn test_labels_prefilter_search() {
     let reader = common::test_reader();
 
     let context = nucliadb_core::query_language::QueryContext {
@@ -124,6 +124,41 @@ fn test_prefilter_search() {
     };
     let query = "{ \"literal\": \"/l/mylabel\" }";
     let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
+    let request = PreFilterRequest {
+        security: None,
+        labels_formula: expression.labels_prefilter_query,
+        timestamp_filters: vec![],
+        keywords_formula: expression.keywords_prefilter_query,
+    };
+    let response = reader.prefilter(&request).unwrap();
+    let ValidFieldCollector::Some(fields) = response.valid_fields else {
+        panic!("Response is not on the right variant");
+    };
+    assert_eq!(fields.len(), 1);
+}
+
+#[test]
+fn test_keywords_prefilter_search() {
+    let reader = common::test_reader();
+    let context = nucliadb_core::query_language::QueryContext {
+        field_labels: HashSet::from(["/l/mylabel".to_string()]),
+        paragraph_labels: HashSet::with_capacity(0),
+    };
+    let labels = "{ \"literal\": \"/l/mylabel\" }";
+    let keywords = "{ \"literal\": \"foobar\" }";
+    let expression = nucliadb_core::query_language::translate(Some(labels), Some(keywords), &context).unwrap();
+    let request = PreFilterRequest {
+        security: None,
+        labels_formula: expression.labels_prefilter_query,
+        timestamp_filters: vec![],
+        keywords_formula: expression.keywords_prefilter_query,
+    };
+    let response = reader.prefilter(&request).unwrap();
+    let ValidFieldCollector::None = response.valid_fields else {
+        panic!("Response is not on the right variant");
+    };
+
+    let expression = nucliadb_core::query_language::translate(Some(labels), None, &context).unwrap();
     let request = PreFilterRequest {
         security: None,
         labels_formula: expression.labels_prefilter_query,
