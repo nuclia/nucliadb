@@ -54,7 +54,7 @@ class NodeReaderStub(object):
                 )
         self.VectorIds = channel.unary_unary(
                 '/nodereader.NodeReader/VectorIds',
-                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.VectorSetID.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.IdCollection.FromString,
                 )
         self.RelationIds = channel.unary_unary(
@@ -242,7 +242,7 @@ def add_NodeReaderServicer_to_server(servicer, server):
             ),
             'VectorIds': grpc.unary_unary_rpc_method_handler(
                     servicer.VectorIds,
-                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.VectorSetID.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.IdCollection.SerializeToString,
             ),
             'RelationIds': grpc.unary_unary_rpc_method_handler(
@@ -428,7 +428,7 @@ class NodeReader(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/VectorIds',
-            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_noderesources__pb2.VectorSetID.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.IdCollection.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

@@ -223,6 +223,31 @@ impl NodeReader {
             Err(error) => Err(IndexNodeException::new_err(error.to_string())),
         }
     }
+
+    pub fn vector_ids<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let request = VectorSetId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
+        let VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id,
+            }),
+            vectorset: vectorset_id,
+        } = request
+        else {
+            return Err(IndexNodeException::new_err("Shard ID must be provided".to_string()));
+        };
+        let shard = self.obtain_shard(shard_id)?;
+        let response = shard.get_vectors_keys(&vectorset_id);
+        match response {
+            Ok(response) => Ok(PyList::new(
+                py,
+                IdCollection {
+                    ids: response,
+                }
+                .encode_to_vec(),
+            )),
+            Err(error) => Err(IndexNodeException::new_err(error.to_string())),
+        }
+    }
 }
 
 impl Default for NodeReader {

@@ -30,6 +30,7 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentItem,
     EdgeList,
     GetShardRequest,
+    IdCollection,
     ParagraphItem,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
@@ -234,6 +235,16 @@ class StandaloneReaderWrapper:
         edge_list = EdgeList()
         edge_list.ParseFromString(pb_bytes)
         return edge_list
+
+    async def VectorIds(self, request: VectorSetID) -> IdCollection:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.vector_ids, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        ids = IdCollection()
+        ids.ParseFromString(pb_bytes)
+        return ids
 
 
 class StandaloneWriterWrapper:

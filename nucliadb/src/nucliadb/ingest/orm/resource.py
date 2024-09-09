@@ -377,6 +377,7 @@ class Resource:
                             vo,
                             vectorset=vectorset_config.vectorset_id,
                             matryoshka_vector_dimension=dimension,
+                            replace_field=reindex,
                         )
         return brain
 

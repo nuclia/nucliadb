@@ -18,11 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import base64
+import hashlib
 from functools import partial
 
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
+from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb_protos import noderesources_pb2
@@ -31,18 +35,36 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_reindex(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
-    knowledgebox,
+    knowledgebox: str,
 ):
-    rid = await create_resource(knowledgebox, nucliadb_grpc)
+    await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_grpc, knowledgebox)
+
+
+async def test_reindex_kb_with_vectorsets(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox_with_vectorsets: str,
+):
+    await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_grpc, knowledgebox_with_vectorsets)
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def _test_reindex(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    kbid,
+):
+    rid = await create_resource(kbid, nucliadb_writer, nucliadb_grpc)
 
     # Doing a search should return results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=text")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=text")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["sentences"]["results"]) > 0
@@ -58,51 +80,135 @@ async def test_reindex(
         )
 
     shard_manager = KBShardManager()
-    results = await shard_manager.apply_for_all_shards(
-        knowledgebox, partial(clean_shard, [rid]), timeout=5
-    )
+    results = await shard_manager.apply_for_all_shards(kbid, partial(clean_shard, [rid]), timeout=5)
     for result in results:
         assert not isinstance(result, Exception)
 
     await asyncio.sleep(0.5)
 
     # Doing a search should not return any result now
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=My+own")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=My+own")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["sentences"]["results"]) == 0
     assert len(content["paragraphs"]["results"]) == 0
 
     # Then do a reindex of the resource with its vectors
-    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resource/{rid}/reindex?reindex_vectors=true")
+    resp = await nucliadb_writer.post(f"/kb/{kbid}/resource/{rid}/reindex?reindex_vectors=true")
     assert resp.status_code == 200
 
     await asyncio.sleep(0.5)
 
     # Doing a search should return semantic results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=My+own")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=My+own")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["sentences"]["results"]) > 0
     assert len(content["paragraphs"]["results"]) > 0
 
 
-async def create_resource(knowledgebox, writer: WriterStub):
-    bm = broker_resource(knowledgebox)
-    await inject_message(writer, bm)
+async def test_reindex_vector_duplication(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox_with_vectorsets: str,
+):
+    """This tests validate the fix on a vectorsets bug. After resource creation
+    and edit, vector ids use to get duplicated. This use to generate other
+    problems later on.
+    """
+    kbid = knowledgebox_with_vectorsets
+
+    rid = await create_resource(kbid, nucliadb_writer, nucliadb_grpc)
+
+    # get node that has a KB shard and ask for vector IDs
+    shard_manager = KBShardManager()
+    shards = await shard_manager.get_shards_by_kbid(kbid)
+    assert len(shards) == 1
+    node, shard_replica_id = manager.choose_node(shards[0])
+
+    ids_before = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            ids_before[vectorset_id] = await node.reader.VectorIds(  # type: ignore
+                noderesources_pb2.VectorSetID(
+                    shard=noderesources_pb2.ShardId(id=shard_replica_id), vectorset=vectorset_id
+                )
+            )
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "title": "Title edit",
+            "summary": "Summary edit",
+            "origin": {"collaborators": [""], "url": "", "filename": "", "related": [""]},
+            "security": {"access_groups": [""]},
+        },
+    )
+
+    assert resp.status_code == 200
+
+    ids_after = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            ids_after[vectorset_id] = await node.reader.VectorIds(  # type: ignore
+                noderesources_pb2.VectorSetID(
+                    shard=noderesources_pb2.ShardId(id=shard_replica_id), vectorset=vectorset_id
+                )
+            )
+
+    for vectorset_id in ids_after:
+        ids = ids_after[vectorset_id].ids
+        assert len(ids) == len(set(ids))
+
+    # TODO: this sometimes fail for multiples vectors for one paragraph. We have
+    # another BUG related with this
+    #
+    # assert ids_before == ids_after
+
+
+async def create_resource(kbid: str, nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub):
+    # create resource
+    file_content = b"This is a file"
+    field_id = "myfile"
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": "my-resource",
+            "title": "My resource",
+            "files": {
+                field_id: {
+                    "language": "en",
+                    "file": {
+                        "filename": "testfile",
+                        "content_type": "text/plain",
+                        "payload": base64.b64encode(file_content).decode("utf-8"),
+                        "md5": hashlib.md5(file_content).hexdigest(),
+                    },
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # update it with extracted data
+    bm = await broker_resource(kbid, rid)
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    await inject_message(nucliadb_grpc, bm)
     return bm.uuid
 
 
-def broker_resource(knowledgebox: str) -> BrokerMessage:
+async def broker_resource(kbid: str, rid: str) -> BrokerMessage:
     from nucliadb.tests.vectors import V1, V2, V3
     from nucliadb_protos import resources_pb2 as rpb
     from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 
-    bmb = BrokerMessageBuilder(kbid=knowledgebox)
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid)
     bmb.with_title("Title Resource")
     bmb.with_summary("Summary of document")
 
-    file_field = FieldBuilder("file", rpb.FieldType.FILE)
+    file_field = FieldBuilder("myfile", rpb.FieldType.FILE)
     file_field.with_extracted_text("My own text Ramon. This is great to be here. \n Where is my beer?")
     file_field.with_extracted_paragraph_metadata(
         rpb.Paragraph(
@@ -117,36 +223,36 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
         )
     )
 
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            dimension = vs.vectorset_index_config.vector_dimension
+            padding = dimension - len(V1)
+            vectors = [
+                rpb.Vector(
+                    start=0,
+                    end=19,
+                    start_paragraph=0,
+                    end_paragraph=45,
+                    vector=V1 + [1.0] * padding,
+                ),
+                rpb.Vector(
+                    start=20,
+                    end=45,
+                    start_paragraph=0,
+                    end_paragraph=45,
+                    vector=V2 + [1.0] * padding,
+                ),
+                rpb.Vector(
+                    start=48,
+                    end=65,
+                    start_paragraph=47,
+                    end_paragraph=64,
+                    vector=V3 + [1.0] * padding,
+                ),
+            ]
+            file_field.with_extracted_vectors(vectors, vectorset_id)
+
     bmb.add_field_builder(file_field)
     bm = bmb.build()
 
-    ev = rpb.ExtractedVectorsWrapper()
-    ev.field.field = "file"
-    ev.field.field_type = rpb.FieldType.FILE
-
-    v1 = rpb.Vector()
-    v1.start = 0
-    v1.end = 19
-    v1.start_paragraph = 0
-    v1.end_paragraph = 45
-    v1.vector.extend(V1)
-    ev.vectors.vectors.vectors.append(v1)
-
-    v2 = rpb.Vector()
-    v2.start = 20
-    v2.end = 45
-    v2.start_paragraph = 0
-    v2.end_paragraph = 45
-    v2.vector.extend(V2)
-    ev.vectors.vectors.vectors.append(v2)
-
-    v3 = rpb.Vector()
-    v3.start = 48
-    v3.end = 65
-    v3.start_paragraph = 47
-    v3.end_paragraph = 64
-    v3.vector.extend(V3)
-    ev.vectors.vectors.vectors.append(v3)
-
-    bm.field_vectors.append(ev)
     return bm
