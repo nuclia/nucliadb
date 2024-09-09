@@ -118,32 +118,32 @@ def is_paragraph_labelset_kind(labelset_id: str, classification_labels: knowledg
         return False
 
 
-def flat_filter_labels(filters: Union[list[str], dict[str, Any]]) -> list[str]:
+def flat_filter_literals(filters: Union[list[str], dict[str, Any]]) -> list[str]:
     if isinstance(filters, list):
         return filters
     else:
-        return list(iter_filter_labels_expression(filters))
+        return list(iter_filter_expression_literals(filters))
 
 
-def iter_filter_labels_expression(expression: dict[str, Any]) -> Iterator[str]:
+def iter_filter_expression_literals(expression: dict[str, Any]) -> Iterator[str]:
     if "literal" in expression:
         yield expression["literal"]
         return
 
     if "not" in expression:
-        for label in iter_filter_labels_expression(expression["not"]):
+        for label in iter_filter_expression_literals(expression["not"]):
             yield label
         return
 
     if "and" in expression:
         for and_term in expression["and"]:
-            for label in iter_filter_labels_expression(and_term):
+            for label in iter_filter_expression_literals(and_term):
                 yield label
         return
 
     if "or" in expression:
         for or_term in expression["or"]:
-            for label in iter_filter_labels_expression(or_term):
+            for label in iter_filter_expression_literals(or_term):
                 yield label
         return
 

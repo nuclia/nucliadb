@@ -25,7 +25,7 @@ from nucliadb.search.search.filters import (
     INDEX_NODE_FILTERS_SCHEMA,
     convert_filter_to_node_schema,
     convert_to_node_filters,
-    iter_filter_labels_expression,
+    iter_filter_expression_literals,
     translate_label_filters,
 )
 from nucliadb_models.search import Filter
@@ -88,18 +88,18 @@ def test_translate_label_filters():
     }
 
 
-def test_iter_filter_labels_expression():
+def test_iter_filter_expression_literals():
     literal = {"literal": "foo"}
-    assert list(iter_filter_labels_expression(literal)) == ["foo"]
-    assert list(iter_filter_labels_expression({"and": [literal, literal]})) == [
+    assert list(iter_filter_expression_literals(literal)) == ["foo"]
+    assert list(iter_filter_expression_literals({"and": [literal, literal]})) == [
         "foo",
         "foo",
     ]
-    assert list(iter_filter_labels_expression({"or": [literal, literal]})) == [
+    assert list(iter_filter_expression_literals({"or": [literal, literal]})) == [
         "foo",
         "foo",
     ]
-    assert list(iter_filter_labels_expression({"not": {"and": [literal, literal]}})) == ["foo", "foo"]
+    assert list(iter_filter_expression_literals({"not": {"and": [literal, literal]}})) == ["foo", "foo"]
 
 
 def test_filters_model():
