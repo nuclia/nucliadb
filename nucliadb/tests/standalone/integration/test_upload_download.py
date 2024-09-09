@@ -27,6 +27,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
 from nucliadb_models import content_types
+from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.fixture(scope="function")
@@ -41,25 +42,19 @@ def header_encode(some_string):
     return base64.b64encode(some_string.encode()).decode()
 
 
-@pytest.fixture(
-    scope="function",
-    params=[
-        lazy_fixture.lf("gcs_storage_settings"),
-        lazy_fixture.lf("s3_storage_settings"),
-        lazy_fixture.lf("local_storage_settings"),
-        lazy_fixture.lf("azure_storage_settings"),
-    ],
-)
-def blobstorage_settings(request):
-    """
-    Fixture to parametrize the tests with different storage backends
-    """
-    yield request.param
-
-
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "storage",
+    [
+        lazy_fixture.lf("gcs_storage"),
+        lazy_fixture.lf("s3_storage"),
+        lazy_fixture.lf("local_storage"),
+        lazy_fixture.lf("azure_storage"),
+    ],
+    indirect=True,
+)
 async def test_file_tus_upload_and_download(
-    blobstorage_settings,
+    storage: Storage,
     configure_redis_dm,
     nucliadb_writer,
     nucliadb_reader,
@@ -226,8 +221,15 @@ async def test_tus_upload_handles_unknown_upload_ids(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "storage",
+    [
+        lazy_fixture.lf("local_storage"),
+    ],
+    indirect=True,
+)
 async def test_content_type_validation(
-    local_storage_settings,
+    storage: Storage,
     configure_redis_dm,
     nucliadb_writer,
     nucliadb_reader,

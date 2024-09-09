@@ -155,7 +155,7 @@ async def nucliadb(
     analytics_disabled,
     maindb_settings,
     storage: Storage,
-    blobstorage_settings,
+    storage_settings,
     tmpdir,
     learning_config,
 ):
@@ -176,7 +176,7 @@ async def nucliadb(
         log_format_type=LogFormatType.PLAIN,
         log_output_type=LogOutputType.FILE,
         **maindb_settings.model_dump(),
-        **blobstorage_settings,
+        **storage_settings,
     )
 
     config_nucliadb(settings)
@@ -649,15 +649,6 @@ def maindb_settings(request):
     Any test using the nucliadb fixture will be run twice, once with redis driver and once with local driver.
     """
     yield request.param
-
-
-@pytest.fixture(scope="function")
-def blobstorage_settings(local_storage_settings):
-    """
-    Redefine this fixture in your test using the params argument
-    to allow running tests using each supported driver type.
-    """
-    yield local_storage_settings
 
 
 def maindb_driver_lazy_fixtures(default_drivers: str = DEFAULT_MAINDB_DRIVER):
