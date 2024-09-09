@@ -47,7 +47,7 @@ def predict():
     [
         (
             None,  # default value will be used
-            [SearchOptions.SEMANTIC, SearchOptions.KEYWORD, SearchOptions.RELATIONS],
+            [SearchOptions.SEMANTIC, SearchOptions.KEYWORD],
         ),
         (
             [ChatOptions.KEYWORD, ChatOptions.SEMANTIC, ChatOptions.RELATIONS],
