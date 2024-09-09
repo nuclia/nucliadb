@@ -406,6 +406,19 @@ async def test_find_keyword_filters(
     assert resp.status_code == 201
     kant_rid = resp.json()["uuid"]
 
+    # Find paragraphs with the word 'treatise' should return 2 results
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "treatise",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 2
+    assert kant_rid in body["resources"]
+    assert nietzsche_rid in body["resources"]
+
     # Find paragraphs with the word 'treatise' but filtering by the keyword 'Nietzsche'
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
@@ -430,31 +443,6 @@ async def test_find_keyword_filters(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 1
-    assert nietzsche_rid in body["resources"]
-
-    # Check that if the keyword is not present, no results are returned
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "query": "treatise",
-            "keyword_filters": ["Foucault"],
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 0
-
-    # Find paragraphs with the word 'treatise' should return 2 results
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "query": "treatise",
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 2
-    assert kant_rid in body["resources"]
     assert nietzsche_rid in body["resources"]
 
     # Make sure that it works with keywords formed by multiple words
@@ -498,3 +486,21 @@ async def test_find_keyword_filters(
     assert len(body["resources"]) == 2
     assert kant_rid in body["resources"]
     assert nietzsche_rid in body["resources"]
+
+    # Test cases where it is expected to return no results
+    for keyword_filters in [
+        ["Focault"],  # Keyword not present
+        ["Nietz"],  # Partial matches
+        ["Nietzsche Friedrich"],  # Wrong order
+        ["Nietzche"],  # Typo -- missing 's'
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": "treatise",
+                "keyword_filters": keyword_filters,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["resources"]) == 0, keyword_filters
