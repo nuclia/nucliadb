@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import logging
 from typing import Any, cast
 
 from psycopg.rows import dict_row
@@ -40,6 +41,7 @@ from .filters import translate_label
 from .query import QueryParser
 
 observer = metrics.Observer("pg_catalog_search", labels={"op": ""})
+logger = logging.getLogger(__name__)
 
 
 def _filter_operands(operands):
@@ -166,10 +168,20 @@ async def pgcatalog_search(query_parser: QueryParser) -> Resources:
                 tmp_facets: dict[str, dict[str, int]] = {
                     translate_label(f): {} for f in query_parser.faceted
                 }
+                facet_filters = " OR ".join(f"label LIKE '{f}/%%'" for f in tmp_facets.keys())
+                for facet in tmp_facets.keys():
+                    if not (
+                        facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")
+                    ):
+                        logger.warn(
+                            f"Unexpected facet used at catalog: {facet}, kbid={query_parser.kbid}"
+                        )
+
                 await cur.execute(
-                    f"SELECT unnest(labels) AS label, COUNT(*) FROM ({query}) fc GROUP BY 1 ORDER BY 1",
+                    f"SELECT label, COUNT(*) FROM (SELECT unnest(labels) AS label FROM ({query}) fc) nl WHERE ({facet_filters}) GROUP BY 1 ORDER BY 1",
                     query_params,
                 )
+
                 for row in await cur.fetchall():
                     label = row["label"]
                     parent = "/".join(label.split("/")[:-1])

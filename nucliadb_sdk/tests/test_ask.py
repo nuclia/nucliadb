@@ -50,6 +50,7 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     result: SyncAskResponse = sdk.ask(
         kbid=docs_dataset,
         query="Nuclia loves Semantic Search",
+        features=["keyword", "semantic", "relations"],
         generative_model="everest",
         prompt="Given this context: {context}. Answer this {question} in a concise way using the provided context",
         extra_context=[
