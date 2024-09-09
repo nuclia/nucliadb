@@ -173,7 +173,9 @@ async def pgcatalog_search(query_parser: QueryParser) -> Resources:
                     if not (
                         facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")
                     ):
-                        logger.warn(f"Unexpected facet used at catalog: {facet}")
+                        logger.warn(
+                            f"Unexpected facet used at catalog: {facet}, kbid={query_parser.kbid}"
+                        )
 
                 await cur.execute(
                     f"SELECT label, COUNT(*) FROM (SELECT unnest(labels) AS label FROM ({query}) fc) nl WHERE ({facet_filters}) GROUP BY 1 ORDER BY 1",
