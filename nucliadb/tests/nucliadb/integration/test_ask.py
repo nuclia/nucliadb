@@ -197,7 +197,11 @@ async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowl
 
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
-        json={"query": "title", "rag_strategies": [{"name": "full_resource"}]},
+        json={
+            "query": "title",
+            "features": ["keyword", "semantic", "relations"],
+            "rag_strategies": [{"name": "full_resource"}],
+        },
     )
     assert resp.status_code == 200
     _ = parse_ask_response(resp)
@@ -228,6 +232,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
         f"/kb/{knowledgebox}/ask",
         json={
             "query": "title",
+            "features": ["keyword", "semantic", "relations"],
             "rag_strategies": [{"name": "field_extension", "fields": ["a/summary"]}],
         },
     )
@@ -522,6 +527,7 @@ async def test_ask_with_json_schema_output(
         f"/kb/{knowledgebox}/ask",
         json={
             "query": "title",
+            "features": ["keyword", "semantic", "relations"],
             "answer_json_schema": {
                 "type": "object",
                 "properties": {"answer": {"type": "string"}, "confidence": {"type": "number"}},
