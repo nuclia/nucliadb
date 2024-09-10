@@ -31,7 +31,7 @@ from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.search.filters import (
     convert_to_node_filters,
-    flat_filter_literals,
+    flatten_filter_literals,
     has_classification_label_filters,
     split_labels_by_type,
     translate_label,
@@ -149,7 +149,7 @@ class QueryParser:
         self.query_endpoint_used = False
         if len(self.label_filters) > 0:
             self.label_filters = translate_label_filters(self.label_filters)
-            self.flat_label_filters = flat_filter_literals(self.label_filters)
+            self.flat_label_filters = flatten_filter_literals(self.label_filters)
         if len(self.keyword_filters) > 0:
             validate_keyword_filters(self.keyword_filters)
         self.max_tokens = max_tokens
@@ -806,7 +806,7 @@ async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optio
 
 
 def validate_keyword_filters(keyword_filters: dict[str, Any]):
-    for literal in flat_filter_literals(keyword_filters):
+    for literal in flatten_filter_literals(keyword_filters):
         if not literal.replace(" ", "").isalnum():
             raise InvalidQueryError(
                 "keyword_filters",

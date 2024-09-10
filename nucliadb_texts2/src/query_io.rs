@@ -30,14 +30,14 @@ fn translate_label_to_facet_query(literal: &str, schema: &TextSchema) -> Box<dyn
 }
 
 fn translate_keyword_to_text_query(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
-    if !literal.contains(' ') {
-        return Box::new(TermQuery::new(
-            Term::from_field_text(schema.text, &literal.to_lowercase()),
-            IndexRecordOption::Basic,
-        ));
+    let terms: Vec<Term> =
+        literal.split_whitespace().map(|w| Term::from_field_text(schema.text, &w.to_lowercase())).collect();
+
+    if terms.len() == 1 {
+        Box::new(TermQuery::new(terms[0].clone(), IndexRecordOption::Basic))
+    } else {
+        Box::new(PhraseQuery::new(terms))
     }
-    let terms = literal.split_whitespace().map(|word| Term::from_field_text(schema.text, &word.to_lowercase()));
-    Box::new(PhraseQuery::new(terms.collect()))
 }
 
 fn translate_not(inner: &BooleanExpression, schema: &TextSchema, is_keyword: bool) -> Box<dyn Query> {

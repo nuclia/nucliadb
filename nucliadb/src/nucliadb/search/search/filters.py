@@ -118,7 +118,7 @@ def is_paragraph_labelset_kind(labelset_id: str, classification_labels: knowledg
         return False
 
 
-def flat_filter_literals(filters: Union[list[str], dict[str, Any]]) -> list[str]:
+def flatten_filter_literals(filters: Union[list[str], dict[str, Any]]) -> list[str]:
     if isinstance(filters, list):
         return filters
     else:
