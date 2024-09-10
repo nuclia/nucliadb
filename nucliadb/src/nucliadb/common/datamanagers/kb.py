@@ -108,21 +108,39 @@ async def get_matryoshka_vector_dimension(
     vectorset_id: Optional[str] = None,
 ) -> Optional[int]:
     """Return vector dimension for matryoshka models"""
-    model_metadata = await get_model_metadata(txn, kbid=kbid)
-    dimension = None
-    if len(model_metadata.matryoshka_dimensions) > 0 and model_metadata.vector_dimension:
-        if model_metadata.vector_dimension in model_metadata.matryoshka_dimensions:
-            dimension = model_metadata.vector_dimension
-        else:
-            logger.error(
-                "KB has an invalid matryoshka dimension!",
-                extra={
-                    "kbid": kbid,
-                    "vector_dimension": model_metadata.vector_dimension,
-                    "matryoshka_dimensions": model_metadata.matryoshka_dimensions,
-                },
-            )
-    return dimension
+    from . import vectorsets
+
+    async for _, vs in vectorsets.iter(txn, kbid=kbid):
+        if len(vs.matryoshka_dimensions) > 0 and vs.vectorset_index_config.vector_dimension:
+            if vs.vectorset_index_config.vector_dimension in vs.matryoshka_dimensions:
+                return vs.vectorset_index_config.vector_dimension
+            else:
+                logger.error(
+                    "KB has an invalid matryoshka dimension!",
+                    extra={
+                        "kbid": kbid,
+                        "vector_dimension": vs.vectorset_index_config.vector_dimension,
+                        "matryoshka_dimensions": vs.matryoshka_dimensions,
+                    },
+                )
+        return None
+    else:
+        # fallback for KBs that don't have vectorset
+        model_metadata = await get_model_metadata(txn, kbid=kbid)
+        dimension = None
+        if len(model_metadata.matryoshka_dimensions) > 0 and model_metadata.vector_dimension:
+            if model_metadata.vector_dimension in model_metadata.matryoshka_dimensions:
+                dimension = model_metadata.vector_dimension
+            else:
+                logger.error(
+                    "KB has an invalid matryoshka dimension!",
+                    extra={
+                        "kbid": kbid,
+                        "vector_dimension": model_metadata.vector_dimension,
+                        "matryoshka_dimensions": model_metadata.matryoshka_dimensions,
+                    },
+                )
+        return dimension
 
 
 async def get_external_index_provider_metadata(
@@ -132,3 +150,13 @@ async def get_external_index_provider_metadata(
     if kb_config is None:
         return None
     return kb_config.external_index_provider
+
+
+async def set_external_index_provider_metadata(
+    txn: Transaction, *, kbid: str, metadata: knowledgebox_pb2.StoredExternalIndexProviderMetadata
+):
+    kb_config = await get_config(txn, kbid=kbid)
+    if kb_config is None:
+        raise KnowledgeBoxNotFound(kbid)
+    kb_config.external_index_provider.CopyFrom(metadata)
+    await set_config(txn, kbid=kbid, config=kb_config)

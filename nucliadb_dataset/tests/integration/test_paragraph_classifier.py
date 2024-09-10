@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
 
 from integration.utils import export_dataset
 from nucliadb_models.resource import KnowledgeBoxObj
@@ -45,15 +44,3 @@ def test_paragraph_classification_with_labels(
 
         loaded_array = partitions[0]
         assert len(loaded_array) == expected
-
-
-def test_paragraph_classification_invalid_label_type(
-    sdk: NucliaDB, upload_data_field_classification: KnowledgeBoxObj
-):
-    trainset = TrainSet()
-    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
-    trainset.filter.labels.append("labelset1")
-    trainset.batch_size = 2
-
-    with pytest.raises(Exception):
-        export_dataset(sdk=sdk, trainset=trainset, kb=upload_data_field_classification)  # noqa

@@ -37,7 +37,7 @@ class FieldUser:
 class FieldExtracted:
     metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
     text: Optional[rpb.ExtractedTextWrapper] = None
-    vectors: Optional[rpb.ExtractedVectorsWrapper] = None
+    vectors: Optional[list[rpb.ExtractedVectorsWrapper]] = None
     question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
 
 
@@ -53,7 +53,7 @@ class FieldBuilder:
         self._field_id = rpb.FieldID(field=field, field_type=field_type)
         self.__extracted_metadata: Optional[rpb.FieldComputedMetadataWrapper] = None
         self.__extracted_text: Optional[rpb.ExtractedTextWrapper] = None
-        self.__extracted_vectors: Optional[rpb.ExtractedVectorsWrapper] = None
+        self.__extracted_vectors: Optional[dict[str, rpb.ExtractedVectorsWrapper]] = None
         self.__user_metadata: Optional[rpb.UserFieldMetadata] = None
         self.__question_answers: Optional[rpb.FieldQuestionAnswerWrapper] = None
 
@@ -81,11 +81,12 @@ class FieldBuilder:
             self.__extracted_text = rpb.ExtractedTextWrapper(field=self._field_id)
         return self.__extracted_text
 
-    @property
-    def _extracted_vectors(self) -> rpb.ExtractedVectorsWrapper:
+    def _extracted_vectors(self, vectorset: str) -> rpb.ExtractedVectorsWrapper:
         if self.__extracted_vectors is None:
-            self.__extracted_vectors = rpb.ExtractedVectorsWrapper(field=self._field_id)
-        return self.__extracted_vectors
+            self.__extracted_vectors = dict()
+        return self.__extracted_vectors.setdefault(
+            vectorset, rpb.ExtractedVectorsWrapper(field=self._field_id, vectorset_id=vectorset)
+        )
 
     @property
     def _question_answers(self) -> rpb.FieldQuestionAnswerWrapper:
@@ -111,8 +112,7 @@ class FieldBuilder:
             field.extracted.text.CopyFrom(self.__extracted_text)
 
         if self.__extracted_vectors is not None:
-            field.extracted.vectors = rpb.ExtractedVectorsWrapper()
-            field.extracted.vectors.CopyFrom(self.__extracted_vectors)
+            field.extracted.vectors = list(self.__extracted_vectors.values())
 
         if self.__question_answers is not None:
             field.extracted.question_answers = rpb.FieldQuestionAnswerWrapper()
@@ -131,8 +131,8 @@ class FieldBuilder:
     def with_extracted_text(self, text: str):
         self._extracted_text.body.text = text
 
-    def with_extracted_vectors(self, vectors: list[utils_pb2.Vector]):
-        self._extracted_vectors.vectors.vectors.vectors.extend(vectors)
+    def with_extracted_vectors(self, vectors: list[utils_pb2.Vector], vectorset: str = ""):
+        self._extracted_vectors(vectorset).vectors.vectors.vectors.extend(vectors)
 
     def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph):
         self._extracted_metadata.metadata.metadata.paragraphs.append(paragraph)
@@ -179,11 +179,11 @@ class FieldBuilder:
         )
 
         # check if is another answer for an already added question
-        for question_answer in self._question_answers.question_answers.question_answer:
+        for question_answer in self._question_answers.question_answers.question_answers.question_answer:
             if question_answer.question == question_pb:
                 question_answer.answers.append(answer_pb)
                 return
 
         question_answer = rpb.QuestionAnswer(question=question_pb)
         question_answer.answers.append(answer_pb)
-        self._question_answers.question_answers.question_answer.append(question_answer)
+        self._question_answers.question_answers.question_answers.question_answer.append(question_answer)

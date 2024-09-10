@@ -47,10 +47,10 @@ def test_parse_entities_to_filters():
 
     request = SearchRequest()
     request.filter.field_labels.append("/e/person/Austin")
-    request.filter.expression = json.dumps({"and": [{"literal": "/e/person/Austin"}]})
+    request.filter.labels_expression = json.dumps({"and": [{"literal": "/e/person/Austin"}]})
     assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
     assert request.filter.field_labels == ["/e/person/Austin", "/e/person/John"]
-    assert json.loads(request.filter.expression) == {
+    assert json.loads(request.filter.labels_expression) == {
         "and": [
             {"literal": "/e/person/John"},
             {"and": [{"literal": "/e/person/Austin"}]},
@@ -83,7 +83,8 @@ class TestApplySynonymsToRequest:
             kbid="kbid",
             features=[],
             query="query",
-            filters=[],
+            label_filters=[],
+            keyword_filters=[],
             faceted=[],
             page_number=0,
             page_size=10,
@@ -166,11 +167,12 @@ class TestVectorSetAndMatryoshkaParsing:
     ):
         parser = QueryParser(
             kbid="kbid",
-            features=[SearchOptions.VECTOR],
+            features=[SearchOptions.SEMANTIC],
             vectorset=vectorset,
             # irrelevant mandatory args
             query="my query",
-            filters=[],
+            label_filters=[],  # type: ignore
+            keyword_filters=[],  # type: ignore
             page_number=0,
             page_size=20,
             min_score=MinScore(bm25=0, semantic=0),
@@ -184,7 +186,8 @@ class TestVectorSetAndMatryoshkaParsing:
                 "nucliadb.search.search.query.get_matryoshka_dimension_cached",
                 new=AsyncMock(return_value=matryoshka_dimension),
             ),
-            patch("nucliadb.search.search.query.get_driver"),
+            patch("nucliadb.common.datamanagers.utils.get_driver"),
+            patch("nucliadb.common.datamanagers.vectorsets.get_kv_pb"),
         ):
             request, incomplete, _ = await parser.parse()
             assert not incomplete

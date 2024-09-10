@@ -93,6 +93,7 @@ pub mod error {
         Generic = 0,
         Extract = 1,
         Process = 2,
+        Dataaugmentation = 3,
     }
     impl ErrorCode {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -104,6 +105,7 @@ pub mod error {
                 ErrorCode::Generic => "GENERIC",
                 ErrorCode::Extract => "EXTRACT",
                 ErrorCode::Process => "PROCESS",
+                ErrorCode::Dataaugmentation => "DATAAUGMENTATION",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -112,6 +114,7 @@ pub mod error {
                 "GENERIC" => Some(Self::Generic),
                 "EXTRACT" => Some(Self::Extract),
                 "PROCESS" => Some(Self::Process),
+                "DATAAUGMENTATION" => Some(Self::Dataaugmentation),
                 _ => None,
             }
         }
@@ -1282,6 +1285,8 @@ pub mod new_knowledge_box_v2_request {
 pub struct NewKnowledgeBoxV2Response {
     #[prost(enumeration = "super::knowledgebox::KnowledgeBoxResponseStatus", tag = "1")]
     pub status: i32,
+    #[prost(string, tag = "2")]
+    pub error_message: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

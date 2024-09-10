@@ -29,15 +29,18 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
+from nucliadb.common.counters import IndexCounts
+from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
+from nucliadb_models.internal.shards import KnowledgeboxShards
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxCounters,
-    KnowledgeboxShards,
     SearchParamDefaults,
 )
 from nucliadb_protos.noderesources_pb2 import Shard
@@ -46,7 +49,7 @@ from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 
-AVG_PARAGRAPH_SIZE_BYTES = 10_000
+MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
 
 
 @api.get(
@@ -86,16 +89,72 @@ async def knowledgebox_counters(
     kbid: str,
     debug: bool = fastapi_query(SearchParamDefaults.debug),
 ) -> KnowledgeboxCounters:
-    shard_manager = get_shard_manager()
-
     try:
-        shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
+        return await _kb_counters(kbid, debug=debug)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,
             detail="The knowledgebox or its shards configuration is missing",
         )
 
+
+async def _kb_counters(
+    kbid: str,
+    debug: bool = False,
+) -> KnowledgeboxCounters:
+    """
+    Resources count is calculated from maindb and cached
+    Field count is calculated from the index node cluster
+    Paragraphs and Sentences count is calculated from the index node cluster or the external index provider.
+    Index size is estimated from the paragraphs count.
+    """
+    counters = KnowledgeboxCounters(
+        resources=0,
+        paragraphs=0,
+        fields=0,
+        sentences=0,
+        index_size=0,
+    )
+    node_index_counts, queried_shards = await get_node_index_counts(kbid)
+    counters.fields = node_index_counts.fields
+    external_index_manager = await get_external_index_manager(kbid)
+    if external_index_manager is not None:
+        index_counts = await external_index_manager.get_index_counts()
+        counters.paragraphs = index_counts.paragraphs
+        counters.sentences = index_counts.sentences
+    else:
+        counters.paragraphs = node_index_counts.paragraphs
+        counters.sentences = node_index_counts.sentences
+    is_small_kb = counters.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
+    resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
+    counters.resources = resource_count
+    counters.index_size = counters.paragraphs * AVG_PARAGRAPH_SIZE_BYTES
+    if debug and queried_shards is not None:
+        counters.shards = queried_shards
+    return counters
+
+
+async def get_resources_count(kbid: str, force_calculate: bool = False) -> int:
+    async with datamanagers.with_ro_transaction() as txn:
+        if force_calculate:
+            # For small kbs, this is faster and more up to date
+            resource_count = await datamanagers.resources.calculate_number_of_resources(txn, kbid=kbid)
+        else:
+            resource_count = await datamanagers.resources.get_number_of_resources(txn, kbid=kbid)
+            if resource_count == -1:
+                # WARNING: standalone, this value will never be cached
+                resource_count = await datamanagers.resources.calculate_number_of_resources(
+                    txn, kbid=kbid
+                )
+    return resource_count
+
+
+async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
+    """
+    Get the index counts for a knowledgebox that has an index in the index node cluster.
+    """
+    shard_manager = get_shard_manager()
+    shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
     ops = []
     queried_shards = []
     for shard_object in shard_groups:
@@ -138,46 +197,17 @@ async def knowledgebox_counters(
     if results is None:
         raise HTTPException(status_code=503, detail=f"No shards found")
 
-    field_count = 0
-    paragraph_count = 0
-    sentence_count = 0
-
+    counts = IndexCounts(
+        fields=0,
+        paragraphs=0,
+        sentences=0,
+    )
     for shard in results:
         if isinstance(shard, Exception):
             logger.error("Error getting shard info", exc_info=shard)
             errors.capture_exception(shard)
             raise HTTPException(status_code=500, detail=f"Error while geting shard data")
-
-        field_count += shard.fields
-        paragraph_count += shard.paragraphs
-        sentence_count += shard.sentences
-
-    async with datamanagers.with_ro_transaction() as txn:
-        try:
-            if len(shard_groups) <= 1:
-                # for smaller kbs, this is faster and more up to date
-                resource_count = await datamanagers.resources.calculate_number_of_resources(
-                    txn, kbid=kbid
-                )
-            else:
-                resource_count = await datamanagers.resources.get_number_of_resources(txn, kbid=kbid)
-                if resource_count == -1:
-                    # WARNING: standalone, this value will never be cached
-                    resource_count = await datamanagers.resources.calculate_number_of_resources(
-                        txn, kbid=kbid
-                    )
-        except Exception as exc:
-            errors.capture_exception(exc)
-            raise HTTPException(status_code=500, detail="Couldn't retrieve counters right now")
-
-    counters = KnowledgeboxCounters(
-        resources=resource_count,
-        paragraphs=paragraph_count,
-        fields=field_count,
-        sentences=sentence_count,
-        index_size=paragraph_count * AVG_PARAGRAPH_SIZE_BYTES,
-    )
-
-    if debug:
-        counters.shards = queried_shards
-    return counters
+        counts.fields += shard.fields
+        counts.paragraphs += shard.paragraphs
+        counts.sentences += shard.sentences
+    return counts, queried_shards

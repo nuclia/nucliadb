@@ -19,6 +19,7 @@
 #
 import random
 import uuid
+from typing import Optional
 
 import pytest
 
@@ -122,8 +123,8 @@ def create_broker_message_with_vectorset(
     field_id: str,
     vectorset_id: str,
     *,
-    default_vectorset_dimension: int,
     vectorset_dimension: int,
+    default_vectorset_dimension: Optional[int] = None,
 ):
     bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
 
@@ -133,18 +134,19 @@ def create_broker_message_with_vectorset(
     bm.extracted_text.append(make_extracted_text(field_id, body))
 
     # default vectorset
-    field_vectors = resources_pb2.ExtractedVectorsWrapper()
-    field_vectors.field.field = field_id
-    field_vectors.field.field_type = resources_pb2.FieldType.TEXT
-    for i in range(0, 100, 10):
-        field_vectors.vectors.vectors.vectors.append(
-            utils_pb2.Vector(
-                start=i,
-                end=i + 10,
-                vector=[random.random()] * default_vectorset_dimension,
+    if default_vectorset_dimension is not None:
+        field_vectors = resources_pb2.ExtractedVectorsWrapper()
+        field_vectors.field.field = field_id
+        field_vectors.field.field_type = resources_pb2.FieldType.TEXT
+        for i in range(0, 100, 10):
+            field_vectors.vectors.vectors.vectors.append(
+                utils_pb2.Vector(
+                    start=i,
+                    end=i + 10,
+                    vector=[random.random()] * default_vectorset_dimension,
+                )
             )
-        )
-    bm.field_vectors.append(field_vectors)
+        bm.field_vectors.append(field_vectors)
 
     # custom vectorset
     field_vectors = resources_pb2.ExtractedVectorsWrapper()

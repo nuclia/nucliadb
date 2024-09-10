@@ -6,9 +6,12 @@ pub struct Filter {
     pub field_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, repeated, tag = "2")]
     pub paragraph_labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    /// JSON string with the filter expression
+    /// JSON string with the filter expression for labels
     #[prost(string, tag = "3")]
-    pub expression: ::prost::alloc::string::String,
+    pub labels_expression: ::prost::alloc::string::String,
+    /// JSON string with the filter expression for keywords
+    #[prost(string, tag = "4")]
+    pub keywords_expression: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1017,7 +1020,7 @@ pub mod node_reader_client {
         }
         pub async fn vector_ids(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+            request: impl tonic::IntoRequest<super::super::noderesources::VectorSetId>,
         ) -> std::result::Result<tonic::Response<super::IdCollection>, tonic::Status> {
             self.inner
                 .ready()
@@ -1281,7 +1284,7 @@ pub mod node_reader_server {
         ) -> std::result::Result<tonic::Response<super::IdCollection>, tonic::Status>;
         async fn vector_ids(
             &self,
-            request: tonic::Request<super::super::noderesources::ShardId>,
+            request: tonic::Request<super::super::noderesources::VectorSetId>,
         ) -> std::result::Result<tonic::Response<super::IdCollection>, tonic::Status>;
         async fn relation_ids(
             &self,
@@ -1745,8 +1748,9 @@ pub mod node_reader_server {
                     struct VectorIdsSvc<T: NodeReader>(pub Arc<T>);
                     impl<
                         T: NodeReader,
-                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
-                    for VectorIdsSvc<T> {
+                    > tonic::server::UnaryService<
+                        super::super::noderesources::VectorSetId,
+                    > for VectorIdsSvc<T> {
                         type Response = super::IdCollection;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -1754,7 +1758,9 @@ pub mod node_reader_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::super::noderesources::ShardId>,
+                            request: tonic::Request<
+                                super::super::noderesources::VectorSetId,
+                            >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {

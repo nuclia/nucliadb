@@ -23,9 +23,11 @@ import logging
 import uuid
 from functools import partial
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.manager import choose_node
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
 from nucliadb_protos import audit_pb2, nodereader_pb2, noderesources_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
@@ -118,10 +120,18 @@ class IndexAuditHandler:
             total_fields += shard.fields
             total_paragraphs += shard.paragraphs
 
-        await self.audit.report(
+        async with datamanagers.with_ro_transaction() as txn:
+            num_vectorsets = (
+                len([vs async for vs in datamanagers.vectorsets.iter(txn=txn, kbid=kbid)]) or 1
+            )
+
+        self.audit.report_storage(
             kbid=kbid,
-            audit_type=audit_pb2.AuditRequest.AuditType.INDEXED,
-            kb_counter=audit_pb2.AuditKBCounter(fields=total_fields, paragraphs=total_paragraphs),
+            paragraphs=total_paragraphs,
+            fields=total_fields,
+            bytes=total_paragraphs  # This is an estimation of bytes stored in a KB
+            * AVG_PARAGRAPH_SIZE_BYTES
+            * num_vectorsets,
         )
 
 
@@ -175,7 +185,7 @@ class ResourceWritesAuditHandler:
         metrics.total_messages.inc({"action": "scheduled", "type": "audit_fields"})
         with metrics.handler_histo({"type": "audit_fields"}):
             when = message_audit.when if message_audit.HasField("when") else None
-            await self.audit.report(
+            self.audit.report_and_send(
                 kbid=message_audit.kbid,
                 when=when,
                 user=message_audit.user,

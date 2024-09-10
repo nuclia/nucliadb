@@ -18,15 +18,41 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import functools
+import random
+import uuid
+from typing import Any, Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
+from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster import manager
-from nucliadb_protos import nodereader_pb2
+from nucliadb.common.cluster.base import AbstractIndexNode
+from nucliadb.common.datamanagers.vectorsets import BrokenInvariant
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.search.predict import DummyPredictEngine
+from nucliadb.search.requesters import utils
+from nucliadb_protos import (
+    nodereader_pb2,
+    resources_pb2,
+    utils_pb2,
+    writer_pb2,
+)
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.indexing import IndexingUtility
+from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    set_utility,
+)
+from tests.ingest.fixtures import make_extracted_text
 from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
+from tests.utils import inject_message
 
 DEFAULT_VECTOR_DIMENSION = 512
 VECTORSET_DIMENSION = 12
@@ -34,7 +60,7 @@ VECTORSET_DIMENSION = 12
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_vectorsets(
+async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -42,7 +68,6 @@ async def test_vectorsets(
 ):
     kbid = kb_with_vectorset.kbid
     vectorset_id = kb_with_vectorset.vectorset_id
-    default_vector_dimension = kb_with_vectorset.default_vector_dimension
     vectorset_dimension = kb_with_vectorset.vectorset_dimension
 
     shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
@@ -50,7 +75,9 @@ async def test_vectorsets(
     node, shard_id = manager.choose_node(logic_shard)
 
     test_cases = [
-        (default_vector_dimension, ""),
+        # If there is just one vectorset, it should be used by default when
+        # no vectorset is specified
+        (vectorset_dimension, ""),
         (vectorset_dimension, vectorset_id),
     ]
     for dimension, vectorset in test_cases:
@@ -64,9 +91,10 @@ async def test_vectorsets(
         results = await node.reader.Search(query_pb)  # type: ignore
         assert len(results.vector.documents) == 5
 
+    # Test that querying with the wrong dimension raises an exception
     test_cases = [
-        (default_vector_dimension, vectorset_id),
-        (vectorset_dimension, ""),
+        (6000, vectorset_id),
+        (6000, "multilingual"),
     ]
     for dimension, vectorset in test_cases:
         query_pb = nodereader_pb2.SearchRequest(
@@ -87,7 +115,66 @@ async def test_vectorsets(
 )
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_vectorset_parameter(
+async def test_vectorset_parameter_without_default_vectorset(
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+    vectorset,
+    expected,
+):
+    kbid = knowledgebox
+
+    calls: list[nodereader_pb2.SearchRequest] = []
+
+    async def mock_node_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
+        calls.append(pb_query)
+        results = [nodereader_pb2.SearchResponse()]
+        incomplete_results = False
+        queried_nodes = []  # type: ignore
+        return (results, incomplete_results, queried_nodes)
+
+    with (
+        patch(
+            "nucliadb.search.search.query.datamanagers.vectorsets.get_default_vectorset",
+            side_effect=BrokenInvariant(""),
+        ),
+        patch(
+            "nucliadb.search.api.v1.search.node_query",
+            new=AsyncMock(side_effect=mock_node_query),
+        ),
+        patch(
+            "nucliadb.search.search.find.node_query",
+            new=AsyncMock(side_effect=mock_node_query),
+        ),
+        patch(
+            "nucliadb.search.search.query.datamanagers.vectorsets.exists",
+            new=AsyncMock(return_value=True),
+        ),
+    ):
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/search",
+            params={"query": "foo", "vectorset": vectorset},
+        )
+        assert resp.status_code == 200
+        assert calls[-1].vectorset == expected
+
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/find",
+            params={
+                "query": "foo",
+                "vectorset": vectorset,
+            },
+        )
+        assert resp.status_code == 200
+        assert calls[-1].vectorset == expected
+
+
+@pytest.mark.parametrize(
+    "vectorset,expected",
+    [(None, "multilingual"), ("", "multilingual"), ("myvectorset", "myvectorset")],
+)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_vectorset_parameter_with_default_vectorset(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
     vectorset,
@@ -134,3 +221,271 @@ async def test_vectorset_parameter(
         )
         assert resp.status_code == 200
         assert calls[-1].vectorset == expected
+
+
+async def test_querying_kb_with_vectorsets(
+    mocker: MockerFixture,
+    storage: Storage,
+    maindb_driver: Driver,
+    shard_manager,
+    learning_config,
+    dummy_indexing_utility,
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    dummy_predict: DummyPredictEngine,
+):
+    """This tests validates a KB with 1 or 2 vectorsets have functional search
+    using or not `vectorset` parameter in search. The point here is not the
+    result, but checking the index response.
+
+    """
+    query: tuple[Any, Optional[nodereader_pb2.SearchResponse], Optional[Exception]] = (None, None, None)
+
+    async def query_shard_wrapper(
+        node: AbstractIndexNode, shard: str, pb_query: nodereader_pb2.SearchRequest
+    ):
+        nonlocal query
+
+        from nucliadb.search.search.shards import query_shard
+
+        # this avoids problems with spying an object twice
+        if not hasattr(node.reader.Search, "spy_return"):
+            spy = mocker.spy(node.reader, "Search")
+        else:
+            spy = node.reader.Search  # type: ignore
+
+        try:
+            result = await query_shard(node, shard, pb_query)
+        except Exception as exc:
+            query = (spy, None, exc)
+            raise
+        else:
+            query = (spy, result, None)
+            return result
+
+    def predict_query_wrapper(original, dimension: int, vectorset_dimensions: dict[str, int]):
+        @functools.wraps(original)
+        async def inner(*args, **kwargs):
+            query_info = await original(*args, **kwargs)
+            query_info.sentence.data = [1.0] * dimension
+            for vectorset_id, vectorset_dimension in vectorset_dimensions.items():
+                query_info.sentence.vectors[vectorset_id] = [1.0] * vectorset_dimension
+            return query_info
+
+        return inner
+
+    # KB with one vectorset
+
+    kbid = KnowledgeBox.new_unique_kbid()
+    kbslug = "kb-with-one-vectorset"
+    kbid, _ = await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=kbslug,
+        semantic_models={
+            "model": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE, vector_dimension=768
+            ),
+        },
+    )
+    rid = uuid.uuid4().hex
+    field_id = "my-field"
+    bm = create_broker_message_with_vectorsets(kbid, rid, field_id, [("model", 768)])
+    await inject_message(nucliadb_grpc, bm)
+
+    with (
+        patch.dict(utils.METHODS, {utils.Method.SEARCH: query_shard_wrapper}, clear=True),
+    ):
+        with (
+            patch.object(
+                dummy_predict,
+                "query",
+                side_effect=predict_query_wrapper(dummy_predict.query, 768, {"model": 768}),
+            ),
+        ):
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/find",
+                json={
+                    "query": "foo",
+                },
+            )
+            assert resp.status_code == 200
+
+            node_search_spy, result, error = query
+            assert result is not None
+            assert error is None
+
+            request = node_search_spy.call_args[0][0]
+            # there's only one model and we get it as the default
+            assert request.vectorset == "model"
+            assert len(request.vector) == 768
+
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/find",
+                json={
+                    "query": "foo",
+                    "vectorset": "model",
+                },
+            )
+            assert resp.status_code == 200
+
+            node_search_spy, result, error = query
+            assert result is not None
+            assert error is None
+
+            request = node_search_spy.call_args[0][0]
+            assert request.vectorset == "model"
+            assert len(request.vector) == 768
+
+    # KB with 2 vectorsets
+
+    kbid = KnowledgeBox.new_unique_kbid()
+    kbslug = "kb-with-vectorsets"
+    kbid, _ = await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=kbslug,
+        semantic_models={
+            "model-A": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE, vector_dimension=768
+            ),
+            "model-B": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.DOT, vector_dimension=1024
+            ),
+        },
+    )
+    rid = uuid.uuid4().hex
+    field_id = "my-field"
+    bm = create_broker_message_with_vectorsets(
+        kbid, rid, field_id, [("model-A", 768), ("model-B", 1024)]
+    )
+    await inject_message(nucliadb_grpc, bm)
+
+    with (
+        patch.dict(utils.METHODS, {utils.Method.SEARCH: query_shard_wrapper}, clear=True),
+    ):
+        with (
+            patch.object(
+                dummy_predict,
+                "query",
+                side_effect=predict_query_wrapper(dummy_predict.query, 500, {"model-A": 768}),
+            ),
+        ):
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/find",
+                json={
+                    "query": "foo",
+                    "vectorset": "model-A",
+                },
+            )
+            assert resp.status_code == 200
+
+            node_search_spy, result, error = query
+            assert result is not None
+            assert error is None
+
+            request = node_search_spy.call_args[0][0]
+            assert request.vectorset == "model-A"
+            assert len(request.vector) == 768
+
+        with (
+            patch.object(
+                dummy_predict,
+                "query",
+                side_effect=predict_query_wrapper(dummy_predict.query, 500, {"model-B": 1024}),
+            ),
+        ):
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/find",
+                json={
+                    "query": "foo",
+                    "vectorset": "model-B",
+                },
+            )
+            assert resp.status_code == 200
+
+            node_search_spy, result, error = query
+            assert result is not None
+            assert error is None
+
+            request = node_search_spy.call_args[0][0]
+            assert request.vectorset == "model-B"
+            assert len(request.vector) == 1024
+
+        with (
+            patch.object(
+                dummy_predict,
+                "query",
+                side_effect=predict_query_wrapper(
+                    dummy_predict.query, 500, {"model-A": 768, "model-B": 1024}
+                ),
+            ),
+        ):
+            resp = await nucliadb_reader.get(
+                f"/kb/{kbid}/find",
+                params={
+                    "query": "foo",
+                },
+            )
+            assert resp.status_code == 200
+            node_search_spy, result, error = query
+            request = node_search_spy.call_args[0][0]
+            assert result is not None
+            assert error is None
+            # with more than one vectorset, we get the first one
+            assert request.vectorset == "model-A"
+
+
+@pytest.fixture(scope="function")
+def dummy_predict():
+    predict = DummyPredictEngine()
+    set_utility(Utility.PREDICT, predict)
+    yield predict
+    clean_utility(Utility.PREDICT)
+
+
+#
+# TODO: replace for the one in ndbfixtures when it's ready
+@pytest.fixture(scope="function")
+async def dummy_indexing_utility():
+    # as it's a dummy utility, we don't need to provide real nats servers or
+    # creds
+    indexing_utility = IndexingUtility(nats_creds=None, nats_servers=[], dummy=True)
+    await indexing_utility.initialize()
+    set_utility(Utility.INDEXING, indexing_utility)
+
+    yield
+
+    clean_utility(Utility.INDEXING)
+    await indexing_utility.finalize()
+
+
+def create_broker_message_with_vectorsets(
+    kbid: str,
+    rid: str,
+    field_id: str,
+    vectorsets: list[tuple[str, int]],
+):
+    bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
+
+    body = "Lorem ipsum dolor sit amet..."
+    bm.texts[field_id].body = body
+
+    bm.extracted_text.append(make_extracted_text(field_id, body))
+
+    for vectorset_id, vectorset_dimension in vectorsets:
+        # custom vectorset
+        field_vectors = resources_pb2.ExtractedVectorsWrapper()
+        field_vectors.field.field = field_id
+        field_vectors.field.field_type = resources_pb2.FieldType.TEXT
+        field_vectors.vectorset_id = vectorset_id
+        for i in range(0, 100, 10):
+            field_vectors.vectors.vectors.vectors.append(
+                utils_pb2.Vector(
+                    start=i,
+                    end=i + 10,
+                    vector=[random.random()] * vectorset_dimension,
+                )
+            )
+        bm.field_vectors.append(field_vectors)
+    return bm

@@ -29,7 +29,7 @@ from nucliadb_dataset.settings import RunningSettings
 from nucliadb_protos.dataset_pb2 import TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
 
-parser = argdantic.ArgParser()
+parser: argdantic.ArgParser = argdantic.ArgParser()
 
 
 @parser.command(

@@ -24,7 +24,7 @@ import httpx
 
 from nucliadb_telemetry.metrics import Counter
 
-pinecone_errors_counter = Counter("pinecone_errors", labels={"type": ""})
+pinecone_errors_counter = Counter("pinecone_errors", labels={"type": "", "status_code": ""})
 
 
 class PineconeAPIError(Exception):
@@ -52,9 +52,33 @@ class PineconeAPIError(Exception):
         super().__init__(exc_message)
 
 
-class PineconeRateLimitError(PineconeAPIError):
+class RetriablePineconeAPIError(PineconeAPIError):
+    """
+    Raised when the client can retry the operation.
+    """
+
+    pass
+
+
+class PineconeRateLimitError(RetriablePineconeAPIError):
     """
     Raised when the client has exceeded the rate limit to be able to backoff and retry.
+    """
+
+    pass
+
+
+class PineconeNeedsPlanUpgradeError(PineconeAPIError):
+    """
+    Raised when the client needs to upgrade the plan to continue using the service.
+    """
+
+    pass
+
+
+class MetadataTooLargeError(ValueError):
+    """
+    Raised when the metadata of a vector to be upserted is too large.
     """
 
     pass
@@ -64,25 +88,41 @@ def raise_for_status(operation: str, response: httpx.Response):
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError:
-        pinecone_errors_counter.inc(labels={"type": operation})
+        pinecone_errors_counter.inc(labels={"type": operation, "status_code": str(response.status_code)})
         code = None
         message = None
         details = None
         try:
             resp_json = response.json()
             error = resp_json.get("error") or {}
-            code = error.get("code")
-            message = error.get("message")
-            details = error.get("details")
+            code = resp_json.get("code") or error.get("code")
+            message = resp_json.get("message") or error.get("message") or ""
+            details = resp_json.get("details") or error.get("details")
         except Exception:  # pragma: no cover
             message = response.text
         if response.status_code == 429:
+            if "month" in message:
+                raise PineconeNeedsPlanUpgradeError(
+                    http_status_code=response.status_code,
+                    code=code,
+                    message=message,
+                    details=details,
+                )
             raise PineconeRateLimitError(
                 http_status_code=response.status_code,
                 code=code,
                 message=message,
                 details=details,
             )
+
+        if str(response.status_code).startswith("5"):
+            raise RetriablePineconeAPIError(
+                http_status_code=response.status_code,
+                code=code,
+                message=message,
+                details=details,
+            )
+
         raise PineconeAPIError(
             http_status_code=response.status_code,
             code=code,

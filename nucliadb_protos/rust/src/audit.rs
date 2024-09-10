@@ -77,6 +77,14 @@ pub struct ChatContext {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RetrievedContext {
+    #[prost(string, tag = "1")]
+    pub text_block_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub text: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ChatAudit {
     #[prost(string, tag = "1")]
     pub question: ::prost::alloc::string::String,
@@ -84,10 +92,19 @@ pub struct ChatAudit {
     pub answer: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "3")]
     pub rephrased_question: ::core::option::Option<::prost::alloc::string::String>,
+    /// Conversation from chats
+    #[deprecated]
     #[prost(message, repeated, tag = "4")]
     pub context: ::prost::alloc::vec::Vec<ChatContext>,
+    /// context retrieved on the current ask
+    #[prost(message, repeated, tag = "6")]
+    pub chat_context: ::prost::alloc::vec::Vec<ChatContext>,
+    #[prost(message, repeated, tag = "8")]
+    pub retrieved_context: ::prost::alloc::vec::Vec<RetrievedContext>,
     #[prost(string, tag = "5")]
     pub learning_id: ::prost::alloc::string::String,
+    #[prost(int32, tag = "9")]
+    pub status_code: i32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -104,6 +121,7 @@ pub struct AuditRequest {
     pub fields: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "7")]
     pub search: ::core::option::Option<super::nodereader::SearchRequest>,
+    #[deprecated]
     #[prost(float, tag = "8")]
     pub timeit: f32,
     #[prost(string, tag = "9")]
@@ -128,6 +146,16 @@ pub struct AuditRequest {
     pub chat: ::core::option::Option<ChatAudit>,
     #[prost(bool, tag = "20")]
     pub success: bool,
+    #[prost(float, tag = "21")]
+    pub request_time: f32,
+    #[prost(float, optional, tag = "22")]
+    pub retrieval_time: ::core::option::Option<f32>,
+    #[prost(float, optional, tag = "23")]
+    pub generative_answer_time: ::core::option::Option<f32>,
+    #[prost(float, optional, tag = "24")]
+    pub generative_answer_first_chunk_time: ::core::option::Option<f32>,
+    #[prost(float, optional, tag = "25")]
+    pub rephrase_time: ::core::option::Option<f32>,
 }
 /// Nested message and enum types in `AuditRequest`.
 pub mod audit_request {

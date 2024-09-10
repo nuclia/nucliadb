@@ -46,6 +46,9 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
       serviceAccount: {{ ((.Values.exporter).serviceAccount) | default "default" }}
       containers:
       - name: metrics-exporter
@@ -56,6 +59,8 @@ spec:
         ]
         envFrom:
           - configMapRef:
+              name: {{ .Release.Name }}-config
+          - secretRef:
               name: {{ .Release.Name }}-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}

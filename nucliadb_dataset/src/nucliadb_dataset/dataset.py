@@ -33,13 +33,8 @@ from nucliadb_dataset.tasks import (
 from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.resource import KnowledgeBoxObj
-from nucliadb_models.search import (
-    KnowledgeboxSearchResults,
-    SearchOptions,
-    SearchRequest,
-)
 from nucliadb_models.trainset import TrainSetPartitions
-from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
+from nucliadb_protos.dataset_pb2 import TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB, Region
 
 CHUNK_SIZE = 5 * 1024 * 1024
@@ -160,72 +155,6 @@ class NucliaDBDataset(NucliaDataset):
 
         self._set_schema(self.task_definition.schema)
         self._set_mappings(self.task_definition.mapping)
-        if self.trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
-            self._check_labels("PARAGRAPHS")
-
-        elif self.trainset.type == TaskType.FIELD_CLASSIFICATION:
-            self._check_labels("RESOURCES")
-
-        elif self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
-            self._check_entities()
-
-    def _computed_labels(self) -> Dict[str, LabelSetCount]:
-        search_result: KnowledgeboxSearchResults = self.search_sdk.search(
-            kbid=self.kbid,
-            content=SearchRequest(features=[SearchOptions.DOCUMENT], faceted=["/l"], page_size=0),
-        )
-
-        response: Dict[str, LabelSetCount] = {}
-        if search_result.fulltext is None or search_result.fulltext.facets is None:
-            return response
-
-        label_facets = {}
-        facet_prefix = "/l/"
-        if "/l" in search_result.fulltext.facets:
-            label_facets = search_result.fulltext.facets.get("/l", {})
-        elif "/classification.labels" in search_result.fulltext.facets:
-            facet_prefix = "/classification.labels/"
-            label_facets = search_result.fulltext.facets.get("/classification.labels", {})
-
-        for labelset, count in label_facets.items():
-            real_labelset = labelset[len(facet_prefix) :]  # removing /l/
-            response[real_labelset] = LabelSetCount(count=count)
-
-        for labelset, labelset_obj in response.items():
-            base_label = f"{facet_prefix}{labelset}"
-            fsearch_result: KnowledgeboxSearchResults = self.search_sdk.search(
-                kbid=self.kbid,
-                content=SearchRequest(
-                    features=[SearchOptions.DOCUMENT], faceted=[base_label], page_size=0
-                ),
-            )
-            if fsearch_result.fulltext is None or fsearch_result.fulltext.facets is None:
-                raise Exception("Search error")
-
-            for label, count in fsearch_result.fulltext.facets.get(base_label, {}).items():
-                labelset_obj.labels[label.replace(base_label + "/", "")] = count
-        return response
-
-    def _check_labels(self, type: str = "PARAGRAPHS"):
-        if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to have only one labelset filter to train")
-
-        labels: KnowledgeBoxLabels = self.reader_sdk.get_labelsets(kbid=self.kbid)
-        labelset = self.trainset.filter.labels[0]
-
-        if labelset not in labels.labelsets:
-            computed_labels = self._computed_labels()
-            if type != "RESOURCES" or labelset not in computed_labels:
-                raise Exception(f"Labelset is not valid {labelset} not in {labels.labelsets}")
-
-        elif type not in labels.labelsets[labelset].kind:
-            raise Exception(f"Labelset not defined for {type} classification")
-
-    def _check_entities(self) -> None:
-        entities: KnowledgeBoxEntities = self.reader_sdk.get_entitygroups(kbid=self.kbid)
-        for family_group in self.trainset.filter.labels:
-            if family_group not in entities.groups:
-                raise Exception("Family group is not valid")
 
     def _map(self, batch: Any):
         for func in self.mappings:

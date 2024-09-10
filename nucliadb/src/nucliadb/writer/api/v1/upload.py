@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-import mimetypes
 import pickle
 import uuid
 from datetime import datetime
@@ -43,6 +42,7 @@ from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
     validate_rid_exists_or_raise_error,
 )
+from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import parse_basic
@@ -60,6 +60,7 @@ from nucliadb.writer.tus.exceptions import (
 from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models import content_types
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
@@ -250,8 +251,15 @@ async def _tus_post(
     request_content_type = None
     if item is None:
         request_content_type = request.headers.get("content-type")
-    if not request_content_type:
-        request_content_type = guess_content_type(metadata["filename"])
+    if request_content_type is None:
+        request_content_type = content_types.guess(metadata["filename"]) or "application/octet-stream"
+
+    if request_content_type is not None and not content_types.valid(request_content_type):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported content type: {request_content_type}",
+        )
+
     metadata.setdefault("content_type", request_content_type)
 
     metadata["implies_resource_creation"] = implies_resource_creation
@@ -529,10 +537,18 @@ async def _tus_patch(
             if isinstance(item_payload, str):
                 item_payload = item_payload.encode()
             creation_payload = pickle.loads(base64.b64decode(item_payload))
+
+        content_type = dm.get("metadata", {}).get("content_type")
+        if content_type is not None and not content_types.valid(content_type):
+            return HTTPClientError(
+                status_code=415,
+                detail=f"Unsupported content type: {content_type}",
+            )
+
         try:
             seqid = await store_file_on_nuclia_db(
                 size=dm.get("size"),
-                content_type=dm.get("metadata", {}).get("content_type"),
+                content_type=content_type,
                 override_resource_title=dm.get("metadata", {}).get("implies_resource_creation", False),
                 filename=dm.get("metadata", {}).get("filename"),
                 password=dm.get("metadata", {}).get("password"),
@@ -701,8 +717,14 @@ async def _upload(
     # - content-type set by the user in the upload request header takes precedence.
     # - if not set, we will try to guess it from the filename and default to a generic binary content type otherwise
     content_type = request.headers.get("content-type")
-    if not content_type:
-        content_type = guess_content_type(filename)
+    if content_type is None:
+        content_type = content_types.guess(filename) or "application/octet-stream"
+
+    if not content_types.valid(content_type):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported content type: {content_type}",
+        )
 
     metadata = {"content_type": content_type, "filename": filename}
 
@@ -813,7 +835,6 @@ async def store_file_on_nuclia_db(
     item: Optional[CreateResourcePayload] = None,
 ) -> Optional[int]:
     # File is on NucliaDB Storage at path
-
     partitioning = get_partitioning()
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -836,8 +857,10 @@ async def store_file_on_nuclia_db(
 
     parse_audit(writer.audit, request)
 
+    unique_slug_context_manager = noop_context_manager()
     if item is not None:
         if item.slug:
+            unique_slug_context_manager = ensure_slug_uniqueness(kbid, item.slug)
             writer.slug = item.slug
             toprocess.slug = item.slug
 
@@ -860,54 +883,55 @@ async def store_file_on_nuclia_db(
             x_skip_store=False,
         )
 
-    if override_resource_title and filename is not None:
-        set_title(writer, toprocess, filename)
+    async with unique_slug_context_manager:
+        if override_resource_title and filename is not None:
+            set_title(writer, toprocess, filename)
 
-    writer.basic.icon = content_type
-    writer.basic.created.FromDatetime(datetime.now())
+        writer.basic.icon = content_type
+        writer.basic.created.FromDatetime(datetime.now())
 
-    # Update resource with file
-    file_field = FieldFile()
-    file_field.added.FromDatetime(datetime.now())
-    file_field.file.bucket_name = bucket
-    file_field.file.content_type = content_type
-    if filename is not None:
-        file_field.file.filename = filename
-    file_field.file.uri = path
-    file_field.file.source = source
+        # Update resource with file
+        file_field = FieldFile()
+        file_field.added.FromDatetime(datetime.now())
+        file_field.file.bucket_name = bucket
+        file_field.file.content_type = content_type
+        if filename is not None:
+            file_field.file.filename = filename
+        file_field.file.uri = path
+        file_field.file.source = source
 
-    if md5:
-        file_field.file.md5 = md5
-    if size:
-        file_field.file.size = size
-    if language:
-        file_field.language = language
-    if password:
-        file_field.password = password
+        if md5:
+            file_field.file.md5 = md5
+        if size:
+            file_field.file.size = size
+        if language:
+            file_field.language = language
+        if password:
+            file_field.password = password
 
-    writer.files[field].CopyFrom(file_field)
-    # Do not store passwords on maindb
-    writer.files[field].ClearField("password")
+        writer.files[field].CopyFrom(file_field)
+        # Do not store passwords on maindb
+        writer.files[field].ClearField("password")
 
-    toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
-        file_field, storage=storage
-    )
-
-    writer.source = BrokerMessage.MessageSource.WRITER
-    writer.basic.metadata.status = Metadata.Status.PENDING
-    writer.basic.metadata.useful = True
-    await transaction.commit(writer, partition)
-    try:
-        processing_info = await processing.send_to_process(toprocess, partition)
-    except LimitsExceededError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-    except SendToProcessError:
-        raise HTTPException(
-            status_code=500,
-            detail="Error while sending to process. Try calling /reprocess",
+        toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
+            file_field, storage=storage
         )
 
-    return processing_info.seqid
+        writer.source = BrokerMessage.MessageSource.WRITER
+        writer.basic.metadata.status = Metadata.Status.PENDING
+        writer.basic.metadata.useful = True
+        await transaction.commit(writer, partition)
+        try:
+            processing_info = await processing.send_to_process(toprocess, partition)
+        except LimitsExceededError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+        except SendToProcessError:
+            raise HTTPException(
+                status_code=500,
+                detail="Error while sending to process. Try calling /reprocess",
+            )
+
+        return processing_info.seqid
 
 
 def maybe_b64decode(some_string: str) -> str:
@@ -916,9 +940,3 @@ def maybe_b64decode(some_string: str) -> str:
     except ValueError:
         # not b64encoded
         return some_string
-
-
-def guess_content_type(filename: str) -> str:
-    default = "application/octet-stream"
-    guessed, _ = mimetypes.guess_type(filename)
-    return guessed or default

@@ -24,8 +24,7 @@ from unittest import mock
 import pytest
 from fastapi import Response
 from fastapi.responses import StreamingResponse
-
-from nucliadb_models.resource import NucliaDBRoles
+from httpx import AsyncClient
 
 
 class MockProxy:
@@ -51,27 +50,28 @@ def learning_collector_proxy_mock():
         yield proxy
 
 
-async def test_api(reader_api, knowledgebox_ingest, learning_collector_proxy_mock):
-    kbid = knowledgebox_ingest
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        # Get feedback months
-        resp = await client.get(f"/kb/{kbid}/feedback")
-        assert resp.status_code == 200
-        assert learning_collector_proxy_mock.calls[-1][1:] == (
-            "GET",
-            f"/collect/feedback/{kbid}",
-            None,
-        )
+@pytest.mark.deploy_modes("component")
+async def test_api(nucliadb_reader: AsyncClient, knowledgebox, learning_collector_proxy_mock):
+    kbid = knowledgebox
 
-        # Download feedback for a month
-        resp = await client.get(f"/kb/{kbid}/feedback/2021-01")
-        assert resp.status_code == 200
-        data = BytesIO()
-        for chunk in resp.iter_bytes():
-            data.write(chunk)
-        assert data.getvalue() == b"some streamed content"
-        assert learning_collector_proxy_mock.calls[-1][1:] == (
-            "GET",
-            f"/collect/feedback/{kbid}/2021-01",
-            None,
-        )
+    # Get feedback months
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/feedback")
+    assert resp.status_code == 200
+    assert learning_collector_proxy_mock.calls[-1][1:] == (
+        "GET",
+        f"/collect/feedback/{kbid}",
+        None,
+    )
+
+    # Download feedback for a month
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/feedback/2021-01")
+    assert resp.status_code == 200
+    data = BytesIO()
+    for chunk in resp.iter_bytes():
+        data.write(chunk)
+    assert data.getvalue() == b"some streamed content"
+    assert learning_collector_proxy_mock.calls[-1][1:] == (
+        "GET",
+        f"/collect/feedback/{kbid}/2021-01",
+        None,
+    )

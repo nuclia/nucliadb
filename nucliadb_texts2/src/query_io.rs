@@ -19,17 +19,28 @@
 
 use crate::schema::TextSchema;
 use nucliadb_core::query_language::{BooleanExpression, BooleanOperation, Operator};
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, TermQuery};
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
 
-fn translate_literal(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
+fn translate_label_to_facet_query(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
     let facet = Facet::from_text(literal).unwrap();
     let term = Term::from_facet(schema.facets, &facet);
     Box::new(TermQuery::new(term, IndexRecordOption::Basic))
 }
 
-fn translate_not(inner: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
+fn translate_keyword_to_text_query(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
+    let terms: Vec<Term> =
+        literal.split_whitespace().map(|w| Term::from_field_text(schema.text, &w.to_lowercase())).collect();
+
+    if terms.len() == 1 {
+        Box::new(TermQuery::new(terms[0].clone(), IndexRecordOption::Basic))
+    } else {
+        Box::new(PhraseQuery::new(terms))
+    }
+}
+
+fn translate_not(inner: &BooleanExpression, schema: &TextSchema, is_keyword: bool) -> Box<dyn Query> {
     let mut operands = Vec::with_capacity(2);
 
     // Check the following issue to see why the additional AllQuery is needed:
@@ -37,13 +48,13 @@ fn translate_not(inner: &BooleanExpression, schema: &TextSchema) -> Box<dyn Quer
     let all_query: Box<dyn Query> = Box::new(AllQuery);
     operands.push((Occur::Must, all_query));
 
-    let subquery = translate_expression(inner, schema);
+    let subquery = translate_expression(inner, schema, is_keyword);
     operands.push((Occur::MustNot, subquery));
 
     Box::new(BooleanQuery::new(operands))
 }
 
-fn translate_operation(operation: &BooleanOperation, schema: &TextSchema) -> Box<dyn Query> {
+fn translate_operation(operation: &BooleanOperation, schema: &TextSchema, is_keyword: bool) -> Box<dyn Query> {
     let operator = match operation.operator {
         Operator::And => Occur::Must,
         Operator::Or => Occur::Should,
@@ -52,17 +63,29 @@ fn translate_operation(operation: &BooleanOperation, schema: &TextSchema) -> Box
     let mut operands = Vec::with_capacity(operation.operands.len());
 
     for operand in operation.operands.iter() {
-        let subquery = translate_expression(operand, schema);
+        let subquery = translate_expression(operand, schema, is_keyword);
         operands.push((operator, subquery));
     }
 
     Box::new(BooleanQuery::new(operands))
 }
 
-pub fn translate_expression(expression: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
+fn translate_expression(expression: &BooleanExpression, schema: &TextSchema, is_keyword: bool) -> Box<dyn Query> {
+    // is_keyword is used to determine if the query should be translated to a facet query or a text query
     match expression {
-        BooleanExpression::Not(inner) => translate_not(inner, schema),
-        BooleanExpression::Literal(literal) => translate_literal(literal, schema),
-        BooleanExpression::Operation(operation) => translate_operation(operation, schema),
+        BooleanExpression::Not(inner) => translate_not(inner, schema, is_keyword),
+        BooleanExpression::Literal(literal) => match is_keyword {
+            true => translate_keyword_to_text_query(literal, schema),
+            false => translate_label_to_facet_query(literal, schema),
+        },
+        BooleanExpression::Operation(operation) => translate_operation(operation, schema, is_keyword),
     }
+}
+
+pub fn translate_labels_expression(expression: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
+    translate_expression(expression, schema, false)
+}
+
+pub fn translate_keywords_expression(expression: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
+    translate_expression(expression, schema, true)
 }

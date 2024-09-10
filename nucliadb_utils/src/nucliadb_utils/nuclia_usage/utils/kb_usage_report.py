@@ -41,7 +41,6 @@ logger = logging.getLogger(__name__)
 
 class KbUsageReportUtility:
     queue: asyncio.Queue
-    lock: asyncio.Lock
 
     def __init__(
         self,
@@ -111,11 +110,7 @@ class KbUsageReportUtility:
         usage.predicts.extend(predicts)
         usage.searches.extend(searches)
         if storage is not None:
-            if storage.HasField("fields"):
-                usage.storage.fields = storage.fields
-            if storage.HasField("paragraphs"):
-                usage.storage.paragraphs = storage.paragraphs
-            if storage.HasField("resources"):
-                usage.storage.resources = storage.resources
+            for field, value in storage.ListFields():
+                setattr(usage.storage, field.name, value)
 
         self.send(usage)

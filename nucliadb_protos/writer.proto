@@ -36,6 +36,7 @@ message Error {
         GENERIC = 0;
         EXTRACT = 1;
         PROCESS = 2;
+        DATAAUGMENTATION = 3;
     }
     ErrorCode code = 4;
 }
@@ -464,11 +465,11 @@ message NewKnowledgeBoxV2Request {
 
 message NewKnowledgeBoxV2Response {
     knowledgebox.KnowledgeBoxResponseStatus status = 1;
+    string error_message = 2;
 }
 
 
 service Writer {
-    rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
     rpc NewKnowledgeBoxV2(NewKnowledgeBoxV2Request) returns (NewKnowledgeBoxV2Response) {}
     rpc DeleteKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.DeleteKnowledgeBoxResponse) {}
     rpc UpdateKnowledgeBox(knowledgebox.KnowledgeBoxUpdate) returns (knowledgebox.UpdateKnowledgeBoxResponse) {}

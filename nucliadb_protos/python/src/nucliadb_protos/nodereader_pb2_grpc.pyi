@@ -102,7 +102,7 @@ class NodeReaderStub:
     ]
 
     VectorIds: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.noderesources_pb2.VectorSetID,
         nucliadb_protos.nodereader_pb2.IdCollection,
     ]
 
@@ -187,7 +187,7 @@ class NodeReaderAsyncStub:
     ]
 
     VectorIds: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.noderesources_pb2.VectorSetID,
         nucliadb_protos.nodereader_pb2.IdCollection,
     ]
 
@@ -288,7 +288,7 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def VectorIds(
         self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
+        request: nucliadb_protos.noderesources_pb2.VectorSetID,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.nodereader_pb2.IdCollection, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.IdCollection]]: ...
 

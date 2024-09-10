@@ -19,6 +19,7 @@
 #
 import asyncio
 import math
+import os
 from datetime import datetime, timedelta
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
@@ -44,11 +45,12 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
-    get_audit,
     get_storage,
     set_utility,
 )
 from tests.utils import broker_resource, inject_message
+
+TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg,local").split(",")
 
 
 @pytest.mark.asyncio
@@ -340,6 +342,7 @@ async def test_paragraph_search_with_filters(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog does not support with_status")
 async def test_catalog_can_filter_by_processing_status(
     nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -664,6 +667,7 @@ async def test_search_relations(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog does not support with_status")
 async def test_processing_status_doesnt_change_on_search_after_processed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -923,32 +927,6 @@ async def test_search_automatic_relations(
         )
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_only_search_and_suggest_calls_audit(nucliadb_reader, knowledgebox):
-    kbid = knowledgebox
-
-    audit = get_audit()
-    audit.search = AsyncMock()
-    audit.suggest = AsyncMock()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog", params={"query": ""})
-    assert resp.status_code == 200
-
-    audit.search.assert_not_awaited()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/search")
-    assert resp.status_code == 200
-
-    audit.search.assert_awaited_once()
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/suggest?query=")
-
-    assert resp.status_code == 200
-
-    audit.suggest.assert_awaited_once()
-
-
 async def get_audit_messages(sub):
     msg = await sub.fetch(1)
     auditreq = AuditRequest()
@@ -958,7 +936,7 @@ async def get_audit_messages(sub):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
-async def test_search_and_suggest_sent_audit(
+async def test_search_sends_audit(
     nucliadb_reader,
     knowledgebox,
     stream_audit: StreamAuditStorage,
@@ -976,6 +954,7 @@ async def test_search_and_suggest_sent_audit(
     subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
 
     set_utility(Utility.AUDIT, stream_audit)
+
     try:
         await jetstream.delete_stream(name=audit_settings.audit_stream)
     except nats.js.errors.NotFoundError:
@@ -993,23 +972,6 @@ async def test_search_and_suggest_sent_audit(
     assert auditreq.kbid == kbid
     assert auditreq.type == AuditRequest.AuditType.SEARCH
     assert auditreq.client_type == ClientType.CHROME_EXTENSION  # Just to use other that the enum default
-    try:
-        int(auditreq.trace_id)
-    except ValueError:
-        assert False, "Invalid trace ID"
-
-    # Test suggest sends audit
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest?query=", headers={"x-ndb-client": "chrome_extension"}
-    )
-    assert resp.status_code == 200
-
-    auditreq = await get_audit_messages(psub)
-
-    assert auditreq.kbid == kbid
-    assert auditreq.type == AuditRequest.AuditType.SUGGEST
-    assert auditreq.client_type == ClientType.CHROME_EXTENSION  # Just to use other that the enum default
-
     try:
         int(auditreq.trace_id)
     except ValueError:
@@ -1549,6 +1511,7 @@ async def test_search_handles_limits_exceeded_error(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog cannot do shards")
 async def test_catalog_returns_shard_and_node_data(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1655,6 +1618,7 @@ async def test_catalog_pagination(
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["resources"]) <= page_size
+        assert body["fulltext"]["page_number"] == page_number
         for resource_id, resource_data in body["resources"].items():
             resource_created_date = datetime.fromisoformat(resource_data["created"]).timestamp()
             if resource_id in resource_uuids:
@@ -1708,3 +1672,88 @@ async def test_catalog_date_range_filtering(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["resources"]) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_catalog_faceted(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    valid_status = ["PROCESSED", "PENDING", "ERROR"]
+
+    for status_name, status_value in rpb.Metadata.Status.items():
+        if status_name not in valid_status:
+            continue
+        bm = broker_resource(knowledgebox)
+        bm.basic.metadata.status = status_value
+        await inject_message(nucliadb_grpc, bm)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog?faceted=/metadata.status",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 3
+    facets = body["fulltext"]["facets"]["/metadata.status"]
+    assert len(facets) == 3
+    for facet, count in facets.items():
+        assert facet.split("/")[-1] in valid_status
+        assert count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_catalog_filters(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    valid_status = ["PROCESSED", "PENDING", "ERROR"]
+
+    for status_name, status_value in rpb.Metadata.Status.items():
+        if status_name not in valid_status:
+            continue
+        bm = broker_resource(knowledgebox)
+        bm.basic.metadata.status = status_value
+        await inject_message(nucliadb_grpc, bm)
+
+    # No filters
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 3
+
+    # Simple filter
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog?filters=/metadata.status/PENDING",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
+    assert list(body["resources"].values())[0]["metadata"]["status"] == "PENDING"
+
+    # AND filter
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/catalog",
+        json={"filters": [{"all": ["/metadata.status/PENDING", "/metadata.status/ERROR"]}]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0
+
+    # OR filter
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/catalog",
+        json={"filters": [{"any": ["/metadata.status/PENDING", "/metadata.status/ERROR"]}]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 2
+    for resource in body["resources"].values():
+        assert resource["metadata"]["status"] in ["PENDING", "ERROR"]

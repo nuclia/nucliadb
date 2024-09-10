@@ -18,8 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import json
+from datetime import datetime
+from typing import Union
 
 import pydantic
+from pydantic import BeforeValidator
 from typing_extensions import Annotated
 
 
@@ -71,3 +74,15 @@ def validate_json(value: str):
         json.loads(value)
     except json.JSONDecodeError as exc:
         raise ValueError("Invalid JSON") from exc
+
+
+def check_valid_datetime(v: Union[str, datetime]) -> datetime:
+    if isinstance(v, datetime):
+        return v
+    try:
+        return datetime.fromisoformat(v)
+    except ValueError as e:
+        raise ValueError(f"Invalid datetime: {e}")
+
+
+DateTime = Annotated[datetime, BeforeValidator(check_valid_datetime)]

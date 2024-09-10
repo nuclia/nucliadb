@@ -20,7 +20,6 @@ data:
   FILE_BACKEND: {{ .Values.storage.file_backend }}
   UPLOAD_TOKEN_EXPIRATION: {{ .Values.storage.upload_token_expiration | quote}}
 {{- if eq .Values.storage.file_backend "gcs" }}
-  GCS_BASE64_CREDS: {{ .Values.storage.gcs_base64_creds }}
   GCS_BUCKET: {{ .Values.storage.gcs_bucket }}
   GCS_DEADLETTER_BUCKET: {{ .Values.storage.gcs_deadletter_bucket }}
   GCS_INDEXING_BUCKET: {{ .Values.storage.gcs_indexing_bucket }}
@@ -28,10 +27,6 @@ data:
   GCS_PROJECT: {{ .Values.storage.gcs_project }}
   GCS_BUCKET_LABELS: {{ toJson .Values.storage.gcs_bucket_labels | quote }}
 {{- else if eq .Values.storage.file_backend "s3" }}
-{{- if eq .Values.storage.s3_irsa "disabled" }}
-  S3_CLIENT_ID: {{ .Values.storage.s3_client_id }}
-  S3_CLIENT_SECRET: {{ .Values.storage.s3_client_secret }}
-{{- end }}
 {{- if .Values.storage.s3_ssl }}
   S3_SSL: "True"
 {{- end }}
@@ -52,7 +47,6 @@ data:
 {{- else }}
   ONPREM: "False"
 {{- end }}
-  NUCLIA_JWT_KEY: {{ .Values.nuclia.nuclia_jwt_key }}
   NUCLIA_HASH_SEED: {{ .Values.nuclia.nuclia_hash_seed | quote }}
   NUCLIA_PARTITIONS: {{ .Values.nuclia.nuclia_partitions | quote }}
   NUCLIADB_INGEST: {{ .Values.nucliadb.ingest }}
@@ -71,9 +65,6 @@ data:
 {{- end}}
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   DRIVER: {{ .Values.maindb.driver }}
-{{- if eq .Values.maindb.driver "pg" }}
-  DRIVER_PG_URL: {{ .Values.maindb.driver_pg_url }}
-{{- end }}
   AUDIT_DRIVER: {{ .Values.audit.driver }}
   AUDIT_JETSTREAM_TARGET: {{ .Values.audit.audit_jetstream_target }}
   AUDIT_JETSTREAM_SERVERS: {{ toJson .Values.audit.audit_jetstream_servers | quote }}
@@ -95,9 +86,5 @@ data:
 
 {{- if .Values.flag_settings_url }}
   FLAG_SETTINGS_URL: "{{ .Values.flag_settings_url }}"
-{{- end }}
-
-{{- if .Values.encryption.secret_key }}
-  ENCRYPTION_SECRET_KEY: {{ .Values.encryption.secret_key }}
 {{- end }}
 {{- end }}

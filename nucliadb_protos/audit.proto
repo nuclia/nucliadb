@@ -39,12 +39,23 @@ message ChatContext {
   string text = 2;
 }
 
+message RetrievedContext {
+  string text_block_id = 1;
+  string text = 2;
+
+}
+
 message ChatAudit {
   string question = 1;
   optional string answer = 2;
   optional string rephrased_question = 3;
-  repeated ChatContext context = 4;
+  // Conversation from chats
+  repeated ChatContext context = 4 [deprecated = true];
+  // context retrieved on the current ask
+  repeated ChatContext chat_context = 6;
+  repeated RetrievedContext retrieved_context = 8;
   string learning_id = 5;
+  int32 status_code = 9;
 }
 
 message AuditRequest {
@@ -57,9 +68,9 @@ message AuditRequest {
     STOPPED = 5;
     SEARCH = 6;
     PROCESSED = 7;
-    KB_DELETED = 8;
-    SUGGEST = 9;
-    INDEXED = 10;
+    KB_DELETED = 8 [deprecated=true];
+    SUGGEST = 9 [deprecated=true];
+    INDEXED = 10 [deprecated=true];
     CHAT = 11;
   }
 
@@ -72,7 +83,7 @@ message AuditRequest {
   repeated string fields = 6;
 
   nodereader.SearchRequest search = 7;
-  float timeit = 8;
+  float timeit = 8 [deprecated = true];
   string origin = 9;
   string rid = 10;
   string task = 11;
@@ -84,4 +95,9 @@ message AuditRequest {
   AuditKBCounter kb_counter = 18;
   ChatAudit chat = 19;
   bool success = 20;
+  float request_time = 21;
+  optional float retrieval_time = 22;
+  optional float generative_answer_time = 23;
+  optional float generative_answer_first_chunk_time = 24;
+  optional float rephrase_time = 25;
 }

@@ -45,6 +45,9 @@ spec:
 {{ toYaml .Values.tolerations | indent 8 }}
       serviceAccount: {{ ((.Values.ingest_processed_consumer).serviceAccount) | default "default" }}
       dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
       containers:
       - name: ingest-processed-consumer
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
@@ -68,6 +71,8 @@ spec:
         ]
         envFrom:
           - configMapRef:
+              name: {{ .Release.Name }}-config
+          - secretRef:
               name: {{ .Release.Name }}-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}

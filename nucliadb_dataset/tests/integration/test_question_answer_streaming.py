@@ -231,7 +231,7 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     qa1_a2.ids_paragraphs.append(paragraph_0_id)
     qa1.answers.append(qa1_a2)
 
-    fqaw.question_answers.question_answer.append(qa1)
+    fqaw.question_answers.question_answers.question_answer.append(qa1)
 
     qa2 = QuestionAnswer()
     qa2.question.text = "Give me an example of side-scrolling game"
@@ -243,7 +243,7 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
     qa2_a1.ids_paragraphs.append(paragraph_1_id)
     qa2.answers.append(qa2_a1)
 
-    fqaw.question_answers.question_answer.append(qa2)
+    fqaw.question_answers.question_answers.question_answer.append(qa2)
 
     bm.question_answers.append(fqaw)
 

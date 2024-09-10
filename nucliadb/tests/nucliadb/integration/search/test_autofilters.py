@@ -23,7 +23,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.tests.vectors import Q
-from nucliadb_models.search import Ner, QueryInfo, SentenceSearch, TokenSearch
+from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch
 from nucliadb_utils.utilities import Utility, set_utility
 
 
@@ -40,6 +40,12 @@ async def test_autofilters_are_returned(
 
     predict_mock.query = AsyncMock(
         return_value=QueryInfo(
+            language="en",
+            stop_words=[],
+            semantic_threshold=0.7,
+            semantic_thresholds={
+                "my-semantic-model": 0.7,
+            },
             entities=TokenSearch(
                 tokens=[
                     Ner(text="Newton", ner="scientist", start=0, end=1),
@@ -47,7 +53,17 @@ async def test_autofilters_are_returned(
                 ],
                 time=0.1,
             ),
-            sentence=SentenceSearch(data=Q, time=0.1),
+            sentence=SentenceSearch(
+                data=Q,
+                vectors={
+                    "my-semantic-model": Q,
+                    "multilingual": Q,
+                },
+                time=0.1,
+                timings={
+                    "my-semantic-model": 0.1,
+                },
+            ),
             visual_llm=False,
             max_context=10000,
             query="What relates Newton and Becquer?",

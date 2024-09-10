@@ -26,7 +26,7 @@ rollover will do the upgrade automatically.
 
 """
 
-from nucliadb.common.cluster.rollover import rollover_kb_shards
+from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 
 
@@ -34,4 +34,4 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    await rollover_kb_shards(context, kbid)
+    await rollover_kb_index(context, kbid)

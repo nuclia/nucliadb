@@ -31,7 +31,7 @@ from .common import (
     CloudLink,
     FieldID,
     Paragraph,
-    QuestionAnswer,
+    QuestionAnswers,
 )
 from .metadata import Relation, convert_pb_relation_to_api
 
@@ -301,18 +301,22 @@ class FileExtractedData(BaseModel):
         )
 
 
-class QuestionAnswers(BaseModel):
-    question_answer: List[QuestionAnswer]
+class FieldQuestionAnswers(BaseModel):
+    question_answers: QuestionAnswers
+    split_question_answers: Optional[Dict[str, QuestionAnswers]] = None
+    deleted_splits: Optional[List[str]] = None
 
     @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.QuestionAnswers) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
+    def from_message(
+        cls: Type[_T],
+        message: resources_pb2.FieldQuestionAnswers,
+    ) -> _T:
+        value = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+        return cls(**value)
 
 
 def convert_fieldmetadata_pb_to_dict(

@@ -17,23 +17,36 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import tempfile
+from contextlib import ExitStack
+from pathlib import Path
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
+from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.local import LocalStorage
-from nucliadb_utils.store import MAIN
-from nucliadb_utils.utilities import Utility
 
 
 @pytest.fixture(scope="function")
-async def local_storage():
-    folder = tempfile.TemporaryDirectory()
-    storage = LocalStorage(local_testing_files=folder.name)
+def local_storage_settings(tmp_path: Path) -> dict[str, Any]:
+    settings = {
+        "file_backend": FileBackendConfig.LOCAL,
+        "local_files": str((tmp_path / "blob").absolute()),
+    }
+    with ExitStack() as stack:
+        for key, value in settings.items():
+            context = patch.object(storage_settings, key, value)
+            stack.enter_context(context)
 
-    MAIN[Utility.STORAGE] = storage
+        yield settings
+
+
+@pytest.fixture(scope="function")
+async def local_storage(local_storage_settings: dict[str, Any]):
+    assert storage_settings.local_files is not None
+
+    storage = LocalStorage(local_testing_files=storage_settings.local_files)
     await storage.initialize()
     yield storage
     await storage.finalize()
-    folder.cleanup()
-    MAIN.pop(Utility.STORAGE, None)

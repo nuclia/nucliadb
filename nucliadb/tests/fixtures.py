@@ -22,12 +22,13 @@ import logging
 import os
 import tempfile
 from typing import AsyncIterator
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import psycopg
 import pytest
 from grpc import aio
 from httpx import AsyncClient
+from pytest_docker_fixtures import images
 from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.common.cluster import manager as cluster_manager
@@ -38,6 +39,7 @@ from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
+from nucliadb.migrator.migrator import run_pg_schema_migrations
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
@@ -53,19 +55,26 @@ from nucliadb_telemetry.settings import (
     LogOutputType,
     LogSettings,
 )
-from nucliadb_utils.settings import FileBackendConfig
+from nucliadb_utils.aiopynecone.models import QueryResponse
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.tests.azure import AzuriteFixture
 from nucliadb_utils.utilities import (
     Utility,
+    clean_pinecone,
     clean_utility,
     clear_global_cache,
+    get_pinecone,
     get_utility,
     set_utility,
 )
 from tests.utils import inject_message
 
 logger = logging.getLogger(__name__)
+
+# Minimum support PostgreSQL version
+# Reason: We want the btree_gin extension to support uuid's
+images.settings["postgresql"]["version"] = "11"
+images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
 
 
 @pytest.fixture(scope="function")
@@ -145,7 +154,8 @@ async def nucliadb(
     dummy_processing,
     analytics_disabled,
     maindb_settings,
-    blobstorage_settings,
+    storage: Storage,
+    storage_settings,
     tmpdir,
     learning_config,
 ):
@@ -166,7 +176,7 @@ async def nucliadb(
         log_format_type=LogFormatType.PLAIN,
         log_output_type=LogOutputType.FILE,
         **maindb_settings.model_dump(),
-        **blobstorage_settings,
+        **storage_settings,
     )
 
     config_nucliadb(settings)
@@ -230,6 +240,57 @@ async def nucliadb_manager(nucliadb: Settings):
 async def knowledgebox(nucliadb_manager: AsyncClient, request):
     resp = await nucliadb_manager.post(
         "/kbs", json={"slug": "knowledgebox", "release_channel": request.param}
+    )
+    assert resp.status_code == 201
+    uuid = resp.json().get("uuid")
+
+    yield uuid
+
+    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    assert resp.status_code == 200
+
+
+@pytest.fixture(scope="function")
+def pinecone_data_plane():
+    dp = Mock()
+    dp.upsert = AsyncMock(return_value=None)
+    dp.query = AsyncMock(
+        return_value=QueryResponse(
+            matches=[],
+        )
+    )
+    return dp
+
+
+@pytest.fixture(scope="function")
+def pinecone_control_plane():
+    cp = Mock()
+    cp.create_index = AsyncMock(return_value="pinecone-host")
+    cp.delete_index = AsyncMock(return_value=None)
+    return cp
+
+
+@pytest.fixture(scope="function")
+def pinecone_mock(pinecone_data_plane, pinecone_control_plane):
+    pinecone_session = get_pinecone()
+    pinecone_session.data_plane = Mock(return_value=pinecone_data_plane)
+    pinecone_session.control_plane = Mock(return_value=pinecone_control_plane)
+    yield
+    clean_pinecone()
+
+
+@pytest.fixture(scope="function")
+async def pinecone_knowledgebox(nucliadb_manager: AsyncClient, pinecone_mock):
+    resp = await nucliadb_manager.post(
+        "/kbs",
+        json={
+            "slug": "pinecone_knowledgebox",
+            "external_index_provider": {
+                "type": "pinecone",
+                "api_key": "my-pinecone-api-key",
+                "serverless_cloud": "aws_us_east_1",
+            },
+        },
     )
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
@@ -450,7 +511,7 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStu
 
 
 @pytest.fixture(scope="function")
-async def stream_audit(natsd: str):
+async def stream_audit(natsd: str, mocker):
     from nucliadb_utils.audit.stream import StreamAuditStorage
     from nucliadb_utils.settings import audit_settings
 
@@ -461,6 +522,13 @@ async def stream_audit(natsd: str):
         audit_settings.audit_hash_seed,
     )
     await audit.initialize()
+
+    mocker.spy(audit, "send")
+    mocker.spy(audit.js, "publish")
+    mocker.spy(audit, "search")
+    mocker.spy(audit, "chat")
+
+    set_utility(Utility.AUDIT, audit)
     yield audit
     await audit.finalize()
 
@@ -516,33 +584,57 @@ async def local_maindb_driver(local_maindb_settings) -> AsyncIterator[Driver]:
 
 
 @pytest.fixture(scope="function")
-def pg_maindb_settings(pg):
+async def pg_maindb_settings(pg):
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    return DriverSettings(
+
+    # We want to be sure schema migrations are always run. As some tests use
+    # this fixture and create their own driver, we need to create one here and
+    # run the migrations, so the maindb_settings fixture can still be generic
+    # and pg migrations are run
+    driver = PGDriver(url=url, connection_pool_min_size=2, connection_pool_max_size=2)
+    await driver.initialize()
+    await run_pg_schema_migrations(driver)
+    await driver.finalize()
+
+    yield DriverSettings(
         driver=DriverConfig.PG,
         driver_pg_url=url,
+        driver_pg_connection_pool_min_size=10,
+        driver_pg_connection_pool_max_size=10,
+        driver_pg_connection_pool_acquire_timeout_ms=200,
     )
 
 
 @pytest.fixture(scope="function")
-async def pg_maindb_driver(pg_maindb_settings):
+async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
     url = pg_maindb_settings.driver_pg_url
-    ingest_settings.driver = DriverConfig.PG
-    ingest_settings.driver_pg_url = url
+    assert url is not None
+    with (
+        patch.object(ingest_settings, "driver", DriverConfig.PG),
+        patch.object(ingest_settings, "driver_pg_url", url),
+    ):
+        async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
+            await cur.execute("TRUNCATE table resources")
+            await cur.execute("TRUNCATE table catalog")
 
-    async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
-        await cur.execute("DROP table IF EXISTS resources")
+        driver = PGDriver(
+            url=url,
+            connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
+            connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
+            acquire_timeout_ms=pg_maindb_settings.driver_pg_connection_pool_acquire_timeout_ms,
+        )
+        await driver.initialize()
 
-    driver = PGDriver(url=url)
-    await driver.initialize()
+        yield driver
 
-    yield driver
-
-    await driver.finalize()
-    ingest_settings.driver_pg_url = None
+        await driver.finalize()
 
 
-def maindb_settings_lazy_fixtures(default_drivers="local"):
+# Coma separated list of drivers
+DEFAULT_MAINDB_DRIVER = "pg"
+
+
+def maindb_settings_lazy_fixtures(default_drivers: str = DEFAULT_MAINDB_DRIVER):
     driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
     return [lazy_fixture.lf(f"{driver_type}_maindb_settings") for driver_type in driver_types.split(",")]
 
@@ -559,53 +651,7 @@ def maindb_settings(request):
     yield request.param
 
 
-@pytest.fixture(scope="function")
-def gcs_storage_settings(gcs):
-    return {
-        "file_backend": FileBackendConfig.GCS,
-        "gcs_endpoint_url": gcs,
-        "gcs_bucket": "test_{kbid}",
-    }
-
-
-@pytest.fixture(scope="function")
-def s3_storage_settings(s3):
-    return {
-        "file_backend": FileBackendConfig.S3,
-        "s3_endpoint": s3,
-        "s3_client_id": "",
-        "s3_client_secret": "",
-        "s3_bucket": "test-{kbid}",
-    }
-
-
-@pytest.fixture(scope="function")
-def local_storage_settings(tmpdir):
-    return {
-        "file_backend": FileBackendConfig.LOCAL,
-        "local_files": f"{tmpdir}/blob",
-    }
-
-
-@pytest.fixture(scope="function")
-def azure_storage_settings(azurite: AzuriteFixture):
-    return {
-        "file_backend": FileBackendConfig.AZURE,
-        "azure_account_url": azurite.account_url,
-        "azure_connection_string": azurite.connection_string,
-    }
-
-
-@pytest.fixture(scope="function")
-def blobstorage_settings(local_storage_settings):
-    """
-    Redefine this fixture in your test using the params argument
-    to allow running tests using each supported driver type.
-    """
-    yield local_storage_settings
-
-
-def maindb_driver_lazy_fixtures(default_drivers: str = "pg"):
+def maindb_driver_lazy_fixtures(default_drivers: str = DEFAULT_MAINDB_DRIVER):
     """
     Allows running tests using maindb_driver for each supported driver type via env vars.
 

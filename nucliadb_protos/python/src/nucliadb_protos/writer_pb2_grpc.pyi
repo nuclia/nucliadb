@@ -21,26 +21,32 @@ from nucliadb_protos.audit_pb2 import (
     ClientType as ClientType,
     DASHBOARD as DASHBOARD,
     DESKTOP as DESKTOP,
+    RetrievedContext as RetrievedContext,
     WEB as WEB,
     WIDGET as WIDGET,
 )
 from nucliadb_protos.knowledgebox_pb2 import (
+    AWS_EU_WEST_1 as AWS_EU_WEST_1,
+    AWS_US_EAST_1 as AWS_US_EAST_1,
+    AWS_US_WEST_2 as AWS_US_WEST_2,
+    AZURE_EASTUS2 as AZURE_EASTUS2,
     CONFLICT as CONFLICT,
     CreateExternalIndexProviderMetadata as CreateExternalIndexProviderMetadata,
     CreatePineconeConfig as CreatePineconeConfig,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
+    EXTERNAL_INDEX_PROVIDER_ERROR as EXTERNAL_INDEX_PROVIDER_ERROR,
     EntitiesGroup as EntitiesGroup,
     EntitiesGroupSummary as EntitiesGroupSummary,
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
     ExternalIndexProviderType as ExternalIndexProviderType,
+    GCP_US_CENTRAL1 as GCP_US_CENTRAL1,
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
-    KnowledgeBoxNew as KnowledgeBoxNew,
     KnowledgeBoxResponseStatus as KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate as KnowledgeBoxUpdate,
     KnowledgeBoxVectorSetsConfig as KnowledgeBoxVectorSetsConfig,
@@ -48,9 +54,11 @@ from nucliadb_protos.knowledgebox_pb2 import (
     LabelSet as LabelSet,
     Labels as Labels,
     NOTFOUND as NOTFOUND,
-    NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
     PINECONE as PINECONE,
+    PINECONE_UNSET as PINECONE_UNSET,
+    PineconeIndexMetadata as PineconeIndexMetadata,
+    PineconeServerlessCloud as PineconeServerlessCloud,
     SemanticModelMetadata as SemanticModelMetadata,
     StoredExternalIndexProviderMetadata as StoredExternalIndexProviderMetadata,
     StoredPineconeConfig as StoredPineconeConfig,
@@ -111,6 +119,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldLink as FieldLink,
     FieldMetadata as FieldMetadata,
     FieldQuestionAnswerWrapper as FieldQuestionAnswerWrapper,
+    FieldQuestionAnswers as FieldQuestionAnswers,
     FieldText as FieldText,
     FieldType as FieldType,
     FileExtractedData as FileExtractedData,
@@ -162,11 +171,6 @@ class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type:
 
 class WriterStub:
     def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
-    NewKnowledgeBox: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
-        nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
-    ]
-
     NewKnowledgeBoxV2: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response,
@@ -254,11 +258,6 @@ class WriterStub:
     ]
 
 class WriterAsyncStub:
-    NewKnowledgeBox: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
-        nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
-    ]
-
     NewKnowledgeBoxV2: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Response,
@@ -346,13 +345,6 @@ class WriterAsyncStub:
     ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def NewKnowledgeBox(
-        self,
-        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse, collections.abc.Awaitable[nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse]]: ...
-
     @abc.abstractmethod
     def NewKnowledgeBoxV2(
         self,

@@ -27,13 +27,14 @@ from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models.conversation import FieldConversation
+from nucliadb_models.external_index_providers import ExternalIndexProvider
 from nucliadb_models.extracted import (
     ExtractedText,
     FieldComputedMetadata,
+    FieldQuestionAnswers,
     FileExtractedData,
     LargeComputedMetadata,
     LinkExtractedData,
-    QuestionAnswers,
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
@@ -120,6 +121,18 @@ class KnowledgeBoxConfig(BaseModel):
         description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",  # noqa: E501
     )
 
+    external_index_provider: Optional[ExternalIndexProvider] = Field(
+        default=None,
+        title="External Index Provider",
+        description="External index provider for the Knowledge Box.",
+    )
+
+    configured_external_index_provider: Optional[dict[str, Any]] = Field(
+        default=None,
+        title="Configured External Index Provider",
+        description="Metadata for the configured external index provider (if any)",
+    )
+
     similarity: Optional[VectorSimilarity] = Field(
         default=None,
         description="This field is deprecated. Use 'learning_configuration' instead.",
@@ -127,7 +140,10 @@ class KnowledgeBoxConfig(BaseModel):
 
     @field_validator("slug")
     @classmethod
-    def id_check(cls, v: str) -> str:
+    def id_check(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+
         for char in v:
             if char in string.ascii_uppercase:
                 raise ValueError("No uppercase ID")
@@ -142,6 +158,11 @@ class KnowledgeBoxConfig(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
+        # Calculate external index provider metadata
+        # that is shown on read requests
+        eip = as_dict.pop("external_index_provider", None)
+        if eip:
+            as_dict["configured_external_index_provider"] = {"type": eip["type"].lower()}
         return cls(**as_dict)
 
 
@@ -177,7 +198,7 @@ class ExtractedData(BaseModel):
     metadata: Optional[FieldComputedMetadata] = None
     large_metadata: Optional[LargeComputedMetadata] = None
     vectors: Optional[VectorObject] = None
-    question_answers: Optional[QuestionAnswers] = None
+    question_answers: Optional[FieldQuestionAnswers] = None
 
 
 class TextFieldExtractedData(ExtractedData):

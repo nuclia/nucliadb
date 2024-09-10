@@ -21,17 +21,39 @@ import logging
 from typing import AsyncGenerator, Optional
 
 import orjson
+from pydantic import BaseModel
 
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import writer_pb2
 
 from .utils import get_kv_pb, with_ro_transaction
 
 logger = logging.getLogger(__name__)
 
+KB_ROLLOVER_STATE = "/kbs/{kbid}/rollover/state"
 KB_ROLLOVER_SHARDS = "/kbs/{kbid}/rollover/shards"
+KB_ROLLOVER_EXTERNAL_INDEX_METADATA = "/kbs/{kbid}/rollover/external_index_metadata"
 KB_ROLLOVER_RESOURCES_TO_INDEX = "/kbs/{kbid}/rollover/to-index/{resource}"
 KB_ROLLOVER_RESOURCES_INDEXED = "/kbs/{kbid}/rollover/indexed/{resource}"
+
+
+class RolloverState(BaseModel):
+    rollover_shards_created: bool = False
+    external_index_created: bool = False
+    resources_scheduled: bool = False
+    resources_indexed: bool = False
+    cutover_shards: bool = False
+    cutover_external_index: bool = False
+    resources_validated: bool = False
+
+
+class RolloverStateNotFoundError(Exception):
+    """
+    Raised when the rollover state is not found.
+    """
+
+    ...
 
 
 async def get_kb_rollover_shards(txn: Transaction, *, kbid: str) -> Optional[writer_pb2.Shards]:
@@ -104,7 +126,9 @@ async def get_indexed_data(
     val = await txn.get(key)
     if val is not None:
         data = orjson.loads(val)
-        return tuple(data)
+        shard_id: str = data[0]
+        modification_time: int = data[1]
+        return shard_id, modification_time
     return None
 
 
@@ -136,7 +160,10 @@ async def _get_batch_indexed_data(*, kbid, batch: list[str]) -> list[tuple[str, 
     results: list[tuple[str, tuple[str, int]]] = []
     for key, val in zip(batch, values):
         if val is not None:
-            data: tuple[str, int] = tuple(orjson.loads(val))
+            shard_id: str
+            modification_time: int
+            shard_id, modification_time = orjson.loads(val)
+            data = (shard_id, modification_time)
             results.append((key.split("/")[-1], data))
     return results
 
@@ -158,3 +185,43 @@ async def iterate_indexed_data(*, kbid: str) -> AsyncGenerator[tuple[str, tuple[
     if len(batch) > 0:
         for key, val in await _get_batch_indexed_data(kbid=kbid, batch=batch):
             yield key, val
+
+
+async def get_rollover_state(txn: Transaction, kbid: str) -> RolloverState:
+    key = KB_ROLLOVER_STATE.format(kbid=kbid)
+    val = await txn.get(key)
+    if not val:
+        raise RolloverStateNotFoundError(kbid)
+    return RolloverState.model_validate_json(val)
+
+
+async def set_rollover_state(txn: Transaction, kbid: str, state: RolloverState) -> None:
+    key = KB_ROLLOVER_STATE.format(kbid=kbid)
+    await txn.set(key, state.model_dump_json().encode())
+
+
+async def clear_rollover_state(txn: Transaction, kbid: str) -> None:
+    key = KB_ROLLOVER_STATE.format(kbid=kbid)
+    await txn.delete(key)
+
+
+async def update_kb_rollover_external_index_metadata(
+    txn: Transaction, *, kbid: str, metadata: kb_pb2.StoredExternalIndexProviderMetadata
+) -> None:
+    key = KB_ROLLOVER_EXTERNAL_INDEX_METADATA.format(kbid=kbid)
+    await txn.set(key, metadata.SerializeToString())
+
+
+async def get_kb_rollover_external_index_metadata(
+    txn: Transaction, *, kbid: str
+) -> Optional[kb_pb2.StoredExternalIndexProviderMetadata]:
+    key = KB_ROLLOVER_EXTERNAL_INDEX_METADATA.format(kbid=kbid)
+    val = await txn.get(key)
+    if not val:
+        return None
+    return kb_pb2.StoredExternalIndexProviderMetadata.FromString(val)
+
+
+async def delete_kb_rollover_external_index_metadata(txn: Transaction, *, kbid: str) -> None:
+    key = KB_ROLLOVER_EXTERNAL_INDEX_METADATA.format(kbid=kbid)
+    await txn.delete(key)

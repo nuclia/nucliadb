@@ -1,13 +1,6 @@
-![nucliadb_standalone](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_standalone.yml/badge.svg)
-![nucliadb_writer](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_writer.yml/badge.svg)
-![nucliadb_reader](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_reader.yml/badge.svg)
-![nucliadb_ingest](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_ingest.yml/badge.svg)
-![nucliadb_node](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_node.yml/badge.svg)
-![nucliadb_search](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_search.yml/badge.svg)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![License: AGPL V3](https://img.shields.io/badge/license-AGPL%20V3-blue)](LICENCE.md)
-![Twitter Follow](https://img.shields.io/twitter/follow/nucliaAI?color=%231DA1F2&logo=Twitter&style=plastic)
-[![Discord](https://img.shields.io/discord/911636727150575649?logo=Discord&logoColor=%23FFFFFF&style=plastic)](https://discord.gg/6wMQ8a3bHX)
+![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/nucliaAI?color=blue)
 ![Rust](https://img.shields.io/badge/Rust-black?logo=rust&style=plastic)
 ![Python](https://img.shields.io/badge/Python-black?logo=python&style=plastic)
 [![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS)](https://codecov.io/gh/nuclia/nucliadb)
@@ -18,10 +11,9 @@
 <h3 align="center">The AI Search Database.</h3>
 
 <h4 align="center">
-  <a href="https://docs.nuclia.dev/docs/docs/nucliadb/intro">DB Quickstart</a> |
-  <a href="https://docs.nuclia.dev/docs/about/nuclia">Nuclia Docs</a> |
-  <a href="docs/">NucliaDB Developer docs</a> |
-  <a href="https://discord.gg/AgevjFJUvk">Chat</a>
+  <a href="https://docs.nuclia.dev/docs/management/nucliadb/intro">Quickstart</a> |
+  <a href="https://docs.nuclia.dev/docs/">Nuclia Docs</a> |
+  <a href="https://nuclia-community.slack.com">Community</a>
 </h4>
 
 NucliaDB is a robust database that allows storing and searching on
@@ -67,15 +59,15 @@ and inference. We do all the hard work for you.
 Trying NucliaDB is super easy! You can extend your knowledge with the
 following readings:
 
-- [Quick start!](https://docs.nuclia.dev/docs/docs/nucliadb/intro)
-- Read about what Knowledge boxes are in [our basic concepts](https://docs.nuclia.dev/docs/docs/nucliadb/basics) section
-- [Upload a file](https://docs.nuclia.dev/docs/docs/getting-started/quick-start/push)
+- [Quick start!](https://docs.nuclia.dev/docs/management/nucliadb/intro)
+- Read about what Knowledge boxes are in [our basic concepts](https://docs.nuclia.dev/docs/management/nucliadb/basics) section
+- [Upload your data](https://docs.nuclia.dev/docs/ingestion/intro)
 
 # 💬 Community
 
-- Chat with us in [Discord][discord]
+- Chat with us in [Slack][slack]
 - 📝 [Blog Posts][blogs]
-- Follow us on [Twitter][twitter]
+- Follow us on [X][X]
 - Do you want to [work with us][linkedin]?
 
 # 🙋 FAQ
@@ -94,7 +86,7 @@ Our business model relies on our normalization API, this one is based on `Nuclia
 
 # 🤝 Contribute and spread the word
 
-We are always happy to have contributions: code, documentation, issues, feedback, or even saying hello on discord! Here is how you can get started:
+We are always happy to have contributions: code, documentation, issues, feedback, or even saying hello on Slack! Here is how you can get started:
 
 - Read our [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md)
 - Create a fork of NucliaDB and submit your pull request!
@@ -115,7 +107,7 @@ We are always happy to have contributions: code, documentation, issues, feedback
 
 [website]: https://nuclia.com/
 [cloud]: https://nuclia.cloud/
-[twitter]: https://twitter.com/nucliaAI
-[discord]: https://discord.gg/AgevjFJUvk
+[X]: https://x.com/nucliaAI
+[slack]: https://nuclia-community.slack.com
 [blogs]: https://nuclia.com/blog
 [linkedin]: https://www.linkedin.com/company/nuclia/

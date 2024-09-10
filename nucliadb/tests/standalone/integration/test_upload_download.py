@@ -26,6 +26,8 @@ from pytest_lazy_fixtures import lazy_fixture
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
+from nucliadb_models import content_types
+from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.fixture(scope="function")
@@ -40,34 +42,30 @@ def header_encode(some_string):
     return base64.b64encode(some_string.encode()).decode()
 
 
-@pytest.fixture(
-    scope="function",
-    params=[
-        lazy_fixture.lf("gcs_storage_settings"),
-        lazy_fixture.lf("s3_storage_settings"),
-        lazy_fixture.lf("local_storage_settings"),
-        lazy_fixture.lf("azure_storage_settings"),
-    ],
-)
-def blobstorage_settings(request):
-    """
-    Fixture to parametrize the tests with different storage backends
-    """
-    yield request.param
-
-
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "storage",
+    [
+        lazy_fixture.lf("gcs_storage"),
+        lazy_fixture.lf("s3_storage"),
+        lazy_fixture.lf("local_storage"),
+        lazy_fixture.lf("azure_storage"),
+    ],
+    indirect=True,
+)
 async def test_file_tus_upload_and_download(
-    blobstorage_settings,
+    storage: Storage,
     configure_redis_dm,
     nucliadb_writer,
     nucliadb_reader,
     knowledgebox_one,
 ):
     language = "ca"
-    filename = "image.jpg"
+    filename = "image.jpeg"
     md5 = "7af0916dba8b70e29d99e72941923529"
-    content_type = "image/jpg"
+    # aitable is a custom content type suffix to indicate
+    # that the file must be processed with the ai tables feature...
+    content_type = "image/jpeg+aitable"
 
     # Create a resource
     kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
@@ -99,7 +97,7 @@ async def test_file_tus_upload_and_download(
             "upload-defer-length": "1",
         },
     )
-    assert resp.status_code == 201
+    assert resp.status_code == 201, resp.json()
     # Get the URL to upload the file to
     url = resp.headers["location"]
 
@@ -220,3 +218,213 @@ async def test_tus_upload_handles_unknown_upload_ids(
     assert resp.status_code == 404
     error_detail = resp.json().get("detail")
     assert error_detail == "Resumable URI not found for upload_id: foobarid"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "storage",
+    [
+        lazy_fixture.lf("local_storage"),
+    ],
+    indirect=True,
+)
+async def test_content_type_validation(
+    storage: Storage,
+    configure_redis_dm,
+    nucliadb_writer,
+    nucliadb_reader,
+    knowledgebox_one,
+):
+    language = "ca"
+    filename = "image.jpg"
+    md5 = "7af0916dba8b70e29d99e72941923529"
+
+    # Create a resource
+    kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
+    resp = await nucliadb_writer.post(
+        f"{kb_path}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource1",
+            "title": "Resource 1",
+        },
+    )
+    assert resp.status_code == 201
+    resource = resp.json().get("uuid")
+
+    # Start TUS upload
+    url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/{TUSUPLOAD}"
+    upload_metadata = ",".join(
+        [
+            f"filename {header_encode(filename)}",
+            f"language {header_encode(language)}",
+            f"md5 {header_encode(md5)}",
+        ]
+    )
+    resp = await nucliadb_writer.post(
+        url,
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "content-type": "invalid-content-type",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 415
+    error_detail = resp.json().get("detail")
+    assert error_detail == "Unsupported content type: invalid-content-type"
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        "application/epub+zip",
+        "application/font-woff",
+        "application/generic",
+        "application/java-archive",
+        "application/java-vm",
+        "application/json",
+        "application/mp4",
+        "application/msword",
+        "application/octet-stream",
+        "application/pdf",
+        "application/pdf+aitable",
+        "application/postscript",
+        "application/rls-services+xml",
+        "application/rtf",
+        "application/stf-link",
+        "application/toml",
+        "application/vnd.jgraph.mxfile",
+        "application/vnd.lotus-organizer",
+        "application/vnd.ms-excel.sheet.macroenabled.12",
+        "application/vnd.ms-excel",
+        "application/vnd.ms-excel+aitable",
+        "application/vnd.ms-outlook",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.ms-project",
+        "application/vnd.ms-word.document.macroenabled.12",
+        "application/vnd.oasis.opendocument.presentation",
+        "application/vnd.oasis.opendocument.text",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation+aitable",
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet+aitable",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document+aitable",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+        "application/vnd.rar",
+        "application/x-mobipocket-ebook",
+        "application/x-ms-shortcut",
+        "application/x-msdownload",
+        "application/x-ndjson",
+        "application/x-openscad",
+        "application/x-sql",
+        "application/x-zip-compressed",
+        "application/xml",
+        "application/zip",
+        "application/zstd",
+        "audio/aac",
+        "audio/mp4",
+        "audio/mpeg",
+        "audio/vnd.dlna.adts",
+        "audio/wav",
+        "audio/x-m4a",
+        "image/avif",
+        "image/gif",
+        "image/heic",
+        "image/jpeg",
+        "image/jpeg+aitable",
+        "image/png",
+        "image/png+aitable",
+        "image/svg+xml",
+        "image/tiff",
+        "image/vnd.djvu",
+        "image/vnd.dwg",
+        "image/webp",
+        "model/stl",
+        "text/calendar",
+        "text/css",
+        "text/csv",
+        "text/csv+aitable",
+        "text/html",
+        "text/javascript",
+        "text/jsx",
+        "text/markdown",
+        "text/plain",
+        "text/rtf",
+        "text/rtf+aitable",
+        "text/x-java-source",
+        "text/x-log",
+        "text/x-python",
+        "text/xml",
+        "text/yaml",
+        "video/mp4",
+        "video/mp4+aitable",
+        "video/quicktime",
+        "video/webm",
+        "video/x-m4v",
+        "video/x-ms-wmv",
+        "video/YouTube",
+        "multipart/form-data",
+    ],
+)
+def test_valid_content_types(content_type):
+    assert content_types.valid(content_type)
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        "multipart/form-data;boundary=--------------------------472719318099714047986957",
+    ],
+)
+def test_invalid_content_types(content_type):
+    assert not content_types.valid(content_type)
+
+
+@pytest.mark.parametrize(
+    "filename,content_type",
+    [
+        # Text files
+        ("foo.txt", "text/plain"),
+        ("foo.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        ("foo.pdf", "application/pdf"),
+        ("foo.json", "application/json"),
+        # Spreadsheets
+        ("foo.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        ("foo.csv", "text/csv"),
+        # Presentations
+        ("foo.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+        # Images
+        ("image.jpg", "image/jpeg"),
+        ("image.jpeg", "image/jpeg"),
+        ("image.png", "image/png"),
+        ("image.tiff", "image/tiff"),
+        ("image.gif", "image/gif"),
+        # Videos
+        ("video.mp4", "video/mp4"),
+        ("video.webm", "video/webm"),
+        ("video.avi", "video/x-msvideo"),
+        ("video.mpeg", "video/mpeg"),
+        # Audio
+        ("audio.mp3", "audio/mpeg"),
+        ("audio.wav", "audio/x-wav"),
+        # Web data
+        ("data.html", "text/html"),
+        ("data.xml", "application/xml"),
+        # Archive files
+        ("archive.zip", "application/zip"),
+        ("fooo.rar", ["application/x-rar-compressed", "application/vnd.rar"]),
+        ("archive.tar", "application/x-tar"),
+        ("archive.tar.gz", "application/x-tar"),
+        # Invalid content types
+        ("foobar", None),
+        ("someuuidwithoutextension", None),
+        ("", None),
+    ],
+)
+def test_guess_content_type(filename, content_type):
+    if isinstance(content_type, list):
+        assert content_types.guess(filename) in content_type
+    else:
+        assert content_types.guess(filename) == content_type

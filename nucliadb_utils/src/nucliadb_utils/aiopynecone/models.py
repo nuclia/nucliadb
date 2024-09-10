@@ -24,9 +24,12 @@ import pydantic
 from pydantic import BaseModel, Field, field_validator
 from typing_extensions import Annotated
 
+from nucliadb_utils.aiopynecone.exceptions import MetadataTooLargeError
+
 KILO_BYTE = 1024
 MAX_METADATA_SIZE = 40 * KILO_BYTE
 MAX_INDEX_NAME_LENGTH = 45
+MAX_VECTOR_ID_LENGTH = 512
 
 
 # Requests
@@ -62,7 +65,7 @@ class CreateIndexRequest(BaseModel):
 
 
 class Vector(BaseModel):
-    id: str = Field(min_length=1, max_length=512)
+    id: str = Field(min_length=1, max_length=MAX_VECTOR_ID_LENGTH)
     values: list[float]
     metadata: dict[str, Any] = {}
 
@@ -71,7 +74,7 @@ class Vector(BaseModel):
     def validate_metadata_size(cls, value):
         json_value = json.dumps(value)
         if len(json_value) > MAX_METADATA_SIZE:
-            raise ValueError("metadata size is too large")
+            raise MetadataTooLargeError(f"metadata size is too large: {len(json_value)} bytes")
         return value
 
 
@@ -110,3 +113,27 @@ class VectorMatch(BaseModel):
 
 class QueryResponse(BaseModel):
     matches: list[VectorMatch]
+
+
+class IndexNamespaceStats(BaseModel):
+    vectorCount: int
+
+
+class IndexStats(BaseModel):
+    dimension: int
+    namespaces: dict[str, IndexNamespaceStats] = {}
+    totalVectorCount: int
+
+
+class IndexStatus(BaseModel):
+    ready: bool
+    state: str
+
+
+class IndexDescription(BaseModel):
+    dimension: int
+    host: str
+    metric: str
+    name: str
+    spec: dict[str, Any]
+    status: IndexStatus

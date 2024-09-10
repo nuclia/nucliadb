@@ -361,15 +361,19 @@ impl ShardWriter {
         };
 
         let mut vector_tasks = vec![];
+        let vectorset_count = indexes.vectors_indexes.len();
         for (vectorset, vector_writer) in indexes.vectors_indexes.iter_mut() {
             vector_tasks.push(|| {
                 run_with_telemetry(info_span!(parent: &span, "vector set_resource"), || {
                     debug!("Vector service starts set_resource");
+
                     let vectorset_resource = match vectorset.as_str() {
                         "" | DEFAULT_VECTORS_INDEX_NAME => (&resource).into(),
-                        vectorset => {
-                            nucliadb_core::vectors::ResourceWrapper::new_vectorset_resource(&resource, vectorset)
-                        }
+                        vectorset => nucliadb_core::vectors::ResourceWrapper::new_vectorset_resource(
+                            &resource,
+                            vectorset,
+                            vectorset_count == 1,
+                        ),
                     };
                     let result = vector_writer.set_resource(vectorset_resource);
                     debug!("Vector service ends set_resource");

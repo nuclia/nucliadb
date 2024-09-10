@@ -17,14 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from contextlib import ExitStack
+from typing import Any
+from unittest.mock import patch
+
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
+from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.s3 import S3Storage
-from nucliadb_utils.store import MAIN
-from nucliadb_utils.utilities import Utility
+from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
 images.settings["s3"] = {
     "image": "localstack/localstack",
@@ -58,21 +62,49 @@ def s3():
 
 
 @pytest.fixture(scope="function")
-async def s3_storage(s3):
+async def s3_storage_settings(s3) -> dict[str, Any]:
+    settings = {
+        "file_backend": FileBackendConfig.S3,
+        "s3_endpoint": s3,
+        "s3_client_id": "",
+        "s3_client_secret": "",
+        "s3_ssl": False,
+        "s3_verify_ssl": False,
+        "s3_region_name": None,
+        "s3_bucket": "test-{kbid}",
+        "s3_bucket_tags": {
+            "testTag": "test",
+        },
+    }
+    extended_settings = {
+        "s3_indexing_bucket": "indexing",
+        "s3_deadletter_bucket": "deadletter",
+    }
+    with ExitStack() as stack:
+        for key, value in settings.items():
+            context = patch.object(storage_settings, key, value)
+            stack.enter_context(context)
+        for key, value in extended_settings.items():
+            context = patch.object(extended_storage_settings, key, value)
+            stack.enter_context(context)
+
+        yield settings | extended_settings
+
+
+@pytest.fixture(scope="function")
+async def s3_storage(s3, s3_storage_settings: dict[str, Any]):
     storage = S3Storage(
-        aws_client_id="",
-        aws_client_secret="",
-        deadletter_bucket="deadletter",
-        indexing_bucket="indexing",
-        endpoint_url=s3,
-        verify_ssl=False,
-        use_ssl=False,
-        region_name=None,
-        bucket="test-{kbid}",
-        bucket_tags={"testTag": "test"},
+        aws_client_id=storage_settings.s3_client_id,
+        aws_client_secret=storage_settings.s3_client_secret,
+        deadletter_bucket=extended_storage_settings.s3_deadletter_bucket,
+        indexing_bucket=extended_storage_settings.s3_indexing_bucket,
+        endpoint_url=storage_settings.s3_endpoint,
+        use_ssl=storage_settings.s3_ssl,
+        verify_ssl=storage_settings.s3_verify_ssl,
+        region_name=storage_settings.s3_region_name,
+        bucket=storage_settings.s3_bucket,
+        bucket_tags=storage_settings.s3_bucket_tags,
     )
     await storage.initialize()
-    MAIN[Utility.STORAGE] = storage
     yield storage
     await storage.finalize()
-    MAIN.pop(Utility.STORAGE, None)

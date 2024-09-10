@@ -85,7 +85,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpg",
+                "content-type": "image/jpeg",
                 "upload-defer-length": "1",
             },
         )
@@ -135,7 +135,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
     field = path.split("/")[-1]
     rid = path.split("/")[-3]
     assert writer.uuid == rid
-    assert writer.basic.icon == "image/jpg"
+    assert writer.basic.icon == "image/jpeg"
     assert writer.basic.title == "image.jpg"
     assert writer.files[field].language == "ca"
     assert writer.files[field].file.size == len(raw_bytes)
@@ -156,7 +156,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpg",
+                "content-type": "image/jpeg",
                 "upload-defer-length": "1",
             },
         )
@@ -174,7 +174,7 @@ async def test_knowledgebox_file_upload_root(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
                 content=f.read(),
                 headers={
-                    "content-type": "image/jpg",
+                    "content-type": "image/jpeg",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
                 },
             )
@@ -193,7 +193,7 @@ async def test_knowledgebox_file_upload_root(
     field = body["field_id"]
     rid = body["uuid"]
     assert writer.uuid == rid
-    assert writer.basic.icon == "image/jpg"
+    assert writer.basic.icon == "image/jpeg"
     assert writer.files[field].file.size == 30472
 
     storage = await get_storage()
@@ -210,7 +210,7 @@ async def test_knowledgebox_file_upload_root(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
                 content=f.read(),
                 headers={
-                    "content-type": "image/jpg",
+                    "content-type": "image/jpeg",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
                 },
             )
@@ -232,7 +232,7 @@ async def test_knowledgebox_file_upload_root_headers(
                     "X-FILENAME": filename,
                     "X-LANGUAGE": "ca",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                    "content-type": "image/jpg",
+                    "content-type": "image/jpeg",
                 },
             )
             assert resp.status_code == 201
@@ -250,7 +250,7 @@ async def test_knowledgebox_file_upload_root_headers(
     field = body["field_id"]
     rid = body["uuid"]
     assert writer.uuid == rid
-    assert writer.basic.icon == "image/jpg"
+    assert writer.basic.icon == "image/jpeg"
     assert writer.basic.title == "image.jpg"
     assert writer.files[field].language == "ca"
     assert writer.files[field].file.size == 30472
@@ -275,7 +275,7 @@ async def test_knowledgebox_file_tus_upload_field(writer_api, knowledgebox_write
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpg",
+                "content-type": "image/jpeg",
                 "upload-defer-length": "1",
             },
         )
@@ -287,7 +287,7 @@ async def test_knowledgebox_file_tus_upload_field(writer_api, knowledgebox_write
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpg",
+                "content-type": "image/jpeg",
                 "upload-defer-length": "1",
             },
         )
@@ -338,7 +338,7 @@ async def test_knowledgebox_file_tus_upload_field(writer_api, knowledgebox_write
     field = path.split("/")[-1]
     rid = path.split("/")[-3]
     assert writer.uuid == rid
-    assert writer.basic.icon == "image/jpg"
+    assert writer.basic.icon == "image/jpeg"
     assert writer.basic.title == ""
     assert writer.files[field].language == "ca"
     assert writer.files[field].file.size == len(raw_bytes)
@@ -366,7 +366,7 @@ async def test_knowledgebox_file_upload_field_headers(writer_api, knowledgebox_w
                     "X-FILENAME": encoded_filename,
                     "X-LANGUAGE": "ca",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                    "content-type": "image/jpg",
+                    "content-type": "image/jpeg",
                 },
             )
             assert resp.status_code == 201
@@ -383,7 +383,7 @@ async def test_knowledgebox_file_upload_field_headers(writer_api, knowledgebox_w
     field = body["field_id"]
     rid = body["uuid"]
     assert writer.uuid == rid
-    assert writer.basic.icon == "image/jpg"
+    assert writer.basic.icon == "image/jpeg"
     assert writer.basic.title == ""
     assert writer.files[field].language == "ca"
     assert writer.files[field].file.size == 30472
@@ -409,7 +409,7 @@ async def test_knowledgebox_file_upload_field_sync(writer_api, knowledgebox_writ
                     "X-FILENAME": filename,
                     "X-LANGUAGE": "ca",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                    "content-type": "image/jpg",
+                    "content-type": "image/jpeg",
                 },
             )
             assert resp.status_code == 201
@@ -437,7 +437,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
         headers = {
             "tus-resumable": "1.0.0",
             "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-            "content-type": "image/jpg",
+            "content-type": "image/jpeg",
             "upload-defer-length": "1",
         }
 
@@ -500,7 +500,7 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
     field = path.split("/")[-1]
     rid = path.split("/")[-3]
     assert writer.uuid == rid
-    assert writer.basic.icon == "image/jpg"
+    assert writer.basic.icon == "image/jpeg"
     assert writer.basic.title == ""
     assert writer.files[field].language == "ca"
     assert writer.files[field].file.size == len(raw_bytes)
@@ -526,7 +526,7 @@ async def test_file_tus_upload_urls_field_by_resource_id(writer_api, knowledgebo
         headers = {
             "tus-resumable": "1.0.0",
             "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-            "content-type": "image/jpg",
+            "content-type": "image/jpeg",
             "upload-defer-length": "1",
         }
 
@@ -562,7 +562,7 @@ async def test_multiple_tus_file_upload_tries(writer_api, knowledgebox_writer, r
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         headers = {
             "tus-resumable": "1.0.0",
-            "content-type": "image/jpg",
+            "content-type": "image/jpeg",
             "upload-defer-length": "1",
         }
 
@@ -633,7 +633,7 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
                 content=f.read(),
                 headers={
                     "X-FILENAME": filename,
-                    "content-type": "image/jpg",
+                    "content-type": "image/jpeg",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
                 },
             )
@@ -653,7 +653,7 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
     rid = body["uuid"]
 
     assert writer.uuid == rid
-    assert writer.basic.icon == "image/jpg"
+    assert writer.basic.icon == "image/jpeg"
     assert writer.files[field].file.size == 30472
     assert writer.files[field].file.filename == filename
 
@@ -683,7 +683,7 @@ async def test_tus_validates_intermediate_chunks_length(writer_api, knowledgebox
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpg",
+                "content-type": "image/jpeg",
                 "upload-defer-length": "1",
             },
         )

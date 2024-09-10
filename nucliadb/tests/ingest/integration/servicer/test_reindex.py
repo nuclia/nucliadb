@@ -21,7 +21,7 @@ from uuid import uuid4
 
 import pytest
 
-from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
@@ -32,10 +32,20 @@ async def test_reindex_resource(grpc_servicer, fake_node, hosted_nucliadb):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     # Create a kb
-    kb_id = str(uuid4())
-    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kb_id)
-    pb.config.title = "My Title"
-    result = await stub.NewKnowledgeBox(pb)
+    kbid = str(uuid4())
+    result = await stub.NewKnowledgeBoxV2(
+        writer_pb2.NewKnowledgeBoxV2Request(
+            kbid=kbid,
+            slug="test",
+            title="My Title",
+            vectorsets=[
+                writer_pb2.NewKnowledgeBoxV2Request.VectorSet(
+                    vectorset_id="my-semantic-model",
+                    vector_dimension=2,
+                )
+            ],
+        )
+    )
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
     # Create a resource with a field and some vectors
@@ -44,10 +54,11 @@ async def test_reindex_resource(grpc_servicer, fake_node, hosted_nucliadb):
     field_id = "text1"
     field_type = FieldType.TEXT
     bm.uuid = rid
-    bm.kbid = result.uuid
+    bm.kbid = kbid
     bm.texts[field_id].body = "My text1"
 
     evw = ExtractedVectorsWrapper()
+    evw.vectorset_id = "my-semantic-model"
     vec = Vector()
     vec.vector.extend([1.0, 1.0])
     evw.vectors.vectors.vectors.append(vec)
@@ -58,5 +69,5 @@ async def test_reindex_resource(grpc_servicer, fake_node, hosted_nucliadb):
     await stub.ProcessMessage([bm])  # type: ignore
 
     # Reindex it along with its vectors
-    req = IndexResource(kbid=kb_id, rid=rid, reindex_vectors=True)
+    req = IndexResource(kbid=kbid, rid=rid, reindex_vectors=True)
     result = await stub.ReIndex(req)

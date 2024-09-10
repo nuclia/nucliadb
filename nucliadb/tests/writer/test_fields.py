@@ -54,7 +54,7 @@ TEST_CONVERSATION_PAYLOAD = {
             "content": {
                 "text": "Hi people!",
                 "format": "PLAIN",
-                "files": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg")],
+                "files": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")],
             },
             "ident": "message_id_001",
         }
@@ -64,7 +64,7 @@ TEST_CONVERSATION_PAYLOAD = {
 TEST_FILE_PAYLOAD = {
     "language": "en",
     "password": "xxxxxx",
-    "file": load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg"),
+    "file": load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg"),
 }
 
 TEST_EXTERNAL_FILE_PAYLOAD = {
@@ -82,7 +82,7 @@ TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
         "content": {
             "text": "Hi people!",
             "format": "PLAIN",
-            "attachments": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg")],
+            "attachments": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")],
         },
         "ident": "message_id_001",
     }

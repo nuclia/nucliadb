@@ -25,9 +25,10 @@ pytest_plugins = [
     "tests.search.node",
     "tests.standalone.fixtures",
     "nucliadb_utils.tests.fixtures",
-    "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.nats",
+    "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
     "nucliadb_utils.tests.azure",
+    "nucliadb_utils.tests.local",
     "nucliadb_utils.tests.indexing",
 ]

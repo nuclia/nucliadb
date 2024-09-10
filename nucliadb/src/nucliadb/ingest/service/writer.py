@@ -25,6 +25,7 @@ from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFo
 from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.broker_message import generate_broker_message
@@ -34,11 +35,10 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import nodewriter_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
-    KnowledgeBoxNew,
     KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate,
     SemanticModelMetadata,
@@ -93,56 +93,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def finalize(self): ...
 
-    async def NewKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxNew, context=None
-    ) -> knowledgebox_pb2.NewKnowledgeBoxResponse:
-        if is_onprem_nucliadb():
-            logger.error(
-                "Sorry, this endpoint is only available for hosted. Onprem must use the REST API"
-            )
-            return knowledgebox_pb2.NewKnowledgeBoxResponse(
-                status=KnowledgeBoxResponseStatus.ERROR,
-            )
-
-        # Hosted KBs are created through backend endpoints. We assume learning
-        # configuration has been already created for it and we are given the
-        # model metadata in the request
-
-        kbid = request.forceuuid or KnowledgeBoxORM.new_unique_kbid()
-        release_channel = request.release_channel
-        semantic_model = parse_model_metadata_from_request(request)
-
-        try:
-            (kbid, _) = await KnowledgeBoxORM.create(
-                self.driver,
-                kbid=kbid,
-                slug=request.slug,
-                title=request.config.title,
-                description=request.config.description,
-                semantic_model=semantic_model,
-                release_channel=release_channel,
-                external_index_provider=request.external_index_provider,
-            )
-
-        except KnowledgeBoxConflict:
-            logger.info("KB already exists", extra={"slug": request.slug})
-            return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
-
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.exception(
-                "Unexpected error creating KB",
-                exc_info=True,
-                extra={"slug": request.slug},
-            )
-            return knowledgebox_pb2.NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
-
-        else:
-            logger.info("KB created successfully", extra={"kbid": kbid})
-            return knowledgebox_pb2.NewKnowledgeBoxResponse(
-                status=KnowledgeBoxResponseStatus.OK, uuid=kbid
-            )
-
     async def NewKnowledgeBoxV2(
         self, request: writer_pb2.NewKnowledgeBoxV2Request, context=None
     ) -> writer_pb2.NewKnowledgeBoxV2Response:
@@ -156,8 +106,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             )
             return writer_pb2.NewKnowledgeBoxV2Response(
                 status=KnowledgeBoxResponseStatus.ERROR,
+                error_message="This endpoint is only available for hosted. Onprem must use the REST API",
             )
-
         # Hosted KBs are created through backend endpoints. We assume learning
         # configuration has been already created for it and we are given the
         # model metadata in the request
@@ -183,6 +133,16 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except KnowledgeBoxConflict:
             logger.info("KB already exists", extra={"slug": request.slug})
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.CONFLICT)
+
+        except ExternalIndexCreationError as exc:
+            logger.exception(
+                "Error creating external index",
+                extra={"slug": request.slug, "error": str(exc)},
+            )
+            return writer_pb2.NewKnowledgeBoxV2Response(
+                status=KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR,
+                error_message=exc.message,
+            )
 
         except Exception as exc:
             errors.capture_exception(exc)
@@ -504,9 +464,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     )
 
                 if shard is not None:
+                    index_message = brain.brain
+                    await self.proc._maybe_external_index_add_resource(
+                        request.kbid,
+                        request.rid,
+                        index_message,
+                    )
                     await self.shards_manager.add_resource(
                         shard,
-                        brain.brain,
+                        index_message,
                         0,
                         partition=self.partitions[0],
                         kb=request.kbid,
@@ -568,30 +534,3 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         else:
             response.status = DelVectorSetResponse.Status.OK
         return response
-
-
-def parse_model_metadata_from_request(
-    request: KnowledgeBoxNew,
-) -> SemanticModelMetadata:
-    model = SemanticModelMetadata()
-    model.similarity_function = request.similarity
-    if request.HasField("vector_dimension"):
-        model.vector_dimension = request.vector_dimension
-    else:
-        logger.warning(
-            "Vector dimension not set. Will be detected automatically on the first vector set."
-        )
-
-    if len(request.matryoshka_dimensions) > 0:
-        if model.vector_dimension not in request.matryoshka_dimensions:
-            logger.warning(
-                "Vector dimensions is inconsistent with matryoshka dimensions! Ignoring them",
-                extra={
-                    "kbid": request.forceuuid,
-                    "kbslug": request.slug,
-                },
-            )
-        else:
-            model.matryoshka_dimensions.extend(request.matryoshka_dimensions)
-
-    return model

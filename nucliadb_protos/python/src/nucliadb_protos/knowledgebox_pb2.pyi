@@ -68,6 +68,7 @@ class _KnowledgeBoxResponseStatusEnumTypeWrapper(google.protobuf.internal.enum_t
     CONFLICT: _KnowledgeBoxResponseStatus.ValueType  # 1
     NOTFOUND: _KnowledgeBoxResponseStatus.ValueType  # 2
     ERROR: _KnowledgeBoxResponseStatus.ValueType  # 3
+    EXTERNAL_INDEX_PROVIDER_ERROR: _KnowledgeBoxResponseStatus.ValueType  # 4
 
 class KnowledgeBoxResponseStatus(_KnowledgeBoxResponseStatus, metaclass=_KnowledgeBoxResponseStatusEnumTypeWrapper): ...
 
@@ -75,6 +76,7 @@ OK: KnowledgeBoxResponseStatus.ValueType  # 0
 CONFLICT: KnowledgeBoxResponseStatus.ValueType  # 1
 NOTFOUND: KnowledgeBoxResponseStatus.ValueType  # 2
 ERROR: KnowledgeBoxResponseStatus.ValueType  # 3
+EXTERNAL_INDEX_PROVIDER_ERROR: KnowledgeBoxResponseStatus.ValueType  # 4
 global___KnowledgeBoxResponseStatus = KnowledgeBoxResponseStatus
 
 class _ExternalIndexProviderType:
@@ -92,6 +94,30 @@ class ExternalIndexProviderType(_ExternalIndexProviderType, metaclass=_ExternalI
 UNSET: ExternalIndexProviderType.ValueType  # 0
 PINECONE: ExternalIndexProviderType.ValueType  # 1
 global___ExternalIndexProviderType = ExternalIndexProviderType
+
+class _PineconeServerlessCloud:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _PineconeServerlessCloudEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_PineconeServerlessCloud.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    PINECONE_UNSET: _PineconeServerlessCloud.ValueType  # 0
+    AWS_US_EAST_1: _PineconeServerlessCloud.ValueType  # 1
+    AWS_US_WEST_2: _PineconeServerlessCloud.ValueType  # 2
+    AWS_EU_WEST_1: _PineconeServerlessCloud.ValueType  # 3
+    GCP_US_CENTRAL1: _PineconeServerlessCloud.ValueType  # 4
+    AZURE_EASTUS2: _PineconeServerlessCloud.ValueType  # 5
+
+class PineconeServerlessCloud(_PineconeServerlessCloud, metaclass=_PineconeServerlessCloudEnumTypeWrapper):
+    """Pinecone"""
+
+PINECONE_UNSET: PineconeServerlessCloud.ValueType  # 0
+AWS_US_EAST_1: PineconeServerlessCloud.ValueType  # 1
+AWS_US_WEST_2: PineconeServerlessCloud.ValueType  # 2
+AWS_EU_WEST_1: PineconeServerlessCloud.ValueType  # 3
+GCP_US_CENTRAL1: PineconeServerlessCloud.ValueType  # 4
+AZURE_EASTUS2: PineconeServerlessCloud.ValueType  # 5
+global___PineconeServerlessCloud = PineconeServerlessCloud
 
 @typing.final
 class KnowledgeBoxID(google.protobuf.message.Message):
@@ -115,55 +141,85 @@ global___KnowledgeBoxID = KnowledgeBoxID
 
 @typing.final
 class CreatePineconeConfig(google.protobuf.message.Message):
-    """Pinecone"""
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     API_KEY_FIELD_NUMBER: builtins.int
+    SERVERLESS_CLOUD_FIELD_NUMBER: builtins.int
     api_key: builtins.str
+    serverless_cloud: global___PineconeServerlessCloud.ValueType
     def __init__(
         self,
         *,
         api_key: builtins.str = ...,
+        serverless_cloud: global___PineconeServerlessCloud.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["api_key", b"api_key"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["api_key", b"api_key", "serverless_cloud", b"serverless_cloud"]) -> None: ...
 
 global___CreatePineconeConfig = CreatePineconeConfig
+
+@typing.final
+class PineconeIndexMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INDEX_NAME_FIELD_NUMBER: builtins.int
+    INDEX_HOST_FIELD_NUMBER: builtins.int
+    VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    index_name: builtins.str
+    index_host: builtins.str
+    vector_dimension: builtins.int
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+    def __init__(
+        self,
+        *,
+        index_name: builtins.str = ...,
+        index_host: builtins.str = ...,
+        vector_dimension: builtins.int = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["index_host", b"index_host", "index_name", b"index_name", "similarity", b"similarity", "vector_dimension", b"vector_dimension"]) -> None: ...
+
+global___PineconeIndexMetadata = PineconeIndexMetadata
 
 @typing.final
 class StoredPineconeConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     @typing.final
-    class IndexHostsEntry(google.protobuf.message.Message):
+    class IndexesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.str
-        value: builtins.str
+        @property
+        def value(self) -> global___PineconeIndexMetadata: ...
         def __init__(
             self,
             *,
             key: builtins.str = ...,
-            value: builtins.str = ...,
+            value: global___PineconeIndexMetadata | None = ...,
         ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
 
     ENCRYPTED_API_KEY_FIELD_NUMBER: builtins.int
-    INDEX_HOSTS_FIELD_NUMBER: builtins.int
+    INDEXES_FIELD_NUMBER: builtins.int
+    SERVERLESS_CLOUD_FIELD_NUMBER: builtins.int
     encrypted_api_key: builtins.str
+    serverless_cloud: global___PineconeServerlessCloud.ValueType
     @property
-    def index_hosts(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
-        """Index name to index host mapping."""
+    def indexes(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___PineconeIndexMetadata]:
+        """vectorset id -> PineconeIndexMetadata"""
 
     def __init__(
         self,
         *,
         encrypted_api_key: builtins.str = ...,
-        index_hosts: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        indexes: collections.abc.Mapping[builtins.str, global___PineconeIndexMetadata] | None = ...,
+        serverless_cloud: global___PineconeServerlessCloud.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["encrypted_api_key", b"encrypted_api_key", "index_hosts", b"index_hosts"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["encrypted_api_key", b"encrypted_api_key", "indexes", b"indexes", "serverless_cloud", b"serverless_cloud"]) -> None: ...
 
 global___StoredPineconeConfig = StoredPineconeConfig
 
@@ -256,84 +312,6 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "external_index_provider", b"external_index_provider", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
-
-@typing.final
-class KnowledgeBoxNew(google.protobuf.message.Message):
-    """NEW"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SLUG_FIELD_NUMBER: builtins.int
-    CONFIG_FIELD_NUMBER: builtins.int
-    FORCEUUID_FIELD_NUMBER: builtins.int
-    SIMILARITY_FIELD_NUMBER: builtins.int
-    VECTOR_DIMENSION_FIELD_NUMBER: builtins.int
-    DEFAULT_MIN_SCORE_FIELD_NUMBER: builtins.int
-    MATRYOSHKA_DIMENSIONS_FIELD_NUMBER: builtins.int
-    EXTERNAL_INDEX_PROVIDER_FIELD_NUMBER: builtins.int
-    LEARNING_CONFIG_FIELD_NUMBER: builtins.int
-    RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
-    slug: builtins.str
-    forceuuid: builtins.str
-    """this fields are only set by backend when creating hosted KBs"""
-    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
-    vector_dimension: builtins.int
-    default_min_score: builtins.float
-    learning_config: builtins.str
-    """this field are only used by NucliaDB Writer API when creating a KB. Used
-    in onprem scenarios
-    DEPRECATED: onprem don't forward requests to ingest gRPC anymore
-    """
-    release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
-    """release channel, although not used when backend creates hosted KBs, it's
-    recomputed and changed depending on the environment
-    """
-    @property
-    def config(self) -> global___KnowledgeBoxConfig: ...
-    @property
-    def matryoshka_dimensions(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
-    @property
-    def external_index_provider(self) -> global___CreateExternalIndexProviderMetadata: ...
-    def __init__(
-        self,
-        *,
-        slug: builtins.str = ...,
-        config: global___KnowledgeBoxConfig | None = ...,
-        forceuuid: builtins.str = ...,
-        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
-        vector_dimension: builtins.int | None = ...,
-        default_min_score: builtins.float | None = ...,
-        matryoshka_dimensions: collections.abc.Iterable[builtins.int] | None = ...,
-        external_index_provider: global___CreateExternalIndexProviderMetadata | None = ...,
-        learning_config: builtins.str = ...,
-        release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "config", b"config", "default_min_score", b"default_min_score", "external_index_provider", b"external_index_provider", "vector_dimension", b"vector_dimension"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_default_min_score", b"_default_min_score", "_vector_dimension", b"_vector_dimension", "config", b"config", "default_min_score", b"default_min_score", "external_index_provider", b"external_index_provider", "forceuuid", b"forceuuid", "learning_config", b"learning_config", "matryoshka_dimensions", b"matryoshka_dimensions", "release_channel", b"release_channel", "similarity", b"similarity", "slug", b"slug", "vector_dimension", b"vector_dimension"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_default_min_score", b"_default_min_score"]) -> typing.Literal["default_min_score"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_vector_dimension", b"_vector_dimension"]) -> typing.Literal["vector_dimension"] | None: ...
-
-global___KnowledgeBoxNew = KnowledgeBoxNew
-
-@typing.final
-class NewKnowledgeBoxResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    STATUS_FIELD_NUMBER: builtins.int
-    UUID_FIELD_NUMBER: builtins.int
-    status: global___KnowledgeBoxResponseStatus.ValueType
-    uuid: builtins.str
-    def __init__(
-        self,
-        *,
-        status: global___KnowledgeBoxResponseStatus.ValueType = ...,
-        uuid: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["status", b"status", "uuid", b"uuid"]) -> None: ...
-
-global___NewKnowledgeBoxResponse = NewKnowledgeBoxResponse
 
 @typing.final
 class KnowledgeBoxUpdate(google.protobuf.message.Message):

@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_FIELDS, KB_RESOURCE_SLUG
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -36,8 +37,9 @@ from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.metrics import processor_observer
+from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
-from nucliadb_models.writer import GENERIC_MIME_TYPE
+from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import (
@@ -90,16 +92,6 @@ KB_FIELDS: dict[int, Type] = {
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
 }
-
-KB_REVERSE: dict[str, FieldType.ValueType] = {
-    "t": FieldType.TEXT,
-    "f": FieldType.FILE,
-    "u": FieldType.LINK,
-    "a": FieldType.GENERIC,
-    "c": FieldType.CONVERSATION,
-}
-
-FIELD_TYPE_TO_ID = {v: k for k, v in KB_REVERSE.items()}
 
 _executor = ThreadPoolExecutor(10)
 
@@ -385,6 +377,7 @@ class Resource:
                             vo,
                             vectorset=vectorset_config.vectorset_id,
                             matryoshka_vector_dimension=dimension,
+                            replace_field=reindex,
                         )
         return brain
 
@@ -406,7 +399,7 @@ class Resource:
             # The [6:8] `slicing purpose is to match exactly the two
             # splitted parts corresponding to type and field, and nothing else!
             type, field = key.split("/")[6:8]
-            type_id = KB_REVERSE.get(type)
+            type_id = FIELD_TYPE_STR_TO_PB.get(type)
             if type_id is None:
                 raise AttributeError("Invalid field type")
             result = (type_id, field)
@@ -822,7 +815,7 @@ class Resource:
         await field_obj.set_large_field_metadata(field_large_metadata)
 
     def generate_field_id(self, field: FieldID) -> str:
-        return f"{FIELD_TYPE_TO_ID[field.field_type]}/{field.field}"
+        return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
 
     async def compute_security(self, brain: ResourceBrain):
         security = await self.get_security()
@@ -1231,8 +1224,17 @@ def maybe_update_basic_icon(basic: PBBasic, mimetype: Optional[str]) -> bool:
     if basic.icon not in (None, "", "application/octet-stream", GENERIC_MIME_TYPE):
         # Icon already set or detected
         return False
+
     if not mimetype:
         return False
+
+    if not content_types.valid(mimetype):
+        logger.warning(
+            "Invalid mimetype. Skipping icon update.",
+            extra={"mimetype": mimetype, "rid": basic.uuid, "slug": basic.slug},
+        )
+        return False
+
     basic.icon = mimetype
     return True
 

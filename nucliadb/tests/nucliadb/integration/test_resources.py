@@ -17,12 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from unittest import mock
 
 import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
 
+from nucliadb.common.maindb.pg import PGDriver
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 
@@ -334,3 +337,36 @@ async def test_resource_slug_modification_handles_unknown_resources(
         },
     )
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_parallel_dup_resource_creation_raises_conflicts(
+    nucliadb_writer,
+    knowledgebox,
+):
+    driver = get_driver()
+    if not isinstance(driver, PGDriver):
+        pytest.skip("local driver is not totally safe in terms of slug uniqueness")
+
+    slug = "foobar-unique"
+
+    async def create_resource(kbid: str):
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resources",
+            json={
+                "title": "My resource",
+                "slug": slug,
+            },
+        )
+        return resp.status_code
+
+    # Create 5 requests that attempt to create the same resource with the same slug simultaneously
+    tasks = []
+    for _ in range(5):
+        tasks.append(asyncio.create_task(create_resource(knowledgebox)))
+    status_codes = await asyncio.gather(*tasks)
+
+    # Check that only one succeeded
+    assert status_codes.count(201) == 1
+    assert status_codes.count(409) == 4

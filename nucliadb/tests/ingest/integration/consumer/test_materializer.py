@@ -106,7 +106,6 @@ async def test_materialize_kb_data(
         )
 
     await mz.finalize()
-
     assert audit_storage.js.publish.call_count == 1
     assert audit_storage.js.publish.call_args[0][0] == "kb-usage.nuclia_db"
     pb = KbUsage()

@@ -40,6 +40,7 @@ from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import running_settings
 
 middleware = []
+
 middleware.extend([Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend())])
 
 

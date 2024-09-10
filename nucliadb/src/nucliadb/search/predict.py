@@ -29,21 +29,18 @@ from pydantic import BaseModel, Field, ValidationError
 
 from nucliadb.search import logger
 from nucliadb.tests.vectors import Q, Qm2023
+from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch
 from nucliadb_models.search import (
     ChatModel,
     FeedbackRequest,
-    Ner,
-    QueryInfo,
     RephraseModel,
-    SentenceSearch,
     SummarizedResource,
     SummarizedResponse,
     SummarizeModel,
-    TokenSearch,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
-from nucliadb_utils import const
+from nucliadb_utils.const import Features
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.utilities import Utility, has_feature, set_utility
@@ -229,7 +226,7 @@ class PredictEngine:
             # /api/v1/predict/rephrase/{kbid}
             return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}/{kbid}"
         else:
-            if has_feature(const.Features.VERSIONED_PRIVATE_PREDICT):
+            if has_feature(Features.VERSIONED_PRIVATE_PREDICT):
                 return f"{self.cluster_url}{VERSIONED_PRIVATE_PREDICT}{endpoint}"
             else:
                 return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
@@ -323,26 +320,6 @@ class PredictEngine:
         await self.check_response(resp, expected_status=200)
         return await _parse_rephrase_response(resp)
 
-    @predict_observer.wrap({"type": "chat"})
-    async def chat_query(self, kbid: str, item: ChatModel) -> tuple[str, AsyncIterator[bytes]]:
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            error = "Nuclia Service account is not defined so the chat operation could not be performed"
-            logger.warning(error)
-            raise SendToPredictError(error)
-
-        resp = await self.make_request(
-            "POST",
-            url=self.get_predict_url(CHAT, kbid),
-            json=item.model_dump(),
-            headers=self.get_predict_headers(kbid),
-            timeout=None,
-        )
-        await self.check_response(resp, expected_status=200)
-        ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
-        return ident, get_answer_generator(resp)
-
     @predict_observer.wrap({"type": "chat_ndjson"})
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
@@ -378,6 +355,7 @@ class PredictEngine:
         self,
         kbid: str,
         sentence: str,
+        semantic_model: Optional[str] = None,
         generative_model: Optional[str] = None,
         rephrase: Optional[bool] = False,
     ) -> QueryInfo:
@@ -388,10 +366,12 @@ class PredictEngine:
             logger.warning(error)
             raise SendToPredictError(error)
 
-        params = {
+        params: dict[str, Any] = {
             "text": sentence,
             "rephrase": str(rephrase),
         }
+        if semantic_model is not None:
+            params["semantic_models"] = [semantic_model]
         if generative_model is not None:
             params["generative_model"] = generative_model
 
@@ -451,12 +431,6 @@ class DummyPredictEngine(PredictEngine):
         self.cluster_url = "http://localhost:8000"
         self.public_url = "http://localhost:8000"
         self.calls = []
-        self.generated_answer = [
-            b"valid ",
-            b"answer ",
-            b" to",
-            AnswerStatusCode.SUCCESS.encode(),
-        ]
         self.ndjson_answer = [
             b'{"chunk": {"type": "text", "text": "valid "}}\n',
             b'{"chunk": {"type": "text", "text": "answer "}}\n',
@@ -495,15 +469,6 @@ class DummyPredictEngine(PredictEngine):
         self.calls.append(("rephrase_query", item))
         return DUMMY_REPHRASE_QUERY
 
-    async def chat_query(self, kbid: str, item: ChatModel) -> tuple[str, AsyncIterator[bytes]]:
-        self.calls.append(("chat_query", item))
-
-        async def generate():
-            for i in self.generated_answer:
-                yield i
-
-        return (DUMMY_LEARNING_ID, generate())
-
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
     ) -> tuple[str, AsyncIterator[GenerativeChunk]]:
@@ -519,6 +484,7 @@ class DummyPredictEngine(PredictEngine):
         self,
         kbid: str,
         sentence: str,
+        semantic_model: Optional[str] = None,
         generative_model: Optional[str] = None,
         rephrase: Optional[bool] = False,
     ) -> QueryInfo:
@@ -528,10 +494,20 @@ class DummyPredictEngine(PredictEngine):
                 language="en",
                 stop_words=[],
                 semantic_threshold=0.7,
+                semantic_thresholds={semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.7},
                 visual_llm=True,
                 max_context=self.max_context,
                 entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
-                sentence=SentenceSearch(data=Qm2023, time=0.0),
+                sentence=SentenceSearch(
+                    data=Qm2023,
+                    vectors={
+                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": Qm2023,
+                    },
+                    time=0.0,
+                    timings={
+                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.0,
+                    },
+                ),
                 query=sentence,
             )
         else:
@@ -539,10 +515,22 @@ class DummyPredictEngine(PredictEngine):
                 language="en",
                 stop_words=[],
                 semantic_threshold=0.7,
+                semantic_thresholds={
+                    semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.7,
+                },
                 visual_llm=True,
                 max_context=self.max_context,
                 entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
-                sentence=SentenceSearch(data=Q, time=0.0),
+                sentence=SentenceSearch(
+                    data=Q,
+                    vectors={
+                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": Q,
+                    },
+                    time=0.0,
+                    timings={
+                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.0,
+                    },
+                ),
                 query=sentence,
             )
 

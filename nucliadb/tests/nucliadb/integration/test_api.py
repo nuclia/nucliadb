@@ -22,7 +22,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.learning_proxy import LearningConfiguration
+from nucliadb.learning_proxy import (
+    LearningConfiguration,
+    SemanticConfig,
+    SimilarityFunction,
+)
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
 from nucliadb_protos import resources_pb2 as rpb
@@ -61,6 +65,13 @@ async def test_kb_creation_allows_setting_learning_configuration(
             semantic_model="english",
             semantic_vector_similarity="cosine",
             semantic_vector_size=384,
+            semantic_model_configs={
+                "english": SemanticConfig(
+                    similarity=SimilarityFunction.COSINE,
+                    size=384,
+                    threshold=0.7,
+                )
+            },
         )
 
         # Check that we can define it to a different semantic model
@@ -76,7 +87,7 @@ async def test_kb_creation_allows_setting_learning_configuration(
         kbid = resp.json()["uuid"]
 
         learning_proxy.set_configuration.assert_called_once_with(
-            kbid, config={"semantic_model": "english"}
+            kbid, config={"semantic_models": ["english"]}
         )
 
 
@@ -744,7 +755,7 @@ async def test_question_answer(
             answer.ids_paragraphs.extend([f"id1/{i}{x}", f"id2/{i}{x}"])
             qa.answers.append(answer)
 
-        qaw.question_answers.question_answer.append(qa)
+        qaw.question_answers.question_answers.question_answer.append(qa)
 
     message.question_answers.append(qaw)
     message.uuid = rid
@@ -761,7 +772,9 @@ async def test_question_answer(
     assert resp.status_code == 200
     data = resp.json()
 
-    assert data["data"]["texts"]["text1"]["extracted"]["question_answers"]["question_answer"][0] == {
+    assert data["data"]["texts"]["text1"]["extracted"]["question_answers"]["question_answers"][
+        "question_answer"
+    ][0] == {
         "question": {
             "text": "My question 0",
             "language": "catalan",
@@ -962,3 +975,41 @@ async def test_pagination_limits(
         },
     )
     assert resp.status_code != 412
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_dates_are_properly_validated(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "My title",
+            "origin": {
+                "created": "0000-01-01T00:00:00Z",
+            },
+        },
+    )
+    assert resp.status_code == 422, print(resp.text)
+    detail = resp.json()["detail"][0]
+    assert detail["loc"] == ["body", "origin", "created"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "My title",
+            "origin": {
+                "created": "0001-01-01T00:00:00Z",
+            },
+        },
+    )
+    assert resp.status_code == 201, print(resp.text)
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}?show=origin")
+    assert resp.status_code == 200, resp.text
+
+    assert resp.json()["origin"]["created"] == "0001-01-01T00:00:00Z"

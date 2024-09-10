@@ -11,7 +11,6 @@ metadata:
     chart: "{{ .Chart.Name }}"
 data:
   GRPC_PORT: {{ .Values.serving.grpc_port | quote }}
-  SENTRY_URL: {{ .Values.running.sentry_url }}
   SERVING_PORT: {{ .Values.serving.port | quote }}
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}

@@ -39,8 +39,11 @@ from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
 from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtility
 
 
-def kb_usage_report_finish_condition(kb_usage_report: KbUsageReportUtility):
-    return kb_usage_report.queue.qsize() == 0
+def kb_usage_report_finish_condition(kb_usage_report: KbUsageReportUtility, count_publish: int):
+    return (
+        kb_usage_report.queue.qsize() == 0
+        and kb_usage_report.nats_stream.publish.call_count == count_publish
+    )
 
 
 async def wait_until(condition, timeout=1):
@@ -66,6 +69,7 @@ async def test_kb_usage_report():
     report_util = KbUsageReportUtility(nats_stream=nats_stream, nats_subject="test-stream")
 
     await report_util.initialize()
+
     report_util.send_kb_usage(
         service=Service.NUCLIA_DB,
         account_id="test-account",
@@ -110,7 +114,7 @@ async def test_kb_usage_report():
         ),
     )
 
-    await wait_until(partial(kb_usage_report_finish_condition, report_util))
+    await wait_until(partial(kb_usage_report_finish_condition, report_util, 1))
     await report_util.finalize()
 
     nats_stream.publish.assert_called_once()

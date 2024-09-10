@@ -441,7 +441,7 @@ class S3Storage(Storage):
             deleted = True
         return deleted
 
-    async def delete_kb(self, kbid: str):
+    async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         bucket_name = self.get_bucket_name(kbid)
 
         missing = False

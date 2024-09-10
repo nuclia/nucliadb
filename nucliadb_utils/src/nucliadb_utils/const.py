@@ -76,3 +76,6 @@ class Features:
     READ_REPLICA_SEARCHES = "nucliadb_read_replica_searches"
     VERSIONED_PRIVATE_PREDICT = "nucliadb_versioned_private_predict"
     REBALANCE_KB = "nucliadb_rebalance_kb"
+    SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
+    NATS_SYNC_ACK = "nucliadb_nats_sync_ack"
+    LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"

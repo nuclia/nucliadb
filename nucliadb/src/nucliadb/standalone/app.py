@@ -43,9 +43,11 @@ from nucliadb_telemetry.fastapi.utils import (
     client_disconnect_handler,
     global_exception_handler,
 )
+from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
+from nucliadb_utils.utilities import get_audit
 
 from .api_router import standalone_api_router
 from .auth import get_auth_backend
@@ -69,7 +71,7 @@ HOMEPAGE_HTML = """
     <h2>Quick Links</h2>
     <ul>
         <li><a href="/admin">Admin UI</a></li>
-        <li><a href="https://docs.nuclia.dev/docs/guides/nucliadb/deploy/basics">NucliaDB Deployment Documentation</a></li>
+        <li><a href="https://docs.nuclia.dev/docs/management/nucliadb/deploy/basics">NucliaDB Deployment Documentation</a></li>
         <li><a href="https://docs.nuclia.dev/docs/api">API Reference</a></li>
         <li><a href="/api/v1/docs">API Explorer</a></li>
         <li><a href="/metrics">Metrics</a></li>
@@ -92,6 +94,7 @@ def application_factory(settings: Settings) -> FastAPI:
             AuthenticationMiddleware,
             backend=get_auth_backend(settings),
         ),
+        Middleware(AuditMiddleware, audit_utility_getter=get_audit),
     ]
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))

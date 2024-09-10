@@ -53,6 +53,18 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
+    const.Features.SKIP_EXTERNAL_INDEX: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
+    const.Features.NATS_SYNC_ACK: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
+    const.Features.LOG_REQUEST_PAYLOADS: {
+        "rollout": 0,
+        "variants": {"environment": ["none"]},
+    },
 }
 
 

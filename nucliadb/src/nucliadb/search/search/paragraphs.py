@@ -17,19 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import logging
 import re
 import string
 from typing import Optional
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.orm.resource import KB_REVERSE
+from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb_protos.utils_pb2 import ExtractedText
+from nucliadb.search.search import cache
 from nucliadb_telemetry import metrics
-
-from .cache import get_resource_from_cache
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
@@ -55,60 +52,6 @@ GET_PARAGRAPH_LATENCY = metrics.Observer(
 )
 
 
-EXTRACTED_CACHE_OPS = metrics.Counter("nucliadb_extracted_text_cache_ops", labels={"type": ""})
-
-
-class ExtractedTextCache:
-    """
-    Used to cache extracted text from a resource in memory during
-    the process of search results serialization.
-    """
-
-    def __init__(self):
-        self.locks = {}
-        self.values = {}
-
-    def get_value(self, key: str) -> Optional[ExtractedText]:
-        return self.values.get(key)
-
-    def get_lock(self, key: str) -> asyncio.Lock:
-        return self.locks.setdefault(key, asyncio.Lock())
-
-    def set_value(self, key: str, value: ExtractedText) -> None:
-        self.values[key] = value
-
-    def clear(self):
-        self.values.clear()
-        self.locks.clear()
-
-
-async def get_field_extracted_text(
-    field: Field, cache: Optional[ExtractedTextCache] = None
-) -> Optional[ExtractedText]:
-    if cache is None:
-        return await field.get_extracted_text()
-
-    key = f"{field.kbid}/{field.uuid}/{field.id}"
-    extracted_text = cache.get_value(key)
-    if extracted_text is not None:
-        EXTRACTED_CACHE_OPS.inc({"type": "hit"})
-        return extracted_text
-
-    async with cache.get_lock(key):
-        # Check again in case another task already fetched it
-        extracted_text = cache.get_value(key)
-        if extracted_text is not None:
-            EXTRACTED_CACHE_OPS.inc({"type": "hit"})
-            return extracted_text
-
-        EXTRACTED_CACHE_OPS.inc({"type": "miss"})
-        extracted_text = await field.get_extracted_text()
-        if extracted_text is not None:
-            # Only cache if we actually have extracted text
-            cache.set_value(key, extracted_text)
-        return extracted_text
-
-
 @GET_PARAGRAPH_LATENCY.wrap({"type": "full"})
 async def get_paragraph_from_full_text(
     *,
@@ -116,22 +59,23 @@ async def get_paragraph_from_full_text(
     start: int,
     end: int,
     split: Optional[str] = None,
-    extracted_text_cache: Optional[ExtractedTextCache] = None,
+    log_on_missing_field: bool = True,
 ) -> str:
     """
     Pull paragraph from full text stored in database.
 
     This requires downloading the full text and then slicing it.
     """
-    extracted_text = await get_field_extracted_text(field, cache=extracted_text_cache)
+    extracted_text = await cache.get_field_extracted_text(field)
     if extracted_text is None:
-        logger.warning(
-            "Extracted_text for field does not exist on DB. This should not happen.",
-            extra={
-                "field_id": field.resource_unique_id,
-                "kbid": field.kbid,
-            },
-        )
+        if log_on_missing_field:
+            logger.warning(
+                "Extracted_text for field does not exist on DB. This should not happen.",
+                extra={
+                    "field_id": field.resource_unique_id,
+                    "kbid": field.kbid,
+                },
+            )
         return ""
 
     if split not in (None, ""):
@@ -155,19 +99,20 @@ async def get_paragraph_text(
     orm_resource: Optional[
         ResourceORM
     ] = None,  # allow passing in orm_resource to avoid extra DB calls or txn issues
-    extracted_text_cache: Optional[ExtractedTextCache] = None,
+    log_on_missing_field: bool = True,
 ) -> str:
     if orm_resource is None:
-        orm_resource = await get_resource_from_cache(kbid, rid)
+        orm_resource = await cache.get_resource(kbid, rid)
         if orm_resource is None:
-            logger.warning(
-                "Resource does not exist on DB. This should not happen.",
-                extra={"resource_id": rid, "kbid": kbid, "field": field},
-            )
+            if log_on_missing_field:
+                logger.warning(
+                    "Resource does not exist on DB. This should not happen.",
+                    extra={"resource_id": rid, "kbid": kbid, "field": field},
+                )
             return ""
 
     _, field_type, field = field.split("/")
-    field_type_int = KB_REVERSE[field_type]
+    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
 
     text = await get_paragraph_from_full_text(
@@ -175,7 +120,7 @@ async def get_paragraph_text(
         start=start,
         end=end,
         split=split,
-        extracted_text_cache=extracted_text_cache,
+        log_on_missing_field=log_on_missing_field,
     )
 
     if highlight:
@@ -197,13 +142,13 @@ async def get_text_sentence(
     Leave separated from get paragraph for now until we understand the differences
     better.
     """
-    orm_resource = await get_resource_from_cache(kbid, rid)
+    orm_resource = await cache.get_resource(kbid, rid)
 
     if orm_resource is None:
         logger.warning(f"{rid} does not exist on DB")
         return ""
 
-    field_type_int = KB_REVERSE[field_type]
+    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
@@ -223,21 +168,32 @@ async def get_text_sentence(
 def highlight_paragraph(
     text: str, words: Optional[list[str]] = None, ematches: Optional[list[str]] = None
 ) -> str:
+    """
+    Highlight `text` with <mark></mark> tags around the words in `words` and `ematches`.
+
+    Parameters:
+    - text: The text to highlight.
+    - words: A list of words to highlight.
+    - ematches: A list of exact matches to highlight.
+
+    Returns:
+    - The highlighted text.
+    """
     REGEX_TEMPLATE = r"(^|\s)({text})(\s|$)"
     text_lower = text.lower()
 
     marks = [0] * (len(text_lower) + 1)
-    if ematches is not None:
-        for quote in ematches:
-            quote_regex = REGEX_TEMPLATE.format(text=re.escape(quote.lower()))
-            try:
-                for match in re.finditer(quote_regex, text_lower):
-                    start, end = match.span(2)
-                    marks[start] = 1
-                    marks[end] = 2
-            except re.error:
-                logger.warning(f"Regex errors while highlighting text. Regex: {quote_regex}")
-                continue
+    ematches = ematches or []
+    for quote in ematches:
+        quote_regex = REGEX_TEMPLATE.format(text=re.escape(quote.lower()))
+        try:
+            for match in re.finditer(quote_regex, text_lower):
+                start, end = match.span(2)
+                marks[start] = 1
+                marks[end] = 2
+        except re.error:
+            logger.warning(f"Regex errors while highlighting text. Regex: {quote_regex}")
+            continue
 
     words = words or []
     for word in words:

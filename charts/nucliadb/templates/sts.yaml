@@ -43,6 +43,9 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
       serviceAccount:  {{ .Values.serviceAccount | default "default" }}
       containers:
       - name: app
@@ -89,6 +92,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+        {{- if .Values.envFrom }}
+        envFrom:
+          {{- toYaml .Values.envFrom | nindent 10 }}
+        {{- end }}
         ports:
         - name: http
           containerPort: 8080

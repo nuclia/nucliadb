@@ -18,14 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import time
-from typing import Callable
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 
 
@@ -38,47 +36,42 @@ from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
     disable_gc=True,
     warmup=False,
 )
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_get_knowledgeboxes(
-    reader_api: Callable[..., AsyncClient],
-    test_resource: Resource,
+    nucliadb_reader_manager: AsyncClient,
+    full_resource: Resource,
     asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
-    async with reader_api(roles=[NucliaDBRoles.MANAGER]) as client:
-        resp = await asyncbenchmark(
-            client.get,
-            f"/{KBS_PREFIX}",
-        )
-        assert resp.status_code == 200
+    resp = await asyncbenchmark(
+        nucliadb_reader_manager.get,
+        f"/{KBS_PREFIX}",
+    )
+    assert resp.status_code == 200
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_get_knowledgebox(
-    reader_api: Callable[..., AsyncClient],
-    test_resource: Resource,
+    nucliadb_reader: AsyncClient,
+    full_resource: Resource,
     asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
-    kbid = test_resource.kb.kbid
-
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await asyncbenchmark(
-            client.get,
-            f"/{KB_PREFIX}/{kbid}",
-        )
-        assert resp.status_code == 200
+    kbid = full_resource.kb.kbid
+    resp = await asyncbenchmark(
+        nucliadb_reader.get,
+        f"/{KB_PREFIX}/{kbid}",
+    )
+    assert resp.status_code == 200
 
 
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_get_knowledgebox_by_slug(
-    reader_api: Callable[..., AsyncClient],
-    test_resource: Resource,
+    nucliadb_reader: AsyncClient,
+    full_resource: Resource,
     asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
-    slug = test_resource.kb.kbid
-
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await asyncbenchmark(
-            client.get,
-            f"/{KB_PREFIX}/{slug}",
-        )
-        assert resp.status_code == 200
+    slug = full_resource.kb.kbid
+    resp = await asyncbenchmark(
+        nucliadb_reader.get,
+        f"/{KB_PREFIX}/{slug}",
+    )
+    assert resp.status_code == 200

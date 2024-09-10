@@ -36,7 +36,7 @@ class AzureBlobStore(BlobStore):
         if self._object_store is None:
             return
         try:
-            await self._object_store.close()
+            await self._object_store.finalize()
         except Exception:
             logger.exception("Error closing AzureBlobStore")
         self._object_store = None

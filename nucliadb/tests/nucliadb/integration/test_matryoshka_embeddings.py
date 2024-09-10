@@ -25,7 +25,7 @@ from httpx import AsyncClient
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.learning_proxy import LearningConfiguration
-from nucliadb_protos import knowledgebox_pb2, resources_pb2, utils_pb2
+from nucliadb_protos import knowledgebox_pb2, resources_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
@@ -55,19 +55,23 @@ async def test_matryoshka_embeddings(
         semantic_matryoshka_dims=matryoshka_dimensions,
     )
 
-    new_kb_response = await nucliadb_grpc.NewKnowledgeBox(  # type: ignore
-        knowledgebox_pb2.KnowledgeBoxNew(
-            forceuuid=kbid,
+    new_kb_response = await nucliadb_grpc.NewKnowledgeBoxV2(  # type: ignore
+        writer_pb2.NewKnowledgeBoxV2Request(
+            kbid=kbid,
             slug=slug,
-            similarity=utils_pb2.VectorSimilarity.DOT,
-            # set vector dimension to the greatest matryoshka dimension, but
-            # we'll internally choose another one more convinient for nucliadb
-            vector_dimension=matryoshka_dimensions[0],
-            matryoshka_dimensions=matryoshka_dimensions,
+            vectorsets=[
+                writer_pb2.NewKnowledgeBoxV2Request.VectorSet(
+                    vectorset_id="my-semantic-model",
+                    similarity=utils_pb2.VectorSimilarity.DOT,
+                    # set vector dimension to the greatest matryoshka dimension, but
+                    # we'll internally choose another one more convinient for nucliadb
+                    vector_dimension=matryoshka_dimensions[0],
+                    matryoshka_dimensions=matryoshka_dimensions,
+                )
+            ],
         )
     )
     assert new_kb_response.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
-    assert new_kb_response.uuid == kbid
 
     # Create a resource
 

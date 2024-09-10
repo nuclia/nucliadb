@@ -208,5 +208,5 @@ async def get_resource_title(kv_driver: Driver, kbid: str, resource_uuid: str) -
 
 
 def encode_streamed_notification(notification: Notification) -> bytes:
-    encoded_nofication = notification.json().encode("utf-8")
+    encoded_nofication = notification.model_dump_json().encode("utf-8")
     return encoded_nofication

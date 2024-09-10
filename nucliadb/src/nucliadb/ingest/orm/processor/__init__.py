@@ -51,7 +51,9 @@ from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
+
+from .pgcatalog import pgcatalog_delete, pgcatalog_update
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +187,7 @@ class Processor:
                     if shard is None:
                         raise AttributeError("Shard not available")
                     await self._maybe_external_index_delete_resource(message.kbid, uuid)
+                    await pgcatalog_delete(txn, message.kbid, uuid)
                     await self.index_node_shard_manager.delete_resource(
                         shard, message.uuid, seqid, partition, message.kbid
                     )
@@ -404,7 +407,7 @@ class Processor:
 
         if shard is not None:
             index_message = resource.indexer.brain
-            await self._maybe_external_index_add_resource(kbid, source, uuid, index_message)
+            await self._maybe_external_index_add_resource(kbid, uuid, index_message)
             await self.index_node_shard_manager.add_resource(
                 shard,
                 index_message,
@@ -413,6 +416,8 @@ class Processor:
                 kb=kbid,
                 source=source,
             )
+
+            await pgcatalog_update(txn, kbid, resource)
         else:
             raise AttributeError("Shard is not available")
 
@@ -425,13 +430,10 @@ class Processor:
     async def _maybe_external_index_add_resource(
         self,
         kbid: str,
-        source: nodewriter_pb2.IndexMessageSource.ValueType,
         resource_uuid: str,
         index_message: PBBrainResource,
     ):
-        if source != nodewriter_pb2.IndexMessageSource.PROCESSOR:
-            # We only want to index resources that are coming from the processor, as they are the ones
-            # that have the vectors and extracted text
+        if not has_vectors_operation(index_message):
             return
 
         external_index_manager = await get_external_index_manager(kbid=kbid)
@@ -439,20 +441,27 @@ class Processor:
             # No external index manager, nothing to do
             return
 
-        await external_index_manager.index_resource(
-            resource_uuid=resource_uuid, resource_data=index_message
-        )
-        self._clear_external_index_fields(index_message)
-
-    @staticmethod
-    def _clear_external_index_fields(index_message: PBBrainResource):
-        """
-        Clear the fields that are already stored in the external index,
-        and we don't want to store them again in the IndexNode cluster.
-        """
-        index_message.ClearField("sentences_to_delete")
-        index_message.ClearField("paragraphs_to_delete")
-        index_message.ClearField("paragraphs")
+        provider_type = external_index_manager.type.value
+        if has_feature(
+            const.Features.SKIP_EXTERNAL_INDEX,
+            context={"kbid": kbid, "provider": provider_type},
+            default=False,
+        ):
+            # This is a safety measure to skip external indexing in case that the external index provider is not working.
+            # As we don't want to block the ingestion pipeline, this is a temporary measure until we implement async consumers
+            # to index to external indexes.
+            logger.warning(
+                "Skipping external index for resource",
+                extra={
+                    "kbid": kbid,
+                    "rid": resource_uuid,
+                    "provider": provider_type,
+                },
+            )
+        else:
+            await external_index_manager.index_resource(
+                resource_uuid=resource_uuid, resource_data=index_message
+            )
 
     async def multi(self, message: writer_pb2.BrokerMessage, seqid: int) -> None:
         self.messages.setdefault(message.multiid, []).append(message)
@@ -686,9 +695,25 @@ def messages_source(messages: list[writer_pb2.BrokerMessage]):
         source = nodewriter_pb2.IndexMessageSource.WRITER
     elif from_processor:
         source = nodewriter_pb2.IndexMessageSource.PROCESSOR
-    else:  # pragma: nocover
+    else:  # pragma: no cover
         msg = "Processor received multiple broker messages with different sources in the same txn!"
         logger.error(msg)
         errors.capture_exception(Exception(msg))
         source = nodewriter_pb2.IndexMessageSource.PROCESSOR
     return source
+
+
+def has_vectors_operation(index_message: PBBrainResource) -> bool:
+    """
+    Returns True if the index message has any vectors to index or to delete.
+    """
+    if len(index_message.sentences_to_delete) > 0 or len(index_message.paragraphs_to_delete) > 0:
+        return True
+    for field_paragraphs in index_message.paragraphs.values():
+        for paragraph in field_paragraphs.paragraphs.values():
+            if len(paragraph.sentences) > 0:
+                return True
+            for vectorset_sentences in paragraph.vectorsets_sentences.values():
+                if len(vectorset_sentences.sentences) > 0:
+                    return True
+    return False

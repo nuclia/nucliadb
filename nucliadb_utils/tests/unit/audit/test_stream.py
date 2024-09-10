@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nucliadb_protos.audit_pb2 import AuditKBCounter, AuditRequest, ChatContext
+from nucliadb_protos.audit_pb2 import AuditRequest, ChatContext, RetrievedContext
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_utils.audit.stream import StreamAuditStorage
 
@@ -87,76 +87,72 @@ async def test_lifecycle(audit_storage: StreamAuditStorage, nats):
 @pytest.mark.asyncio
 async def test_publish(audit_storage: StreamAuditStorage, nats):
     await audit_storage.initialize()
-    await audit_storage.send(AuditRequest())
+    audit_storage.send(AuditRequest())
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
 async def test_report(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.report(
-        kbid="kbid",
-        audit_type=AuditRequest.AuditType.DELETED,
-        audit_fields=[],
-        kb_counter=AuditKBCounter(),
-    )
-
-    await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
-
-
-@pytest.mark.asyncio
-async def test_report_resources(audit_storage: StreamAuditStorage, nats):
-    audit_storage.report_resources(
-        kbid="kbid",
-        resources=10,
-    )
+    audit_storage.report_and_send(kbid="kbid", audit_type=AuditRequest.AuditType.DELETED)
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
 async def test_visited(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.visited("kbid", "uuid", "user", "origin")
+    from nucliadb_utils.audit.stream import RequestContext, request_context_var
 
+    context = RequestContext()
+    request_context_var.set(context)
+    audit_storage.visited("kbid", "uuid", "user", "origin")
+    audit_storage.send(context.audit_request)
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
 async def test_delete_kb(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.delete_kb("kbid")
+    audit_storage.delete_kb("kbid")
 
-    await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
+    await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
 @pytest.mark.asyncio
 async def test_search(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.search("kbid", "user", 0, "origin", SearchRequest(), -1, 1)
+    from nucliadb_utils.audit.stream import RequestContext, request_context_var
 
-    await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
-
-
-@pytest.mark.asyncio
-async def test_suggest(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.suggest("kbid", "user", 0, "origin", -1)
-
+    context = RequestContext()
+    request_context_var.set(context)
+    audit_storage.search("kbid", "user", 0, "origin", SearchRequest(), -1, 1)
+    audit_storage.send(context.audit_request)
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 
 
 @pytest.mark.asyncio
 async def test_chat(audit_storage: StreamAuditStorage, nats):
-    await audit_storage.chat(
+    from nucliadb_utils.audit.stream import RequestContext, request_context_var
+
+    context = RequestContext()
+    request_context_var.set(context)
+
+    audit_storage.chat(
         kbid="kbid",
         user="user",
         client_type=0,
         origin="origin",
-        timeit=-1,
+        generative_answer_time=1,
+        generative_answer_first_chunk_time=1,
+        rephrase_time=1,
         question="foo",
         rephrased_question="rephrased",
-        context=[ChatContext(author="USER", text="epa")],
+        chat_context=[ChatContext(author="USER", text="epa")],
+        retrieved_context=[RetrievedContext(text="epa", text_block_id="some/id/path")],
         answer="bar",
         learning_id="learning_id",
+        status_code=0,
     )
 
+    audit_storage.send(context.audit_request)
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
     arg = nats.jetstream().publish.call_args[0][1]
@@ -167,5 +163,8 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
     assert pb.chat.rephrased_question == "rephrased"
     assert pb.chat.answer == "bar"
     assert pb.chat.learning_id == "learning_id"
-    assert pb.chat.context[0].author == "USER"
-    assert pb.chat.context[0].text == "epa"
+    assert pb.chat.status_code == 0
+    assert pb.chat.chat_context[0].author == "USER"
+    assert pb.chat.chat_context[0].text == "epa"
+    assert pb.chat.retrieved_context[0].text_block_id == "some/id/path"
+    assert pb.chat.retrieved_context[0].text == "epa"

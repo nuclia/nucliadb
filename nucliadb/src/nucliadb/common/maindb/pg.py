@@ -29,6 +29,7 @@ import psycopg
 import psycopg_pool
 
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb_telemetry import metrics
 
 RETRIABLE_EXCEPTIONS = (
@@ -36,13 +37,6 @@ RETRIABLE_EXCEPTIONS = (
     OSError,
     ConnectionResetError,
 )
-
-CREATE_TABLE = """
-CREATE TABLE IF NOT EXISTS resources (
-    key TEXT PRIMARY KEY,
-    value BYTEA
-);
-"""
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +90,17 @@ class DataLayer:
                     "DO UPDATE SET value = EXCLUDED.value",
                     (key, value),
                 )
+
+    async def insert(self, key: str, value: bytes) -> None:
+        with pg_observer({"type": "insert"}):
+            async with self.connection.cursor() as cur:
+                try:
+                    await cur.execute(
+                        "INSERT INTO resources (key, value) VALUES (%s, %s) ",
+                        (key, value),
+                    )
+                except psycopg.errors.UniqueViolation:
+                    raise ConflictError(key)
 
     async def delete(self, key: str) -> None:
         with pg_observer({"type": "delete"}):
@@ -179,6 +184,9 @@ class PGTransaction(Transaction):
 
     async def set(self, key: str, value: bytes):
         await self.data_layer.set(key, value)
+
+    async def insert(self, key: str, value: bytes):
+        await self.data_layer.insert(key, value)
 
     async def delete(self, key: str):
         await self.data_layer.delete(key)
@@ -277,18 +285,15 @@ class PGDriver(Driver):
                 )
                 await self.pool.open()
 
-                # check if table exists
-                async with self._get_connection() as conn:
-                    await conn.execute(CREATE_TABLE)
-
             self.initialized = True
             self.metrics_task = asyncio.create_task(self._report_metrics_task())
 
     async def finalize(self):
         async with self._lock:
-            await self.pool.close()
-            self.initialized = False
-            self.metrics_task.cancel()
+            if self.initialized:
+                await self.pool.close()
+                self.initialized = False
+                self.metrics_task.cancel()
 
     async def _report_metrics_task(self):
         while True:

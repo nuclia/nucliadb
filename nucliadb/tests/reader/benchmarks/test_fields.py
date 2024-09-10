@@ -18,14 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import time
-from typing import Callable
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 
 
@@ -48,33 +46,31 @@ from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
     disable_gc=True,
     warmup=False,
 )
-@pytest.mark.asyncio
+@pytest.mark.deploy_modes("component")
 async def test_get_field_all(
-    reader_api: Callable[..., AsyncClient],
-    test_resource: Resource,
+    nucliadb_reader: AsyncClient,
+    full_resource: Resource,
     asyncbenchmark: AsyncBenchmarkFixture,
     field_type: str,
     field_id: str,
 ) -> None:
-    rsc = test_resource
-    kbid = rsc.kb.kbid
-    rid = rsc.uuid
-
-    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await asyncbenchmark(
-            client.get,
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}",
-            params={
-                "show": ["value", "extracted", "error"],
-                "field_type": [field_type],
-                "extracted": [
-                    "metadata",
-                    "vectors",
-                    "large_metadata",
-                    "text",
-                    "link",
-                    "file",
-                ],
-            },
-        )
-        assert resp.status_code == 200
+    resource = full_resource
+    kbid = resource.kb.kbid
+    rid = resource.uuid
+    resp = await asyncbenchmark(
+        nucliadb_reader.get,
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}",
+        params={
+            "show": ["value", "extracted", "error"],
+            "field_type": [field_type],
+            "extracted": [
+                "metadata",
+                "vectors",
+                "large_metadata",
+                "text",
+                "link",
+                "file",
+            ],
+        },
+    )
+    assert resp.status_code == 200

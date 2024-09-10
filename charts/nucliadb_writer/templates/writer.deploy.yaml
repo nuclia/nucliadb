@@ -42,6 +42,9 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
       serviceAccount: {{ .Values.serviceAccount | default "default" }}
       containers:
       - name: writer
@@ -76,6 +79,8 @@ spec:
               command: ["sleep", "15"]
         envFrom:
           - configMapRef:
+              name: writer-config
+          - secretRef:
               name: writer-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}

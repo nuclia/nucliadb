@@ -53,6 +53,9 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
       serviceAccount: {{ .Values.serviceAccount | default "default" }}
 {{- if .Values.nats.secretName }}
       volumes:
@@ -78,6 +81,8 @@ spec:
         command: ["node_sidecar"]
         envFrom:
           - configMapRef:
+              name: node-config
+          - secretRef:
               name: node-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
@@ -118,16 +123,15 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          - secretRef:
+              name: node-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
           {{- end }}
         env:
           - name: METRICS_PORT
             value: "3032"
-          {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-          {{- end }}
+          {{- include "toEnv" .Values.env | indent 10 }}
         ports:
         - name: grpc-writer
           containerPort: {{ .Values.serving.grpc_writer }}
@@ -158,16 +162,15 @@ spec:
         envFrom:
           - configMapRef:
               name: node-config
+          - secretRef:
+              name: node-config
           {{- if .Values.envFrom }}
           {{- toYaml .Values.envFrom | nindent 10 }}
           {{- end }}
         env:
           - name: METRICS_PORT
             value: "3031"
-        {{- range $key, $value := .Values.env }}
-          - name: "{{ $key }}"
-            value: {{ tpl $value $ | toJson }}
-        {{- end }}
+          {{- include "toEnv" .Values.env | indent 10 }}
         ports:
         - name: grpc-reader
           containerPort: {{ .Values.serving.grpc_reader }}

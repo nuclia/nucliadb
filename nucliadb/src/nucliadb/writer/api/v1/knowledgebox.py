@@ -27,12 +27,17 @@ from starlette.requests import Request
 
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
+from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.external_index_providers import (
+    ExternalIndexProviderType,
+    PineconeServerlessCloud,
+)
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
@@ -72,6 +77,8 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxO
         kbid, slug = await _create_kb(item)
     except KnowledgeBoxConflict:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
+    except ExternalIndexCreationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
     except Exception:
         raise HTTPException(status_code=500, detail="Error creating knowledge box")
     else:
@@ -84,7 +91,8 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
 
     kbid = KnowledgeBox.new_unique_kbid()
 
-    # Onprem KBs have to call learning proxy to create it's own configuration.
+    # Onprem KB creation doesn't have an existing learning configuration yet, so
+    # we need to call learning proxy to create it
     if item.learning_configuration:
         user_learning_config = item.learning_configuration
     else:
@@ -94,6 +102,11 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
         )
         # learning will choose the default values
         user_learning_config = {}
+
+    # We need to be backward compatible with the old "semantic_model" field where
+    # only one semantic model was allowed.
+    if "semantic_model" in user_learning_config:
+        user_learning_config["semantic_models"] = [user_learning_config.pop("semantic_model")]
 
     # we rely on learning to return the updated configuration with defaults and
     # any other needed values (e.g. matryoshka settings if available)
@@ -111,9 +124,26 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
             )
 
     rollback_learning_config = partial(_rollback_learning_config, kbid)
-
-    semantic_model = learning_config.into_semantic_model_metadata()
+    semantic_models = learning_config.into_semantic_models_metadata()
     release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
+
+    external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
+        type=knowledgebox_pb2.ExternalIndexProviderType.UNSET,
+    )
+    if (
+        item.external_index_provider
+        and item.external_index_provider.type == ExternalIndexProviderType.PINECONE
+    ):
+        pinecone_api_key = item.external_index_provider.api_key
+        serverless_pb = to_pinecone_serverless_cloud_pb(item.external_index_provider.serverless_cloud)
+        external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
+            type=knowledgebox_pb2.ExternalIndexProviderType.PINECONE,
+            pinecone_config=knowledgebox_pb2.CreatePineconeConfig(
+                api_key=pinecone_api_key,
+                serverless_cloud=serverless_pb,
+            ),
+        )
+
     try:
         (kbid, slug) = await KnowledgeBox.create(
             driver,
@@ -121,8 +151,9 @@ async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
             slug=item.slug or kbid,
             title=item.title or "",
             description=item.description or "",
-            semantic_model=semantic_model,
+            semantic_models=semantic_models,
             release_channel=release_channel,
+            external_index_provider=external_index_provider,
         )
 
     except Exception as exc:
@@ -208,3 +239,15 @@ async def delete_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     asyncio.create_task(processing.delete_from_processing(kbid=kbid))
 
     return KnowledgeBoxObj(uuid=kbid)
+
+
+def to_pinecone_serverless_cloud_pb(
+    serverless: PineconeServerlessCloud,
+) -> knowledgebox_pb2.PineconeServerlessCloud.ValueType:
+    return {
+        PineconeServerlessCloud.AWS_EU_WEST_1: knowledgebox_pb2.PineconeServerlessCloud.AWS_EU_WEST_1,
+        PineconeServerlessCloud.AWS_US_EAST_1: knowledgebox_pb2.PineconeServerlessCloud.AWS_US_EAST_1,
+        PineconeServerlessCloud.AWS_US_WEST_2: knowledgebox_pb2.PineconeServerlessCloud.AWS_US_WEST_2,
+        PineconeServerlessCloud.AZURE_EASTUS2: knowledgebox_pb2.PineconeServerlessCloud.AZURE_EASTUS2,
+        PineconeServerlessCloud.GCP_US_CENTRAL1: knowledgebox_pb2.PineconeServerlessCloud.GCP_US_CENTRAL1,
+    }[serverless]

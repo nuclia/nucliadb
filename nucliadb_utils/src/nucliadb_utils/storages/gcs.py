@@ -34,6 +34,7 @@ import aiohttp.client_exceptions
 import backoff
 import google.auth.transport.requests  # type: ignore
 import yarl
+from google.auth.exceptions import DefaultCredentialsError  # type: ignore
 from google.oauth2 import service_account  # type: ignore
 
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -458,12 +459,25 @@ class GCSStorage(Storage):
         url: str = "https://www.googleapis.com",
         scopes: Optional[List[str]] = None,
     ):
-        if account_credentials is not None:
+        if account_credentials is None:
+            self._json_credentials = None
+        elif isinstance(account_credentials, str) and account_credentials.strip() == "":
+            self._json_credentials = None
+        else:
             self._json_credentials = json.loads(base64.b64decode(account_credentials))
+
+        if self._json_credentials is not None:
             self._credentials = service_account.Credentials.from_service_account_info(
                 self._json_credentials,
                 scopes=DEFAULT_SCOPES if scopes is None else scopes,
             )
+        else:
+            try:
+                self._credentials, self._project = google.auth.default()
+            except DefaultCredentialsError:
+                logger.warning("Setting up without credentials as couldn't find workload identity")
+                self._credentials = None
+
         self.source = CloudFile.GCS
         self.deadletter_bucket = deadletter_bucket
         self.indexing_bucket = indexing_bucket
@@ -473,16 +487,15 @@ class GCSStorage(Storage):
         # https://cloud.google.com/storage/docs/bucket-locations
         self._bucket_labels = labels or {}
         self._executor = executor
-        self._creation_access_token = datetime.now()
         self._upload_url = url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
         self.object_base_url = url + "/storage/v1/b"
         self._client = None
 
     def _get_access_token(self):
-        if self._credentials.valid is False:
-            req = google.auth.transport.requests.Request()
-            self._credentials.refresh(req)
-            self._creation_access_token = datetime.now()
+        if self._credentials.expired or self._credentials.valid is False:
+            request = google.auth.transport.requests.Request()
+            self._credentials.refresh(request)
+
         return self._credentials.token
 
     @storage_ops_observer.wrap({"type": "initialize"})
@@ -552,7 +565,9 @@ class GCSStorage(Storage):
             raise AttributeError()
 
         headers = await self.get_access_headers()
-        url = f"{self.object_base_url}/{bucket_name}?project={self._project}"
+        # Using object access url instead of bucket access to avoid
+        # giving admin permission to the SA, needed to GET a bucket
+        url = f"{self.object_base_url}/{bucket_name}/o"
         async with self.session.get(
             url,
             headers=headers,
@@ -652,7 +667,7 @@ class GCSStorage(Storage):
         return deleted
 
     @storage_ops_observer.wrap({"type": "delete"})
-    async def delete_kb(self, kbid: str):
+    async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         if self.session is None:
             raise AttributeError()
         bucket_name = self.get_bucket_name(kbid)

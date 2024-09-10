@@ -52,7 +52,7 @@ async def start_indexed_publisher() -> IndexedPublisher:
 
 async def start_worker(writer: Writer, nats_connection_manager: NatsConnectionManager) -> Worker:
     node = await get_node_id()
-    if node is None:  # pragma: nocover
+    if node is None:  # pragma: no cover
         raise Exception("No Key defined")
 
     worker = Worker(

@@ -29,9 +29,9 @@ from nucliadb.ingest.processing import PushPayload
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
+from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_models.conversation import PushConversation
 from nucliadb_models.writer import (
-    GENERIC_MIME_TYPE,
     CreateResourcePayload,
     UpdateResourcePayload,
 )

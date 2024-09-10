@@ -34,26 +34,32 @@ from nucliadb_protos.audit_pb2 import (
     ClientType as ClientType,
     DASHBOARD as DASHBOARD,
     DESKTOP as DESKTOP,
+    RetrievedContext as RetrievedContext,
     WEB as WEB,
     WIDGET as WIDGET,
 )
 from nucliadb_protos.knowledgebox_pb2 import (
+    AWS_EU_WEST_1 as AWS_EU_WEST_1,
+    AWS_US_EAST_1 as AWS_US_EAST_1,
+    AWS_US_WEST_2 as AWS_US_WEST_2,
+    AZURE_EASTUS2 as AZURE_EASTUS2,
     CONFLICT as CONFLICT,
     CreateExternalIndexProviderMetadata as CreateExternalIndexProviderMetadata,
     CreatePineconeConfig as CreatePineconeConfig,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
+    EXTERNAL_INDEX_PROVIDER_ERROR as EXTERNAL_INDEX_PROVIDER_ERROR,
     EntitiesGroup as EntitiesGroup,
     EntitiesGroupSummary as EntitiesGroupSummary,
     EntitiesGroups as EntitiesGroups,
     Entity as Entity,
     EntityGroupDuplicateIndex as EntityGroupDuplicateIndex,
     ExternalIndexProviderType as ExternalIndexProviderType,
+    GCP_US_CENTRAL1 as GCP_US_CENTRAL1,
     KBConfiguration as KBConfiguration,
     KnowledgeBoxConfig as KnowledgeBoxConfig,
     KnowledgeBoxID as KnowledgeBoxID,
-    KnowledgeBoxNew as KnowledgeBoxNew,
     KnowledgeBoxResponseStatus as KnowledgeBoxResponseStatus,
     KnowledgeBoxUpdate as KnowledgeBoxUpdate,
     KnowledgeBoxVectorSetsConfig as KnowledgeBoxVectorSetsConfig,
@@ -61,9 +67,11 @@ from nucliadb_protos.knowledgebox_pb2 import (
     LabelSet as LabelSet,
     Labels as Labels,
     NOTFOUND as NOTFOUND,
-    NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
     PINECONE as PINECONE,
+    PINECONE_UNSET as PINECONE_UNSET,
+    PineconeIndexMetadata as PineconeIndexMetadata,
+    PineconeServerlessCloud as PineconeServerlessCloud,
     SemanticModelMetadata as SemanticModelMetadata,
     StoredExternalIndexProviderMetadata as StoredExternalIndexProviderMetadata,
     StoredPineconeConfig as StoredPineconeConfig,
@@ -124,6 +132,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldLink as FieldLink,
     FieldMetadata as FieldMetadata,
     FieldQuestionAnswerWrapper as FieldQuestionAnswerWrapper,
+    FieldQuestionAnswers as FieldQuestionAnswers,
     FieldText as FieldText,
     FieldType as FieldType,
     FileExtractedData as FileExtractedData,
@@ -258,11 +267,13 @@ class Error(google.protobuf.message.Message):
         GENERIC: Error._ErrorCode.ValueType  # 0
         EXTRACT: Error._ErrorCode.ValueType  # 1
         PROCESS: Error._ErrorCode.ValueType  # 2
+        DATAAUGMENTATION: Error._ErrorCode.ValueType  # 3
 
     class ErrorCode(_ErrorCode, metaclass=_ErrorCodeEnumTypeWrapper): ...
     GENERIC: Error.ErrorCode.ValueType  # 0
     EXTRACT: Error.ErrorCode.ValueType  # 1
     PROCESS: Error.ErrorCode.ValueType  # 2
+    DATAAUGMENTATION: Error.ErrorCode.ValueType  # 3
 
     FIELD_FIELD_NUMBER: builtins.int
     FIELD_TYPE_FIELD_NUMBER: builtins.int
@@ -1709,12 +1720,15 @@ class NewKnowledgeBoxV2Response(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     STATUS_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
     status: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxResponseStatus.ValueType
+    error_message: builtins.str
     def __init__(
         self,
         *,
         status: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxResponseStatus.ValueType = ...,
+        error_message: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["status", b"status"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["error_message", b"error_message", "status", b"status"]) -> None: ...
 
 global___NewKnowledgeBoxV2Response = NewKnowledgeBoxV2Response

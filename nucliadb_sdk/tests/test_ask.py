@@ -20,6 +20,8 @@
 import unittest
 import unittest.mock
 
+import pytest
+
 import nucliadb_sdk
 from nucliadb_models.metadata import RelationType
 from nucliadb_models.search import (
@@ -48,6 +50,7 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     result: SyncAskResponse = sdk.ask(
         kbid=docs_dataset,
         query="Nuclia loves Semantic Search",
+        features=["keyword", "semantic", "relations"],
         generative_model="everest",
         prompt="Given this context: {context}. Answer this {question} in a concise way using the provided context",
         extra_context=[
@@ -63,6 +66,7 @@ def test_ask_on_kb(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
                 "confidence": {"type": "number"},
             },
         },
+        top_k=20,
     )
     assert result.learning_id == "00"
     assert result.answer == "valid answer to"
@@ -167,3 +171,33 @@ def test_ask_stream(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
     )
     assert isinstance(resp, SyncAskResponse)
     sdk.session.headers.pop("X-Synchronous", None)
+
+
+@pytest.mark.parametrize(
+    "rag_strategies",
+    [
+        [{"name": "full_resource"}],
+        [{"name": "neighbouring_paragraphs", "before": 1, "after": 1}],
+        [{"name": "hierarchy", "count": 40}],
+        [{"name": "field_extension", "fields": ["a/title", "a/summary"]}],
+        [
+            {
+                "name": "metadata_extension",
+                "types": ["origin", "classification_labels", "ners", "extra_metadata"],
+            }
+        ],
+        [
+            {
+                "name": "prequeries",
+                "queries": [
+                    {"request": {"query": "Nuclia loves Semantic Search"}, "weight": 1.0},
+                    {"request": {"query": "Nuclia is a powerful AI search platform"}, "weight": 3.0},
+                ],
+            }
+        ],
+    ],
+)
+def test_ask_rag_strategies(docs_dataset, sdk: nucliadb_sdk.NucliaDB, rag_strategies):
+    sdk.ask(
+        kbid=docs_dataset, query="Does Nuclia offer RAG as a service?", rag_strategies=rag_strategies
+    )

@@ -11,7 +11,7 @@ enum KnowledgeBoxResponseStatus {
     CONFLICT = 1;
     NOTFOUND = 2;
     ERROR = 3;
-
+    EXTERNAL_INDEX_PROVIDER_ERROR = 4;
 }
 
 // ID
@@ -28,15 +28,32 @@ enum ExternalIndexProviderType {
 }
 
 // Pinecone
+enum PineconeServerlessCloud {
+    PINECONE_UNSET = 0;
+    AWS_US_EAST_1 = 1;
+    AWS_US_WEST_2 = 2;
+    AWS_EU_WEST_1 = 3;
+    GCP_US_CENTRAL1 = 4;
+    AZURE_EASTUS2 = 5;
+}
+
 message CreatePineconeConfig {
     string api_key = 1;
+    PineconeServerlessCloud serverless_cloud = 2;
+}
+
+message PineconeIndexMetadata {
+    string index_name = 1;
+    string index_host = 2;
+    int32 vector_dimension = 3;
+    utils.VectorSimilarity similarity = 4;
 }
 
 message StoredPineconeConfig {
     string encrypted_api_key = 1;
-
-    // Index name to index host mapping.
-    map<string, string> index_hosts = 2;
+    // vectorset id -> PineconeIndexMetadata
+    map<string, PineconeIndexMetadata> indexes = 2;
+    PineconeServerlessCloud serverless_cloud = 3;
 }
 
 // External Index node provider
@@ -71,38 +88,6 @@ message KnowledgeBoxConfig {
     // DEPRECATED: duplicated field also stored in `writer.proto Shards`
     utils.ReleaseChannel release_channel = 8 [deprecated = true];
 }
-
-// NEW
-
-message KnowledgeBoxNew {
-    string slug = 1;
-    KnowledgeBoxConfig config = 2;
-
-    // this fields are only set by backend when creating hosted KBs
-    string forceuuid = 3;
-    utils.VectorSimilarity similarity = 4;
-    optional int32 vector_dimension = 5;
-    optional float default_min_score = 6  [deprecated = true];
-    repeated uint32 matryoshka_dimensions = 9;
-
-    CreateExternalIndexProviderMetadata external_index_provider = 10;
-
-    // this field are only used by NucliaDB Writer API when creating a KB. Used
-    // in onprem scenarios
-    // DEPRECATED: onprem don't forward requests to ingest gRPC anymore
-    string learning_config = 8 [deprecated = true];
-
-    // release channel, although not used when backend creates hosted KBs, it's
-    // recomputed and changed depending on the environment
-    utils.ReleaseChannel release_channel = 7;
-}
-
-
-message NewKnowledgeBoxResponse {
-    KnowledgeBoxResponseStatus status = 1;
-    string uuid = 2;
-}
-
 
 // UPDATE
 

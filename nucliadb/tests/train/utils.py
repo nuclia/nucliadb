@@ -17,85 +17,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import AsyncGenerator, overload
+from typing import AsyncGenerator, Type
 
 import aiohttp
 
-from nucliadb.train.types import TrainBatch, TrainBatchType
-from nucliadb_protos.dataset_pb2 import (
-    FieldClassificationBatch,
-    ImageClassificationBatch,
-    ParagraphClassificationBatch,
-    ParagraphStreamingBatch,
-    QuestionAnswerStreamingBatch,
-    SentenceClassificationBatch,
-    TokenClassificationBatch,
-)
-
-# NOTE: we use def instead of async def to make mypy happy. Otherwise, it
-# considers the overloaded functions as corountines returning async iterators
-# instead of async iterators themselves and complains about it
-
-
-@overload
-def get_batches_from_train_response_stream(
-    response: aiohttp.ClientResponse,
-    pb_klass: type[FieldClassificationBatch],
-) -> AsyncGenerator[FieldClassificationBatch, None]: ...
-
-
-@overload
-def get_batches_from_train_response_stream(
-    response: aiohttp.ClientResponse,
-    pb_klass: type[ImageClassificationBatch],
-) -> AsyncGenerator[ImageClassificationBatch, None]: ...
-
-
-@overload
-def get_batches_from_train_response_stream(
-    response: aiohttp.ClientResponse,
-    pb_klass: type[ParagraphClassificationBatch],
-) -> AsyncGenerator[ParagraphClassificationBatch, None]: ...
-
-
-@overload
-def get_batches_from_train_response_stream(
-    response: aiohttp.ClientResponse,
-    pb_klass: type[ParagraphStreamingBatch],
-) -> AsyncGenerator[ParagraphStreamingBatch, None]: ...
-
-
-@overload
-def get_batches_from_train_response_stream(
-    response: aiohttp.ClientResponse,
-    pb_klass: type[QuestionAnswerStreamingBatch],
-) -> AsyncGenerator[QuestionAnswerStreamingBatch, None]: ...
-
-
-@overload
-def get_batches_from_train_response_stream(
-    response: aiohttp.ClientResponse,
-    pb_klass: type[SentenceClassificationBatch],
-) -> AsyncGenerator[SentenceClassificationBatch, None]: ...
-
-
-@overload
-def get_batches_from_train_response_stream(
-    response: aiohttp.ClientResponse,
-    pb_klass: type[TokenClassificationBatch],
-) -> AsyncGenerator[TokenClassificationBatch, None]: ...
+from nucliadb.train.types import T
 
 
 async def get_batches_from_train_response_stream(
     response: aiohttp.ClientResponse,
-    pb_klass: TrainBatchType,
-) -> AsyncGenerator[TrainBatch, None]:
+    pb_klass: Type[T],
+) -> AsyncGenerator[T, None]:
     while True:
         header = await response.content.read(4)
         if header == b"":
             break
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
-        batch = pb_klass()
+        batch: T = pb_klass()
         batch.ParseFromString(payload)
         yield batch

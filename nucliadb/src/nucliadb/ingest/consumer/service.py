@@ -153,6 +153,7 @@ async def start_ingest_processed_consumer(
 async def start_auditor() -> Callable[[], Awaitable[None]]:
     audit = get_audit()
     assert audit is not None
+
     pubsub = await get_pubsub()
     assert pubsub is not None, "Pubsub is not configured"
     storage = await get_storage(service_name=SERVICE_NAME)

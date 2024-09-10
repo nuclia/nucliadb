@@ -22,13 +22,14 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
+from nucliadb_models import content_types
 from nucliadb_models.conversation import InputConversationField
 from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     Extra,
     InputMetadata,
-    Origin,
+    InputOrigin,
     UserFieldMetadata,
     UserMetadata,
 )
@@ -36,8 +37,6 @@ from nucliadb_models.processing import PushProcessingOptions
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdPattern, FieldIdString, SlugString
-
-GENERIC_MIME_TYPE = "application/generic"
 
 
 class FieldDefaults:
@@ -85,7 +84,7 @@ class CreateResourcePayload(BaseModel):
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    origin: Optional[Origin] = None
+    origin: Optional[InputOrigin] = None
     extra: Optional[Extra] = None
 
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
@@ -104,13 +103,8 @@ class CreateResourcePayload(BaseModel):
     def icon_check(cls, v):
         if v is None:
             return v
-
-        if "/" not in v:
-            raise ValueError("Icon should be a MIME string")
-
-        if len(v.split("/")) != 2:
-            raise ValueError("Icon needs two parts of MIME string")
-
+        if not content_types.valid(v):
+            raise ValueError(f"Icon is not a valid MIME string: {v}")
         return v
 
     @field_validator("extra")
@@ -130,7 +124,7 @@ class UpdateResourcePayload(BaseModel):
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    origin: Optional[Origin] = None
+    origin: Optional[InputOrigin] = None
     extra: Optional[Extra] = None
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links

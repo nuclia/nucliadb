@@ -19,8 +19,7 @@
 #
 import functools
 import json
-from time import monotonic as time
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, cast
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
@@ -69,8 +68,12 @@ from nucliadb_models.search import (
     MetadataAskResponseItem,
     MinScore,
     NucliaDBClientType,
+    PrequeriesAskResponseItem,
+    PreQueriesStrategy,
+    PreQueryResult,
     PromptContext,
     PromptContextOrder,
+    RagStrategyName,
     Relations,
     RelationsAskResponseItem,
     RetrievalAskResponseItem,
@@ -90,7 +93,8 @@ class AskResult:
         *,
         kbid: str,
         ask_request: AskRequest,
-        find_results: KnowledgeboxFindResults,
+        main_results: KnowledgeboxFindResults,
+        prequeries_results: Optional[list[PreQueryResult]],
         nuclia_learning_id: Optional[str],
         predict_answer_stream: AsyncGenerator[GenerativeChunk, None],
         prompt_context: PromptContext,
@@ -101,7 +105,8 @@ class AskResult:
         # Initial attributes
         self.kbid = kbid
         self.ask_request = ask_request
-        self.find_results = find_results
+        self.main_results = main_results
+        self.prequeries_results = prequeries_results or []
         self.nuclia_learning_id = nuclia_learning_id
         self.predict_answer_stream = predict_answer_stream
         self.prompt_context = prompt_context
@@ -162,14 +167,31 @@ class AskResult:
 
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First stream out the find results
-        yield RetrievalAskResponseItem(results=self.find_results)
+        yield RetrievalAskResponseItem(results=self.main_results)
+
+        if len(self.prequeries_results) > 0:
+            item = PrequeriesAskResponseItem()
+            for index, (prequery, result) in enumerate(self.prequeries_results):
+                prequery_id = prequery.id or f"prequery_{index}"
+                item.results[prequery_id] = result
+            yield item
 
         # Then stream out the predict answer
-        async for answer_chunk in self._stream_predict_answer_text():
-            yield AnswerAskResponseItem(text=answer_chunk)
+        first_chunk_yielded = False
+        with self.metrics.time("stream_predict_answer"):
+            async for answer_chunk in self._stream_predict_answer_text():
+                yield AnswerAskResponseItem(text=answer_chunk)
+                if not first_chunk_yielded:
+                    self.metrics.record_first_chunk_yielded()
+                    first_chunk_yielded = True
 
         if self._object is not None:
             yield JSONAskResponseItem(object=self._object.object)
+            if not first_chunk_yielded:
+                # When there is a JSON generative response, we consider the first chunk yielded
+                # to be the moment when the JSON object is yielded, not the text
+                self.metrics.record_first_chunk_yielded()
+                first_chunk_yielded = True
 
         # Then the status
         if self.status_code == AnswerStatusCode.ERROR:
@@ -191,8 +213,18 @@ class AskResult:
             audit_answer = self._answer_text.encode("utf-8")
         else:
             audit_answer = json.dumps(self._object.object).encode("utf-8")
-        await self.auditor.audit(
+
+        try:
+            rephrase_time = self.metrics.elapsed("rephrase")
+        except KeyError:
+            # Not all ask requests have a rephrase step
+            rephrase_time = None
+
+        self.auditor.audit(
             text_answer=audit_answer,
+            generative_answer_time=self.metrics.elapsed("stream_predict_answer"),
+            generative_answer_first_chunk_time=self.metrics.get_first_chunk_time() or 0,
+            rephrase_time=rephrase_time,
             status_code=self.status_code,
         )
 
@@ -256,12 +288,20 @@ class AskResult:
         if self._object is not None:
             answer_json = self._object.object
 
+        prequeries_results: Optional[dict[str, KnowledgeboxFindResults]] = None
+        if self.prequeries_results:
+            prequeries_results = {}
+            for index, (prequery, result) in enumerate(self.prequeries_results):
+                prequery_id = prequery.id or f"prequery_{index}"
+                prequeries_results[prequery_id] = result
+
         response = SyncAskResponse(
             answer=self._answer_text,
             answer_json=answer_json,
             status=self.status_code.prettify(),
             relations=self._relations,
-            retrieval_results=self.find_results,
+            retrieval_results=self.main_results,
+            prequeries=prequeries_results,
             citations=citations,
             metadata=metadata,
             learning_id=self.nuclia_learning_id or "",
@@ -282,6 +322,7 @@ class AskResult:
                     kbid=self.kbid,
                     text_answer=self._answer_text,
                     target_shard_replicas=self.ask_request.shards,
+                    timeout=5.0,
                 )
         return self._relations
 
@@ -293,14 +334,10 @@ class AskResult:
         This method does not assume any order in the stream of items, but it assumes that at least
         the answer text is streamed in order.
         """
-        first_answer_chunk_yielded = False
         async for generative_chunk in self.predict_answer_stream:
             item = generative_chunk.chunk
             if isinstance(item, TextGenerativeResponse):
                 self._answer_text += item.text
-                if not first_answer_chunk_yielded:
-                    self.metrics.record_first_chunk_yielded()
-                    first_answer_chunk_yielded = True
                 yield item.text
             elif isinstance(item, JSONGenerativeResponse):
                 self._object = item
@@ -320,9 +357,11 @@ class AskResult:
 class NotEnoughContextAskResult(AskResult):
     def __init__(
         self,
-        find_results: KnowledgeboxFindResults,
+        main_results: KnowledgeboxFindResults,
+        prequeries_results: Optional[list[PreQueryResult]] = None,
     ):
-        self.find_results = find_results
+        self.main_results = main_results
+        self.prequeries_results = prequeries_results or []
         self.nuclia_learning_id = None
 
     async def ndjson_stream(self) -> AsyncGenerator[str, None]:
@@ -331,7 +370,7 @@ class NotEnoughContextAskResult(AskResult):
         return the find results and the messages indicating that there is not enough
         context in the corpus to answer.
         """
-        yield self._ndjson_encode(RetrievalAskResponseItem(results=self.find_results))
+        yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         status = AnswerStatusCode.NO_CONTEXT
         yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
@@ -339,7 +378,7 @@ class NotEnoughContextAskResult(AskResult):
     async def json(self) -> str:
         return SyncAskResponse(
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
-            retrieval_results=self.find_results,
+            retrieval_results=self.main_results,
             status=AnswerStatusCode.NO_CONTEXT,
         ).model_dump_json(exclude_unset=True)
 
@@ -353,7 +392,6 @@ async def ask(
     origin: str,
     resource: Optional[str] = None,
 ) -> AskResult:
-    start_time = time()
     metrics = RAGMetrics()
     chat_history = ask_request.context or []
     user_context = ask_request.extra_context or []
@@ -375,10 +413,15 @@ async def ask(
         except RephraseMissingContextError:
             logger.info("Failed to rephrase ask query, using original")
 
+    prequeries = parse_prequeries(ask_request)
     # Retrieval is not needed if we are chatting on a specific
     # resource and the full_resource strategy is enabled
     needs_retrieval = True
     if resource is not None:
+        if prequeries is not None:
+            raise InvalidQueryError(
+                "rag_strategies", "Prequeries are not supported when asking on a specific resource"
+            )
         ask_request.resource_filters = [resource]
         if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
             needs_retrieval = False
@@ -386,26 +429,34 @@ async def ask(
     # Maybe do a retrieval query
     if needs_retrieval:
         with metrics.time("retrieval"):
-            find_results, query_parser = await get_find_results(
+            main_results, prequeries_results, query_parser = await get_find_results(
                 kbid=kbid,
                 # Prefer the rephrased query if available
                 query=rephrased_query or user_query,
-                chat_request=ask_request,
+                item=ask_request,
                 ndb_client=client_type,
                 user=user_id,
                 origin=origin,
                 metrics=metrics,
+                prequeries=prequeries,
             )
-        if len(find_results.resources) == 0:
-            return NotEnoughContextAskResult(find_results=find_results)
+        if len(main_results.resources) == 0 and all(
+            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+        ):
+            return NotEnoughContextAskResult(
+                main_results=main_results,
+                prequeries_results=prequeries_results,
+            )
 
     else:
-        find_results = KnowledgeboxFindResults(resources={}, min_score=None)
+        main_results = KnowledgeboxFindResults(resources={}, min_score=None)
+        prequeries_results = None
         query_parser = QueryParser(
             kbid=kbid,
             features=[],
             query="",
-            filters=ask_request.filters,
+            label_filters=ask_request.filters,
+            keyword_filters=ask_request.keyword_filters,
             page_number=0,
             page_size=0,
             min_score=MinScore(),
@@ -417,7 +468,9 @@ async def ask(
         max_tokens_context = await query_parser.get_max_tokens_context()
         prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
-            find_results=find_results,
+            main_results=main_results,
+            prequeries_results=prequeries_results,
+            main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
             resource=resource,
             user_context=user_context,
             strategies=ask_request.rag_strategies,
@@ -458,7 +511,6 @@ async def ask(
         user_id=user_id,
         client_type=client_type,
         origin=origin,
-        start_time=start_time,
         user_query=user_query,
         rephrased_query=rephrased_query,
         chat_history=chat_history,
@@ -469,7 +521,8 @@ async def ask(
     return AskResult(
         kbid=kbid,
         ask_request=ask_request,
-        find_results=find_results,
+        main_results=main_results,
+        prequeries_results=prequeries_results,
         nuclia_learning_id=nuclia_learning_id,
         predict_answer_stream=predict_answer_stream,  # type: ignore
         prompt_context=prompt_context,
@@ -515,3 +568,15 @@ def handled_ask_exceptions(func):
             return HTTPClientError(status_code=412, detail=str(exc))
 
     return wrapper
+
+
+def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
+    for rag_strategy in ask_request.rag_strategies:
+        if rag_strategy.name == RagStrategyName.PREQUERIES:
+            prequeries = cast(PreQueriesStrategy, rag_strategy)
+            # Give each query a unique id if they don't have one
+            for index, query in enumerate(prequeries.queries):
+                if query.id is None:
+                    query.id = f"prequery_{index}"
+            return prequeries
+    return None

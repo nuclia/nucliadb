@@ -27,7 +27,7 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 
 # These should be refactored
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb_protos import noderesources_pb2, resources_pb2
+from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
 
 from .utils import with_ro_transaction
@@ -63,7 +63,7 @@ async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
 
 
 async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> Optional[str]:
-    encoded_uuid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug))
+    encoded_uuid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug, for_update=False))
     if not encoded_uuid:
         return None
     return encoded_uuid.decode()
@@ -101,8 +101,10 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
 
 
 @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
-async def get_resource_shard_id(txn: Transaction, *, kbid: str, rid: str) -> Optional[str]:
-    shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid))
+async def get_resource_shard_id(
+    txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
+) -> Optional[str]:
+    shard = await txn.get(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid, for_update=for_update))
     if shard is not None:
         return shard.decode()
     else:
@@ -314,21 +316,3 @@ async def get_resource(txn: Transaction, *, kbid: str, rid: str) -> Optional["Re
 
     kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
     return await kb_orm.get(rid)
-
-
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
-async def get_resource_index_message(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    reindex: bool = False,
-) -> Optional[noderesources_pb2.Resource]:
-    # prevent circulat imports -- this is not ideal that we have the ORM mix here.
-    from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-
-    kb_orm = KnowledgeBoxORM(txn, await get_storage(), kbid)
-    res = await kb_orm.get(rid)
-    if res is None:
-        return None
-    return (await res.generate_index_message(reindex=reindex)).brain

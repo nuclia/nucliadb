@@ -19,7 +19,7 @@
 #
 from datetime import datetime
 from functools import partial
-from typing import AsyncGenerator, Optional, Sequence, cast
+from typing import Any, AsyncGenerator, Callable, Coroutine, Optional, Sequence, cast
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -35,6 +35,8 @@ from nucliadb.common.datamanagers.resources import (
     KB_RESOURCE_SLUG,
     KB_RESOURCE_SLUG_BASE,
 )
+from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
+from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
@@ -61,8 +63,6 @@ from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
-    get_endecryptor,
-    get_pinecone,
     get_storage,
     has_feature,
 )
@@ -103,7 +103,6 @@ class KnowledgeBox:
         slug: str,
         title: str = "",
         description: str = "",
-        semantic_model: Optional[SemanticModelMetadata] = None,
         semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
         release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
@@ -114,21 +113,12 @@ class KnowledgeBox:
             raise KnowledgeBoxCreationError("A kbid must be provided to create a new KB")
         if not slug:
             raise KnowledgeBoxCreationError("A slug must be provided to create a new KB")
-
-        if semantic_model is None:
-            if semantic_models is None or len(semantic_models) == 0:
-                raise KnowledgeBoxCreationError(
-                    "KB must only define semantic_model or semantic_models, not both"
-                )
-        else:
-            if semantic_models is not None and len(semantic_models) > 0:
-                raise KnowledgeBoxCreationError(
-                    "KB must only define semantic_model or semantic_models, not both"
-                )
+        if semantic_models is None or len(semantic_models) == 0:
+            raise KnowledgeBoxCreationError("KB must define at least one semantic model")
 
         release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
 
-        rollback_ops = []
+        rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
 
         try:
             async with driver.transaction() as txn:
@@ -150,61 +140,55 @@ class KnowledgeBox:
                 # B/c with Shards.actual
                 kb_shards.actual = -1
                 kb_shards.release_channel = release_channel
-                if semantic_model is not None:
-                    # bw/c we keep populating the deprecated fields for KBs with
-                    # only one vectorset
 
+                vs_external_indexes = []
+                for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                     # if this KB uses a matryoshka model, we can choose a different
                     # dimension
                     if len(semantic_model.matryoshka_dimensions) > 0:
-                        semantic_model.vector_dimension = choose_matryoshka_dimension(
-                            semantic_model.matryoshka_dimensions  # type: ignore
-                        )
-                    kb_shards.similarity = semantic_model.similarity_function
-                    kb_shards.model.CopyFrom(semantic_model)
-                    stored_external_index_provider = await cls._maybe_create_external_index(
-                        kbid,
-                        request=external_index_provider,
-                        vector_dimension=semantic_model.vector_dimension,
-                    )
-                    rollback_ops.append(
-                        partial(cls._maybe_delete_external_index, kbid, stored_external_index_provider)
-                    )
-                else:
-                    stored_external_index_provider = StoredExternalIndexProviderMetadata(
-                        type=external_index_provider.type
-                    )
-                    if external_index_provider.type != ExternalIndexProviderType.UNSET:
-                        raise KnowledgeBoxCreationError(
-                            "External index provider is only supported with a single semantic model for now"
-                        )
+                        dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
+                    else:
+                        dimension = semantic_model.vector_dimension
 
-                    for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
-                        # if this KB uses a matryoshka model, we can choose a different
-                        # dimension
-                        if len(semantic_model.matryoshka_dimensions) > 0:
-                            dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
-                        else:
-                            dimension = semantic_model.vector_dimension
-                        vectorset_config = knowledgebox_pb2.VectorSetConfig(
+                    vs_external_indexes.append(
+                        VectorsetExternalIndex(
                             vectorset_id=vectorset_id,
-                            vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
-                                similarity=semantic_model.similarity_function,
-                                # XXX: hardcoded value
-                                vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-                                normalize_vectors=len(semantic_model.matryoshka_dimensions) > 0,
-                                vector_dimension=dimension,
-                            ),
-                            matryoshka_dimensions=semantic_model.matryoshka_dimensions,
+                            dimension=dimension,
+                            similarity=semantic_model.similarity_function,
                         )
-                        await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
+                    )
+
+                    vectorset_config = knowledgebox_pb2.VectorSetConfig(
+                        vectorset_id=vectorset_id,
+                        vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
+                            similarity=semantic_model.similarity_function,
+                            # XXX: hardcoded value
+                            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                            normalize_vectors=len(semantic_model.matryoshka_dimensions) > 0,
+                            vector_dimension=dimension,
+                        ),
+                        matryoshka_dimensions=semantic_model.matryoshka_dimensions,
+                    )
+                    await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
+
+                stored_external_index_provider = await cls._maybe_create_external_indexes(
+                    kbid, request=external_index_provider, indexes=vs_external_indexes
+                )
+                rollback_ops.append(
+                    partial(
+                        cls._maybe_delete_external_indexes,
+                        kbid,
+                        stored_external_index_provider,
+                    )
+                )
+
                 config = KnowledgeBoxConfig(
                     title=title,
                     description=description,
                     slug=slug,
                     migration_version=get_latest_version(),
-                    external_index_provider=stored_external_index_provider,
                 )
+                config.external_index_provider.CopyFrom(stored_external_index_provider)
                 await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
                 await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
 
@@ -241,7 +225,7 @@ class KnowledgeBox:
                     await op()
                 except Exception:
                     if isinstance(op, partial):
-                        name = op.func.__name__
+                        name: str = op.func.__name__
                     else:
                         getattr(op, "__name__", "unknown?")
                     logger.exception(f"Unexpected error rolling back {name}. Keep rolling back")
@@ -302,11 +286,12 @@ class KnowledgeBox:
             await txn.commit()
 
         if kb_config is not None:
-            await cls._maybe_delete_external_index(kbid, kb_config.external_index_provider)
+            await cls._maybe_delete_external_indexes(kbid, kb_config.external_index_provider)
 
-        audit_util = get_audit()
-        if audit_util is not None:
-            await audit_util.delete_kb(kbid)
+        audit = get_audit()
+        if audit is not None:
+            audit.delete_kb(kbid=kbid)
+
         return kbid
 
     @classmethod
@@ -490,52 +475,27 @@ class KnowledgeBox:
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
 
     @classmethod
-    async def _maybe_create_external_index(
+    async def _maybe_create_external_indexes(
         cls,
         kbid: str,
         request: CreateExternalIndexProviderMetadata,
-        vector_dimension: int,
+        indexes: list[VectorsetExternalIndex],
     ) -> StoredExternalIndexProviderMetadata:
-        metadata = StoredExternalIndexProviderMetadata(type=request.type)
         if request.type != ExternalIndexProviderType.PINECONE:
-            return metadata
-
-        index_name = f"{kbid}--default"
-        logger.info(
-            "Creating pincone index",
-            extra={"kbid": kbid, "index_name": index_name, "vector_dimension": vector_dimension},
-        )
-        api_key = request.pinecone_config.api_key
-        pinecone = get_pinecone().control_plane(api_key=api_key)
-        index_host = await pinecone.create_index(
-            name=index_name,
-            dimension=vector_dimension,
-        )
-        endecryptor = get_endecryptor()
-        encrypted_api_key = endecryptor.encrypt(api_key)
-        metadata.pinecone_config.encrypted_api_key = encrypted_api_key
-        metadata.pinecone_config.index_hosts[index_name] = index_host
-        return metadata
+            return StoredExternalIndexProviderMetadata(type=request.type)
+        # Only pinecone is supported for now
+        return await PineconeIndexManager.create_indexes(kbid, request, indexes)
 
     @classmethod
-    async def _maybe_delete_external_index(
-        cls, kbid: str, external_index_provider: StoredExternalIndexProviderMetadata
-    ):
-        if external_index_provider.type != ExternalIndexProviderType.PINECONE:
+    async def _maybe_delete_external_indexes(
+        cls,
+        kbid: str,
+        stored: StoredExternalIndexProviderMetadata,
+    ) -> None:
+        if stored.type != ExternalIndexProviderType.PINECONE:
             return
-
-        index_name = f"{kbid}--default"
-        logger.info("Deleting pincone index", extra={"kbid": kbid, "index_name": index_name})
-        encrypted_api_key = external_index_provider.pinecone_config.encrypted_api_key
-        endecryptor = get_endecryptor()
-        api_key = endecryptor.decrypt(encrypted_api_key)
-        pinecone = get_pinecone().control_plane(api_key=api_key)
-        try:
-            await pinecone.delete_index(name=index_name)
-        except Exception:
-            logger.exception(
-                "Error deleting pinecone index", extra={"kbid": kbid, "index_name": index_name}
-            )
+        # Only pinecone is supported for now
+        await PineconeIndexManager.delete_indexes(kbid, stored)
 
 
 def release_channel_for_kb(

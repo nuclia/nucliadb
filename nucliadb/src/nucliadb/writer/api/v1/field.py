@@ -64,7 +64,7 @@ from nucliadb_utils.utilities import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, resources_pb2.FieldType.V]
+    FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, resources_pb2.FieldType.ValueType]
 else:
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, int]
 

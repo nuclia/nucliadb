@@ -18,13 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Any, Iterator, Optional, cast
+from dataclasses import dataclass
+from typing import Optional, cast
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.cache import get_resource_cache
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -60,6 +60,14 @@ def _round(x: float) -> float:
     return round(x, ndigits=3)
 
 
+@dataclass
+class SortableParagraph:
+    rid: str
+    fid: str
+    pid: str
+    score: float
+
+
 @merge_observer.wrap({"type": "set_text_value"})
 async def set_text_value(
     kbid: str,
@@ -67,7 +75,6 @@ async def set_text_value(
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
-    extracted_text_cache: Optional[paragraphs.ExtractedTextCache] = None,
 ):
     async with max_operations:
         assert result_paragraph.paragraph
@@ -82,7 +89,6 @@ async def set_text_value(
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO
-            extracted_text_cache=extracted_text_cache,
         )
 
 
@@ -114,36 +120,6 @@ async def set_resource_metadata_value(
             find_resources.pop(resource, None)
 
 
-class Orderer:
-    def __init__(self):
-        self.boosted_items = []
-        self.items = []
-
-    def add(self, key: Any):
-        self.items.append(key)
-
-    def add_boosted(self, key: Any):
-        self.boosted_items.append(key)
-
-    def sorted_by_score(self) -> Iterator[Any]:
-        for key in sorted(self.items, key=lambda value: value[3], reverse=True):
-            yield key
-
-    def sorted_by_insertion(self) -> Iterator[Any]:
-        returned = set()
-        for key in self.boosted_items:
-            if key in returned:
-                continue
-            returned.add(key)
-            yield key
-
-        for key in self.items:
-            if key in returned:
-                continue
-            returned.add(key)
-            yield key
-
-
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
     find_resources: dict[str, FindResource],
@@ -159,8 +135,7 @@ async def fetch_find_metadata(
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
-    orderer = Orderer()
-    etcache = paragraphs.ExtractedTextCache()
+    paragraphs_to_sort: list[SortableParagraph] = []
     for result_paragraph in result_paragraphs:
         if result_paragraph.paragraph is not None:
             find_resource = find_resources.setdefault(
@@ -171,8 +146,7 @@ async def fetch_find_metadata(
             )
 
             if result_paragraph.paragraph.id in find_field.paragraphs:
-                # Its a multiple match, push the score
-                # find_field.paragraphs[result_paragraph.paragraph.id].score = 25
+                # Its a multiple match, boost the score
                 if (
                     find_field.paragraphs[result_paragraph.paragraph.id].score
                     < result_paragraph.paragraph.score
@@ -181,27 +155,26 @@ async def fetch_find_metadata(
                     find_field.paragraphs[result_paragraph.paragraph.id].score = (
                         result_paragraph.paragraph.score * 2
                     )
-                    orderer.add(
-                        (
-                            result_paragraph.rid,
-                            result_paragraph.field,
-                            result_paragraph.paragraph.id,
-                            result_paragraph.paragraph.score,
+                    paragraphs_to_sort.append(
+                        SortableParagraph(
+                            rid=result_paragraph.rid,
+                            fid=result_paragraph.field,
+                            pid=result_paragraph.paragraph.id,
+                            score=result_paragraph.paragraph.score,
                         )
                     )
                 find_field.paragraphs[result_paragraph.paragraph.id].score_type = SCORE_TYPE.BOTH
 
             else:
                 find_field.paragraphs[result_paragraph.paragraph.id] = result_paragraph.paragraph
-                orderer.add(
-                    (
-                        result_paragraph.rid,
-                        result_paragraph.field,
-                        result_paragraph.paragraph.id,
-                        result_paragraph.paragraph.score,
+                paragraphs_to_sort.append(
+                    SortableParagraph(
+                        rid=result_paragraph.rid,
+                        fid=result_paragraph.field,
+                        pid=result_paragraph.paragraph.id,
+                        score=result_paragraph.paragraph.score,
                     )
                 )
-
             operations.append(
                 asyncio.create_task(
                     set_text_value(
@@ -210,16 +183,16 @@ async def fetch_find_metadata(
                         highlight=highlight,
                         ematches=ematches,
                         max_operations=max_operations,
-                        extracted_text_cache=etcache,
                     )
                 )
             )
             resources.add(result_paragraph.rid)
-    etcache.clear()
 
-    for order, (rid, field_id, paragraph_id, _) in enumerate(orderer.sorted_by_score()):
-        find_resources[rid].fields[field_id].paragraphs[paragraph_id].order = order
-        best_matches.append(paragraph_id)
+    for order, paragraph in enumerate(
+        sorted(paragraphs_to_sort, key=lambda par: par.score, reverse=True)
+    ):
+        find_resources[paragraph.rid].fields[paragraph.fid].paragraphs[paragraph.pid].order = order
+        best_matches.append(paragraph.pid)
 
     async with get_driver().transaction(read_only=True) as txn:
         for resource in resources:
@@ -397,7 +370,6 @@ async def find_merge_results(
     total_paragraphs = 0
     for response in search_responses:
         # Iterate over answers from different logic shards
-
         ematches.extend(response.paragraph.ematches)
         real_query = response.paragraph.query
         next_page = next_page and response.paragraph.next_page
@@ -408,38 +380,33 @@ async def find_merge_results(
 
         relations.append(response.relation)
 
-    rcache = get_resource_cache(clear=True)
+    result_paragraphs, merged_next_page = merge_paragraphs_vectors(
+        paragraphs, vectors, count, page, min_score_semantic, kbid
+    )
+    next_page = next_page or merged_next_page
 
-    try:
-        result_paragraphs, merged_next_page = merge_paragraphs_vectors(
-            paragraphs, vectors, count, page, min_score_semantic, kbid
-        )
-        next_page = next_page or merged_next_page
+    api_results = KnowledgeboxFindResults(
+        resources={},
+        query=real_query,
+        total=total_paragraphs,
+        page_number=page,
+        page_size=count,
+        next_page=next_page,
+        min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
+        best_matches=[],
+    )
 
-        api_results = KnowledgeboxFindResults(
-            resources={},
-            query=real_query,
-            total=total_paragraphs,
-            page_number=page,
-            page_size=count,
-            next_page=next_page,
-            min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
-            best_matches=[],
-        )
+    await fetch_find_metadata(
+        api_results.resources,
+        api_results.best_matches,
+        result_paragraphs,
+        kbid,
+        show,
+        field_type_filter,
+        extracted,
+        highlight,
+        ematches,
+    )
+    api_results.relations = await merge_relations_results(relations, requested_relations)
 
-        await fetch_find_metadata(
-            api_results.resources,
-            api_results.best_matches,
-            result_paragraphs,
-            kbid,
-            show,
-            field_type_filter,
-            extracted,
-            highlight,
-            ematches,
-        )
-        api_results.relations = await merge_relations_results(relations, requested_relations)
-
-        return api_results
-    finally:
-        rcache.clear()
+    return api_results

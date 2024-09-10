@@ -17,20 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import Generator
+from typing import Any, Generator
+from unittest.mock import patch
 
 import pytest
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_docker_fixtures import images  # type: ignore  # type: ignore
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore  # type: ignore
 
+from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.azure import AzureStorage
-from nucliadb_utils.store import MAIN
-from nucliadb_utils.utilities import Utility
 
 images.settings["azurite"] = {
     "image": "mcr.microsoft.com/azure-storage/azurite",
-    "version": "3.30.0",
+    "version": "3.31.0",
     "options": {
         "ports": {"10000": None},
         "command": " ".join(
@@ -50,6 +51,8 @@ class Azurite(BaseImage):
     name = "azurite"
     port = 10000
 
+    _errors = 0
+
     def check(self):
         try:
             from azure.storage.blob import BlobServiceClient  # type: ignore
@@ -57,13 +60,15 @@ class Azurite(BaseImage):
             container_port = self.port
             host_port = self.get_port(port=container_port)
             conn_string = get_connection_string(self.host, host_port)
-
             client = BlobServiceClient.from_connection_string(conn_string)
             container_client = client.get_container_client("foo")
             container_client.create_container()
             container_client.delete_container()
             return True
         except Exception as ex:
+            self._errors += 1
+            if self._errors > 10:
+                raise
             print(ex)
             return False
 
@@ -107,16 +112,28 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
 
 
 @pytest.fixture(scope="function")
-async def azure_storage(azurite):
+def azure_storage_settings(azurite: AzuriteFixture) -> dict[str, Any]:
+    settings = {
+        "file_backend": FileBackendConfig.AZURE,
+        "azure_account_url": azurite.account_url,
+        "azure_connection_string": azurite.connection_string,
+    }
+    with ExitStack() as stack:
+        for key, value in settings.items():
+            context = patch.object(storage_settings, key, value)
+            stack.enter_context(context)
+
+        yield settings
+
+
+@pytest.fixture(scope="function")
+async def azure_storage(azurite, azure_storage_settings: dict[str, Any]):
+    assert storage_settings.azure_account_url is not None
+
     storage = AzureStorage(
-        account_url=azurite.account_url,
-        connection_string=azurite.connection_string,
+        account_url=storage_settings.azure_account_url,
+        connection_string=storage_settings.azure_connection_string,
     )
-    MAIN[Utility.STORAGE] = storage
     await storage.initialize()
-    try:
-        yield storage
-    finally:
-        await storage.finalize()
-        if Utility.STORAGE in MAIN:
-            del MAIN[Utility.STORAGE]
+    yield storage
+    await storage.finalize()

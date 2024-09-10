@@ -18,25 +18,36 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Set, Type, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Set, TypeVar, Union
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
-from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
+from nucliadb_models.utils import DateTime
 from nucliadb_protos.audit_pb2 import ClientType
 from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
 from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from nucliadb_protos.writer_pb2 import Shards as PBShards
+
+# Bw/c import to avoid breaking users
+from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
+from nucliadb_models.internal.shards import (  # noqa isort: skip
+    DocumentServiceEnum,
+    ParagraphServiceEnum,
+    VectorServiceEnum,
+    RelationServiceEnum,
+    ShardCreated,
+    ShardObject,
+    ShardReplica,
+    KnowledgeboxShards,
+)
+
 
 _T = TypeVar("_T")
 
@@ -90,16 +101,41 @@ class ResourceProperties(str, Enum):
 
 
 class SearchOptions(str, Enum):
+    FULLTEXT = "fulltext"
+    KEYWORD = "keyword"
+    RELATIONS = "relations"
+    SEMANTIC = "semantic"
+
+    # DEPRECATED: use keyword, fulltext and semantic instead
     PARAGRAPH = "paragraph"
     DOCUMENT = "document"
-    RELATIONS = "relations"
     VECTOR = "vector"
+
+    def normalized(self):
+        if self.value == SearchOptions.PARAGRAPH:
+            return SearchOptions.KEYWORD
+        elif self.value == SearchOptions.DOCUMENT:
+            return SearchOptions.FULLTEXT
+        elif self.value == SearchOptions.VECTOR:
+            return SearchOptions.SEMANTIC
+        return self.value
 
 
 class ChatOptions(str, Enum):
+    KEYWORD = "keyword"
+    RELATIONS = "relations"
+    SEMANTIC = "semantic"
+
+    # DEPRECATED: use keyword, and semantic instead
     VECTORS = "vectors"
     PARAGRAPHS = "paragraphs"
-    RELATIONS = "relations"
+
+    def normalized(self):
+        if self.value == ChatOptions.PARAGRAPHS:
+            return ChatOptions.KEYWORD
+        elif self.value == ChatOptions.VECTORS:
+            return ChatOptions.SEMANTIC
+        return self.value
 
 
 class SuggestOptions(str, Enum):
@@ -258,34 +294,6 @@ class EntitySubgraph(BaseModel):
 #     path: List[DirectionalRelation]
 
 
-class SentenceSearch(BaseModel):
-    data: List[float] = []
-    time: float
-
-
-class Ner(BaseModel):
-    text: str
-    ner: str
-    start: int
-    end: int
-
-
-class TokenSearch(BaseModel):
-    tokens: List[Ner] = []
-    time: float
-
-
-class QueryInfo(BaseModel):
-    language: Optional[str] = None
-    stop_words: List[str] = []
-    semantic_threshold: Optional[float] = None
-    visual_llm: bool
-    max_context: int
-    entities: TokenSearch
-    sentence: SentenceSearch
-    query: str
-
-
 class Relations(BaseModel):
     entities: Dict[str, EntitySubgraph]
     # TODO: implement in the next iteration of knowledge graph search
@@ -380,78 +388,6 @@ class KnowledgeBoxCount(BaseModel):
     sentences: int
 
 
-class DocumentServiceEnum(str, Enum):
-    DOCUMENT_V0 = "DOCUMENT_V0"
-    DOCUMENT_V1 = "DOCUMENT_V1"
-    DOCUMENT_V2 = "DOCUMENT_V2"
-
-
-class ParagraphServiceEnum(str, Enum):
-    PARAGRAPH_V0 = "PARAGRAPH_V0"
-    PARAGRAPH_V1 = "PARAGRAPH_V1"
-    PARAGRAPH_V2 = "PARAGRAPH_V2"
-    PARAGRAPH_V3 = "PARAGRAPH_V3"
-
-
-class VectorServiceEnum(str, Enum):
-    VECTOR_V0 = "VECTOR_V0"
-    VECTOR_V1 = "VECTOR_V1"
-
-
-class RelationServiceEnum(str, Enum):
-    RELATION_V0 = "RELATION_V0"
-    RELATION_V1 = "RELATION_V1"
-    RELATION_V2 = "RELATION_V2"
-
-
-class ShardCreated(BaseModel):
-    id: str
-    document_service: DocumentServiceEnum
-    paragraph_service: ParagraphServiceEnum
-    vector_service: VectorServiceEnum
-    relation_service: RelationServiceEnum
-
-
-class ShardReplica(BaseModel):
-    node: str
-    shard: ShardCreated
-
-
-class ShardObject(BaseModel):
-    shard: str
-    replicas: List[ShardReplica]
-
-    @classmethod
-    def from_message(cls: Type[_T], message: PBShardObject) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-
-
-class KnowledgeboxShards(BaseModel):
-    kbid: str
-    actual: int
-    similarity: VectorSimilarity
-    shards: List[ShardObject]
-    model: Optional[SemanticModelMetadata] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: PBShards) -> _T:
-        as_dict = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
-        if message.HasField("model"):
-            as_dict["model"] = SemanticModelMetadata.from_message(message.model)
-        return cls(**as_dict)
-
-
 class SearchParamDefaults:
     query = ParamDefault(default="", title="Query", description="The query to search for")
     suggest_query = ParamDefault(
@@ -460,12 +396,12 @@ class SearchParamDefaults:
     fields = ParamDefault(
         default=[],
         title="Fields",
-        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details on filtering by field, see: https://docs.nuclia.dev/docs/docs/using/search/#search-in-a-specific-field",  # noqa: E501
+        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details on filtering by field, see: https://docs.nuclia.dev/docs/rag/advanced/search/#search-in-a-specific-field",  # noqa: E501
     )
     filters = ParamDefault(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
     resource_filters = ParamDefault(
         default=[],
@@ -475,7 +411,7 @@ class SearchParamDefaults:
     faceted = ParamDefault(
         default=[],
         title="Faceted",
-        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
         max_items=50,
     )
     autofilter = ParamDefault(
@@ -538,7 +474,7 @@ class SearchParamDefaults:
     sort_field = ParamDefault(
         default=None,
         title="Sort field",
-        description="Field to sort results with",
+        description="Field to sort results with (Score not supported in catalog)",
     )
     sort = ParamDefault(
         default=None,
@@ -548,7 +484,7 @@ class SearchParamDefaults:
     search_features = ParamDefault(
         default=None,
         title="Search features",
-        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes.",  # noqa
+        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes. `document`, `paragraph` and `vector` are deprecated, please use `fulltext`, `keyword` and `semantic` instead",  # noqa
     )
     debug = ParamDefault(
         default=False,
@@ -606,9 +542,9 @@ class SearchParamDefaults:
         description="Use to rephrase the new LLM query by taking into account the chat conversation history",  # noqa
     )
     chat_features = ParamDefault(
-        default=[ChatOptions.VECTORS, ChatOptions.PARAGRAPHS, ChatOptions.RELATIONS],
+        default=[ChatOptions.SEMANTIC, ChatOptions.KEYWORD],
         title="Chat features",
-        description="Features enabled for the chat endpoint. Semantic search is done if `vectors` is included. If `paragraphs` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned.",  # noqa
+        description="Features enabled for the chat endpoint. Semantic search is done if `semantic` (or `vectors`) is included. If `keyword` (or `paragraphs`) is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",  # noqa
     )
     suggest_features = ParamDefault(
         default=[
@@ -658,27 +594,28 @@ class CatalogRequest(BaseModel):
     filters: Union[List[str], List[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
-    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    debug: bool = SearchParamDefaults.debug.to_pydantic_field()
+    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field(deprecated=True)
+    debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
     with_status: Optional[ResourceProcessingStatus] = Field(
         default=None,
         title="With processing status",
         description="Filter results by resource processing status",
+        deprecated="Use filters instead",
     )
-    range_creation_start: Optional[datetime] = (
+    range_creation_start: Optional[DateTime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[datetime] = (
+    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[DateTime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
-    range_modification_end: Optional[datetime] = (
+    range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
 
@@ -692,12 +629,12 @@ class MinScore(BaseModel):
     semantic: Optional[float] = Field(
         default=None,
         title="Minimum semantic score",
-        description="Minimum semantic similarity score used to filter vector index search. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum semantic similarity score used to filter vector index search. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
     )
     bm25: float = Field(
         default=0,
         title="Minimum bm25 score",
-        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum score used to filter bm25 index search. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
         ge=0,
     )
 
@@ -708,7 +645,7 @@ class BaseSearchRequest(BaseModel):
     filters: Union[List[str], List[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
@@ -717,21 +654,21 @@ class BaseSearchRequest(BaseModel):
         title="Minimum score",
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
     )
-    range_creation_start: Optional[datetime] = (
+    range_creation_start: Optional[DateTime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[datetime] = (
+    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[DateTime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
-    range_modification_end: Optional[datetime] = (
+    range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
     features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.DOCUMENT,
-            SearchOptions.VECTOR,
+            SearchOptions.KEYWORD,
+            SearchOptions.FULLTEXT,
+            SearchOptions.SEMANTIC,
         ]
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
@@ -753,6 +690,11 @@ class BaseSearchRequest(BaseModel):
         title="Rephrase the query to improve search",
         description="Consume LLM tokens to rephrase the query so the semantic search is better",
     )
+
+    @field_validator("features", mode="after")
+    @classmethod
+    def normalize_features(cls, features: List[SearchOptions]):
+        return [feature.normalized() for feature in features]
 
 
 class SearchRequest(BaseSearchRequest):
@@ -881,6 +823,9 @@ class RagStrategyName:
     FIELD_EXTENSION = "field_extension"
     FULL_RESOURCE = "full_resource"
     HIERARCHY = "hierarchy"
+    NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
+    METADATA_EXTENSION = "metadata_extension"
+    PREQUERIES = "prequeries"
 
 
 class ImageRagStrategyName:
@@ -906,7 +851,7 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 
 
 class FieldExtensionStrategy(RagStrategy):
-    name: Literal["field_extension"]
+    name: Literal["field_extension"] = "field_extension"
     fields: Set[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
@@ -935,21 +880,125 @@ class FieldExtensionStrategy(RagStrategy):
 
 
 class FullResourceStrategy(RagStrategy):
-    name: Literal["full_resource"]
+    name: Literal["full_resource"] = "full_resource"
     count: Optional[int] = Field(
         default=None,
         title="Count",
         description="Maximum number of full documents to retrieve. If not specified, all matching documents are retrieved.",
+        ge=1,
     )
 
 
 class HierarchyResourceStrategy(RagStrategy):
-    name: Literal["hierarchy"]
-    count: Optional[int] = Field(
-        default=None,
+    name: Literal["hierarchy"] = "hierarchy"
+    count: int = Field(
+        default=0,
         title="Count",
         description="Number of extra characters that are added to each matching paragraph when adding to the context.",
+        ge=0,
     )
+
+
+class NeighbouringParagraphsStrategy(RagStrategy):
+    name: Literal["neighbouring_paragraphs"] = "neighbouring_paragraphs"
+    before: int = Field(
+        default=2,
+        title="Before",
+        description="Number of previous neighbouring paragraphs to add to the context, for each matching paragraph in the retrieval step.",
+        ge=0,
+    )
+    after: int = Field(
+        default=2,
+        title="After",
+        description="Number of following neighbouring paragraphs to add to the context, for each matching paragraph in the retrieval step.",
+        ge=0,
+    )
+
+
+class MetadataExtensionType(str, Enum):
+    ORIGIN = "origin"
+    CLASSIFICATION_LABELS = "classification_labels"
+    NERS = "ners"
+    EXTRA_METADATA = "extra_metadata"
+
+
+class MetadataExtensionStrategy(RagStrategy):
+    """
+    RAG strategy to enrich the context with metadata of the matching paragraphs or its resources.
+    This strategy can be combined with any of the other strategies.
+    """
+
+    name: Literal["metadata_extension"] = "metadata_extension"
+    types: set[MetadataExtensionType] = Field(
+        min_length=1,
+        title="Types",
+        description="""
+List of resource metadata types to add to the context.
+  - 'origin': origin metadata of the resource.
+  - 'classification_labels': classification labels of the resource.
+  - 'ner': Named Entity Recognition entities detected for the resource.
+  - 'extra_metadata': extra metadata of the resource.
+
+Types for which the metadata is not found at the resource are ignored and not added to the context.
+""",
+        examples=[
+            ["origin", "classification_labels"],
+            ["ners"],
+        ],
+    )
+
+
+class PreQuery(BaseModel):
+    request: "FindRequest" = Field(
+        title="Request",
+        description="The request to be executed before the main query.",
+    )
+    weight: float = Field(
+        default=1.0,
+        title="Weight",
+        description=(
+            "Weight of the prequery in the context. The weight is used to scale the results of the prequery before adding them to the context."
+            "The weight should be a positive number, and they are normalized so that the sum of all weights for all prequeries is 1."
+        ),
+        ge=0,
+    )
+    id: Optional[str] = Field(
+        default=None,
+        title="Prequery id",
+        min_length=1,
+        max_length=100,
+        description="Identifier of the prequery. If not specified, it is autogenerated based on the index of the prequery in the list (prequery_0, prequery_1, ...).",
+        examples=[
+            "title_prequery",
+            "summary_prequery",
+            "prequery_1",
+        ],
+    )
+
+
+class PreQueriesStrategy(RagStrategy):
+    """
+    This strategy allows to run a set of queries before the main query and add the results to the context.
+    It allows to give more importance to some queries over others by setting the weight of each query.
+    The weight of the main query can also be set with the `main_query_weight` parameter.
+    """
+
+    name: Literal["prequeries"] = "prequeries"
+    queries: list[PreQuery] = Field(
+        title="Queries",
+        description="List of queries to run before the main query. The results are added to the context with the specified weights for each query. There is a limit of 10 prequeries per request.",
+        min_length=1,
+        max_length=10,
+    )
+    main_query_weight: float = Field(
+        default=1.0,
+        title="Main query weight",
+        description="Weight of the main query in the context. Use this to control the importance of the main query in the context.",
+        ge=0,
+    )
+
+
+PreQueryResult = tuple[PreQuery, "KnowledgeboxFindResults"]
 
 
 class TableImageStrategy(ImageRagStrategy):
@@ -970,7 +1019,14 @@ class ParagraphImageStrategy(ImageRagStrategy):
 
 
 RagStrategies = Annotated[
-    Union[FieldExtensionStrategy, FullResourceStrategy, HierarchyResourceStrategy],
+    Union[
+        FieldExtensionStrategy,
+        FullResourceStrategy,
+        HierarchyResourceStrategy,
+        NeighbouringParagraphsStrategy,
+        MetadataExtensionStrategy,
+        PreQueriesStrategy,
+    ],
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
@@ -1010,11 +1066,33 @@ class CustomPrompt(BaseModel):
 
 class ChatRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
+    top_k: int = Field(
+        default=20,
+        title="Top k",
+        ge=1,
+        le=200,
+        description="The top most relevant results to fetch at the retrieval step. The maximum number of results allowed is 200.",
+    )
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[List[str], List[Filter]] = Field(
         default=[],
         title="Filters",
-        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/docs/using/search/#filters",  # noqa: E501
+        description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
+    )
+    keyword_filters: Union[list[str], list[Filter]] = Field(
+        default=[],
+        title="Keyword filters",
+        description=(
+            "List of keyword filter expressions to apply to the retrieval step. "
+            "The text block search will only be performed on the documents that contain the specified keywords. "
+            "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
+        ),
+        examples=[
+            ["NLP", "BERT"],
+            [Filter(all=["NLP", "BERT"])],
+            ["Friedrich Nietzsche", "Immanuel Kant"],
+        ],
     )
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
@@ -1023,14 +1101,14 @@ class ChatRequest(BaseModel):
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
     )
     features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
-    range_creation_start: Optional[datetime] = (
+    range_creation_start: Optional[DateTime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
-    range_creation_end: Optional[datetime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[datetime] = (
+    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[DateTime] = (
         SearchParamDefaults.range_modification_start.to_pydantic_field()
     )
-    range_modification_end: Optional[datetime] = (
+    range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
     show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
@@ -1060,7 +1138,47 @@ class ChatRequest(BaseModel):
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
-        description="Options for tweaking how the context for the LLM model is crafted. `full_resource` will add the full text of the matching resources to the context. `field_extension` will add the text of the matching resource's specified fields to the context. If empty, the default strategy is used.",  # noqa
+        description=(
+            """Options for tweaking how the context for the LLM model is crafted:
+- `full_resource` will add the full text of the matching resources to the context.
+- `field_extension` will add the text of the matching resource's specified fields to the context.
+- `hierarchy` will add the title and summary text of the parent resource to the context for each matching paragraph.
+- `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
+- `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context. This strategy can be combined with any other strategy.
+- `prequeries` allows to run additional queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights.
+
+If empty, the default strategy is used. `full_resource`, `hierarchy`, `prequeries` and `neighbouring_paragraphs` are exclusive strategies: if selected, they must be the only strategy.
+"""
+        ),
+        examples=[
+            [{"name": "full_resource", "count": 2}],
+            [
+                {"name": "field_extension", "fields": ["t/amend", "a/title"]},
+            ],
+            [{"name": "hierarchy", "count": 2}],
+            [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
+            [{"name": "metadata_extension", "types": ["origin", "classification_labels"]}],
+            [
+                {
+                    "name": "prequeries",
+                    "queries": [
+                        {
+                            "request": {
+                                "query": "What is the capital of France?",
+                                "features": ["keyword"],
+                            },
+                            "weight": 0.5,
+                        },
+                        {
+                            "request": {
+                                "query": "What is the capital of Germany?",
+                            },
+                            "weight": 0.5,
+                        },
+                    ],
+                }
+            ],
+        ],
     )
     rag_images_strategies: list[RagImagesStrategies] = Field(
         default=[],
@@ -1096,27 +1214,40 @@ class ChatRequest(BaseModel):
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
-        unique_strategy_names: set[str] = set()
+        strategy_names: set[str] = set()
         for strategy in rag_strategies or []:
             if not isinstance(strategy, dict):
                 raise ValueError("RAG strategies must be defined using an object")
             strategy_name = strategy.get("name")
             if strategy_name is None:
                 raise ValueError(f"Invalid strategy '{strategy}'")
-            unique_strategy_names.add(strategy_name)
-        if len(unique_strategy_names) != len(rag_strategies):
+            strategy_names.add(strategy_name)
+        if len(strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
 
-        # If full_resource or hierarchy strategies is chosen, they must be the only strategy
-        for unique_strategy_name in (
+        # metadata extension can be combined with other strategies
+        try:
+            strategy_names.remove(RagStrategyName.METADATA_EXTENSION)
+        except KeyError:
+            pass
+
+        # If any of the unique strategies are chosen, they must be the only strategy
+        for strategy_name in (
             RagStrategyName.FULL_RESOURCE,
             RagStrategyName.HIERARCHY,
+            RagStrategyName.NEIGHBOURING_PARAGRAPHS,
+            RagStrategyName.PREQUERIES,
         ):
-            if unique_strategy_name in unique_strategy_names and len(rag_strategies) > 1:
+            if strategy_name in strategy_names and len(strategy_names) > 1:
                 raise ValueError(
-                    f"If '{unique_strategy_name}' strategy is chosen, it must be the only strategy."
+                    f"If '{strategy_name}' strategy is chosen, it must be the only strategy."
                 )
         return rag_strategies
+
+    @field_validator("features", mode="after")
+    @classmethod
+    def normalize_features(cls, features: List[ChatOptions]):
+        return [feature.normalized() for feature in features]
 
 
 class SummarizeResourceModel(BaseModel):
@@ -1192,17 +1323,34 @@ class SummarizedResponse(BaseModel):
 class FindRequest(BaseSearchRequest):
     features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.VECTOR,
+            SearchOptions.KEYWORD,
+            SearchOptions.SEMANTIC,
         ]
     )
 
-    @field_validator("features")
+    @field_validator("features", mode="after")
     @classmethod
     def fulltext_not_supported(cls, v):
-        if SearchOptions.DOCUMENT in v or SearchOptions.DOCUMENT == v:
+        # features are already normalized in the BaseSearchRequest model
+        if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
             raise ValueError("fulltext search not supported")
         return v
+
+    keyword_filters: Union[list[str], list[Filter]] = Field(
+        default=[],
+        title="Keyword filters",
+        description=(
+            "List of keyword filter expressions to apply to the retrieval step. "
+            "The text block search will only be performed on the documents that contain the specified keywords. "
+            "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
+        ),
+        examples=[
+            ["NLP", "BERT"],
+            [Filter(all=["NLP", "BERT"])],
+            ["Friedrich Nietzsche", "Immanuel Kant"],
+        ],
+    )
 
 
 class SCORE_TYPE(str, Enum):
@@ -1426,6 +1574,11 @@ class SyncAskResponse(BaseModel):
         title="Retrieval results",
         description="The retrieval results of the query",
     )
+    prequeries: Optional[Dict[str, KnowledgeboxFindResults]] = Field(
+        default=None,
+        title="Prequeries",
+        description="The retrieval results of the prequeries",
+    )
     learning_id: str = Field(
         default="",
         title="Learning id",
@@ -1461,6 +1614,11 @@ class SyncAskResponse(BaseModel):
 class RetrievalAskResponseItem(BaseModel):
     type: Literal["retrieval"] = "retrieval"
     results: KnowledgeboxFindResults
+
+
+class PrequeriesAskResponseItem(BaseModel):
+    type: Literal["prequeries"] = "prequeries"
+    results: dict[str, KnowledgeboxFindResults] = {}
 
 
 class AnswerAskResponseItem(BaseModel):
@@ -1516,6 +1674,7 @@ AskResponseItemType = Union[
     RetrievalAskResponseItem,
     RelationsAskResponseItem,
     DebugAskResponseItem,
+    PrequeriesAskResponseItem,
 ]
 
 
@@ -1523,7 +1682,7 @@ class AskResponseItem(BaseModel):
     item: AskResponseItemType = Field(..., discriminator="type")
 
 
-def parse_custom_prompt(item: ChatRequest) -> CustomPrompt:
+def parse_custom_prompt(item: AskRequest) -> CustomPrompt:
     prompt = CustomPrompt()
     if item.prompt is not None:
         if isinstance(item.prompt, str):

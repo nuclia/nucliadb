@@ -25,12 +25,13 @@ from typing import Any, Awaitable, Optional, Union
 from async_lru import alru_cache
 
 from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.vectorsets import BrokenInvariant
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.search.filters import (
     convert_to_node_filters,
-    flat_filter_labels,
+    flatten_filter_literals,
     has_classification_label_filters,
     split_labels_by_type,
     translate_label,
@@ -41,13 +42,13 @@ from nucliadb.search.search.metrics import (
     query_parse_dependency_observer,
 )
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
     MaxTokens,
     MinScore,
-    QueryInfo,
     SearchOptions,
     SortField,
     SortFieldMap,
@@ -95,7 +96,8 @@ class QueryParser:
         kbid: str,
         features: list[SearchOptions],
         query: str,
-        filters: Union[list[str], list[Filter]],
+        label_filters: Union[list[str], list[Filter]],
+        keyword_filters: Union[list[str], list[Filter]],
         page_number: int,
         page_size: int,
         min_score: MinScore,
@@ -121,8 +123,9 @@ class QueryParser:
         self.kbid = kbid
         self.features = features
         self.query = query
-        self.filters: dict[str, Any] = convert_to_node_filters(filters)
-        self.flat_filter_labels: list[str] = []
+        self.label_filters: dict[str, Any] = convert_to_node_filters(label_filters)
+        self.flat_label_filters: list[str] = []
+        self.keyword_filters: dict[str, Any] = convert_to_node_filters(keyword_filters)
         self.faceted = faceted or []
         self.page_number = page_number
         self.page_size = page_size
@@ -144,14 +147,16 @@ class QueryParser:
         self.generative_model = generative_model
         self.rephrase = rephrase
         self.query_endpoint_used = False
-        if len(self.filters) > 0:
-            self.filters = translate_label_filters(self.filters)
-            self.flat_filter_labels = flat_filter_labels(self.filters)
+        if len(self.label_filters) > 0:
+            self.label_filters = translate_label_filters(self.label_filters)
+            self.flat_label_filters = flatten_filter_literals(self.label_filters)
+        if len(self.keyword_filters) > 0:
+            validate_keyword_filters(self.keyword_filters)
         self.max_tokens = max_tokens
 
     @property
     def has_vector_search(self) -> bool:
-        return SearchOptions.VECTOR in self.features
+        return SearchOptions.SEMANTIC in self.features
 
     @property
     def has_relations_search(self) -> bool:
@@ -159,10 +164,14 @@ class QueryParser:
 
     def _get_query_information(self) -> Awaitable[QueryInfo]:
         if self._query_information_task is None:  # pragma: no cover
-            self._query_information_task = asyncio.create_task(
-                query_information(self.kbid, self.query, self.generative_model, self.rephrase)
-            )
+            self._query_information_task = asyncio.create_task(self._query_information())
         return self._query_information_task
+
+    async def _query_information(self) -> QueryInfo:
+        vectorset = await self.select_vectorset()
+        return await query_information(
+            self.kbid, self.query, vectorset, self.generative_model, self.rephrase
+        )
 
     def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
         if self._get_matryoshka_dimension_task is None:
@@ -207,7 +216,7 @@ class QueryParser:
         This will schedule concurrent tasks for different data that needs to be pulled
         for the sake of the query being performed
         """
-        if len(self.filters) > 0 and has_classification_label_filters(self.flat_filter_labels):
+        if len(self.label_filters) > 0 and has_classification_label_filters(self.flat_label_filters):
             asyncio.ensure_future(self._get_classification_labels())
 
         if self.has_vector_search and self.user_vector is None:
@@ -250,19 +259,22 @@ class QueryParser:
         return request, incomplete, autofilters
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
-        if len(self.filters) > 0:
-            field_labels = self.flat_filter_labels
+        if len(self.label_filters) > 0:
+            field_labels = self.flat_label_filters
             paragraph_labels: list[str] = []
-            if has_classification_label_filters(self.flat_filter_labels):
+            if has_classification_label_filters(self.flat_label_filters):
                 classification_labels = await self._get_classification_labels()
                 field_labels, paragraph_labels = split_labels_by_type(
-                    self.flat_filter_labels, classification_labels
+                    self.flat_label_filters, classification_labels
                 )
-                check_supported_filters(self.filters, paragraph_labels)
+                check_supported_filters(self.label_filters, paragraph_labels)
 
             request.filter.field_labels.extend(field_labels)
             request.filter.paragraph_labels.extend(paragraph_labels)
-            request.filter.expression = json.dumps(self.filters)
+            request.filter.labels_expression = json.dumps(self.label_filters)
+
+        if len(self.keyword_filters) > 0:
+            request.filter.keywords_expression = json.dumps(self.keyword_filters)
 
         request.faceted.labels.extend([translate_label(facet) for facet in self.faceted])
         request.fields.extend(self.fields)
@@ -358,14 +370,47 @@ class QueryParser:
         request.min_score_bm25 = self.min_score.bm25
 
     def parse_document_search(self, request: nodereader_pb2.SearchRequest) -> None:
-        if SearchOptions.DOCUMENT in self.features:
+        if SearchOptions.FULLTEXT in self.features:
             request.document = True
             node_features.inc({"type": "documents"})
 
     def parse_paragraph_search(self, request: nodereader_pb2.SearchRequest) -> None:
-        if SearchOptions.PARAGRAPH in self.features:
+        if SearchOptions.KEYWORD in self.features:
             request.paragraph = True
             node_features.inc({"type": "paragraphs"})
+
+    @alru_cache(maxsize=1)
+    async def select_vectorset(self) -> Optional[str]:
+        """Validate the vectorset parameter and override it with a default if
+        needed.
+        """
+        if self.vectorset:
+            # validate vectorset
+            async with datamanagers.with_ro_transaction() as txn:
+                if not await datamanagers.vectorsets.exists(
+                    txn, kbid=self.kbid, vectorset_id=self.vectorset
+                ):
+                    raise InvalidQueryError(
+                        "vectorset",
+                        f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
+                    )
+            return self.vectorset
+        else:
+            # no vectorset specified, get the default one
+            async with datamanagers.with_ro_transaction() as txn:
+                try:
+                    default_vectorset = await datamanagers.vectorsets.get_default_vectorset(
+                        txn, kbid=self.kbid
+                    )
+                except BrokenInvariant:
+                    # XXX: fix to avoid tests complaining too much, it should be
+                    # an error at some point though
+                    return None
+                    # logger.exception("KB has no default vectorset", extra={"kbid": self.kbid})
+                    # raise InvalidQueryError("vectorset", f"KB has no default vectorset") from exc
+                else:
+                    return default_vectorset.vectorset_id
+        return None
 
     async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
         if not self.has_vector_search:
@@ -374,6 +419,11 @@ class QueryParser:
         node_features.inc({"type": "vectors"})
 
         incomplete = False
+
+        vectorset = await self.select_vectorset()
+        if vectorset is not None:
+            request.vectorset = vectorset
+
         query_vector = None
         if self.user_vector is None:
             try:
@@ -383,22 +433,17 @@ class QueryParser:
                 incomplete = True
             else:
                 if query_info and query_info.sentence:
-                    query_vector = query_info.sentence.data
+                    if vectorset:
+                        if vectorset in query_info.sentence.vectors:
+                            query_vector = query_info.sentence.vectors[vectorset]
+                        else:
+                            incomplete = True
+                    else:
+                        query_vector = query_info.sentence.data
                 else:
                     incomplete = True
         else:
             query_vector = self.user_vector
-
-        if self.vectorset:
-            async with get_driver().transaction(read_only=True) as txn:
-                if not await datamanagers.vectorsets.exists(
-                    txn, kbid=self.kbid, vectorset_id=self.vectorset
-                ):
-                    raise InvalidQueryError(
-                        "vectorset",
-                        f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
-                    )
-            request.vectorset = self.vectorset
 
         if query_vector is not None:
             matryoshka_dimension = await self._get_matryoshka_dimension()
@@ -529,7 +574,7 @@ async def paragraph_query_to_pb(
     if range_modification_end is not None:
         request.timestamps.to_modified.FromDatetime(range_modification_end)
 
-    if SearchOptions.PARAGRAPH in features:
+    if SearchOptions.KEYWORD in features:
         request.uuid = rid
         request.body = query
         if len(filters) > 0:
@@ -554,11 +599,12 @@ async def paragraph_query_to_pb(
 async def query_information(
     kbid: str,
     query: str,
+    semantic_model: Optional[str],
     generative_model: Optional[str] = None,
     rephrase: bool = False,
 ) -> QueryInfo:
     predict = get_predict()
-    return await predict.query(kbid, query, generative_model, rephrase)
+    return await predict.query(kbid, query, semantic_model, generative_model, rephrase)
 
 
 @query_parse_dependency_observer.wrap({"type": "detect_entities"})
@@ -637,10 +683,10 @@ def parse_entities_to_filters(
         # So far, autofilters feature will only yield 'and' expressions with the detected entities.
         # More complex autofilters can be added here if we leverage the query endpoint.
         expanded_expression = {"and": [{"literal": entity} for entity in added_filters]}
-        if request.filter.expression:
-            expression = json.loads(request.filter.expression)
+        if request.filter.labels_expression:
+            expression = json.loads(request.filter.labels_expression)
             expanded_expression["and"].append(expression)
-        request.filter.expression = json.dumps(expanded_expression)
+        request.filter.labels_expression = json.dumps(expanded_expression)
     return added_filters
 
 
@@ -757,3 +803,12 @@ async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optio
                 matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
 
         return matryoshka_dimension
+
+
+def validate_keyword_filters(keyword_filters: dict[str, Any]):
+    for literal in flatten_filter_literals(keyword_filters):
+        if not literal.replace(" ", "").isalnum():
+            raise InvalidQueryError(
+                "keyword_filters",
+                "Only alphanumeric strings with spaces are allowed in keyword filters",
+            )

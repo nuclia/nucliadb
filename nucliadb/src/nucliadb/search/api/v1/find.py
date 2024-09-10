@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from datetime import datetime
 from typing import Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
@@ -31,9 +30,10 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
-from nucliadb.search.search.utils import min_score_from_query_params
+from nucliadb.search.search.utils import maybe_log_request_payload, min_score_from_query_params
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -45,6 +45,7 @@ from nucliadb_models.search import (
     SearchParamDefaults,
 )
 from nucliadb_models.security import RequestSecurity
+from nucliadb_models.utils import DateTime
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 
@@ -54,7 +55,7 @@ FIND_EXAMPLES = {
         description="Perform a hybrid search that will return text and semantic results matching the query",
         value={
             "query": "How can I be an effective product manager?",
-            "features": [SearchOptions.PARAGRAPH, SearchOptions.VECTOR],
+            "features": [SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
         },
     )
 }
@@ -82,12 +83,12 @@ async def find_knowledgebox(
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
     min_score: Optional[float] = Query(
         default=None,
-        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
         deprecated=True,
     ),
     min_score_semantic: Optional[float] = Query(
         default=None,
-        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/docs/using/search/#minimum-score",  # noqa: E501
+        description="Minimum semantic similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
     ),
     min_score_bm25: float = Query(
         default=0,
@@ -95,19 +96,19 @@ async def find_knowledgebox(
         ge=0,
     ),
     vectorset: Optional[str] = fastapi_query(SearchParamDefaults.vectorset),
-    range_creation_start: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[datetime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[datetime] = fastapi_query(
+    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
+    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
+    range_modification_start: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
-    range_modification_end: Optional[datetime] = fastapi_query(
+    range_modification_end: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
     features: list[SearchOptions] = fastapi_query(
         SearchParamDefaults.search_features,
         default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.VECTOR,
+            SearchOptions.KEYWORD,
+            SearchOptions.SEMANTIC,
         ],
     ),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
@@ -191,9 +192,13 @@ async def _find_endpoint(
     x_forwarded_for: str,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
-        results, incomplete, _ = await find(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
-        response.status_code = 206 if incomplete else 200
-        return results
+        maybe_log_request_payload(kbid, "/find", item)
+        with cache.request_caches():
+            results, incomplete, _ = await find(
+                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+            )
+            response.status_code = 206 if incomplete else 200
+            return results
     except KnowledgeBoxNotFound:
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
     except LimitsExceededError as exc:

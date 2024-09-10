@@ -29,8 +29,12 @@ fn update_shard(shard_id: String, cache: Arc<ShardReaderCache>) {
     let Some(shard) = cache.peek(&shard_id) else {
         return;
     };
-    if let Err(err) = shard.update() {
-        error!("Shard {shard_id} could not be updated: {err:?}");
+    if shard.update().is_err() {
+        // Let's do a single retry for temporary errors
+        std::thread::sleep(Duration::from_millis(500));
+        if let Err(err) = shard.update() {
+            error!("Shard {shard_id} could not be updated: {err:?}");
+        }
     }
 }
 

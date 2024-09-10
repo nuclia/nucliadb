@@ -27,6 +27,7 @@ from nucliadb.ingest.settings import DriverSettings
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.settings import LogFormatType, LogLevel, LogOutputType
 from nucliadb_utils.settings import StorageSettings
+from nucliadb_utils.storages.settings import Settings as ExtendedStorageSettings
 
 
 class StandaloneDiscoveryMode(Enum):
@@ -43,7 +44,7 @@ class AuthPolicy(Enum):
     UPSTREAM_BASICAUTH = "upstream_basicauth"
 
 
-class Settings(DriverSettings, StorageSettings):
+class Settings(DriverSettings, StorageSettings, ExtendedStorageSettings):
     # be consistent here with DATA_PATH env var
     data_path: str = pydantic.Field("./data/node", description="Path to node index files")
 
@@ -52,7 +53,7 @@ class Settings(DriverSettings, StorageSettings):
     # use with standalone app vs cluster app.
     nua_api_key: Optional[str] = pydantic.Field(
         default=None,
-        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/docs/using/understanding/intro#get-a-nua-key",  # noqa
+        description="Nuclia Understanding API Key. Read how to generate a NUA Key here: https://docs.nuclia.dev/docs/rag/advanced/understanding/intro#get-a-nua-key",  # noqa
     )
     zone: Optional[str] = pydantic.Field(default=None, description="Nuclia Understanding API Zone ID")
     http_host: str = pydantic.Field(default="0.0.0.0", description="HTTP Port")

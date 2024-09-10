@@ -28,15 +28,18 @@ from typing import Any, AsyncGenerator, Optional
 import backoff
 import httpx
 
-from nucliadb_telemetry.metrics import Observer
+from nucliadb_telemetry.metrics import INF, Histogram, Observer
 from nucliadb_utils.aiopynecone.exceptions import (
     PineconeAPIError,
     PineconeRateLimitError,
+    RetriablePineconeAPIError,
     raise_for_status,
 )
 from nucliadb_utils.aiopynecone.models import (
     CreateIndexRequest,
     CreateIndexResponse,
+    IndexDescription,
+    IndexStats,
     ListResponse,
     QueryResponse,
     UpsertRequest,
@@ -44,6 +47,25 @@ from nucliadb_utils.aiopynecone.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+upsert_batch_size_histogram = Histogram(
+    "pinecone_upsert_batch_size",
+    buckets=[10.0, 100.0, 200.0, 500.0, 1000.0, 5000.0, INF],
+)
+upsert_batch_count_histogram = Histogram(
+    "pinecone_upsert_batch_count",
+    buckets=[0.0, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0, INF],
+)
+
+delete_batch_size_histogram = Histogram(
+    "pinecone_delete_batch_size",
+    buckets=[1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 150.0, INF],
+)
+
+delete_batch_count_histogram = Histogram(
+    "pinecone_delete_batch_count",
+    buckets=[0.0, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 50.0, INF],
+)
 
 
 pinecone_observer = Observer(
@@ -56,10 +78,14 @@ pinecone_observer = Observer(
 
 DEFAULT_TIMEOUT = 30
 CONTROL_PLANE_BASE_URL = "https://api.pinecone.io/"
-INDEX_HOST_BASE_URL = "https://{index_host}/"
 BASE_API_HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
+    # This is needed so that it is easier for Pinecone to track which api requests
+    # are coming from the Nuclia integration:
+    # https://docs.pinecone.io/integrations/build-integration/attribute-usage-to-your-integration
+    "User-Agent": "source_tag=nuclia",
+    "X-Pinecone-API-Version": "2024-10",
 }
 MEGA_BYTE = 1024 * 1024
 MAX_UPSERT_PAYLOAD_SIZE = 2 * MEGA_BYTE
@@ -69,15 +95,11 @@ MAX_LIST_PAGE_SIZE = 100
 
 RETRIABLE_EXCEPTIONS = (
     PineconeRateLimitError,
+    RetriablePineconeAPIError,
     httpx.ConnectError,
     httpx.NetworkError,
-)
-
-backoff_handler = backoff.on_exception(
-    backoff.expo,
-    RETRIABLE_EXCEPTIONS,
-    jitter=backoff.random_jitter,
-    max_tries=4,
+    httpx.WriteTimeout,
+    httpx.ReadTimeout,
 )
 
 
@@ -92,21 +114,29 @@ class ControlPlane:
         self.http_session = http_session
 
     @pinecone_observer.wrap({"type": "create_index"})
-    async def create_index(self, name: str, dimension: int, metric: str = "dotproduct") -> str:
+    async def create_index(
+        self,
+        name: str,
+        dimension: int,
+        metric: str = "dotproduct",
+        serverless_cloud: Optional[dict[str, str]] = None,
+    ) -> str:
         """
         Create a new index in Pinecone. It can only create serverless indexes on the AWS us-east-1 region.
         Params:
         - `name`: The name of the index.
         - `dimension`: The dimension of the vectors in the index.
         - `metric`: The similarity metric to use. Default is "dotproduct".
+        - `serverless_cloud`: The serverless provider to use. Default is AWS us-east-1.
         Returns:
         - The index host to be used for data plane operations.
         """
+        serverless_cloud = serverless_cloud or {"cloud": "aws", "region": "us-east-1"}
         payload = CreateIndexRequest(
             name=name,
             dimension=dimension,
             metric=metric,
-            spec={"serverless": {"cloud": "aws", "region": "us-east-1"}},
+            spec={"serverless": serverless_cloud},
         )
         headers = {"Api-Key": self.api_key}
         http_response = await self.http_session.post(
@@ -129,6 +159,18 @@ class ControlPlane:
             logger.warning("Pinecone index not found.", extra={"index_name": name})
             return
         raise_for_status("delete_index", response)
+
+    @pinecone_observer.wrap({"type": "describe_index"})
+    async def describe_index(self, name: str) -> IndexDescription:
+        """
+        Describe an index in Pinecone.
+        Params:
+        - `name`: The name of the index to describe.
+        """
+        headers = {"Api-Key": self.api_key}
+        response = await self.http_session.get(f"/indexes/{name}", headers=headers)
+        raise_for_status("describe_index", response)
+        return IndexDescription.model_validate(response.json())
 
 
 class DataPlane:
@@ -154,7 +196,31 @@ class DataPlane:
     def _get_request_timeout(self, timeout: Optional[float] = None) -> Optional[float]:
         return timeout or self.client_timeout
 
-    @backoff_handler
+    @pinecone_observer.wrap({"type": "stats"})
+    async def stats(self, filter: Optional[dict[str, Any]] = None) -> IndexStats:
+        """
+        Get the index stats.
+        Params:
+        - `filter`: to filter the stats by their metadata. See:
+        https://docs.pinecone.io/reference/api/2024-07/data-plane/describeindexstats
+        """
+        post_kwargs: dict[str, Any] = {
+            "headers": {"Api-Key": self.api_key},
+        }
+        if filter is not None:
+            post_kwargs["json"] = {
+                "filter": filter,
+            }
+        response = await self.http_session.post("/describe_index_stats", **post_kwargs)
+        raise_for_status("stats", response)
+        return IndexStats.model_validate(response.json())
+
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "upsert"})
     async def upsert(self, vectors: list[Vector], timeout: Optional[float] = None) -> None:
         """
@@ -166,6 +232,7 @@ class DataPlane:
         if len(vectors) == 0:
             # Nothing to upsert.
             return
+        upsert_batch_size_histogram.observe(len(vectors))
         headers = {"Api-Key": self.api_key}
         payload = UpsertRequest(vectors=vectors)
         post_kwargs: dict[str, Any] = {
@@ -229,9 +296,17 @@ class DataPlane:
         for batch in batchify(vectors, batch_size):
             tasks.append(asyncio.create_task(_upsert_batch(batch)))
 
-        await asyncio.gather(*tasks)
+        upsert_batch_count_histogram.observe(len(tasks))
 
-    @backoff_handler
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "delete"})
     async def delete(self, ids: list[str], timeout: Optional[float] = None) -> None:
         """
@@ -243,8 +318,16 @@ class DataPlane:
         """
         if len(ids) > MAX_DELETE_BATCH_SIZE:
             raise ValueError(f"Maximum number of ids in a single request is {MAX_DELETE_BATCH_SIZE}.")
+        if len(ids) == 0:  # pragma: no cover
+            return
 
+        delete_batch_size_histogram.observe(len(ids))
         headers = {"Api-Key": self.api_key}
+
+        # This is a temporary log info to hunt down a bug.
+        rids = {vid.split("/")[0] for vid in ids}
+        logger.info(f"Deleting vectors from resources: {list(rids)}")
+
         payload = {"ids": ids}
         post_kwargs: dict[str, Any] = {
             "headers": headers,
@@ -256,7 +339,12 @@ class DataPlane:
         response = await self.http_session.post("/vectors/delete", **post_kwargs)
         raise_for_status("delete", response)
 
-    @backoff_handler
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "list_page"})
     async def list_page(
         self,
@@ -324,7 +412,12 @@ class DataPlane:
                 break
             pagination_token = response.pagination.next
 
-    @backoff_handler
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "delete_all"})
     async def delete_all(self, timeout: Optional[float] = None):
         """
@@ -381,9 +474,17 @@ class DataPlane:
         async for batch in async_batchify(async_iterable, batch_size):
             tasks.append(asyncio.create_task(_delete_batch(batch)))
 
-        await asyncio.gather(*tasks)
+        delete_batch_count_histogram.observe(len(tasks))
 
-    @backoff_handler
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=4,
+    )
     @pinecone_observer.wrap({"type": "query"})
     async def query(
         self,
@@ -464,8 +565,12 @@ class PineconeSession:
         if session is not None:
             return session
 
+        base_url = index_host
+        if not index_host.startswith("https://"):
+            base_url = f"https://{index_host}/"
+
         session = httpx.AsyncClient(
-            base_url=INDEX_HOST_BASE_URL.format(index_host=index_host),
+            base_url=base_url,
             headers=BASE_API_HEADERS,
             timeout=DEFAULT_TIMEOUT,
         )
@@ -501,3 +606,31 @@ async def async_batchify(async_iterable: AsyncIterable, batch_size: int):
             batch = []
     if batch:
         yield batch
+
+
+class FilterOperator:
+    """
+    Filter operators for metadata queries.
+    https://docs.pinecone.io/guides/data/filter-with-metadata#metadata-query-language
+    """
+
+    EQUALS = "$eq"
+    NOT_EQUALS = "$ne"
+    GREATER_THAN = "$gt"
+    GREATER_THAN_OR_EQUAL = "$gte"
+    LESS_THAN = "$lt"
+    LESS_THAN_OR_EQUAL = "$lte"
+    IN = "$in"
+    NOT_IN = "$nin"
+    EXISTS = "$exists"
+
+
+class LogicalOperator:
+    """
+    Logical operators for metadata queries.
+    https://docs.pinecone.io/guides/data/filter-with-metadata#metadata-query-language
+    """
+
+    AND = "$and"
+    OR = "$or"
+    NOT = "$not"

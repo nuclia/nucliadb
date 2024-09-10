@@ -34,6 +34,10 @@ from nucliadb_utils.aiopynecone.client import (
     batchify,
     raise_for_status,
 )
+from nucliadb_utils.aiopynecone.exceptions import (
+    PineconeNeedsPlanUpgradeError,
+    RetriablePineconeAPIError,
+)
 from nucliadb_utils.aiopynecone.models import CreateIndexRequest, QueryResponse, Vector
 
 
@@ -71,6 +75,7 @@ class TestControlPlane:
     @pytest.fixture()
     def http_session(self, http_response):
         session_mock = unittest.mock.Mock()
+        session_mock.get = unittest.mock.AsyncMock(return_value=http_response)
         session_mock.post = unittest.mock.AsyncMock(return_value=http_response)
         session_mock.delete = unittest.mock.AsyncMock(return_value=http_response)
         return session_mock
@@ -92,6 +97,26 @@ class TestControlPlane:
         await client.delete_index(name="name")
 
         http_session.delete.assert_called_once()
+
+    async def test_describe_index(self, client: ControlPlane, http_session, http_response):
+        http_response.json.return_value = {
+            "dimension": 10,
+            "metric": "dot",
+            "host": "host",
+            "name": "index-name",
+            "spec": {},
+            "status": {
+                "ready": True,
+                "state": "Initialized",
+            },
+        }
+        index = await client.describe_index(name="index-name")
+        assert index.dimension == 10
+        assert index.host == "host"
+        assert index.metric == "dot"
+        assert index.name == "index-name"
+        assert index.spec == {}
+        assert index.status.ready is True
 
 
 class TestDataPlane:
@@ -131,6 +156,25 @@ class TestDataPlane:
 
         with pytest.raises(ValueError):
             await client.delete(["id"] * (MAX_DELETE_BATCH_SIZE + 1))
+
+    async def test_stats(self, client: DataPlane, http_session, http_response):
+        http_response.json.return_value = {
+            "dimension": 10,
+            "namespaces": {
+                "": {
+                    "vectorCount": 10,
+                },
+                "namespace": {
+                    "vectorCount": 10,
+                },
+            },
+            "totalVectorCount": 20,
+        }
+        stats = await client.stats()
+        assert stats.dimension == 10
+        assert stats.namespaces[""].vectorCount == 10
+        assert stats.namespaces["namespace"].vectorCount == 10
+        assert stats.totalVectorCount == 20
 
     async def test_query(self, client: DataPlane, http_session, http_response):
         http_response.json.return_value = {
@@ -234,6 +278,40 @@ class TestDataPlane:
         assert batch_size == 511
         client._upsert_batch_size = None
 
+    async def test_client_retries_on_rate_limit_errors(
+        self, client: DataPlane, http_session, http_response
+    ):
+        http_response.status_code = 429
+        http_response.json.return_value = {"error": {"code": 4, "message": "rate limit error"}}
+        http_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "rate limit error", request=None, response=http_response
+        )
+        with pytest.raises(PineconeRateLimitError):
+            await client.query(vector=[1.0])
+        assert http_session.post.call_count == 4
+
+    @pytest.fixture(scope="function")
+    def metrics_registry(self):
+        import prometheus_client.registry
+
+        # Clear all metrics before each test
+        for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
+            if not hasattr(collector, "_metrics"):
+                continue
+            collector._metrics.clear()
+        yield prometheus_client.registry.REGISTRY
+
+    async def test_client_records_metrics(self, client: DataPlane, metrics_registry, http_response):
+        http_response.json.return_value = {"matches": []}
+        await client.query(vector=[1.0])
+
+        assert (
+            metrics_registry.get_sample_value(
+                "pinecone_client_duration_seconds_count", {"type": "query"}
+            )
+            > 0
+        )
+
 
 def test_batchify():
     iterable = list(range(10))
@@ -258,9 +336,19 @@ async def test_async_batchify():
     assert batches == 5
 
 
-def test_raise_for_status():
+def test_raise_for_status_5xx():
     request = unittest.mock.MagicMock()
     response = unittest.mock.MagicMock(status_code=500)
+    response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "message", request=request, response=response
+    )
+    with pytest.raises(RetriablePineconeAPIError):
+        raise_for_status("op", response)
+
+
+def test_raise_for_status_4xx():
+    request = unittest.mock.MagicMock()
+    response = unittest.mock.MagicMock(status_code=412)
     response.raise_for_status.side_effect = httpx.HTTPStatusError(
         "message", request=request, response=response
     )
@@ -275,6 +363,27 @@ def test_raise_for_status_rate_limit():
         "message", request=request, response=response
     )
     with pytest.raises(PineconeRateLimitError):
+        raise_for_status("op", response)
+
+
+def test_raise_for_status_monthly_rate_limit():
+    request = unittest.mock.MagicMock()
+    response = unittest.mock.MagicMock(
+        status_code=429,
+        json=unittest.mock.Mock(
+            return_value={
+                "message": "Request failed. You've reached your write unit limit for the current month (2000000). To continue writing data, upgrade your plan.",  # noqa
+                "code": 8,
+                "details": [],
+            }
+        ),
+    )
+    response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "Request failed. You've reached your write unit limit for the current month (2000000). To continue writing data, upgrade your plan.",  # noqa
+        request=request,
+        response=response,
+    )
+    with pytest.raises(PineconeNeedsPlanUpgradeError):
         raise_for_status("op", response)
 
 

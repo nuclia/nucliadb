@@ -21,7 +21,9 @@ env: {}
 # Configmap and/or secrets to mount into the environment
 envFrom:
   - configMapRef:
-      name: nucliadb-config
+      name: nucliadb-config #  Nucliadb-shared configMap
+  - secretRef:
+      name: nucliadb-config #  Nucliadb-shared secret
 
 # Kubernetes settings
 affinity: {}
