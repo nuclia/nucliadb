@@ -506,9 +506,9 @@ async def create_bucket(
 
 
 def parse_status_code(error: botocore.exceptions.ClientError) -> int:
-    error_code = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", None)
-    if error_code is not None and error_code.isnumeric():
-        return int(error_code)
+    status_code = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", None)
+    if status_code is not None:
+        return status_code
 
     error_code = error.response["Error"]["Code"]
     if error_code.isnumeric():
