@@ -100,7 +100,6 @@ impl VectorReader for VectorReaderService {
                 let field_type = parts.first().unwrap_or(&"").to_string();
                 let field_name = parts.get(1).unwrap_or(&"").to_string();
                 let clause = AtomClause::key_field(field_type, field_name);
-                eprintln!("EP: {:?}", clause);
                 formula.extend(clause);
             }
         }
