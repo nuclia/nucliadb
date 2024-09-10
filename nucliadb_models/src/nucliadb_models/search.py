@@ -1085,7 +1085,8 @@ class ChatRequest(BaseModel):
         description=(
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
-            "The filters are case-insensitive. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
+            "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
         ),
         examples=[
             ["NLP", "BERT"],
@@ -1341,7 +1342,8 @@ class FindRequest(BaseSearchRequest):
         description=(
             "List of keyword filter expressions to apply to the retrieval step. "
             "The text block search will only be performed on the documents that contain the specified keywords. "
-            "The filters are case-insensitive. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
+            "The filters are case-insensitive, and only alphanumeric characters and spaces are allowed. "
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"  # noqa
         ),
         examples=[
             ["NLP", "BERT"],
