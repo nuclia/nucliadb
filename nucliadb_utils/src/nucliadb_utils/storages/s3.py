@@ -506,12 +506,17 @@ async def create_bucket(
 
 
 def parse_status_code(error: botocore.exceptions.ClientError) -> int:
+    status_code = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", None)
+    if status_code is not None:
+        return status_code
+
     error_code = error.response["Error"]["Code"]
     if error_code.isnumeric():
         return int(error_code)
 
     # See https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList
     error_code_mappings = {
+        "AccessDenied": 403,
         "NoSuchBucket": 404,
         "NoSuchKey": 404,
         "BucketNotEmpty": 409,
