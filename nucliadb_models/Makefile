@@ -10,9 +10,9 @@ lint:
 
 .PHONY: test
 test:
-	pytest -s --tb=native -v tests
+	pytest -sv --tb=native tests
 
 
 .PHONY: test-cov
 test-cov:
-	pytest -rfE --cov=nucliadb_models --cov-config=../.coveragerc -s --tb=native -v --cov-report term-missing:skip-covered --cov-report xml tests
+	pytest -rfE -sxv --cov=nucliadb_models --cov-config=../.coveragerc --tb=native --cov-report term-missing:skip-covered --cov-report xml tests
