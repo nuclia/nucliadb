@@ -122,7 +122,7 @@ fn build_resource(shard_id: String) -> noderesources::Resource {
     for i in 1..=20 {
         let mut sentences = HashMap::new();
         sentences.insert(
-            format!("paragraph-vector-{i}"),
+            format!("{rid}/{field_id}/{i}/paragraph-{i}"),
             noderesources::VectorSentence {
                 vector: vec![i as f32; VECTOR_DIMENSION],
                 ..Default::default()
