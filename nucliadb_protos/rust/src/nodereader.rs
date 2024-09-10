@@ -400,6 +400,8 @@ pub struct VectorSearchRequest {
     pub key_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(float, tag = "17")]
     pub min_score: f32,
+    #[prost(string, repeated, tag = "19")]
+    pub field_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

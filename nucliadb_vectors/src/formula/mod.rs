@@ -28,6 +28,7 @@ pub enum AtomClause {
     KeyPrefix(String),
     Label(String),
     KeyPrefixSet((HashSet<String>, HashSet<String>)),
+    KeyField((String, String)),
 }
 impl AtomClause {
     pub fn label(value: String) -> AtomClause {
@@ -39,10 +40,12 @@ impl AtomClause {
     pub fn key_set(resource_set: HashSet<String>, field_set: HashSet<String>) -> AtomClause {
         Self::KeyPrefixSet((resource_set, field_set))
     }
+    pub fn key_field(field_type: String, field_name: String) -> AtomClause {
+        Self::KeyField((field_type, field_name))
+    }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         match self {
             Self::KeyPrefix(value) => retriever.get_key(x).starts_with(value.as_bytes()),
-
             Self::Label(value) => retriever.has_label(x, value.as_bytes()),
             Self::KeyPrefixSet((resource_set, field_set)) => {
                 let key = retriever.get_key(x);
@@ -73,6 +76,13 @@ impl AtomClause {
                 }
 
                 field_set.contains(std::str::from_utf8(&key[0..end_pos]).unwrap())
+            }
+            Self::KeyField((field_type, field_name)) => {
+                let key = retriever.get_key(x);
+                let mut key_parts = key.split(|b| *b == b'/');
+                let ftype = std::str::from_utf8(key_parts.next().unwrap()).unwrap();
+                let fname = std::str::from_utf8(key_parts.next().unwrap()).unwrap();
+                ftype == field_type && fname == field_name
             }
         }
     }

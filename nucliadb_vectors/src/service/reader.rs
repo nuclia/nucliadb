@@ -93,6 +93,18 @@ impl VectorReader for VectorReaderService {
             formula.extend(clause_labels);
         }
 
+        if !request.field_filters.is_empty() {
+            for field in request.field_filters.iter() {
+                // split "a/title" into "a" and "title"
+                let parts = field.split('/').collect::<Vec<&str>>();
+                let field_type = parts.first().unwrap_or(&"").to_string();
+                let field_name = parts.get(1).unwrap_or(&"").to_string();
+                let clause = AtomClause::key_field(field_type, field_name);
+                eprintln!("EP: {:?}", clause);
+                formula.extend(clause);
+            }
+        }
+
         if let Some(filter) = context.filtering_formula.as_ref() {
             let clause = query_io::map_expression(filter);
             formula.extend(clause);
