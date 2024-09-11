@@ -20,88 +20,97 @@
 
 mod common;
 
+use ::nucliadb_protos::{nodereader, noderesources, nodewriter};
+use common::NodeFixture;
+use nucliadb_core::protos::{self as nucliadb_protos, NewShardRequest};
+use nucliadb_protos::prost_types::Timestamp;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use uuid::Uuid;
-
-use common::NodeFixture;
-use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::protos::{NewShardRequest, ReleaseChannel};
-use nucliadb_protos::{nodereader, noderesources, nodewriter};
-use rstest::*;
 use tonic::Request;
+use uuid::Uuid;
 
 const VECTOR_DIMENSION: usize = 10;
 
-#[rstest]
 #[tokio::test]
-async fn test_vector_normalization_shard(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
-    use nucliadb_core::protos::VectorIndexConfig;
-
+async fn test_search_fields_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    // Create a shard with vector normalization
-
-    const KBID: &str = "vector-normalization-kbid";
-    #[allow(deprecated)]
-    let shard = writer
-        .new_shard(Request::new(NewShardRequest {
-            kbid: KBID.to_string(),
-            release_channel: release_channel.into(),
-            config: Some(VectorIndexConfig {
-                normalize_vectors: true,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }))
-        .await?
-        .into_inner();
+    let new_shard_response = writer.new_shard(Request::new(NewShardRequest::default())).await?;
+    let shard_id = &new_shard_response.get_ref().id;
 
     // Add a resource with vectors
+    let resource1 = build_resource_with_field(shard_id.clone(), "f/field1".to_string());
+    let resource2 = build_resource_with_field(shard_id.clone(), "f/field2".to_string());
+    let result1 = writer.set_resource(resource1).await?;
+    let result2 = writer.set_resource(resource2).await?;
+    assert_eq!(result1.get_ref().status(), nodewriter::op_status::Status::Ok);
+    assert_eq!(result2.get_ref().status(), nodewriter::op_status::Status::Ok);
 
-    let resource = build_resource(shard.id.clone());
-    let result = writer.set_resource(resource).await?;
-
-    assert_eq!(result.get_ref().status(), nodewriter::op_status::Status::Ok);
-
-    // Search and validate normalization
-    //
-    // Normalization is validated using DOT product (so no normalization is done
-    // during similarity computation) and checking all vectors give the same
-    // result and score 1.0
-
+    // Search filtering with an unexisting field, to check that no vector are returned
     let magnitude = f32::sqrt((17.0_f32).powi(2) * VECTOR_DIMENSION as f32);
     let query_vector = vec![17.0 / magnitude; VECTOR_DIMENSION];
 
     let search_request = nodereader::SearchRequest {
-        shard: shard.id.clone(),
-        vector: query_vector,
-        with_duplicates: true,
+        shard: shard_id.clone(),
+        fields: ["f/foobar".to_string()].to_vec(),
+        vector: query_vector.clone(),
         page_number: 0,
-        result_per_page: 30,
-        min_score_semantic: 0.9,
+        result_per_page: 1,
+        min_score_semantic: -1.0,
+        paragraph: false,
+        document: false,
         ..Default::default()
     };
     let results = reader.search(Request::new(search_request)).await?.into_inner();
 
     assert!(results.vector.is_some());
     let vector_results = results.vector.unwrap();
-    assert_eq!(vector_results.documents.len(), 20);
-    let scores = vector_results.documents.iter().map(|result| result.score).collect::<Vec<f32>>();
-    assert!(scores.iter().all(|score| *score == scores[0]));
-    assert!(vector_results.documents.iter().all(|result| trunc(result.score, 5) == 1.0));
+    assert_eq!(vector_results.documents.len(), 0);
+
+    // Search filtering with a real field, to check that the vector is returned
+    let search_request = nodereader::SearchRequest {
+        shard: shard_id.clone(),
+        vector: query_vector.clone(),
+        fields: ["f/field1".to_string(), "f/unexisting".to_string()].to_vec(),
+        page_number: 0,
+        result_per_page: 1,
+        min_score_semantic: -1.0,
+        paragraph: false,
+        document: false,
+        ..Default::default()
+    };
+    let results = reader.search(Request::new(search_request)).await?.into_inner();
+
+    assert!(results.vector.is_some());
+    let vector_results = results.vector.unwrap();
+    assert_eq!(vector_results.documents.len(), 1);
+
+    // Search filtering with multiple fields, to check that the OR is applied
+    let search_request = nodereader::SearchRequest {
+        shard: shard_id.clone(),
+        vector: query_vector.clone(),
+        fields: ["f/field1".to_string(), "f/field2".to_string()].to_vec(),
+        page_number: 0,
+        result_per_page: 2,
+        min_score_semantic: -1.0,
+        paragraph: false,
+        document: false,
+        ..Default::default()
+    };
+    let results = reader.search(Request::new(search_request)).await?.into_inner();
+
+    assert!(results.vector.is_some());
+    let vector_results = results.vector.unwrap();
+    assert_eq!(vector_results.documents.len(), 2);
 
     Ok(())
 }
 
-fn build_resource(shard_id: String) -> noderesources::Resource {
+fn build_resource_with_field(shard_id: String, field_id: String) -> noderesources::Resource {
     let rid = Uuid::new_v4().to_string();
-    let field_id = Uuid::new_v4().to_string();
 
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let timestamp = Timestamp {
@@ -121,8 +130,10 @@ fn build_resource(shard_id: String) -> noderesources::Resource {
     let mut field_paragraphs = HashMap::new();
     for i in 1..=20 {
         let mut sentences = HashMap::new();
+        let start = i;
+        let end = i + 1;
         sentences.insert(
-            format!("{rid}/{field_id}/{i}/paragraph-{i}"),
+            format!("{rid}/{field_id}/{i}/{start}-{end}"),
             noderesources::VectorSentence {
                 vector: vec![i as f32; VECTOR_DIMENSION],
                 ..Default::default()
@@ -161,9 +172,4 @@ fn build_resource(shard_id: String) -> noderesources::Resource {
         paragraphs: resource_paragraphs,
         ..Default::default()
     }
-}
-
-fn trunc(value: f32, digits: usize) -> f32 {
-    let factor = (10 * digits) as f32;
-    f32::trunc(value * factor) / factor
 }

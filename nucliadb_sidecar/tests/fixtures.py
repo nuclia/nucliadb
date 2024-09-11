@@ -41,7 +41,7 @@ from nucliadb_sidecar.settings import indexing_settings, settings
 from nucliadb_sidecar.writer import Writer
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import nats_consumer_settings
+from nucliadb_utils.settings import nats_consumer_settings, storage_settings
 from nucliadb_utils.utilities import get_storage, start_nats_manager, stop_nats_manager
 
 images.settings["nucliadb_sidecar_reader"] = {
@@ -156,11 +156,23 @@ nucliadb_sidecar_reader = nucliadbNodeReader()
 nucliadb_sidecar_writer = nucliadbNodeWriter()
 
 
-@pytest.fixture(scope="session")
-def node_single():
+@pytest.fixture(scope="function")
+def node_single(storage):
     docker_client = docker.from_env(version=BaseImage.docker_version)
     volume_node = docker_client.volumes.create(driver="local")
-    writer1_host, writer1_port = nucliadb_sidecar_writer.run(volume_node)
+
+    # Extract relevant file backend settings to pass to the image
+    file_backend = storage_settings.file_backend.value
+    file_backend_settings = {
+        k: (getattr(storage_settings, k) or "").replace("localhost", "172.17.0.1")
+        for k in dir(storage_settings)
+        if k.startswith(file_backend)
+    }
+    file_backend_settings[f"{file_backend}_INDEXING_BUCKET"] = "indexing"
+
+    writer1_host, writer1_port = nucliadb_sidecar_writer.run(
+        volume_node, file_backend=file_backend, file_backend_config=file_backend_settings
+    )
     reader1_host, reader1_port = nucliadb_sidecar_reader.run(volume_node)
 
     settings.writer_listen_address = f"{writer1_host}:{writer1_port}"

@@ -328,6 +328,7 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         field_labels: Vec::with_capacity(0),
         paragraph_labels: Vec::with_capacity(0),
         reload: search_request.reload,
+        field_filters: search_request.fields.clone(),
     })
 }
 

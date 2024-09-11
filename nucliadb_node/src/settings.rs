@@ -113,6 +113,11 @@ pub fn build_object_store_driver(settings: &EnvSettings) -> Arc<dyn ObjectStore>
             if !settings.gcs_base64_creds.is_empty() {
                 let service_account_key = STANDARD.decode(&settings.gcs_base64_creds).unwrap();
                 builder = builder.with_service_account_key(String::from_utf8(service_account_key).unwrap());
+            } else if let Some(endpoint) = &settings.gcs_endpoint_url {
+                // Anonymous with local endpoint (for testing)
+                builder = builder.with_service_account_key(
+                    format!(r#"{{"gcs_base_url": "{endpoint}", "disable_oauth": true, "private_key":"","private_key_id":"","client_email":""}}"#),
+                );
             }
             Arc::new(builder.build().unwrap())
         }
@@ -246,6 +251,7 @@ pub struct EnvSettings {
     pub file_backend: ObjectStoreType,
     pub gcs_indexing_bucket: String,
     pub gcs_base64_creds: String,
+    pub gcs_endpoint_url: Option<String>,
     pub s3_client_id: String,
     pub s3_client_secret: String,
     pub s3_region_name: String,
@@ -327,6 +333,7 @@ impl Default for EnvSettings {
             file_backend: ObjectStoreType::NOTSET,
             gcs_indexing_bucket: Default::default(),
             gcs_base64_creds: Default::default(),
+            gcs_endpoint_url: None,
             s3_client_id: Default::default(),
             s3_client_secret: Default::default(),
             s3_region_name: Default::default(),
