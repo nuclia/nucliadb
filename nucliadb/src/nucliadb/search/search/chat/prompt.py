@@ -102,8 +102,6 @@ class CappedPromptContext:
         return self.output.__getitem__(key)
 
     def __delitem__(self, key: str) -> None:
-        if key not in self.output:
-            raise KeyError(key)
         self._size -= len(self.output[key])
         del self.output[key]
 
