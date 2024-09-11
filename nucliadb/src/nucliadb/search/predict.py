@@ -19,6 +19,7 @@
 #
 import json
 import os
+import random
 from enum import Enum
 from typing import Any, AsyncIterator, Dict, Literal, Optional, Union
 from unittest.mock import AsyncMock, Mock
@@ -27,6 +28,7 @@ import aiohttp
 import backoff
 from pydantic import BaseModel, Field, ValidationError
 
+from nucliadb.common import datamanagers
 from nucliadb.search import logger
 from nucliadb.tests.vectors import Q, Qm2023
 from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch
@@ -511,25 +513,30 @@ class DummyPredictEngine(PredictEngine):
                 query=sentence,
             )
         else:
+            async with datamanagers.with_ro_transaction() as txn:
+                semantic_thresholds = {}
+                vectors = {}
+                timings = {}
+                async for vectorset_id, config in datamanagers.vectorsets.iter(txn, kbid=kbid):
+                    semantic_thresholds[vectorset_id] = 0.7
+                    vectors[vectorset_id] = [random.random()] * (
+                        config.vectorset_index_config.vector_dimension or 1
+                    )
+                    timings[vectorset_id] = 0.010
+
             return QueryInfo(
                 language="en",
                 stop_words=[],
                 semantic_threshold=0.7,
-                semantic_thresholds={
-                    semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.7,
-                },
+                semantic_thresholds=semantic_thresholds,
                 visual_llm=True,
                 max_context=self.max_context,
                 entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
                 sentence=SentenceSearch(
                     data=Q,
-                    vectors={
-                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": Q,
-                    },
+                    vectors=vectors,
                     time=0.0,
-                    timings={
-                        semantic_model or "<MUST-PROVIDE-SEMANTIC-MODEL>": 0.0,
-                    },
+                    timings=timings,
                 ),
                 query=sentence,
             )
