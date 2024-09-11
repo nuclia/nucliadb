@@ -706,3 +706,38 @@ async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowled
     print(ask_response.prequeries.keys())
     assert len(ask_response.prequeries["prequery_0"].best_matches) > 1
     assert len(ask_response.prequeries["title_query"].best_matches) > 1
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_rag_strategy_prequeries_with_full_resource(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "",
+            "rag_strategies": [
+                {
+                    "name": "full_resource",
+                    "count": 2,
+                },
+                {
+                    "name": "prequeries",
+                    "queries": [
+                        {
+                            "request": {"query": "summary", "fields": ["a/summary"]},
+                            "weight": 20,
+                        },
+                        {
+                            "request": {"query": "title", "fields": ["a/title"]},
+                            "weight": 1,
+                            "id": "title_query",
+                        },
+                    ],
+                },
+            ],
+            "debug": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
