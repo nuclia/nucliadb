@@ -43,6 +43,7 @@ from nucliadb.migrator.migrator import run_pg_schema_migrations
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
+from nucliadb.tests.config import reset_config
 from nucliadb.writer import API_PREFIX
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
@@ -89,39 +90,6 @@ def analytics_disabled():
     os.environ["NUCLIADB_DISABLE_ANALYTICS"] = "True"
     yield
     os.environ.pop("NUCLIADB_DISABLE_ANALYTICS")
-
-
-def reset_config():
-    from nucliadb.common.cluster import settings as cluster_settings
-    from nucliadb.ingest import settings as ingest_settings
-    from nucliadb.train import settings as train_settings
-    from nucliadb.writer import settings as writer_settings
-    from nucliadb_utils import settings as utils_settings
-    from nucliadb_utils.cache import settings as cache_settings
-
-    all_settings = [
-        cluster_settings.settings,
-        ingest_settings.settings,
-        train_settings.settings,
-        writer_settings.settings,
-        cache_settings.settings,
-        utils_settings.audit_settings,
-        utils_settings.http_settings,
-        utils_settings.indexing_settings,
-        utils_settings.nuclia_settings,
-        utils_settings.nucliadb_settings,
-        utils_settings.storage_settings,
-        utils_settings.transaction_settings,
-    ]
-    for settings in all_settings:
-        defaults = type(settings)()
-        for attr, _value in settings:
-            default_value = getattr(defaults, attr)
-            setattr(settings, attr, default_value)
-
-    from nucliadb.common.cluster import manager
-
-    manager.INDEX_NODES.clear()
 
 
 @pytest.fixture(scope="function")
