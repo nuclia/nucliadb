@@ -219,7 +219,7 @@ async def default_prompt_context(
                     context[pid] = text
 
 
-async def get_field_extracted_text(kbid, field_id: FieldId) -> Optional[tuple[FieldId, str]]:
+async def get_field_extracted_text(kbid: str, field_id: FieldId) -> Optional[tuple[FieldId, str]]:
     extracted_text_pb = await cache.get_extracted_text_from_field_id(kbid, field_id)
     if extracted_text_pb is None:
         return None
