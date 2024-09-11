@@ -90,6 +90,7 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
     summary="Create a KB from an export and import its content",
     tags=["Knowledge Boxes"],
     response_model=NewImportedKbResponse,
+    openapi_extra={"x-hidden-operation": True},
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
