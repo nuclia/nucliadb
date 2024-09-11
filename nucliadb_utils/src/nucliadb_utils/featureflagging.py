@@ -53,26 +53,6 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
-    const.Features.CORS_MIDDLEWARE: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
-    const.Features.NODE_SET_RESOURCE_FROM_STORAGE: {
-        "rollout": 0,
-        "variants": {"environment": ["none"]},
-    },
-    const.Features.FIND_MERGE_ORDER_FIX: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
-    const.Features.PG_CATALOG_READ: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
-    const.Features.PG_CATALOG_WRITE: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
     const.Features.SKIP_EXTERNAL_INDEX: {
         "rollout": 0,
         "variants": {"environment": ["none"]},

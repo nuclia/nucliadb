@@ -206,8 +206,8 @@ class NodeS3Storage:
     def envs(self):
         return {
             "FILE_BACKEND": "s3",
-            "S3_CLIENT_ID": "",
-            "S3_CLIENT_SECRET": "",
+            "S3_CLIENT_ID": "fake",
+            "S3_CLIENT_SECRET": "fake",
             "S3_BUCKET": "test",
             "S3_INDEXING_BUCKET": "indexing",
             "S3_DEADLETTER_BUCKET": "deadletter",
@@ -255,6 +255,8 @@ class _NodeRunner:
         self.volume_node_1 = self.docker_client.volumes.create(driver="local")
         self.volume_node_2 = self.docker_client.volumes.create(driver="local")
 
+        self.storage.server = self.storage.server.replace("localhost", docker_internal_host)
+        images.settings["nucliadb_node_writer"]["env"].update(self.storage.envs())
         writer1_host, writer1_port = nucliadb_node_1_writer.run(self.volume_node_1)
         writer2_host, writer2_port = nucliadb_node_2_writer.run(self.volume_node_2)
 
@@ -270,7 +272,6 @@ class _NodeRunner:
                 "WRITER_LISTEN_ADDRESS": f"{docker_internal_host}:{writer1_port}",
             }
         )
-        self.storage.server = self.storage.server.replace("localhost", docker_internal_host)
         images.settings["nucliadb_node_sidecar"]["env"].update(self.storage.envs())
 
         sidecar1_host, sidecar1_port = nucliadb_node_1_sidecar.run(self.volume_node_1)

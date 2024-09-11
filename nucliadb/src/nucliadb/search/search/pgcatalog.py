@@ -34,8 +34,6 @@ from nucliadb_models.search import (
     SortOrder,
 )
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from .filters import translate_label
 from .query import QueryParser
@@ -149,9 +147,7 @@ def _pg_driver() -> PGDriver:
 
 
 def pgcatalog_enabled(kbid):
-    return isinstance(get_driver(), PGDriver) and has_feature(
-        const.Features.PG_CATALOG_READ, context={"kbid": kbid}
-    )
+    return isinstance(get_driver(), PGDriver)
 
 
 @observer.wrap({"op": "search"})
