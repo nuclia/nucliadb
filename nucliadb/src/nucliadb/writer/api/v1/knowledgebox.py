@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional
 from functools import partial
 
 from fastapi import HTTPException
@@ -59,9 +58,9 @@ from nucliadb_utils.authentication import requires
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxObj:
+async def create_kb_endpoint(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxObj:
     try:
-        kbid, slug = await _create_kb(item)
+        kbid, slug = await create_kb(item)
     except KnowledgeBoxConflict:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
     except ExternalIndexCreationError as exc:
@@ -72,7 +71,7 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig) -> KnowledgeBoxO
         return KnowledgeBoxObj(uuid=kbid, slug=slug)
 
 
-async def _create_kb(item: KnowledgeBoxConfig) -> tuple[str, Optional[str]]:
+async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
     driver = get_driver()
     rollback_learning_config = None
 
