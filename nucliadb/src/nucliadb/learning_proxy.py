@@ -98,6 +98,8 @@ class LearningConfiguration(BaseModel):
         default=None, alias="semantic_matryoshka_dims"
     )
 
+    semantic_models: list[str] = Field(default_factory=list)
+
     # This is where the config for each semantic model (aka vectorsets) is returned
     semantic_model_configs: dict[str, SemanticConfig] = Field(default={})
 
