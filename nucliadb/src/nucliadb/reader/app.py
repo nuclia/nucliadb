@@ -23,7 +23,6 @@ import importlib.metadata
 from fastapi import FastAPI
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
-from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
@@ -35,28 +34,14 @@ from nucliadb_telemetry.fastapi.utils import (
     client_disconnect_handler,
     global_exception_handler,
 )
-from nucliadb_utils import const
 from nucliadb_utils.audit.stream import AuditMiddleware
 from nucliadb_utils.authentication import NucliaCloudAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
-from nucliadb_utils.settings import http_settings, running_settings
-from nucliadb_utils.utilities import get_audit, has_feature
+from nucliadb_utils.settings import running_settings
+from nucliadb_utils.utilities import get_audit
 
 middleware = []
-
-if has_feature(const.Features.CORS_MIDDLEWARE, default=False):
-    middleware.append(
-        Middleware(
-            CORSMiddleware,
-            allow_origins=http_settings.cors_origins,
-            allow_methods=["*"],
-            # Authorization will be exluded from * in the future, (CORS non-wildcard request-header).
-            # Browsers already showing deprecation notices, so it needs to be specified explicitly
-            allow_headers=["*", "Authorization"],
-        )
-    )
-
 middleware.extend(
     [
         Middleware(
