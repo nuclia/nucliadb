@@ -101,7 +101,7 @@ class LearningConfiguration(BaseModel):
     semantic_models: list[str] = Field(default_factory=list)
 
     # This is where the config for each semantic model (aka vectorsets) is returned
-    semantic_model_configs: dict[str, SemanticConfig] = Field(default={})
+    semantic_model_configs: dict[str, SemanticConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_matryoshka_and_vector_dimension_consistency(self) -> Self:
