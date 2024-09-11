@@ -28,7 +28,7 @@ from nucliadb.ingest.consumer import materializer
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import KbUsage, Service
+from nucliadb_protos.kb_usage_pb2 import KbUsage, Service
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 from tests.ingest.fixtures import create_resource
 
