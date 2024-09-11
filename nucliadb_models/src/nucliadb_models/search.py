@@ -887,6 +887,11 @@ class FullResourceStrategy(RagStrategy):
         description="Maximum number of full documents to retrieve. If not specified, all matching documents are retrieved.",
         ge=1,
     )
+    include_remaining_text_blocks: bool = Field(
+        default=False,
+        title="Include remaining text blocks",
+        description="Whether to include the remaining text blocks after the maximum number of resources has been reached.",
+    )
 
 
 class HierarchyResourceStrategy(RagStrategy):

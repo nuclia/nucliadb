@@ -289,6 +289,7 @@ async def full_resource_prompt_context(
         ],
         max_concurrent=MAX_RESOURCE_TASKS,
     )
+    added_fields = set()
     for resource_extracted_text in resources_extracted_texts:
         if resource_extracted_text is None:
             continue
@@ -300,6 +301,13 @@ async def full_resource_prompt_context(
                     del context[tb_id]
             # Add the extracted text of each field to the context.
             context[field.full()] = extracted_text
+            added_fields.add(field.full())
+
+    if strategy.include_remaining_text_blocks:
+        for paragraph in ordered_paragraphs:
+            tb_id = parse_text_block_id(paragraph.id)
+            if tb_id.field_id.full() not in added_fields:
+                context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
 async def extend_prompt_context_with_metadata(
