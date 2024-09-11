@@ -101,6 +101,15 @@ class CappedPromptContext:
     def __getitem__(self, key: str) -> str:
         return self.output.__getitem__(key)
 
+    def __delitem__(self, key: str) -> None:
+        if key not in self.output:
+            raise KeyError(key)
+        self._size -= len(self.output[key])
+        del self.output[key]
+
+    def text_block_ids(self) -> list[str]:
+        return list(self.output.keys())
+
     @property
     def size(self) -> int:
         return self._size
@@ -212,26 +221,17 @@ async def default_prompt_context(
                     context[pid] = text
 
 
-async def get_field_extracted_text(field: Field) -> Optional[tuple[Field, str]]:
-    extracted_text_pb = await cache.get_field_extracted_text(field)
+async def get_field_extracted_text(kbid, field_id: FieldId) -> Optional[tuple[FieldId, str]]:
+    extracted_text_pb = await cache.get_extracted_text_from_field_id(kbid, field_id)
     if extracted_text_pb is None:
         return None
-    return field, extracted_text_pb.text
-
-
-async def get_resource_field_extracted_text(
-    kbid: str, field_id: FieldId
-) -> Optional[tuple[FieldId, str]]:
-    extracted_text = await cache.get_extracted_text_from_field_id(kbid, field_id)
-    if extracted_text is None:
-        return None
-    return field_id, extracted_text.text
+    return field_id, extracted_text_pb.text
 
 
 async def get_resource_extracted_texts(
     kbid: str,
     resource_uuid: str,
-) -> list[tuple[Field, str]]:
+) -> list[tuple[FieldId, str]]:
     resource = await cache.get_resource(kbid, resource_uuid)
     if resource is None:
         return []
@@ -241,8 +241,12 @@ async def get_resource_extracted_texts(
         resource.txn = txn
         runner = ConcurrentRunner(max_tasks=MAX_RESOURCE_FIELD_TASKS)
         for field_type, field_key in await resource.get_fields(force=True):
-            field = await resource.get_field(field_key, field_type, load=False)
-            runner.schedule(get_field_extracted_text(field))
+            field_id = FieldId.from_pb(resource_uuid, field_type, field_key)
+            runner.schedule(get_field_extracted_text(kbid, field_id))
+        # Include the summary aswell
+        runner.schedule(
+            get_field_extracted_text(kbid, FieldId(rid=resource_uuid, type="a", key="summary"))
+        )
 
         # Wait for the results
         results = await runner.wait()
@@ -261,7 +265,6 @@ async def full_resource_prompt_context(
     Algorithm steps:
         - Collect the list of resources in the results (in order of relevance).
         - For each resource, collect the extracted text from all its fields and craft the context.
-
     Arguments:
         context: The context to be updated.
         kbid: The knowledge box id.
@@ -276,25 +279,29 @@ async def full_resource_prompt_context(
         # Collect the list of resources in the results (in order of relevance).
         ordered_resources = []
         for paragraph in ordered_paragraphs:
-            resource_uuid = paragraph.id.split("/")[0]
+            resource_uuid = parse_text_block_id(paragraph.id).rid
             if resource_uuid not in ordered_resources:
                 ordered_resources.append(resource_uuid)
 
     # For each resource, collect the extracted text from all its fields.
-    resource_extracted_texts = await run_concurrently(
+    resources_extracted_texts = await run_concurrently(
         [
             get_resource_extracted_texts(kbid, resource_uuid)
             for resource_uuid in ordered_resources[: strategy.count]
         ],
         max_concurrent=MAX_RESOURCE_TASKS,
     )
-
-    for extracted_texts in resource_extracted_texts:
-        if extracted_texts is None:
+    for resource_extracted_text in resources_extracted_texts:
+        if resource_extracted_text is None:
             continue
-        for field, extracted_text in extracted_texts:
+        for field, extracted_text in resource_extracted_text:
+            # First off, remove the text block ids from paragraphs that belong to
+            # the same field, as otherwise the context will be duplicated.
+            for tb_id in context.text_block_ids():
+                if tb_id.startswith(field.full()):
+                    del context[tb_id]
             # Add the extracted text of each field to the context.
-            context[field.resource_unique_id] = extracted_text
+            context[field.full()] = extracted_text
 
 
 async def extend_prompt_context_with_metadata(
@@ -302,39 +309,38 @@ async def extend_prompt_context_with_metadata(
     kbid: str,
     strategy: MetadataExtensionStrategy,
 ) -> None:
-    parsed_text_block_ids = _parse_text_block_ids(context)
-    if len(parsed_text_block_ids) == 0:
+    text_block_ids: list[TextBlockId] = []
+    for text_block_id in context.text_block_ids():
+        try:
+            text_block_ids.append(parse_text_block_id(text_block_id))
+        except ValueError:
+            # Some text block ids are not paragraphs nor fields, so they are skipped
+            # (e.g. USER_CONTEXT_0, when the user provides extra context)
+            continue
+    if len(text_block_ids) == 0:
         return
 
     if MetadataExtensionType.ORIGIN in strategy.types:
-        await extend_prompt_context_with_origin_metadata(context, kbid, parsed_text_block_ids)
+        await extend_prompt_context_with_origin_metadata(context, kbid, text_block_ids)
 
     if MetadataExtensionType.CLASSIFICATION_LABELS in strategy.types:
-        await extend_prompt_context_with_classification_labels(context, kbid, parsed_text_block_ids)
+        await extend_prompt_context_with_classification_labels(context, kbid, text_block_ids)
 
     if MetadataExtensionType.NERS in strategy.types:
-        await extend_prompt_context_with_ner(context, kbid, parsed_text_block_ids)
+        await extend_prompt_context_with_ner(context, kbid, text_block_ids)
 
     if MetadataExtensionType.EXTRA_METADATA in strategy.types:
-        await extend_prompt_context_with_extra_metadata(context, kbid, parsed_text_block_ids)
+        await extend_prompt_context_with_extra_metadata(context, kbid, text_block_ids)
 
 
-def _parse_text_block_ids(context: CappedPromptContext) -> list[TextBlockId]:
-    tb_ids: list[TextBlockId] = []
-    for text_block_id in context.output.keys():
-        try:
-            # Typically, the text block id is a paragraph id
-            tb_ids.append(ParagraphId.from_string(text_block_id))
-        except ValueError:
-            # When we're doing `full_resource` or `hierarchy` strategies,the text block id
-            # is a field id
-            try:
-                tb_ids.append(FieldId.from_string(text_block_id))
-            except ValueError:
-                # Some text block ids are not paragraphs nor fields, so they are skipped
-                # (e.g. USER_CONTEXT_0, when the user provides extra context)
-                continue
-    return tb_ids
+def parse_text_block_id(text_block_id: str) -> TextBlockId:
+    try:
+        # Typically, the text block id is a paragraph id
+        return ParagraphId.from_string(text_block_id)
+    except ValueError:
+        # When we're doing `full_resource` or `hierarchy` strategies,the text block id
+        # is a field id
+        return FieldId.from_string(text_block_id)
 
 
 async def extend_prompt_context_with_origin_metadata(context, kbid, text_block_ids: list[TextBlockId]):
@@ -474,7 +480,7 @@ async def composed_prompt_context(
                 # Invalid field id, skiping
                 continue
 
-    tasks = [get_resource_field_extracted_text(kbid, fid) for fid in extend_field_ids]
+    tasks = [get_field_extracted_text(kbid, fid) for fid in extend_field_ids]
     field_extracted_texts = await run_concurrently(tasks)
 
     for result in field_extracted_texts:
