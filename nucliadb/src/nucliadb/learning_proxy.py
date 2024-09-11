@@ -474,7 +474,27 @@ class InMemoryLearningConfig(LearningConfigService):
         return _IN_MEMORY_CONFIGS.get(kbid, None)
 
     async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:
-        parsed_config = LearningConfiguration.model_validate(config)  #
+        if not config:
+            # generate a default config
+            config.update(
+                {
+                    "semantic_model": "multilingual",
+                    "semantic_vector_similarity": "dot",
+                    "semantic_vector_size": 512,
+                    "semantic_threshold": 0.7,
+                    "semantic_matryoshka_dims": [],
+                    "semantic_models": ["multilingual"],
+                    "semantic_model_configs": {
+                        "multilingual": {
+                            "similarity": SimilarityFunction.DOT,
+                            "size": 512,
+                            "threshold": 0.7,
+                            "matryoshka_dims": [],
+                        }
+                    },
+                }
+            )
+        parsed_config = LearningConfiguration.model_validate(config)
         _IN_MEMORY_CONFIGS[kbid] = parsed_config
         return parsed_config
 
