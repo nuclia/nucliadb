@@ -30,6 +30,7 @@ import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
+from lru import LRU
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
@@ -461,20 +462,24 @@ class ProxiedLearningConfig(LearningConfigService):
             yield client
 
 
+_IN_MEMORY_CONFIGS: dict[str, LearningConfiguration]
+_IN_MEMORY_CONFIGS = LRU(50)  # type: ignore
+
+
 class InMemoryLearningConfig(LearningConfigService):
     def __init__(self):
         self.in_memory_configs = {}
 
     async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
-        return self.in_memory_configs.get(kbid, None)
+        return _IN_MEMORY_CONFIGS.get(kbid, None)
 
     async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:
         parsed_config = LearningConfiguration.model_validate(config)  #
-        self.in_memory_configs[kbid] = parsed_config
+        _IN_MEMORY_CONFIGS[kbid] = parsed_config
         return parsed_config
 
     async def delete_configuration(self, kbid: str) -> None:
-        self.in_memory_configs.pop(kbid, None)
+        _IN_MEMORY_CONFIGS.pop(kbid, None)
 
 
 def learning_config_service() -> LearningConfigService:
