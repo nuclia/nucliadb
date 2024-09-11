@@ -18,8 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from functools import partial, wraps
 from typing import Optional
+from functools import partial
 
 from fastapi import HTTPException
 from fastapi_versioning import version
@@ -32,6 +32,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.writer import logger
+from nucliadb.writer.api.utils import only_for_onprem
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.external_index_providers import (
@@ -46,20 +47,6 @@ from nucliadb_models.resource import (
 )
 from nucliadb_protos import knowledgebox_pb2
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.settings import is_onprem_nucliadb
-
-
-def only_for_onprem(fun):
-    @wraps(fun)
-    async def endpoint_wrapper(*args, **kwargs):
-        if not is_onprem_nucliadb():
-            raise HTTPException(
-                status_code=403,
-                detail="This endpoint is only available for onprem NucliaDB",
-            )
-        return await fun(*args, **kwargs)
-
-    return endpoint_wrapper
 
 
 @only_for_onprem
