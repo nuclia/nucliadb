@@ -201,12 +201,12 @@ class KnowledgeBox:
                 storage = await get_storage(service_name=SERVICE_NAME)
 
                 created = await storage.create_kb(kbid)
-                rollback_ops.append(partial(storage.delete_kb, kbid))
                 if not created:
                     logger.error(f"KB {kbid} could not be created")
                     raise KnowledgeBoxCreationError(
                         f"KB blob storage could not be created (slug={slug})"
                     )
+                rollback_ops.append(partial(storage.delete_kb, kbid))
 
                 # Create shards in index nodes
 
