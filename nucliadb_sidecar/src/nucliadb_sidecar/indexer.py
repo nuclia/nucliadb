@@ -41,11 +41,10 @@ from nucliadb_sidecar.signals import SuccessfulIndexingPayload
 from nucliadb_sidecar.writer import Writer
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.errors import capture_exception
-from nucliadb_utils import const
 from nucliadb_utils.nats import MessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage, has_feature
+from nucliadb_utils.utilities import get_storage
 
 CONCURRENT_INDEXERS_COUNT = metrics.Gauge("nucliadb_concurrent_indexers_count", labels={"node": ""})
 indexer_observer = metrics.Observer(
@@ -384,10 +383,7 @@ class PriorityIndexer:
 
     async def _index_message(self, pb: IndexMessage):
         if pb.typemessage == TypeMessage.CREATION:
-            if has_feature(const.Features.NODE_SET_RESOURCE_FROM_STORAGE, context={"kbid": pb.kbid}):
-                await self._set_resource_from_storage(pb)
-            else:
-                await self._set_resource(pb)
+            await self._set_resource(pb)
         elif pb.typemessage == TypeMessage.DELETION:
             await self._delete_resource(pb)
         else:  # pragma: no cover
@@ -430,52 +426,6 @@ class PriorityIndexer:
                 raise grpc_error
 
     async def _set_resource(self, pb: IndexMessage) -> None:
-        brain = await self.storage.get_indexing(pb)
-        shard_id = pb.shard
-        rid = brain.resource.uuid
-        brain.shard_id = brain.resource.shard_id = shard_id
-        _extra = {
-            "kbid": pb.kbid,
-            "shard": pb.shard,
-            "rid": rid,
-            "storage_key": pb.storage_key,
-        }
-        logger.debug(f"Adding {rid} at {shard_id} otx:{pb.txid}", extra=_extra)
-        try:
-            with self._handled_grpc_errors():
-                status = await self.writer.set_resource(brain)
-                self._parse_op_status_errors(pb, status)
-                logger.debug(f"...done (Added {rid} at {shard_id} otx:{pb.txid})", extra=_extra)
-                return
-        except ShardNotFound:
-            logger.error("Shard does not exist. This message will be ignored", extra=_extra)
-            return
-        except MetadataNotFoundError:
-            logger.error(
-                "Error on indexer worker trying to set a resource without metadata. "
-                "This message will be ignored",
-                extra={
-                    "kbid": pb.kbid,
-                    "shard": pb.shard,
-                    "rid": pb.resource,
-                    "storage_key": pb.storage_key,
-                },
-            )
-            return
-        except InconsistentDimensionsError:
-            logger.error(
-                "Trying to index vectors with an incorrect dimension! This should not happen!"
-                "We drop the message to not block the queue",
-                extra={
-                    "kbid": pb.kbid,
-                    "shard": pb.shard,
-                    "rid": pb.resource,
-                    "storage_key": pb.storage_key,
-                },
-            )
-            return
-
-    async def _set_resource_from_storage(self, pb: IndexMessage) -> None:
         """
         Set a resource using the new v2 method that doesn't
         require the indexer to fetch the resource from storage.

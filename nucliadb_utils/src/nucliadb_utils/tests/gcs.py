@@ -39,9 +39,12 @@ from nucliadb_utils.tests import free_port
 DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
 DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None
 
+# This images has the XML API in this PR https://github.com/fsouza/fake-gcs-server/pull/1164
+# which is needed because the Rust crate object_store uses it
+# If this gets merged, we can switch to the official image
 images.settings["gcs"] = {
-    "image": "fsouza/fake-gcs-server",
-    "version": "1.44.1",
+    "image": "tustvold/fake-gcs-server",
+    "version": "latest",
     "options": {},
 }
 
@@ -57,7 +60,7 @@ class GCS(BaseImage):
         options = super().get_image_options()
         options["ports"] = {str(self.port): str(self.port)}
         options["command"] = (
-            f"-scheme http -external-url http://{DOCKER_HOST}:{self.port} -port {self.port}"
+            f"-scheme http -external-url http://{DOCKER_HOST}:{self.port} -port {self.port} -public-host 172.17.0.1:{self.port}"
         )
         return options
 
@@ -88,7 +91,7 @@ def gcs_storage_settings(gcs) -> dict[str, Any]:
         "gcs_location": "location",
     }
     extended_settings = {
-        "gcs_deadletter_bucket": "deadletters",
+        "gcs_deadletter_bucket": "deadletter",
         "gcs_indexing_bucket": "indexing",
     }
     with ExitStack() as stack:
