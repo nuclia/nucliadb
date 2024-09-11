@@ -30,6 +30,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import FeedbackRequest, NucliaDBClientType
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.utilities import get_audit
 
 
 @api.post(
@@ -72,3 +73,15 @@ async def send_feedback(
 ):
     predict = get_predict()
     await predict.send_feedback(kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
+    audit = get_audit()
+    if audit is not None:
+        audit.feedback(
+            kbid=kbid,
+            user=x_nucliadb_user,
+            client=x_ndb_client.to_proto(),
+            origin=x_forwarded_for,
+            learning_id=item.ident,
+            good=item.good,
+            task=item.task.to_proto() if item.task else None,
+            feedback=item.feedback,
+        )

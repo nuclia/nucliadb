@@ -1460,6 +1460,9 @@ class KnowledgeboxFindResults(JsonBaseModel):
 class FeedbackTasks(str, Enum):
     CHAT = "CHAT"
 
+    def to_proto(self) -> int:
+        return ClientType.Value(self.name)
+
 
 class FeedbackRequest(BaseModel):
     ident: str = Field(

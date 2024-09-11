@@ -58,6 +58,18 @@ message ChatAudit {
   int32 status_code = 9;
 }
 
+enum TaskType {
+  CHAT = 0;
+}
+
+message FeedbackAudit {
+  string learning_id = 1;
+  bool good = 2;
+  TaskType task = 3;
+  optional string feedback = 4;
+}
+
+
 message AuditRequest {
   enum AuditType {
     VISITED = 0;
@@ -72,6 +84,7 @@ message AuditRequest {
     SUGGEST = 9 [deprecated=true];
     INDEXED = 10 [deprecated=true];
     CHAT = 11;
+    FEEDBACK = 12;
   }
 
   AuditType type = 1;
@@ -100,4 +113,5 @@ message AuditRequest {
   optional float generative_answer_time = 23;
   optional float generative_answer_first_chunk_time = 24;
   optional float rephrase_time = 25;
+  FeedbackAudit feedback = 26;
 }
