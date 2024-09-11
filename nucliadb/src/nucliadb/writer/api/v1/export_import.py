@@ -94,15 +94,16 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def kb_create_and_import_endpoint(request: Request) -> NewImportedKbResponse:
+async def kb_create_and_import_endpoint(request: Request):
     context = get_app_context(request.app)
 
     # Read stream and parse learning configuration
     stream_reader = ExportStreamReader(request.stream())
     learning_config, leftover_bytes = await stream_reader.maybe_read_learning_config()
     if learning_config is None:
-        raise Exception(
-            "Trying to import an export missing learning config. Try using import on an existing KB"
+        return HTTPClientError(
+            status_code=400,
+            detail="Trying to import an export missing learning config. Try using import on an existing KB or use a newer export",
         )
 
     # Create a KB with the import learning config
