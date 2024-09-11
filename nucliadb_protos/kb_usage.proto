@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package kb_usage;
+
+import "google/protobuf/timestamp.proto";
+
+enum KBSource {
+    HOSTED = 0;
+    ONPREM = 1;
+}
+
+enum Service {
+    PREDICT = 0;
+    PROCESSING = 1;
+    NUCLIA_DB = 2;
+    TASK = 3;
+}
+
+enum SearchType {
+    SEARCH = 0;
+    SUGGEST = 1;
+}
+
+enum PredictType {
+    SENTENCE = 0;
+    TOKEN = 1;
+    QUESTION_ANSWER = 2;
+    REPHRASE = 3;
+    SUMMARIZE = 4;
+    EXTRACT_TABLES = 5;
+    RERANK = 6;
+    RELATIONS = 7;
+    SPEECH = 8;
+    CAPTION = 9;
+    DA_LABELS = 10;
+    DA_GRAPH = 11;
+    DA_ASK = 12;
+    DA_QA = 13;
+}
+
+enum ClientType {
+    API = 0;
+    WEB = 1;
+    WIDGET = 2;
+    DESKTOP = 3;
+    DASHBOARD = 4;
+    CHROME_EXTENSION = 5;
+    INTERNAL = 6;
+}
+
+message Process {
+    ClientType client = 1;
+    float slow_processing_time = 2;
+    float pre_processing_time = 3;
+    uint64 bytes = 4;
+    uint32 chars = 5;
+    uint32 media_seconds = 6;
+    uint32 pages = 7;
+    uint32 paragraphs = 8;
+    uint32 media_files = 9 [deprecated = true];
+    uint32 num_processed = 10;
+}
+
+message Storage {
+    optional uint64 paragraphs = 1;
+    optional uint64 fields = 2;
+    optional uint64 resources = 3;
+    optional uint64 bytes = 4;
+}
+
+message Search {
+    ClientType client = 1;
+    SearchType type = 2;
+    uint32 tokens = 3;
+    uint32 num_searches = 4;
+}
+
+
+message Predict {
+    ClientType client = 1;
+    PredictType type = 2;
+    string model = 3;
+    uint32 input = 4;
+    uint32 output = 5;
+    uint32 image = 6;
+    uint32 num_predicts = 7;
+}
+
+
+message KbUsage {
+    // Identifiers
+    Service service = 1;
+    google.protobuf.Timestamp timestamp = 2;
+    optional string account_id = 3;
+    optional string kb_id = 4;
+    KBSource kb_source = 5;
+
+    // Data
+    repeated Process processes = 6;
+    repeated Predict predicts = 7;
+    repeated Search searches = 8;
+    optional Storage storage = 9;
+}
+
+message KbUsageAggregated {
+    repeated KbUsage kb_usages = 1;
+}

@@ -25,7 +25,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+from nucliadb_protos.kb_usage_pb2 import (
     ClientType,
     KBSource,
     Predict,
