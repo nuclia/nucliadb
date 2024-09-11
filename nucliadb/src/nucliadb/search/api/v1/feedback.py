@@ -78,10 +78,10 @@ async def send_feedback(
         audit.feedback(
             kbid=kbid,
             user=x_nucliadb_user,
-            client=x_ndb_client.to_proto(),
+            client_type=x_ndb_client.to_proto(),
             origin=x_forwarded_for,
             learning_id=item.ident,
             good=item.good,
-            task=item.task.to_proto() if item.task else None,
+            task=item.task.to_proto(),
             feedback=item.feedback,
         )
