@@ -42,10 +42,12 @@ async fn test_search_fields_filtering() -> Result<(), Box<dyn std::error::Error>
     let shard_id = &new_shard_response.get_ref().id;
 
     // Add a resource with vectors
-    let resource = build_resource_with_field(shard_id.clone(), "f/field1".to_string());
-    let result = writer.set_resource(resource).await?;
-
-    assert_eq!(result.get_ref().status(), nodewriter::op_status::Status::Ok);
+    let resource1 = build_resource_with_field(shard_id.clone(), "f/field1".to_string());
+    let resource2 = build_resource_with_field(shard_id.clone(), "f/field2".to_string());
+    let result1 = writer.set_resource(resource1).await?;
+    let result2 = writer.set_resource(resource2).await?;
+    assert_eq!(result1.get_ref().status(), nodewriter::op_status::Status::Ok);
+    assert_eq!(result2.get_ref().status(), nodewriter::op_status::Status::Ok);
 
     // Search filtering with an unexisting field, to check that no vector are returned
     let magnitude = f32::sqrt((17.0_f32).powi(2) * VECTOR_DIMENSION as f32);
@@ -54,7 +56,7 @@ async fn test_search_fields_filtering() -> Result<(), Box<dyn std::error::Error>
     let search_request = nodereader::SearchRequest {
         shard: shard_id.clone(),
         fields: ["f/foobar".to_string()].to_vec(),
-        vector: query_vector,
+        vector: query_vector.clone(),
         page_number: 0,
         result_per_page: 1,
         min_score_semantic: -1.0,
@@ -69,11 +71,10 @@ async fn test_search_fields_filtering() -> Result<(), Box<dyn std::error::Error>
     assert_eq!(vector_results.documents.len(), 0);
 
     // Search filtering with a real field, to check that the vector is returned
-    let query_vector2 = vec![17.0 / magnitude; VECTOR_DIMENSION];
     let search_request = nodereader::SearchRequest {
         shard: shard_id.clone(),
-        vector: query_vector2,
-        fields: ["f/field1".to_string()].to_vec(),
+        vector: query_vector.clone(),
+        fields: ["f/field1".to_string(), "f/unexisting".to_string()].to_vec(),
         page_number: 0,
         result_per_page: 1,
         min_score_semantic: -1.0,
@@ -86,6 +87,24 @@ async fn test_search_fields_filtering() -> Result<(), Box<dyn std::error::Error>
     assert!(results.vector.is_some());
     let vector_results = results.vector.unwrap();
     assert_eq!(vector_results.documents.len(), 1);
+
+    // Search filtering with multiple fields, to check that the OR is applied
+    let search_request = nodereader::SearchRequest {
+        shard: shard_id.clone(),
+        vector: query_vector.clone(),
+        fields: ["f/field1".to_string(), "f/field2".to_string()].to_vec(),
+        page_number: 0,
+        result_per_page: 2,
+        min_score_semantic: -1.0,
+        paragraph: false,
+        document: false,
+        ..Default::default()
+    };
+    let results = reader.search(Request::new(search_request)).await?.into_inner();
+
+    assert!(results.vector.is_some());
+    let vector_results = results.vector.unwrap();
+    assert_eq!(vector_results.documents.len(), 2);
 
     Ok(())
 }
@@ -111,8 +130,10 @@ fn build_resource_with_field(shard_id: String, field_id: String) -> noderesource
     let mut field_paragraphs = HashMap::new();
     for i in 1..=20 {
         let mut sentences = HashMap::new();
+        let start = i;
+        let end = i + 1;
         sentences.insert(
-            format!("{rid}/{field_id}/{i}/paragraph-{i}"),
+            format!("{rid}/{field_id}/{i}/{start}-{end}"),
             noderesources::VectorSentence {
                 vector: vec![i as f32; VECTOR_DIMENSION],
                 ..Default::default()

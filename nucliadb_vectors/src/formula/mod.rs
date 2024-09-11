@@ -80,10 +80,17 @@ impl AtomClause {
             Self::KeyField((field_type, field_name)) => {
                 let key = retriever.get_key(x);
                 let mut key_parts = key.split(|b| *b == b'/');
-                key_parts.next(); // Skip resource_id
-                let ftype = std::str::from_utf8(key_parts.next().unwrap()).unwrap();
-                let fname = std::str::from_utf8(key_parts.next().unwrap()).unwrap();
-                ftype == field_type && fname == field_name
+                // Skip resource_id, then try to parse field_type and field_name and check if they match
+                if key_parts.next().is_some() {
+                    if let Some(ftype) = key_parts.next() {
+                        if let Some(fname) = key_parts.next() {
+                            let ftype_str = std::str::from_utf8(ftype).unwrap();
+                            let fname_str = std::str::from_utf8(fname).unwrap();
+                            return ftype_str == field_type && fname_str == field_name;
+                        }
+                    }
+                }
+                false
             }
         }
     }
