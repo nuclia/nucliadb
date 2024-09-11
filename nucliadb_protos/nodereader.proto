@@ -215,8 +215,8 @@ message VectorSearchRequest {
     // Empty for searching on the original index
     string vector_set = 15;
     repeated string key_filters = 16;
-
     float min_score = 17;
+    repeated string field_filters = 19;
 }
 
 message DocumentVectorIdentifier {

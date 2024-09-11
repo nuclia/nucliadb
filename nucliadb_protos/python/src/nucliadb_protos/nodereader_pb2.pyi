@@ -655,6 +655,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
     VECTOR_SET_FIELD_NUMBER: builtins.int
     KEY_FILTERS_FIELD_NUMBER: builtins.int
     MIN_SCORE_FIELD_NUMBER: builtins.int
+    FIELD_FILTERS_FIELD_NUMBER: builtins.int
     id: builtins.str
     """Shard ID"""
     page_number: builtins.int
@@ -682,6 +683,8 @@ class VectorSearchRequest(google.protobuf.message.Message):
 
     @property
     def key_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def field_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
@@ -696,8 +699,9 @@ class VectorSearchRequest(google.protobuf.message.Message):
         vector_set: builtins.str = ...,
         key_filters: collections.abc.Iterable[builtins.str] | None = ...,
         min_score: builtins.float = ...,
+        field_filters: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["field_labels", b"field_labels", "id", b"id", "key_filters", b"key_filters", "min_score", b"min_score", "page_number", b"page_number", "paragraph_labels", b"paragraph_labels", "reload", b"reload", "result_per_page", b"result_per_page", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["field_filters", b"field_filters", "field_labels", b"field_labels", "id", b"id", "key_filters", b"key_filters", "min_score", b"min_score", "page_number", b"page_number", "paragraph_labels", b"paragraph_labels", "reload", b"reload", "result_per_page", b"result_per_page", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___VectorSearchRequest = VectorSearchRequest
 
