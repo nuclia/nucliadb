@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
 from typing import AsyncGenerator
 from uuid import uuid4
 
@@ -29,24 +30,31 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.export_import import importer
 from nucliadb.export_import.datamanager import ExportImportDataManager
-from nucliadb.export_import.exceptions import IncompatibleExport
+from nucliadb.export_import.exceptions import (
+    IncompatibleExport,
+)
 from nucliadb.export_import.models import (
     ExportMetadata,
     ImportMetadata,
     NatsTaskMessage,
 )
 from nucliadb.export_import.tasks import get_exports_producer, get_imports_producer
-from nucliadb.export_import.utils import stream_compatible_with_kb
+from nucliadb.export_import.utils import ExportStreamReader, stream_compatible_with_kb
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import logger
-from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb.writer.api.utils import only_for_onprem
+from nucliadb.writer.api.v1.knowledgebox import create_kb
+from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb_models.export_import import (
     CreateExportResponse,
     CreateImportResponse,
     Status,
 )
-from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.resource import (
+    KnowledgeBoxConfig,
+    NucliaDBRoles,
+)
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires_one
 
@@ -73,6 +81,52 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
     else:
         await start_export_task(context, kbid, export_id)
         return CreateExportResponse(export_id=export_id)
+
+
+@only_for_onprem
+@api.post(
+    f"/{KBS_PREFIX}/import",
+    summary="Create a KB from an export and import its content",
+    tags=["Knowledge Boxes"],
+    # response_model=CreateImportResponse,
+)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@version(1)
+async def kb_create_and_import_endpoint(request: Request):
+    context = get_app_context(request.app)
+
+    # Read stream and parse learning configuration
+    stream_reader = ExportStreamReader(request.stream())
+    learning_config, leftover_bytes = await stream_reader.maybe_read_learning_config()
+    if learning_config is None:
+        raise Exception(
+            "Trying to import an export missing learning config. Try using import on an existing KB"
+        )
+    print("Import learning config:", learning_config)
+
+    # Create a KB with the import learning config
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    import_kb_config = KnowledgeBoxConfig(
+        title=f"Imported KB - {now}",
+        learning_configuration=learning_config.dict(),
+    )
+    kbid, slug = await create_kb(import_kb_config)
+
+    # Import contents to the new KB
+
+    async def stream_with_leftovers(leftovers: bytes, stream: AsyncGenerator[bytes, None]):
+        if len(leftovers) > 0:
+            yield leftovers
+        async for chunk in stream:
+            yield chunk
+
+    import_id = uuid4().hex
+    await importer.import_kb(
+        context=context, kbid=kbid, stream=stream_with_leftovers(leftover_bytes, request.stream())
+    )
+
+    return (kbid, slug, import_id)
 
 
 @api.post(
