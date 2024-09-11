@@ -49,6 +49,7 @@ from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb_models.export_import import (
     CreateExportResponse,
     CreateImportResponse,
+    NewImportedKbResponse,
     Status,
 )
 from nucliadb_models.resource import (
@@ -88,11 +89,11 @@ async def start_kb_export_endpoint(request: Request, kbid: str):
     f"/{KBS_PREFIX}/import",
     summary="Create a KB from an export and import its content",
     tags=["Knowledge Boxes"],
-    # response_model=CreateImportResponse,
+    response_model=NewImportedKbResponse,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def kb_create_and_import_endpoint(request: Request):
+async def kb_create_and_import_endpoint(request: Request) -> NewImportedKbResponse:
     context = get_app_context(request.app)
 
     # Read stream and parse learning configuration
@@ -102,7 +103,6 @@ async def kb_create_and_import_endpoint(request: Request):
         raise Exception(
             "Trying to import an export missing learning config. Try using import on an existing KB"
         )
-    print("Import learning config:", learning_config)
 
     # Create a KB with the import learning config
 
@@ -121,12 +121,14 @@ async def kb_create_and_import_endpoint(request: Request):
         async for chunk in stream:
             yield chunk
 
-    import_id = uuid4().hex
     await importer.import_kb(
         context=context, kbid=kbid, stream=stream_with_leftovers(leftover_bytes, request.stream())
     )
 
-    return (kbid, slug, import_id)
+    return NewImportedKbResponse(
+        kbid=kbid,
+        slug=slug,
+    )
 
 
 @api.post(
