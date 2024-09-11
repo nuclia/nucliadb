@@ -92,7 +92,7 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
     # We need to be backward compatible with the old "semantic_model" field where
     # only one semantic model was allowed.
     if "semantic_model" in user_learning_config:
-        user_learning_config["semantic_models"] = [user_learning_config.pop("semantic_model")]
+        user_learning_config["semantic_models"] = [user_learning_config["semantic_model"]]
 
     # we rely on learning to return the updated configuration with defaults and
     # any other needed values (e.g. matryoshka settings if available)
