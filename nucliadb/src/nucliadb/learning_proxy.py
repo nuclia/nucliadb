@@ -21,6 +21,7 @@ import contextlib
 import json
 import logging
 import os
+from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from enum import Enum, IntEnum
 from typing import Any, Optional, Union
@@ -154,33 +155,20 @@ class LearningConfiguration(BaseModel):
 async def get_configuration(
     kbid: str,
 ) -> Optional[LearningConfiguration]:
-    async with learning_config_client() as client:
-        resp = await client.get(f"config/{kbid}")
-        try:
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as err:
-            if err.response.status_code == 404:
-                return None
-            raise
-        return LearningConfiguration.model_validate(resp.json())
+    return await learning_config_service().get_configuration(kbid)
 
 
 async def set_configuration(
     kbid: str,
     config: dict[str, Any],
 ) -> LearningConfiguration:
-    async with learning_config_client() as client:
-        resp = await client.post(f"config/{kbid}", json=config)
-        resp.raise_for_status()
-        return LearningConfiguration.model_validate(resp.json())
+    return await learning_config_service().set_configuration(kbid, config)
 
 
 async def delete_configuration(
     kbid: str,
 ) -> None:
-    async with learning_config_client() as client:
-        resp = await client.delete(f"config/{kbid}")
-        resp.raise_for_status()
+    return await learning_config_service().delete_configuration(kbid)
 
 
 async def learning_config_proxy(
@@ -428,3 +416,69 @@ class DummyClient(httpx.AsyncClient):
             return getattr(self, method)(*args, **kwargs)
         else:
             return self._response()
+
+
+class LearningConfigService(ABC):
+    @abstractmethod
+    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]: ...
+
+    @abstractmethod
+    async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration: ...
+
+    @abstractmethod
+    async def delete_configuration(self, kbid: str) -> None: ...
+
+
+class ProxiedLearningConfig(LearningConfigService):
+    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
+        async with self._client() as client:
+            resp = await client.get(f"config/{kbid}")
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as err:
+                if err.response.status_code == 404:
+                    return None
+                raise
+            return LearningConfiguration.model_validate(resp.json())
+
+    async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:
+        async with self._client() as client:
+            resp = await client.post(f"config/{kbid}", json=config)
+            resp.raise_for_status()
+            return LearningConfiguration.model_validate(resp.json())
+
+    async def delete_configuration(self, kbid: str) -> None:
+        async with self._client() as client:
+            resp = await client.delete(f"config/{kbid}")
+            resp.raise_for_status()
+
+    @contextlib.asynccontextmanager
+    async def _client(self) -> AsyncIterator[httpx.AsyncClient]:
+        async with httpx.AsyncClient(
+            base_url=get_base_url(LearningService.CONFIG),
+            headers=get_auth_headers(),
+        ) as client:
+            yield client
+
+
+class InMemoryLearningConfig(LearningConfigService):
+    def __init__(self):
+        self.in_memory_configs = {}
+
+    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
+        return self.in_memory_configs.get(kbid, None)
+
+    async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:
+        parsed_config = LearningConfiguration.model_validate(config)  #
+        self.in_memory_configs[kbid] = parsed_config
+        return parsed_config
+
+    async def delete_configuration(self, kbid: str) -> None:
+        self.in_memory_configs.pop(kbid, None)
+
+
+def learning_config_service() -> LearningConfigService:
+    if nuclia_settings.dummy_learning_services:
+        return InMemoryLearningConfig()
+    else:
+        return ProxiedLearningConfig()
