@@ -25,7 +25,7 @@ use simsimd::SpatialSimilarity;
 /// Fallback implementation of simsimd. This is used because manylinux for ARM64
 /// uses GCC 7.5.0 which is not able to compile simsimd (missing arm_sve.h headers)
 /// Once manylinux with GCC 8+ is released, we could delete this.
-#[cfg(any(target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
 mod simsimd {
     type Distance = f64;
     pub trait SpatialSimilarity
@@ -47,7 +47,7 @@ mod simsimd {
                 dem_x += a[i] * a[i];
                 dem_y += b[i] * b[i];
             }
-            Some((sum / (f32::sqrt(dem_x) * f32::sqrt(dem_y))) as f64)
+            Some(1.0 - (sum / (f32::sqrt(dem_x) * f32::sqrt(dem_y))) as f64)
         }
 
         fn dot(a: &[Self], b: &[Self]) -> Option<Distance> {

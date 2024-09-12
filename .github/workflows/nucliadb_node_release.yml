@@ -111,6 +111,7 @@ jobs:
       - run: twine check dist/*
 
       - uses: actions/upload-artifact@v3
+        if: github.event_name == 'push'
         with:
           name: pypi_files
           path: dist
