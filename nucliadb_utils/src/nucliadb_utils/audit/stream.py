@@ -435,6 +435,6 @@ class StreamAuditStorage(AuditStorage):
 
         auditrequest.feedback.learning_id = learning_id
         auditrequest.feedback.good = good
-        auditrequest.feedback.task = task
+        auditrequest.feedback.task = task  # type: ignore
         if feedback is not None:
             auditrequest.feedback.feedback = feedback
