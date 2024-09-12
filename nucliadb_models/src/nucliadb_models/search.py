@@ -30,7 +30,7 @@ from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.utils import DateTime
-from nucliadb_protos.audit_pb2 import ClientType
+from nucliadb_protos.audit_pb2 import ClientType, TaskType
 from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
 from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -1459,6 +1459,9 @@ class KnowledgeboxFindResults(JsonBaseModel):
 
 class FeedbackTasks(str, Enum):
     CHAT = "CHAT"
+
+    def to_proto(self) -> int:
+        return TaskType.Value(self.name)
 
 
 class FeedbackRequest(BaseModel):
