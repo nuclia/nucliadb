@@ -25,7 +25,7 @@ bit-set = "0.5.3"
 fxhash = "0.2.1"
 libc = "0.2.153"
 lazy_static = "1.4.0"
-simsimd = "4.3.1"
+simsimd = "5.1.4"
 
 [dev-dependencies]
 lazy_static = "1.4.0"
