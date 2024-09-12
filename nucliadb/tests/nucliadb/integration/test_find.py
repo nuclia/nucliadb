@@ -388,7 +388,7 @@ async def test_find_keyword_filters(
         f"/kb/{kbid}/resources",
         json={
             "title": "Friedrich Nietzsche. Beyond Good and Evil",
-            "summary": "The book is a treatise on the nature of morality and ethics. It was written by Friedrich Nietzsche.",
+            "summary": "[SKU-123:4] The book is a treatise on the nature of morality and ethics. It was written by Friedrich Nietzsche.",
             "icon": "text/plain",
         },
     )
@@ -399,7 +399,7 @@ async def test_find_keyword_filters(
         f"/kb/{kbid}/resources",
         json={
             "title": "Immanuel Kant. Critique of Pure Reason",
-            "summary": "The book is a treatise on metaphysics. It was written by Immanuel Kant.",
+            "summary": "[SKU-567:8] The book is a treatise on metaphysics. It was written by Immanuel Kant.",
             "icon": "text/plain",
         },
     )
@@ -440,6 +440,15 @@ async def test_find_keyword_filters(
             ],
             [nietzsche_rid, kant_rid],
         ),
+        # Searching with ids that contain punctuation characters should work
+        (
+            ["SKU-123:4"],
+            [nietzsche_rid],
+        ),
+        (
+            ["SKU-567:8"],
+            [kant_rid],
+        ),
         # Negative tests (no results expected)
         (["Focault"], []),  # Keyword not present
         (["Nietz"], []),  # Partial matches
@@ -462,19 +471,3 @@ async def test_find_keyword_filters(
             assert (
                 rid in body["resources"]
             ), f"Keyword filters: {keyword_filters}, expected rids: {expected_rids}"
-
-
-async def test_find_keyword_filters_validation(nucliadb_reader: AsyncClient):
-    for invalid_character in ".,:)([]{}-_^%&$#":
-        resp = await nucliadb_reader.post(
-            "/kb/kbid/find",
-            json={
-                "query": "treatise",
-                "keyword_filters": [f"Foo{invalid_character}Bar"],
-            },
-        )
-        assert resp.status_code == 412
-        assert (
-            "Only alphanumeric strings with spaces are allowed in keyword filters"
-            in resp.json()["detail"]
-        )
