@@ -4,9 +4,11 @@ on:
   pull_request:
     branches:
       - main
+      - dev
   push:
     branches:
       - main
+      - dev
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -427,10 +429,12 @@ jobs:
       - ci-passed
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
+    with:
+      environment: ${{ github.ref == 'refs/heads/master' && 'stage' || 'dev' }}
 
   release:
     name: Trigger release
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs:
       - ci-passed
     uses: ./.github/workflows/release.yml
