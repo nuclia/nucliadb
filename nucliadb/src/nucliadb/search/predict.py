@@ -513,6 +513,7 @@ class DummyPredictEngine(PredictEngine):
                 query=sentence,
             )
         else:
+            # populate data with existing vectorsets
             async with datamanagers.with_ro_transaction() as txn:
                 semantic_thresholds = {}
                 vectors = {}
@@ -523,6 +524,13 @@ class DummyPredictEngine(PredictEngine):
                         config.vectorset_index_config.vector_dimension or 1
                     )
                     timings[vectorset_id] = 0.010
+
+            # and fake data with the passed one too
+            model = semantic_model or "<SHOULD-PROVIDE-SEMANTIC-MODEL>"
+            semantic_thresholds[model] = 0.7
+            vectors[model] = Q
+            timings[model] = 0.0
+
 
             return QueryInfo(
                 language="en",
