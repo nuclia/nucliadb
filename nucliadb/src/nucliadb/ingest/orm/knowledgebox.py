@@ -19,7 +19,7 @@
 #
 from datetime import datetime
 from functools import partial
-from typing import Any, AsyncGenerator, Callable, Coroutine, Optional, Sequence, cast
+from typing import Any, AsyncGenerator, Callable, Coroutine, Optional, Sequence
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -48,7 +48,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2, utils_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     ExternalIndexProviderType,
@@ -58,13 +58,10 @@ from nucliadb_protos.knowledgebox_pb2 import (
 )
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import ReleaseChannel
-from nucliadb_utils import const
-from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
     get_storage,
-    has_feature,
 )
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
@@ -104,7 +101,6 @@ class KnowledgeBox:
         title: str = "",
         description: str = "",
         semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
-        release_channel: Optional[ReleaseChannel.ValueType] = ReleaseChannel.STABLE,
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
@@ -115,8 +111,6 @@ class KnowledgeBox:
             raise KnowledgeBoxCreationError("A slug must be provided to create a new KB")
         if semantic_models is None or len(semantic_models) == 0:
             raise KnowledgeBoxCreationError("KB must define at least one semantic model")
-
-        release_channel = cast(ReleaseChannel.ValueType, release_channel_for_kb(slug, release_channel))
 
         rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
 
@@ -139,7 +133,7 @@ class KnowledgeBox:
                 kb_shards.kbid = kbid
                 # B/c with Shards.actual
                 kb_shards.actual = -1
-                kb_shards.release_channel = release_channel
+                kb_shards.release_channel = ReleaseChannel.STABLE
 
                 vs_external_indexes = []
                 for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
@@ -496,20 +490,6 @@ class KnowledgeBox:
             return
         # Only pinecone is supported for now
         await PineconeIndexManager.delete_indexes(kbid, stored)
-
-
-def release_channel_for_kb(
-    slug: str, release_channel: Optional[ReleaseChannel.ValueType]
-) -> ReleaseChannel.ValueType:
-    if running_settings.running_environment == "stage" and has_feature(
-        const.Features.EXPERIMENTAL_KB, context={"slug": slug}
-    ):
-        release_channel = utils_pb2.ReleaseChannel.EXPERIMENTAL
-
-    if release_channel is None:
-        return utils_pb2.ReleaseChannel.STABLE
-
-    return release_channel
 
 
 def chunker(seq: Sequence, size: int):

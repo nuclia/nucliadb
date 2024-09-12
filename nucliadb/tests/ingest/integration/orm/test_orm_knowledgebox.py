@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -27,6 +27,7 @@ from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxCreationError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, chunker
+from nucliadb_models.resource import ReleaseChannel
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_utils.storages.storage import Storage
@@ -143,34 +144,22 @@ async def test_create_knowledgebox_without_vectorsets_is_not_allowed(
         await KnowledgeBox.create(maindb_driver, kbid="kbid", slug="slug", semantic_models={})
 
 
-@pytest.mark.parametrize(
-    "release_channel",
-    [
-        utils_pb2.ReleaseChannel.STABLE,
-        utils_pb2.ReleaseChannel.EXPERIMENTAL,
-    ],
-)
 @pytest.mark.asyncio
 async def test_create_knowledgebox_with_release_channel(
     storage: Storage,
     maindb_driver: Driver,
     shard_manager: cluster_manager.KBShardManager,
-    release_channel: utils_pb2.ReleaseChannel.ValueType,
 ):
-    with patch("nucliadb.ingest.orm.knowledgebox.release_channel_for_kb") as mock:
-        mock.return_value = release_channel
-
-        kbid, _ = await KnowledgeBox.create(
-            maindb_driver,
-            kbid=KnowledgeBox.new_unique_kbid(),
-            slug="mykbslug",
-            semantic_models={"my-semantic-model": SemanticModelMetadata()},
-        )
-
+    kbid, _ = await KnowledgeBox.create(
+        maindb_driver,
+        kbid=KnowledgeBox.new_unique_kbid(),
+        slug="mykbslug",
+        semantic_models={"my-semantic-model": SemanticModelMetadata()},
+    )
     async with maindb_driver.transaction(read_only=True) as txn:
         shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         assert shards is not None
-        assert shards.release_channel == release_channel
+        assert shards.release_channel == ReleaseChannel.STABLE
 
 
 @pytest.mark.asyncio

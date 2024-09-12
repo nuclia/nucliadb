@@ -53,7 +53,6 @@ from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
 from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
-from nucliadb_protos.utils_pb2 import ReleaseChannel as PBReleaseChannel
 
 _T = TypeVar("_T")
 
@@ -82,22 +81,12 @@ class ExtractedDataTypeName(str, Enum):
 
 
 class ReleaseChannel(str, Enum):
+    """
+    Deprecated. No longer used.
+    """
+
     STABLE = "STABLE"
     EXPERIMENTAL = "EXPERIMENTAL"
-
-    def to_pb(self) -> PBReleaseChannel.ValueType:
-        return RELEASE_CHANNEL_ENUM_TO_PB[self.value]
-
-    @classmethod
-    def from_message(cls, message: PBReleaseChannel.ValueType):
-        return cls(RELEASE_CHANNEL_PB_TO_ENUM[message])
-
-
-RELEASE_CHANNEL_ENUM_TO_PB = {
-    ReleaseChannel.STABLE.value: PBReleaseChannel.STABLE,
-    ReleaseChannel.EXPERIMENTAL.value: PBReleaseChannel.EXPERIMENTAL,
-}
-RELEASE_CHANNEL_PB_TO_ENUM = {v: k for k, v in RELEASE_CHANNEL_ENUM_TO_PB.items()}
 
 
 class KnowledgeBoxConfig(BaseModel):

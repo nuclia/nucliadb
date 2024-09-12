@@ -85,11 +85,6 @@ async def test_set_and_search(data_path):
     return await _test_set_and_search(ReleaseChannel.STABLE)
 
 
-@pytest.mark.asyncio
-async def test_set_and_search_exp(data_path):
-    return await _test_set_and_search(ReleaseChannel.EXPERIMENTAL)
-
-
 async def _test_set_and_search(channel):
     cluster = IndexNode()
 
