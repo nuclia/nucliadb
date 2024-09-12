@@ -21,6 +21,7 @@ use crate::schema::TextSchema;
 use nucliadb_core::query_language::{BooleanExpression, BooleanOperation, Operator};
 use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, TermQuery};
 use tantivy::schema::{Facet, IndexRecordOption};
+use tantivy::tokenizer::TokenizerManager;
 use tantivy::Term;
 
 fn translate_label_to_facet_query(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
@@ -30,9 +31,14 @@ fn translate_label_to_facet_query(literal: &str, schema: &TextSchema) -> Box<dyn
 }
 
 fn translate_keyword_to_text_query(literal: &str, schema: &TextSchema) -> Box<dyn Query> {
-    let terms: Vec<Term> =
-        literal.split_whitespace().map(|w| Term::from_field_text(schema.text, &w.to_lowercase())).collect();
-
+    // Tokenize the literal in the same way we tokenize the text field at indexing time
+    let tokenizer = TokenizerManager::default().get("default").unwrap();
+    let mut token_stream = tokenizer.token_stream(literal);
+    let mut terms = Vec::new();
+    while let Some(token) = token_stream.next() {
+        terms.push(Term::from_field_text(schema.text, &token.text));
+    }
+    // Create a query using the tokenized terms
     if terms.len() == 1 {
         Box::new(TermQuery::new(terms[0].clone(), IndexRecordOption::Basic))
     } else {
