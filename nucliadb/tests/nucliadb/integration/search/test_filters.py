@@ -42,11 +42,6 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 
-RELEASE_CHANNELS = (
-    "STABLE",
-    "EXPERIMENTAL",
-)
-
 
 class ClassificationLabels:
     RESOURCE_ANNOTATED = "user-resource/label"
@@ -283,7 +278,6 @@ async def kbid(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", RELEASE_CHANNELS, indirect=True)
 @pytest.mark.parametrize(
     "filters",
     [

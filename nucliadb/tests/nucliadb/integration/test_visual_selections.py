@@ -97,7 +97,6 @@ async def annotated_file_field(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_visual_selection(nucliadb_reader: AsyncClient, knowledgebox: str, annotated_file_field):
     kbid = knowledgebox
     rid, field_id = annotated_file_field

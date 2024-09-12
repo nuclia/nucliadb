@@ -58,7 +58,6 @@ async def resource_with_bm_relations(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_api_aliases(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -95,7 +94,6 @@ async def test_api_aliases(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_broker_message_relations(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -144,7 +142,6 @@ async def test_broker_message_relations(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_extracted_relations(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,

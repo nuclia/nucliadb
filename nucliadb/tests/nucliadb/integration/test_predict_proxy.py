@@ -23,7 +23,6 @@ import pytest
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize(
     "method,endpoint,params,payload",
     [
@@ -61,7 +60,6 @@ async def test_predict_proxy(nucliadb_reader, knowledgebox, method, endpoint, pa
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_predict_proxy_not_proxied_returns_422(
     nucliadb_reader,
     knowledgebox,

@@ -21,7 +21,6 @@ import pytest
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgebox):
     kbid = knowledgebox
 

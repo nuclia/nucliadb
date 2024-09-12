@@ -92,7 +92,6 @@ async def test_kb_creation_allows_setting_learning_configuration(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_creation(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -219,7 +218,6 @@ async def test_creation(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("channel", ("EXPERIMENTAL", "STABLE"))
 async def test_can_create_knowledgebox_with_colon_in_slug(nucliadb_manager: AsyncClient, channel):
     resp = await nucliadb_manager.post(
         "/kbs",
@@ -233,7 +231,6 @@ async def test_can_create_knowledgebox_with_colon_in_slug(nucliadb_manager: Asyn
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_serialize_errors(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -284,7 +281,6 @@ async def test_serialize_errors(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_entitygroups(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -323,7 +319,6 @@ async def test_entitygroups(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_extracted_shortened_metadata(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -401,16 +396,12 @@ async def test_extracted_shortened_metadata(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "field_id,error,knowledgebox",
+    "field_id,error",
     [
-        ("foobar", False, "EXPERIMENTAL"),
-        ("My_Field_1", False, "EXPERIMENTAL"),
-        ("With Spaces Not Allowed", True, "EXPERIMENTAL"),
-        ("Invalid&Character", True, "EXPERIMENTAL"),
-        ("foobar", False, "STABLE"),
-        ("My_Field_1", False, "STABLE"),
-        ("With Spaces Not Allowed", True, "STABLE"),
-        ("Invalid&Character", True, "STABLE"),
+        ("foobar", False),
+        ("My_Field_1", False),
+        ("With Spaces Not Allowed", True),
+        ("Invalid&Character", True),
     ],
 )
 async def test_field_ids_are_validated(
@@ -438,7 +429,6 @@ async def test_field_ids_are_validated(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_extra(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -516,7 +506,6 @@ async def test_extra(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -546,11 +535,6 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "knowledgebox",
-    ("STABLE", "EXPERIMENTAL"),
-    indirect=True,
-)
-@pytest.mark.parametrize(
     "slug,valid",
     [
         ("foo", True),
@@ -576,7 +560,6 @@ async def test_resource_slug_validation(nucliadb_writer, nucliadb_reader, knowle
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -609,7 +592,6 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_language_metadata(
     nucliadb_writer,
     nucliadb_reader,
@@ -682,7 +664,6 @@ async def test_language_metadata(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_story_7081(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -715,7 +696,6 @@ async def test_story_7081(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_question_answer(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -796,7 +776,6 @@ async def test_question_answer(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_question_answer_annotations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -852,7 +831,6 @@ async def test_question_answer_annotations(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_link_fields_store_css_selector(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -893,7 +871,6 @@ async def test_link_fields_store_css_selector(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_link_fields_store_xpath(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -977,7 +954,6 @@ async def test_pagination_limits(
     assert resp.status_code != 412
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_dates_are_properly_validated(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,

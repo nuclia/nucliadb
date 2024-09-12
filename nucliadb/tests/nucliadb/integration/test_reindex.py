@@ -22,7 +22,6 @@ import base64
 import hashlib
 from functools import partial
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
@@ -35,7 +34,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_reindex(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -54,7 +52,6 @@ async def test_reindex_kb_with_vectorsets(
     await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_grpc, knowledgebox_with_vectorsets)
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def _test_reindex(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

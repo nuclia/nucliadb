@@ -34,7 +34,6 @@ from tests.utils.broker_messages import BrokerMessageBuilder
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_field_classification(
     train_rest_api: aiohttp.ClientSession,
     knowledgebox_with_labels: str,

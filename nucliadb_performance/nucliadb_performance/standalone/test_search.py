@@ -66,7 +66,7 @@ def get_test_kb():
 
 def create_kb(kb_slug: str):
     ndb = get_nucliadb_client(local=True)
-    release_channel = ReleaseChannel.EXPERIMENTAL if "experimental" in kb_slug else ReleaseChannel.STABLE
+    release_channel = ReleaseChannel.STABLE
     print(f"Creating KB {kb_slug}...")
     ndb.writer.create_knowledge_box(slug=kb_slug, release_channel=release_channel)
 

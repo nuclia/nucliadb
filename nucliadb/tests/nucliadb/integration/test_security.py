@@ -45,7 +45,6 @@ async def resource_with_security(nucliadb_writer, knowledgebox):
     return resp.json()["uuid"]
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_security_is_returned_serialization(
     nucliadb_reader, knowledgebox, resource_with_security
 ):
@@ -58,7 +57,6 @@ async def test_resource_security_is_returned_serialization(
     assert set(resource["security"]["access_groups"]) == set([PLATFORM_GROUP, DEVELOPERS_GROUP])
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_security_is_updated(
     nucliadb_reader, nucliadb_writer, knowledgebox, resource_with_security
 ):
@@ -86,7 +84,6 @@ async def test_resource_security_is_updated(
     assert resource["security"]["access_groups"] == []
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize("search_endpoint", ("find_get", "find_post", "search_get", "search_post"))
 async def test_resource_security_search(
     nucliadb_reader,
