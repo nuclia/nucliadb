@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from contextvars import ContextVar
 from typing import Optional
 
@@ -44,17 +45,22 @@ async def fetch_resources(
 ) -> dict[str, Resource]:
     result = {}
     async with get_driver().transaction(read_only=True) as txn:
-        # TODO: this could be done in parallel
+        tasks = []
         for resource in resources:
-            serialization = await managed_serialize(
-                txn,
-                kbid,
-                resource,
-                show,
-                field_type_filter=field_type_filter,
-                extracted=extracted,
-                service_name=SERVICE_NAME,
+            tasks.append(
+                asyncio.create_task(
+                    managed_serialize(
+                        txn,
+                        kbid,
+                        resource,
+                        show,
+                        field_type_filter=field_type_filter,
+                        extracted=extracted,
+                        service_name=SERVICE_NAME,
+                    )
+                )
             )
+        for resource, serialization in zip(resources, await asyncio.gather(*tasks)):
             if serialization is not None:
                 result[resource] = serialization
     return result
