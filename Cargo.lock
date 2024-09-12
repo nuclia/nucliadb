@@ -2300,7 +2300,7 @@ checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes",
  "heck 0.5.0",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -2320,7 +2320,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 2.0.66",
@@ -2354,7 +2354,7 @@ dependencies = [
  "indoc",
  "libc",
  "memoffset",
- "parking_lot 0.12.2",
+ "parking_lot 0.11.2",
  "pyo3-build-config",
  "pyo3-ffi",
  "pyo3-macros",
@@ -3130,9 +3130,9 @@ dependencies = [
 
 [[package]]
 name = "simsimd"
-version = "5.1.4"
+version = "4.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a129ee03e03382f3fcae1295760ba232f7b6b1603dc467b170f2116630e18586"
+checksum = "cc9b7427cabeed25b18b43cc7d7ec466d8d1953a13ed56c46dc414c99ca4754e"
 dependencies = [
  "cc",
 ]
