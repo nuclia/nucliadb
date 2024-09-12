@@ -108,6 +108,18 @@ pub struct ChatAudit {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FeedbackAudit {
+    #[prost(string, tag = "1")]
+    pub learning_id: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub good: bool,
+    #[prost(enumeration = "TaskType", tag = "3")]
+    pub task: i32,
+    #[prost(string, optional, tag = "4")]
+    pub feedback: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AuditRequest {
     #[prost(enumeration = "audit_request::AuditType", tag = "1")]
     pub r#type: i32,
@@ -156,6 +168,8 @@ pub struct AuditRequest {
     pub generative_answer_first_chunk_time: ::core::option::Option<f32>,
     #[prost(float, optional, tag = "25")]
     pub rephrase_time: ::core::option::Option<f32>,
+    #[prost(message, optional, tag = "26")]
+    pub feedback: ::core::option::Option<FeedbackAudit>,
 }
 /// Nested message and enum types in `AuditRequest`.
 pub mod audit_request {
@@ -184,6 +198,7 @@ pub mod audit_request {
         Suggest = 9,
         Indexed = 10,
         Chat = 11,
+        Feedback = 12,
     }
     impl AuditType {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -204,6 +219,7 @@ pub mod audit_request {
                 AuditType::Suggest => "SUGGEST",
                 AuditType::Indexed => "INDEXED",
                 AuditType::Chat => "CHAT",
+                AuditType::Feedback => "FEEDBACK",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -221,6 +237,7 @@ pub mod audit_request {
                 "SUGGEST" => Some(Self::Suggest),
                 "INDEXED" => Some(Self::Indexed),
                 "CHAT" => Some(Self::Chat),
+                "FEEDBACK" => Some(Self::Feedback),
                 _ => None,
             }
         }
@@ -260,6 +277,29 @@ impl ClientType {
             "DESKTOP" => Some(Self::Desktop),
             "DASHBOARD" => Some(Self::Dashboard),
             "CHROME_EXTENSION" => Some(Self::ChromeExtension),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum TaskType {
+    Chat = 0,
+}
+impl TaskType {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            TaskType::Chat => "CHAT",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "CHAT" => Some(Self::Chat),
             _ => None,
         }
     }

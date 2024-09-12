@@ -410,3 +410,31 @@ class StreamAuditStorage(AuditStorage):
         if answer is not None:
             auditrequest.chat.answer = answer
         auditrequest.chat.status_code = status_code
+
+    def feedback(
+        self,
+        kbid: str,
+        user: str,
+        client_type: int,
+        origin: str,
+        learning_id: str,
+        good: bool,
+        task: int,
+        feedback: Optional[str],
+    ):
+        rcontext = get_request_context()
+        if rcontext is None:
+            return
+
+        auditrequest = rcontext.audit_request
+
+        auditrequest.origin = origin
+        auditrequest.client_type = client_type  # type: ignore
+        auditrequest.userid = user
+        auditrequest.kbid = kbid
+
+        auditrequest.feedback.learning_id = learning_id
+        auditrequest.feedback.good = good
+        auditrequest.feedback.task = task  # type: ignore
+        if feedback is not None:
+            auditrequest.feedback.feedback = feedback
