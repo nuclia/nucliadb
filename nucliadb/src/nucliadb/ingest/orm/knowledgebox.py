@@ -57,7 +57,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     StoredExternalIndexProviderMetadata,
 )
 from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_protos.utils_pb2 import ReleaseChannel
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
@@ -133,7 +132,6 @@ class KnowledgeBox:
                 kb_shards.kbid = kbid
                 # B/c with Shards.actual
                 kb_shards.actual = -1
-                kb_shards.release_channel = ReleaseChannel.STABLE
 
                 vs_external_indexes = []
                 for vectorset_id, semantic_model in semantic_models.items():  # type: ignore

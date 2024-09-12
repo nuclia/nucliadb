@@ -99,11 +99,6 @@ class KnowledgeBoxConfig(BaseModel):
         title="Description",
         description="Description for the Knowledge Box.",
     )
-    release_channel: Optional[ReleaseChannel] = Field(
-        default=None,
-        title="Release Channel",
-        description="Release channel for the Knowledge Box.",
-    )
     learning_configuration: Optional[Dict[str, Any]] = Field(
         default=None,
         title="Learning Configuration",
