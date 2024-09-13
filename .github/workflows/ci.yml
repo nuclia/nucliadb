@@ -430,11 +430,11 @@ jobs:
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
     with:
-      environment: ${{ github.ref == 'refs/heads/master' && 'stage' || 'dev' }}
+      environment: ${{ github.ref == 'refs/heads/main' && 'stage' || 'dev' }}
 
   release:
     name: Trigger release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - ci-passed
     uses: ./.github/workflows/release.yml
