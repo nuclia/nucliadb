@@ -237,7 +237,6 @@ mod tests {
     use std::time::Duration;
 
     use crossbeam_utils::thread::scope;
-    use nucliadb_core::Channel;
     use nucliadb_vectors::config::VectorConfig;
     use tempfile::tempdir;
 
@@ -266,7 +265,6 @@ mod tests {
             .create(NewShard {
                 kbid: "kbid".to_string(),
                 shard_id: shard_id_0.clone(),
-                channel: Channel::EXPERIMENTAL,
                 vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
             })
             .unwrap();
@@ -312,7 +310,6 @@ mod tests {
             .create(NewShard {
                 kbid: "kbid".to_string(),
                 shard_id: shard_id_0.clone(),
-                channel: Channel::EXPERIMENTAL,
                 vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
             })
             .unwrap();

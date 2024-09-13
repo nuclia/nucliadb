@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::{Channel, NodeResult};
+use nucliadb_core::NodeResult;
 use nucliadb_protos::nodereader;
 use nucliadb_protos::noderesources;
 use nucliadb_vectors::config::{Similarity, VectorConfig};
@@ -45,7 +45,6 @@ fn test_vectorsets() -> NodeResult<()> {
         crate::shards::writer::NewShard {
             kbid: kbid.clone(),
             shard_id: shard_id.clone(),
-            channel: Channel::default(),
             vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
         },
         &shards_path,

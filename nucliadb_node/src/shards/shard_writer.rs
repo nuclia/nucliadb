@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
+use nucliadb_core::paragraphs::*;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{Resource, ResourceId};
@@ -27,7 +28,6 @@ use nucliadb_core::relations::*;
 use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::*;
-use nucliadb_core::{paragraphs::*, Channel};
 use nucliadb_core::{thread, IndexFiles};
 use nucliadb_procs::measure;
 use nucliadb_vectors::config::VectorConfig;
@@ -62,7 +62,6 @@ struct ShardWriterIndexes {
 pub struct NewShard {
     pub kbid: String,
     pub shard_id: String,
-    pub channel: Channel,
     pub vector_configs: HashMap<String, VectorConfig>,
 }
 
@@ -114,7 +113,7 @@ impl ShardWriter {
 
         let shard_id = new.shard_id;
         let shard_path = disk_structure::shard_path_by_id(shards_path, &shard_id);
-        let metadata = Arc::new(ShardMetadata::new(shard_path.clone(), shard_id.clone(), new.kbid, new.channel));
+        let metadata = Arc::new(ShardMetadata::new(shard_path.clone(), shard_id.clone(), new.kbid));
         let mut indexes = ShardIndexes::new(&shard_path);
 
         std::fs::create_dir(&shard_path)?;
@@ -160,7 +159,6 @@ impl ShardWriter {
 
         let rsc = RelationConfig {
             path: indexes.relations_path(),
-            channel: new.channel,
         };
         let relation_task = || Some(nucliadb_relations2::writer::RelationsWriterService::create(rsc));
         let info = info_span!(parent: &span, "relation start");
@@ -259,7 +257,6 @@ impl ShardWriter {
 
         let rsc = RelationConfig {
             path: indexes.relations_path(),
-            channel: metadata.channel(),
         };
         let info = info_span!(parent: &span, "Open relations index writer");
         let relation_task = || Some(open_relations_writer(versions.relations, &rsc));

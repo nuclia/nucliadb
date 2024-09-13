@@ -23,24 +23,19 @@ use object_store::path::Path;
 
 use common::{resources, NodeFixture};
 use nucliadb_core::protos::prost::Message;
-use nucliadb_core::protos::{IndexMessage, NewShardRequest, ReleaseChannel, ShardId};
+use nucliadb_core::protos::{IndexMessage, NewShardRequest, ShardId};
 use rstest::*;
 use tonic::Request;
 
 #[rstest]
 #[tokio::test]
-async fn test_set_resource_from_storage(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_set_resource_from_storage() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    let request = Request::new(NewShardRequest {
-        release_channel: release_channel.into(),
-        ..Default::default()
-    });
+    let request = Request::new(NewShardRequest::default());
     let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
     let mut resource = resources::little_prince(shard_id);
