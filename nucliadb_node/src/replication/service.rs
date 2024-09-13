@@ -21,7 +21,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use nucliadb_core::protos::ReleaseChannel;
 use nucliadb_core::tantivy_replica::TantivyReplicaState;
 use nucliadb_core::tracing::{debug, error, info, warn};
 use nucliadb_core::{IndexFiles, NodeResult, RawReplicaState};
@@ -217,7 +216,6 @@ impl replication::replication_service_server::ReplicationService for Replication
                         shard_id,
                         generation_id: gen_id,
                         kbid: metadata.kbid(),
-                        release_channel: ReleaseChannel::from(metadata.channel()).into(),
                         ..Default::default()
                     });
                 }

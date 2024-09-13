@@ -26,7 +26,7 @@ use uuid::Uuid;
 
 use common::NodeFixture;
 use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::protos::{NewShardRequest, ReleaseChannel};
+use nucliadb_core::protos::NewShardRequest;
 use nucliadb_protos::{nodereader, noderesources, nodewriter};
 use rstest::*;
 use tonic::Request;
@@ -35,9 +35,7 @@ const VECTOR_DIMENSION: usize = 10;
 
 #[rstest]
 #[tokio::test]
-async fn test_vector_normalization_shard(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_vector_normalization_shard() -> Result<(), Box<dyn std::error::Error>> {
     use nucliadb_core::protos::VectorIndexConfig;
 
     let mut fixture = NodeFixture::new();
@@ -52,7 +50,6 @@ async fn test_vector_normalization_shard(
     let shard = writer
         .new_shard(Request::new(NewShardRequest {
             kbid: KBID.to_string(),
-            release_channel: release_channel.into(),
             config: Some(VectorIndexConfig {
                 normalize_vectors: true,
                 ..Default::default()

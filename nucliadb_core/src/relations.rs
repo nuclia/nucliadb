@@ -21,7 +21,6 @@ use std::path::PathBuf;
 
 use crate::prelude::*;
 use crate::protos::*;
-use crate::Channel;
 use crate::IndexFiles;
 
 pub type RelationsReaderPointer = Box<dyn RelationsReader>;
@@ -32,7 +31,6 @@ pub type ProtosResponse = RelationSearchResponse;
 #[derive(Clone)]
 pub struct RelationConfig {
     pub path: PathBuf,
-    pub channel: Channel,
 }
 
 pub trait RelationsReader: std::fmt::Debug + Send + Sync {

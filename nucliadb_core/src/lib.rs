@@ -52,36 +52,9 @@ use std::fs::File;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context, Error};
-use nucliadb_protos::utils::ReleaseChannel;
-use serde::{Deserialize, Serialize};
 
 use crate::tantivy_replica::TantivyReplicaState;
 pub type NodeResult<O> = anyhow::Result<O>;
-
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
-pub enum Channel {
-    #[default]
-    STABLE,
-    EXPERIMENTAL,
-}
-
-impl From<ReleaseChannel> for Channel {
-    fn from(value: ReleaseChannel) -> Self {
-        match value {
-            ReleaseChannel::Experimental => Channel::EXPERIMENTAL,
-            ReleaseChannel::Stable => Channel::STABLE,
-        }
-    }
-}
-
-impl From<Channel> for ReleaseChannel {
-    fn from(value: Channel) -> Self {
-        match value {
-            Channel::STABLE => ReleaseChannel::Stable,
-            Channel::EXPERIMENTAL => ReleaseChannel::Experimental,
-        }
-    }
-}
 
 #[derive(Debug, Default)]
 pub struct RawReplicaState {
