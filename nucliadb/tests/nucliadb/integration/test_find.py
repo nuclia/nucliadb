@@ -29,7 +29,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_find_with_label_changes(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -101,7 +100,6 @@ async def test_find_with_label_changes(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_find_does_not_support_fulltext_search(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -121,7 +119,6 @@ async def test_find_does_not_support_fulltext_search(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_find_resource_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -176,7 +173,6 @@ async def test_find_resource_filters(
         assert rid in body["resources"]
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_find_min_score(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -204,7 +200,6 @@ async def test_find_min_score(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_story_7286(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -264,7 +259,6 @@ async def test_story_7286(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_find_marks_fuzzy_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -362,7 +356,6 @@ def find_with_limits_exceeded_error():
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_find_handles_limits_exceeded_error(
     nucliadb_reader, knowledgebox, find_with_limits_exceeded_error
 ):
@@ -376,7 +369,6 @@ async def test_find_handles_limits_exceeded_error(
     assert resp.json() == {"detail": "over the quota"}
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_find_keyword_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

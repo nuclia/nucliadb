@@ -24,7 +24,6 @@ from nucliadb_models.search import SummarizedResponse
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_summarize(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

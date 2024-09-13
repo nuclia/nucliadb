@@ -32,7 +32,6 @@ from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_purge_vectorsets(
     maindb_driver: Driver,
     storage: Storage,

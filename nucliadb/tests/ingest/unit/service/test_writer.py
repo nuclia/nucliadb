@@ -100,7 +100,6 @@ class TestWriterServicer:
             )
             for vs in request.vectorsets
         }
-        assert "release_channel" not in knowledgebox_class.create.call_args.kwargs
 
     async def test_NewKnowledgeBoxV2_with_matryoshka_dimensions(
         self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class

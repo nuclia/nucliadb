@@ -35,7 +35,6 @@ from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_sentence_classification(
     train_rest_api: aiohttp.ClientSession,
     nucliadb_grpc: WriterStub,

@@ -30,7 +30,6 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_crud(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -72,7 +71,6 @@ async def test_resource_crud(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_list_resources(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -109,7 +107,6 @@ async def test_list_resources(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_get_resource_field(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -141,7 +138,6 @@ async def test_get_resource_field(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_creation_slug_conflicts(
     nucliadb_writer: AsyncClient,
     knowledgebox,
@@ -179,7 +175,6 @@ async def test_resource_creation_slug_conflicts(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_title_is_set_automatically_if_not_provided(
     nucliadb_reader,
     nucliadb_writer,
@@ -201,7 +196,6 @@ async def test_title_is_set_automatically_if_not_provided(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize("update_by", ["slug", "uuid"])
 async def test_resource_slug_modification(
     nucliadb_reader,
@@ -254,7 +248,6 @@ async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_slug_modification_rollbacks(
     nucliadb_reader,
     nucliadb_writer,
@@ -292,7 +285,6 @@ async def test_resource_slug_modification_rollbacks(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_slug_modification_handles_conflicts(
     nucliadb_writer,
     knowledgebox,
@@ -325,7 +317,6 @@ async def test_resource_slug_modification_handles_conflicts(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_slug_modification_handles_unknown_resources(
     nucliadb_writer,
     knowledgebox,
@@ -340,7 +331,6 @@ async def test_resource_slug_modification_handles_unknown_resources(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_parallel_dup_resource_creation_raises_conflicts(
     nucliadb_writer,
     knowledgebox,

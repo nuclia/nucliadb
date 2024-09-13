@@ -42,7 +42,6 @@ from tests.utils import inject_message
     warmup=False,
 )
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_search_returns_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -70,7 +69,6 @@ async def test_search_returns_labels(
     warmup=False,
 )
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

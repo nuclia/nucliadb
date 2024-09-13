@@ -320,7 +320,7 @@ async def worker(
 
 @pytest.fixture(scope="function")
 async def shard(request, writer_stub: NodeWriterStub) -> AsyncIterable[str]:
-    channel = ReleaseChannel.EXPERIMENTAL if request.param == "EXPERIMENTAL" else ReleaseChannel.STABLE
+    channel = ReleaseChannel.STABLE
     request = NewShardRequest(kbid="test", release_channel=channel)
     shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
 
@@ -332,7 +332,7 @@ async def shard(request, writer_stub: NodeWriterStub) -> AsyncIterable[str]:
 
 @pytest.fixture(scope="function")
 async def bunch_of_shards(request, writer_stub: NodeWriterStub) -> AsyncIterable[list[str]]:
-    channel = ReleaseChannel.EXPERIMENTAL if request.param == "EXPERIMENTAL" else ReleaseChannel.STABLE
+    channel = ReleaseChannel.STABLE
     request = NewShardRequest(kbid="test", release_channel=channel)
 
     try:

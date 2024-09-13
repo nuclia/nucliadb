@@ -244,14 +244,12 @@ class KBShardManager:
 
                         shard_created = await node.new_shard(
                             kbid,
-                            release_channel=kb_shards.release_channel,
                             vector_index_config=vector_index_config,
                         )
 
                     else:
                         shard_created = await node.new_shard_with_vectorsets(
                             kbid,
-                            release_channel=kb_shards.release_channel,
                             vectorsets_configs=vectorsets,
                         )
 

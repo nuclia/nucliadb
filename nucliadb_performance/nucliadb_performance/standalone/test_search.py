@@ -21,7 +21,6 @@ from functools import cache
 
 from molotov import global_setup, global_teardown, scenario
 
-from nucliadb_models.resource import ReleaseChannel
 from nucliadb_performance.settings import get_benchmark_output_file, settings
 from nucliadb_performance.utils.errors import print_errors
 from nucliadb_performance.utils.export_import import import_kb
@@ -66,9 +65,8 @@ def get_test_kb():
 
 def create_kb(kb_slug: str):
     ndb = get_nucliadb_client(local=True)
-    release_channel = ReleaseChannel.EXPERIMENTAL if "experimental" in kb_slug else ReleaseChannel.STABLE
     print(f"Creating KB {kb_slug}...")
-    ndb.writer.create_knowledge_box(slug=kb_slug, release_channel=release_channel)
+    ndb.writer.create_knowledge_box(slug=kb_slug)
 
 
 def import_test_data(kb_slug: str):
