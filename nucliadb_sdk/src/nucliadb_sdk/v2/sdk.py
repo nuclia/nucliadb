@@ -21,6 +21,7 @@ import enum
 import inspect
 import io
 import warnings
+from json import JSONDecodeError
 from typing import (
     Any,
     AsyncGenerator,
@@ -345,7 +346,13 @@ class _NucliaDBBase:
                 f"Account limits exceeded error {response.status_code}: {response.text}"
             )
         elif response.status_code == 429:
-            raise exceptions.RateLimitError(response.text)
+            try_after: Optional[float] = None
+            try:
+                body = response.json()
+                try_after = body.get("detail", {}).get("try_after")
+            except JSONDecodeError:
+                pass
+            raise exceptions.RateLimitError(response.text, try_after=try_after)
         elif response.status_code in (
             409,
             419,
