@@ -27,9 +27,7 @@ use std::collections::HashMap;
 
 use common::{resources, NodeFixture, TestNodeReader};
 use itertools::Itertools;
-use nucliadb_core::protos::{
-    op_status, Filter, NewShardRequest, ReleaseChannel, SuggestFeatures, SuggestRequest, SuggestResponse,
-};
+use nucliadb_core::protos::{op_status, Filter, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse};
 use rstest::*;
 use tonic::Request;
 
@@ -37,10 +35,7 @@ use tonic::Request;
 #[awt]
 #[tokio::test]
 async fn test_suggest_paragraphs(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] _release_channel: ReleaseChannel,
-    #[future]
-    #[with(_release_channel)]
-    suggest_shard: (NodeFixture, ShardDetails),
+    #[future] suggest_shard: (NodeFixture, ShardDetails),
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (node, shard) = suggest_shard;
     let mut reader = node.reader_client();
@@ -133,10 +128,7 @@ async fn test_suggest_paragraphs(
 #[awt]
 #[tokio::test]
 async fn test_suggest_entities(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] _release_channel: ReleaseChannel,
-    #[future]
-    #[with(_release_channel)]
-    suggest_shard: (NodeFixture, ShardDetails),
+    #[future] suggest_shard: (NodeFixture, ShardDetails),
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (node, shard) = suggest_shard;
     let mut reader = node.reader_client();
@@ -179,10 +171,7 @@ async fn test_suggest_entities(
 #[awt]
 #[tokio::test]
 async fn test_suggest_features(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] _release_channel: ReleaseChannel,
-    #[future]
-    #[with(_release_channel)]
-    suggest_shard: (NodeFixture, ShardDetails),
+    #[future] suggest_shard: (NodeFixture, ShardDetails),
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Test: search for "ann" with paragraph and entities features and validate
     // we search only for what we request.
@@ -205,30 +194,20 @@ async fn test_suggest_features(
     Ok(())
 }
 
-#[fixture]
-fn default_release_channel(#[default(ReleaseChannel::Stable)] value: ReleaseChannel) -> ReleaseChannel {
-    value
-}
-
 struct ShardDetails {
     id: String,
     resources: HashMap<&'static str, String>,
 }
 
 #[fixture]
-async fn suggest_shard(
-    #[from(default_release_channel)] release_channel: ReleaseChannel,
-) -> (NodeFixture, ShardDetails) {
+async fn suggest_shard() -> (NodeFixture, ShardDetails) {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await.unwrap();
     fixture.with_reader().await.unwrap();
 
     let mut writer = fixture.writer_client();
 
-    let request = Request::new(NewShardRequest {
-        release_channel: release_channel.into(),
-        ..Default::default()
-    });
+    let request = Request::new(NewShardRequest::default());
     let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
 

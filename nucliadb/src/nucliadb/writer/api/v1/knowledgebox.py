@@ -111,7 +111,6 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
 
     rollback_learning_config = partial(_rollback_learning_config, kbid)
     semantic_models = learning_config.into_semantic_models_metadata()
-    release_channel = item.release_channel.to_pb() if item.release_channel is not None else None
 
     external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
         type=knowledgebox_pb2.ExternalIndexProviderType.UNSET,
@@ -138,7 +137,6 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
             title=item.title or "",
             description=item.description or "",
             semantic_models=semantic_models,
-            release_channel=release_channel,
             external_index_provider=external_index_provider,
         )
 

@@ -105,3 +105,16 @@ class AuditStorage:
 
     def delete_kb(self, kbid: str):
         raise NotImplementedError
+
+    def feedback(
+        self,
+        kbid: str,
+        user: str,
+        client_type: int,
+        origin: str,
+        learning_id: str,
+        good: bool,
+        task: int,
+        feedback: Optional[str],
+    ):
+        raise NotImplementedError

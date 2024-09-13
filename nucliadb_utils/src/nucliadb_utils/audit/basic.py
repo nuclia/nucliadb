@@ -106,3 +106,16 @@ class BasicAuditStorage(AuditStorage):
 
     def delete_kb(self, kbid: str):
         logger.debug(f"DELETE_KB {kbid}")
+
+    def feedback(
+        self,
+        kbid: str,
+        user: str,
+        client_type: int,
+        origin: str,
+        learning_id: str,
+        good: bool,
+        task: int,
+        feedback: Optional[str],
+    ):
+        logger.debug(f"FEEDBACK {kbid} {user} {client_type} {origin}")

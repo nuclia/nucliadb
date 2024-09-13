@@ -29,7 +29,6 @@ use uuid::Uuid;
 use crate::metrics::vectors::MergeSource;
 use crate::prelude::*;
 use crate::query_language::BooleanExpression;
-use crate::Channel;
 use crate::IndexFiles;
 use nucliadb_protos::noderesources;
 
@@ -54,7 +53,6 @@ pub struct MergeContext {
 pub struct VectorIndexConfig {
     pub similarity: utils::VectorSimilarity,
     pub path: PathBuf,
-    pub channel: Channel,
     pub shard_id: String,
     pub normalize_vectors: bool,
 }

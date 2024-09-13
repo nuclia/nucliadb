@@ -93,12 +93,11 @@ class AbstractIndexNode(metaclass=ABCMeta):
     async def new_shard(
         self,
         kbid: str,
-        release_channel: utils_pb2.ReleaseChannel.ValueType,
         vector_index_config: VectorIndexConfig,
     ) -> noderesources_pb2.ShardCreated:
         req = NewShardRequest(
             kbid=kbid,
-            release_channel=release_channel,
+            release_channel=utils_pb2.ReleaseChannel.STABLE,
             config=vector_index_config,
             # Deprecated fields, only for backwards compatibility with older nodes
             similarity=vector_index_config.similarity,
@@ -111,12 +110,11 @@ class AbstractIndexNode(metaclass=ABCMeta):
     async def new_shard_with_vectorsets(
         self,
         kbid: str,
-        release_channel: utils_pb2.ReleaseChannel.ValueType,
         vectorsets_configs: dict[str, VectorIndexConfig],
     ) -> noderesources_pb2.ShardCreated:
         req = NewShardRequest(
             kbid=kbid,
-            release_channel=release_channel,
+            release_channel=utils_pb2.ReleaseChannel.STABLE,
             vectorsets_configs=vectorsets_configs,
         )
 

@@ -26,7 +26,6 @@ from nucliadb_models.text import TextFormat
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_text_field_in_json_format(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -59,7 +58,6 @@ async def test_text_field_in_json_format(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_text_field_with_invalid_json(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

@@ -33,31 +33,23 @@ from nucliadb.ingest.orm.knowledgebox import (
 )
 from nucliadb.purge import purge_kb, purge_kb_storage
 from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
-from nucliadb_models.resource import ReleaseChannel
 from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "release_channel",
-    [ReleaseChannel.EXPERIMENTAL, ReleaseChannel.STABLE],
-)
 async def test_purge_deletes_everything_from_maindb(
     maindb_driver: Driver,
     storage: Storage,
     nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
-    release_channel: str,
 ):
     """Create a KB and some resource and then purge it. Validate that purge
     removes every key from maindb
 
     """
     kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_manager.post(
-        "/kbs", json={"slug": kb_slug, "release_channel": release_channel}
-    )
+    resp = await nucliadb_manager.post("/kbs", json={"slug": kb_slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -105,25 +97,18 @@ async def test_purge_deletes_everything_from_maindb(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "release_channel",
-    [ReleaseChannel.EXPERIMENTAL, ReleaseChannel.STABLE],
-)
 async def test_purge_orphan_shards(
     maindb_driver: Driver,
     storage: Storage,
     nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
-    release_channel: str,
 ):
     """Create a KB with some resource (hence a shard) and delete it. Simulate an
     index node is down and validate orphan shards purge works as expected.
 
     """
     kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_manager.post(
-        "/kbs", json={"slug": kb_slug, "release_channel": release_channel}
-    )
+    resp = await nucliadb_manager.post("/kbs", json={"slug": kb_slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -172,16 +157,11 @@ async def test_purge_orphan_shards(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "release_channel",
-    [ReleaseChannel.EXPERIMENTAL, ReleaseChannel.STABLE],
-)
 async def test_purge_orphan_shard_detection(
     maindb_driver: Driver,
     storage: Storage,
     nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
-    release_channel: str,
 ):
     """Prepare a situation where there are:
     - a regular KB
@@ -192,9 +172,7 @@ async def test_purge_orphan_shard_detection(
     """
     # Regular KB
     kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_manager.post(
-        "/kbs", json={"slug": kb_slug, "release_channel": release_channel}
-    )
+    resp = await nucliadb_manager.post("/kbs", json={"slug": kb_slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -203,7 +181,6 @@ async def test_purge_orphan_shard_detection(
     node = random.choice(available_nodes)
     orphan_shard = await node.new_shard(
         kbid="deleted-kb",
-        release_channel=utils_pb2.ReleaseChannel.STABLE,
         vector_index_config=nodewriter_pb2.VectorIndexConfig(
             similarity=utils_pb2.VectorSimilarity.COSINE,
             normalize_vectors=False,

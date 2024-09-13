@@ -23,7 +23,7 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use nucliadb_core::{node_error, protos, Channel, NodeResult};
+use nucliadb_core::{node_error, protos, NodeResult};
 use serde::*;
 
 use crate::disk_structure;
@@ -73,7 +73,6 @@ impl From<Similarity> for protos::VectorSimilarity {
 pub struct ShardMetadataFile {
     pub kbid: String,
     pub id: String,
-    pub channel: Channel,
 }
 
 #[derive(Default, Debug)]
@@ -81,7 +80,6 @@ pub struct ShardMetadata {
     shard_path: PathBuf,
     id: String,
     kbid: String,
-    channel: Channel,
 
     // A generation id is a way to track if a shard has changed.
     // A new id means that something in the shard has changed.
@@ -103,17 +101,15 @@ impl ShardMetadata {
             shard_path,
             kbid: metadata.kbid,
             id: metadata.id,
-            channel: metadata.channel,
             generation_id: RwLock::new(None),
         })
     }
 
-    pub fn new(shard_path: PathBuf, id: String, kbid: String, channel: Channel) -> ShardMetadata {
+    pub fn new(shard_path: PathBuf, id: String, kbid: String) -> ShardMetadata {
         ShardMetadata {
             shard_path,
             kbid,
             id,
-            channel,
             generation_id: RwLock::new(None),
         }
     }
@@ -133,7 +129,6 @@ impl ShardMetadata {
             &ShardMetadataFile {
                 kbid: self.kbid.clone(),
                 id: self.id.clone(),
-                channel: self.channel,
             },
         )?;
         writer.flush()?;
@@ -151,10 +146,6 @@ impl ShardMetadata {
 
     pub fn kbid(&self) -> String {
         self.kbid.clone()
-    }
-
-    pub fn channel(&self) -> Channel {
-        self.channel
     }
 
     pub fn id(&self) -> String {
@@ -247,13 +238,11 @@ mod test {
     #[test]
     fn create() {
         let dir = TempDir::new().unwrap();
-        let meta =
-            ShardMetadata::new(dir.path().to_path_buf(), "ID".to_string(), "KB".to_string(), Channel::EXPERIMENTAL);
+        let meta = ShardMetadata::new(dir.path().to_path_buf(), "ID".to_string(), "KB".to_string());
         meta.serialize_metadata().unwrap();
         let meta_disk = ShardMetadata::open(dir.path().to_path_buf()).unwrap();
         assert_eq!(meta.kbid, meta_disk.kbid);
         assert_eq!(meta.id, meta_disk.id);
-        assert_eq!(meta.channel, meta_disk.channel);
     }
 
     #[test]
@@ -281,8 +270,7 @@ mod test {
     #[test]
     fn test_cache_generation_id() {
         let dir = TempDir::new().unwrap();
-        let meta =
-            ShardMetadata::new(dir.path().to_path_buf(), "ID".to_string(), "KB".to_string(), Channel::EXPERIMENTAL);
+        let meta = ShardMetadata::new(dir.path().to_path_buf(), "ID".to_string(), "KB".to_string());
         let gen_id = meta.get_generation_id();
         assert_eq!(gen_id, meta.get_generation_id());
         // assert!(meta.generation_id.read().unwrap().is_none());

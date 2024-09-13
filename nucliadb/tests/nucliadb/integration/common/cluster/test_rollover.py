@@ -41,7 +41,6 @@ async def app_context(natsd, storage, nucliadb):
     await ctx.finalize()
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_rollover_kb_index(
     app_context: ApplicationContext,
     knowledgebox,
@@ -113,7 +112,6 @@ async def _test_rollover_kb_index(
     assert len(body["resources"]) == count
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_rollover_kb_index_does_a_clean_cutover(
     app_context,
     knowledgebox,
@@ -131,7 +129,6 @@ async def test_rollover_kb_index_does_a_clean_cutover(
     assert shards2.extra == {}
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_rollover_kb_index_handles_changes_in_between(
     app_context,
     knowledgebox,

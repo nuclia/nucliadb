@@ -52,7 +52,6 @@ async def get_question_answer_streaming_batch_from_response(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_question_answer_streaming(
     train_rest_api: aiohttp.ClientSession,
     nucliadb_grpc: WriterStub,
@@ -161,7 +160,6 @@ def smb_wonder_bm(kbid: str) -> BrokerMessage:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_question_answer_streaming_streams_qa_annotations(
     train_rest_api: aiohttp.ClientSession,
     writer_rest_api: aiohttp.ClientSession,
