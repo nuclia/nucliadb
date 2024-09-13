@@ -87,4 +87,4 @@ async def send_feedback(
             feedback=item.feedback,
         )
     else:
-        logger.warning("Can't send feedback to audit stream")
+        logger.warning("Can't create feedback to audit stream")
