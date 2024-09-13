@@ -87,23 +87,23 @@ class CappedPromptContext:
         self._size = 0
 
     def __setitem__(self, key: str, value: str) -> None:
+        prev_value_len = len(self.output.get(key, ""))
         if self.max_size is None:
-            # Unbounded size
-            self.output[key] = value
+            # Unbounded size context
+            to_add = value
         else:
-            existing_len = len(self.output.get(key, ""))
-            self._size -= existing_len
-            size_available = self.max_size - self._size
-            if size_available > 0:
-                self.output[key] = value[:size_available]
-                self._size += len(self.output[key])
+            # Make sure we don't exceed the max size
+            size_available = max(self.max_size - self._size + prev_value_len, 0)
+            to_add = value[:size_available]
+        self.output[key] = to_add
+        self._size = self._size - prev_value_len + len(to_add)
 
     def __getitem__(self, key: str) -> str:
         return self.output.__getitem__(key)
 
     def __delitem__(self, key: str) -> None:
-        self._size -= len(self.output[key])
-        del self.output[key]
+        value = self.output.pop(key, "")
+        self._size -= len(value)
 
     def text_block_ids(self) -> list[str]:
         return list(self.output.keys())
@@ -290,10 +290,10 @@ async def full_resource_prompt_context(
         max_concurrent=MAX_RESOURCE_TASKS,
     )
     added_fields = set()
-    for resource_extracted_text in resources_extracted_texts:
-        if resource_extracted_text is None:
+    for resource_extracted_texts in resources_extracted_texts:
+        if resource_extracted_texts is None:
             continue
-        for field, extracted_text in resource_extracted_text:
+        for field, extracted_text in resource_extracted_texts:
             # First off, remove the text block ids from paragraphs that belong to
             # the same field, as otherwise the context will be duplicated.
             for tb_id in context.text_block_ids():
@@ -305,8 +305,8 @@ async def full_resource_prompt_context(
 
     if strategy.include_remaining_text_blocks:
         for paragraph in ordered_paragraphs:
-            tb_id = parse_text_block_id(paragraph.id)
-            if tb_id.field_id.full() not in added_fields:
+            pid = cast(ParagraphId, parse_text_block_id(paragraph.id))
+            if pid.field_id.full() not in added_fields:
                 context[paragraph.id] = _clean_paragraph_text(paragraph)
 
 
