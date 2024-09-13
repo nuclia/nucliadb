@@ -21,26 +21,19 @@
 mod common;
 
 use common::{NodeFixture, TestNodeReader, TestNodeWriter};
-use nucliadb_core::protos::{EmptyQuery, GetShardRequest, NewShardRequest, ReleaseChannel, ShardId};
+use nucliadb_core::protos::{EmptyQuery, GetShardRequest, NewShardRequest, ShardId};
 use rstest::*;
 use tonic::Request;
 
 #[rstest]
 #[tokio::test]
-async fn test_create_shard(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest {
-            release_channel: release_channel.into(),
-            ..Default::default()
-        }))
-        .await?;
+    let new_shard_response = writer.new_shard(Request::new(NewShardRequest::default())).await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     let response = reader
@@ -59,9 +52,7 @@ async fn test_create_shard(
 
 #[rstest]
 #[tokio::test]
-async fn test_shard_metadata(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_shard_metadata() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
@@ -70,12 +61,10 @@ async fn test_shard_metadata(
     async fn create_shard_with_metadata(
         writer: &mut TestNodeWriter,
         kbid: String,
-        release_channel: ReleaseChannel,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let shard = writer
             .new_shard(Request::new(NewShardRequest {
                 kbid,
-                release_channel: release_channel.into(),
                 ..Default::default()
             }))
             .await?
@@ -111,11 +100,11 @@ async fn test_shard_metadata(
     const KB2: &str = "KB2";
 
     // Used to validate correct creation
-    let shard_0 = create_shard_with_metadata(&mut writer, KB0.to_string(), release_channel).await?;
+    let shard_0 = create_shard_with_metadata(&mut writer, KB0.to_string()).await?;
     // Used to check 1 is not overwritting 0
-    let shard_1 = create_shard_with_metadata(&mut writer, KB1.to_string(), release_channel).await?;
+    let shard_1 = create_shard_with_metadata(&mut writer, KB1.to_string()).await?;
     // Used to validate correct creation when there are more shards
-    let shard_2 = create_shard_with_metadata(&mut writer, KB2.to_string(), release_channel).await?;
+    let shard_2 = create_shard_with_metadata(&mut writer, KB2.to_string()).await?;
 
     validate_shard_metadata(&mut reader, shard_0, KB0.to_string()).await?;
     validate_shard_metadata(&mut reader, shard_1, KB1.to_string()).await?;
@@ -126,9 +115,7 @@ async fn test_shard_metadata(
 
 #[rstest]
 #[tokio::test]
-async fn test_list_shards(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
@@ -136,7 +123,7 @@ async fn test_list_shards(
     let current =
         writer.list_shards(Request::new(EmptyQuery {})).await?.get_ref().ids.iter().map(|s| s.id.clone()).len();
 
-    let request_ids = create_shards(&mut writer, 5, release_channel).await;
+    let request_ids = create_shards(&mut writer, 5).await;
 
     let response = writer.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
 
@@ -151,9 +138,7 @@ async fn test_list_shards(
 
 #[rstest]
 #[tokio::test]
-async fn test_delete_shards(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> anyhow::Result<()> {
+async fn test_delete_shards() -> anyhow::Result<()> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
@@ -161,7 +146,7 @@ async fn test_delete_shards(
     let current =
         writer.list_shards(Request::new(EmptyQuery {})).await?.get_ref().ids.iter().map(|s| s.id.clone()).len();
 
-    let request_ids = create_shards(&mut writer, 5, release_channel).await;
+    let request_ids = create_shards(&mut writer, 5).await;
 
     for (id, expected) in request_ids.iter().map(|v| (v.clone(), v.clone())) {
         let response = writer
@@ -181,17 +166,12 @@ async fn test_delete_shards(
     Ok(())
 }
 
-async fn create_shards(writer: &mut TestNodeWriter, n: usize, release_channel: ReleaseChannel) -> Vec<String> {
+async fn create_shards(writer: &mut TestNodeWriter, n: usize) -> Vec<String> {
     let mut shard_ids = Vec::with_capacity(n);
 
     for _ in 0..n {
-        let response = writer
-            .new_shard(Request::new(NewShardRequest {
-                release_channel: release_channel.into(),
-                ..Default::default()
-            }))
-            .await
-            .expect("Error in new_shard request");
+        let response =
+            writer.new_shard(Request::new(NewShardRequest::default())).await.expect("Error in new_shard request");
 
         shard_ids.push(response.get_ref().id.clone());
     }

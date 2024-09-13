@@ -24,7 +24,6 @@ use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::relations::*;
-use nucliadb_core::Channel;
 use nucliadb_relations2::writer::RelationsWriterService;
 use tempfile::TempDir;
 
@@ -33,7 +32,6 @@ fn test_index_docs() -> NodeResult<()> {
     let dir = TempDir::new().unwrap();
     let config = RelationConfig {
         path: dir.path().join("relations"),
-        channel: Channel::EXPERIMENTAL,
     };
 
     let mut writer = RelationsWriterService::create(config).unwrap();

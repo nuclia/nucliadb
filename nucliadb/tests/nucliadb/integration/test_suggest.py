@@ -27,7 +27,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_suggest_paragraphs(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
@@ -151,9 +150,6 @@ async def test_suggest_paragraphs(
 
 
 @pytest.mark.asyncio
-# Old relations gives different suggest results. They are better but still different
-# so we are not testing them for now.
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL",), indirect=True)
 async def test_suggest_related_entities(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox, request
 ):
@@ -262,7 +258,6 @@ async def test_suggest_related_entities(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_suggestion_on_link_computed_titles_sc6088(
     nucliadb_writer,
     nucliadb_grpc,
@@ -320,7 +315,6 @@ async def test_suggestion_on_link_computed_titles_sc6088(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_suggest_features(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,

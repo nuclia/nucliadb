@@ -42,7 +42,6 @@ def audit():
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -71,7 +70,6 @@ def find_incomplete_results():
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_handles_incomplete_find_results(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -99,7 +97,6 @@ async def resource(nucliadb_writer, knowledgebox):
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resource):
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
@@ -114,7 +111,6 @@ async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resou
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, resource):
     citations = {"foo": [], "bar": []}  # type: ignore
     citations_gen = CitationsGenerativeResponse(citations=citations)
@@ -136,7 +132,6 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, re
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize("debug", (True, False))
 async def test_sync_ask_returns_prompt_context(
     nucliadb_reader: AsyncClient, knowledgebox, resource, debug
@@ -188,7 +183,6 @@ def parse_ask_response(resp):
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resource1, resource2 = resources
 
@@ -221,7 +215,6 @@ async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowl
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resource1, resource2 = resources
 
@@ -342,7 +335,6 @@ async def test_ask_rag_strategies_validation(nucliadb_reader, invalid_payload, e
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox, resources):
     # By default, max size is big enough to fit all the prompt context
     resp = await nucliadb_reader.post(
@@ -388,7 +380,6 @@ async def test_ask_on_a_kb_not_found(nucliadb_reader):
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_max_tokens(nucliadb_reader, knowledgebox, resources):
     # As an integer
     resp = await nucliadb_reader.post(
@@ -423,7 +414,6 @@ async def test_ask_max_tokens(nucliadb_reader, knowledgebox, resources):
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox, resource):
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/resource/{resource}/ask",
@@ -435,7 +425,6 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox, resou
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_handles_stream_errors_on_predict(nucliadb_reader, knowledgebox, resource):
     predict = get_predict()
     prev = predict.ndjson_answer.copy()
@@ -472,7 +461,6 @@ async def test_ask_handles_stream_errors_on_predict(nucliadb_reader, knowledgebo
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_handles_stream_unexpected_errors_sync(nucliadb_reader, knowledgebox, resource):
     with mock.patch(
         "nucliadb.search.search.chat.ask.AskResult._stream",
@@ -488,7 +476,6 @@ async def test_ask_handles_stream_unexpected_errors_sync(nucliadb_reader, knowle
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_handles_stream_unexpected_errors_stream(nucliadb_reader, knowledgebox, resource):
     with mock.patch(
         "nucliadb.search.search.chat.ask.AskResult._stream",
@@ -509,7 +496,6 @@ async def test_ask_handles_stream_unexpected_errors_stream(nucliadb_reader, know
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_with_json_schema_output(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -544,7 +530,6 @@ async def test_ask_with_json_schema_output(
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_assert_audit_retrieval_contexts(
     nucliadb_reader: AsyncClient, knowledgebox, resources, audit
 ):
@@ -558,7 +543,6 @@ async def test_ask_assert_audit_retrieval_contexts(
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_rag_strategy_neighbouring_paragraphs(
     nucliadb_reader: AsyncClient, knowledgebox, resources
 ):
@@ -579,7 +563,6 @@ async def test_ask_rag_strategy_neighbouring_paragraphs(
 pytest.mark.asyncio()
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_rag_strategy_metadata_extension(
     nucliadb_reader: AsyncClient, knowledgebox, resources
 ):
@@ -644,7 +627,6 @@ async def test_ask_rag_strategy_metadata_extension(
         assert origin_found, ask_response.prompt_context
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
@@ -673,7 +655,6 @@ async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox, resources):
     assert ask_response.retrieval_results.best_matches[0] == prev_best_matches[0]
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",

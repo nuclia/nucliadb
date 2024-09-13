@@ -31,7 +31,7 @@ use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{
     EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode, RelationNodeFilter,
-    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, ReleaseChannel, Resource, ResourceId,
+    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, Resource, ResourceId,
 };
 use rstest::*;
 use tonic::Request;
@@ -323,20 +323,13 @@ async fn create_knowledge_graph(writer: &mut TestNodeWriter, shard_id: String) -
 
 #[rstest]
 #[tokio::test]
-async fn test_search_relations_prefixed(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest {
-            release_channel: release_channel.into(),
-            ..Default::default()
-        }))
-        .await?;
+    let new_shard_response = writer.new_shard(Request::new(NewShardRequest::default())).await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     let _nodes = create_knowledge_graph(&mut writer, shard_id.clone()).await;
@@ -481,20 +474,13 @@ async fn test_search_relations_prefixed(
 
 #[rstest]
 #[tokio::test]
-async fn test_search_relations_neighbours(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest {
-            release_channel: release_channel.into(),
-            ..Default::default()
-        }))
-        .await?;
+    let new_shard_response = writer.new_shard(Request::new(NewShardRequest::default())).await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     let relation_nodes = create_knowledge_graph(&mut writer, shard_id.clone()).await;

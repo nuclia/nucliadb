@@ -39,7 +39,6 @@ async def app_context(natsd, storage, nucliadb):
     await ctx.finalize()
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_rebalance_kb_shards(
     app_context,
     knowledgebox,

@@ -28,7 +28,6 @@ use nucliadb_core::protos::{
     ResourceId,
 };
 use nucliadb_core::relations::*;
-use nucliadb_core::Channel;
 use nucliadb_relations2::reader::RelationsReaderService;
 use nucliadb_relations2::writer::RelationsWriterService;
 use tempfile::TempDir;
@@ -38,7 +37,6 @@ fn create_reader() -> NodeResult<RelationsReaderService> {
     let shard_path = dir.path().join("relations");
     let config = RelationConfig {
         path: shard_path.clone(),
-        channel: Channel::EXPERIMENTAL,
     };
 
     let mut writer = RelationsWriterService::create(config)?;
@@ -128,7 +126,6 @@ fn test_start_new_reader_after_a_writer() -> NodeResult<()> {
     let shard_path = dir.path().join("relations");
     let config = RelationConfig {
         path: shard_path.clone(),
-        channel: Channel::EXPERIMENTAL,
     };
 
     let _writer = RelationsWriterService::create(config)?;

@@ -41,7 +41,6 @@ def nuclia_jwt_key():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_external_file_field(
     nuclia_jwt_key,
     nucliadb_reader,

@@ -227,7 +227,7 @@ impl ShardReader {
         Ok(Shard {
             metadata: Some(protos::ShardMetadata {
                 kbid: self.metadata.kbid(),
-                release_channel: self.metadata.channel() as i32,
+                release_channel: 0,
             }),
             shard_id: self.id.clone(),
             // naming issue here, this is not number of resource

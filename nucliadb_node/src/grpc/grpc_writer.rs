@@ -38,7 +38,7 @@ use nucliadb_core::protos::{
     ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, Span, *};
-use nucliadb_core::{Channel, NodeResult};
+use nucliadb_core::NodeResult;
 use nucliadb_vectors::config::VectorConfig;
 use object_store::path::Path;
 use std::collections::HashMap;
@@ -122,7 +122,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let kbid = request.kbid.clone();
         let shard_id = uuid::Uuid::new_v4().to_string();
-        let channel = Channel::from(request.release_channel());
 
         #[allow(deprecated)]
         let vector_configs = if !request.vectorsets_configs.is_empty() {
@@ -160,7 +159,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
             shards.create(NewShard {
                 kbid,
                 shard_id,
-                channel,
                 vector_configs,
             })
         })

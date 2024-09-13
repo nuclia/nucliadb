@@ -59,7 +59,6 @@ VECTORSET_DIMENSION = 12
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -114,7 +113,6 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     [(None, ""), ("", ""), ("myvectorset", "myvectorset")],
 )
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_vectorset_parameter_without_default_vectorset(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -173,7 +171,6 @@ async def test_vectorset_parameter_without_default_vectorset(
     [(None, "multilingual"), ("", "multilingual"), ("myvectorset", "myvectorset")],
 )
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_vectorset_parameter_with_default_vectorset(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,

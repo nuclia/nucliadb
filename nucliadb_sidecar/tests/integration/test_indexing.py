@@ -44,7 +44,6 @@ TEST_PARTITION = "111"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_indexing(worker, shard: str, reader: Reader):
     node = settings.force_host_id
 
@@ -83,7 +82,6 @@ async def test_indexing(worker, shard: str, reader: Reader):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_prioritary_indexing_on_one_shard(
     worker,
     shard: str,
@@ -210,7 +208,6 @@ class TestConcurrentIndexingFailureRecovery:
         settings.indexer_delay_after_error = original_delay
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("bunch_of_shards", ("EXPERIMENTAL", "STABLE"), indirect=True)
     async def test(
         self,
         bunch_of_shards: list[str],
@@ -289,7 +286,6 @@ async def test_indexing_not_found(worker, reader):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("shard", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, natsd):
     node_id = settings.force_host_id
     assert node_id

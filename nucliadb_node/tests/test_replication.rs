@@ -25,8 +25,8 @@ use std::sync::Arc;
 
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
-    op_status, IndexParagraphs, NewShardRequest, NewVectorSetRequest, ReleaseChannel, SearchRequest, SearchResponse,
-    ShardId, VectorSetId,
+    op_status, IndexParagraphs, NewShardRequest, NewVectorSetRequest, SearchRequest, SearchResponse, ShardId,
+    VectorSetId,
 };
 use nucliadb_node::replication::health::ReplicationHealthManager;
 use rstest::*;
@@ -34,9 +34,7 @@ use tonic::Request;
 
 #[rstest]
 #[tokio::test]
-async fn test_search_replicated_data(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?.with_secondary_reader().await?;
     let mut writer = fixture.writer_client();
@@ -45,7 +43,7 @@ async fn test_search_replicated_data(
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    let shard = create_shard(&mut writer, release_channel).await;
+    let shard = create_shard(&mut writer).await;
 
     let mut query = create_search_request(&shard.id, "prince", None);
     query.vector = vec![0.5, 0.5, 0.5];
@@ -107,11 +105,8 @@ struct ShardDetails {
     id: String,
 }
 
-async fn create_shard(writer: &mut TestNodeWriter, release_channel: ReleaseChannel) -> ShardDetails {
-    let request = Request::new(NewShardRequest {
-        release_channel: release_channel.into(),
-        ..Default::default()
-    });
+async fn create_shard(writer: &mut TestNodeWriter) -> ShardDetails {
+    let request = Request::new(NewShardRequest::default());
     let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
     create_test_resources(writer, shard_id.clone(), None).await;
@@ -194,7 +189,7 @@ async fn test_replicate_vectorsets() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    let shard = create_shard(&mut writer, ReleaseChannel::Experimental).await;
+    let shard = create_shard(&mut writer).await;
 
     // Create a vectorset and insert something
     let request = Request::new(NewVectorSetRequest {
