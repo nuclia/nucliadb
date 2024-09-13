@@ -75,6 +75,7 @@ async def send_feedback(
     await predict.send_feedback(kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
     audit = get_audit()
     if audit is not None:
+        logger.info(f"Sending feedback audit event {kbid} {item.ident}")
         audit.feedback(
             kbid=kbid,
             user=x_nucliadb_user,
@@ -85,3 +86,5 @@ async def send_feedback(
             task=item.task.to_proto(),
             feedback=item.feedback,
         )
+    else:
+        logger.warning("Can't send feedback to audit stream")
