@@ -2,9 +2,14 @@ name: Deploy
 
 on:
   workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        default: "stage"
 
 concurrency:
-  group: deploy_workflow
+  group: deploy_workflow-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -95,11 +100,31 @@ jobs:
 
     - name: Repository Dispatch
       uses: peter-evans/repository-dispatch@v3
+      if: ${{ inputs.environment == 'stage' }}
       with:
         token: ${{ steps.app-token.outputs.token }}
         repository: nuclia/nucliadb_deploy
         event-type: promote
         client-payload: '{"component": "nucliadb_shared", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+
+    - name: Checkout tooling repository
+      uses: actions/checkout@v4
+      if: ${{ inputs.environment == 'dev' }}
+      with:
+        repository: nuclia/tooling
+        ref: main
+        token: ${{ steps.app-token.outputs.token }}
+    
+    - name: Promote to Nuclia
+      uses: ./.github/actions/promote
+      if: ${{ inputs.environment == 'dev' }}
+      with:
+        component: nucliadb_shared
+        chart-version: ${{ steps.version_step.outputs.version_number }}
+        environment: ${{ inputs.environment }}
+        ghapp-nuclia-service-bot-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+        ghapp-nuclia-service-bot-pk: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+        argocd-appset-file: "./repo-core-apps/apps/nucliadb_shared.applicationSet.yaml"
 
   deploy-nucliadb-node:
     name: Deploy Node
@@ -157,11 +182,31 @@ jobs:
 
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v3
+        if: ${{ inputs.environment == 'stage' }}
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/nucliadb_deploy
           event-type: promote
           client-payload: '{"component": "nucliadb_node", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+
+      - name: Checkout tooling repository
+        uses: actions/checkout@v4
+        if: ${{ inputs.environment == 'dev' }}
+        with:
+          repository: nuclia/tooling
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Promote to Nuclia
+        uses: ./.github/actions/promote
+        if: ${{ inputs.environment == 'dev' }}
+        with:
+          component: nucliadb_node
+          chart-version: ${{ steps.version_step.outputs.version_number }}
+          environment: ${{ inputs.environment }}
+          ghapp-nuclia-service-bot-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+          ghapp-nuclia-service-bot-pk: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+          argocd-appset-file: "./repo-core-apps/apps/nucliadb_node.applicationSet.yaml"
 
   deploy-nucliadb-component:
     name: Deploy NucliaDB component
@@ -228,8 +273,28 @@ jobs:
 
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v3
+        if: ${{ inputs.environment == 'stage' }}
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: nuclia/nucliadb_deploy
           event-type: promote
           client-payload: '{"component": "nucliadb_${{ matrix.component }}", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+
+      - name: Checkout tooling repository
+        uses: actions/checkout@v4
+        if: ${{ inputs.environment == 'dev' }}
+        with:
+          repository: nuclia/tooling
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Promote to Nuclia
+        uses: ./.github/actions/promote
+        if: ${{ inputs.environment == 'dev' }}
+        with:
+          component: nucliadb_${{ matrix.component }}
+          chart-version: ${{ steps.version_step.outputs.version_number }}
+          environment: ${{ inputs.environment }}
+          ghapp-nuclia-service-bot-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+          ghapp-nuclia-service-bot-pk: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+          argocd-appset-file: "./repo-core-apps/apps/nucliadb_${{ matrix.component }}.applicationSet.yaml"
