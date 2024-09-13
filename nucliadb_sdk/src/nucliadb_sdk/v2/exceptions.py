@@ -16,6 +16,9 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from typing import Optional
+
+
 class ClientError(Exception):
     pass
 
@@ -33,7 +36,9 @@ class AccountLimitError(ClientError):
 
 
 class RateLimitError(ClientError):
-    pass
+    def __init__(self, message, try_after: Optional[float] = None):
+        super().__init__(message)
+        self.try_after = try_after
 
 
 class ConflictError(ClientError):

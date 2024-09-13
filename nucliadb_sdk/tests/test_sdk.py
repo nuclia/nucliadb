@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import httpx
 import pytest
 
 import nucliadb_sdk
@@ -103,3 +104,44 @@ def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.get_models(kbid=kb.uuid)
     sdk.get_model(kbid=kb.uuid, model_id="foo")
     sdk.get_configuration_schema(kbid=kb.uuid)
+
+
+def test_check_response():
+    sdk = nucliadb_sdk.NucliaDB(region="europe-1")
+
+    response = httpx.Response(200)
+    assert sdk._check_response(response) is response
+
+    response = httpx.Response(299)
+    assert sdk._check_response(response) is response
+
+    with pytest.raises(nucliadb_sdk.exceptions.UnknownError) as err:
+        sdk._check_response(httpx.Response(300, text="foo"))
+        assert str(err.value) == "Unknown error connecting to API: 300: foo"
+
+    for status_code in (401, 403):
+        with pytest.raises(nucliadb_sdk.exceptions.AuthError) as err:
+            sdk._check_response(httpx.Response(status_code, text="foo"))
+            assert str(err.value) == f"Auth error {status_code}: foo"
+
+    with pytest.raises(nucliadb_sdk.exceptions.AccountLimitError) as err:
+        sdk._check_response(httpx.Response(402, text="foo"))
+        assert str(err.value) == f"Account limits exceeded error {status_code}: foo"
+
+    with pytest.raises(nucliadb_sdk.exceptions.RateLimitError) as err:
+        sdk._check_response(httpx.Response(429, json={"detail": {"try_after": 1}}, text="Rate limit!"))
+        assert str(err.value) == f"Rate limit!"
+        assert err.value.try_after == 1
+
+    for status_code in (409, 419):
+        with pytest.raises(nucliadb_sdk.exceptions.ConflictError) as err:
+            sdk._check_response(httpx.Response(status_code, text="foo"))
+            assert str(err.value) == "foo"
+
+    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError) as err:
+        sdk._check_response(
+            httpx.Response(
+                404, text="foo", request=httpx.Request(method="GET", url=httpx.URL("http://url"))
+            ),
+        )
+        assert str(err.value) == "Resource not found at http://url: foo"
