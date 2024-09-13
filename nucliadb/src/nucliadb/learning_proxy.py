@@ -476,27 +476,32 @@ class InMemoryLearningConfig(LearningConfigService):
     async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:
         if not config:
             # generate a default config
-            config.update(
-                {
-                    "semantic_model": "multilingual",
-                    "semantic_vector_similarity": "dot",
-                    "semantic_vector_size": 512,
-                    "semantic_threshold": 0.7,
-                    "semantic_matryoshka_dims": [],
-                    "semantic_models": ["multilingual"],
-                    "semantic_model_configs": {
-                        "multilingual": {
-                            "similarity": SimilarityFunction.DOT,
-                            "size": 512,
-                            "threshold": 0.7,
-                            "matryoshka_dims": [],
-                        }
-                    },
-                }
+            default_model = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
+            size = 768 if default_model == "multilingual-2023-02-21" else 512
+            # XXX for some reason, we override the model name and set this one
+            # default_model = "multilingual"
+            learning_config = LearningConfiguration(
+                semantic_model=default_model,
+                semantic_vector_similarity="cosine",
+                semantic_vector_size=size,
+                semantic_threshold=None,
+                semantic_matryoshka_dims=[],
+                semantic_models=[default_model],
+                semantic_model_configs={
+                    default_model: SemanticConfig(
+                        similarity=SimilarityFunction.COSINE,
+                        size=size,
+                        threshold=0,
+                        matryoshka_dims=[],
+                    )
+                },
             )
-        parsed_config = LearningConfiguration.model_validate(config)
-        _IN_MEMORY_CONFIGS[kbid] = parsed_config
-        return parsed_config
+
+        else:
+            learning_config = LearningConfiguration.model_validate(config)
+
+        _IN_MEMORY_CONFIGS[kbid] = learning_config
+        return learning_config
 
     async def delete_configuration(self, kbid: str) -> None:
         _IN_MEMORY_CONFIGS.pop(kbid, None)
