@@ -478,7 +478,7 @@ async def test_chat_query_ndjson():
 
     chat_query_response = Mock()
     chat_query_response.status = 200
-    chat_query_response.headers = {"NUCLIA-LEARNING-ID": "learning-id"}
+    chat_query_response.headers = {"NUCLIA-LEARNING-ID": "learning-id", "NUCLIA-LEARNING-MODEL": "chatgpt"}
     chat_query_response.content = _content()
     pe.session = mock.Mock()
     pe.session.post = AsyncMock(return_value=chat_query_response)
@@ -488,7 +488,7 @@ async def test_chat_query_ndjson():
     learning_id, learning_model, generator = await pe.chat_query_ndjson("kbid", item)
 
     assert learning_id == "learning-id"
-    assert learning_model == "xx"
+    assert learning_model == "chatgpt"
     parsed = [line async for line in generator]
     assert len(parsed) == 2
     assert parsed[0].chunk == TextGenerativeResponse(text="foo")
