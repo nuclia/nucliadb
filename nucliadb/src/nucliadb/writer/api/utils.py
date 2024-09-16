@@ -17,33 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from enum import Enum
+from functools import wraps
 
-from pydantic import BaseModel
+from fastapi import HTTPException
 
-
-class CreateExportResponse(BaseModel):
-    export_id: str
+from nucliadb_utils.settings import is_onprem_nucliadb
 
 
-class CreateImportResponse(BaseModel):
-    import_id: str
+def only_for_onprem(fun):
+    @wraps(fun)
+    async def endpoint_wrapper(*args, **kwargs):
+        if not is_onprem_nucliadb():
+            raise HTTPException(
+                status_code=403,
+                detail="This endpoint is only available for onprem NucliaDB",
+            )
+        return await fun(*args, **kwargs)
 
-
-class NewImportedKbResponse(BaseModel):
-    kbid: str
-    slug: str
-
-
-class Status(str, Enum):
-    SCHEDULED = "scheduled"
-    RUNNING = "running"
-    FINISHED = "finished"
-    ERRORED = "errored"
-
-
-class StatusResponse(BaseModel):
-    status: Status
-    total: int = 0
-    processed: int = 0
-    retries: int = 0
+    return endpoint_wrapper

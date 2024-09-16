@@ -51,6 +51,7 @@ from nucliadb_models.entities import (
 from nucliadb_models.export_import import (
     CreateExportResponse,
     CreateImportResponse,
+    NewImportedKbResponse,
     StatusResponse,
 )
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
@@ -682,6 +683,15 @@ class _NucliaDBBase:
         request_type=None,
         response_type=None,
         stream_response=True,
+    )
+
+    create_kb_from_import = _request_builder(
+        name="create_kb_from_import",
+        path_template="/v1/kbs/import",
+        method="POST",
+        path_params=(),
+        request_type=None,
+        response_type=NewImportedKbResponse,
     )
 
     start_import = _request_builder(

@@ -434,6 +434,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
+        auditrequest.type = AuditRequest.FEEDBACK
 
         auditrequest.feedback.learning_id = learning_id
         auditrequest.feedback.good = good
