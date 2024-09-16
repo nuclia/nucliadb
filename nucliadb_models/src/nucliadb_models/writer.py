@@ -86,6 +86,7 @@ class CreateResourcePayload(BaseModel):
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     origin: Optional[InputOrigin] = None
     extra: Optional[Extra] = None
+    hidden: Optional[bool] = None
 
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
@@ -136,6 +137,7 @@ class UpdateResourcePayload(BaseModel):
         title="Security",
         description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
     )
+    hidden: Optional[bool] = None
 
 
 class ResourceCreated(BaseModel):

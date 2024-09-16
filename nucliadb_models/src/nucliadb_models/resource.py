@@ -280,6 +280,7 @@ class Resource(BaseModel):
     last_seqid: Optional[int] = None
     last_account_seq: Optional[int] = None
     queue: Optional[QueueType] = None
+    hidden: Optional[bool] = None
 
     origin: Optional[Origin] = None
     extra: Optional[Extra] = None

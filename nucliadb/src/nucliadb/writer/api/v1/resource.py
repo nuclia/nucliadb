@@ -556,12 +556,16 @@ def needs_resource_reindex(item: UpdateResourcePayload) -> bool:
     # a resource and that means this message should force reindexing everything.
     # XXX This is not ideal. Long term, we should handle it differently
     # so this is not required
-    return item.usermetadata is not None or (
-        item.origin is not None
-        and (
-            item.origin.created is not None
-            or item.origin.modified is not None
-            or item.origin.metadata is not None
+    return (
+        item.usermetadata is not None
+        or item.hidden is not None
+        or (
+            item.origin is not None
+            and (
+                item.origin.created is not None
+                or item.origin.modified is not None
+                or item.origin.metadata is not None
+            )
         )
     )
 
