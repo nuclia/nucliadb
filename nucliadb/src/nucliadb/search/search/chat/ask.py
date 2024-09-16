@@ -649,10 +649,7 @@ async def retrieval_in_resource(
     origin: str,
     metrics: RAGMetrics,
 ) -> RetrievalResults:
-    skip_retrieval = resource is not None and any(
-        strategy.name == "full_resource" for strategy in ask_request.rag_strategies
-    )
-    if skip_retrieval:
+    if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
         # Retrieval is not needed if we are chatting on a specific resource and the full_resource strategy is enabled
         return RetrievalResults(
             main_query=KnowledgeboxFindResults(resources={}, min_score=None),
