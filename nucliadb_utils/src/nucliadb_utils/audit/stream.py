@@ -424,7 +424,6 @@ class StreamAuditStorage(AuditStorage):
     ):
         rcontext = get_request_context()
         if rcontext is None:
-            logger.warning("feedback context not found")
             return
 
         auditrequest = rcontext.audit_request
