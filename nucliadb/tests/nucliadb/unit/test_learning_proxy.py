@@ -25,9 +25,9 @@ import pytest
 from nucliadb.learning_proxy import (
     LearningConfiguration,
     LearningService,
+    ProxiedLearningConfig,
     delete_configuration,
     get_configuration,
-    learning_config_client,
     proxy,
     set_configuration,
 )
@@ -76,9 +76,14 @@ def async_client(config_response):
     client.post = mock.AsyncMock(return_value=config_response)
     client.patch = mock.AsyncMock(return_value=config_response)
     client.delete = mock.AsyncMock(return_value=config_response)
-    with mock.patch(f"{MODULE}.service_client") as mocked:
-        mocked.return_value.__aenter__.return_value = client
-        mocked.return_value.__aexit__.return_value = None
+    with (
+        mock.patch(f"{MODULE}.service_client") as service_client_mock,
+        mock.patch(f"{MODULE}.ProxiedLearningConfig._client") as proxy_client_mock,
+    ):
+        service_client_mock.return_value.__aenter__.return_value = client
+        service_client_mock.return_value.__aexit__.return_value = None
+        proxy_client_mock.return_value.__aenter__.return_value = client
+        proxy_client_mock.return_value.__aexit__.return_value = None
         yield client
 
 
@@ -93,13 +98,13 @@ def settings():
 
 
 async def test_get_learning_config_client_onprem(settings, onprem_nucliadb):
-    async with learning_config_client() as client:
+    async with ProxiedLearningConfig()._client() as client:
         assert str(client.base_url) == "http://europe-1.public-url/api/v1/"
         assert client.headers["X-NUCLIA-NUAKEY"] == f"Bearer service-account"
 
 
 async def test_get_learning_config_client_hosted(settings, hosted_nucliadb):
-    async with learning_config_client() as client:
+    async with ProxiedLearningConfig()._client() as client:
         assert str(client.base_url) == "http://config.learning.svc.cluster.local:8080/api/v1/internal/"
         assert "X-NUCLIA-NUAKEY" not in client.headers
 

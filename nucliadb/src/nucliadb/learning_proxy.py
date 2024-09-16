@@ -21,6 +21,7 @@ import contextlib
 import json
 import logging
 import os
+from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from enum import Enum, IntEnum
 from typing import Any, Optional, Union
@@ -29,6 +30,7 @@ import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
+from lru import LRU
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
@@ -98,8 +100,18 @@ class LearningConfiguration(BaseModel):
         default=None, alias="semantic_matryoshka_dims"
     )
 
+    semantic_models: list[str] = Field(default_factory=list)
+
     # This is where the config for each semantic model (aka vectorsets) is returned
-    semantic_model_configs: dict[str, SemanticConfig] = Field(default={})
+    semantic_model_configs: dict[str, SemanticConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def maintain_bw_compatibility_with_single_model_configs(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("semantic_model", None) and len(data.get("semantic_models", [])) > 0:
+                data["semantic_model"] = data["semantic_models"][0]
+        return data
 
     @model_validator(mode="after")
     def validate_matryoshka_and_vector_dimension_consistency(self) -> Self:
@@ -144,33 +156,20 @@ class LearningConfiguration(BaseModel):
 async def get_configuration(
     kbid: str,
 ) -> Optional[LearningConfiguration]:
-    async with learning_config_client() as client:
-        resp = await client.get(f"config/{kbid}")
-        try:
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as err:
-            if err.response.status_code == 404:
-                return None
-            raise
-        return LearningConfiguration.model_validate(resp.json())
+    return await learning_config_service().get_configuration(kbid)
 
 
 async def set_configuration(
     kbid: str,
     config: dict[str, Any],
 ) -> LearningConfiguration:
-    async with learning_config_client() as client:
-        resp = await client.post(f"config/{kbid}", json=config)
-        resp.raise_for_status()
-        return LearningConfiguration.model_validate(resp.json())
+    return await learning_config_service().set_configuration(kbid, config)
 
 
 async def delete_configuration(
     kbid: str,
 ) -> None:
-    async with learning_config_client() as client:
-        resp = await client.delete(f"config/{kbid}")
-        resp.raise_for_status()
+    return await learning_config_service().delete_configuration(kbid)
 
 
 async def learning_config_proxy(
@@ -418,3 +417,98 @@ class DummyClient(httpx.AsyncClient):
             return getattr(self, method)(*args, **kwargs)
         else:
             return self._response()
+
+
+class LearningConfigService(ABC):
+    @abstractmethod
+    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]: ...
+
+    @abstractmethod
+    async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration: ...
+
+    @abstractmethod
+    async def delete_configuration(self, kbid: str) -> None: ...
+
+
+class ProxiedLearningConfig(LearningConfigService):
+    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
+        async with self._client() as client:
+            resp = await client.get(f"config/{kbid}")
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as err:
+                if err.response.status_code == 404:
+                    return None
+                raise
+            return LearningConfiguration.model_validate(resp.json())
+
+    async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:
+        async with self._client() as client:
+            resp = await client.post(f"config/{kbid}", json=config)
+            resp.raise_for_status()
+            return LearningConfiguration.model_validate(resp.json())
+
+    async def delete_configuration(self, kbid: str) -> None:
+        async with self._client() as client:
+            resp = await client.delete(f"config/{kbid}")
+            resp.raise_for_status()
+
+    @contextlib.asynccontextmanager
+    async def _client(self) -> AsyncIterator[httpx.AsyncClient]:
+        async with httpx.AsyncClient(
+            base_url=get_base_url(LearningService.CONFIG),
+            headers=get_auth_headers(),
+        ) as client:
+            yield client
+
+
+_IN_MEMORY_CONFIGS: dict[str, LearningConfiguration]
+_IN_MEMORY_CONFIGS = LRU(50)  # type: ignore
+
+
+class InMemoryLearningConfig(LearningConfigService):
+    def __init__(self):
+        self.in_memory_configs = {}
+
+    async def get_configuration(self, kbid: str) -> Optional[LearningConfiguration]:
+        return _IN_MEMORY_CONFIGS.get(kbid, None)
+
+    async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:
+        if not config:
+            # generate a default config
+            default_model = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
+            size = 768 if default_model == "multilingual-2023-02-21" else 512
+            # XXX for some reason, we override the model name and set this one
+            # default_model = "multilingual"
+            learning_config = LearningConfiguration(
+                semantic_model=default_model,
+                semantic_vector_similarity="cosine",
+                semantic_vector_size=size,
+                semantic_threshold=None,
+                semantic_matryoshka_dims=[],
+                semantic_models=[default_model],
+                semantic_model_configs={
+                    default_model: SemanticConfig(
+                        similarity=SimilarityFunction.COSINE,
+                        size=size,
+                        threshold=0,
+                        matryoshka_dims=[],
+                    )
+                },
+            )
+
+        else:
+            learning_config = LearningConfiguration.model_validate(config)
+
+        _IN_MEMORY_CONFIGS[kbid] = learning_config
+        return learning_config
+
+    async def delete_configuration(self, kbid: str) -> None:
+        _IN_MEMORY_CONFIGS.pop(kbid, None)
+
+
+def learning_config_service() -> LearningConfigService:
+    if nuclia_settings.dummy_learning_services:
+        return InMemoryLearningConfig()
+    else:
+        return ProxiedLearningConfig()
