@@ -84,6 +84,40 @@ async def get_find_results(
     metrics: RAGMetrics = RAGMetrics(),
     prequeries: Optional[PreQueriesStrategy] = None,
 ) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], QueryParser]:
+    prequeries_results = None
+    if prequeries is not None:
+        with metrics.time("prequeries"):
+            prequeries_results = await run_prequeries(
+                kbid,
+                prequeries,
+                x_ndb_client=ndb_client,
+                x_nucliadb_user=user,
+                x_forwarded_for=origin,
+                generative_model=item.generative_model,
+                metrics=metrics,
+            )
+    with metrics.time("main_query"):
+        main_results, query_parser = await run_main_query(
+            kbid,
+            query,
+            item,
+            ndb_client,
+            user,
+            origin,
+            metrics=metrics,
+        )
+    return main_results, prequeries_results, query_parser
+
+
+async def run_main_query(
+    kbid: str,
+    query: str,
+    item: AskRequest,
+    ndb_client: NucliaDBClientType,
+    user: str,
+    origin: str,
+    metrics: RAGMetrics = RAGMetrics(),
+) -> tuple[KnowledgeboxFindResults, QueryParser]:
     find_request = FindRequest()
     find_request.resource_filters = item.resource_filters
     find_request.features = []
@@ -114,7 +148,6 @@ async def get_find_results(
     # We don't support pagination, we always get the top_k results.
     find_request.page_size = item.top_k
     find_request.page_number = 0
-
     find_results, incomplete, query_parser = await find(
         kbid,
         find_request,
@@ -126,21 +159,7 @@ async def get_find_results(
     )
     if incomplete:
         raise IncompleteFindResultsError()
-
-    prequeries_results = None
-    if prequeries is not None:
-        with metrics.time("prequeries"):
-            prequeries_results = await run_prequeries(
-                kbid,
-                prequeries,
-                x_ndb_client=ndb_client,
-                x_nucliadb_user=user,
-                x_forwarded_for=origin,
-                generative_model=item.generative_model,
-                metrics=metrics,
-            )
-
-    return find_results, prequeries_results, query_parser
+    return find_results, query_parser
 
 
 async def get_relations_results(

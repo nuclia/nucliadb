@@ -982,7 +982,11 @@ class PreQuery(BaseModel):
     prefilter: bool = Field(
         default=False,
         title="Prefilter",
-        description=
+        description=(
+            "If set to true, the prequery results are used to filter the scope of the remaining queries. "
+            "The resources of the most relevant paragraphs of the prefilter queries are used as resource "
+            "filters for the main query and other prequeries with the prefilter flag set to false."
+        ),
     )
 
 

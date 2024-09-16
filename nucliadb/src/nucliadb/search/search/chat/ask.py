@@ -417,7 +417,8 @@ async def ask(
     try:
         retrieval_results = await retrieval_step(
             kbid=kbid,
-            main_retrieval_query=rephrased_query or user_query,
+            # Prefer the rephrased query for retrieval if available
+            main_query=rephrased_query or user_query,
             ask_request=ask_request,
             client_type=client_type,
             user_id=user_id,
@@ -571,7 +572,7 @@ class NoRetrievalResultsError(Exception):
 
 async def retrieval_step(
     kbid: str,
-    main_retrieval_query: str,
+    main_query: str,
     ask_request: AskRequest,
     client_type: NucliaDBClientType,
     user_id: str,
@@ -582,11 +583,72 @@ async def retrieval_step(
     """
     This function encapsulates all the logic related to retrieval in the ask endpoint.
     """
-    prequeries = parse_prequeries(ask_request)
-    prefilter_queries = []
-    if prequeries is not None:
-        prefilter_queries = [prequery.request for prequery in prequeries.queries if prequery.prefilter]
+    if resource is None:
+        return await retrieval_in_kb(
+            kbid,
+            main_query,
+            ask_request,
+            client_type,
+            user_id,
+            origin,
+            metrics,
+        )
+    else:
+        return await retrieval_in_resource(
+            kbid,
+            resource,
+            main_query,
+            ask_request,
+            client_type,
+            user_id,
+            origin,
+            metrics,
+        )
 
+
+async def retrieval_in_kb(
+    kbid: str,
+    main_query: str,
+    ask_request: AskRequest,
+    client_type: NucliaDBClientType,
+    user_id: str,
+    origin: str,
+    metrics: RAGMetrics,
+) -> RetrievalResults:
+    prequeries = parse_prequeries(ask_request)
+    with metrics.time("retrieval"):
+        main_results, prequeries_results, query_parser = await get_find_results(
+            kbid=kbid,
+            query=main_query,
+            item=ask_request,
+            ndb_client=client_type,
+            user=user_id,
+            origin=origin,
+            metrics=metrics,
+            prequeries=prequeries,
+        )
+        if len(main_results.resources) == 0 and all(
+            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+        ):
+            raise NoRetrievalResultsError(main_results, prequeries_results)
+    return RetrievalResults(
+        main_query=main_results,
+        prequeries=prequeries_results,
+        query_parser=query_parser,
+        main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
+    )
+
+
+async def retrieval_in_resource(
+    kbid: str,
+    resource: str,
+    main_query: str,
+    ask_request: AskRequest,
+    client_type: NucliaDBClientType,
+    user_id: str,
+    origin: str,
+    metrics: RAGMetrics,
+) -> RetrievalResults:
     skip_retrieval = resource is not None and any(
         strategy.name == "full_resource" for strategy in ask_request.rag_strategies
     )
@@ -608,18 +670,23 @@ async def retrieval_step(
             main_query_weight=1.0,
         )
 
-    if resource is not None:
-        # Make sure the retrieval is scoped to the resource if provided
-        ask_request.resource_filters = [resource]
-        if prequeries is not None:
-            for prequery in prequeries.queries:
-                prequery.request.resource_filters = [resource]
+    prequeries = parse_prequeries(ask_request)
+
+    # Make sure the retrieval is scoped to the resource if provided
+    ask_request.resource_filters = [resource]
+    if prequeries is not None:
+        for prequery in prequeries.queries:
+            if prequery.prefilter is True:
+                raise InvalidQueryError(
+                    "rag_strategies",
+                    "Prequeries with prefilter are not supported when asking on a resource",
+                )
+            prequery.request.resource_filters = [resource]
 
     with metrics.time("retrieval"):
         main_results, prequeries_results, query_parser = await get_find_results(
             kbid=kbid,
-            # Prefer the rephrased query if available
-            query=main_retrieval_query,
+            query=main_query,
             item=ask_request,
             ndb_client=client_type,
             user=user_id,
