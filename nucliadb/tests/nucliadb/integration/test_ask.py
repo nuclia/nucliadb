@@ -689,7 +689,6 @@ async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowled
     assert len(ask_response.prequeries["title_query"].best_matches) > 1
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_rag_strategy_prequeries_with_full_resource(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -724,7 +723,6 @@ async def test_ask_rag_strategy_prequeries_with_full_resource(
     assert resp.status_code == 200, resp.text
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_ask_rag_strategy_prequeries_with_prefilter(
     nucliadb_reader: AsyncClient,
     knowledgebox,
