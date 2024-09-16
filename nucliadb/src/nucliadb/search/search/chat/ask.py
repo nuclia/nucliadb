@@ -585,7 +585,7 @@ async def retrieval_step(
     prequeries = parse_prequeries(ask_request)
     prefilter_queries = []
     if prequeries is not None:
-        prefilter_queries = [prequery.request for prequery in prequeries.queries if query.]
+        prefilter_queries = [prequery.request for prequery in prequeries.queries if prequery.prefilter]
 
     skip_retrieval = resource is not None and any(
         strategy.name == "full_resource" for strategy in ask_request.rag_strategies

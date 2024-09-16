@@ -979,6 +979,11 @@ class PreQuery(BaseModel):
             "prequery_1",
         ],
     )
+    prefilter: bool = Field(
+        default=False,
+        title="Prefilter",
+        description=
+    )
 
 
 class PreQueriesStrategy(RagStrategy):
