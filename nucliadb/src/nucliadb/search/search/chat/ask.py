@@ -358,10 +358,10 @@ class AskResult:
 class NotEnoughContextAskResult(AskResult):
     def __init__(
         self,
-        main_results: KnowledgeboxFindResults,
+        main_results: Optional[KnowledgeboxFindResults] = None,
         prequeries_results: Optional[list[PreQueryResult]] = None,
     ):
-        self.main_results = main_results
+        self.main_results = main_results or KnowledgeboxFindResults(resources={}, min_score=None)
         self.prequeries_results = prequeries_results or []
         self.nuclia_learning_id = None
 
@@ -565,9 +565,15 @@ class RetrievalResults:
 
 
 class NoRetrievalResultsError(Exception):
-    def __init__(self, main: KnowledgeboxFindResults, prequeries: Optional[list[PreQueryResult]]):
+    def __init__(
+        self,
+        main: Optional[KnowledgeboxFindResults] = None,
+        prequeries: Optional[list[PreQueryResult]] = None,
+        prefilters: Optional[list[PreQueryResult]] = None,
+    ):
         self.main_query = main
         self.prequeries = prequeries
+        self.prefilters = prefilters
 
 
 async def retrieval_step(
@@ -625,7 +631,7 @@ async def retrieval_in_kb(
             user=user_id,
             origin=origin,
             metrics=metrics,
-            prequeries=prequeries,
+            prequeries_strategy=prequeries,
         )
         if len(main_results.resources) == 0 and all(
             len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
@@ -689,7 +695,7 @@ async def retrieval_in_resource(
             user=user_id,
             origin=origin,
             metrics=metrics,
-            prequeries=prequeries,
+            prequeries_strategy=prequeries,
         )
         if len(main_results.resources) == 0 and all(
             len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []

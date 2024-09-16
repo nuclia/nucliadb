@@ -23,6 +23,7 @@ from typing import Optional
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.chat.ask import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
@@ -82,20 +83,52 @@ async def get_find_results(
     user: str,
     origin: str,
     metrics: RAGMetrics = RAGMetrics(),
-    prequeries: Optional[PreQueriesStrategy] = None,
+    prequeries_strategy: Optional[PreQueriesStrategy] = None,
 ) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], QueryParser]:
+    prefilter_results = None
     prequeries_results = None
-    if prequeries is not None:
-        with metrics.time("prequeries"):
-            prequeries_results = await run_prequeries(
-                kbid,
-                prequeries,
-                x_ndb_client=ndb_client,
-                x_nucliadb_user=user,
-                x_forwarded_for=origin,
-                generative_model=item.generative_model,
-                metrics=metrics,
-            )
+
+    if prequeries_strategy is not None:
+        prefilters = [prequery for prequery in prequeries_strategy.queries if prequery.prefilter]
+        prequeries = [prequery for prequery in prequeries_strategy.queries if not prequery.prefilter]
+
+        if len(prefilters) > 0:
+            with metrics.time("prefilters"):
+                prefilter_results = await run_prequeries(
+                    kbid,
+                    prefilters,
+                    x_ndb_client=ndb_client,
+                    x_nucliadb_user=user,
+                    x_forwarded_for=origin,
+                    generative_model=item.generative_model,
+                    metrics=metrics,
+                )
+                prefilter_matching_resources = {
+                    resource
+                    for _, find_results in prefilter_results
+                    for resource in find_results.resources.keys()
+                }
+                if len(prefilter_matching_resources) == 0:
+                    raise NoRetrievalResultsError()
+
+                # Make sure the main query and prequeries use the same resource filters.
+                # This is important to avoid returning results that don't match the prefilter.
+                item.resource_filters = list(prefilter_matching_resources)
+                for prequery in prequeries:
+                    prequery.request.resource_filters = list(prefilter_matching_resources)
+
+        if prequeries:
+            with metrics.time("prequeries"):
+                prequeries_results = await run_prequeries(
+                    kbid,
+                    prequeries,
+                    x_ndb_client=ndb_client,
+                    x_nucliadb_user=user,
+                    x_forwarded_for=origin,
+                    generative_model=item.generative_model,
+                    metrics=metrics,
+                )
+
     with metrics.time("main_query"):
         main_results, query_parser = await run_main_query(
             kbid,
@@ -329,7 +362,7 @@ def sorted_prompt_context_list(context: PromptContext, order: PromptContextOrder
 
 async def run_prequeries(
     kbid: str,
-    prequeries: PreQueriesStrategy,
+    prequeries: list[PreQuery],
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
@@ -358,7 +391,7 @@ async def run_prequeries(
             return prequery, find_results
 
     ops = []
-    for prequery in prequeries.queries:
+    for prequery in prequeries:
         ops.append(asyncio.create_task(_prequery_find(prequery)))
     ops_results = await asyncio.gather(*ops)
     for prequery, find_results in ops_results:
