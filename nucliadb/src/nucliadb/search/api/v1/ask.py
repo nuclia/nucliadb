@@ -21,6 +21,8 @@ from typing import Optional, Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
+from google.protobuf.json_format import ParseDict
+from google.protobuf.struct_pb2 import Struct
 from starlette.responses import StreamingResponse
 
 from nucliadb.models.responses import HTTPClientError
@@ -94,7 +96,9 @@ async def create_ask_response(
     if request_context is not None:
         auditrequest = request_context.audit_request
         if auditrequest is not None:
-            auditrequest.raw_request.update(ask_request.model_dump())
+            struct_message = Struct()
+            ParseDict(ask_request.model_dump(), struct_message)
+            auditrequest.raw_request.CopyFrom(struct_message)
 
     headers = {
         "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",

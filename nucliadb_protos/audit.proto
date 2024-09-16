@@ -5,7 +5,7 @@ package audit;
 import "google/protobuf/timestamp.proto";
 import "nucliadb_protos/nodereader.proto";
 import "nucliadb_protos/resources.proto";
-import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
 
 message AuditField {
   enum FieldAction {
@@ -116,5 +116,5 @@ message AuditRequest {
   optional float generative_answer_first_chunk_time = 24;
   optional float rephrase_time = 25;
   FeedbackAudit feedback = 26;
-  map<string, google.protobuf.Any> raw_request = 27;
+  google.protobuf.Struct raw_request = 27;
 }

@@ -172,11 +172,8 @@ pub struct AuditRequest {
     pub rephrase_time: ::core::option::Option<f32>,
     #[prost(message, optional, tag = "26")]
     pub feedback: ::core::option::Option<FeedbackAudit>,
-    #[prost(map = "string, message", tag = "27")]
-    pub raw_request: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        ::prost_types::Any,
-    >,
+    #[prost(message, optional, tag = "27")]
+    pub raw_request: ::core::option::Option<::prost_types::Struct>,
 }
 /// Nested message and enum types in `AuditRequest`.
 pub mod audit_request {

@@ -478,7 +478,10 @@ async def test_chat_query_ndjson():
 
     chat_query_response = Mock()
     chat_query_response.status = 200
-    chat_query_response.headers = {"NUCLIA-LEARNING-ID": "learning-id", "NUCLIA-LEARNING-MODEL": "chatgpt"}
+    chat_query_response.headers = {
+        "NUCLIA-LEARNING-ID": "learning-id",
+        "NUCLIA-LEARNING-MODEL": "chatgpt",
+    }
     chat_query_response.content = _content()
     pe.session = mock.Mock()
     pe.session.post = AsyncMock(return_value=chat_query_response)
