@@ -424,6 +424,7 @@ class StreamAuditStorage(AuditStorage):
     ):
         rcontext = get_request_context()
         if rcontext is None:
+            logger.warning("feedback context not found")
             return
 
         auditrequest = rcontext.audit_request
@@ -432,6 +433,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
+        auditrequest.type = AuditRequest.FEEDBACK
 
         auditrequest.feedback.learning_id = learning_id
         auditrequest.feedback.good = good
