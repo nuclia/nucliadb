@@ -722,3 +722,42 @@ async def test_ask_rag_strategy_prequeries_with_full_resource(
         },
     )
     assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
+async def test_ask_rag_strategy_prequeries_with_prefilter(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resources,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "",
+            "rag_strategies": [
+                {
+                    "name": "prequeries",
+                    "queries": [
+                        {
+                            "request": {"query": "The title 1", "fields": ["a/title"]},
+                            "weight": 20,
+                            "id": "prefilter_query",
+                            "prefilter": True,
+                        },
+                        {
+                            "request": {"query": "summary"},
+                            "weight": 1,
+                            "id": "prequery",
+                        },
+                    ],
+                },
+            ],
+            "debug": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.prequeries is not None
+    assert len(ask_response.prequeries) == 1
+    assert len(ask_response.prequeries["prequery"].resources) == 1
+    assert ask_response.prequeries["prequery"].resources[resources[0]].title == "The title 1"
