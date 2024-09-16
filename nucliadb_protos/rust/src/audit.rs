@@ -105,6 +105,8 @@ pub struct ChatAudit {
     pub learning_id: ::prost::alloc::string::String,
     #[prost(int32, tag = "9")]
     pub status_code: i32,
+    #[prost(string, tag = "10")]
+    pub model: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -170,6 +172,11 @@ pub struct AuditRequest {
     pub rephrase_time: ::core::option::Option<f32>,
     #[prost(message, optional, tag = "26")]
     pub feedback: ::core::option::Option<FeedbackAudit>,
+    #[prost(map = "string, message", tag = "27")]
+    pub raw_request: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost_types::Any,
+    >,
 }
 /// Nested message and enum types in `AuditRequest`.
 pub mod audit_request {

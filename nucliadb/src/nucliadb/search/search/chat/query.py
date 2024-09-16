@@ -195,6 +195,7 @@ def maybe_audit_chat(
     query_context: PromptContext,
     query_context_order: PromptContextOrder,
     learning_id: str,
+    model: str,
 ):
     audit = get_audit()
     if audit is None:
@@ -227,6 +228,7 @@ def maybe_audit_chat(
         answer=audit_answer,
         learning_id=learning_id,
         status_code=int(status_code.value),
+        model=model,
     )
 
 
@@ -256,6 +258,7 @@ class ChatAuditor:
         learning_id: Optional[str],
         query_context: PromptContext,
         query_context_order: PromptContextOrder,
+        model: str,
     ):
         self.kbid = kbid
         self.user_id = user_id
@@ -267,6 +270,7 @@ class ChatAuditor:
         self.learning_id = learning_id
         self.query_context = query_context
         self.query_context_order = query_context_order
+        self.model = model
 
     def audit(
         self,
@@ -292,6 +296,7 @@ class ChatAuditor:
             query_context=self.query_context,
             query_context_order=self.query_context_order,
             learning_id=self.learning_id or "unknown",
+            model=self.model,
         )
 
 

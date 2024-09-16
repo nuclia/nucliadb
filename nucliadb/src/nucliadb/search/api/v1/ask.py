@@ -35,6 +35,7 @@ from nucliadb_models.search import (
     SyncAskResponse,
     parse_max_tokens,
 )
+from nucliadb_utils.audit.stream import get_request_context
 from nucliadb_utils.authentication import requires
 
 
@@ -87,6 +88,14 @@ async def create_ask_response(
             origin=origin,
             resource=resource,
         )
+
+    # Add to requests's audit information
+    request_context = get_request_context()
+    if request_context is not None:
+        auditrequest = request_context.audit_request
+        if auditrequest is not None:
+            auditrequest.raw_request.update(ask_request.model_dump())
+
     headers = {
         "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
         "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",

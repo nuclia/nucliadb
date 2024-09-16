@@ -504,7 +504,11 @@ async def ask(
     )
     with metrics.time("stream_start"):
         predict = get_predict()
-        nuclia_learning_id, predict_answer_stream = await predict.chat_query_ndjson(kbid, chat_model)
+        (
+            nuclia_learning_id,
+            nuclia_learning_model,
+            predict_answer_stream,
+        ) = await predict.chat_query_ndjson(kbid, chat_model)
 
     auditor = ChatAuditor(
         kbid=kbid,
@@ -517,6 +521,7 @@ async def ask(
         learning_id=nuclia_learning_id,
         query_context=prompt_context,
         query_context_order=prompt_context_order,
+        model=nuclia_learning_model,
     )
     return AskResult(
         kbid=kbid,

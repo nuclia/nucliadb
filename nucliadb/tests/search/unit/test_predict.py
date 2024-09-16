@@ -485,9 +485,10 @@ async def test_chat_query_ndjson():
 
     item = ChatModel(question="foo", user_id="bar")
 
-    learning_id, generator = await pe.chat_query_ndjson("kbid", item)
+    learning_id, learning_model, generator = await pe.chat_query_ndjson("kbid", item)
 
     assert learning_id == "learning-id"
+    assert learning_model == "xx"
     parsed = [line async for line in generator]
     assert len(parsed) == 2
     assert parsed[0].chunk == TextGenerativeResponse(text="foo")

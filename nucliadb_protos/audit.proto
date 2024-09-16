@@ -5,6 +5,7 @@ package audit;
 import "google/protobuf/timestamp.proto";
 import "nucliadb_protos/nodereader.proto";
 import "nucliadb_protos/resources.proto";
+import "google/protobuf/any.proto";
 
 message AuditField {
   enum FieldAction {
@@ -56,6 +57,7 @@ message ChatAudit {
   repeated RetrievedContext retrieved_context = 8;
   string learning_id = 5;
   int32 status_code = 9;
+  string model = 10;
 }
 
 enum TaskType {
@@ -114,4 +116,5 @@ message AuditRequest {
   optional float generative_answer_first_chunk_time = 24;
   optional float rephrase_time = 25;
   FeedbackAudit feedback = 26;
+  map<string, google.protobuf.Any> raw_request = 27;
 }
