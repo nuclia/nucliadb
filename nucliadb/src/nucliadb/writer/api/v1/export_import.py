@@ -98,7 +98,8 @@ async def kb_create_and_import_endpoint(request: Request):
     context = get_app_context(request.app)
 
     # Read stream and parse learning configuration
-    stream_reader = ExportStreamReader(request.stream())
+    stream = request.stream()
+    stream_reader = ExportStreamReader(stream)
     learning_config, leftover_bytes = await stream_reader.maybe_read_learning_config()
     if learning_config is None:
         return HTTPClientError(
@@ -124,7 +125,7 @@ async def kb_create_and_import_endpoint(request: Request):
             yield chunk
 
     await importer.import_kb(
-        context=context, kbid=kbid, stream=stream_with_leftovers(leftover_bytes, request.stream())
+        context=context, kbid=kbid, stream=stream_with_leftovers(leftover_bytes, stream)
     )
 
     return NewImportedKbResponse(
