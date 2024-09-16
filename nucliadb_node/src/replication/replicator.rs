@@ -269,7 +269,6 @@ pub async fn connect_to_primary_and_replicate(
                 let payload = NewShard {
                     kbid: shard_state.kbid.clone(),
                     shard_id: shard_state.shard_id.clone(),
-                    channel: shard_state.release_channel().into(),
                     // Create the default vectorset with a default config, it
                     // will get overwritten on first sync
                     vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),

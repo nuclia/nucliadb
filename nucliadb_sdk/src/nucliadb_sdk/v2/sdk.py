@@ -21,6 +21,7 @@ import enum
 import inspect
 import io
 import warnings
+from json import JSONDecodeError
 from typing import (
     Any,
     AsyncGenerator,
@@ -50,6 +51,7 @@ from nucliadb_models.entities import (
 from nucliadb_models.export_import import (
     CreateExportResponse,
     CreateImportResponse,
+    NewImportedKbResponse,
     StatusResponse,
 )
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
@@ -345,7 +347,13 @@ class _NucliaDBBase:
                 f"Account limits exceeded error {response.status_code}: {response.text}"
             )
         elif response.status_code == 429:
-            raise exceptions.RateLimitError(response.text)
+            try_after: Optional[float] = None
+            try:
+                body = response.json()
+                try_after = body.get("detail", {}).get("try_after")
+            except JSONDecodeError:
+                pass
+            raise exceptions.RateLimitError(response.text, try_after=try_after)
         elif response.status_code in (
             409,
             419,
@@ -675,6 +683,15 @@ class _NucliaDBBase:
         request_type=None,
         response_type=None,
         stream_response=True,
+    )
+
+    create_kb_from_import = _request_builder(
+        name="create_kb_from_import",
+        path_template="/v1/kbs/import",
+        method="POST",
+        path_params=(),
+        request_type=None,
+        response_type=NewImportedKbResponse,
     )
 
     start_import = _request_builder(

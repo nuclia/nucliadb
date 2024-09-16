@@ -80,7 +80,6 @@ async def resource(nucliadb_grpc, knowledgebox):
         "vector",
     ],
 )
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_with_date_range_filters_nucliadb_dates(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -138,7 +137,6 @@ async def test_search_with_date_range_filters_nucliadb_dates(
         "vector",
     ],
 )
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_with_date_range_filters_origin_dates(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

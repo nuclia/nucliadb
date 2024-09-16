@@ -26,7 +26,7 @@ from typing import Optional
 
 from nats.js.client import JetStreamContext
 
-from nucliadb_utils.nuclia_usage.protos.kb_usage_pb2 import (
+from nucliadb_protos.kb_usage_pb2 import (
     KBSource,
     KbUsage,
     Predict,

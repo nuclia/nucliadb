@@ -28,7 +28,7 @@ use nucliadb_core::protos as nucliadb_protos;
 use nucliadb_protos::op_status::Status;
 use nucliadb_protos::prost_types::Timestamp;
 use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{IndexMetadata, NewShardRequest, ReleaseChannel, Resource, ResourceId, SearchRequest};
+use nucliadb_protos::{IndexMetadata, NewShardRequest, Resource, ResourceId, SearchRequest};
 use rstest::*;
 use tonic::Request;
 use uuid::Uuid;
@@ -78,20 +78,13 @@ async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id
 
 #[rstest]
 #[tokio::test]
-async fn test_search_sorting(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_search_sorting() -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = NodeFixture::new();
     fixture.with_writer().await?.with_reader().await?;
     let mut writer = fixture.writer_client();
     let mut reader = fixture.reader_client();
 
-    let new_shard_response = writer
-        .new_shard(Request::new(NewShardRequest {
-            release_channel: release_channel.into(),
-            ..Default::default()
-        }))
-        .await?;
+    let new_shard_response = writer.new_shard(Request::new(NewShardRequest::default())).await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     create_dummy_resources(20, &mut writer, shard_id.clone()).await;

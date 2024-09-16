@@ -50,7 +50,6 @@ async def get_paragraph_streaming_batch_from_response(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ["STABLE", "EXPERIMENTAL"], indirect=True)
 async def test_generator_paragraph_streaming(
     train_rest_api: aiohttp.ClientSession,
     nucliadb_grpc: WriterStub,

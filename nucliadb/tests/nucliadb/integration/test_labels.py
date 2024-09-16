@@ -162,7 +162,6 @@ async def inject_resource_with_paragraph_labels(knowledgebox, writer):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_labels_global(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -195,7 +194,6 @@ async def test_labels_global(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_classification_labels_cancelled_by_the_user(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -241,7 +239,6 @@ async def test_classification_labels_cancelled_by_the_user(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_classification_labels_are_shown_in_resource_basic(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -314,7 +311,6 @@ def test_add_field_classifications():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_fieldmetadata_classification_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

@@ -4,12 +4,14 @@ on:
   pull_request:
     branches:
       - main
+      - dev
   push:
     branches:
       - main
+      - dev
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -427,10 +429,12 @@ jobs:
       - ci-passed
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
+    with:
+      environment: ${{ github.ref == 'refs/heads/main' && 'stage' || 'dev' }}
 
   release:
     name: Trigger release
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - ci-passed
     uses: ./.github/workflows/release.yml

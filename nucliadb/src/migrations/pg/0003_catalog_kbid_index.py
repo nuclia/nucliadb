@@ -17,3 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+from nucliadb.common.maindb.pg import PGTransaction
+
+
+async def migrate(txn: PGTransaction) -> None:
+    async with txn.connection.cursor() as cur:
+        await cur.execute("CREATE INDEX ON catalog(kbid);")

@@ -27,7 +27,6 @@ use crate::errors::{op_status_error, IndexNodeException, LoadShardError};
 use crate::RawProtos;
 use nucliadb_core::merge::MergerError;
 use nucliadb_core::protos::*;
-use nucliadb_core::Channel;
 use nucliadb_node::analytics::blocking::send_analytics_event;
 use nucliadb_node::analytics::payload::AnalyticsEvent;
 use nucliadb_node::cache::ShardWriterCache;
@@ -96,7 +95,6 @@ impl NodeWriter {
 
         let kbid = request.kbid.clone();
         let shard_id = uuid::Uuid::new_v4().to_string();
-        let channel = Channel::from(request.release_channel());
 
         #[allow(deprecated)]
         let vector_configs = if !request.vectorsets_configs.is_empty() {
@@ -132,7 +130,6 @@ impl NodeWriter {
         let new_shard = self.shards.create(NewShard {
             kbid,
             shard_id,
-            channel,
             vector_configs,
         });
         match new_shard {

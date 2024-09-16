@@ -30,6 +30,11 @@ class CreateImportResponse(BaseModel):
     import_id: str
 
 
+class NewImportedKbResponse(BaseModel):
+    kbid: str
+    slug: str
+
+
 class Status(str, Enum):
     SCHEDULED = "scheduled"
     RUNNING = "running"

@@ -211,7 +211,6 @@ async def entities(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_get_entities_groups(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -242,7 +241,6 @@ async def test_get_entities_groups(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_list_entities_groups(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -260,7 +258,6 @@ async def test_list_entities_groups(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_create_entities_group_twice(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -280,7 +277,6 @@ async def test_create_entities_group_twice(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_update_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -311,7 +307,6 @@ async def test_update_entities_group(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_update_indexed_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -340,7 +335,6 @@ async def test_update_indexed_entities_group(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_update_entities_group_metadata(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -365,7 +359,6 @@ async def test_update_entities_group_metadata(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_delete_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -382,7 +375,6 @@ async def test_delete_entities_group(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_delete_and_recreate_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -411,7 +403,6 @@ async def test_delete_and_recreate_entities_group(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_entities_indexing(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,

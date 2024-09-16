@@ -31,7 +31,8 @@ proto-py:
 	python -m grpc_tools.protoc nucliadb_protos/dataset.proto       -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/migrations.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/standalone.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
-	python -m grpc_tools.protoc nucliadb_protos/replication.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/replication.proto   -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
+	python -m grpc_tools.protoc nucliadb_protos/kb_usage.proto 		-I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
 
 proto-rust:
 	cargo build --locked -p nucliadb_protos
@@ -123,7 +124,7 @@ build-node-binding-debug:
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-nucliadb-local:
-	docker build -t nuclia/nucliadb:latest .
+	docker build -t nuclia/nucliadb:latest . -f Dockerfile.pipbinding
 
 build-nucliadb-local-withbinding:
 	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding

@@ -54,7 +54,6 @@ TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg,local").sp
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_simple_search_sc_2062(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -143,7 +142,6 @@ async def create_resource_with_duplicates(knowledgebox, writer: WriterStub, sent
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_filters_out_duplicate_paragraphs(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -176,7 +174,6 @@ async def test_search_filters_out_duplicate_paragraphs(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_returns_paragraph_positions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -249,7 +246,6 @@ def broker_resource_with_classifications(knowledgebox):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_returns_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -275,7 +271,6 @@ async def test_search_returns_labels(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_with_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -303,7 +298,6 @@ async def test_search_with_filters(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_paragraph_search_with_filters(
     nucliadb_writer,
     nucliadb_reader,
@@ -341,7 +335,6 @@ async def test_paragraph_search_with_filters(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog does not support with_status")
 async def test_catalog_can_filter_by_processing_status(
     nucliadb_reader: AsyncClient,
@@ -425,7 +418,6 @@ async def test_catalog_can_filter_by_processing_status(
 
 @pytest.mark.skip(reason="Needs sc-5626")
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -473,7 +465,6 @@ async def test_(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_returns_sentence_positions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -544,7 +535,6 @@ async def inject_resource_with_a_sentence(knowledgebox, writer):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -666,7 +656,6 @@ async def test_search_relations(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog does not support with_status")
 async def test_processing_status_doesnt_change_on_search_after_processed(
     nucliadb_reader: AsyncClient,
@@ -729,7 +718,6 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_automatic_relations(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
 ):
@@ -935,7 +923,6 @@ async def get_audit_messages(sub):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_sends_audit(
     nucliadb_reader,
     knowledgebox,
@@ -1024,7 +1011,6 @@ async def test_search_pagination(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_search_pagination(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1115,7 +1101,6 @@ async def test_resource_search_pagination(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("endpoint", ["search", "find"])
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_endpoints_handle_predict_errors(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1278,7 +1263,6 @@ async def test_search_two_logic_shards(
     assert len(content1["sentences"]["results"]) == len(content2["sentences"]["results"])
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_min_score(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1300,7 +1284,6 @@ async def test_search_min_score(
     assert body["fulltext"]["min_score"] == 10
 
 
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.parametrize(
     "facets,valid,error_message",
     [
@@ -1347,7 +1330,6 @@ async def test_facets_validation(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_marks_fuzzy_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1405,7 +1387,6 @@ def check_fuzzy_paragraphs(search_response, *, fuzzy_result: bool, n_expected: i
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_by_path_filter(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1461,7 +1442,6 @@ async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledgebox):
     kb = knowledgebox
     # If query is not present, should not fail
@@ -1475,7 +1455,6 @@ async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledg
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_with_duplicates(nucliadb_reader, knowledgebox):
     kb = knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/search?with_duplicates=True")
@@ -1495,7 +1474,6 @@ def search_with_limits_exceeded_error():
 
 
 @pytest.mark.asyncio()
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_handles_limits_exceeded_error(
     nucliadb_reader, knowledgebox, search_with_limits_exceeded_error
 ):
@@ -1510,7 +1488,6 @@ async def test_search_handles_limits_exceeded_error(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 @pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog cannot do shards")
 async def test_catalog_returns_shard_and_node_data(
     nucliadb_reader: AsyncClient,
@@ -1537,7 +1514,6 @@ async def test_catalog_returns_shard_and_node_data(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_catalog_post(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1579,7 +1555,6 @@ async def test_api_does_not_show_tracebacks_on_api_errors(not_debug, nucliadb_re
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_catalog_pagination(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1632,7 +1607,6 @@ async def test_catalog_pagination(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_catalog_date_range_filtering(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1675,7 +1649,6 @@ async def test_catalog_date_range_filtering(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_catalog_faceted(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1705,7 +1678,6 @@ async def test_catalog_faceted(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_catalog_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

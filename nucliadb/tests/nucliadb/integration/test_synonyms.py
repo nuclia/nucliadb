@@ -21,7 +21,6 @@ import pytest
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_custom_synonyms_api(
     nucliadb_reader,
     nucliadb_writer,
@@ -88,7 +87,6 @@ async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_with_synonyms(
     nucliadb_reader,
     nucliadb_writer,
@@ -186,7 +184,6 @@ async def test_search_with_synonyms(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("knowledgebox", ("EXPERIMENTAL", "STABLE"), indirect=True)
 async def test_search_errors_if_vectors_or_relations_requested(
     nucliadb_reader,
     knowledgebox,

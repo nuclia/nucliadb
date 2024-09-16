@@ -23,7 +23,7 @@ mod common;
 use common::resources as test_resources;
 use common::NodeFixture;
 use nucliadb_core::protos::op_status::Status;
-use nucliadb_core::protos::{NewShardRequest, ReleaseChannel};
+use nucliadb_core::protos::NewShardRequest;
 use nucliadb_node::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
 use nucliadb_protos::noderesources::ResourceId;
 use nucliadb_protos::noderesources::ShardId;
@@ -35,9 +35,7 @@ use tonic::Request;
 
 #[rstest]
 #[tokio::test]
-async fn test_vectorsets(
-    #[values(ReleaseChannel::Stable, ReleaseChannel::Experimental)] release_channel: ReleaseChannel,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_vectorsets() -> Result<(), Box<dyn std::error::Error>> {
     use nucliadb_core::protos::VectorIndexConfig;
 
     let mut fixture = NodeFixture::new();
@@ -45,12 +43,7 @@ async fn test_vectorsets(
     let mut writer = fixture.writer_client();
     let _reader = fixture.reader_client();
 
-    let response = writer
-        .new_shard(Request::new(NewShardRequest {
-            release_channel: release_channel.into(),
-            ..Default::default()
-        }))
-        .await?;
+    let response = writer.new_shard(Request::new(NewShardRequest::default())).await?;
     let shard_id = &response.get_ref().id;
 
     let response = writer
