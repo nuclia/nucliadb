@@ -418,7 +418,6 @@ async def ask(
         retrieval_results = await retrieval_step(
             kbid=kbid,
             main_retrieval_query=rephrased_query or user_query,
-            prequeries=parse_prequeries(ask_request),
             ask_request=ask_request,
             client_type=client_type,
             user_id=user_id,
@@ -573,7 +572,6 @@ class NoRetrievalResultsError(Exception):
 async def retrieval_step(
     kbid: str,
     main_retrieval_query: str,
-    prequeries: Optional[PreQueriesStrategy],
     ask_request: AskRequest,
     client_type: NucliaDBClientType,
     user_id: str,
@@ -584,6 +582,11 @@ async def retrieval_step(
     """
     This function encapsulates all the logic related to retrieval in the ask endpoint.
     """
+    prequeries = parse_prequeries(ask_request)
+    prefilter_queries = []
+    if prequeries is not None:
+        prefilter_queries = [prequery.request for prequery in prequeries.queries if query.]
+
     skip_retrieval = resource is not None and any(
         strategy.name == "full_resource" for strategy in ask_request.rag_strategies
     )
