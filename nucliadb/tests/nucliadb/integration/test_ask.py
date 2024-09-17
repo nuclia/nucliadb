@@ -762,7 +762,7 @@ async def test_ask_rag_strategy_prequeries_with_prefilter(
     assert len(ask_response.prequeries) == 2
 
     # Check that the prefilter query found the right resource
-    assert ask_response.prequeries["prefilter_query"].resources == 1
+    assert len(ask_response.prequeries["prefilter_query"].resources) == 1
     assert expected_rid in ask_response.prequeries["prefilter_query"].resources
 
     # Check that the other prequery was executed and only matched one resource (due to the prefilter)
