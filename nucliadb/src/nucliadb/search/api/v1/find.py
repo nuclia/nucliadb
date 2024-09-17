@@ -79,7 +79,7 @@ async def find_knowledgebox(
     query: str = fastapi_query(SearchParamDefaults.query),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
-    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number, deprecated=True),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
     min_score: Optional[float] = Query(
         default=None,

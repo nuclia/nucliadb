@@ -109,7 +109,7 @@ async def search_knowledgebox(
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
     sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
-    page_number: int = fastapi_query(SearchParamDefaults.page_number),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number, deprecated=True),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
     min_score: Optional[float] = Query(
         default=None,
