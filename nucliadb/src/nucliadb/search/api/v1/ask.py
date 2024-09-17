@@ -19,6 +19,7 @@
 #
 from typing import Optional, Union
 
+import orjson
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
@@ -67,6 +68,13 @@ async def ask_knowledgebox_endpoint(
     )
 
 
+def default(obj):
+    "Convert sets to lists when dumping json"
+    if isinstance(obj, set):
+        return list(obj)
+    raise TypeError
+
+
 @handled_ask_exceptions
 async def create_ask_response(
     kbid: str,
@@ -94,7 +102,8 @@ async def create_ask_response(
     if request_context is not None:
         auditrequest = request_context.audit_request
         if auditrequest is not None:
-            auditrequest.raw_request = ask_request.model_dump_json()
+            json_dict = ask_request.model_dump()
+            auditrequest.raw_request = orjson.dumps(json_dict, default=default).decode()
 
     headers = {
         "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
