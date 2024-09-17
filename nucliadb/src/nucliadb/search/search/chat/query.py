@@ -85,15 +85,15 @@ async def get_find_results(
     metrics: RAGMetrics = RAGMetrics(),
     prequeries_strategy: Optional[PreQueriesStrategy] = None,
 ) -> tuple[KnowledgeboxFindResults, Optional[list[PreQueryResult]], QueryParser]:
-    prefilter_results = None
     prequeries_results = None
-
+    prefilter_queries_results = None
+    queries_results = None
     if prequeries_strategy is not None:
         prefilters = [prequery for prequery in prequeries_strategy.queries if prequery.prefilter]
         prequeries = [prequery for prequery in prequeries_strategy.queries if not prequery.prefilter]
         if len(prefilters) > 0:
             with metrics.time("prefilters"):
-                prefilter_results = await run_prequeries(
+                prefilter_queries_results = await run_prequeries(
                     kbid,
                     prefilters,
                     x_ndb_client=ndb_client,
@@ -104,7 +104,7 @@ async def get_find_results(
                 )
                 prefilter_matching_resources = {
                     resource
-                    for _, find_results in prefilter_results
+                    for _, find_results in prefilter_queries_results
                     for resource in find_results.resources.keys()
                 }
                 if len(prefilter_matching_resources) == 0:
@@ -117,7 +117,7 @@ async def get_find_results(
 
         if prequeries:
             with metrics.time("prequeries"):
-                prequeries_results = await run_prequeries(
+                queries_results = await run_prequeries(
                     kbid,
                     prequeries,
                     x_ndb_client=ndb_client,
@@ -126,6 +126,8 @@ async def get_find_results(
                     generative_model=item.generative_model,
                     metrics=metrics,
                 )
+
+        prequeries_results = (prefilter_queries_results or []) + (queries_results or [])
 
     with metrics.time("main_query"):
         main_results, query_parser = await run_main_query(

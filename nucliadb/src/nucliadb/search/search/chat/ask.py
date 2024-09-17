@@ -546,6 +546,7 @@ def handled_ask_exceptions(func):
 
 
 def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
+    query_ids = []
     for rag_strategy in ask_request.rag_strategies:
         if rag_strategy.name == RagStrategyName.PREQUERIES:
             prequeries = cast(PreQueriesStrategy, rag_strategy)
@@ -553,6 +554,12 @@ def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
             for index, query in enumerate(prequeries.queries):
                 if query.id is None:
                     query.id = f"prequery_{index}"
+                if query.id in query_ids:
+                    raise InvalidQueryError(
+                        "rag_strategies",
+                        "Prequeries must have unique ids",
+                    )
+                query_ids.append(query.id)
             return prequeries
     return None
 

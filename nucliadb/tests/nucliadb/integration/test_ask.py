@@ -754,10 +754,17 @@ async def test_ask_rag_strategy_prequeries_with_prefilter(
             "debug": True,
         },
     )
+    expected_rid = resources[0]
     assert resp.status_code == 200, resp.text
     content = resp.json()
     ask_response = SyncAskResponse.model_validate(content)
     assert ask_response.prequeries is not None
-    assert len(ask_response.prequeries) == 1
+    assert len(ask_response.prequeries) == 2
+
+    # Check that the prefilter query found the right resource
+    assert ask_response.prequeries["prefilter_query"].resources == 1
+    assert expected_rid in ask_response.prequeries["prefilter_query"].resources
+
+    # Check that the other prequery was executed and only matched one resource (due to the prefilter)
     assert len(ask_response.prequeries["prequery"].resources) == 1
-    assert ask_response.prequeries["prequery"].resources[resources[0]].title == "The title 0"
+    assert ask_response.prequeries["prequery"].resources[expected_rid].title == "The title 0"
