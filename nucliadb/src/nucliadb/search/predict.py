@@ -31,7 +31,14 @@ from pydantic import BaseModel, Field, ValidationError
 from nucliadb.common import datamanagers
 from nucliadb.search import logger
 from nucliadb.tests.vectors import Q, Qm2023
-from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch
+from nucliadb_models.internal.predict import (
+    Ner,
+    QueryInfo,
+    RerankModel,
+    RerankResponse,
+    SentenceSearch,
+    TokenSearch,
+)
 from nucliadb_models.search import (
     ChatModel,
     FeedbackRequest,
@@ -90,6 +97,7 @@ SUMMARIZE = "/summarize"
 CHAT = "/chat"
 REPHRASE = "/rephrase"
 FEEDBACK = "/feedback"
+RERANK = "/rerank"
 
 NUCLIA_LEARNING_ID_HEADER = "NUCLIA-LEARNING-ID"
 NUCLIA_LEARNING_MODEL_HEADER = "NUCLIA-LEARNING-MODEL"
@@ -447,6 +455,24 @@ class PredictEngine:
         data = await resp.json()
         return SummarizedResponse.model_validate(data)
 
+    @predict_observer.wrap({"type": "rerank"})
+    async def rerank(self, kbid: str, item: RerankModel) -> RerankResponse:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined. Rerank operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url(RERANK, kbid),
+            json=item.model_dump(),
+            headers=self.get_predict_headers(kbid),
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        return RerankResponse.model_validate(data)
+
 
 class DummyPredictEngine(PredictEngine):
     def __init__(self):
@@ -577,6 +603,15 @@ class DummyPredictEngine(PredictEngine):
             for field_id, field_text in item.resources[rid].fields.items():
                 rsummary.append(f"{field_id}: {field_text}")
             response.resources[rid] = SummarizedResource(summary="\n\n".join(rsummary), tokens=10)
+        return response
+
+    async def rerank(self, kbid: str, item: RerankModel) -> RerankResponse:
+        self.calls.append(("rerank", (kbid, item)))
+        # as we don't have information about the retrieval scores, return a
+        # random score given by the dict iteration
+        response = RerankResponse(
+            context_scores={paragraph_id: i for i, paragraph_id in enumerate(item.context.keys())}
+        )
         return response
 
 
