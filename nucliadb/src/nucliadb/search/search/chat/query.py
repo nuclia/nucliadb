@@ -23,7 +23,7 @@ from typing import Optional
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.requesters.utils import Method, node_query
-from nucliadb.search.search.chat.ask import NoRetrievalResultsError
+from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.merge import merge_relations_results
@@ -91,7 +91,6 @@ async def get_find_results(
     if prequeries_strategy is not None:
         prefilters = [prequery for prequery in prequeries_strategy.queries if prequery.prefilter]
         prequeries = [prequery for prequery in prequeries_strategy.queries if not prequery.prefilter]
-
         if len(prefilters) > 0:
             with metrics.time("prefilters"):
                 prefilter_results = await run_prequeries(
@@ -110,7 +109,6 @@ async def get_find_results(
                 }
                 if len(prefilter_matching_resources) == 0:
                     raise NoRetrievalResultsError()
-
                 # Make sure the main query and prequeries use the same resource filters.
                 # This is important to avoid returning results that don't match the prefilter.
                 item.resource_filters = list(prefilter_matching_resources)

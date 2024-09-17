@@ -730,6 +730,7 @@ async def test_ask_rag_strategy_prequeries_with_prefilter(
 ):
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
+        headers={"X-Synchronous": "True"},
         json={
             "query": "",
             "rag_strategies": [
@@ -737,7 +738,7 @@ async def test_ask_rag_strategy_prequeries_with_prefilter(
                     "name": "prequeries",
                     "queries": [
                         {
-                            "request": {"query": "The title 1", "fields": ["a/title"]},
+                            "request": {"query": '"The title 0"', "fields": ["a/title"]},
                             "weight": 20,
                             "id": "prefilter_query",
                             "prefilter": True,
@@ -754,8 +755,9 @@ async def test_ask_rag_strategy_prequeries_with_prefilter(
         },
     )
     assert resp.status_code == 200, resp.text
-    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    content = resp.json()
+    ask_response = SyncAskResponse.model_validate(content)
     assert ask_response.prequeries is not None
     assert len(ask_response.prequeries) == 1
     assert len(ask_response.prequeries["prequery"].resources) == 1
-    assert ask_response.prequeries["prequery"].resources[resources[0]].title == "The title 1"
+    assert ask_response.prequeries["prequery"].resources[resources[0]].title == "The title 0"

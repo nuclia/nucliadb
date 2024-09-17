@@ -35,6 +35,7 @@ from nucliadb.search.predict import (
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
+from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
@@ -562,18 +563,6 @@ class RetrievalResults:
     query_parser: QueryParser
     main_query_weight: float
     prequeries: Optional[list[PreQueryResult]] = None
-
-
-class NoRetrievalResultsError(Exception):
-    def __init__(
-        self,
-        main: Optional[KnowledgeboxFindResults] = None,
-        prequeries: Optional[list[PreQueryResult]] = None,
-        prefilters: Optional[list[PreQueryResult]] = None,
-    ):
-        self.main_query = main
-        self.prequeries = prequeries
-        self.prefilters = prefilters
 
 
 async def retrieval_step(
