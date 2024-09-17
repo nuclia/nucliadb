@@ -233,7 +233,6 @@ def merge_paragraphs_vectors(
     count: int,
     page: int,
     min_score: float,
-    kbid: str,
 ) -> tuple[list[TempFindParagraph], bool]:
     # Flatten the results from several shards to be able to sort them globally
     flat_paragraphs = [
@@ -406,7 +405,7 @@ async def find_merge_results(
         relations.append(response.relation)
 
     result_paragraphs, merged_next_page = merge_paragraphs_vectors(
-        paragraphs, vectors, count, page, min_score_semantic, kbid
+        paragraphs, vectors, count, page, min_score_semantic
     )
     next_page = next_page or merged_next_page
 
