@@ -574,6 +574,11 @@ class SearchParamDefaults:
         title="Prefer markdown",
         description="If set to true, the response will be in markdown format",
     )
+    show_hidden = ParamDefault(
+        default=False,
+        title="Show hidden resources",
+        description="If set to false (default), excludes hidden resources from search",
+    )
 
 
 class Filter(BaseModel):
@@ -684,6 +689,7 @@ class BaseSearchRequest(BaseModel):
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     resource_filters: List[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
 
     rephrase: bool = Field(
         default=False,
@@ -1064,7 +1070,7 @@ class CustomPrompt(BaseModel):
     )
 
 
-class ChatRequest(BaseModel):
+class AskRequest(BaseModel):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     top_k: int = Field(
         default=20,
@@ -1135,6 +1141,7 @@ class ChatRequest(BaseModel):
         description="Whether to include the citations for the answer in the response",
     )
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
@@ -1211,6 +1218,17 @@ If empty, the default strategy is used. `full_resource`, `hierarchy`, `prequerie
         description="If set to true, the response will be in markdown format",
     )
 
+    answer_json_schema: Optional[Dict[str, Any]] = Field(
+        default=None,
+        title="Answer JSON schema",
+        description="""Desired JSON schema for the LLM answer.
+This schema is passed to the LLM so that it answers in a scructured format following the schema. If not provided, textual response is returned.
+Note that when using this parameter, the answer in the generative response will not be returned in chunks, the whole response text will be returned instead.
+Using this feature also disables the `citations` parameter. For maximal accuracy, please include a `description` for each field of the schema.
+""",
+        examples=[ANSWER_JSON_SCHEMA_EXAMPLE],
+    )
+
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
@@ -1248,6 +1266,11 @@ If empty, the default strategy is used. `full_resource`, `hierarchy`, `prequerie
     @classmethod
     def normalize_features(cls, features: List[ChatOptions]):
         return [feature.normalized() for feature in features]
+
+
+# Alias (for backwards compatiblity with testbed)
+class ChatRequest(AskRequest):
+    pass
 
 
 class SummarizeResourceModel(BaseModel):
@@ -1507,19 +1530,6 @@ def validate_facets(facets):
                 )
         facet = next_facet
     return facets
-
-
-class AskRequest(ChatRequest):
-    answer_json_schema: Optional[Dict[str, Any]] = Field(
-        default=None,
-        title="Answer JSON schema",
-        description="""Desired JSON schema for the LLM answer.
-This schema is passed to the LLM so that it answers in a scructured format following the schema. If not provided, textual response is returned.
-Note that when using this parameter, the answer in the generative response will not be returned in chunks, the whole response text will be returned instead.
-Using this feature also disables the `citations` parameter. For maximal accuracy, please include a `description` for each field of the schema.
-""",
-        examples=[ANSWER_JSON_SCHEMA_EXAMPLE],
-    )
 
 
 class AskTokens(BaseModel):

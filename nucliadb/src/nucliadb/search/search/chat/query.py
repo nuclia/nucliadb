@@ -114,6 +114,7 @@ async def get_find_results(
     # We don't support pagination, we always get the top_k results.
     find_request.page_size = item.top_k
     find_request.page_number = 0
+    find_request.show_hidden = item.show_hidden
 
     find_results, incomplete, query_parser = await find(
         kbid,

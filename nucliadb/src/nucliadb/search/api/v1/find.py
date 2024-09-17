@@ -122,6 +122,7 @@ async def find_knowledgebox(
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
+    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -152,6 +153,7 @@ async def find_knowledgebox(
             with_synonyms=with_synonyms,
             autofilter=autofilter,
             security=security,
+            show_hidden=show_hidden,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())

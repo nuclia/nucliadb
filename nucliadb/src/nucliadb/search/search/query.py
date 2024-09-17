@@ -119,10 +119,18 @@ class QueryParser:
         generative_model: Optional[str] = None,
         rephrase: bool = False,
         max_tokens: Optional[MaxTokens] = None,
+        hidden: Optional[bool] = None,
     ):
         self.kbid = kbid
         self.features = features
         self.query = query
+        self.hidden = hidden
+        if self.hidden is not None:
+            if self.hidden:
+                label_filters.append(Filter(all=["/q/h"]))
+            else:
+                label_filters.append(Filter(none=["/q/h"]))
+            print(label_filters)
         self.label_filters: dict[str, Any] = convert_to_node_filters(label_filters)
         self.flat_label_filters: list[str] = []
         self.keyword_filters: dict[str, Any] = convert_to_node_filters(keyword_filters)

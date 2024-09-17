@@ -451,6 +451,7 @@ async def ask(
     else:
         main_results = KnowledgeboxFindResults(resources={}, min_score=None)
         prequeries_results = None
+        # Dummy query parser, used below for calculating max tokens, etc.
         query_parser = QueryParser(
             kbid=kbid,
             features=[],
