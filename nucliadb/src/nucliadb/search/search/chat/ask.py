@@ -19,6 +19,7 @@
 #
 import functools
 import json
+from dataclasses import dataclass
 from typing import AsyncGenerator, Optional, cast
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -34,6 +35,7 @@ from nucliadb.search.predict import (
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
+from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
@@ -357,10 +359,10 @@ class AskResult:
 class NotEnoughContextAskResult(AskResult):
     def __init__(
         self,
-        main_results: KnowledgeboxFindResults,
+        main_results: Optional[KnowledgeboxFindResults] = None,
         prequeries_results: Optional[list[PreQueryResult]] = None,
     ):
-        self.main_results = main_results
+        self.main_results = main_results or KnowledgeboxFindResults(resources={}, min_score=None)
         self.prequeries_results = prequeries_results or []
         self.nuclia_learning_id = None
 
@@ -413,54 +415,27 @@ async def ask(
         except RephraseMissingContextError:
             logger.info("Failed to rephrase ask query, using original")
 
-    prequeries = parse_prequeries(ask_request)
-    # Retrieval is not needed if we are chatting on a specific
-    # resource and the full_resource strategy is enabled
-    needs_retrieval = True
-    if resource is not None:
-        if prequeries is not None:
-            raise InvalidQueryError(
-                "rag_strategies", "Prequeries are not supported when asking on a specific resource"
-            )
-        ask_request.resource_filters = [resource]
-        if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
-            needs_retrieval = False
-
-    # Maybe do a retrieval query
-    if needs_retrieval:
-        with metrics.time("retrieval"):
-            main_results, prequeries_results, query_parser = await get_find_results(
-                kbid=kbid,
-                # Prefer the rephrased query if available
-                query=rephrased_query or user_query,
-                item=ask_request,
-                ndb_client=client_type,
-                user=user_id,
-                origin=origin,
-                metrics=metrics,
-                prequeries=prequeries,
-            )
-        if len(main_results.resources) == 0 and all(
-            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
-        ):
-            return NotEnoughContextAskResult(
-                main_results=main_results,
-                prequeries_results=prequeries_results,
-            )
-
-    else:
-        main_results = KnowledgeboxFindResults(resources={}, min_score=None)
-        prequeries_results = None
-        query_parser = QueryParser(
+    try:
+        retrieval_results = await retrieval_step(
             kbid=kbid,
-            features=[],
-            query="",
-            label_filters=ask_request.filters,
-            keyword_filters=ask_request.keyword_filters,
-            page_number=0,
-            page_size=0,
-            min_score=MinScore(),
+            # Prefer the rephrased query for retrieval if available
+            main_query=rephrased_query or user_query,
+            ask_request=ask_request,
+            client_type=client_type,
+            user_id=user_id,
+            origin=origin,
+            metrics=metrics,
+            resource=resource,
         )
+    except NoRetrievalResultsError as err:
+        # If a retrieval was attempted but no results were found,
+        # early return the ask endpoint without querying the generative model
+        return NotEnoughContextAskResult(
+            main_results=err.main_query,
+            prequeries_results=err.prequeries,
+        )
+
+    query_parser = retrieval_results.query_parser
 
     # Now we build the prompt context
     with metrics.time("context_building"):
@@ -468,9 +443,9 @@ async def ask(
         max_tokens_context = await query_parser.get_max_tokens_context()
         prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
-            main_results=main_results,
-            prequeries_results=prequeries_results,
-            main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
+            main_results=retrieval_results.main_query,
+            prequeries_results=retrieval_results.prequeries,
+            main_query_weight=retrieval_results.main_query_weight,
             resource=resource,
             user_context=user_context,
             strategies=ask_request.rag_strategies,
@@ -521,8 +496,8 @@ async def ask(
     return AskResult(
         kbid=kbid,
         ask_request=ask_request,
-        main_results=main_results,
-        prequeries_results=prequeries_results,
+        main_results=retrieval_results.main_query,
+        prequeries_results=retrieval_results.prequeries,
         nuclia_learning_id=nuclia_learning_id,
         predict_answer_stream=predict_answer_stream,  # type: ignore
         prompt_context=prompt_context,
@@ -571,6 +546,7 @@ def handled_ask_exceptions(func):
 
 
 def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
+    query_ids = []
     for rag_strategy in ask_request.rag_strategies:
         if rag_strategy.name == RagStrategyName.PREQUERIES:
             prequeries = cast(PreQueriesStrategy, rag_strategy)
@@ -578,5 +554,152 @@ def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
             for index, query in enumerate(prequeries.queries):
                 if query.id is None:
                     query.id = f"prequery_{index}"
+                if query.id in query_ids:
+                    raise InvalidQueryError(
+                        "rag_strategies",
+                        "Prequeries must have unique ids",
+                    )
+                query_ids.append(query.id)
             return prequeries
     return None
+
+
+@dataclass
+class RetrievalResults:
+    main_query: KnowledgeboxFindResults
+    query_parser: QueryParser
+    main_query_weight: float
+    prequeries: Optional[list[PreQueryResult]] = None
+
+
+async def retrieval_step(
+    kbid: str,
+    main_query: str,
+    ask_request: AskRequest,
+    client_type: NucliaDBClientType,
+    user_id: str,
+    origin: str,
+    metrics: RAGMetrics,
+    resource: Optional[str] = None,
+) -> RetrievalResults:
+    """
+    This function encapsulates all the logic related to retrieval in the ask endpoint.
+    """
+    if resource is None:
+        return await retrieval_in_kb(
+            kbid,
+            main_query,
+            ask_request,
+            client_type,
+            user_id,
+            origin,
+            metrics,
+        )
+    else:
+        return await retrieval_in_resource(
+            kbid,
+            resource,
+            main_query,
+            ask_request,
+            client_type,
+            user_id,
+            origin,
+            metrics,
+        )
+
+
+async def retrieval_in_kb(
+    kbid: str,
+    main_query: str,
+    ask_request: AskRequest,
+    client_type: NucliaDBClientType,
+    user_id: str,
+    origin: str,
+    metrics: RAGMetrics,
+) -> RetrievalResults:
+    prequeries = parse_prequeries(ask_request)
+    with metrics.time("retrieval"):
+        main_results, prequeries_results, query_parser = await get_find_results(
+            kbid=kbid,
+            query=main_query,
+            item=ask_request,
+            ndb_client=client_type,
+            user=user_id,
+            origin=origin,
+            metrics=metrics,
+            prequeries_strategy=prequeries,
+        )
+        if len(main_results.resources) == 0 and all(
+            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+        ):
+            raise NoRetrievalResultsError(main_results, prequeries_results)
+    return RetrievalResults(
+        main_query=main_results,
+        prequeries=prequeries_results,
+        query_parser=query_parser,
+        main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
+    )
+
+
+async def retrieval_in_resource(
+    kbid: str,
+    resource: str,
+    main_query: str,
+    ask_request: AskRequest,
+    client_type: NucliaDBClientType,
+    user_id: str,
+    origin: str,
+    metrics: RAGMetrics,
+) -> RetrievalResults:
+    if any(strategy.name == "full_resource" for strategy in ask_request.rag_strategies):
+        # Retrieval is not needed if we are chatting on a specific resource and the full_resource strategy is enabled
+        return RetrievalResults(
+            main_query=KnowledgeboxFindResults(resources={}, min_score=None),
+            prequeries=None,
+            query_parser=QueryParser(
+                kbid=kbid,
+                features=[],
+                query="",
+                label_filters=ask_request.filters,
+                keyword_filters=ask_request.keyword_filters,
+                page_number=0,
+                page_size=0,
+                min_score=MinScore(),
+            ),
+            main_query_weight=1.0,
+        )
+
+    prequeries = parse_prequeries(ask_request)
+
+    # Make sure the retrieval is scoped to the resource if provided
+    ask_request.resource_filters = [resource]
+    if prequeries is not None:
+        for prequery in prequeries.queries:
+            if prequery.prefilter is True:
+                raise InvalidQueryError(
+                    "rag_strategies",
+                    "Prequeries with prefilter are not supported when asking on a resource",
+                )
+            prequery.request.resource_filters = [resource]
+
+    with metrics.time("retrieval"):
+        main_results, prequeries_results, query_parser = await get_find_results(
+            kbid=kbid,
+            query=main_query,
+            item=ask_request,
+            ndb_client=client_type,
+            user=user_id,
+            origin=origin,
+            metrics=metrics,
+            prequeries_strategy=prequeries,
+        )
+        if len(main_results.resources) == 0 and all(
+            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+        ):
+            raise NoRetrievalResultsError(main_results, prequeries_results)
+    return RetrievalResults(
+        main_query=main_results,
+        prequeries=prequeries_results,
+        query_parser=query_parser,
+        main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
+    )

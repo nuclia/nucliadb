@@ -48,6 +48,13 @@ def test_field_ids():
     assert field_id.type == "u"
     assert field_id.pb_type == FieldType.LINK
 
+    field_id = FieldId.from_pb("rid", FieldType.LINK, "field_id", subfield_id="subfield_id")
+    assert field_id.rid == "rid"
+    assert field_id.type == "u"
+    assert field_id.key == "field_id"
+    assert field_id.subfield_id == "subfield_id"
+    assert field_id.full() == "rid/u/field_id/subfield_id"
+
 
 def test_paragraph_ids():
     invalids = [

@@ -887,6 +887,11 @@ class FullResourceStrategy(RagStrategy):
         description="Maximum number of full documents to retrieve. If not specified, all matching documents are retrieved.",
         ge=1,
     )
+    include_remaining_text_blocks: bool = Field(
+        default=False,
+        title="Include remaining text blocks",
+        description="Whether to include the remaining text blocks after the maximum number of resources has been reached.",
+    )
 
 
 class HierarchyResourceStrategy(RagStrategy):
@@ -973,6 +978,15 @@ class PreQuery(BaseModel):
             "summary_prequery",
             "prequery_1",
         ],
+    )
+    prefilter: bool = Field(
+        default=False,
+        title="Prefilter",
+        description=(
+            "If set to true, the prequery results are used to filter the scope of the remaining queries. "
+            "The resources of the most relevant paragraphs of the prefilter queries are used as resource "
+            "filters for the main query and other prequeries with the prefilter flag set to false."
+        ),
     )
 
 
@@ -1145,9 +1159,9 @@ class ChatRequest(BaseModel):
 - `hierarchy` will add the title and summary text of the parent resource to the context for each matching paragraph.
 - `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
 - `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context. This strategy can be combined with any other strategy.
-- `prequeries` allows to run additional queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights.
+- `prequeries` allows to run additional queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights. This strategy can be combined with any other strategy.
 
-If empty, the default strategy is used. `full_resource`, `hierarchy`, `prequeries` and `neighbouring_paragraphs` are exclusive strategies: if selected, they must be the only strategy.
+If empty, the default strategy is used. `full_resource`, `hierarchy`, and `neighbouring_paragraphs` are mutually exclusive strategies: if selected, they must be the only strategy.
 """
         ),
         examples=[
@@ -1225,18 +1239,21 @@ If empty, the default strategy is used. `full_resource`, `hierarchy`, `prequerie
         if len(strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
 
-        # metadata extension can be combined with other strategies
-        try:
-            strategy_names.remove(RagStrategyName.METADATA_EXTENSION)
-        except KeyError:
-            pass
+        # The following can combined with other strategies
+        for combinable_strategy in (
+            RagStrategyName.METADATA_EXTENSION,
+            RagStrategyName.PREQUERIES,
+        ):
+            try:
+                strategy_names.remove(combinable_strategy)
+            except KeyError:
+                pass
 
         # If any of the unique strategies are chosen, they must be the only strategy
         for strategy_name in (
             RagStrategyName.FULL_RESOURCE,
             RagStrategyName.HIERARCHY,
             RagStrategyName.NEIGHBOURING_PARAGRAPHS,
-            RagStrategyName.PREQUERIES,
         ):
             if strategy_name in strategy_names and len(strategy_names) > 1:
                 raise ValueError(
