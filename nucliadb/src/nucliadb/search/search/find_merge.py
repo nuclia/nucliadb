@@ -129,8 +129,6 @@ async def set_resource_metadata_value(
 
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
-    find_resources: dict[str, FindResource],
-    best_matches: list[str],
     result_paragraphs: list[TempFindParagraph],
     kbid: str,
     show: list[ResourceProperties],
@@ -138,7 +136,10 @@ async def fetch_find_metadata(
     extracted: list[ExtractedDataTypeName],
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
-):
+) -> tuple[dict[str, FindResource], list[str]]:
+    find_resources: dict[str, FindResource] = {}
+    best_matches: list[str] = []
+
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
@@ -224,6 +225,8 @@ async def fetch_find_metadata(
             for task in done:
                 if task.exception() is not None:  # pragma: no cover
                     logger.error("Error fetching find metadata", exc_info=task.exception())
+
+    return find_resources, best_matches
 
 
 @merge_observer.wrap({"type": "merge_paragraphs_vectors"})
@@ -420,9 +423,7 @@ async def find_merge_results(
         best_matches=[],
     )
 
-    await fetch_find_metadata(
-        api_results.resources,
-        api_results.best_matches,
+    resources, best_matches = await fetch_find_metadata(
         result_paragraphs,
         kbid,
         show,
@@ -431,6 +432,8 @@ async def find_merge_results(
         highlight,
         ematches,
     )
+    api_results.resources = resources
+    api_results.best_matches = best_matches
     api_results.relations = await merge_relations_results(relations, requested_relations)
 
     return api_results
