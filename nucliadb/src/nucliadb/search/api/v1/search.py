@@ -236,6 +236,7 @@ async def catalog_get(
     range_modification_end: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
+    hidden: Optional[bool] = fastapi_query(SearchParamDefaults.hidden),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     item = CatalogRequest(
         query=query,
@@ -250,6 +251,7 @@ async def catalog_get(
         range_creation_end=range_creation_end,
         range_modification_start=range_modification_start,
         range_modification_end=range_modification_end,
+        hidden=hidden,
     )
     if sort_field:
         item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
@@ -314,6 +316,7 @@ async def catalog(
                 range_creation_end=item.range_creation_end,
                 range_modification_start=item.range_modification_start,
                 range_modification_end=item.range_modification_end,
+                hidden=item.hidden,
             )
             pb_query, _, _ = await query_parser.parse()
 

@@ -579,6 +579,11 @@ class SearchParamDefaults:
         title="Show hidden resources",
         description="If set to false (default), excludes hidden resources from search",
     )
+    hidden = ParamDefault(
+        default=None,
+        title="Filter resources by hidden",
+        description="Set to filter only hidden or only non-hidden resources. Default is to return everything",
+    )
 
 
 class Filter(BaseModel):
@@ -623,6 +628,7 @@ class CatalogRequest(BaseModel):
     range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
+    hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
 
     @field_validator("faceted")
     @classmethod
