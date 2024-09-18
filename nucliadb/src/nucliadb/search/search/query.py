@@ -127,10 +127,10 @@ class QueryParser:
         self.hidden = hidden
         if self.hidden is not None:
             if self.hidden:
-                label_filters.append(Filter(all=["/q/h"]))
+                label_filters.append(Filter(all=["/q/h"]))  # type: ignore
             else:
-                label_filters.append(Filter(none=["/q/h"]))
-            print(label_filters)
+                label_filters.append(Filter(none=["/q/h"]))  # type: ignore
+
         self.label_filters: dict[str, Any] = convert_to_node_filters(label_filters)
         self.flat_label_filters: list[str] = []
         self.keyword_filters: dict[str, Any] = convert_to_node_filters(keyword_filters)
@@ -781,8 +781,16 @@ def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]
             "Paragraph labels can only be used with 'all' filter",
         )
     for term in filters["and"]:
-        # Nested expressions are not allowed with paragraph labels
-        if "literal" not in term:
+        # Nested expressions are not allowed with paragraph labels (only "literal" and "not(literal)")
+        if "not" in term:
+            subterm = term["not"]
+            if "literal" not in subterm:
+                # AND (NOT( X )) where X is anything other than a literal
+                raise InvalidQueryError(
+                    "filters",
+                    "Paragraph labels can only be used with 'all' filter",
+                )
+        elif "literal" not in term:
             raise InvalidQueryError(
                 "filters",
                 "Paragraph labels can only be used with 'all' filter",

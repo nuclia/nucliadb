@@ -19,6 +19,7 @@
 #
 import pytest
 from httpx import AsyncClient
+from tests.utils import broker_resource, inject_message
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
@@ -40,7 +41,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import broker_resource, inject_message
 
 
 class ClassificationLabels:
@@ -278,9 +278,10 @@ async def kbid(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "filters",
-    [
+async def test_filtering_before_and_after_reindexing(
+    app_context, nucliadb_reader: AsyncClient, kbid: str
+):
+    FILTERS = [
         # Filter with unexisting labels and entities
         [entity_filter("unexisting/entity")],
         [label_filter("user-paragraph/unexisting")],
@@ -321,16 +322,15 @@ async def kbid(
             label_filter(ClassificationLabels.RESOURCE_ANNOTATED),
             label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
         ],
-    ],
-)
-async def test_filtering_before_and_after_reindexing(
-    app_context, nucliadb_reader: AsyncClient, kbid: str, filters
-):
-    await _test_filtering(nucliadb_reader, kbid, filters)
+    ]
+
+    for f in FILTERS:
+        await _test_filtering(nucliadb_reader, kbid, f)
 
     await rollover.rollover_kb_index(app_context, kbid)
 
-    await _test_filtering(nucliadb_reader, kbid, filters)
+    for f in FILTERS:
+        await _test_filtering(nucliadb_reader, kbid, f)
 
 
 async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
@@ -351,7 +351,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
             min_score=MinScore(semantic=-1).model_dump(),
         ),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     content = resp.json()
 
     # Collect all paragraphs from the response
