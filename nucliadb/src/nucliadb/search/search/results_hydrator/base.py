@@ -152,16 +152,11 @@ async def hydrate_text_block(
     """
     Fetch the text for a text block and update the FindParagraph object.
     """
-    _, field_type, field_key = text_block.field_id.split("/")
+    field_id = FieldId.from_string(text_block.field_id)
     text = await paragraphs.get_paragraph_text(
         kbid=kbid,
         paragraph_id=ParagraphId(
-            field_id=FieldId(
-                rid=text_block.resource_id,
-                type=field_type,
-                key=field_key,
-                subfield_id=text_block.subfield_id,
-            ),
+            field_id=field_id,
             paragraph_start=text_block.position_start,
             paragraph_end=text_block.position_end,
         ),
