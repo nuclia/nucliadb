@@ -121,7 +121,7 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, re
 
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
-        json={"query": "title", "citations": True},
+        json={"query": "title", "citations": True, "citation_threshold": 0.5},
         headers={"X-Synchronous": "true"},
     )
     assert resp.status_code == 200
