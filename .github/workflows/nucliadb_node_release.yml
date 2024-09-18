@@ -76,7 +76,7 @@ jobs:
       - name: set up python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
           architecture: ${{ matrix.python-architecture || 'x64' }}
 
       - name: Setup env
@@ -144,7 +144,7 @@ jobs:
       - name: set up python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
 
       - run: pip install -U twine
 

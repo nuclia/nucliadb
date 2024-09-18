@@ -263,11 +263,23 @@ def test_capped_prompt_context():
     assert context.output == {"key1": "fo"}
     assert context.size == 2
 
+    # Check text block ids
+    assert context.text_block_ids() == ["key1"]
+
     # Check without limits
     context = chat_prompt.CappedPromptContext(max_size=None)
     context["key1"] = "foo" * int(1e6)
 
     assert context.output == {"key1": "foo" * int(1e6)}
+    assert context.size == int(3e6)
+
+    # Check that the size is updated correctly upon deletion
+    del context["key1"]
+    assert context.size == 0
+
+    # Deletion of non-existing key should not raise an error
+    del context["key1337"]
+    assert context.size == 0
 
 
 @pytest.mark.asyncio

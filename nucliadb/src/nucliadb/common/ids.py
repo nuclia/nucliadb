@@ -85,6 +85,12 @@ class FieldId:
         return FIELD_TYPE_STR_TO_PB[self.type]
 
     @classmethod
+    def from_pb(
+        cls, rid: str, field_type: FieldType.ValueType, key: str, subfield_id: Optional[str] = None
+    ) -> "FieldId":
+        return cls(rid=rid, type=FIELD_TYPE_PB_TO_STR[field_type], key=key, subfield_id=subfield_id)
+
+    @classmethod
     def from_string(cls, value: str) -> "FieldId":
         """
         Parse a FieldId from a string
