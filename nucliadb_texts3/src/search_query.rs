@@ -80,16 +80,18 @@ pub fn create_query(
     queries.push((Occur::Must, main_q));
 
     // Field types filter
-    search
+    let field_filter: Vec<_> = search
         .fields
         .iter()
-        .map(|value| format!("/{}", value))
-        .flat_map(|facet_key| Facet::from_text(facet_key.as_str()).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.field, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            queries.push((Occur::Must, Box::new(facet_term_query)));
-        });
+        .map(|field_name| {
+            let term = Term::from_field_bytes(schema.field, field_name.as_bytes());
+            let term_query: Box<dyn Query> = Box::new(TermQuery::new(term, IndexRecordOption::Basic));
+            (Occur::Should, term_query)
+        })
+        .collect();
+    if !field_filter.is_empty() {
+        queries.push((Occur::Must, Box::new(BooleanQuery::new(field_filter))));
+    }
 
     if let Some(filter) = search.filter.as_ref() {
         let context = QueryContext {

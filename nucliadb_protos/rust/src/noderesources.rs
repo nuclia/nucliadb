@@ -61,6 +61,7 @@ pub mod shard_created {
         DocumentV0 = 0,
         DocumentV1 = 1,
         DocumentV2 = 2,
+        DocumentV3 = 3,
     }
     impl DocumentService {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -72,6 +73,7 @@ pub mod shard_created {
                 DocumentService::DocumentV0 => "DOCUMENT_V0",
                 DocumentService::DocumentV1 => "DOCUMENT_V1",
                 DocumentService::DocumentV2 => "DOCUMENT_V2",
+                DocumentService::DocumentV3 => "DOCUMENT_V3",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -80,6 +82,7 @@ pub mod shard_created {
                 "DOCUMENT_V0" => Some(Self::DocumentV0),
                 "DOCUMENT_V1" => Some(Self::DocumentV1),
                 "DOCUMENT_V2" => Some(Self::DocumentV2),
+                "DOCUMENT_V3" => Some(Self::DocumentV3),
                 _ => None,
             }
         }

@@ -19,7 +19,7 @@
 //
 use nucliadb_core::protos::*;
 use tantivy::chrono::{DateTime, Utc};
-use tantivy::schema::{Cardinality, FacetOptions, Field, NumericOptions, Schema, FAST, STORED, STRING, TEXT};
+use tantivy::schema::{Cardinality, FacetOptions, Field, NumericOptions, Schema, FAST, INDEXED, STORED, TEXT};
 
 #[derive(Debug, Clone)]
 pub struct TextSchema {
@@ -55,8 +55,8 @@ impl TextSchema {
 
         let facet_options = FacetOptions::default().set_stored();
 
-        let uuid = sb.add_bytes_field("uuid", FAST);
-        let field = sb.add_bytes_field("field", FAST);
+        let uuid = sb.add_bytes_field("uuid", STORED | FAST | INDEXED);
+        let field = sb.add_bytes_field("field", STORED | FAST | INDEXED);
 
         let text = sb.add_text_field("text", TEXT);
 

@@ -95,42 +95,50 @@ impl Debug for TextReaderService {
     }
 }
 
-struct PrefilterSegmentCollector {
-    reader: BytesFastFieldReader,
-    uuids: Vec<String>,
+struct FieldUuidSegmentCollector {
+    uuid_reader: BytesFastFieldReader,
+    field_reader: BytesFastFieldReader,
+    results: Vec<ValidField>,
 }
 
-impl SegmentCollector for PrefilterSegmentCollector {
-    type Fruit = Vec<String>;
+impl SegmentCollector for FieldUuidSegmentCollector {
+    type Fruit = Vec<ValidField>;
 
-    fn collect(&mut self, doc: tantivy::DocId, score: tantivy::Score) {
-        let bytes = self.reader.get_bytes(doc);
-        self.uuids.push(String::from_utf8_lossy(bytes).to_string());
+    fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
+        let uuid = self.uuid_reader.get_bytes(doc);
+        let field = self.field_reader.get_bytes(doc);
+        self.results.push(ValidField {
+            resource_id: String::from_utf8_lossy(uuid).to_string(),
+            field_id: String::from_utf8_lossy(field).to_string(),
+        });
     }
 
     fn harvest(self) -> Self::Fruit {
-        self.uuids
+        self.results
     }
 }
 
-struct PrefilterCollector {
+struct FieldUuidCollector {
+    uuid: Field,
     field: Field,
 }
 
-impl Collector for PrefilterCollector {
-    type Fruit = Vec<String>;
+impl Collector for FieldUuidCollector {
+    type Fruit = Vec<ValidField>;
 
-    type Child = PrefilterSegmentCollector;
+    type Child = FieldUuidSegmentCollector;
 
     fn for_segment(
         &self,
-        segment_local_id: tantivy::SegmentOrdinal,
+        _segment_local_id: tantivy::SegmentOrdinal,
         segment: &tantivy::SegmentReader,
     ) -> tantivy::Result<Self::Child> {
-        let reader = segment.fast_fields().bytes(self.field)?;
-        Ok(PrefilterSegmentCollector {
-            reader,
-            uuids: vec![],
+        let uuid_reader = segment.fast_fields().bytes(self.uuid)?;
+        let field_reader = segment.fast_fields().bytes(self.field)?;
+        Ok(FieldUuidSegmentCollector {
+            uuid_reader,
+            field_reader,
+            results: vec![],
         })
     }
 
@@ -224,65 +232,29 @@ impl FieldReader for TextReaderService {
 
         let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
         let searcher = self.reader.searcher();
-        // let collector = PrefilterCollector {
-        //     field: self.schema.uuid_field,
-        // };
-        // let mut docs_fulfilled = searcher.search(&prefilter_query, &collector)?;
-        // let mut inverted = false;
+        let collector = FieldUuidCollector {
+            uuid: self.schema.uuid,
+            field: self.schema.field,
+        };
+        let docs_fulfilled = searcher.search(&prefilter_query, &collector)?;
 
-        // // If none of the fields match the pre-filter, thats all the query planner needs to know.
-        // if docs_fulfilled.is_empty() {
-        //     return Ok(PreFilterResponse {
-        //         valid_fields: ValidFieldCollector::None,
-        //     });
-        // }
-
-        // // If all the fields match the pre-filter, thats all the query planner needs to know
-        // if docs_fulfilled.len() as u64 == searcher.num_docs() {
-        //     return Ok(PreFilterResponse {
-        //         valid_fields: ValidFieldCollector::All,
-        //     });
-        // }
-
-        // // More than half in results
-        // if docs_fulfilled.len() * 2 > searcher.num_docs() as usize {
-        //     let inverted_prefilter_query: Box<dyn Query> =
-        //         Box::new(BooleanQuery::new(vec![(Occur::MustNot, prefilter_query)]));
-        //     docs_fulfilled = searcher.search(&inverted_prefilter_query, &DocSetCollector)?;
-        //     inverted = true;
-        // }
-
-        // The fields matching the pre-filter are a non-empty subset of all the fields, so they are
-        // brought to memory
-        // let mut valid_fields = Vec::new();
-        // for fulfilled_doc in docs_fulfilled {
-        //     let fulfilled_field = ValidField {
-        //         resource_id: fulfilled_doc,
-        //         field_id: String::new(),
-        //     };
-        //     valid_fields.push(fulfilled_field);
-        // }
-        // println!("FAST Prefiltered down to {} of {}", valid_fields.len(), searcher.num_docs());
-
-        let mut docs_fulfilled = searcher.search(&prefilter_query, &DocSetCollector)?;
-        println!("Prefiltered down to {} of {}", docs_fulfilled.len(), searcher.num_docs());
-        let mut inverted = false;
-
-        // The fields matching the pre-filter are a non-empty subset of all the fields, so they are
-        // brought to memory
-        let mut valid_fields = Vec::new();
-        for fulfilled_doc in docs_fulfilled {
-            if let Ok(doc) = searcher.doc(fulfilled_doc) {
-                let resource_id = doc.get_first(self.schema.uuid).unwrap().as_text().unwrap().to_string();
-                valid_fields.push(ValidField {
-                    resource_id,
-                    field_id: String::new(),
-                });
-            }
+        // If none of the fields match the pre-filter, thats all the query planner needs to know.
+        if docs_fulfilled.is_empty() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::None,
+            });
         }
 
+        // If all the fields match the pre-filter, thats all the query planner needs to know
+        if docs_fulfilled.len() as u64 == searcher.num_docs() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::All,
+            });
+        }
+
+        // The fields matching the pre-filter are a non-empty subset of all the fields
         Ok(PreFilterResponse {
-            valid_fields: ValidFieldCollector::Some(valid_fields),
+            valid_fields: ValidFieldCollector::Some(docs_fulfilled),
         })
     }
 
@@ -394,19 +366,23 @@ impl TextReaderService {
                         bm25: 0.0,
                         booster: id as f32,
                     });
-                    let uuid = doc
-                        .get_first(self.schema.uuid)
-                        .expect("document doesn't appear to have uuid.")
-                        .as_text()
-                        .unwrap()
-                        .to_string();
+                    let uuid = String::from_utf8(
+                        doc.get_first(self.schema.uuid)
+                            .expect("document doesn't appear to have uuid.")
+                            .as_bytes()
+                            .unwrap()
+                            .to_vec(),
+                    )
+                    .unwrap();
 
-                    let field = doc
-                        .get_first(self.schema.field)
-                        .expect("document doesn't appear to have field.")
-                        .as_facet()
-                        .unwrap()
-                        .to_path_string();
+                    let field = String::from_utf8(
+                        doc.get_first(self.schema.field)
+                            .expect("document doesn't appear to have field.")
+                            .as_bytes()
+                            .unwrap()
+                            .to_vec(),
+                    )
+                    .unwrap();
 
                     let labels = doc
                         .get_all(self.schema.facets)
@@ -462,19 +438,23 @@ impl TextReaderService {
                         bm25: score,
                         booster: id as f32,
                     });
-                    let uuid = doc
-                        .get_first(self.schema.uuid)
-                        .expect("document doesn't appear to have uuid.")
-                        .as_text()
-                        .unwrap()
-                        .to_string();
+                    let uuid = String::from_utf8(
+                        doc.get_first(self.schema.uuid)
+                            .expect("document doesn't appear to have uuid.")
+                            .as_bytes()
+                            .unwrap()
+                            .to_vec(),
+                    )
+                    .unwrap();
 
-                    let field = doc
-                        .get_first(self.schema.field)
-                        .expect("document doesn't appear to have field.")
-                        .as_facet()
-                        .unwrap()
-                        .to_path_string();
+                    let field = String::from_utf8(
+                        doc.get_first(self.schema.field)
+                            .expect("document doesn't appear to have field.")
+                            .as_bytes()
+                            .unwrap()
+                            .to_vec(),
+                    )
+                    .unwrap();
 
                     let labels = doc
                         .get_all(self.schema.facets)
@@ -642,19 +622,23 @@ impl Iterator for BatchProducer {
         let top_docs = self.searcher.search(&self.query, &top_docs).unwrap();
         let mut items = vec![];
         for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc(i.1)) {
-            let uuid = doc
-                .get_first(self.uuid_field)
-                .expect("document doesn't appear to have uuid.")
-                .as_text()
-                .unwrap()
-                .to_string();
+            let uuid = String::from_utf8(
+                doc.get_first(self.uuid_field)
+                    .expect("document doesn't appear to have uuid.")
+                    .as_bytes()
+                    .unwrap()
+                    .to_vec(),
+            )
+            .unwrap();
 
-            let field = doc
-                .get_first(self.field_field)
-                .expect("document doesn't appear to have field.")
-                .as_facet()
-                .unwrap()
-                .to_path_string();
+            let field = String::from_utf8(
+                doc.get_first(self.field_field)
+                    .expect("document doesn't appear to have field.")
+                    .as_bytes()
+                    .unwrap()
+                    .to_vec(),
+            )
+            .unwrap();
 
             let labels = doc
                 .get_all(self.facet_field)

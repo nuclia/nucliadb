@@ -81,7 +81,7 @@ impl FieldWriter for TextWriterService {
         debug!("{id:?} - Delete existing uuid: starts at {v} ms");
 
         let uuid_field = self.schema.uuid;
-        let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
+        let uuid_term = Term::from_field_bytes(uuid_field, resource_id.uuid.as_bytes());
         self.writer.delete_term(uuid_term);
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Delete existing uuid: ends at {v} ms");
@@ -227,7 +227,7 @@ impl TextWriterService {
         };
 
         let mut base_doc = doc!(
-            self.schema.uuid => resource_id,
+            self.schema.uuid => resource_id.as_bytes(),
             self.schema.modified => timestamp_to_datetime_utc(modified),
             self.schema.created => timestamp_to_datetime_utc(created),
             self.schema.status => resource.status as u64,

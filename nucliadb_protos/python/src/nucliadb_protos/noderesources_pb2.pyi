@@ -129,11 +129,13 @@ class ShardCreated(google.protobuf.message.Message):
         DOCUMENT_V0: ShardCreated._DocumentService.ValueType  # 0
         DOCUMENT_V1: ShardCreated._DocumentService.ValueType  # 1
         DOCUMENT_V2: ShardCreated._DocumentService.ValueType  # 2
+        DOCUMENT_V3: ShardCreated._DocumentService.ValueType  # 3
 
     class DocumentService(_DocumentService, metaclass=_DocumentServiceEnumTypeWrapper): ...
     DOCUMENT_V0: ShardCreated.DocumentService.ValueType  # 0
     DOCUMENT_V1: ShardCreated.DocumentService.ValueType  # 1
     DOCUMENT_V2: ShardCreated.DocumentService.ValueType  # 2
+    DOCUMENT_V3: ShardCreated.DocumentService.ValueType  # 3
 
     class _ParagraphService:
         ValueType = typing.NewType("ValueType", builtins.int)
