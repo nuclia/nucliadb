@@ -1692,6 +1692,7 @@ dependencies = [
  "nucliadb_protos",
  "nucliadb_relations2",
  "nucliadb_texts2",
+ "nucliadb_texts3",
  "nucliadb_vectors",
  "num_cpus",
  "object_store",
@@ -1808,6 +1809,17 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_texts2"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.12.1",
+ "nucliadb_core",
+ "nucliadb_procs",
+ "tantivy",
+ "tempfile",
+]
+
+[[package]]
+name = "nucliadb_texts3"
 version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",

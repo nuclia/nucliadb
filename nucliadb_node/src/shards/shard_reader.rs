@@ -76,6 +76,7 @@ fn open_paragraphs_reader(version: u32, path: &Path) -> NodeResult<ParagraphsRea
 fn open_texts_reader(version: u32, path: &Path) -> NodeResult<TextsReaderPointer> {
     match version {
         2 => nucliadb_texts2::reader::TextReaderService::open(path).map(|i| Box::new(i) as TextsReaderPointer),
+        3 => nucliadb_texts3::reader::TextReaderService::open(path).map(|i| Box::new(i) as TextsReaderPointer),
         v => Err(node_error!("Invalid text reader version {v}")),
     }
 }
