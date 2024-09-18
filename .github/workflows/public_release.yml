@@ -141,7 +141,7 @@ jobs:
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
           cache: "true"
 
       - name: Install nucliadb
