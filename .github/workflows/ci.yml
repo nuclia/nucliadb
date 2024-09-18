@@ -67,7 +67,7 @@ jobs:
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -125,7 +125,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -159,7 +159,7 @@ jobs:
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v3
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
           cache: true
       - name: Install venv
         run: pdm sync -d --clean --no-editable
@@ -181,7 +181,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -221,7 +221,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
       - name: Restore venv
         uses: actions/cache/restore@v4
         with:
@@ -285,7 +285,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
 
       - name: Restore venv
         uses: actions/cache/restore@v4
@@ -336,7 +336,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
 
       - name: Restore venv
         uses: actions/cache/restore@v4
@@ -380,7 +380,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.5"
 
       - name: Restore venv
         uses: actions/cache/restore@v4
