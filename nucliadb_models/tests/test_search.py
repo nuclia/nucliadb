@@ -59,6 +59,29 @@ def test_field_extension_strategy_fields_field_validator():
             fields={"z/myfield"},
         )
 
+@pytest.mark.filterwarnings("ignore:deprecated")
+def test_base_search_request_top_k():
+    request = search.BaseSearchRequest(
+        page_number=10,
+        page_size=20,
+    )
+    assert request.page_number == 10
+    assert request.page_size == 20
+
+    request = search.BaseSearchRequest(
+        top_k=100,
+    )
+    assert request.page_number == 0
+    assert request.page_size == 100
+
+    request = search.BaseSearchRequest(
+        page_number=10,
+        page_size=20,
+        top_k=100,
+    )
+    assert request.page_number == 0
+    assert request.page_size == 100
+
 
 def test_search_request_features_normalization():
     request = search.SearchRequest(
