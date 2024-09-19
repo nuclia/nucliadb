@@ -450,7 +450,7 @@ class SearchParamDefaults:
         default=20,
         le=200,
         title="Page size",
-        description="The number of results to return per page. The maximum number of results per page allowed is 200.\nATENTION: pagination will be deprecated, please, refer to `top_k`",
+        description="The number of results to return per page. The maximum number of results per page allowed is 200.\nATENTION: pagination is deprecated and will be removed soon, pleas use to `top_k` instead",
         deprecated=True,
     )
     top_k = ParamDefault(
