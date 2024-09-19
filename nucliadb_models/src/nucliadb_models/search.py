@@ -1288,7 +1288,9 @@ If empty, the default strategy is used. `full_resource`, `hierarchy`, and `neigh
             elif isinstance(strategy, BaseModel):
                 obj = strategy.model_dump()
             else:
-                raise ValueError("RAG strategies must be defined using a valid RagStrategy object or a dictionary")
+                raise ValueError(
+                    "RAG strategies must be defined using a valid RagStrategy object or a dictionary"
+                )
             strategy_name = obj.get("name")
             if strategy_name is None:
                 raise ValueError(f"Invalid strategy '{strategy}'")

@@ -43,6 +43,7 @@ from nucliadb_models.search import (
     MetadataExtensionType,
     PreQueriesStrategy,
     PreQuery,
+    RagStrategies,
     SyncAskResponse,
 )
 
@@ -832,22 +833,22 @@ async def test_all_rag_strategies_combinations(
         PreQueriesStrategy(queries=[PreQuery(request=FindRequest())]),
     ]
 
-    # Create all possible combinations of the list
-    all_combinations = []  # type: ignore
-    for i in range(1, len(rag_strategies) + 1):
-        all_combinations.extend(list(combinations(rag_strategies, i)))
-
-    # Remove those combinations that we know are not supported
-    valid_combinations = []
-    for combination in all_combinations:
+    def valid_combination(combination: list[RagStrategies]) -> bool:
         try:
-            ChatRequest(query="foo", rag_strategies=list(combination))  # type: ignore
-            valid_combinations.append(combination)
+            ChatRequest(query="foo", rag_strategies=combination)
+            return True
         except ValueError:
-            pass
+            return False
+
+    # Create all possible combinations of the list
+    valid_combinations = []
+    for i in range(1, len(rag_strategies) + 1):
+        for combination in combinations(rag_strategies, i):
+            if valid_combination(list(combination)):  # type: ignore
+                valid_combinations.append(list(combination))
 
     assert len(valid_combinations) >= 19
-    for combination in valid_combinations:
+    for combination in valid_combinations:  # type: ignore
         print(f"Combination: {sorted([strategy.name for strategy in combination])}")
         resp = await nucliadb_reader.post(
             f"/kb/{knowledgebox}/ask",
