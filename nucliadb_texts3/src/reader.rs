@@ -378,14 +378,17 @@ impl TextReaderService {
                     )
                     .unwrap();
 
-                    let field = String::from_utf8(
-                        doc.get_first(self.schema.field)
-                            .expect("document doesn't appear to have field.")
-                            .as_bytes()
-                            .unwrap()
-                            .to_vec(),
-                    )
-                    .unwrap();
+                    let field = format!(
+                        "/{}",
+                        String::from_utf8(
+                            doc.get_first(self.schema.field)
+                                .expect("document doesn't appear to have field.")
+                                .as_bytes()
+                                .unwrap()
+                                .to_vec(),
+                        )
+                        .unwrap()
+                    );
 
                     let labels = doc
                         .get_all(self.schema.facets)
@@ -450,14 +453,17 @@ impl TextReaderService {
                     )
                     .unwrap();
 
-                    let field = String::from_utf8(
-                        doc.get_first(self.schema.field)
-                            .expect("document doesn't appear to have field.")
-                            .as_bytes()
-                            .unwrap()
-                            .to_vec(),
-                    )
-                    .unwrap();
+                    let field = format!(
+                        "/{}",
+                        String::from_utf8(
+                            doc.get_first(self.schema.field)
+                                .expect("document doesn't appear to have field.")
+                                .as_bytes()
+                                .unwrap()
+                                .to_vec(),
+                        )
+                        .unwrap()
+                    );
 
                     let labels = doc
                         .get_all(self.schema.facets)
@@ -634,14 +640,17 @@ impl Iterator for BatchProducer {
             )
             .unwrap();
 
-            let field = String::from_utf8(
-                doc.get_first(self.field_field)
-                    .expect("document doesn't appear to have field.")
-                    .as_bytes()
-                    .unwrap()
-                    .to_vec(),
-            )
-            .unwrap();
+            let field = format!(
+                "/{}",
+                String::from_utf8(
+                    doc.get_first(self.field_field)
+                        .expect("document doesn't appear to have field.")
+                        .as_bytes()
+                        .unwrap()
+                        .to_vec(),
+                )
+                .unwrap()
+            );
 
             let labels = doc
                 .get_all(self.facet_field)
