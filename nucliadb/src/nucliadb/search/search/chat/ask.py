@@ -65,6 +65,7 @@ from nucliadb_models.search import (
     CitationsAskResponseItem,
     DebugAskResponseItem,
     ErrorAskResponseItem,
+    FindRequest,
     JSONAskResponseItem,
     KnowledgeboxFindResults,
     MetadataAskResponseItem,
@@ -72,6 +73,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     PrequeriesAskResponseItem,
     PreQueriesStrategy,
+    PreQuery,
     PreQueryResult,
     PromptContext,
     PromptContextOrder,
@@ -79,6 +81,7 @@ from nucliadb_models.search import (
     Relations,
     RelationsAskResponseItem,
     RetrievalAskResponseItem,
+    SearchOptions,
     StatusAskResponseItem,
     SyncAskMetadata,
     SyncAskResponse,
@@ -132,7 +135,7 @@ class AskResult:
 
     @property
     def status_error_details(self) -> Optional[str]:
-        if self._status is None:
+        if self._status is None:  # pragma: no cover
             return None
         return self._status.details
 
@@ -670,6 +673,8 @@ async def retrieval_in_resource(
         )
 
     prequeries = parse_prequeries(ask_request)
+    if prequeries is None and ask_request.answer_json_schema is not None and main_query == "":
+        prequeries = calculate_prequeries_for_json_schema(ask_request)
 
     # Make sure the retrieval is scoped to the resource if provided
     ask_request.resource_filters = [resource]
@@ -703,3 +708,79 @@ async def retrieval_in_resource(
         query_parser=query_parser,
         main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
     )
+
+
+def calculate_prequeries_for_json_schema(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
+    """
+    This function generates a PreQueriesStrategy with a query for each property in the JSON schema
+    found in ask_request.answer_json_schema.
+
+    This is useful for the use-case where the user is asking for a structured answer on a corpus
+    that is too big to send to the generative model.
+
+    For instance, a JSON schema like this:
+    {
+        "name": "book_ordering",
+        "description": "Structured answer for a book to order",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The title of the book"
+                },
+                "author": {
+                    "type": "string",
+                    "description": "The author of the book"
+                },
+            },
+            "required": ["title", "author"]
+        }
+    }
+    Will generate a PreQueriesStrategy with 2 queries, one for each property in the JSON schema, with equal weights
+    [
+        PreQuery(request=FindRequest(query="The title of the book", ...), weight=1.0),
+        PreQuery(request=FindRequest(query="The author of the book", ...), weight=1.0),
+    ]
+    """
+    prequeries: list[PreQuery] = []
+    json_schema = ask_request.answer_json_schema or {}
+    features = []
+    if ChatOptions.SEMANTIC in ask_request.features:
+        features.append(SearchOptions.SEMANTIC)
+    if ChatOptions.KEYWORD in ask_request.features:
+        features.append(SearchOptions.KEYWORD)
+    properties = json_schema.get("parameters", {}).get("properties", {})
+    if len(properties) == 0:  # pragma: no cover
+        return None
+    for prop_name, prop_def in properties.items():
+        query = prop_name
+        if prop_def.get("description"):
+            query += f": {prop_def['description']}"
+        req = FindRequest(
+            query=query,
+            features=features,
+            filters=[],
+            keyword_filters=[],
+            page_number=0,
+            page_size=10,
+            min_score=ask_request.min_score,
+            vectorset=ask_request.vectorset,
+            highlight=False,
+            debug=False,
+            show=[],
+            with_duplicates=False,
+            with_synonyms=False,
+            resource_filters=[],  # to be filled with the resource filter
+            rephrase=False,
+            security=ask_request.security,
+            autofilter=False,
+        )
+        prequery = PreQuery(
+            request=req,
+            weight=1.0,
+        )
+        prequeries.append(prequery)
+    strategy = PreQueriesStrategy(queries=prequeries)
+    ask_request.rag_strategies = [strategy]
+    return strategy

@@ -768,3 +768,39 @@ async def test_ask_rag_strategy_prequeries_with_prefilter(
     # Check that the other prequery was executed and only matched one resource (due to the prefilter)
     assert len(ask_response.prequeries["prequery"].resources) == 1
     assert ask_response.prequeries["prequery"].resources[expected_rid].title == "The title 0"
+
+
+async def test_ask_on_resource_with_json_schema_automatic_prequeries(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resource,
+):
+    kbid = knowledgebox
+    rid = resource
+    answer_json_schema = {
+        "name": "book_ordering",
+        "description": "Structured answer for a book to order",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "The title of the book"},
+                "author": {"type": "string", "description": "The author of the book"},
+                "ref_num": {"type": "string", "description": "The ISBN of the book"},
+                "price": {"type": "number", "description": "The price of the book"},
+            },
+            "required": ["title", "author", "ref_num", "price"],
+        },
+    }
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/resource/{rid}/ask",
+        headers={"X-Synchronous": "True"},
+        json={
+            "query": "",
+            "features": ["keyword", "semantic"],
+            "answer_json_schema": answer_json_schema,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    ask_response = SyncAskResponse.model_validate_json(resp.content)
+    assert ask_response.prequeries is not None
+    assert len(ask_response.prequeries) == 4

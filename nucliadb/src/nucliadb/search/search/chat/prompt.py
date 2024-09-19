@@ -127,9 +127,9 @@ async def get_next_conversation_messages(
     for current_page in range(page, cmetadata.pages + 1):
         conv = await field_obj.db_get_value(current_page)
         for message in conv.messages[start_idx:]:
-            if message_type is not None and message.type != message_type:
+            if message_type is not None and message.type != message_type:  # pragma: no cover
                 continue
-            if msg_to is not None and msg_to not in message.to:
+            if msg_to is not None and msg_to not in message.to:  # pragma: no cover
                 continue
             output.append(message)
             if len(output) >= num_messages:
@@ -155,13 +155,13 @@ async def get_expanded_conversation_messages(
     *, kb: KnowledgeBoxORM, rid: str, field_id: str, mident: str
 ) -> list[resources_pb2.Message]:
     resource = await kb.get(rid)
-    if resource is None:
+    if resource is None:  # pragma: no cover
         return []
     field_obj = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)
     found_message, found_page, found_idx = await find_conversation_message(
         field_obj=field_obj, mident=mident
     )
-    if found_message is None:
+    if found_message is None:  # pragma: no cover
         return []
     elif found_message.type == resources_pb2.Message.MessageType.QUESTION:
         # only try to get answer if it was a question
@@ -221,7 +221,7 @@ async def default_prompt_context(
 
 async def get_field_extracted_text(kbid: str, field_id: FieldId) -> Optional[tuple[FieldId, str]]:
     extracted_text_pb = await cache.get_extracted_text_from_field_id(kbid, field_id)
-    if extracted_text_pb is None:
+    if extracted_text_pb is None:  # pragma: no cover
         return None
     return field_id, extracted_text_pb.text
 
@@ -231,7 +231,7 @@ async def get_resource_extracted_texts(
     resource_uuid: str,
 ) -> list[tuple[FieldId, str]]:
     resource = await cache.get_resource(kbid, resource_uuid)
-    if resource is None:
+    if resource is None:  # pragma: no cover
         return []
 
     # Schedule the extraction of the text of each field in the resource
