@@ -738,7 +738,6 @@ Please return ONLY the question without any explanation. Just the rephrased ques
         return [feature.normalized() for feature in features]
 
     @model_validator(mode="after")
-    @classmethod
     def top_k_overwrites_pagination(self):
         """This method adds support for `top_k` attribute, overwriting
         `page_number` and `page_size` if needed"""
