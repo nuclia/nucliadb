@@ -59,6 +59,7 @@ def test_field_extension_strategy_fields_field_validator():
             fields={"z/myfield"},
         )
 
+
 @pytest.mark.filterwarnings("ignore:deprecated")
 def test_base_search_request_top_k():
     request = search.BaseSearchRequest(
