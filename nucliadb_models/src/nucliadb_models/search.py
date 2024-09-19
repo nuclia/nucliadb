@@ -118,7 +118,7 @@ class SearchOptions(str, Enum):
             return SearchOptions.FULLTEXT
         elif self.value == SearchOptions.VECTOR:
             return SearchOptions.SEMANTIC
-        return self.value
+        return self
 
 
 class ChatOptions(str, Enum):
@@ -135,7 +135,7 @@ class ChatOptions(str, Enum):
             return ChatOptions.KEYWORD
         elif self.value == ChatOptions.VECTORS:
             return ChatOptions.SEMANTIC
-        return self.value
+        return self
 
 
 class SuggestOptions(str, Enum):
