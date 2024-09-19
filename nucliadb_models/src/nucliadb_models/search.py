@@ -443,7 +443,7 @@ class SearchParamDefaults:
     page_number = ParamDefault(
         default=0,
         title="Page number",
-        description="The page number of the results to return.\nATENTION: pagination will be deprecated, please, refer to `top_k`",
+        description="The page number of the results to return.\nATENTION: pagination is deprecated and this parameter will be removed soon. Please, use `top_k` instead",
         deprecated=True,
     )
     page_size = ParamDefault(
