@@ -46,6 +46,7 @@ from nucliadb_models.search import (
     Relations,
     RephraseModel,
     SearchOptions,
+    parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
@@ -178,6 +179,7 @@ async def run_main_query(
     find_request.security = item.security
     find_request.debug = item.debug
     find_request.rephrase = item.rephrase
+    find_request.rephrase_prompt = parse_rephrase_prompt(item)
     # We don't support pagination, we always get the top_k results.
     find_request.page_size = item.top_k
     find_request.page_number = 0

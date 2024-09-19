@@ -477,6 +477,7 @@ async def search(
         autofilter=item.autofilter,
         security=item.security,
         rephrase=item.rephrase,
+        rephrase_prompt=item.rephrase_prompt,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()
 

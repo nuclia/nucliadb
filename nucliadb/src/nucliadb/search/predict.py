@@ -362,8 +362,24 @@ class PredictEngine:
         sentence: str,
         semantic_model: Optional[str] = None,
         generative_model: Optional[str] = None,
-        rephrase: Optional[bool] = False,
+        rephrase: bool = False,
+        rephrase_prompt: Optional[str] = None,
     ) -> QueryInfo:
+        """
+        Query endpoint: returns information to be used by NucliaDB at retrieval time, for instance:
+        - The embeddings
+        - The entities
+        - The stop words
+        - The semantic threshold
+        - etc.
+
+        :param kbid: KnowledgeBox ID
+        :param sentence: The query sentence
+        :param semantic_model: The semantic model to use to generate the embeddings
+        :param generative_model: The generative model that will be used to generate the answer
+        :param rephrase: If the query should be rephrased before calculating the embeddings for a better retrieval
+        :param rephrase_prompt: Custom prompt to use for rephrasing
+        """
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -375,6 +391,8 @@ class PredictEngine:
             "text": sentence,
             "rephrase": str(rephrase),
         }
+        if rephrase_prompt is not None:
+            params["rephrase_prompt"] = rephrase_prompt
         if semantic_model is not None:
             params["semantic_models"] = [semantic_model]
         if generative_model is not None:
@@ -491,7 +509,8 @@ class DummyPredictEngine(PredictEngine):
         sentence: str,
         semantic_model: Optional[str] = None,
         generative_model: Optional[str] = None,
-        rephrase: Optional[bool] = False,
+        rephrase: bool = False,
+        rephrase_prompt: Optional[str] = None,
     ) -> QueryInfo:
         self.calls.append(("query", sentence))
 
