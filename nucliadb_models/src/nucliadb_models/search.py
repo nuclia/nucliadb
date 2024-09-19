@@ -647,8 +647,8 @@ class BaseSearchRequest(BaseModel):
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
-    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
-    page_size: int = SearchParamDefaults.page_size.to_pydantic_field(deprecated=True)
+    page_number: int = SearchParamDefaults.page_number.to_pydantic_field(deprecated=True)
+    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
         default=None,
         title="Minimum score",
