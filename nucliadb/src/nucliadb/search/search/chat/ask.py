@@ -475,6 +475,7 @@ async def ask(
         question=user_query,
         truncate=True,
         citations=ask_request.citations,
+        citation_threshold=ask_request.citation_threshold,
         generative_model=ask_request.generative_model,
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,

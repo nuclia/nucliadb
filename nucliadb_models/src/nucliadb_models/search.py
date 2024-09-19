@@ -784,6 +784,12 @@ class ChatModel(BaseModel):
         default=None, description="Optional custom prompt input by the user"
     )
     citations: bool = Field(default=False, description="Whether to include the citations in the answer")
+    citation_threshold: Optional[float] = Field(
+        default=None,
+        description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",  # noqa
+        ge=0.0,
+        le=1.0,
+    )
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
@@ -1147,6 +1153,12 @@ class ChatRequest(BaseModel):
     citations: bool = Field(
         default=False,
         description="Whether to include the citations for the answer in the response",
+    )
+    citation_threshold: Optional[float] = Field(
+        default=None,
+        description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",
+        ge=0.0,
+        le=1.0,
     )
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
