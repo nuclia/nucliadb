@@ -56,6 +56,7 @@ message ChatAudit {
   repeated RetrievedContext retrieved_context = 8;
   string learning_id = 5;
   int32 status_code = 9;
+  string model = 10;
 }
 
 enum TaskType {
@@ -114,4 +115,5 @@ message AuditRequest {
   optional float generative_answer_first_chunk_time = 24;
   optional float rephrase_time = 25;
   FeedbackAudit feedback = 26;
+  optional string user_request = 27;
 }

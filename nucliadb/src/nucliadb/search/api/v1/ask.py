@@ -66,6 +66,13 @@ async def ask_knowledgebox_endpoint(
     )
 
 
+def default(obj):
+    "Convert sets to lists when dumping json"
+    if isinstance(obj, set):
+        return list(obj)
+    raise TypeError
+
+
 @handled_ask_exceptions
 async def create_ask_response(
     kbid: str,
@@ -87,6 +94,7 @@ async def create_ask_response(
             origin=origin,
             resource=resource,
         )
+
     headers = {
         "NUCLIA-LEARNING-ID": ask_result.nuclia_learning_id or "unknown",
         "Access-Control-Expose-Headers": "NUCLIA-LEARNING-ID",
