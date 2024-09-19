@@ -52,7 +52,7 @@ from nucliadb_models.search import (
     PromptContext,
     PromptContextImages,
     PromptContextOrder,
-    RagStrategy,
+    RagStrategies,
     RagStrategyName,
     TableImageStrategy,
 )
@@ -745,7 +745,7 @@ class PromptContextBuilder:
         main_query_weight: float = 1.0,
         resource: Optional[str] = None,
         user_context: Optional[list[str]] = None,
-        strategies: Optional[Sequence[RagStrategy]] = None,
+        strategies: Optional[Sequence[RagStrategies]] = None,
         image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
         max_context_characters: Optional[int] = None,
         visual_llm: bool = False,

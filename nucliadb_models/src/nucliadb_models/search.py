@@ -19,7 +19,7 @@
 #
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Set, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -879,7 +879,7 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 
 class FieldExtensionStrategy(RagStrategy):
     name: Literal["field_extension"] = "field_extension"
-    fields: Set[str] = Field(
+    fields: list[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
         min_length=1,
@@ -961,7 +961,7 @@ class MetadataExtensionStrategy(RagStrategy):
     """
 
     name: Literal["metadata_extension"] = "metadata_extension"
-    types: set[MetadataExtensionType] = Field(
+    types: list[MetadataExtensionType] = Field(
         min_length=1,
         title="Types",
         description="""
@@ -1283,9 +1283,13 @@ If empty, the default strategy is used. `full_resource`, `hierarchy`, and `neigh
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
         strategy_names: set[str] = set()
         for strategy in rag_strategies or []:
-            if not isinstance(strategy, dict):
-                raise ValueError("RAG strategies must be defined using an object")
-            strategy_name = strategy.get("name")
+            if isinstance(strategy, dict):
+                obj = strategy
+            elif isinstance(strategy, BaseModel):
+                obj = strategy.model_dump()
+            else:
+                raise ValueError("RAG strategies must be defined using a valid RagStrategy object or a dictionary")
+            strategy_name = obj.get("name")
             if strategy_name is None:
                 raise ValueError(f"Invalid strategy '{strategy}'")
             strategy_names.add(strategy_name)

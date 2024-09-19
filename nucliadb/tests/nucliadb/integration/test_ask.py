@@ -34,11 +34,13 @@ from nucliadb.search.predict import (
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AskResponseItem,
+    ChatRequest,
     FieldExtensionStrategy,
     FindRequest,
     FullResourceStrategy,
     HierarchyResourceStrategy,
     MetadataExtensionStrategy,
+    MetadataExtensionType,
     PreQueriesStrategy,
     PreQuery,
     SyncAskResponse,
@@ -319,7 +321,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
                 "query": "title",
                 "rag_strategies": ["foo"],
             },
-            "must be defined using an object",
+            "must be defined using a valid",
         ),
         (
             # Invalid payload type (note the extra json.dumps)
@@ -817,7 +819,6 @@ async def test_ask_on_resource_with_json_schema_automatic_prequeries(
     assert len(ask_response.prequeries) == 4
 
 
-
 async def test_all_rag_strategies_combinations(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -825,24 +826,35 @@ async def test_all_rag_strategies_combinations(
 ):
     rag_strategies = [
         FullResourceStrategy(),
-        FieldExtensionStrategy(),
-        MetadataExtensionStrategy(
-            types=["origin", "extra_metadata", "classification_labels", "ners"]
-        ),
+        FieldExtensionStrategy(fields=["a/summary"]),
+        MetadataExtensionStrategy(types=list(MetadataExtensionType)),
         HierarchyResourceStrategy(),
-        PreQueriesStrategy(
-            queries=[PreQuery(
-                request=FindRequest()
-            )]
-        )
+        PreQueriesStrategy(queries=[PreQuery(request=FindRequest())]),
     ]
 
-    # Create all possible 3-element combinations of the list
-    all_combinations = []
-    for i in range(1, 4):
-        all_combinations.extend(combinations(rag_strategies, i))
+    # Create all possible combinations of the list
+    all_combinations = []  # type: ignore
+    for i in range(1, len(rag_strategies) + 1):
+        all_combinations.extend(list(combinations(rag_strategies, i)))
 
     # Remove those combinations that we know are not supported
+    valid_combinations = []
     for combination in all_combinations:
-        names = {strategy.name for strategy in combination}
-        pass
+        try:
+            ChatRequest(query="foo", rag_strategies=list(combination))  # type: ignore
+            valid_combinations.append(combination)
+        except ValueError:
+            pass
+
+    assert len(valid_combinations) >= 19
+    for combination in valid_combinations:
+        print(f"Combination: {sorted([strategy.name for strategy in combination])}")
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/ask",
+            headers={"X-Synchronous": "True"},
+            json={
+                "query": "title",
+                "rag_strategies": [strategy.dict() for strategy in combination],
+            },
+        )
+        assert resp.status_code == 200, resp.text
