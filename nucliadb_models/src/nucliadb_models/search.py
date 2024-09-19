@@ -1530,9 +1530,9 @@ class KnowledgeboxFindResults(JsonBaseModel):
     relations: Optional[Relations] = None
     query: Optional[str] = None
     total: int = 0
-    page_number: int = 0
-    page_size: int = 20
-    next_page: bool = False
+    page_number: int = Field(default=0, description="Pagination will be deprecated, please, refer to `top_k` in the request")
+    page_size: int = Field(default=20, description="Pagination will be deprecated, please, refer to `top_k` in the request")
+    next_page: bool = Field(default=False, description="Pagination will be deprecated, please, refer to `top_k` in the request")
     nodes: Optional[List[Dict[str, str]]] = Field(
         default=None,
         title="Nodes",
