@@ -574,7 +574,7 @@ class SearchParamDefaults:
         title="Prefer markdown",
         description="If set to true, the response will be in markdown format",
     )
-    show_hidden = ParamDefault(
+    show_hidden: SkipJsonSchema[bool] = ParamDefault(
         default=False,
         title="Show hidden resources",
         description="If set to false (default), excludes hidden resources from search",
@@ -628,7 +628,7 @@ class CatalogRequest(BaseModel):
     range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
-    hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
+    hidden: SkipJsonSchema[Optional[bool]] = SearchParamDefaults.hidden.to_pydantic_field()
 
     @field_validator("faceted")
     @classmethod
@@ -695,7 +695,7 @@ class BaseSearchRequest(BaseModel):
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     resource_filters: List[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
-    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
+    show_hidden: SkipJsonSchema[bool] = SearchParamDefaults.show_hidden.to_pydantic_field()
 
     rephrase: bool = Field(
         default=False,
@@ -1161,7 +1161,7 @@ class AskRequest(BaseModel):
         description="Whether to include the citations for the answer in the response",
     )
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
-    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
+    show_hidden: SkipJsonSchema[bool] = SearchParamDefaults.show_hidden.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
