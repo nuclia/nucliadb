@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 from nucliadb.common.external_index_providers.base import QueryResults as ExternalIndexQueryResults
 from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
@@ -151,13 +152,14 @@ async def hydrate_text_block(
     """
     Fetch the text for a text block and update the FindParagraph object.
     """
+    field_id = FieldId.from_string(text_block.field_id)
     text = await paragraphs.get_paragraph_text(
         kbid=kbid,
-        rid=text_block.resource_id,
-        field=text_block.field_id,
-        start=text_block.position_start,
-        end=text_block.position_end,
-        split=text_block.subfield_id,
+        paragraph_id=ParagraphId(
+            field_id=field_id,
+            paragraph_start=text_block.position_start,
+            paragraph_end=text_block.position_end,
+        ),
     )
     field_paragraphs[text_block.id] = FindParagraph(
         score=text_block.score,

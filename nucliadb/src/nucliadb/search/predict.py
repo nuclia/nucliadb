@@ -77,6 +77,7 @@ DUMMY_RELATION_NODE = [
 
 DUMMY_REPHRASE_QUERY = "This is a rephrased query"
 DUMMY_LEARNING_ID = "00"
+DUMMY_LEARNING_MODEL = "chatgpt"
 
 
 PUBLIC_PREDICT = "/api/v1/predict"
@@ -91,6 +92,7 @@ REPHRASE = "/rephrase"
 FEEDBACK = "/feedback"
 
 NUCLIA_LEARNING_ID_HEADER = "NUCLIA-LEARNING-ID"
+NUCLIA_LEARNING_MODEL_HEADER = "NUCLIA-LEARNING-MODEL"
 
 
 predict_observer = metrics.Observer(
@@ -325,7 +327,7 @@ class PredictEngine:
     @predict_observer.wrap({"type": "chat_ndjson"})
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
-    ) -> tuple[str, AsyncIterator[GenerativeChunk]]:
+    ) -> tuple[str, str, AsyncIterator[GenerativeChunk]]:
         """
         Chat query using the new stream format
         Format specs: https://github.com/ndjson/ndjson-spec
@@ -350,7 +352,8 @@ class PredictEngine:
         )
         await self.check_response(resp, expected_status=200)
         ident = resp.headers.get(NUCLIA_LEARNING_ID_HEADER)
-        return ident, get_chat_ndjson_generator(resp)
+        model = resp.headers.get(NUCLIA_LEARNING_MODEL_HEADER)
+        return ident, model, get_chat_ndjson_generator(resp)
 
     @predict_observer.wrap({"type": "query"})
     async def query(
@@ -359,8 +362,24 @@ class PredictEngine:
         sentence: str,
         semantic_model: Optional[str] = None,
         generative_model: Optional[str] = None,
-        rephrase: Optional[bool] = False,
+        rephrase: bool = False,
+        rephrase_prompt: Optional[str] = None,
     ) -> QueryInfo:
+        """
+        Query endpoint: returns information to be used by NucliaDB at retrieval time, for instance:
+        - The embeddings
+        - The entities
+        - The stop words
+        - The semantic threshold
+        - etc.
+
+        :param kbid: KnowledgeBox ID
+        :param sentence: The query sentence
+        :param semantic_model: The semantic model to use to generate the embeddings
+        :param generative_model: The generative model that will be used to generate the answer
+        :param rephrase: If the query should be rephrased before calculating the embeddings for a better retrieval
+        :param rephrase_prompt: Custom prompt to use for rephrasing
+        """
         try:
             self.check_nua_key_is_configured_for_onprem()
         except NUAKeyMissingError:
@@ -372,6 +391,8 @@ class PredictEngine:
             "text": sentence,
             "rephrase": str(rephrase),
         }
+        if rephrase_prompt is not None:
+            params["rephrase_prompt"] = rephrase_prompt
         if semantic_model is not None:
             params["semantic_models"] = [semantic_model]
         if generative_model is not None:
@@ -473,14 +494,14 @@ class DummyPredictEngine(PredictEngine):
 
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
-    ) -> tuple[str, AsyncIterator[GenerativeChunk]]:
+    ) -> tuple[str, str, AsyncIterator[GenerativeChunk]]:
         self.calls.append(("chat_query_ndjson", item))
 
         async def generate():
             for item in self.ndjson_answer:
                 yield GenerativeChunk.model_validate_json(item)
 
-        return (DUMMY_LEARNING_ID, generate())
+        return (DUMMY_LEARNING_ID, DUMMY_LEARNING_MODEL, generate())
 
     async def query(
         self,
@@ -488,7 +509,8 @@ class DummyPredictEngine(PredictEngine):
         sentence: str,
         semantic_model: Optional[str] = None,
         generative_model: Optional[str] = None,
-        rephrase: Optional[bool] = False,
+        rephrase: bool = False,
+        rephrase_prompt: Optional[str] = None,
     ) -> QueryInfo:
         self.calls.append(("query", sentence))
 

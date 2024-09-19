@@ -72,7 +72,6 @@ jobs:
   push-docker:
     name: Build and push nucliadb docker image
     runs-on: ubuntu-latest
-    needs: build_wheels
 
     steps:
       - name: Checkout

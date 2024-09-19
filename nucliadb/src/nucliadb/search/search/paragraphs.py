@@ -22,6 +22,7 @@ import re
 import string
 from typing import Optional
 
+from nucliadb.common.ids import ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
@@ -88,11 +89,7 @@ async def get_paragraph_from_full_text(
 async def get_paragraph_text(
     *,
     kbid: str,
-    rid: str,
-    field: str,
-    start: int,
-    end: int,
-    split: Optional[str] = None,
+    paragraph_id: ParagraphId,
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
     matches: Optional[list[str]] = None,
@@ -101,25 +98,28 @@ async def get_paragraph_text(
     ] = None,  # allow passing in orm_resource to avoid extra DB calls or txn issues
     log_on_missing_field: bool = True,
 ) -> str:
+    rid = paragraph_id.rid
+    field_type = paragraph_id.field_id.type
+    field_key = paragraph_id.field_id.key
+
     if orm_resource is None:
         orm_resource = await cache.get_resource(kbid, rid)
         if orm_resource is None:
             if log_on_missing_field:
                 logger.warning(
                     "Resource does not exist on DB. This should not happen.",
-                    extra={"resource_id": rid, "kbid": kbid, "field": field},
+                    extra={"resource_id": rid, "kbid": kbid, "field": f"{field_type}/{field_key}"},
                 )
             return ""
 
-    _, field_type, field = field.split("/")
     field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    field_obj = await orm_resource.get_field(field_key, field_type_int, load=False)
 
     text = await get_paragraph_from_full_text(
         field=field_obj,
-        start=start,
-        end=end,
-        split=split,
+        start=paragraph_id.paragraph_start,
+        end=paragraph_id.paragraph_end,
+        split=paragraph_id.field_id.subfield_id,
         log_on_missing_field=log_on_missing_field,
     )
 

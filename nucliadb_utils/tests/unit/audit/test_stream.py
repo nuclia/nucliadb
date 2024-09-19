@@ -150,6 +150,7 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
         answer="bar",
         learning_id="learning_id",
         status_code=0,
+        model="xx",
     )
 
     audit_storage.send(context.audit_request)
@@ -164,6 +165,7 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
     assert pb.chat.answer == "bar"
     assert pb.chat.learning_id == "learning_id"
     assert pb.chat.status_code == 0
+    assert pb.chat.model == "xx"
     assert pb.chat.chat_context[0].author == "USER"
     assert pb.chat.chat_context[0].text == "epa"
     assert pb.chat.retrieved_context[0].text_block_id == "some/id/path"
