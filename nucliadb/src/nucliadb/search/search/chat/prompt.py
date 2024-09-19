@@ -455,11 +455,11 @@ def to_yaml(obj: BaseModel) -> str:
     )
 
 
-async def composed_prompt_context(
+async def field_extension_prompt_context(
     context: CappedPromptContext,
     kbid: str,
     ordered_paragraphs: list[FindParagraph],
-    field_extension: Optional[FieldExtensionStrategy] = None,
+    strategy: FieldExtensionStrategy,
 ) -> None:
     """
     Algorithm steps:
@@ -470,12 +470,12 @@ async def composed_prompt_context(
     """
     ordered_resources = []
     for paragraph in ordered_paragraphs:
-        resource_uuid = paragraph.id.split("/")[0]
+        resource_uuid = ParagraphId.from_string(paragraph.id).rid
         if resource_uuid not in ordered_resources:
             ordered_resources.append(resource_uuid)
 
     # Fetch the extracted texts of the specified fields for each resource
-    extend_fields = field_extension.fields if field_extension else []
+    extend_fields = strategy.fields
     extend_field_ids = []
     for resource_uuid in ordered_resources:
         for field_id in extend_fields:
@@ -492,8 +492,13 @@ async def composed_prompt_context(
     for result in field_extracted_texts:
         if result is None:
             continue
-        # Add the extracted text of each field to the beginning of the context.
         field, extracted_text = result
+        # First off, remove the text block ids from paragraphs that belong to
+        # the same field, as otherwise the context will be duplicated.
+        for tb_id in context.text_block_ids():
+            if tb_id.startswith(field.full()):
+                del context[tb_id]
+        # Add the extracted text of each field to the beginning of the context.
         context[field.full()] = extracted_text
 
     # Add the extracted text of each paragraph to the end of the context.
@@ -807,56 +812,65 @@ class PromptContextBuilder:
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
+            # When no strategy is specified, use the default one
             await default_prompt_context(context, self.kbid, self.ordered_paragraphs)
             return
+        else:
+            # Add the paragraphs to the context and then apply the strategies
+            for paragraph in self.ordered_paragraphs:
+                context[paragraph.id] = _clean_paragraph_text(paragraph)
 
-        full_resource_strategy: Optional[FullResourceStrategy] = None
-        hierarchy_strategy: Optional[HierarchyResourceStrategy] = None
-        neighbouring_paragraphs_strategy: Optional[NeighbouringParagraphsStrategy] = None
-        extend_with_fields_strategy: Optional[FieldExtensionStrategy] = None
+        full_resource: Optional[FullResourceStrategy] = None
+        hierarchy: Optional[HierarchyResourceStrategy] = None
+        neighbouring_paragraphs: Optional[NeighbouringParagraphsStrategy] = None
+        field_extension: Optional[FieldExtensionStrategy] = None
         metadata_extension: Optional[MetadataExtensionStrategy] = None
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
-                extend_with_fields_strategy = cast(FieldExtensionStrategy, strategy)
+                field_extension = cast(FieldExtensionStrategy, strategy)
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
-                full_resource_strategy = cast(FullResourceStrategy, strategy)
+                full_resource = cast(FullResourceStrategy, strategy)
                 if self.resource:
                     # When the retrieval is scoped to a specific resource
                     # the full resource strategy only includes that resource
-                    full_resource_strategy.count = 1
+                    full_resource.count = 1
             elif strategy.name == RagStrategyName.HIERARCHY:
-                hierarchy_strategy = cast(HierarchyResourceStrategy, strategy)
+                hierarchy = cast(HierarchyResourceStrategy, strategy)
             elif strategy.name == RagStrategyName.NEIGHBOURING_PARAGRAPHS:
-                neighbouring_paragraphs_strategy = cast(NeighbouringParagraphsStrategy, strategy)
+                neighbouring_paragraphs = cast(NeighbouringParagraphsStrategy, strategy)
             elif strategy.name == RagStrategyName.METADATA_EXTENSION:
                 metadata_extension = cast(MetadataExtensionStrategy, strategy)
 
-        if full_resource_strategy:
+        if full_resource:
+            # When full resoure is enabled, only metadata extension is allowed.
             await full_resource_prompt_context(
-                context, self.kbid, self.ordered_paragraphs, self.resource, full_resource_strategy
+                context, self.kbid, self.ordered_paragraphs, self.resource, full_resource
             )
-        elif hierarchy_strategy:
+            if metadata_extension:
+                await extend_prompt_context_with_metadata(context, self.kbid, metadata_extension)
+            return
+
+        if hierarchy:
             await hierarchy_prompt_context(
                 context,
                 self.kbid,
                 self.ordered_paragraphs,
-                hierarchy_strategy,
+                hierarchy,
             )
-        elif neighbouring_paragraphs_strategy:
+        if neighbouring_paragraphs:
             await neighbouring_paragraphs_prompt_context(
                 context,
                 self.kbid,
                 self.ordered_paragraphs,
-                neighbouring_paragraphs_strategy,
+                neighbouring_paragraphs,
             )
-        else:
-            await composed_prompt_context(
+        if field_extension:
+            await field_extension_prompt_context(
                 context,
                 self.kbid,
                 self.ordered_paragraphs,
-                extend_with_fields_strategy,
+                field_extension,
             )
-
         if metadata_extension:
             await extend_prompt_context_with_metadata(context, self.kbid, metadata_extension)
 

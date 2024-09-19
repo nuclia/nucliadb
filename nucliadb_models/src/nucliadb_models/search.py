@@ -1289,28 +1289,18 @@ If empty, the default strategy is used. `full_resource`, `hierarchy`, and `neigh
             if strategy_name is None:
                 raise ValueError(f"Invalid strategy '{strategy}'")
             strategy_names.add(strategy_name)
+
         if len(strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
 
-        # The following can combined with other strategies
-        for combinable_strategy in (
-            RagStrategyName.METADATA_EXTENSION,
-            RagStrategyName.PREQUERIES,
+        for not_allowed_combination in (
+            {RagStrategyName.FULL_RESOURCE, RagStrategyName.HIERARCHY},
+            {RagStrategyName.FULL_RESOURCE, RagStrategyName.NEIGHBOURING_PARAGRAPHS},
+            {RagStrategyName.FULL_RESOURCE, RagStrategyName.FIELD_EXTENSION},
         ):
-            try:
-                strategy_names.remove(combinable_strategy)
-            except KeyError:
-                pass
-
-        # If any of the unique strategies are chosen, they must be the only strategy
-        for strategy_name in (
-            RagStrategyName.FULL_RESOURCE,
-            RagStrategyName.HIERARCHY,
-            RagStrategyName.NEIGHBOURING_PARAGRAPHS,
-        ):
-            if strategy_name in strategy_names and len(strategy_names) > 1:
+            if not_allowed_combination.issubset(strategy_names):
                 raise ValueError(
-                    f"If '{strategy_name}' strategy is chosen, it must be the only strategy."
+                    f"The following strategies cannot be combined in the same request: {', '.join(sorted(not_allowed_combination))}"
                 )
         return rag_strategies
 

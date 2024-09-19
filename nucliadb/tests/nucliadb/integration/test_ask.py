@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
+from itertools import combinations
 from unittest import mock
 
 import pytest
@@ -31,7 +32,17 @@ from nucliadb.search.predict import (
     StatusGenerativeResponse,
 )
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.search import AskResponseItem, SyncAskResponse
+from nucliadb_models.search import (
+    AskResponseItem,
+    FieldExtensionStrategy,
+    FindRequest,
+    FullResourceStrategy,
+    HierarchyResourceStrategy,
+    MetadataExtensionStrategy,
+    PreQueriesStrategy,
+    PreQuery,
+    SyncAskResponse,
+)
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -268,7 +279,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
             None,
         ),
         (
-            # full_resource cannot be combined with other strategies
+            # full_resource can only be combined with metadata extension
             {
                 "query": "title",
                 "rag_strategies": [
@@ -276,7 +287,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
                     {"name": "field_extension", "fields": ["a/summary"]},
                 ],
             },
-            "If 'full_resource' strategy is chosen, it must be the only strategy",
+            "The following strategies cannot be combined in the same request: field_extension, full_resource",
         ),
         (
             # field_extension requires fields
@@ -804,3 +815,34 @@ async def test_ask_on_resource_with_json_schema_automatic_prequeries(
     ask_response = SyncAskResponse.model_validate_json(resp.content)
     assert ask_response.prequeries is not None
     assert len(ask_response.prequeries) == 4
+
+
+
+async def test_all_rag_strategies_combinations(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resources,
+):
+    rag_strategies = [
+        FullResourceStrategy(),
+        FieldExtensionStrategy(),
+        MetadataExtensionStrategy(
+            types=["origin", "extra_metadata", "classification_labels", "ners"]
+        ),
+        HierarchyResourceStrategy(),
+        PreQueriesStrategy(
+            queries=[PreQuery(
+                request=FindRequest()
+            )]
+        )
+    ]
+
+    # Create all possible 3-element combinations of the list
+    all_combinations = []
+    for i in range(1, 4):
+        all_combinations.extend(combinations(rag_strategies, i))
+
+    # Remove those combinations that we know are not supported
+    for combination in all_combinations:
+        names = {strategy.name for strategy in combination}
+        pass
