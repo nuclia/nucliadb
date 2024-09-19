@@ -109,7 +109,7 @@ impl SegmentCollector for FieldUuidSegmentCollector {
         let field = self.field_reader.get_bytes(doc);
         self.results.push(ValidField {
             resource_id: String::from_utf8_lossy(uuid).to_string(),
-            field_id: String::from_utf8_lossy(field).to_string(),
+            field_id: format!("/{}", String::from_utf8_lossy(field)),
         });
     }
 
@@ -296,13 +296,16 @@ impl FieldReader for TextReaderService {
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
-            let key = searcher
-                .doc(addr)?
-                .get_first(self.schema.uuid)
-                .expect("documents must have a uuid.")
-                .as_text()
-                .expect("uuid field must be a text")
-                .to_string();
+            let key = String::from_utf8(
+                searcher
+                    .doc(addr)?
+                    .get_first(self.schema.uuid)
+                    .expect("documents must have a uuid.")
+                    .as_bytes()
+                    .expect("uuid field must be bytes")
+                    .to_vec(),
+            )
+            .unwrap();
             keys.push(key);
         }
 

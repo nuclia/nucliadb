@@ -133,7 +133,7 @@ impl ShardWriter {
         let tsc = TextConfig {
             path: indexes.texts_path(),
         };
-        let text_task = || Some(nucliadb_texts2::writer::TextWriterService::create(tsc));
+        let text_task = || Some(nucliadb_texts3::writer::TextWriterService::create(tsc));
         let info = info_span!(parent: &span, "text start");
         let text_task = || run_with_telemetry(info, text_task);
 
@@ -688,6 +688,7 @@ pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeRes
 pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
     match version {
         2 => nucliadb_texts2::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
+        3 => nucliadb_texts3::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
         v => Err(node_error!("Invalid text writer version {v}")),
     }
 }
