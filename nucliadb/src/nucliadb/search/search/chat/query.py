@@ -46,6 +46,7 @@ from nucliadb_models.search import (
     Relations,
     RephraseModel,
     SearchOptions,
+    parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
@@ -178,6 +179,7 @@ async def run_main_query(
     find_request.security = item.security
     find_request.debug = item.debug
     find_request.rephrase = item.rephrase
+    find_request.rephrase_prompt = parse_rephrase_prompt(item)
     # We don't support pagination, we always get the top_k results.
     find_request.page_size = item.top_k
     find_request.page_number = 0
@@ -249,6 +251,7 @@ def maybe_audit_chat(
     query_context: PromptContext,
     query_context_order: PromptContextOrder,
     learning_id: str,
+    model: str,
 ):
     audit = get_audit()
     if audit is None:
@@ -281,6 +284,7 @@ def maybe_audit_chat(
         answer=audit_answer,
         learning_id=learning_id,
         status_code=int(status_code.value),
+        model=model,
     )
 
 
@@ -310,6 +314,7 @@ class ChatAuditor:
         learning_id: Optional[str],
         query_context: PromptContext,
         query_context_order: PromptContextOrder,
+        model: str,
     ):
         self.kbid = kbid
         self.user_id = user_id
@@ -321,6 +326,7 @@ class ChatAuditor:
         self.learning_id = learning_id
         self.query_context = query_context
         self.query_context_order = query_context_order
+        self.model = model
 
     def audit(
         self,
@@ -346,6 +352,7 @@ class ChatAuditor:
             query_context=self.query_context,
             query_context_order=self.query_context_order,
             learning_id=self.learning_id or "unknown",
+            model=self.model,
         )
 
 

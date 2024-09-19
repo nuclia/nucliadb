@@ -21,6 +21,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Optional, cast
 
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
@@ -79,13 +80,19 @@ async def set_text_value(
     async with max_operations:
         assert result_paragraph.paragraph
         assert result_paragraph.paragraph.position
+        _, field_type, field_key = result_paragraph.field.split("/")
         result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
-            rid=result_paragraph.rid,
-            field=result_paragraph.field,
-            start=result_paragraph.paragraph.position.start,
-            end=result_paragraph.paragraph.position.end,
-            split=result_paragraph.split,
+            paragraph_id=ParagraphId(
+                field_id=FieldId(
+                    rid=result_paragraph.rid,
+                    type=field_type,
+                    key=field_key,
+                    subfield_id=result_paragraph.split,
+                ),
+                paragraph_start=result_paragraph.paragraph.position.start,
+                paragraph_end=result_paragraph.paragraph.position.end,
+            ),
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO

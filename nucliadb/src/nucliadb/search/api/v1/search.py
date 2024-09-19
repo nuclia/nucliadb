@@ -483,6 +483,7 @@ async def search(
         security=item.security,
         rephrase=item.rephrase,
         hidden=item.show_hidden and None,
+        rephrase_prompt=item.rephrase_prompt,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()
 

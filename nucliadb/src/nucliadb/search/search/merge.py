@@ -22,6 +22,7 @@ import datetime
 import math
 from typing import Any, Optional, Set, Union
 
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.search.search import cache
 from nucliadb.search.search.fetch import (
     fetch_resources,
@@ -211,11 +212,16 @@ async def merge_suggest_paragraph_results(
         _, field_type, field = result.field.split("/")
         text = await get_paragraph_text(
             kbid=kbid,
-            rid=result.uuid,
-            field=result.field,
-            start=result.start,
-            end=result.end,
-            split=result.split,
+            paragraph_id=ParagraphId(
+                field_id=FieldId(
+                    rid=result.uuid,
+                    type=field_type,
+                    key=field,
+                    subfield_id=result.split,
+                ),
+                paragraph_start=result.start,
+                paragraph_end=result.end,
+            ),
             highlight=highlight,
             ematches=ematches,  # type: ignore
             matches=result.matches,  # type: ignore
@@ -380,11 +386,16 @@ async def merge_paragraph_results(
         _, field_type, field = result.field.split("/")
         text = await get_paragraph_text(
             kbid=kbid,
-            rid=result.uuid,
-            field=result.field,
-            start=result.start,
-            end=result.end,
-            split=result.split,
+            paragraph_id=ParagraphId(
+                field_id=FieldId(
+                    rid=result.uuid,
+                    type=field_type,
+                    key=field,
+                    subfield_id=result.split,
+                ),
+                paragraph_start=result.start,
+                paragraph_end=result.end,
+            ),
             highlight=highlight,
             ematches=ematches,
             matches=result.matches,  # type: ignore

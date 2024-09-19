@@ -118,7 +118,7 @@ class SearchOptions(str, Enum):
             return SearchOptions.FULLTEXT
         elif self.value == SearchOptions.VECTOR:
             return SearchOptions.SEMANTIC
-        return self.value
+        return self
 
 
 class ChatOptions(str, Enum):
@@ -135,7 +135,7 @@ class ChatOptions(str, Enum):
             return ChatOptions.KEYWORD
         elif self.value == ChatOptions.VECTORS:
             return ChatOptions.SEMANTIC
-        return self.value
+        return self
 
 
 class SuggestOptions(str, Enum):
@@ -699,8 +699,29 @@ class BaseSearchRequest(BaseModel):
 
     rephrase: bool = Field(
         default=False,
-        title="Rephrase the query to improve search",
-        description="Consume LLM tokens to rephrase the query so the semantic search is better",
+        description=(
+            "Rephrase the query for a more efficient retrieval. This will consume LLM tokens and make the request slower."
+        ),
+    )
+
+    rephrase_prompt: Optional[str] = Field(
+        default=None,
+        title="Rephrase",
+        description=(
+            "Rephrase prompt given to the generative model responsible for rephrasing the query for a more effective retrieval step. "
+            "This is only used if the `rephrase` flag is set to true in the request.\n"
+            "If not specified, Nuclia's default prompt is used. It must include the {question} placeholder. "
+            "The placeholder will be replaced with the original question"
+        ),
+        min_length=1,
+        examples=[
+            """Rephrase this question so its better for retrieval, and keep the rephrased question in the same language as the original.
+QUESTION: {question}
+Please return ONLY the question without any explanation. Just the rephrased question.""",
+            """Rephrase this question so its better for retrieval, identify any part numbers and append them to the end of the question separated by a commas.
+            QUESTION: {question}
+            Please return ONLY the question without any explanation.""",
+        ],
     )
 
     @field_validator("features", mode="after")
@@ -796,6 +817,12 @@ class ChatModel(BaseModel):
         default=None, description="Optional custom prompt input by the user"
     )
     citations: bool = Field(default=False, description="Whether to include the citations in the answer")
+    citation_threshold: Optional[float] = Field(
+        default=None,
+        description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",  # noqa
+        ge=0.0,
+        le=1.0,
+    )
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
@@ -1067,7 +1094,7 @@ class CustomPrompt(BaseModel):
     system: Optional[str] = Field(
         default=None,
         title="System prompt",
-        description="System prompt given to the generative model. This can help customize the behavior of the model. If not specified, the default model provider's prompt is used.",  # noqa
+        description="System prompt given to the generative model responsible of generating the answer. This can help customize the behavior of the model when generating the answer. If not specified, the default model provider's prompt is used.",  # noqa
         min_length=1,
         examples=[
             "You are a medical assistant, use medical terminology",
@@ -1079,13 +1106,32 @@ class CustomPrompt(BaseModel):
     user: Optional[str] = Field(
         default=None,
         title="User prompt",
-        description="User prompt given to the generative model. Use the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step and question will be the user's query.",  # noqa
+        description="User prompt given to the generative model responsible of generating the answer. Use the words {context} and {question} in brackets where you want those fields to be placed, in case you want them in your prompt. Context will be the data returned by the retrieval step and question will be the user's query.",  # noqa
         min_length=1,
         examples=[
             "Taking into account our previous conversation, and this context: {context} answer this {question}",
             "Give a detailed answer to this {question} in a list format. If you do not find an answer in this context: {context}, say that you don't have enough data.",
             "Given this context: {context}. Answer this {question} in a concise way using the provided context",
             "Given this context: {context}. Answer this {question} using the provided context. Please, answer always in French",
+        ],
+    )
+    rephrase: Optional[str] = Field(
+        default=None,
+        title="Rephrase",
+        description=(
+            "Rephrase prompt given to the generative model responsible for rephrasing the query for a more effective retrieval step. "
+            "This is only used if the `rephrase` flag is set to true in the request.\n"
+            "If not specified, Nuclia's default prompt is used. It must include the {question} placeholder. "
+            "The placeholder will be replaced with the original question"
+        ),
+        min_length=1,
+        examples=[
+            """Rephrase this question so its better for retrieval, and keep the rephrased question in the same language as the original.
+QUESTION: {question}
+Please return ONLY the question without any explanation. Just the rephrased question.""",
+            """Rephrase this question so its better for retrieval, identify any part numbers and append them to the end of the question separated by a commas.
+            QUESTION: {question}
+            Please return ONLY the question without any explanation.""",
         ],
     )
 
@@ -1160,6 +1206,12 @@ class AskRequest(BaseModel):
         default=False,
         description="Whether to include the citations for the answer in the response",
     )
+    citation_threshold: Optional[float] = Field(
+        default=None,
+        description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",
+        ge=0.0,
+        le=1.0,
+    )
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
     show_hidden: SkipJsonSchema[bool] = SearchParamDefaults.show_hidden.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
@@ -1228,8 +1280,9 @@ If empty, the default strategy is used. `full_resource`, `hierarchy`, and `neigh
 
     rephrase: bool = Field(
         default=False,
-        title="Rephrase the query to improve search",
-        description="Consume LLM tokens to rephrase the query so the semantic search is better",
+        description=(
+            "Rephrase the query for a more efficient retrieval. This will consume LLM tokens and make the request slower."
+        ),
     )
 
     prefer_markdown: bool = Field(
@@ -1727,4 +1780,10 @@ def parse_custom_prompt(item: AskRequest) -> CustomPrompt:
         else:
             prompt.user = item.prompt.user
             prompt.system = item.prompt.system
+            prompt.rephrase = item.prompt.rephrase
     return prompt
+
+
+def parse_rephrase_prompt(item: AskRequest) -> Optional[str]:
+    prompt = parse_custom_prompt(item)
+    return prompt.rephrase

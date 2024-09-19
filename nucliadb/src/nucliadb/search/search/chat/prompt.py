@@ -127,9 +127,9 @@ async def get_next_conversation_messages(
     for current_page in range(page, cmetadata.pages + 1):
         conv = await field_obj.db_get_value(current_page)
         for message in conv.messages[start_idx:]:
-            if message_type is not None and message.type != message_type:
+            if message_type is not None and message.type != message_type:  # pragma: no cover
                 continue
-            if msg_to is not None and msg_to not in message.to:
+            if msg_to is not None and msg_to not in message.to:  # pragma: no cover
                 continue
             output.append(message)
             if len(output) >= num_messages:
@@ -155,13 +155,13 @@ async def get_expanded_conversation_messages(
     *, kb: KnowledgeBoxORM, rid: str, field_id: str, mident: str
 ) -> list[resources_pb2.Message]:
     resource = await kb.get(rid)
-    if resource is None:
+    if resource is None:  # pragma: no cover
         return []
     field_obj = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)
     found_message, found_page, found_idx = await find_conversation_message(
         field_obj=field_obj, mident=mident
     )
-    if found_message is None:
+    if found_message is None:  # pragma: no cover
         return []
     elif found_message.type == resources_pb2.Message.MessageType.QUESTION:
         # only try to get answer if it was a question
@@ -221,7 +221,7 @@ async def default_prompt_context(
 
 async def get_field_extracted_text(kbid: str, field_id: FieldId) -> Optional[tuple[FieldId, str]]:
     extracted_text_pb = await cache.get_extracted_text_from_field_id(kbid, field_id)
-    if extracted_text_pb is None:
+    if extracted_text_pb is None:  # pragma: no cover
         return None
     return field_id, extracted_text_pb.text
 
@@ -231,7 +231,7 @@ async def get_resource_extracted_texts(
     resource_uuid: str,
 ) -> list[tuple[FieldId, str]]:
     resource = await cache.get_resource(kbid, resource_uuid)
-    if resource is None:
+    if resource is None:  # pragma: no cover
         return []
 
     # Schedule the extraction of the text of each field in the resource
@@ -524,10 +524,7 @@ async def get_paragraph_text_with_neighbours(
     ) -> tuple[ParagraphId, str]:
         return pid, await get_paragraph_text(
             kbid=kbid,
-            rid=pid.field_id.rid,
-            field=pid.field_id.full(),
-            start=pid.paragraph_start,
-            end=pid.paragraph_end,
+            paragraph_id=pid,
             log_on_missing_field=True,
         )
 
@@ -657,38 +654,41 @@ async def hierarchy_prompt_context(
 
     # Iterate paragraphs to get extended text
     for paragraph in ordered_paragraphs_copy:
-        rid, field_type, field = paragraph.id.split("/")[:3]
-        field_path = "/".join([rid, field_type, field])
-        position = paragraph.id.split("/")[-1]
-        start, end = position.split("-")
-        int_start = int(start)
-        int_end = int(end) + paragraphs_extra_characters
+        paragraph_id = ParagraphId.from_string(paragraph.id)
         extended_paragraph_text = paragraph.text
         if paragraphs_extra_characters > 0:
             extended_paragraph_text = await get_paragraph_text(
                 kbid=kbid,
-                rid=rid,
-                field=field_path,
-                start=int_start,
-                end=int_end,
+                paragraph_id=paragraph_id,
                 log_on_missing_field=True,
             )
+        rid = paragraph_id.rid
         if rid not in resources:
             # Get the title and the summary of the resource
             title_text = await get_paragraph_text(
                 kbid=kbid,
-                rid=rid,
-                field="/a/title",
-                start=0,
-                end=500,
+                paragraph_id=ParagraphId(
+                    field_id=FieldId(
+                        rid=rid,
+                        type="a",
+                        key="title",
+                    ),
+                    paragraph_start=0,
+                    paragraph_end=500,
+                ),
                 log_on_missing_field=False,
             )
             summary_text = await get_paragraph_text(
                 kbid=kbid,
-                rid=rid,
-                field="/a/summary",
-                start=0,
-                end=1000,
+                paragraph_id=ParagraphId(
+                    field_id=FieldId(
+                        rid=rid,
+                        type="a",
+                        key="summary",
+                    ),
+                    paragraph_start=0,
+                    paragraph_end=1000,
+                ),
                 log_on_missing_field=False,
             )
             resources[rid] = ExtraCharsParagraph(

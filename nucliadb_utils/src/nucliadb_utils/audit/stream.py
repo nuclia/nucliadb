@@ -86,6 +86,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
         token = request_context_var.set(context)
         context.audit_request.time.FromDatetime(datetime.now(tz=timezone.utc))
         context.audit_request.trace_id = get_trace_id()
+
+        if request.url.path.split("/")[-1] in ("ask", "search", "find"):
+            body = (await request.body()).decode()
+            context.audit_request.user_request = body
+
         response = await call_next(request)
 
         if isinstance(response, StreamingResponse):
@@ -380,6 +385,7 @@ class StreamAuditStorage(AuditStorage):
         answer: Optional[str],
         learning_id: str,
         status_code: int,
+        model: str,
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,
@@ -410,6 +416,7 @@ class StreamAuditStorage(AuditStorage):
         if answer is not None:
             auditrequest.chat.answer = answer
         auditrequest.chat.status_code = status_code
+        auditrequest.chat.model = model
 
     def feedback(
         self,

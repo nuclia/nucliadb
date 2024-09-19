@@ -20,6 +20,7 @@
 import uuid
 
 from nucliadb.common import datamanagers
+from nucliadb.common.ids import ParagraphId
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.search import paragraphs
 from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper
@@ -28,11 +29,11 @@ from nucliadb_protos.utils_pb2 import ExtractedText
 
 async def test_get_paragraph_text(storage, cache, txn, fake_node, processor, knowledgebox_ingest):
     kbid = knowledgebox_ingest
-    uid = uuid.uuid4().hex
-    basic = Basic(slug="slug", uuid=uid)
-    await datamanagers.resources.set_basic(txn, kbid=kbid, rid=uid, basic=basic)
+    rid = uuid.uuid4().hex
+    basic = Basic(slug="slug", uuid=rid)
+    await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
     kb = KnowledgeBox(txn, storage, kbid)
-    orm_resource = await kb.get(uid)
+    orm_resource = await kb.get(rid)
     field_obj = await orm_resource.get_field("field", 4, load=False)
     await field_obj.set_extracted_text(ExtractedTextWrapper(body=ExtractedText(text="Hello World!")))
 
@@ -41,10 +42,7 @@ async def test_get_paragraph_text(storage, cache, txn, fake_node, processor, kno
 
     text1 = await paragraphs.get_paragraph_text(
         kbid=kbid,
-        rid=uid,
-        field="/t/field",
-        start=0,
-        end=5,
+        paragraph_id=ParagraphId.from_string(f"{rid}/t/field/0-5"),
         orm_resource=orm_resource,
     )
     assert text1 == "Hello"
