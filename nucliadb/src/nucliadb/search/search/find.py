@@ -123,6 +123,7 @@ async def _index_node_retrieval(
         security=item.security,
         generative_model=generative_model,
         rephrase=item.rephrase,
+        rephrase_prompt=item.rephrase_prompt,
     )
     with metrics.time("query_parse"):
         pb_query, incomplete_results, autofilters = await query_parser.parse()
@@ -234,6 +235,7 @@ async def _external_index_retrieval(
         security=item.security,
         generative_model=generative_model,
         rephrase=item.rephrase,
+        rephrase_prompt=item.rephrase_prompt,
     )
     search_request, incomplete_results, _ = await query_parser.parse()
 

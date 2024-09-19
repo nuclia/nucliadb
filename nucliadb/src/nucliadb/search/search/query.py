@@ -118,6 +118,7 @@ class QueryParser:
         security: Optional[RequestSecurity] = None,
         generative_model: Optional[str] = None,
         rephrase: bool = False,
+        rephrase_prompt: Optional[str] = None,
         max_tokens: Optional[MaxTokens] = None,
     ):
         self.kbid = kbid
@@ -146,6 +147,7 @@ class QueryParser:
         self.security = security
         self.generative_model = generative_model
         self.rephrase = rephrase
+        self.rephrase_prompt = rephrase_prompt
         self.query_endpoint_used = False
         if len(self.label_filters) > 0:
             self.label_filters = translate_label_filters(self.label_filters)
@@ -168,7 +170,7 @@ class QueryParser:
     async def _query_information(self) -> QueryInfo:
         vectorset = await self.select_vectorset()
         return await query_information(
-            self.kbid, self.query, vectorset, self.generative_model, self.rephrase
+            self.kbid, self.query, vectorset, self.generative_model, self.rephrase, self.rephrase_prompt
         )
 
     def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
@@ -600,9 +602,10 @@ async def query_information(
     semantic_model: Optional[str],
     generative_model: Optional[str] = None,
     rephrase: bool = False,
+    rephrase_prompt: Optional[str] = None,
 ) -> QueryInfo:
     predict = get_predict()
-    return await predict.query(kbid, query, semantic_model, generative_model, rephrase)
+    return await predict.query(kbid, query, semantic_model, generative_model, rephrase, rephrase_prompt)
 
 
 @query_parse_dependency_observer.wrap({"type": "detect_entities"})

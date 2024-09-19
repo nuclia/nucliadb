@@ -87,6 +87,7 @@ from nucliadb_models.search import (
     SyncAskResponse,
     UserPrompt,
     parse_custom_prompt,
+    parse_rephrase_prompt,
 )
 from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -462,9 +463,8 @@ async def ask(
             prompt_context_images,
         ) = await prompt_context_builder.build()
 
-    custom_prompt = parse_custom_prompt(ask_request)
-
     # Make the chat request to the predict API
+    custom_prompt = parse_custom_prompt(ask_request)
     chat_model = ChatModel(
         user_id=user_id,
         system=custom_prompt.system,
@@ -755,6 +755,7 @@ def calculate_prequeries_for_json_schema(ask_request: AskRequest) -> Optional[Pr
         features.append(SearchOptions.SEMANTIC)
     if ChatOptions.KEYWORD in ask_request.features:
         features.append(SearchOptions.KEYWORD)
+
     properties = json_schema.get("parameters", {}).get("properties", {})
     if len(properties) == 0:  # pragma: no cover
         return None
@@ -777,7 +778,8 @@ def calculate_prequeries_for_json_schema(ask_request: AskRequest) -> Optional[Pr
             with_duplicates=False,
             with_synonyms=False,
             resource_filters=[],  # to be filled with the resource filter
-            rephrase=False,
+            rephrase=ask_request.rephrase,
+            rephrase_prompt=parse_rephrase_prompt(ask_request),
             security=ask_request.security,
             autofilter=False,
         )
