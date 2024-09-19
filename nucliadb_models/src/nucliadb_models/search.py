@@ -429,16 +429,35 @@ class SearchParamDefaults:
         title="Shards",
         description="The list of shard replicas to search in. If empty, random replicas will be selected.",
     )
-    page_number = ParamDefault(
+    catalog_page_number = ParamDefault(
         default=0,
         title="Page number",
         description="The page number of the results to return",
+    )
+    catalog_page_size = ParamDefault(
+        default=20,
+        le=200,
+        title="Page size",
+        description="The number of results to return per page. The maximum number of results per page allowed is 200.",
+    )
+    page_number = ParamDefault(
+        default=0,
+        title="Page number",
+        description="The page number of the results to return.\nATENTION: pagination will be deprecated, please, refer to `top_k`",
+        deprecated=True,
     )
     page_size = ParamDefault(
         default=20,
         le=200,
         title="Page size",
-        description="The number of results to return per page. The maximum number of results per page allowed is 200.",
+        description="The number of results to return per page. The maximum number of results per page allowed is 200.\nATENTION: pagination will be deprecated, please, refer to `top_k`",
+        deprecated=True,
+    )
+    top_k = ParamDefault(
+        default=None,
+        le=200,
+        title="Top k",
+        description="The number of results search should return. The maximum number of results allowed is 200.",
     )
     highlight = ParamDefault(
         default=False,
@@ -598,8 +617,8 @@ class CatalogRequest(BaseModel):
     )
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
-    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
-    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    page_number: int = SearchParamDefaults.catalog_page_number.to_pydantic_field()
+    page_size: int = SearchParamDefaults.catalog_page_size.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field(deprecated=True)
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
     with_status: Optional[ResourceProcessingStatus] = Field(
@@ -649,6 +668,7 @@ class BaseSearchRequest(BaseModel):
     )
     page_number: int = SearchParamDefaults.page_number.to_pydantic_field(deprecated=True)
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    top_k: Optional[int] = SearchParamDefaults.top_k.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
         default=None,
         title="Minimum score",
@@ -716,6 +736,16 @@ Please return ONLY the question without any explanation. Just the rephrased ques
     @classmethod
     def normalize_features(cls, features: List[SearchOptions]):
         return [feature.normalized() for feature in features]
+
+    @model_validator(mode="after")
+    @classmethod
+    def top_k_overwrites_pagination(self):
+        """This method adds support for `top_k` attribute, overwriting
+        `page_number` and `page_size` if needed"""
+        if self.top_k is not None:
+            self.page_number = 0
+            self.page_size = self.top_k
+        return self
 
 
 class SearchRequest(BaseSearchRequest):

@@ -67,8 +67,9 @@ async def resource_search(
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort: Optional[SortField] = fastapi_query(SearchParamDefaults.sort_field, alias="sort_field"),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
-    page_number: int = fastapi_query(SearchParamDefaults.page_number, deprecated=True),
+    page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    top_k: Optional[int] = fastapi_query(SearchParamDefaults.top_k),
     range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
     range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
     range_modification_start: Optional[DateTime] = fastapi_query(
@@ -89,6 +90,9 @@ async def resource_search(
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: list[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> Union[ResourceSearchResults, HTTPClientError]:
+    if top_k is not None:
+        page_number = 0
+        page_size = top_k
     with cache.request_caches():
         try:
             pb_query = await paragraph_query_to_pb(
