@@ -84,8 +84,8 @@ pub fn create_query(
         .fields
         .iter()
         .map(|field_name| {
-            let term = Term::from_field_bytes(schema.field, field_name.as_bytes());
-            let term_query: Box<dyn Query> = Box::new(TermQuery::new(term, IndexRecordOption::Basic));
+            let facet_term = Term::from_facet(schema.field, &Facet::from(&format!("/{field_name}")));
+            let term_query: Box<dyn Query> = Box::new(TermQuery::new(facet_term, IndexRecordOption::Basic));
             (Occur::Should, term_query)
         })
         .collect();

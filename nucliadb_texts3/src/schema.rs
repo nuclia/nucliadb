@@ -56,7 +56,7 @@ impl TextSchema {
         let facet_options = FacetOptions::default().set_stored();
 
         let uuid = sb.add_bytes_field("uuid", STORED | FAST | INDEXED);
-        let field = sb.add_bytes_field("field", STORED | FAST | INDEXED);
+        let field = sb.add_facet_field("field", facet_options.clone());
 
         let text = sb.add_text_field("text", TEXT);
 

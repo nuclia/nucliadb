@@ -256,7 +256,10 @@ impl TextWriterService {
 
         for (field, text_info) in &resource.texts {
             let mut field_doc = base_doc.clone();
-            field_doc.add_bytes(self.schema.field, field.as_bytes());
+            let mut facet_key: String = "/".to_owned();
+            facet_key.push_str(field.as_str());
+            let facet_field = Facet::from(facet_key.as_str());
+            field_doc.add_facet(self.schema.field, facet_field);
             field_doc.add_text(self.schema.text, &text_info.text);
 
             for label in text_info.labels.iter() {

@@ -39,7 +39,7 @@ use nucliadb_core::texts::*;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_procs::measure;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
-use tantivy::fastfield::BytesFastFieldReader;
+use tantivy::fastfield::{BytesFastFieldReader, FacetReader};
 use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, LeasedItem, ReloadPolicy, Searcher};
@@ -97,7 +97,7 @@ impl Debug for TextReaderService {
 
 struct FieldUuidSegmentCollector {
     uuid_reader: BytesFastFieldReader,
-    field_reader: BytesFastFieldReader,
+    field_reader: FacetReader,
     results: Vec<ValidField>,
 }
 
@@ -106,10 +106,13 @@ impl SegmentCollector for FieldUuidSegmentCollector {
 
     fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
         let uuid = self.uuid_reader.get_bytes(doc);
-        let field = self.field_reader.get_bytes(doc);
+        let mut facet_ords = vec![];
+        self.field_reader.facet_ords(doc, &mut facet_ords);
+        let mut facet = Facet::root();
+        self.field_reader.facet_from_ord(facet_ords[0], &mut facet).expect("field facet not found");
         self.results.push(ValidField {
             resource_id: String::from_utf8_lossy(uuid).to_string(),
-            field_id: format!("/{}", String::from_utf8_lossy(field)),
+            field_id: facet.to_path_string(),
         });
     }
 
@@ -134,7 +137,7 @@ impl Collector for FieldUuidCollector {
         segment: &tantivy::SegmentReader,
     ) -> tantivy::Result<Self::Child> {
         let uuid_reader = segment.fast_fields().bytes(self.uuid)?;
-        let field_reader = segment.fast_fields().bytes(self.field)?;
+        let field_reader = segment.facet_reader(self.field)?;
         Ok(FieldUuidSegmentCollector {
             uuid_reader,
             field_reader,
@@ -378,17 +381,12 @@ impl TextReaderService {
                     )
                     .unwrap();
 
-                    let field = format!(
-                        "/{}",
-                        String::from_utf8(
-                            doc.get_first(self.schema.field)
-                                .expect("document doesn't appear to have field.")
-                                .as_bytes()
-                                .unwrap()
-                                .to_vec(),
-                        )
+                    let field = doc
+                        .get_first(self.schema.field)
+                        .expect("document doesn't appear to have field.")
+                        .as_facet()
                         .unwrap()
-                    );
+                        .to_path_string();
 
                     let labels = doc
                         .get_all(self.schema.facets)
@@ -453,17 +451,12 @@ impl TextReaderService {
                     )
                     .unwrap();
 
-                    let field = format!(
-                        "/{}",
-                        String::from_utf8(
-                            doc.get_first(self.schema.field)
-                                .expect("document doesn't appear to have field.")
-                                .as_bytes()
-                                .unwrap()
-                                .to_vec(),
-                        )
+                    let field = doc
+                        .get_first(self.schema.field)
+                        .expect("document doesn't appear to have field.")
+                        .as_facet()
                         .unwrap()
-                    );
+                        .to_path_string();
 
                     let labels = doc
                         .get_all(self.schema.facets)
@@ -640,17 +633,12 @@ impl Iterator for BatchProducer {
             )
             .unwrap();
 
-            let field = format!(
-                "/{}",
-                String::from_utf8(
-                    doc.get_first(self.field_field)
-                        .expect("document doesn't appear to have field.")
-                        .as_bytes()
-                        .unwrap()
-                        .to_vec(),
-                )
+            let field = doc
+                .get_first(self.field_field)
+                .expect("document doesn't appear to have field.")
+                .as_facet()
                 .unwrap()
-            );
+                .to_path_string();
 
             let labels = doc
                 .get_all(self.facet_field)
