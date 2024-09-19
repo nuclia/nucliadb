@@ -86,6 +86,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
         token = request_context_var.set(context)
         context.audit_request.time.FromDatetime(datetime.now(tz=timezone.utc))
         context.audit_request.trace_id = get_trace_id()
+
+        if request.url.path.split("/")[-1] in ("ask", "search", "find"):
+            body = (await request.body()).decode()
+            context.audit_request.user_request = body
+
         response = await call_next(request)
 
         if isinstance(response, StreamingResponse):

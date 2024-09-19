@@ -115,5 +115,5 @@ message AuditRequest {
   optional float generative_answer_first_chunk_time = 24;
   optional float rephrase_time = 25;
   FeedbackAudit feedback = 26;
-  optional string raw_request = 27;
+  optional string user_request = 27;
 }

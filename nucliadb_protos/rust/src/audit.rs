@@ -173,7 +173,7 @@ pub struct AuditRequest {
     #[prost(message, optional, tag = "26")]
     pub feedback: ::core::option::Option<FeedbackAudit>,
     #[prost(string, optional, tag = "27")]
-    pub raw_request: ::core::option::Option<::prost::alloc::string::String>,
+    pub user_request: ::core::option::Option<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `AuditRequest`.
 pub mod audit_request {
