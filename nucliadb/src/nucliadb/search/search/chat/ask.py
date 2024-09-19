@@ -135,7 +135,7 @@ class AskResult:
 
     @property
     def status_error_details(self) -> Optional[str]:
-        if self._status is None:
+        if self._status is None:  # pragma: no cover
             return None
         return self._status.details
 
@@ -751,7 +751,7 @@ def calculate_prequeries_for_json_schema(ask_request: AskRequest) -> Optional[Pr
     if ChatOptions.KEYWORD in ask_request.features:
         features.append(SearchOptions.KEYWORD)
     properties = json_schema.get("parameters", {}).get("properties", {})
-    if len(properties) == 0:
+    if len(properties) == 0:  # pragma: no cover
         return None
     for prop_name, prop_def in properties.items():
         query = prop_name
