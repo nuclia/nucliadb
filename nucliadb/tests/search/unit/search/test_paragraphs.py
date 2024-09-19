@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from nucliadb.common.ids import ParagraphId
 from nucliadb.search.search import cache, paragraphs
 from nucliadb.search.search.cache import set_extracted_text_cache
 from nucliadb_protos.utils_pb2 import ExtractedText
@@ -72,11 +73,7 @@ class TestGetParagraphText:
         assert (
             await paragraphs.get_paragraph_text(
                 kbid="kbid",
-                rid="rid",
-                field="/t/text",
-                start=0,
-                end=12,
-                split=None,
+                paragraph_id=ParagraphId.from_string("rid/t/text/0-12"),
                 highlight=True,
                 ematches=None,
                 matches=None,

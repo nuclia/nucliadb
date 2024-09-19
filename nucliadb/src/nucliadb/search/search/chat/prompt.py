@@ -524,10 +524,7 @@ async def get_paragraph_text_with_neighbours(
     ) -> tuple[ParagraphId, str]:
         return pid, await get_paragraph_text(
             kbid=kbid,
-            rid=pid.field_id.rid,
-            field=pid.field_id.full(),
-            start=pid.paragraph_start,
-            end=pid.paragraph_end,
+            paragraph_id=pid,
             log_on_missing_field=True,
         )
 
@@ -657,38 +654,41 @@ async def hierarchy_prompt_context(
 
     # Iterate paragraphs to get extended text
     for paragraph in ordered_paragraphs_copy:
-        rid, field_type, field = paragraph.id.split("/")[:3]
-        field_path = "/".join([rid, field_type, field])
-        position = paragraph.id.split("/")[-1]
-        start, end = position.split("-")
-        int_start = int(start)
-        int_end = int(end) + paragraphs_extra_characters
+        paragraph_id = ParagraphId.from_string(paragraph.id)
         extended_paragraph_text = paragraph.text
         if paragraphs_extra_characters > 0:
             extended_paragraph_text = await get_paragraph_text(
                 kbid=kbid,
-                rid=rid,
-                field=field_path,
-                start=int_start,
-                end=int_end,
+                paragraph_id=paragraph_id,
                 log_on_missing_field=True,
             )
+        rid = paragraph_id.rid
         if rid not in resources:
             # Get the title and the summary of the resource
             title_text = await get_paragraph_text(
                 kbid=kbid,
-                rid=rid,
-                field="/a/title",
-                start=0,
-                end=500,
+                paragraph_id=ParagraphId(
+                    field_id=FieldId(
+                        rid=rid,
+                        type="a",
+                        key="title",
+                    ),
+                    paragraph_start=0,
+                    paragraph_end=500,
+                ),
                 log_on_missing_field=False,
             )
             summary_text = await get_paragraph_text(
                 kbid=kbid,
-                rid=rid,
-                field="/a/summary",
-                start=0,
-                end=1000,
+                paragraph_id=ParagraphId(
+                    field_id=FieldId(
+                        rid=rid,
+                        type="a",
+                        key="summary",
+                    ),
+                    paragraph_start=0,
+                    paragraph_end=1000,
+                ),
                 log_on_missing_field=False,
             )
             resources[rid] = ExtraCharsParagraph(
