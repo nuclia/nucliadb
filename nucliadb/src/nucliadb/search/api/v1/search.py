@@ -445,6 +445,9 @@ async def search(
     do_audit: bool = True,
     with_status: Optional[ResourceProcessingStatus] = None,
 ) -> tuple[KnowledgeboxSearchResults, bool]:
+    if item.page_number > 0:
+        logger.warning("Someone is still using pagination!", extra={"kbid": kbid, "endpoint": "search"})
+
     audit = get_audit()
     start_time = time()
 
