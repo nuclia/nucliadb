@@ -37,6 +37,7 @@ use super::indexes::{ShardIndexes, DEFAULT_VECTORS_INDEX_NAME};
 use super::metadata::ShardMetadata;
 use super::versioning::{self, Versions};
 use crate::disk_structure::{self, *};
+use crate::settings::{feature_flags, Settings};
 use crate::telemetry::run_with_telemetry;
 
 const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
@@ -105,7 +106,7 @@ impl ShardWriter {
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(new: NewShard, shards_path: &Path) -> NodeResult<(Self, Arc<ShardMetadata>)> {
+    pub fn new(new: NewShard, shards_path: &Path, settings: &Settings) -> NodeResult<(Self, Arc<ShardMetadata>)> {
         let span = tracing::Span::current();
 
         if new.vector_configs.is_empty() {
@@ -118,6 +119,14 @@ impl ShardWriter {
         let mut indexes = ShardIndexes::new(&shard_path);
 
         std::fs::create_dir(&shard_path)?;
+
+        let ff_context = Some(HashMap::from([("kbid".to_string(), metadata.kbid())]));
+        let texts3_enabled = settings.flags.enabled(feature_flags::TEXTS3, false, ff_context);
+        let texts_version = if texts3_enabled {
+            3
+        } else {
+            2
+        };
 
         let versions = Versions {
             paragraphs: versioning::PARAGRAPHS_VERSION,
@@ -133,7 +142,7 @@ impl ShardWriter {
         let tsc = TextConfig {
             path: indexes.texts_path(),
         };
-        let text_task = || Some(nucliadb_texts3::writer::TextWriterService::create(tsc));
+        let text_task = || Some(create_texts_writer(texts_version, tsc));
         let info = info_span!(parent: &span, "text start");
         let text_task = || run_with_telemetry(info, text_task);
 
@@ -199,7 +208,7 @@ impl ShardWriter {
                 path: shard_path,
                 metadata: Arc::clone(&metadata),
                 indexes: RwLock::new(ShardWriterIndexes {
-                    texts_index: Box::new(fields.unwrap()),
+                    texts_index: fields.unwrap(),
                     paragraphs_index: Box::new(paragraphs.unwrap()),
                     vectors_indexes: vectors,
                     relations_index: Box::new(relations.unwrap()),
@@ -689,6 +698,14 @@ pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsW
     match version {
         2 => nucliadb_texts2::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
         3 => nucliadb_texts3::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
+        v => Err(node_error!("Invalid text writer version {v}")),
+    }
+}
+
+pub fn create_texts_writer(version: u32, config: TextConfig) -> NodeResult<TextsWriterPointer> {
+    match version {
+        2 => nucliadb_texts2::writer::TextWriterService::create(config).map(|i| Box::new(i) as TextsWriterPointer),
+        3 => nucliadb_texts3::writer::TextWriterService::create(config).map(|i| Box::new(i) as TextsWriterPointer),
         v => Err(node_error!("Invalid text writer version {v}")),
     }
 }

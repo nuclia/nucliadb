@@ -22,7 +22,7 @@ path = "src/bin/writer.rs"
 [dependencies]
 axum = "0.6"
 axum-server = "0.5"
-
+mrflagly = { version = "0.2.9", default-features = false }
 tonic = "0.11"
 tonic-health = "0.11"
 futures-core = "0.3.17"

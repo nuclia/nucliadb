@@ -28,6 +28,7 @@ use tempfile;
 use uuid::Uuid;
 
 use crate::disk_structure;
+use crate::settings::EnvSettings;
 use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
 use crate::shards::reader::ShardReader;
 
@@ -41,6 +42,7 @@ fn test_vectorsets() -> NodeResult<()> {
     let shard_id = "shard".to_string();
     let kbid = "kbid".to_string();
 
+    let settings = EnvSettings::default().into();
     let (writer, _metadata) = ShardWriter::new(
         crate::shards::writer::NewShard {
             kbid: kbid.clone(),
@@ -48,6 +50,7 @@ fn test_vectorsets() -> NodeResult<()> {
             vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
         },
         &shards_path,
+        &settings,
     )?;
     writer.create_vectors_index(
         "myvectorset".to_string(),
