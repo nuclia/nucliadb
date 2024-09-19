@@ -786,7 +786,7 @@ class ChatModel(BaseModel):
     citations: bool = Field(default=False, description="Whether to include the citations in the answer")
     citation_threshold: Optional[float] = Field(
         default=None,
-        description="If citations is set to True, this will be the similarity threshold. Value between 0 and 1, lower values will produce more citations. If not set, it will be set to the optimized threshold found by Nuclia.",  # noqa
+        description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",  # noqa
         ge=0.0,
         le=1.0,
     )
@@ -1156,7 +1156,7 @@ class ChatRequest(BaseModel):
     )
     citation_threshold: Optional[float] = Field(
         default=None,
-        description="If citations is set to True, this will be the similarity threshold. Value between 0 and 1, lower values will produce more citations. If not set, it will be set to the optimized threshold found by Nuclia.",
+        description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",
         ge=0.0,
         le=1.0,
     )
