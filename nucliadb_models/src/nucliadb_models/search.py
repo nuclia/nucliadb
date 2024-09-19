@@ -574,7 +574,7 @@ class SearchParamDefaults:
         title="Prefer markdown",
         description="If set to true, the response will be in markdown format",
     )
-    show_hidden: SkipJsonSchema[bool] = ParamDefault(
+    show_hidden = ParamDefault(
         default=False,
         title="Show hidden resources",
         description="If set to false (default), excludes hidden resources from search",
