@@ -1235,14 +1235,14 @@ class ChatRequest(BaseModel):
         title="RAG context building strategies",
         description=(
             """Options for tweaking how the context for the LLM model is crafted:
-- `full_resource` will add the full text of the matching resources to the context.
+- `full_resource` will add the full text of the matching resources to the context. This strategy cannot be combined with `hierarchy`, `neighbouring_paragraphs`, or `field_extension`.
 - `field_extension` will add the text of the matching resource's specified fields to the context.
 - `hierarchy` will add the title and summary text of the parent resource to the context for each matching paragraph.
 - `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
-- `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context. This strategy can be combined with any other strategy.
-- `prequeries` allows to run additional queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights. This strategy can be combined with any other strategy.
+- `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context.
+- `prequeries` allows to run multiple retrieval queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights.
 
-If empty, the default strategy is used. `full_resource`, `hierarchy`, and `neighbouring_paragraphs` are mutually exclusive strategies: if selected, they must be the only strategy.
+If empty, the default strategy is used, which simply adds the text of the matching paragraphs to the context.
 """
         ),
         examples=[
