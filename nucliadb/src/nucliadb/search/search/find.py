@@ -191,7 +191,7 @@ async def _external_index_retrieval(
     # Hydrate results
     results_min_score = MinScore(
         bm25=0,
-        semantic=item.min_score.semantic or query_parser.min_score.semantic,
+        semantic=query_parser.min_score.semantic,
     )
     retrieval_results = KnowledgeboxFindResults(
         resources={},

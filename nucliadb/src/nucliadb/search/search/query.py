@@ -574,6 +574,9 @@ class QueryParser:
             if external_provider is None:
                 # index nodes are sharded, we need to know how many shards we'll query
                 kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
+                if kb_shards is None:
+                    logger.warning("Trying to query a KB with no shards", extra={"kbid": self.kbid})
+                    return
                 shards = len(kb_shards.shards)
 
         request.result_per_page = self.reranker.items_needed(self.page_size, shards)
