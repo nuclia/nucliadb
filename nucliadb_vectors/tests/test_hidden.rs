@@ -23,6 +23,7 @@ use std::collections::{HashMap, HashSet};
 use nucliadb_core::protos::{
     IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSearchRequest, VectorSentence,
 };
+use nucliadb_core::query_language::BooleanExpression;
 use nucliadb_core::vectors::{ResourceWrapper, VectorReader, VectorWriter, VectorsContext};
 use nucliadb_core::NodeResult;
 use nucliadb_vectors::config::VectorConfig;
@@ -49,7 +50,7 @@ fn resource(labels: Vec<String>) -> Resource {
                         sentences: HashMap::from([(
                             format!("{id}/a/title/0-5"),
                             VectorSentence {
-                                vector: vec![0.0, 0.0, 0.0, 0.0],
+                                vector: vec![0.5, 0.5, 0.5, rand::random()],
                                 metadata: None,
                             },
                         )]),
@@ -81,6 +82,7 @@ fn test_hidden_search() -> NodeResult<()> {
     let request = VectorSearchRequest {
         vector: vec![0.5, 0.5, 0.5, 0.5],
         min_score: -1.0,
+        result_per_page: 10,
         ..Default::default()
     };
     let all = reader.search(
@@ -92,18 +94,26 @@ fn test_hidden_search() -> NodeResult<()> {
     )?;
     assert_eq!(
         HashSet::from_iter(all.documents.into_iter().map(|d| d.doc_id.unwrap().id)),
-        HashSet::from([hidden_resource.resource.unwrap().uuid, visible_resource.resource.unwrap().uuid])
+        HashSet::from([
+            format!("{}/a/title/0-5", hidden_resource.resource.unwrap().uuid),
+            format!("{}/a/title/0-5", visible_resource.resource.as_ref().unwrap().uuid)
+        ])
     );
 
     let visible = reader.search(
         &request,
         &VectorsContext {
             filtering_formula: None,
-            segment_filtering_formula: None,
+            segment_filtering_formula: Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal(
+                "/q/h".to_string(),
+            )))),
         },
     )?;
     assert_eq!(visible.documents.len(), 1);
-    // assert_eq!(visible.documents.doc_id.unwrap().id, &visible_resource.resource.unwrap().uuid);
+    assert_eq!(
+        visible.documents[0].clone().doc_id.unwrap().id,
+        format!("{}/a/title/0-5", visible_resource.resource.unwrap().uuid)
+    );
 
     Ok(())
 }
