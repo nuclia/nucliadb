@@ -41,6 +41,11 @@ from nucliadb.search.search.metrics import (
     node_features,
     query_parse_dependency_observer,
 )
+from nucliadb.search.search.rerankers import (
+    MultiMatchBoosterReranker,
+    PredictReranker,
+    Reranker,
+)
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import translate_system_to_alias_label
@@ -121,6 +126,7 @@ class QueryParser:
         rephrase_prompt: Optional[str] = None,
         max_tokens: Optional[MaxTokens] = None,
         hidden: Optional[bool] = None,
+        reranker: Optional[Reranker] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -161,6 +167,13 @@ class QueryParser:
             self.label_filters = translate_label_filters(self.label_filters)
             self.flat_label_filters = flatten_filter_literals(self.label_filters)
         self.max_tokens = max_tokens
+        if page_number > 0 and isinstance(reranker, PredictReranker):
+            logger.warning(
+                "Trying to use predict reranker with pagination. Using multi-match booster instead",
+                extra={"kbid": kbid},
+            )
+        else:
+            self.reranker = reranker or MultiMatchBoosterReranker()
 
     @property
     def has_vector_search(self) -> bool:
@@ -264,6 +277,7 @@ class QueryParser:
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
         await self.parse_min_score(request, incomplete)
+        await self.adjust_page_size(request, self.reranker)
         return request, incomplete, autofilters
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
@@ -543,6 +557,26 @@ class QueryParser:
         if self.max_tokens is not None and self.max_tokens.answer is not None:
             return self.max_tokens.answer
         return None
+
+    async def adjust_page_size(self, request: nodereader_pb2.SearchRequest, reranker: Reranker):
+        """Some rerankers want more results than the requested by the user so
+        reranking can have more choices. This function adjust the number of
+        retrieval results requested according to the reranker needs."""
+
+        if not self.reranker.needs_extra_results:
+            return
+
+        async with datamanagers.with_ro_transaction() as txn:
+            external_provider = await datamanagers.kb.get_external_index_provider_metadata(
+                txn, kbid=self.kbid
+            )
+            shards = 1
+            if external_provider is None:
+                # index nodes are sharded, we need to know how many shards we'll query
+                kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
+                shards = len(kb_shards.shards)
+
+        request.result_per_page = self.reranker.items_needed(self.page_size, shards)
 
 
 async def paragraph_query_to_pb(
