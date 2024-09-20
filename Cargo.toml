@@ -9,6 +9,7 @@ members = [
   "nucliadb_protos/rust",
   "nucliadb_relations2",
   "nucliadb_texts2",
+  "nucliadb_texts3",
   "nucliadb_vectors",
   "vectors_benchmark",
 ]

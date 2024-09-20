@@ -29,6 +29,7 @@ message ShardCreated {
         DOCUMENT_V0 = 0;
         DOCUMENT_V1 = 1;
         DOCUMENT_V2 = 2;
+        DOCUMENT_V3 = 3;
     }
     DocumentService document_service = 2;
     enum ParagraphService {
