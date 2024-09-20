@@ -246,6 +246,7 @@ where
         nodes: no_nodes,
         uid: data_point_id,
         ctime: merge_time,
+        tags: vec![], // QQQ
     };
 
     {
@@ -273,6 +274,7 @@ pub fn create(
     elems: Vec<Elem>,
     time: Option<SystemTime>,
     config: &VectorConfig,
+    tags: Vec<String>,
 ) -> VectorR<OpenDataPoint> {
     // Check dimensions
     if let Some(dim) = config.vector_type.dimension() {
@@ -328,6 +330,7 @@ pub fn create(
         nodes: no_nodes,
         uid: data_point_id,
         ctime: time.unwrap_or_else(SystemTime::now),
+        tags,
     };
     {
         // Saving the journal
@@ -357,11 +360,12 @@ impl DeleteLog for NoDLog {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Journal {
     uid: DpId,
     nodes: usize,
     ctime: SystemTime,
+    tags: Vec<String>,
 }
 impl Journal {
     pub fn id(&self) -> DpId {
@@ -375,6 +379,9 @@ impl Journal {
     }
     pub fn update_time(&mut self, time: SystemTime) {
         self.ctime = time;
+    }
+    pub fn tags(&self) -> &Vec<String> {
+        &self.tags
     }
 }
 
@@ -640,8 +647,8 @@ impl OpenDataPoint {
     pub fn get_id(&self) -> DpId {
         self.journal.uid
     }
-    pub fn journal(&self) -> Journal {
-        self.journal
+    pub fn journal(&self) -> &Journal {
+        &self.journal
     }
     pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
         let node_storage = &self.nodes;
@@ -779,7 +786,7 @@ mod test {
         // Create a data point with random data of different length
         let pin = DataPointPin::create_pin(temp_dir.path())?;
         let elems = (0..100).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp = create(&pin, elems.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+        let dp = create(&pin, elems.iter().cloned().map(|x| x.0).collect(), None, &config, vec![])?;
         let nodes = dp.nodes;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
@@ -819,11 +826,11 @@ mod test {
         // Create two data points with random data of different length
         let pin1 = DataPointPin::create_pin(temp_dir.path())?;
         let elems1 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp1 = create(&pin1, elems1.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+        let dp1 = create(&pin1, elems1.iter().cloned().map(|x| x.0).collect(), None, &config, vec![])?;
 
         let pin2 = DataPointPin::create_pin(temp_dir.path())?;
         let elems2 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp2 = create(&pin2, elems2.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+        let dp2 = create(&pin2, elems2.iter().cloned().map(|x| x.0).collect(), None, &config, vec![])?;
 
         let pin_merged = DataPointPin::create_pin(temp_dir.path())?;
         let merged_dp = merge(&pin_merged, &[(NoDLog, &dp1), (NoDLog, &dp2)], &config, SystemTime::now())?;
@@ -890,6 +897,7 @@ mod test {
             elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
             None,
             &config,
+            vec![],
         )?;
 
         // Search a few times

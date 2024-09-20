@@ -466,12 +466,12 @@ impl Writer {
                 new_dimension = data_point.stored_len();
             }
 
+            new_number_of_embeddings += data_point_journal.no_nodes();
             let online_data_point = OnlineDataPoint {
                 pin: data_point_pin,
                 journal: data_point_journal,
             };
 
-            new_number_of_embeddings += data_point_journal.no_nodes();
             new_data_points.push(online_data_point);
         }
 
@@ -521,7 +521,7 @@ mod test {
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, &writer.config).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config, vec![]).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -555,7 +555,7 @@ mod test {
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, &writer.config).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config, vec![]).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -587,7 +587,7 @@ mod test {
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, &writer.config).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config, vec![]).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -623,7 +623,7 @@ mod test {
         let embeddings = vec![];
         let time = Some(SystemTime::now());
         let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-        create(&data_point_pin, embeddings, time, &writer.config).unwrap();
+        create(&data_point_pin, embeddings, time, &writer.config, vec![]).unwrap();
 
         let online_data_point = OnlineDataPoint {
             journal: data_point_pin.read_journal().unwrap(),

@@ -147,10 +147,11 @@ impl VectorWriter for VectorWriterService {
         }
 
         if !elems.is_empty() {
+            let tags = resource.labels().iter().filter(|t| SEGMENT_TAGS.contains(&t.as_str())).cloned().collect();
             let location = self.index.location();
             let time = Some(temporal_mark);
             let data_point_pin = DataPointPin::create_pin(location)?;
-            data_point::create(&data_point_pin, elems, time, self.index.config())?;
+            data_point::create(&data_point_pin, elems, time, self.index.config(), tags)?;
             self.index.add_data_point(data_point_pin)?;
         }
 

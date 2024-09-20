@@ -271,6 +271,31 @@ pub fn translate(
     })
 }
 
+/// Extract an expression only involving some labels it it's an AND subset of the total expression
+pub fn extract_label_filters(expression: &BooleanExpression, labels: &[&str]) -> Option<BooleanExpression> {
+    match expression {
+        BooleanExpression::Literal(label) if labels.contains(&label.as_str()) => Some(expression.clone()),
+        BooleanExpression::Not(not_expression) => {
+            extract_label_filters(not_expression, labels).map(|e| BooleanExpression::Not(Box::new(e)))
+        }
+        BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands,
+        }) => {
+            let relevant: Vec<_> = operands.iter().filter_map(|e| extract_label_filters(e, labels)).collect();
+            match &relevant[..] {
+                [] => None,
+                [expression] => Some(expression.clone()),
+                _ => Some(BooleanExpression::Operation(BooleanOperation {
+                    operator: Operator::And,
+                    operands: relevant,
+                })),
+            }
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -477,11 +502,11 @@ mod tests {
     fn test_split() {
         #[rustfmt::skip] let context = QueryContext {
             paragraph_labels: HashSet::from([
-                "foo_paragraph".to_string(), 
+                "foo_paragraph".to_string(),
                 "var_paragraph".to_string()
             ]),
             field_labels: HashSet::from([
-                "foo_field".to_string(), 
+                "foo_field".to_string(),
                 "var_field".to_string()
             ]),
         };
@@ -521,5 +546,51 @@ mod tests {
                 panic!("Ill formed split");
             }
         }
+    }
+
+    #[test]
+    fn test_extract_label_filters() {
+        const LABELS: &[&str] = &["/v", "/w"];
+
+        let a: BooleanExpression = BooleanExpression::Literal("/a".to_string());
+        let b: BooleanExpression = BooleanExpression::Literal("/b".to_string());
+        let v: BooleanExpression = BooleanExpression::Literal("/v".to_string());
+        let w: BooleanExpression = BooleanExpression::Literal("/w".to_string());
+
+        // Literal
+        assert_eq!(extract_label_filters(&a, LABELS), None);
+        assert_eq!(extract_label_filters(&v, LABELS), Some(v.clone()));
+
+        // Not literal
+        let expr = BooleanExpression::Not(Box::new(a.clone()));
+        assert_eq!(extract_label_filters(&expr, LABELS), None);
+
+        let expr = BooleanExpression::Not(Box::new(v.clone()));
+        assert_eq!(extract_label_filters(&expr, LABELS), Some(expr));
+
+        // Or (not supported)
+        let or_expr = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::Or,
+            operands: vec![a.clone(), v.clone(), BooleanExpression::Not(Box::new(w.clone()))],
+        });
+        assert_eq!(extract_label_filters(&or_expr, LABELS), None);
+
+        // And
+        let expr = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![a.clone(), v.clone(), BooleanExpression::Not(Box::new(w.clone()))],
+        });
+        let expected = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![v.clone(), BooleanExpression::Not(Box::new(w.clone()))],
+        });
+        assert_eq!(extract_label_filters(&expr, LABELS), Some(expected));
+
+        // Nested
+        let expr = BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![a.clone(), v.clone(), or_expr],
+        });
+        assert_eq!(extract_label_filters(&expr, LABELS), Some(v));
     }
 }

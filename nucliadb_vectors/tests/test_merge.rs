@@ -47,12 +47,12 @@ fn test_concurrent_merge_delete() -> NodeResult<()> {
 
     // Create two segments
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, vec![elem(0)], Some(past), &config)?;
+    data_point::create(&data_point_pin, vec![elem(0)], Some(past), &config, vec![])?;
     writer.add_data_point(data_point_pin)?;
     writer.commit()?;
 
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, vec![elem(1)], Some(past), &config)?;
+    data_point::create(&data_point_pin, vec![elem(1)], Some(past), &config, vec![])?;
     writer.add_data_point(data_point_pin)?;
     writer.commit()?;
 
