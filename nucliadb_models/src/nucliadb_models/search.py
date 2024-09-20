@@ -429,16 +429,35 @@ class SearchParamDefaults:
         title="Shards",
         description="The list of shard replicas to search in. If empty, random replicas will be selected.",
     )
-    page_number = ParamDefault(
+    catalog_page_number = ParamDefault(
         default=0,
         title="Page number",
         description="The page number of the results to return",
+    )
+    catalog_page_size = ParamDefault(
+        default=20,
+        le=200,
+        title="Page size",
+        description="The number of results to return per page. The maximum number of results per page allowed is 200.",
+    )
+    page_number = ParamDefault(
+        default=0,
+        title="Page number",
+        description="The page number of the results to return.\nATENTION: pagination is deprecated and this parameter will be removed soon. Please, use `top_k` instead",
+        deprecated=True,
     )
     page_size = ParamDefault(
         default=20,
         le=200,
         title="Page size",
-        description="The number of results to return per page. The maximum number of results per page allowed is 200.",
+        description="The number of results to return per page. The maximum number of results per page allowed is 200.\nATENTION: pagination is deprecated and will be removed soon, pleas use to `top_k` instead",
+        deprecated=True,
+    )
+    top_k = ParamDefault(
+        default=None,
+        le=200,
+        title="Top k",
+        description="The number of results search should return. The maximum number of results allowed is 200.",
     )
     highlight = ParamDefault(
         default=False,
@@ -598,8 +617,8 @@ class CatalogRequest(BaseModel):
     )
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
-    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
-    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    page_number: int = SearchParamDefaults.catalog_page_number.to_pydantic_field()
+    page_size: int = SearchParamDefaults.catalog_page_size.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field(deprecated=True)
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
     with_status: Optional[ResourceProcessingStatus] = Field(
@@ -647,8 +666,9 @@ class BaseSearchRequest(BaseModel):
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
-    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
-    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    page_number: int = SearchParamDefaults.page_number.to_pydantic_field(deprecated=True)
+    page_size: int = SearchParamDefaults.page_size.to_pydantic_field(deprecated=True)
+    top_k: Optional[int] = SearchParamDefaults.top_k.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
         default=None,
         title="Minimum score",
@@ -716,6 +736,15 @@ Please return ONLY the question without any explanation. Just the rephrased ques
     @classmethod
     def normalize_features(cls, features: List[SearchOptions]):
         return [feature.normalized() for feature in features]
+
+    @model_validator(mode="after")
+    def top_k_overwrites_pagination(self):
+        """This method adds support for `top_k` attribute, overwriting
+        `page_number` and `page_size` if needed"""
+        if self.top_k is not None:
+            self.page_number = 0
+            self.page_size = self.top_k
+        return self
 
 
 class SearchRequest(BaseSearchRequest):
@@ -1501,9 +1530,16 @@ class KnowledgeboxFindResults(JsonBaseModel):
     relations: Optional[Relations] = None
     query: Optional[str] = None
     total: int = 0
-    page_number: int = 0
-    page_size: int = 20
-    next_page: bool = False
+    page_number: int = Field(
+        default=0, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+    )
+    page_size: int = Field(
+        default=20, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+    )
+    next_page: bool = Field(
+        default=False,
+        description="Pagination will be deprecated, please, refer to `top_k` in the request",
+    )
     nodes: Optional[List[Dict[str, str]]] = Field(
         default=None,
         title="Nodes",

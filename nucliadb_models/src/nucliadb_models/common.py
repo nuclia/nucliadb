@@ -59,12 +59,14 @@ class ParamDefault(BaseModel):
     le: Optional[float] = None
     gt: Optional[float] = None
     max_items: Optional[int] = None
+    deprecated: bool = False
 
     def to_pydantic_field(self, default=_NOT_SET, **kw) -> Field:  # type: ignore
         """
         :param default: to be able to override default value - as some params
         are reused but they will have different default values depending on the endpoint.
         """
+        deprecated = kw.pop("deprecated", self.deprecated)
         return Field(
             default=self.default if default is _NOT_SET else default,
             title=self.title,
@@ -72,6 +74,7 @@ class ParamDefault(BaseModel):
             gt=self.gt,
             le=self.le,
             max_length=self.max_items,
+            deprecated=deprecated,
             **kw,
         )
 
