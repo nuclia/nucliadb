@@ -153,12 +153,23 @@ class LocalTransaction(Transaction):
     async def delete(self, key: str):
         if key not in self.deleted_keys:
             self.deleted_keys.append(key)
+        else:
+            # Already deleted
+            raise KeyError(f"Not found {key}")
 
         if key in self.visited_keys:
             del self.visited_keys[key]
 
         if key in self.modified_keys:
             del self.modified_keys[key]
+
+    async def delete_by_prefix(self, prefix: str) -> None:
+        keys = []
+        for key in self.modified_keys.keys():
+            if key.startswith(prefix):
+                keys.append(key)
+        for key in keys:
+            await self.delete(key)
 
     async def keys(self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True):
         prev_key = None

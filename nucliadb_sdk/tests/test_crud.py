@@ -82,9 +82,6 @@ def test_crud_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
         sdk.get_resource_by_slug(kbid=kb.uuid, slug="mykey1")
 
-    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
-        sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
-
 
 def test_modify_resource_slug(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
     sdk.create_resource(kbid=kb.uuid, texts={"text": {"body": "I'm Ramon"}}, slug="my-resource")

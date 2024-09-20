@@ -107,6 +107,11 @@ class DataLayer:
             async with self.connection.cursor() as cur:
                 await cur.execute("DELETE FROM resources WHERE key = %s", (key,))
 
+    async def delete_by_prefix(self, prefix: str) -> None:
+        with pg_observer({"type": "delete_by_prefix"}):
+            async with self.connection.cursor() as cur:
+                await cur.execute("DELETE FROM resources WHERE key LIKE %s", (prefix + "%",))
+
     async def batch_get(self, keys: list[str], select_for_update: bool = False) -> list[Optional[bytes]]:
         with pg_observer({"type": "batch_get"}):
             async with self.connection.cursor() as cur:
@@ -190,6 +195,9 @@ class PGTransaction(Transaction):
 
     async def delete(self, key: str):
         await self.data_layer.delete(key)
+
+    async def delete_by_prefix(self, prefix: str) -> None:
+        await self.data_layer.delete_by_prefix(prefix)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, jitter=backoff.random_jitter, max_tries=2)
     async def keys(

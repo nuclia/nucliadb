@@ -52,6 +52,9 @@ class Transaction:
     async def delete(self, key: str):
         raise NotImplementedError()
 
+    async def delete_by_prefix(self, prefix: str) -> None:
+        raise NotImplementedError()
+
     def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
     ) -> AsyncGenerator[str, None]:
