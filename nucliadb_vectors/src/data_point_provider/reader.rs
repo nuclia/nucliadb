@@ -114,7 +114,7 @@ fn last_modified(path: &Path) -> std::io::Result<SystemTime> {
     std::fs::metadata(path)?.modified()
 }
 
-fn segment_matches(expression: &BooleanExpression, labels: &Vec<String>) -> bool {
+fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
     match expression {
         BooleanExpression::Literal(tag) => labels.contains(tag),
         BooleanExpression::Not(expr) => !segment_matches(expr, labels),

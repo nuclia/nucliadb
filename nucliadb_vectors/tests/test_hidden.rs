@@ -24,7 +24,7 @@ use nucliadb_core::protos::{
     IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSearchRequest, VectorSentence,
 };
 use nucliadb_core::query_language::BooleanExpression;
-use nucliadb_core::vectors::{ResourceWrapper, VectorReader, VectorWriter, VectorsContext};
+use nucliadb_core::vectors::{MergeParameters, ResourceWrapper, VectorReader, VectorWriter, VectorsContext};
 use nucliadb_core::NodeResult;
 use nucliadb_vectors::config::VectorConfig;
 use nucliadb_vectors::service::{VectorReaderService, VectorWriterService};
@@ -100,6 +100,7 @@ fn test_hidden_search() -> NodeResult<()> {
         ])
     );
 
+    // Find only the visible resource
     let visible = reader.search(
         &request,
         &VectorsContext {
@@ -112,8 +113,16 @@ fn test_hidden_search() -> NodeResult<()> {
     assert_eq!(visible.documents.len(), 1);
     assert_eq!(
         visible.documents[0].clone().doc_id.unwrap().id,
-        format!("{}/a/title/0-5", visible_resource.resource.unwrap().uuid)
+        format!("{}/a/title/0-5", visible_resource.resource.as_ref().unwrap().uuid)
     );
+
+    // Won't merge results
+    let merge_plan = writer.prepare_merge(MergeParameters {
+        max_nodes_in_merge: 1000,
+        segments_before_merge: 1,
+        maximum_deleted_entries: 0,
+    })?;
+    assert!(merge_plan.is_none());
 
     Ok(())
 }

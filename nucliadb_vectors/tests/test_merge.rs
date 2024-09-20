@@ -18,7 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::HashSet,
+    time::{Duration, SystemTime},
+};
 
 use nucliadb_core::{vectors::MergeParameters, NodeResult};
 use nucliadb_vectors::{
@@ -47,12 +50,12 @@ fn test_concurrent_merge_delete() -> NodeResult<()> {
 
     // Create two segments
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, vec![elem(0)], Some(past), &config, vec![])?;
+    data_point::create(&data_point_pin, vec![elem(0)], Some(past), &config, HashSet::new())?;
     writer.add_data_point(data_point_pin)?;
     writer.commit()?;
 
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, vec![elem(1)], Some(past), &config, vec![])?;
+    data_point::create(&data_point_pin, vec![elem(1)], Some(past), &config, HashSet::new())?;
     writer.add_data_point(data_point_pin)?;
     writer.commit()?;
 

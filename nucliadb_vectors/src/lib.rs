@@ -58,6 +58,8 @@ pub enum VectorErr {
     FromUtf8Error(#[from] std::string::FromUtf8Error),
     #[error("Some of the merged segments were not found")]
     MissingMergedSegments,
+    #[error("Not all of the merged segments have the same tags")]
+    InconsistentMergeSegmentTags,
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(&'static str),
 }

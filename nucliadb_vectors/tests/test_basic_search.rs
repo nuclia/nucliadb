@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashSet;
+
 use nucliadb_core::NodeResult;
 use nucliadb_vectors::config::VectorType;
 use nucliadb_vectors::data_point_provider::SearchRequest;
@@ -81,7 +83,7 @@ fn test_basic_search(
     // Write some data
     let mut writer = Writer::new(&index_path, config.clone(), "abc".into())?;
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, (0..DIMENSION).map(elem).collect(), None, &config, vec![])?;
+    data_point::create(&data_point_pin, (0..DIMENSION).map(elem).collect(), None, &config, HashSet::new())?;
     writer.add_data_point(data_point_pin)?;
     writer.commit()?;
 

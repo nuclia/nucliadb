@@ -31,7 +31,7 @@ use nucliadb_core::merge::{send_merge_request, MergePriority, MergeRequest};
 use nucliadb_core::metrics::get_metrics;
 use nucliadb_core::vectors::{MergeParameters, MergeResults, MergeRunner};
 use nucliadb_core::{tracing, NodeResult};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -164,6 +164,38 @@ pub struct Writer {
     shard_id: String,
 }
 
+fn plan_merge<'a>(
+    live_segments: &mut Vec<&'a OnlineDataPoint>,
+    parameters: &MergeParameters,
+    pruning_deletions: bool,
+) -> Vec<&'a OnlineDataPoint> {
+    let mut nodes_in_merge = 0;
+    let mut inputs = Vec::new();
+    if pruning_deletions {
+        // Too many deletions, order oldest segments last (first to pop()) so we can prune the delete log
+        live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.time()));
+    } else {
+        // Order smallest segments last (first to be pop()), so they are merged first
+        live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
+    }
+
+    while nodes_in_merge < parameters.max_nodes_in_merge {
+        let Some(online_data_point) = live_segments.pop() else {
+            break;
+        };
+        let data_point_size = online_data_point.journal.no_nodes();
+
+        if data_point_size + nodes_in_merge > parameters.max_nodes_in_merge && nodes_in_merge > 0 {
+            break;
+        }
+
+        inputs.push(online_data_point);
+        nodes_in_merge += data_point_size;
+    }
+
+    inputs
+}
+
 impl Writer {
     pub fn add_data_point(&mut self, data_point_pin: DataPointPin) -> VectorR<()> {
         let data_point = data_point::open(&data_point_pin)?;
@@ -192,47 +224,55 @@ impl Writer {
             return Ok(None);
         }
 
-        let mut live_segments: Vec<_> = self.online_data_points.iter().collect();
-        let mut nodes_in_merge = 0;
-        let mut inputs = Vec::new();
+        // Group segments by tags, we can only merge segments with the same set of tags
+        let mut live_segment_groups = HashMap::new();
+        for dp in &self.online_data_points {
+            let mut sorted_tags = Vec::from_iter(dp.journal.tags().iter());
+            sorted_tags.sort();
+            live_segment_groups.entry(sorted_tags).or_insert(vec![]).push(dp);
+        }
 
         let pruning_deletions = self.delete_log.size() > parameters.maximum_deleted_entries;
-        if pruning_deletions {
-            // Too many deletins, order oldest segments last (first to pop()) so we can prune the delete log
-            live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.time()));
-        } else {
-            // Order smallest segments last (first to be pop()), so they are merged first
-            live_segments.sort_unstable_by_key(|i| std::cmp::Reverse(i.journal.no_nodes()));
-        }
+        let mut possible_plans = Vec::new();
+        for live_segments in live_segment_groups.values_mut() {
+            let inputs = plan_merge(live_segments, &parameters, pruning_deletions);
 
-        let dtrie_copy = self.delete_log.clone();
-        while nodes_in_merge < parameters.max_nodes_in_merge {
-            let Some(online_data_point) = live_segments.pop() else {
-                break;
-            };
-            let data_point_size = online_data_point.journal.no_nodes();
-
-            if data_point_size + nodes_in_merge > parameters.max_nodes_in_merge && nodes_in_merge > 0 {
-                break;
+            // We need at least one segment for pruning deletes and 2 for an actual merge
+            if inputs.is_empty() || (inputs.len() < 2 && !pruning_deletions) {
+                continue;
             }
 
-            let open_data_point = data_point::open(&online_data_point.pin)?;
-            inputs.push(open_data_point);
-            nodes_in_merge += data_point_size;
+            possible_plans.push(inputs);
         }
 
-        // We need at least one segment for pruning deletes and 2 for an actual merge
-        if inputs.is_empty() || (inputs.len() < 2 && !pruning_deletions) {
+        if possible_plans.is_empty() {
             return Ok(None);
         }
 
+        if pruning_deletions {
+            // Too many deletions, prioritize plan with oldest segment. We take the last segment since they are presorted that way
+            possible_plans.sort_unstable_by_key(|i| i[0].journal.time());
+        } else {
+            // Otherwise, prioritize plan that merges more segments
+            possible_plans.sort_unstable_by_key(|i| std::cmp::Reverse(i.len()));
+        }
+
+        // Open data points of chosen plan (first)
+        let mut inputs = Vec::new();
+        for dp in &possible_plans[0] {
+            inputs.push(data_point::open(&dp.pin)?);
+        }
+
+        let dtrie_copy = self.delete_log.clone();
         let destination = DataPointPin::create_pin(self.location())?;
+        let segments_left = self.online_data_points.len() - inputs.len() + 1;
+
         Ok(Some(Box::new(PreparedMerge {
             dtrie_copy,
             destination: Some(destination),
             inputs,
             config: self.config.clone(),
-            segments_left: live_segments.len() + 1,
+            segments_left,
             merge_time: SystemTime::now(),
         })))
     }
@@ -502,7 +542,7 @@ mod test {
     use std::time::Duration;
 
     use super::*;
-    use data_point::create;
+    use data_point::{create, Elem, LabelDictionary};
 
     #[test]
     fn force_merge_more_than_limit() {
@@ -521,7 +561,7 @@ mod test {
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, &writer.config, vec![]).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config, HashSet::new()).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -555,7 +595,7 @@ mod test {
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, &writer.config, vec![]).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config, HashSet::new()).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -587,7 +627,7 @@ mod test {
             let embeddings = vec![];
             let time = Some(SystemTime::now());
             let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-            create(&data_point_pin, embeddings, time, &writer.config, vec![]).unwrap();
+            create(&data_point_pin, embeddings, time, &writer.config, HashSet::new()).unwrap();
 
             let online_data_point = OnlineDataPoint {
                 journal: data_point_pin.read_journal().unwrap(),
@@ -623,7 +663,7 @@ mod test {
         let embeddings = vec![];
         let time = Some(SystemTime::now());
         let data_point_pin = DataPointPin::create_pin(&vectors_path).unwrap();
-        create(&data_point_pin, embeddings, time, &writer.config, vec![]).unwrap();
+        create(&data_point_pin, embeddings, time, &writer.config, HashSet::new()).unwrap();
 
         let online_data_point = OnlineDataPoint {
             journal: data_point_pin.read_journal().unwrap(),
@@ -651,5 +691,114 @@ mod test {
         // Nothing else to merge
         let merge_proposal = writer.prepare_merge(merge_parameters).unwrap();
         assert!(merge_proposal.is_none());
+    }
+
+    fn create_segment(
+        path: &Path,
+        time: SystemTime,
+        config: &VectorConfig,
+        tags: HashSet<String>,
+    ) -> NodeResult<OnlineDataPoint> {
+        let pin = DataPointPin::create_pin(path)?;
+        create(
+            &pin,
+            vec![Elem::new("key".to_string(), vec![0.1, 0.2, 0.3, 0.4], LabelDictionary::default(), None)],
+            Some(time),
+            config,
+            tags,
+        )?;
+        Ok(OnlineDataPoint {
+            journal: pin.read_journal()?,
+            pin,
+        })
+    }
+
+    #[test]
+    fn test_wont_merge_mixed_tags() -> NodeResult<()> {
+        let dir = tempfile::tempdir()?;
+        let vectors_path = dir.path().join("vectors");
+
+        let mut writer = Writer::new(&vectors_path, VectorConfig::default(), "abc".into())?;
+
+        // 2 visible segments (older) and 3 hidden segments (newer)
+        let time = SystemTime::now().checked_sub(Duration::from_secs(10)).unwrap();
+        let s1 = create_segment(&vectors_path, time, &writer.config, HashSet::new())?;
+        let s1_id = s1.pin.id();
+
+        let time = time.checked_add(Duration::from_secs(1)).unwrap();
+        let s2 = create_segment(&vectors_path, time, &writer.config, HashSet::new())?;
+        let s2_id = s2.pin.id();
+
+        let tags = HashSet::from(["/q/h".to_string()]);
+        let time = time.checked_add(Duration::from_secs(1)).unwrap();
+        let s3 = create_segment(&vectors_path, time, &writer.config, tags.clone())?;
+
+        let time = time.checked_add(Duration::from_secs(1)).unwrap();
+        let s4 = create_segment(&vectors_path, time, &writer.config, tags.clone())?;
+
+        let time = time.checked_add(Duration::from_secs(1)).unwrap();
+        let s5 = create_segment(&vectors_path, time, &writer.config, tags.clone())?;
+
+        writer.online_data_points = vec![s1, s2, s3, s4, s5];
+
+        // Create a bunch of deletions
+        for i in 0..5 {
+            writer.record_delete(format!("delete{i:02}").as_bytes(), time);
+        }
+        writer.commit()?;
+
+        // If normal merge (not because of deletions), prioritize merging 3 segments
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 1,
+            max_nodes_in_merge: 50_000,
+            maximum_deleted_entries: 10,
+        };
+        let mut plan = writer.prepare_merge(merge_parameters)?.expect("expected some merge plan");
+        writer.record_merge(plan.run()?.as_ref())?;
+        assert_eq!(writer.online_data_points.len(), 3);
+        assert_eq!(writer.online_data_points[0].pin.id(), s1_id);
+        assert_eq!(writer.online_data_points[1].pin.id(), s2_id);
+        assert_eq!(writer.online_data_points[2].journal.no_nodes(), 3);
+        assert_eq!(writer.online_data_points[2].journal.tags(), &tags);
+        let merge_id = writer.online_data_points[2].pin.id();
+
+        // Add some more segments
+        let time = time.checked_add(Duration::from_secs(1)).unwrap();
+        let s4 = create_segment(&vectors_path, time, &writer.config, tags.clone())?;
+        let s4_id = s4.pin.id();
+        writer.online_data_points.push(s4);
+
+        let time = time.checked_add(Duration::from_secs(1)).unwrap();
+        let s5 = create_segment(&vectors_path, time, &writer.config, tags.clone())?;
+        let s5_id = s5.pin.id();
+        writer.online_data_points.push(s5);
+
+        // If merging because of deletions, prioritize merging 2 segments that are older (s1, s2)
+        let merge_parameters = MergeParameters {
+            segments_before_merge: 1,
+            max_nodes_in_merge: 50_000,
+            maximum_deleted_entries: 1,
+        };
+        let mut plan = writer.prepare_merge(merge_parameters)?.expect("expected some merge plan");
+        writer.record_merge(plan.run()?.as_ref())?;
+        assert_eq!(writer.online_data_points.len(), 4);
+        assert_eq!(writer.online_data_points[0].pin.id(), merge_id);
+        assert_eq!(writer.online_data_points[1].pin.id(), s4_id);
+        assert_eq!(writer.online_data_points[2].pin.id(), s5_id);
+
+        assert_eq!(writer.online_data_points[3].journal.no_nodes(), 2);
+        assert_eq!(writer.online_data_points[3].journal.tags(), &HashSet::new());
+
+        // Now, will merge the remaining 3 hidden segments
+        let mut plan = writer.prepare_merge(merge_parameters)?.expect("expected some merge plan");
+        writer.record_merge(plan.run()?.as_ref())?;
+        assert_eq!(writer.online_data_points.len(), 2);
+
+        // Nothing else to merge (two segments will remain)
+        let merge_proposal = writer.prepare_merge(merge_parameters).unwrap();
+        assert!(merge_proposal.is_none());
+        assert_eq!(writer.online_data_points.len(), 2);
+
+        Ok(())
     }
 }
