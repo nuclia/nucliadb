@@ -9,6 +9,7 @@ use nucliadb_vectors::formula::*;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use serde_json::json;
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::Path;
 use std::time::SystemTime;
@@ -139,7 +140,7 @@ fn add_batch(batch_no: usize, writer: &mut Writer, elems: Vec<(String, Vec<f32>)
         .map(|(key, vector)| Elem::new(key.clone(), vector, random_labels(batch_no, key.clone(), index_size), None))
         .collect();
 
-    data_point::create(&new_data_point_pin, elems, Some(temporal_mark), &config).unwrap();
+    data_point::create(&new_data_point_pin, elems, Some(temporal_mark), &config, HashSet::new()).unwrap();
 
     writer.add_data_point(new_data_point_pin).unwrap();
     writer.commit().unwrap();
@@ -226,7 +227,7 @@ fn test_datapoint(
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(unfiltered_request).unwrap();
+            reader.search(unfiltered_request, &None).unwrap();
         });
         stats.read_time += elapsed_time as u128;
     }
@@ -239,7 +240,7 @@ fn test_datapoint(
         let _ = std::io::stdout().flush();
 
         let (_, elapsed_time) = measure_time!(microseconds {
-            reader.search(filtered_request).unwrap();
+            reader.search(filtered_request, &None).unwrap();
         });
         stats.tagged_time += elapsed_time as u128;
     }
