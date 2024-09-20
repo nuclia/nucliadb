@@ -40,6 +40,7 @@ BASIC = (
     "last_seqid",
     "last_account_seq",
     "queue",
+    "hidden",
 )
 RELATIONS = ("relations",)
 ORIGIN = ("origin",)

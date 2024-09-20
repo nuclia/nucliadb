@@ -43,6 +43,7 @@ from nucliadb_models.writer import UpdateResourcePayload
             UpdateResourcePayload(usermetadata=UserMetadata(classifications=[], relations=[])),
             True,
         ),
+        (UpdateResourcePayload(hidden=True), True),
     ],
 )
 def test_needs_resource_reindex(item, reindex_needed):
