@@ -23,9 +23,7 @@ from time import time
 from typing import Optional
 
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
-from nucliadb.common.external_index_providers.manager import (
-    get_external_index_manager,
-)
+from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search import results_hydrator
 from nucliadb.search.search.find_merge import find_merge_results
@@ -35,6 +33,7 @@ from nucliadb.search.search.results_hydrator.base import (
     ResourceHydrationOptions,
 )
 from nucliadb.search.search.utils import (
+    filter_hidden_resources,
     min_score_from_payload,
     should_disable_vector_search,
 )
@@ -123,7 +122,7 @@ async def _index_node_retrieval(
         security=item.security,
         generative_model=generative_model,
         rephrase=item.rephrase,
-        hidden=item.show_hidden and None,
+        hidden=await filter_hidden_resources(kbid, item.show_hidden),
         rephrase_prompt=item.rephrase_prompt,
     )
     with metrics.time("query_parse"):
@@ -236,7 +235,7 @@ async def _external_index_retrieval(
         security=item.security,
         generative_model=generative_model,
         rephrase=item.rephrase,
-        hidden=item.show_hidden and None,
+        hidden=await filter_hidden_resources(kbid, item.show_hidden),
         rephrase_prompt=item.rephrase_prompt,
     )
     search_request, incomplete_results, _ = await query_parser.parse()

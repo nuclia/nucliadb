@@ -38,6 +38,7 @@ from nucliadb.search.search.merge import fetch_resources, merge_results
 from nucliadb.search.search.pgcatalog import pgcatalog_enabled, pgcatalog_search
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
+    filter_hidden_resources,
     maybe_log_request_payload,
     min_score_from_payload,
     min_score_from_query_params,
@@ -482,7 +483,7 @@ async def search(
         autofilter=item.autofilter,
         security=item.security,
         rephrase=item.rephrase,
-        hidden=item.show_hidden and None,
+        hidden=await filter_hidden_resources(kbid, item.show_hidden),
         rephrase_prompt=item.rephrase_prompt,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()

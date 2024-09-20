@@ -282,6 +282,8 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     ENABLED_INSIGHTS_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
     RELEASE_CHANNEL_FIELD_NUMBER: builtins.int
+    HIDDEN_RESOURCES_FIELD_NUMBER: builtins.int
+    HIDE_NEW_RESOURCES_FIELD_NUMBER: builtins.int
     title: builtins.str
     description: builtins.str
     slug: builtins.str
@@ -289,6 +291,8 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     disable_vectors: builtins.bool
     release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType
     """DEPRECATED: duplicated field also stored in `writer.proto Shards`"""
+    hidden_resources: builtins.bool
+    hide_new_resources: builtins.bool
     @property
     def external_index_provider(self) -> global___StoredExternalIndexProviderMetadata: ...
     @property
@@ -307,9 +311,11 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         enabled_insights: collections.abc.Iterable[builtins.str] | None = ...,
         disable_vectors: builtins.bool = ...,
         release_channel: nucliadb_protos.utils_pb2.ReleaseChannel.ValueType = ...,
+        hidden_resources: builtins.bool = ...,
+        hide_new_resources: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["external_index_provider", b"external_index_provider"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "external_index_provider", b"external_index_provider", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "external_index_provider", b"external_index_provider", "hidden_resources", b"hidden_resources", "hide_new_resources", b"hide_new_resources", "migration_version", b"migration_version", "release_channel", b"release_channel", "slug", b"slug", "title", b"title"]) -> None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 

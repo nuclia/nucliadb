@@ -115,6 +115,7 @@ async def get_find_results(
                 item.resource_filters = list(prefilter_matching_resources)
                 for prequery in prequeries:
                     prequery.request.resource_filters = list(prefilter_matching_resources)
+                    prequery.request.show_hidden = item.show_hidden
 
         if prequeries:
             with metrics.time("prequeries"):

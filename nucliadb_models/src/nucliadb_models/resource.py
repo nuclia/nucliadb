@@ -123,6 +123,16 @@ class KnowledgeBoxConfig(BaseModel):
         description="This field is deprecated. Use 'learning_configuration' instead.",
     )
 
+    hidden_resources: bool = Field(
+        default=False,
+        description="Allow hiding resources",
+    )
+
+    hide_new_resources: bool = Field(
+        default=False,
+        description="Hide newly created resources",
+    )
+
     @field_validator("slug")
     @classmethod
     def id_check(cls, v: Optional[str]) -> Optional[str]:
