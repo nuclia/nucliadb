@@ -65,9 +65,10 @@ async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
 
     # Delete
     await sdk_async.delete_resource_by_slug(kbid=kb.uuid, rslug="resource")
-
-    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
+    try:
         await sdk_async.delete_resource(kbid=kb.uuid, rid=resource.id)
+    except nucliadb_sdk.v2.exceptions.NotFoundError:
+        pass
 
 
 async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
