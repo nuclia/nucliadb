@@ -120,8 +120,8 @@ impl ShardWriter {
 
         std::fs::create_dir(&shard_path)?;
 
-        let ff_context = Some(HashMap::from([("kbid".to_string(), metadata.kbid())]));
-        let texts3_enabled = settings.flags.enabled(feature_flags::TEXTS3, false, ff_context);
+        let ff_context = HashMap::from([("kbid".to_string(), metadata.kbid())]);
+        let texts3_enabled = settings.has_feature(feature_flags::TEXTS3, ff_context);
         let texts_version = if texts3_enabled {
             3
         } else {

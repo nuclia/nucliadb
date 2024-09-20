@@ -35,6 +35,7 @@ use mrflagly::{FlagService, FlagServiceOptions};
 use nucliadb_core::tracing::Level;
 use object_store::ObjectStore;
 use serde::de::Unexpected;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
@@ -100,7 +101,7 @@ const DEFAULT_FEATURE_FLAGS: &str = r#"{"nucliadb_node_texts3": {"rollout": 100}
 pub struct Settings {
     env: Arc<EnvSettings>,
     pub object_store: Arc<dyn ObjectStore>,
-    pub flags: Arc<FlagService>,
+    flags: Arc<FlagService>,
 }
 
 impl From<EnvSettings> for Settings {
@@ -112,6 +113,14 @@ impl From<EnvSettings> for Settings {
             object_store,
             flags,
         }
+    }
+}
+
+impl Settings {
+    pub fn has_feature(&self, feature: &str, context: HashMap<String, String>) -> bool {
+        let mut extended_context = HashMap::from([("environment".to_string(), self.running_environment.clone())]);
+        extended_context.extend(context);
+        self.flags.enabled(feature, false, Some(extended_context))
     }
 }
 
