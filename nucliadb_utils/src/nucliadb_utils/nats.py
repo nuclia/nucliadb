@@ -60,9 +60,9 @@ class MessageProgressUpdater:
 
     _task: asyncio.Task
 
-    def __init__(self, msg: Msg, timeout: float):
+    def __init__(self, msg: Msg, update_interval: float):
         self.msg = msg
-        self.timeout = timeout
+        self.update_interval = update_interval
 
     def start(self):
         seqid = self.msg.reply.split(".")[5]
@@ -91,7 +91,7 @@ class MessageProgressUpdater:
     async def _progress(self):
         while True:
             try:
-                await asyncio.sleep(self.timeout)
+                await asyncio.sleep(self.update_interval)
                 if self.msg._ackd:  # all done, do not mark with in_progress
                     return
                 await self.msg.in_progress()
