@@ -847,7 +847,7 @@ async def test_all_rag_strategies_combinations(
             if valid_combination(list(combination)):  # type: ignore
                 valid_combinations.append(list(combination))
 
-    assert len(valid_combinations) >= 19
+    assert len(valid_combinations) == 19
     for combination in valid_combinations:  # type: ignore
         print(f"Combination: {sorted([strategy.name for strategy in combination])}")
         resp = await nucliadb_reader.post(
