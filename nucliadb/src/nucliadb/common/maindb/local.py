@@ -153,9 +153,6 @@ class LocalTransaction(Transaction):
     async def delete(self, key: str):
         if key not in self.deleted_keys:
             self.deleted_keys.append(key)
-        else:
-            # Already deleted
-            raise KeyError(f"Not found {key}")
 
         if key in self.visited_keys:
             del self.visited_keys[key]
