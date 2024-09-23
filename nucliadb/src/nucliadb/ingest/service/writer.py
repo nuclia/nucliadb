@@ -128,6 +128,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     for vs in request.vectorsets
                 },
                 external_index_provider=request.external_index_provider,
+                hidden_resources_enabled=request.hidden_resources_enabled,
+                hidden_resources_hide_on_creation=request.hidden_resources_hide_on_creation,
             )
 
         except KnowledgeBoxConflict:
