@@ -461,6 +461,8 @@ message NewKnowledgeBoxV2Request {
     repeated VectorSet vectorsets = 5;
 
     knowledgebox.CreateExternalIndexProviderMetadata external_index_provider = 6;
+    bool hidden_resources_enabled = 7;
+    bool hidden_resources_hide_on_creation = 8;
 }
 
 message NewKnowledgeBoxV2Response {

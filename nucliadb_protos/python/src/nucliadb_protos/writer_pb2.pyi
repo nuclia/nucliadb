@@ -1695,10 +1695,14 @@ class NewKnowledgeBoxV2Request(google.protobuf.message.Message):
     DESCRIPTION_FIELD_NUMBER: builtins.int
     VECTORSETS_FIELD_NUMBER: builtins.int
     EXTERNAL_INDEX_PROVIDER_FIELD_NUMBER: builtins.int
+    HIDDEN_RESOURCES_ENABLED_FIELD_NUMBER: builtins.int
+    HIDDEN_RESOURCES_HIDE_ON_CREATION_FIELD_NUMBER: builtins.int
     kbid: builtins.str
     slug: builtins.str
     title: builtins.str
     description: builtins.str
+    hidden_resources_enabled: builtins.bool
+    hidden_resources_hide_on_creation: builtins.bool
     @property
     def vectorsets(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NewKnowledgeBoxV2Request.VectorSet]: ...
     @property
@@ -1712,9 +1716,11 @@ class NewKnowledgeBoxV2Request(google.protobuf.message.Message):
         description: builtins.str = ...,
         vectorsets: collections.abc.Iterable[global___NewKnowledgeBoxV2Request.VectorSet] | None = ...,
         external_index_provider: nucliadb_protos.knowledgebox_pb2.CreateExternalIndexProviderMetadata | None = ...,
+        hidden_resources_enabled: builtins.bool = ...,
+        hidden_resources_hide_on_creation: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["external_index_provider", b"external_index_provider"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["description", b"description", "external_index_provider", b"external_index_provider", "kbid", b"kbid", "slug", b"slug", "title", b"title", "vectorsets", b"vectorsets"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "external_index_provider", b"external_index_provider", "hidden_resources_enabled", b"hidden_resources_enabled", "hidden_resources_hide_on_creation", b"hidden_resources_hide_on_creation", "kbid", b"kbid", "slug", b"slug", "title", b"title", "vectorsets", b"vectorsets"]) -> None: ...
 
 global___NewKnowledgeBoxV2Request = NewKnowledgeBoxV2Request
 

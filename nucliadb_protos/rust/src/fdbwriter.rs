@@ -1264,6 +1264,10 @@ pub struct NewKnowledgeBoxV2Request {
     pub external_index_provider: ::core::option::Option<
         super::knowledgebox::CreateExternalIndexProviderMetadata,
     >,
+    #[prost(bool, tag = "7")]
+    pub hidden_resources_enabled: bool,
+    #[prost(bool, tag = "8")]
+    pub hidden_resources_hide_on_creation: bool,
 }
 /// Nested message and enum types in `NewKnowledgeBoxV2Request`.
 pub mod new_knowledge_box_v2_request {
