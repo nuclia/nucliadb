@@ -69,6 +69,8 @@ message Basic {
     // last processing sequid (non nats) of this resource in the account queue
     int64 last_account_seq = 35;
     QueueType queue = 36;
+
+    optional bool hidden = 37;
 }
 
 

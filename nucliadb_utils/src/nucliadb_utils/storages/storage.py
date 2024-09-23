@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import abc
+import asyncio
 import hashlib
 import uuid
 from io import BytesIO
@@ -132,12 +133,27 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     cached_buckets: List[str] = []
     chunk_size = CHUNK_SIZE
 
-    async def delete_resource(self, kbid: str, uuid: str):
-        # Delete all keys inside a resource
+    async def delete_resource(self, kbid: str, uuid: str, max_parallel: int = 1):
+        """
+        Delete all storage keys related to a resource
+
+        Parameters:
+        - kbid: the knowledge box id
+        - uuid: the resource uuid
+        - max_parallel: the maximum number of parallel deletes
+        """
         bucket = self.get_bucket_name(kbid)
         resource_storage_base_path = STORAGE_RESOURCE.format(kbid=kbid, uuid=uuid)
+        semaphore = asyncio.Semaphore(max_parallel)
+
+        async def _delete_object(object_info: ObjectInfo):
+            async with semaphore:
+                await self.delete_upload(object_info.name, bucket)
+
+        tasks = []
         async for object_info in self.iterate_objects(bucket, resource_storage_base_path):
-            await self.delete_upload(object_info.name, bucket)
+            tasks.append(asyncio.create_task(_delete_object(object_info)))
+        await asyncio.gather(*tasks)
 
     async def deadletter(self, message: BrokerMessage, seq: int, seqid: int, partition: str):
         if self.deadletter_bucket is None:

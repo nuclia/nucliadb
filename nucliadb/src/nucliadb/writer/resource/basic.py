@@ -198,6 +198,9 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
         unique_groups = list(set(item.security.access_groups))
         bm.security.access_groups.extend(unique_groups)
 
+    if item.hidden is not None:
+        bm.basic.hidden = item.hidden
+
 
 def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushPayload):
     bm.basic.created.FromDatetime(datetime.now())

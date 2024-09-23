@@ -162,6 +162,7 @@ async def managed_serialize(
             resource.summary = orm_resource.basic.summary
             resource.icon = orm_resource.basic.icon
             resource.thumbnail = orm_resource.basic.thumbnail
+            resource.hidden = orm_resource.basic.hidden
             resource.created = (
                 orm_resource.basic.created.ToDatetime()
                 if orm_resource.basic.HasField("created")

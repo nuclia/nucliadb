@@ -35,6 +35,7 @@ BASE_LABELS: dict[str, list[str]] = {
     "m": [],  # origin metadata in the form of (key/value). Max key/value size is 255
     "p": [],  # origin metadata in the form of (key/value). Max key/value size is 255
     "k": [],  # kind of text paragraph to be stored
+    "q": [],  # reserved for internal use: h (hidden)
 }
 
 

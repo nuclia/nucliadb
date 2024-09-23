@@ -133,6 +133,8 @@ pub struct Basic {
     pub last_account_seq: i64,
     #[prost(enumeration = "basic::QueueType", tag = "36")]
     pub queue: i32,
+    #[prost(bool, optional, tag = "37")]
+    pub hidden: ::core::option::Option<bool>,
 }
 /// Nested message and enum types in `Basic`.
 pub mod basic {

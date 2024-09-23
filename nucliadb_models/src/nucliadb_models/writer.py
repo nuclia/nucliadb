@@ -21,6 +21,7 @@ import json
 from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from nucliadb_models import content_types
 from nucliadb_models.conversation import InputConversationField
@@ -86,6 +87,7 @@ class CreateResourcePayload(BaseModel):
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     origin: Optional[InputOrigin] = None
     extra: Optional[Extra] = None
+    hidden: SkipJsonSchema[Optional[bool]] = None
 
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
@@ -136,6 +138,7 @@ class UpdateResourcePayload(BaseModel):
         title="Security",
         description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
     )
+    hidden: SkipJsonSchema[Optional[bool]] = None
 
 
 class ResourceCreated(BaseModel):

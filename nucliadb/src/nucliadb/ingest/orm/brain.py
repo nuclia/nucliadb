@@ -507,6 +507,10 @@ class ResourceBrain:
         for classification in basic.usermetadata.classifications:
             self.labels["l"].append(f"{classification.labelset}/{classification.label}")
 
+        # hidden
+        if basic.hidden:
+            self.labels["q"].append("h")
+
         self.compute_labels()
 
     def process_field_metadata(

@@ -106,6 +106,7 @@ pub struct ShardWriterCache {
     pub shards_path: PathBuf,
     cache: Mutex<InnerCache>,
     metadata_manager: Arc<ShardsMetadataManager>,
+    settings: Settings,
 }
 
 impl ShardWriterCache {
@@ -114,6 +115,7 @@ impl ShardWriterCache {
             cache: Mutex::new(InnerCache::new(settings.max_open_shards)),
             shards_path: settings.shards_path(),
             metadata_manager: Arc::new(ShardsMetadataManager::new(settings.shards_path())),
+            settings,
         }
     }
 
@@ -123,7 +125,7 @@ impl ShardWriterCache {
 
     pub fn create(&self, new: NewShard) -> NodeResult<Arc<ShardWriter>> {
         let shard_id = new.shard_id.clone();
-        let (shard, metadata) = ShardWriter::new(new, &self.shards_path)?;
+        let (shard, metadata) = ShardWriter::new(new, &self.shards_path, &self.settings)?;
         let shard = Arc::new(shard);
 
         self.metadata_manager.add_metadata(metadata);

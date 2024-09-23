@@ -155,6 +155,7 @@ async def search_knowledgebox(
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
+    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden, include_in_schema=False),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -193,6 +194,7 @@ async def search_knowledgebox(
             with_synonyms=with_synonyms,
             autofilter=autofilter,
             security=security,
+            show_hidden=show_hidden,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())
@@ -236,6 +238,7 @@ async def catalog_get(
     range_modification_end: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
+    hidden: Optional[bool] = fastapi_query(SearchParamDefaults.hidden, include_in_schema=False),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     item = CatalogRequest(
         query=query,
@@ -250,6 +253,7 @@ async def catalog_get(
         range_creation_end=range_creation_end,
         range_modification_start=range_modification_start,
         range_modification_end=range_modification_end,
+        hidden=hidden,
     )
     if sort_field:
         item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
@@ -314,6 +318,7 @@ async def catalog(
                 range_creation_end=item.range_creation_end,
                 range_modification_start=item.range_modification_start,
                 range_modification_end=item.range_modification_end,
+                hidden=item.hidden,
             )
             pb_query, _, _ = await query_parser.parse()
 
@@ -482,6 +487,7 @@ async def search(
         autofilter=item.autofilter,
         security=item.security,
         rephrase=item.rephrase,
+        hidden=item.show_hidden and None,
         rephrase_prompt=item.rephrase_prompt,
     )
     pb_query, incomplete_results, autofilters = await query_parser.parse()

@@ -126,6 +126,7 @@ async def _index_node_retrieval(
         security=item.security,
         generative_model=generative_model,
         rephrase=item.rephrase,
+        hidden=item.show_hidden and None,
         rephrase_prompt=item.rephrase_prompt,
     )
     with metrics.time("query_parse"):
@@ -238,6 +239,7 @@ async def _external_index_retrieval(
         security=item.security,
         generative_model=generative_model,
         rephrase=item.rephrase,
+        hidden=item.show_hidden and None,
         rephrase_prompt=item.rephrase_prompt,
     )
     search_request, incomplete_results, _ = await query_parser.parse()

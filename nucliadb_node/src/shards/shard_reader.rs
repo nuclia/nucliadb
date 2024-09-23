@@ -76,6 +76,7 @@ fn open_paragraphs_reader(version: u32, path: &Path) -> NodeResult<ParagraphsRea
 fn open_texts_reader(version: u32, path: &Path) -> NodeResult<TextsReaderPointer> {
     match version {
         2 => nucliadb_texts2::reader::TextReaderService::open(path).map(|i| Box::new(i) as TextsReaderPointer),
+        3 => nucliadb_texts3::reader::TextReaderService::open(path).map(|i| Box::new(i) as TextsReaderPointer),
         v => Err(node_error!("Invalid text reader version {v}")),
     }
 }
@@ -155,6 +156,7 @@ impl ShardReader {
             0 => DocumentService::DocumentV0,
             1 => DocumentService::DocumentV1,
             2 => DocumentService::DocumentV2,
+            3 => DocumentService::DocumentV3,
             i => panic!("Unknown document version {i}"),
         }
     }

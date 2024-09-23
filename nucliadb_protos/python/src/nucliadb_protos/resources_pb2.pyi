@@ -179,6 +179,7 @@ class Basic(google.protobuf.message.Message):
     LAST_SEQID_FIELD_NUMBER: builtins.int
     LAST_ACCOUNT_SEQ_FIELD_NUMBER: builtins.int
     QUEUE_FIELD_NUMBER: builtins.int
+    HIDDEN_FIELD_NUMBER: builtins.int
     slug: builtins.str
     icon: builtins.str
     title: builtins.str
@@ -193,6 +194,7 @@ class Basic(google.protobuf.message.Message):
     last_account_seq: builtins.int
     """last processing sequid (non nats) of this resource in the account queue"""
     queue: global___Basic.QueueType.ValueType
+    hidden: builtins.bool
     @property
     def created(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -229,9 +231,11 @@ class Basic(google.protobuf.message.Message):
         last_seqid: builtins.int = ...,
         last_account_seq: builtins.int = ...,
         queue: global___Basic.QueueType.ValueType = ...,
+        hidden: builtins.bool | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["computedmetadata", b"computedmetadata", "created", b"created", "metadata", b"metadata", "modified", b"modified", "usermetadata", b"usermetadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["computedmetadata", b"computedmetadata", "created", b"created", "fieldmetadata", b"fieldmetadata", "icon", b"icon", "labels", b"labels", "last_account_seq", b"last_account_seq", "last_seqid", b"last_seqid", "layout", b"layout", "metadata", b"metadata", "modified", b"modified", "queue", b"queue", "slug", b"slug", "summary", b"summary", "thumbnail", b"thumbnail", "title", b"title", "usermetadata", b"usermetadata", "uuid", b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_hidden", b"_hidden", "computedmetadata", b"computedmetadata", "created", b"created", "hidden", b"hidden", "metadata", b"metadata", "modified", b"modified", "usermetadata", b"usermetadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_hidden", b"_hidden", "computedmetadata", b"computedmetadata", "created", b"created", "fieldmetadata", b"fieldmetadata", "hidden", b"hidden", "icon", b"icon", "labels", b"labels", "last_account_seq", b"last_account_seq", "last_seqid", b"last_seqid", "layout", b"layout", "metadata", b"metadata", "modified", b"modified", "queue", b"queue", "slug", b"slug", "summary", b"summary", "thumbnail", b"thumbnail", "title", b"title", "usermetadata", b"usermetadata", "uuid", b"uuid"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_hidden", b"_hidden"]) -> typing.Literal["hidden"] | None: ...
 
 global___Basic = Basic
 
