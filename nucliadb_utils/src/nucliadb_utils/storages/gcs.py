@@ -40,7 +40,7 @@ from google.auth.exceptions import DefaultCredentialsError  # type: ignore
 from google.oauth2 import service_account  # type: ignore
 
 from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry import metrics
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
@@ -570,35 +570,31 @@ class GCSStorage(Storage):
         headers = await self.get_access_headers()
         batch_id = "batch_" + str(datetime.now().timestamp())
         headers["Content-Type"] = f"multipart/mixed; boundary={batch_id}"
-        batch_body = ""
-        for uri in uris:
-            delete_url = f"/storage/v1/b/{bucket_name}/o/{quote_plus(uri)}"
-            batch_body += (
-                f"--{batch_id}\n"
-                f"Content-Type: application/http\n"
-                f"Content-ID: {uri}\n"
-                f"\n"
-                f"DELETE {delete_url} HTTP/1.1\n"
-                f"Content-Length: 0\n"
-                f"Content-Type: application/json\n"
-                f"Accept: application/json\n"
-                f"\n"
+        request_parts = [
+            BatchPartRequest(
+                content_id=uri,
+                method="DELETE",
+                url=f"/storage/v1/b/{bucket_name}/o/{quote_plus(uri)}",
+                content_type="application/json",
             )
-        batch_body += f"--{batch_id}--"
-
+            for uri in uris
+        ]
+        batch_body = build_batch_request(request_parts, batch_id)
         async with self.session.post(
             batch_url,
             headers=headers,
             data=batch_body,
         ) as resp:
+            # Batch endpoint always returns 200 unless the body is malformed.
+            # Individual responses are parsed from the response body.
             if resp.status != 200:
                 text = await resp.text()
                 raise GoogleCloudException(f"{resp.status}: {text}")
             errored = []
             part_responses = parse_batch_response(await resp.text())
-            for part in part_responses:
-                if part.status not in (204, 404):
-                    errored.append(part.content_id)
+            for part_response in part_responses:
+                if part_response.status not in (204, 404):
+                    errored.append(part_response.content_id)
             if errored:
                 raise GoogleCloudException(f"Failed to delete objects: {errored}")
 
@@ -704,6 +700,9 @@ class GCSStorage(Storage):
     @storage_ops_observer.wrap({"type": "delete"})
     async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         bucket_name = self.get_bucket_name(kbid)
+        return await self.delete_bucket(bucket_name)
+
+    async def delete_bucket(self, bucket_name: str) -> tuple[bool, bool]:
         headers = await self.get_access_headers()
         url = f"{self.object_base_url}/{bucket_name}"
         deleted = False
@@ -721,11 +720,7 @@ class GCSStorage(Storage):
             else:
                 details = await resp.text()
                 msg = f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
-                logger.error(msg, extra={"kbid": kbid})
-                with errors.push_scope() as scope:
-                    scope.set_extra("kbid", kbid)
-                    scope.set_extra("status_code", resp.status)
-                    errors.capture_message(msg, "error", scope)
+                logger.error(msg, extra={"bucket_name": bucket_name})
         return deleted, conflict
 
     async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
@@ -794,10 +789,40 @@ def batchify(iterable, n):
 
 
 @dataclass
+class BatchPartRequest:
+    content_id: str
+    method: str
+    url: str
+    content_type: str
+    content: Optional[str] = None
+
+
+@dataclass
 class BatchPartResponse:
     content_id: str
     status: int
     body: dict[str, Any] = field(default_factory=dict)
+
+
+def build_batch_request(parts: list[BatchPartRequest], batch_id: str) -> str:
+    boundary = batch_id
+    batch_request = ""
+    for part in parts:
+        batch_request += f"--{boundary}\n"
+        batch_request += f"Content-Type: application/http\n"
+        batch_request += f"Content-ID: {part.content_id}\n"
+        batch_request += f"\n"
+        batch_request += f"{part.method} {part.url} HTTP/1.1\n"
+        batch_request += f"Content-Type: {part.content_type}\n"
+        batch_request += f"Accept: application/json\n"
+        if part.content:
+            batch_request += f"Content-Length: {len(part.content)}\n"
+            batch_request += f"\n"
+            batch_request += f"{part.content}\n"
+        else:
+            batch_request += f"Content-Length: 0\n"
+    batch_request += f"--{boundary}--"
+    return batch_request
 
 
 def parse_batch_response(batch_response: str) -> list[BatchPartResponse]:
@@ -810,13 +835,15 @@ def parse_batch_response(batch_response: str) -> list[BatchPartResponse]:
         if len(lines) < 5:
             continue
         try:
-            content_id = lines[2].split("Content-ID: ")[1].lstrip("response-")
+            content_id = lines[2].split("Content-ID: ")[1].split("response-")[-1]
             status = int(lines[4].split("HTTP/1.1 ")[1].split(" ")[0])
-            body = json.loads(lines[-2])
-        except (IndexError, ValueError, json.JSONDecodeError):
+        except (IndexError, ValueError):
             logger.warning(f"Could not parse batch response: {part}")
             content_id = ""
             status = -1
+        try:
+            body = json.loads(lines[-2])
+        except json.JSONDecodeError:
             body = {}
         responses.append(BatchPartResponse(content_id, status, body))
     return responses
