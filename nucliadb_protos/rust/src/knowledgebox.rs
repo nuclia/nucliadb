@@ -105,7 +105,7 @@ pub struct KnowledgeBoxConfig {
     #[prost(enumeration = "super::utils::ReleaseChannel", tag = "8")]
     pub release_channel: i32,
     #[prost(bool, tag = "10")]
-    pub hidden_resources_enable: bool,
+    pub hidden_resources_enabled: bool,
     #[prost(bool, tag = "11")]
     pub hidden_resources_hide_on_creation: bool,
 }

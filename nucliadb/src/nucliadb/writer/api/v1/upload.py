@@ -196,6 +196,13 @@ async def _tus_post(
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
 
+    kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
+    if item and item.hidden and not (kb_config and kb_config.hidden_resources_enabled):
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot hide a resource: the KB does not have hidden resources enabled",
+        )
+
     await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
     dm = get_dm()

@@ -92,6 +92,13 @@ async def create_resource(
     kbid: str,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
 ):
+    kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
+    if item.hidden and not (kb_config and kb_config.hidden_resources_enabled):
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot hide a resource: the KB does not have hidden resources enabled",
+        )
+
     await maybe_back_pressure(request, kbid)
 
     partitioning = get_partitioning()
@@ -122,7 +129,6 @@ async def create_resource(
         writer.slug = item.slug
         toprocess.slug = item.slug
 
-    kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
     async with unique_slug_context_manager:
         parse_audit(writer.audit, request)
         parse_basic_creation(writer, item, toprocess, kb_config)
@@ -251,6 +257,13 @@ async def modify_resource(
     *,
     rid: str,
 ):
+    kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
+    if item.hidden and not (kb_config and kb_config.hidden_resources_enabled):
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot hide a resource: the KB does not have hidden resources enabled",
+        )
+
     partitioning = get_partitioning()
 
     partition = partitioning.generate_partition(kbid, rid)

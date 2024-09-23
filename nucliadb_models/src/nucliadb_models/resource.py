@@ -123,7 +123,7 @@ class KnowledgeBoxConfig(BaseModel):
         description="This field is deprecated. Use 'learning_configuration' instead.",
     )
 
-    hidden_resources_enable: bool = Field(
+    hidden_resources_enabled: bool = Field(
         default=False,
         description="Allow hiding resources",
     )

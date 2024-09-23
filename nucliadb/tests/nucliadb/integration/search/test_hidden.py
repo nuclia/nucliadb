@@ -42,6 +42,9 @@ async def test_hidden_search(
     nucliadb_manager: AsyncClient,
     knowledgebox: str,
 ):
+    resp = await nucliadb_manager.patch(f"/kb/{knowledgebox}", json={"hidden_resources_enabled": True})
+    assert resp.status_code == 200
+
     r1 = await create_resource(knowledgebox, nucliadb_grpc)
     r2 = await create_resource(knowledgebox, nucliadb_grpc)
 
@@ -54,15 +57,6 @@ async def test_hidden_search(
     resp = await nucliadb_writer.patch(f"/kb/{knowledgebox}/resource/{r1}", json={"hidden": True})
     assert resp.status_code == 200
     await asyncio.sleep(0.5)
-
-    # Both resources appear in searches (because the hidden feature are disabled)
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search")
-    assert resp.status_code == 200
-    assert resp.json()["resources"].keys() == {r1, r2}
-
-    # Enable hidden feature in KB
-    resp = await nucliadb_manager.patch(f"/kb/{knowledgebox}", json={"hidden_resources_enable": True})
-    assert resp.status_code == 200
 
     # Only r2 appears on search
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search")

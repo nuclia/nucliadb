@@ -138,7 +138,7 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
             description=item.description or "",
             semantic_models=semantic_models,
             external_index_provider=external_index_provider,
-            hidden_resources_enable=item.hidden_resources_enable,
+            hidden_resources_enabled=item.hidden_resources_enabled,
             hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
         )
 
@@ -168,14 +168,14 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
         item.slug
         or item.title
         or item.description
-        or item.hidden_resources_enable
+        or item.hidden_resources_enabled
         or item.hidden_resources_hide_on_creation
     ):
         config = knowledgebox_pb2.KnowledgeBoxConfig(
             slug=item.slug or "",
             title=item.title or "",
             description=item.description or "",
-            hidden_resources_enable=item.hidden_resources_enable,
+            hidden_resources_enabled=item.hidden_resources_enabled,
             hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
         )
     try:

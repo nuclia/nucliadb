@@ -102,7 +102,7 @@ class KnowledgeBox:
         description: str = "",
         semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
-        hidden_resources_enable: bool = False,
+        hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
@@ -182,7 +182,7 @@ class KnowledgeBox:
                     description=description,
                     slug=slug,
                     migration_version=get_latest_version(),
-                    hidden_resources_enable=hidden_resources_enable,
+                    hidden_resources_enabled=hidden_resources_enabled,
                     hidden_resources_hide_on_creation=hidden_resources_hide_on_creation,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
@@ -255,7 +255,7 @@ class KnowledgeBox:
 
         if config and exist != config:
             exist.MergeFrom(config)
-            exist.hidden_resources_enable = config.hidden_resources_enable
+            exist.hidden_resources_enabled = config.hidden_resources_enabled
             exist.hidden_resources_hide_on_creation = config.hidden_resources_hide_on_creation
 
         await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)

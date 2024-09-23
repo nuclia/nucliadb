@@ -442,7 +442,7 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
 
 
 @pytest.mark.asyncio
-async def test_hidden_resources_hide_on_creation(
+async def test_hide_on_creation(
     writer_api: Callable[[list[str]], AsyncClient],
     knowledgebox_writer: str,
 ):
@@ -470,6 +470,7 @@ async def test_hidden_resources_hide_on_creation(
         resp = await client.patch(
             f"/{KB_PREFIX}/{kbid}",
             json={
+                "hidden_resources": True,
                 "hidden_resources_hide_on_creation": True,
             },
         )
@@ -490,4 +491,4 @@ async def test_hidden_resources_hide_on_creation(
 
     async with datamanagers.utils.with_ro_transaction() as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
-        assert basic and basic.hidden is False
+        assert basic and basic.hidden is True
