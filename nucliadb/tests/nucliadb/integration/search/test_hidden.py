@@ -61,7 +61,7 @@ async def test_hidden_search(
     assert resp.json()["resources"].keys() == {r1, r2}
 
     # Enable hidden feature in KB
-    resp = await nucliadb_manager.patch(f"/kb/{knowledgebox}", json={"hidden_resources": True})
+    resp = await nucliadb_manager.patch(f"/kb/{knowledgebox}", json={"hidden_resources_enable": True})
     assert resp.status_code == 200
 
     # Only r2 appears on search

@@ -105,9 +105,9 @@ pub struct KnowledgeBoxConfig {
     #[prost(enumeration = "super::utils::ReleaseChannel", tag = "8")]
     pub release_channel: i32,
     #[prost(bool, tag = "10")]
-    pub hidden_resources: bool,
+    pub hidden_resources_enable: bool,
     #[prost(bool, tag = "11")]
-    pub hide_new_resources: bool,
+    pub hidden_resources_hide_on_creation: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

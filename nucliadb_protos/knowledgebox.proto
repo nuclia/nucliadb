@@ -88,8 +88,8 @@ message KnowledgeBoxConfig {
     // DEPRECATED: duplicated field also stored in `writer.proto Shards`
     utils.ReleaseChannel release_channel = 8 [deprecated = true];
 
-    bool hidden_resources = 10;
-    bool hide_new_resources = 11;
+    bool hidden_resources_enable = 10;
+    bool hidden_resources_hide_on_creation = 11;
 }
 
 // UPDATE

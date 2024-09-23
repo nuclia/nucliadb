@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 async def filter_hidden_resources(kbid: str, show_hidden: bool) -> Optional[bool]:
     kb_config = await kb.get_config(kbid=kbid)
-    hidden_enabled = kb_config and kb_config.hidden_resources
+    hidden_enabled = kb_config and kb_config.hidden_resources_enable
     if hidden_enabled and not show_hidden:
         return False
     else:

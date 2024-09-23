@@ -219,7 +219,7 @@ def parse_basic_creation(
     parse_basic_modify(bm, item, toprocess)
 
     if item.hidden is None:
-        if kb_config and kb_config.hide_new_resources:
+        if kb_config and kb_config.hidden_resources_hide_on_creation:
             bm.basic.hidden = True
 
 

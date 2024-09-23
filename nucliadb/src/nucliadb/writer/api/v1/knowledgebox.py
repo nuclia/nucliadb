@@ -138,8 +138,8 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
             description=item.description or "",
             semantic_models=semantic_models,
             external_index_provider=external_index_provider,
-            hidden_resources=item.hidden_resources,
-            hide_new_resources=item.hide_new_resources,
+            hidden_resources_enable=item.hidden_resources_enable,
+            hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
         )
 
     except Exception as exc:
@@ -164,13 +164,19 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
 async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> KnowledgeBoxObjID:
     driver = get_driver()
     config = None
-    if item.slug or item.title or item.description or item.hidden_resources or item.hide_new_resources:
+    if (
+        item.slug
+        or item.title
+        or item.description
+        or item.hidden_resources_enable
+        or item.hidden_resources_hide_on_creation
+    ):
         config = knowledgebox_pb2.KnowledgeBoxConfig(
             slug=item.slug or "",
             title=item.title or "",
             description=item.description or "",
-            hidden_resources=item.hidden_resources,
-            hide_new_resources=item.hide_new_resources,
+            hidden_resources_enable=item.hidden_resources_enable,
+            hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
         )
     try:
         async with driver.transaction() as txn:
