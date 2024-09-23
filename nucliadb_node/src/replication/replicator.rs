@@ -35,6 +35,7 @@ use tokio::time::Duration; // Import the Future trait
 use tonic::Request;
 
 use crate::cache::ShardWriterCache;
+use crate::disk_structure::VERSION_FILE;
 use crate::replication::health::ReplicationHealthManager;
 use crate::settings::Settings;
 use crate::shards::indexes::DEFAULT_VECTORS_INDEX_NAME;
@@ -274,7 +275,13 @@ pub async fn connect_to_primary_and_replicate(
                     vector_configs: HashMap::from([(DEFAULT_VECTORS_INDEX_NAME.to_string(), VectorConfig::default())]),
                 };
                 let shard_create = tokio::task::spawn_blocking(move || shard_cache_clone.create(payload)).await?;
-                if shard_create.is_err() {
+                if let Ok(ref shard) = shard_create {
+                    // We want to avoid shard readers to open this until it's replicated, so it doesn't end up opening the
+                    // wrong version of the code for an index. So we delete one the metadata file containing the version
+                    // which will make the opening of the reader to fail with shard not found (it can fall back to the primary).
+                    // This file will be created once the shard is replicated, with the proper index versions
+                    std::fs::remove_file(shard.path.join(VERSION_FILE))?;
+                } else {
                     warn!("Failed to create shard: {:?}", shard_create);
                     continue;
                 }
