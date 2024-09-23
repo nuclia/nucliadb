@@ -25,7 +25,7 @@ use std::path::Path;
 pub const VECTORS_VERSION: u32 = 1;
 pub const PARAGRAPHS_VERSION: u32 = 3;
 pub const RELATIONS_VERSION: u32 = 2;
-pub const TEXTS_VERSION: u32 = 2;
+pub const TEXTS_VERSION: u32 = 3;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct Versions {

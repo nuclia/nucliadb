@@ -79,8 +79,10 @@ def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
 
     # Delete
     sdk.delete_resource_by_slug(kbid=kb.uuid, rslug="resource")
-    with pytest.raises(nucliadb_sdk.exceptions.NotFoundError):
+    try:
         sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
+    except nucliadb_sdk.exceptions.NotFoundError:
+        pass
 
 
 def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):

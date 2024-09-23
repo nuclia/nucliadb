@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
+from itertools import combinations
 from unittest import mock
 
 import pytest
@@ -31,7 +32,20 @@ from nucliadb.search.predict import (
     StatusGenerativeResponse,
 )
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.search import AskResponseItem, SyncAskResponse
+from nucliadb_models.search import (
+    AskResponseItem,
+    ChatRequest,
+    FieldExtensionStrategy,
+    FindRequest,
+    FullResourceStrategy,
+    HierarchyResourceStrategy,
+    MetadataExtensionStrategy,
+    MetadataExtensionType,
+    PreQueriesStrategy,
+    PreQuery,
+    RagStrategies,
+    SyncAskResponse,
+)
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -268,7 +282,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
             None,
         ),
         (
-            # full_resource cannot be combined with other strategies
+            # full_resource can only be combined with metadata extension
             {
                 "query": "title",
                 "rag_strategies": [
@@ -276,7 +290,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
                     {"name": "field_extension", "fields": ["a/summary"]},
                 ],
             },
-            "If 'full_resource' strategy is chosen, it must be the only strategy",
+            "The following strategies cannot be combined in the same request: field_extension, full_resource",
         ),
         (
             # field_extension requires fields
@@ -308,7 +322,7 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
                 "query": "title",
                 "rag_strategies": ["foo"],
             },
-            "must be defined using an object",
+            "must be defined using a valid",
         ),
         (
             # Invalid payload type (note the extra json.dumps)
@@ -804,3 +818,44 @@ async def test_ask_on_resource_with_json_schema_automatic_prequeries(
     ask_response = SyncAskResponse.model_validate_json(resp.content)
     assert ask_response.prequeries is not None
     assert len(ask_response.prequeries) == 4
+
+
+async def test_all_rag_strategies_combinations(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    resources,
+):
+    rag_strategies = [
+        FullResourceStrategy(),
+        FieldExtensionStrategy(fields=["a/summary"]),
+        MetadataExtensionStrategy(types=list(MetadataExtensionType)),
+        HierarchyResourceStrategy(),
+        PreQueriesStrategy(queries=[PreQuery(request=FindRequest())]),
+    ]
+
+    def valid_combination(combination: list[RagStrategies]) -> bool:
+        try:
+            ChatRequest(query="foo", rag_strategies=combination)
+            return True
+        except ValueError:
+            return False
+
+    # Create all possible combinations of the list
+    valid_combinations = []
+    for i in range(1, len(rag_strategies) + 1):
+        for combination in combinations(rag_strategies, i):
+            if valid_combination(list(combination)):  # type: ignore
+                valid_combinations.append(list(combination))
+
+    assert len(valid_combinations) == 19
+    for combination in valid_combinations:  # type: ignore
+        print(f"Combination: {sorted([strategy.name for strategy in combination])}")
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/ask",
+            headers={"X-Synchronous": "True"},
+            json={
+                "query": "title",
+                "rag_strategies": [strategy.dict() for strategy in combination],
+            },
+        )
+        assert resp.status_code == 200, resp.text

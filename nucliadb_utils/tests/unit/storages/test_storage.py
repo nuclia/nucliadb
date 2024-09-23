@@ -102,7 +102,6 @@ class TestStorage:
     @pytest.mark.asyncio
     async def test_delete_resource(self, storage: StorageTest):
         await storage.delete_resource("bucket", "uri")
-
         storage.delete_upload.assert_called_once_with("uri", "bucket")
 
     @pytest.mark.asyncio

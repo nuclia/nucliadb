@@ -47,6 +47,7 @@ from nucliadb.ingest.orm.exceptions import (
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
+from nucliadb.ingest.settings import settings
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -392,20 +393,25 @@ class KnowledgeBox:
             disable_vectors=False,
         )
 
-    async def delete_resource(self, uuid: str):
+    async def maindb_delete_resource(self, uuid: str):
         basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=uuid)
-
-        async for key in self.txn.keys(KB_RESOURCE.format(kbid=self.kbid, uuid=uuid), count=-1):
-            await self.txn.delete(key)
-
+        await self.txn.delete_by_prefix(KB_RESOURCE.format(kbid=self.kbid, uuid=uuid))
         if basic and basic.slug:
-            slug_key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=basic.slug)
             try:
-                await self.txn.delete(slug_key)
+                await self.txn.delete(KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=basic.slug))
             except Exception:
-                pass
+                logger.exception("Error deleting slug")
 
-        await self.storage.delete_resource(self.kbid, uuid)
+    async def storage_delete_resource(self, uuid: str):
+        await self.storage.delete_resource(
+            self.kbid, uuid, max_parallel=settings.ingest_delete_resource_storage_max_parallel
+        )
+
+    async def delete_resource(self, uuid: str):
+        with processor_observer({"type": "delete_resource_maindb"}):
+            await self.maindb_delete_resource(uuid)
+        with processor_observer({"type": "delete_resource_storage"}):
+            await self.storage_delete_resource(uuid)
 
     async def get_resource_uuid_by_slug(self, slug: str) -> Optional[str]:
         return await datamanagers.resources.get_resource_uuid_from_slug(

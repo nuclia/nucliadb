@@ -31,9 +31,11 @@
 //! providers (to parse from CLI for example).
 
 use anyhow::anyhow;
+use mrflagly::{FlagService, FlagServiceOptions};
 use nucliadb_core::tracing::Level;
 use object_store::ObjectStore;
 use serde::de::Unexpected;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
@@ -89,19 +91,56 @@ pub fn load_settings() -> NodeResult<Settings> {
 const SENTRY_ENVS: [&str; 2] = ["stage", "prod"];
 const DEFAULT_ENV: &str = "stage";
 
+// Feature flags
+pub mod feature_flags {
+    pub const TEXTS3: &str = "nucliadb_node_texts3";
+}
+const DEFAULT_FEATURE_FLAGS: &str = r#"{"nucliadb_node_texts3": {"rollout": 100}}"#;
+
 #[derive(Clone)]
 pub struct Settings {
     env: Arc<EnvSettings>,
     pub object_store: Arc<dyn ObjectStore>,
+    flags: Arc<FlagService>,
 }
 
 impl From<EnvSettings> for Settings {
     fn from(value: EnvSettings) -> Self {
         let object_store = build_object_store_driver(&value);
+        let flags = Arc::new(build_flag_service(&value));
         Self {
             env: Arc::new(value),
             object_store,
+            flags,
         }
+    }
+}
+
+impl Settings {
+    pub fn has_feature(&self, feature: &str, context: HashMap<String, String>) -> bool {
+        let mut extended_context = HashMap::from([("environment".to_string(), self.running_environment.clone())]);
+        extended_context.extend(context);
+        self.flags.enabled(feature, false, Some(extended_context))
+    }
+}
+
+fn build_flag_service(settings: &EnvSettings) -> FlagService {
+    if let Some(flag_settings_url) = &settings.flag_settings_url {
+        FlagService::new(FlagServiceOptions {
+            finder_type: mrflagly::FlagFinderType::URL,
+            url: Some(flag_settings_url.clone()),
+            data: None,
+            env_var: None,
+            refresh_interval: 300,
+        })
+    } else {
+        FlagService::new(FlagServiceOptions {
+            finder_type: mrflagly::FlagFinderType::JSON,
+            url: None,
+            data: Some(DEFAULT_FEATURE_FLAGS.to_string()),
+            env_var: None,
+            refresh_interval: 300,
+        })
     }
 }
 
@@ -258,6 +297,9 @@ pub struct EnvSettings {
     pub s3_indexing_bucket: String,
     pub s3_endpoint: Option<String>,
     pub azure_account_url: Option<String>,
+
+    // Mr.Flagly
+    pub flag_settings_url: Option<String>,
 }
 
 impl EnvSettings {
@@ -340,6 +382,7 @@ impl Default for EnvSettings {
             s3_indexing_bucket: Default::default(),
             s3_endpoint: None,
             azure_account_url: Default::default(),
+            flag_settings_url: None,
         }
     }
 }

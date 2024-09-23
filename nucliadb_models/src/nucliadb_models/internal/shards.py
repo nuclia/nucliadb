@@ -33,6 +33,7 @@ class DocumentServiceEnum(str, Enum):
     DOCUMENT_V0 = "DOCUMENT_V0"
     DOCUMENT_V1 = "DOCUMENT_V1"
     DOCUMENT_V2 = "DOCUMENT_V2"
+    DOCUMENT_V3 = "DOCUMENT_V3"
 
 
 class ParagraphServiceEnum(str, Enum):

@@ -19,7 +19,7 @@
 #
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Set, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -429,16 +429,35 @@ class SearchParamDefaults:
         title="Shards",
         description="The list of shard replicas to search in. If empty, random replicas will be selected.",
     )
-    page_number = ParamDefault(
+    catalog_page_number = ParamDefault(
         default=0,
         title="Page number",
         description="The page number of the results to return",
+    )
+    catalog_page_size = ParamDefault(
+        default=20,
+        le=200,
+        title="Page size",
+        description="The number of results to return per page. The maximum number of results per page allowed is 200.",
+    )
+    page_number = ParamDefault(
+        default=0,
+        title="Page number",
+        description="The page number of the results to return.\nATENTION: pagination is deprecated and this parameter will be removed soon. Please, use `top_k` instead",
+        deprecated=True,
     )
     page_size = ParamDefault(
         default=20,
         le=200,
         title="Page size",
-        description="The number of results to return per page. The maximum number of results per page allowed is 200.",
+        description="The number of results to return per page. The maximum number of results per page allowed is 200.\nATENTION: pagination is deprecated and will be removed soon, pleas use to `top_k` instead",
+        deprecated=True,
+    )
+    top_k = ParamDefault(
+        default=None,
+        le=200,
+        title="Top k",
+        description="The number of results search should return. The maximum number of results allowed is 200.",
     )
     highlight = ParamDefault(
         default=False,
@@ -608,8 +627,8 @@ class CatalogRequest(BaseModel):
     )
     faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
-    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
-    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    page_number: int = SearchParamDefaults.catalog_page_number.to_pydantic_field()
+    page_size: int = SearchParamDefaults.catalog_page_size.to_pydantic_field()
     shards: List[str] = SearchParamDefaults.shards.to_pydantic_field(deprecated=True)
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
     with_status: Optional[ResourceProcessingStatus] = Field(
@@ -658,8 +677,9 @@ class BaseSearchRequest(BaseModel):
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
-    page_number: int = SearchParamDefaults.page_number.to_pydantic_field()
-    page_size: int = SearchParamDefaults.page_size.to_pydantic_field()
+    page_number: int = SearchParamDefaults.page_number.to_pydantic_field(deprecated=True)
+    page_size: int = SearchParamDefaults.page_size.to_pydantic_field(deprecated=True)
+    top_k: Optional[int] = SearchParamDefaults.top_k.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
         default=None,
         title="Minimum score",
@@ -728,6 +748,15 @@ Please return ONLY the question without any explanation. Just the rephrased ques
     @classmethod
     def normalize_features(cls, features: List[SearchOptions]):
         return [feature.normalized() for feature in features]
+
+    @model_validator(mode="after")
+    def top_k_overwrites_pagination(self):
+        """This method adds support for `top_k` attribute, overwriting
+        `page_number` and `page_size` if needed"""
+        if self.top_k is not None:
+            self.page_number = 0
+            self.page_size = self.top_k
+        return self
 
 
 class SearchRequest(BaseSearchRequest):
@@ -891,7 +920,7 @@ ALLOWED_FIELD_TYPES: dict[str, str] = {
 
 class FieldExtensionStrategy(RagStrategy):
     name: Literal["field_extension"] = "field_extension"
-    fields: Set[str] = Field(
+    fields: list[str] = Field(
         title="Fields",
         description="List of field ids to extend the context with. It will try to extend the retrieval context with the specified fields in the matching resources. The field ids have to be in the format `{field_type}/{field_name}`, like 'a/title', 'a/summary' for title and summary fields or 't/amend' for a text field named 'amend'.",  # noqa
         min_length=1,
@@ -973,7 +1002,7 @@ class MetadataExtensionStrategy(RagStrategy):
     """
 
     name: Literal["metadata_extension"] = "metadata_extension"
-    types: set[MetadataExtensionType] = Field(
+    types: list[MetadataExtensionType] = Field(
         min_length=1,
         title="Types",
         description="""
@@ -1219,14 +1248,14 @@ class AskRequest(BaseModel):
         title="RAG context building strategies",
         description=(
             """Options for tweaking how the context for the LLM model is crafted:
-- `full_resource` will add the full text of the matching resources to the context.
+- `full_resource` will add the full text of the matching resources to the context. This strategy cannot be combined with `hierarchy`, `neighbouring_paragraphs`, or `field_extension`.
 - `field_extension` will add the text of the matching resource's specified fields to the context.
 - `hierarchy` will add the title and summary text of the parent resource to the context for each matching paragraph.
 - `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
-- `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context. This strategy can be combined with any other strategy.
-- `prequeries` allows to run additional queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights. This strategy can be combined with any other strategy.
+- `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context.
+- `prequeries` allows to run multiple retrieval queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights.
 
-If empty, the default strategy is used. `full_resource`, `hierarchy`, and `neighbouring_paragraphs` are mutually exclusive strategies: if selected, they must be the only strategy.
+If empty, the default strategy is used, which simply adds the text of the matching paragraphs to the context.
 """
         ),
         examples=[
@@ -1307,34 +1336,30 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
         strategy_names: set[str] = set()
         for strategy in rag_strategies or []:
-            if not isinstance(strategy, dict):
-                raise ValueError("RAG strategies must be defined using an object")
-            strategy_name = strategy.get("name")
+            if isinstance(strategy, dict):
+                obj = strategy
+            elif isinstance(strategy, BaseModel):
+                obj = strategy.model_dump()
+            else:
+                raise ValueError(
+                    "RAG strategies must be defined using a valid RagStrategy object or a dictionary"
+                )
+            strategy_name = obj.get("name")
             if strategy_name is None:
                 raise ValueError(f"Invalid strategy '{strategy}'")
             strategy_names.add(strategy_name)
+
         if len(strategy_names) != len(rag_strategies):
             raise ValueError("There must be at most one strategy of each type")
 
-        # The following can combined with other strategies
-        for combinable_strategy in (
-            RagStrategyName.METADATA_EXTENSION,
-            RagStrategyName.PREQUERIES,
+        for not_allowed_combination in (
+            {RagStrategyName.FULL_RESOURCE, RagStrategyName.HIERARCHY},
+            {RagStrategyName.FULL_RESOURCE, RagStrategyName.NEIGHBOURING_PARAGRAPHS},
+            {RagStrategyName.FULL_RESOURCE, RagStrategyName.FIELD_EXTENSION},
         ):
-            try:
-                strategy_names.remove(combinable_strategy)
-            except KeyError:
-                pass
-
-        # If any of the unique strategies are chosen, they must be the only strategy
-        for strategy_name in (
-            RagStrategyName.FULL_RESOURCE,
-            RagStrategyName.HIERARCHY,
-            RagStrategyName.NEIGHBOURING_PARAGRAPHS,
-        ):
-            if strategy_name in strategy_names and len(strategy_names) > 1:
+            if not_allowed_combination.issubset(strategy_names):
                 raise ValueError(
-                    f"If '{strategy_name}' strategy is chosen, it must be the only strategy."
+                    f"The following strategies cannot be combined in the same request: {', '.join(sorted(not_allowed_combination))}"
                 )
         return rag_strategies
 
@@ -1530,9 +1555,16 @@ class KnowledgeboxFindResults(JsonBaseModel):
     relations: Optional[Relations] = None
     query: Optional[str] = None
     total: int = 0
-    page_number: int = 0
-    page_size: int = 20
-    next_page: bool = False
+    page_number: int = Field(
+        default=0, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+    )
+    page_size: int = Field(
+        default=20, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+    )
+    next_page: bool = Field(
+        default=False,
+        description="Pagination will be deprecated, please, refer to `top_k` in the request",
+    )
     nodes: Optional[List[Dict[str, str]]] = Field(
         default=None,
         title="Nodes",

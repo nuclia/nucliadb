@@ -81,6 +81,7 @@ async def find_knowledgebox(
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     page_number: int = fastapi_query(SearchParamDefaults.page_number),
     page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    top_k: Optional[int] = fastapi_query(SearchParamDefaults.top_k),
     min_score: Optional[float] = Query(
         default=None,
         description="Minimum similarity score to filter vector index results. If not specified, the default minimum score of the semantic model associated to the Knowledge Box will be used. Check out the documentation for more information on how to use this parameter: https://docs.nuclia.dev/docs/rag/advanced/search#minimum-score",  # noqa: E501
@@ -137,6 +138,7 @@ async def find_knowledgebox(
             filters=filters,
             page_number=page_number,
             page_size=page_size,
+            top_k=top_k,
             min_score=min_score_from_query_params(min_score_bm25, min_score_semantic, min_score),
             vectorset=vectorset,
             range_creation_end=range_creation_end,
