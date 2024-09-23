@@ -374,6 +374,7 @@ pub struct Journal {
     uid: DpId,
     nodes: usize,
     ctime: SystemTime,
+    #[serde(default)]
     tags: HashSet<String>,
 }
 impl Journal {
