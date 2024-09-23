@@ -39,8 +39,12 @@ async def test_hidden_search(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
+    nucliadb_manager: AsyncClient,
     knowledgebox: str,
 ):
+    resp = await nucliadb_manager.patch(f"/kb/{knowledgebox}", json={"hidden_resources_enabled": True})
+    assert resp.status_code == 200
+
     r1 = await create_resource(knowledgebox, nucliadb_grpc)
     r2 = await create_resource(knowledgebox, nucliadb_grpc)
 

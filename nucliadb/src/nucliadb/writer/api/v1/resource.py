@@ -48,7 +48,7 @@ from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_man
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
-    parse_basic,
+    parse_basic_creation,
     parse_basic_modify,
     set_status,
     set_status_modify,
@@ -92,6 +92,13 @@ async def create_resource(
     kbid: str,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
 ):
+    kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
+    if item.hidden and not (kb_config and kb_config.hidden_resources_enabled):
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot hide a resource: the KB does not have hidden resources enabled",
+        )
+
     await maybe_back_pressure(request, kbid)
 
     partitioning = get_partitioning()
@@ -124,7 +131,7 @@ async def create_resource(
 
     async with unique_slug_context_manager:
         parse_audit(writer.audit, request)
-        parse_basic(writer, item, toprocess)
+        parse_basic_creation(writer, item, toprocess, kb_config)
 
         if item.origin is not None:
             parse_origin(writer.origin, item.origin)
@@ -250,6 +257,13 @@ async def modify_resource(
     *,
     rid: str,
 ):
+    kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
+    if item.hidden and not (kb_config and kb_config.hidden_resources_enabled):
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot hide a resource: the KB does not have hidden resources enabled",
+        )
+
     partitioning = get_partitioning()
 
     partition = partitioning.generate_partition(kbid, rid)

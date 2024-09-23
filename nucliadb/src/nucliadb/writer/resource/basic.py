@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
+from typing import Optional
 
 from fastapi import HTTPException
 
@@ -39,6 +40,7 @@ from nucliadb_models.writer import (
     CreateResourcePayload,
     UpdateResourcePayload,
 )
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig
 from nucliadb_protos.resources_pb2 import (
     Answers,
     Basic,
@@ -202,7 +204,12 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
         bm.basic.hidden = item.hidden
 
 
-def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushPayload):
+def parse_basic_creation(
+    bm: BrokerMessage,
+    item: CreateResourcePayload,
+    toprocess: PushPayload,
+    kb_config: Optional[KnowledgeBoxConfig],
+):
     bm.basic.created.FromDatetime(datetime.now())
 
     if item.title is None:
@@ -210,6 +217,10 @@ def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushP
     parse_icon_on_create(bm, item)
 
     parse_basic_modify(bm, item, toprocess)
+
+    if item.hidden is None:
+        if kb_config and kb_config.hidden_resources_hide_on_creation:
+            bm.basic.hidden = True
 
 
 def set_status(basic: Basic, item: CreateResourcePayload):
