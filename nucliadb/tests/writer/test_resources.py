@@ -470,11 +470,11 @@ async def test_hide_on_creation(
         resp = await client.patch(
             f"/{KB_PREFIX}/{kbid}",
             json={
-                "hidden_resources": True,
+                "hidden_resources_enabled": True,
                 "hidden_resources_hide_on_creation": True,
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.text
 
     # Create new resource (hidden because of the previous setting)
     async with writer_api([NucliaDBRoles.WRITER, NucliaDBRoles.READER]) as client:
