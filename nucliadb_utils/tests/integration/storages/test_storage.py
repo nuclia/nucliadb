@@ -70,6 +70,22 @@ async def storage_test(storage: Storage):
     async for object_info in storage.iterate_objects(bucket, ""):
         assert object_info.name == key1
 
+    if getattr(storage, "delete_in_batches"):
+        # Upload a bunch of objects to test batch deletion
+        to_delete = []
+        for i in range(10):
+            key = f"to_delete_{i}"
+            await storage.uploadbytes(bucket, key, example)
+            to_delete.append(key)
+
+        await storage.delete_in_batches(to_delete, bucket)
+
+        # No objects should be left
+        remaining = []
+        async for object_info in storage.iterate_objects(bucket, "to_delete_"):
+            remaining.append(object_info.name)
+        assert len(remaining) == 0, print(remaining)
+
     deleted = await storage.schedule_delete_kb(kbid1)
     assert deleted
 

@@ -25,6 +25,7 @@ import json
 import socket
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from dataclasses import field
 from datetime import datetime
 from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, cast
 from urllib.parse import quote_plus
@@ -34,6 +35,7 @@ import aiohttp.client_exceptions
 import backoff
 import google.auth.transport.requests  # type: ignore
 import yarl
+from attr import dataclass
 from google.auth.exceptions import DefaultCredentialsError  # type: ignore
 from google.oauth2 import service_account  # type: ignore
 
@@ -67,6 +69,8 @@ OBJECT_DATA_CHUNK_SIZE = 1 * MB
 
 DEFAULT_SCOPES = ["https://www.googleapis.com/auth/devstorage.read_write"]
 MAX_TRIES = 4
+
+MAX_REQUESTS_PER_BATCH = 100
 
 POLICY_DELETE = {
     "lifecycle": {
@@ -550,6 +554,54 @@ class GCSStorage(Storage):
                 else:
                     raise GoogleCloudException(f"{resp.status}: {json.dumps(data)}")
 
+    async def delete_in_batches(self, uris: list[str], bucket_name: str):
+        """
+        Use the batch api from GCS to delete multiple objects at once.
+        """
+        valid_uris = [uri for uri in uris if uri]
+        if len(valid_uris) == 0:  # pragma: no cover
+            return
+        for batch in batchify(valid_uris, MAX_REQUESTS_PER_BATCH):
+            await self._delete_batch(batch, bucket_name)
+
+    @storage_ops_observer.wrap({"type": "delete_batch"})
+    async def _delete_batch(self, uris: list[str], bucket_name: str):
+        batch_url = "https://storage.googleapis.com/batch/storage/v1"
+        headers = await self.get_access_headers()
+        batch_id = "batch_" + str(datetime.now().timestamp())
+        headers["Content-Type"] = f"multipart/mixed; boundary={batch_id}"
+        batch_body = ""
+        for uri in uris:
+            delete_url = f"/storage/v1/b/{bucket_name}/o/{quote_plus(uri)}"
+            batch_body += (
+                f"--{batch_id}\n"
+                f"Content-Type: application/http\n"
+                f"Content-ID: {uri}\n"
+                f"\n"
+                f"DELETE {delete_url} HTTP/1.1\n"
+                f"Content-Length: 0\n"
+                f"Content-Type: application/json\n"
+                f"Accept: application/json\n"
+                f"\n"
+            )
+        batch_body += f"--{batch_id}--"
+
+        async with self.session.post(
+            batch_url,
+            headers=headers,
+            data=batch_body,
+        ) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                raise GoogleCloudException(f"{resp.status}: {text}")
+            errored = []
+            part_responses = parse_batch_response(await resp.text())
+            for part in part_responses:
+                if part.status not in (204, 404):
+                    errored.append(part.content_id)
+            if errored:
+                raise GoogleCloudException(f"Failed to delete objects: {errored}")
+
     @storage_ops_observer.wrap({"type": "check_bucket_exists"})
     async def check_exists(self, bucket_name: str):
         headers = await self.get_access_headers()
@@ -731,3 +783,40 @@ def parse_object_metadata(object_data: dict[str, Any], key: str) -> ObjectMetada
         size=int(size),
         content_type=content_type,
     )
+
+
+def batchify(iterable, n):
+    """
+    Split an iterable into chunks of size n.
+    """
+    for i in range(0, len(iterable), n):
+        yield iterable[i : i + n]
+
+
+@dataclass
+class BatchPartResponse:
+    content_id: str
+    status: int
+    body: dict[str, Any] = field(default_factory=dict)
+
+
+def parse_batch_response(batch_response: str) -> list[BatchPartResponse]:
+    parts = batch_response.split(f"--batch_")
+    responses = []
+    for part in parts:
+        if not part:
+            continue
+        lines = part.split("\r\n")
+        if len(lines) < 5:
+            continue
+        try:
+            content_id = lines[2].split("Content-ID: ")[1].lstrip("response-")
+            status = int(lines[4].split("HTTP/1.1 ")[1].split(" ")[0])
+            body = json.loads(lines[-2])
+        except (IndexError, ValueError, json.JSONDecodeError):
+            logger.warning(f"Could not parse batch response: {part}")
+            content_id = ""
+            status = -1
+            body = {}
+        responses.append(BatchPartResponse(content_id, status, body))
+    return responses
