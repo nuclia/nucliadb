@@ -123,6 +123,10 @@ async def _index_node_retrieval(
             highlight=item.highlight,
         )
 
+    # once hydrated, we send the results to rerank
+    reranker = query_parser.reranker
+    await reranker.rerank_find_response(kbid, query_parser.query, search_results, query_parser.page_size)
+
     search_time = time() - start_time
     if audit is not None:
         audit.search(
@@ -219,6 +223,14 @@ async def _external_index_retrieval(
         text_block_min_score=results_min_score.semantic,
         max_parallel_operations=50,
     )
+
+    # once hydrated, we send the results to rerank
+    reranker = query_parser.reranker
+    await reranker.rerank_find_response(
+        kbid, query_parser.query, retrieval_results, query_parser.page_size
+    )
+    # XXX: done later, could be substituted though
+    retrieval_results.best_matches.clear()
 
     # Once hydrated, populate best_matches with the paragraphs ids sorted by score
     scored_paragraphs: list[ScoredParagraph] = [

@@ -167,11 +167,13 @@ class QueryParser:
             self.label_filters = translate_label_filters(self.label_filters)
             self.flat_label_filters = flatten_filter_literals(self.label_filters)
         self.max_tokens = max_tokens
+        self.reranker: Reranker
         if page_number > 0 and isinstance(reranker, PredictReranker):
             logger.warning(
                 "Trying to use predict reranker with pagination. Using multi-match booster instead",
                 extra={"kbid": kbid},
             )
+            self.reranker = MultiMatchBoosterReranker()
         else:
             self.reranker = reranker or MultiMatchBoosterReranker()
 
@@ -563,7 +565,7 @@ class QueryParser:
         reranking can have more choices. This function adjust the number of
         retrieval results requested according to the reranker needs."""
 
-        if not self.reranker.needs_extra_results:
+        if not reranker.needs_extra_results:
             return
 
         async with datamanagers.with_ro_transaction() as txn:
@@ -579,7 +581,7 @@ class QueryParser:
                     return
                 shards = len(kb_shards.shards)
 
-        request.result_per_page = self.reranker.items_needed(self.page_size, shards)
+        request.result_per_page = reranker.items_needed(self.page_size, shards)
 
 
 async def paragraph_query_to_pb(
