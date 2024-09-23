@@ -50,7 +50,7 @@ from nucliadb_utils.storages.exceptions import (
     InvalidOffset,
     ResumableUploadGone,
 )
-from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.storages.storage import STORAGE_RESOURCE, Storage, StorageField
 from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 
 storage_ops_observer = metrics.Observer("gcs_ops", labels={"type": ""})
@@ -701,6 +701,17 @@ class GCSStorage(Storage):
     async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         bucket_name = self.get_bucket_name(kbid)
         return await self.delete_bucket(bucket_name)
+
+    async def delete_resource(self, kbid: str, uuid: str, max_parallel: int = 1):
+        """
+        Reimplemented to use batch delete instead of default parallel delete
+        """
+        bucket = self.get_bucket_name(kbid)
+        resource_storage_base_path = STORAGE_RESOURCE.format(kbid=kbid, uuid=uuid)
+        to_delete = []
+        async for object_info in self.iterate_objects(bucket, resource_storage_base_path):
+            to_delete.append(object_info.name)
+        await self.delete_in_batches(to_delete, bucket)
 
     async def delete_bucket(self, bucket_name: str) -> tuple[bool, bool]:
         headers = await self.get_access_headers()
