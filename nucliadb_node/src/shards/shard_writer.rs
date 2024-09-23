@@ -131,7 +131,7 @@ impl ShardWriter {
         let versions = Versions {
             paragraphs: versioning::PARAGRAPHS_VERSION,
             vectors: versioning::VECTORS_VERSION,
-            texts: versioning::TEXTS_VERSION,
+            texts: texts_version,
             relations: versioning::RELATIONS_VERSION,
         };
         let versions_path = shard_path.join(VERSION_FILE);
