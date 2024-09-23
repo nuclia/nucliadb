@@ -48,7 +48,7 @@ from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_man
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
-    parse_basic,
+    parse_basic_creation,
     parse_basic_modify,
     set_status,
     set_status_modify,
@@ -122,9 +122,10 @@ async def create_resource(
         writer.slug = item.slug
         toprocess.slug = item.slug
 
+    kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
     async with unique_slug_context_manager:
         parse_audit(writer.audit, request)
-        parse_basic(writer, item, toprocess)
+        parse_basic_creation(writer, item, toprocess, kb_config)
 
         if item.origin is not None:
             parse_origin(writer.origin, item.origin)

@@ -439,3 +439,55 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         assert resp.status_code == 422
         body = resp.json()
         assert body["detail"] == "Paragraph classifications need to be unique"
+
+
+@pytest.mark.asyncio
+async def test_hide_new_resources(
+    writer_api: Callable[[list[str]], AsyncClient],
+    knowledgebox_writer: str,
+):
+    kbid = knowledgebox_writer
+
+    # Create new resource (default = visible)
+    async with writer_api([NucliaDBRoles.WRITER, NucliaDBRoles.READER]) as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+            json={
+                "slug": "resource1",
+                "title": "My resource",
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        rid = data["uuid"]
+
+    async with datamanagers.utils.with_ro_transaction() as txn:
+        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
+        assert basic.hidden is False
+
+    # Set KB to hide new resources
+    async with writer_api([NucliaDBRoles.MANAGER]) as client:
+        resp = await client.patch(
+            f"/{KB_PREFIX}/{kbid}",
+            json={
+                "hide_new_resources": True,
+            },
+        )
+        assert resp.status_code == 200
+
+    # Create new resource (hidden because of the previous setting)
+    async with writer_api([NucliaDBRoles.WRITER, NucliaDBRoles.READER]) as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+            json={
+                "slug": "resource2",
+                "title": "My resource",
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        rid = data["uuid"]
+
+    async with datamanagers.utils.with_ro_transaction() as txn:
+        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
+        assert basic.hidden is True

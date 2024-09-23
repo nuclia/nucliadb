@@ -45,7 +45,7 @@ from nucliadb.writer.api.v1.resource import (
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
 from nucliadb.writer.back_pressure import maybe_back_pressure
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import parse_basic
+from nucliadb.writer.resource.basic import parse_basic_creation
 from nucliadb.writer.resource.field import parse_fields
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
@@ -866,7 +866,8 @@ async def store_file_on_nuclia_db(
 
         toprocess.processing_options = item.processing_options
 
-        parse_basic(writer, item, toprocess)
+        kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
+        parse_basic_creation(writer, item, toprocess, kb_config)
         if item.origin is not None:
             parse_origin(writer.origin, item.origin)
         if item.extra is not None:
