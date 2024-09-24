@@ -27,9 +27,7 @@ indexed.
 """
 
 import logging
-import os
 
-from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -39,5 +37,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    if os.environ.get("RUNNING_ENVIRONMENT", os.environ.get("ENVIRONMENT")) == "stage":
-        await rollover_kb_index(context, kbid)
+    """
+    We only need 1 rollover migration defined at a time; otherwise, we will
+    possibly run many for a kb when we only ever need to run one
+    """

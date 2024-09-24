@@ -25,10 +25,7 @@ Targeted rollover for a specific KBs which still don't have the latest version o
 
 import logging
 
-from nucliadb.common import datamanagers
-from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_protos.noderesources_pb2 import ShardCreated
 
 logger = logging.getLogger(__name__)
 
@@ -40,26 +37,30 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    try:
-        if await has_old_paragraphs_index(context, kbid):
-            logger.info("Rolling over affected KB", extra={"kbid": kbid})
-            await rollover_kb_index(context, kbid)
-        else:
-            logger.info(
-                "KB already has the latest version of the paragraphs index, skipping rollover",
-                extra={"kbid": kbid},
-            )
-    except ShardsObjectNotFound:
-        logger.warning("KB not found, skipping rollover", extra={"kbid": kbid})
+    """
+    We only need 1 rollover migration defined at a time; otherwise, we will
+    possibly run many for a kb when we only ever need to run one
+    """
+    # try:
+    #     if await has_old_paragraphs_index(context, kbid):
+    #         logger.info("Rolling over affected KB", extra={"kbid": kbid})
+    #         await rollover_kb_index(context, kbid)
+    #     else:
+    #         logger.info(
+    #             "KB already has the latest version of the paragraphs index, skipping rollover",
+    #             extra={"kbid": kbid},
+    #         )
+    # except ShardsObjectNotFound:
+    #     logger.warning("KB not found, skipping rollover", extra={"kbid": kbid})
 
 
-async def has_old_paragraphs_index(context: ExecutionContext, kbid: str) -> bool:
-    async with context.kv_driver.transaction(read_only=True) as txn:
-        shards_object = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-        if not shards_object:
-            raise ShardsObjectNotFound()
-        for shard in shards_object.shards:
-            for replica in shard.replicas:
-                if replica.shard.paragraph_service != ShardCreated.ParagraphService.PARAGRAPH_V3:
-                    return True
-        return False
+# async def has_old_paragraphs_index(context: ExecutionContext, kbid: str) -> bool:
+#     async with context.kv_driver.transaction(read_only=True) as txn:
+#         shards_object = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+#         if not shards_object:
+#             raise ShardsObjectNotFound()
+#         for shard in shards_object.shards:
+#             for replica in shard.replicas:
+#                 if replica.shard.paragraph_service != ShardCreated.ParagraphService.PARAGRAPH_V3:
+#                     return True
+#         return False
