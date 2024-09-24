@@ -78,7 +78,6 @@ def test_merge_paragraphs_vectors():
         20,
         0,
         min_score=1,
-        kbid="kbid",
     )
     assert not next_page
     assert len(paragraphs) == 10
