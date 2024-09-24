@@ -126,7 +126,7 @@ class QueryParser:
         rephrase_prompt: Optional[str] = None,
         max_tokens: Optional[MaxTokens] = None,
         hidden: Optional[bool] = None,
-        reranker: Optional[Reranker] = None,
+        reranker: Reranker = MultiMatchBoosterReranker(),
     ):
         self.kbid = kbid
         self.features = features
@@ -175,7 +175,7 @@ class QueryParser:
             )
             self.reranker = MultiMatchBoosterReranker()
         else:
-            self.reranker = reranker or MultiMatchBoosterReranker()
+            self.reranker = reranker
 
     @property
     def has_vector_search(self) -> bool:
