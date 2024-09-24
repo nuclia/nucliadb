@@ -43,7 +43,7 @@ from nucliadb.search.search.metrics import (
 )
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
-from nucliadb_models.labels import translate_system_to_alias_label
+from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
@@ -128,9 +128,9 @@ class QueryParser:
         self.hidden = hidden
         if self.hidden is not None:
             if self.hidden:
-                label_filters.append(Filter(all=["/q/h"]))  # type: ignore
+                label_filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
             else:
-                label_filters.append(Filter(none=["/q/h"]))  # type: ignore
+                label_filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
 
         self.label_filters: dict[str, Any] = convert_to_node_filters(label_filters)
         self.flat_label_filters: list[str] = []
@@ -709,6 +709,7 @@ def suggest_query_to_pb(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
+    hidden: Optional[bool] = None,
 ) -> nodereader_pb2.SuggestRequest:
     request = nodereader_pb2.SuggestRequest()
 
@@ -718,9 +719,20 @@ def suggest_query_to_pb(
 
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
-        filters = [translate_label(fltr) for fltr in filters]
-        request.filter.field_labels.extend(filters)
         request.fields.extend(fields)
+
+        if hidden is not None:
+            if hidden:
+                filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
+            else:
+                filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
+
+        expression = convert_to_node_filters(filters)
+        if expression:
+            expression = translate_label_filters(expression)
+
+        request.filter.field_labels.extend(flatten_filter_literals(expression))
+        request.filter.labels_expression = json.dumps(expression)
 
     if range_creation_start is not None:
         request.timestamps.from_created.FromDatetime(range_creation_start)

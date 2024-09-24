@@ -57,6 +57,8 @@ LABEL_QUERY_ALIASES = {
 
 LABEL_QUERY_ALIASES_REVERSED = {v: k for k, v in LABEL_QUERY_ALIASES.items()}
 
+LABEL_HIDDEN = "/q/h"
+
 
 def translate_alias_to_system_label(label: str) -> str:
     parts = label.split("/")

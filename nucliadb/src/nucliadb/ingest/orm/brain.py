@@ -25,7 +25,7 @@ from typing import Optional
 from nucliadb.common import ids
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.utils import compute_paragraph_key
-from nucliadb_models.labels import BASE_LABELS, flatten_resource_labels
+from nucliadb_models.labels import BASE_LABELS, LABEL_HIDDEN, flatten_resource_labels
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
@@ -509,7 +509,8 @@ class ResourceBrain:
 
         # hidden
         if basic.hidden:
-            self.labels["q"].append("h")
+            _, p1, p2 = LABEL_HIDDEN.split("/")
+            self.labels[p1].append(p2)
 
         self.compute_labels()
 

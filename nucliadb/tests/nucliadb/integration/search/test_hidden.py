@@ -24,11 +24,11 @@ from httpx import AsyncClient
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import broker_resource, inject_message
+from tests.utils import broker_resource_with_title_paragraph, inject_message
 
 
 async def create_resource(kbid, nucliadb_grpc):
-    message = broker_resource(kbid)
+    message = broker_resource_with_title_paragraph(kbid)
     await inject_message(nucliadb_grpc, message)
     return message.uuid
 
@@ -53,6 +53,10 @@ async def test_hidden_search(
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r1, r2}
 
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=title")
+    assert resp.status_code == 200
+    assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r1, r2}
+
     # Hide r1
     resp = await nucliadb_writer.patch(f"/kb/{knowledgebox}/resource/{r1}", json={"hidden": True})
     assert resp.status_code == 200
@@ -63,10 +67,18 @@ async def test_hidden_search(
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r2}
 
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=title")
+    assert resp.status_code == 200
+    assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r2}
+
     # Unless show_hidden is passed, then both resources are returned
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?show_hidden=true")
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r1, r2}
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=title&show_hidden=true")
+    assert resp.status_code == 200
+    assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r1, r2}
 
 
 @pytest.fixture()
