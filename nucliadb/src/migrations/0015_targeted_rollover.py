@@ -24,21 +24,20 @@ Targeted rollover for a specific KB
 """
 
 import logging
-import os
 
-from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
 
 
-AFFECTED_KBS = [kbid.strip() for kbid in os.environ.get("ROLLOVER_KBS", "").split(",") if kbid.strip()]
+# AFFECTED_KBS = [kbid.strip() for kbid in os.environ.get("ROLLOVER_KBS", "").split(",") if kbid.strip()]
 
 
 async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    if kbid in AFFECTED_KBS:
-        logger.info(f"Rolling over affected KB: {kbid}")
-        await rollover_kb_index(context, kbid)
+    """
+    We only need 1 rollover migration defined at a time; otherwise, we will
+    possibly run many for a kb when we only ever need to run one
+    """
