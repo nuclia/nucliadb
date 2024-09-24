@@ -229,8 +229,6 @@ async def _external_index_retrieval(
     await reranker.rerank_find_response(
         kbid, query_parser.query, retrieval_results, query_parser.page_size
     )
-    # XXX: done later, could be substituted though
-    retrieval_results.best_matches.clear()
 
     # Once hydrated, populate best_matches with the paragraphs ids sorted by score
     scored_paragraphs: list[ScoredParagraph] = [
