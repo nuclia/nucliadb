@@ -37,6 +37,9 @@ it's transaction
 
 import sys
 from functools import wraps
+from typing import Optional
+
+from async_lru import alru_cache
 
 from . import kb as kb_dm
 from . import labels as labels_dm
@@ -67,6 +70,18 @@ def ro_txn_wrap(fun: P) -> P:  # type: ignore
     return wrapper
 
 
+def cached_ro_txn_wrap(fun: P, cache_size: Optional[int] = None) -> P:  # type: ignore
+    """A `None` cache means unbounded."""
+
+    @wraps(fun)
+    @alru_cache(maxsize=cache_size)
+    async def wrapper(**kwargs: P.kwargs):
+        async with with_ro_transaction() as txn:
+            return await fun(txn, **kwargs)
+
+    return wrapper
+
+
 def rw_txn_wrap(fun: P) -> P:  # type: ignore
     @wraps(fun)
     async def wrapper(**kwargs: P.kwargs):
@@ -82,6 +97,7 @@ class kb:
     exists_kb = ro_txn_wrap(kb_dm.exists_kb)
     get_config = ro_txn_wrap(kb_dm.get_config)
     get_external_index_provider_metadata = ro_txn_wrap(kb_dm.get_external_index_provider_metadata)
+    has_external_index_provider = cached_ro_txn_wrap(kb_dm.has_external_index_provider, cache_size=500)
 
 
 class resources:
