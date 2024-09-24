@@ -394,7 +394,7 @@ class Reranker(str, Enum):
 
     """
 
-    MULTI_MATCH_BOOSTER = ("multi_match_booster",)
+    MULTI_MATCH_BOOSTER = "multi_match_booster"
     PREDICT_RERANKER = "predict"
 
 
