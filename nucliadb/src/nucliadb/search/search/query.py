@@ -568,11 +568,12 @@ class QueryParser:
         if not reranker.needs_extra_results:
             return
 
-        has_external_index = await datamanagers.atomic.kb.has_external_index_provider(kbid=self.kbid)
-        if has_external_index:
+        async with datamanagers.with_ro_transaction() as txn:
+            external_provider = await datamanagers.kb.get_external_index_provider_metadata(
+                txn, kbid=self.kbid
+            )
             shards = 1
-        else:
-            async with datamanagers.with_ro_transaction() as txn:
+            if external_provider is None:
                 # index nodes are sharded, we need to know how many shards we'll query
                 kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
                 if kb_shards is None:
