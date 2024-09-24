@@ -19,7 +19,6 @@
 #
 import pytest
 from httpx import AsyncClient
-from tests.utils import broker_resource, inject_message
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
@@ -41,6 +40,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import broker_resource, inject_message
 
 
 class ClassificationLabels:

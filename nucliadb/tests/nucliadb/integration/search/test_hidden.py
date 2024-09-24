@@ -21,10 +21,10 @@ import asyncio
 
 import pytest
 from httpx import AsyncClient
-from tests.utils import broker_resource_with_title_paragraph, inject_message
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import broker_resource_with_title_paragraph, inject_message
 
 
 async def create_resource(kbid, nucliadb_grpc):
