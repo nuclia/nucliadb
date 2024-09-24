@@ -19,6 +19,7 @@
 #
 import pytest
 from httpx import AsyncClient
+from tests.utils import broker_resource, inject_message
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
@@ -40,7 +41,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import broker_resource, inject_message
 
 
 class ClassificationLabels:
@@ -363,7 +363,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
     ]
 
     # Check that only the expected paragraphs were returned
-    assert len(paragraphs) == len(expected_paragraphs)
+    assert len(paragraphs) == len(expected_paragraphs), f"{filters}\n{paragraphs}\n{expected_paragraphs}"
     not_yet_found = expected_paragraphs.copy()
     for par in paragraphs:
         if par["text"] not in expected_paragraphs:

@@ -33,6 +33,7 @@ use nucliadb_core::protos::{
     ShardFile, ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
     VectorSearchRequest, VectorSearchResponse,
 };
+use nucliadb_core::query_language;
 use nucliadb_core::query_language::BooleanExpression;
 use nucliadb_core::query_language::BooleanOperation;
 use nucliadb_core::query_language::Operator;
@@ -372,22 +373,36 @@ impl ShardReader {
         // Prefilter to apply field label filters
         if let Some(filter) = &mut request.filter {
             if !filter.field_labels.is_empty() && suggest_paragraphs {
-                let labels = std::mem::take(&mut filter.field_labels);
-                let operands = labels.into_iter().map(BooleanExpression::Literal).collect();
-                let op = BooleanOperation {
-                    operator: Operator::And,
-                    operands,
+                let labels_formula = if filter.labels_expression.is_empty() {
+                    // Backwards compatibility, take all labels to be AND'ed together
+                    let labels = std::mem::take(&mut filter.field_labels);
+                    let operands = labels.into_iter().map(BooleanExpression::Literal).collect();
+                    let op = BooleanOperation {
+                        operator: Operator::And,
+                        operands,
+                    };
+
+                    Some(BooleanExpression::Operation(op))
+                } else {
+                    // Parse the formula for labels, suggest only supports resource labels
+                    let context = query_language::QueryContext {
+                        field_labels: filter.field_labels.iter().cloned().collect(),
+                        paragraph_labels: HashSet::new(),
+                    };
+                    let analysis = query_language::translate(Some(&filter.labels_expression), None, &context)?;
+                    analysis.labels_prefilter_query
                 };
+
                 let prefilter = PreFilterRequest {
                     timestamp_filters: vec![],
                     security: None,
-                    labels_formula: Some(BooleanExpression::Operation(op)),
+                    labels_formula,
                     keywords_formula: None,
                 };
 
                 let prefiltered = read_rw_lock(&self.text_reader).prefilter(&prefilter)?;
 
-                // Apply prefilter to paragraphs query
+                // Apply prefilter to paragraphs query and clear filters
                 match prefiltered.valid_fields {
                     query_planner::ValidFieldCollector::All => {}
                     query_planner::ValidFieldCollector::Some(keys) => {
@@ -395,6 +410,8 @@ impl ShardReader {
                     }
                     query_planner::ValidFieldCollector::None => suggest_paragraphs = false,
                 }
+                filter.labels_expression.clear();
+                filter.field_labels.clear();
             }
         }
 
