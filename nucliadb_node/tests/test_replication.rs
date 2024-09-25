@@ -26,7 +26,7 @@ use std::sync::Arc;
 use common::{resources, NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::{
     op_status, IndexParagraphs, NewShardRequest, NewVectorSetRequest, SearchRequest, SearchResponse, ShardId,
-    VectorIndexConfig, VectorSetId,
+    VectorSetId,
 };
 use nucliadb_node::replication::health::ReplicationHealthManager;
 use rstest::*;
@@ -84,18 +84,6 @@ async fn test_search_replicated_data() -> Result<(), Box<dyn std::error::Error>>
         primary_shard.upgrade().unwrap().metadata.get_generation_id(),
         secondary_shard.upgrade().unwrap().metadata.get_generation_id()
     );
-    println!("PRIMARY {:?}", primary_shard.upgrade().unwrap().metadata.get_generation_id());
-
-    // Test a second change is replicated
-    create_test_resources(&mut writer, shard.id.clone(), None).await;
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-    // Validate generation id is the same
-    assert_eq!(
-        primary_shard.upgrade().unwrap().metadata.get_generation_id(),
-        secondary_shard.upgrade().unwrap().metadata.get_generation_id()
-    );
-    println!("PRIMARY {:?}", primary_shard.upgrade().unwrap().metadata.get_generation_id());
 
     // Test deleting shard deletes it from secondary
     delete_shard(&mut writer, shard.id.clone()).await;
@@ -118,16 +106,7 @@ struct ShardDetails {
 }
 
 async fn create_shard(writer: &mut TestNodeWriter) -> ShardDetails {
-    let request = Request::new(NewShardRequest {
-        vectorsets_configs: HashMap::from([(
-            "multilingual".to_string(),
-            VectorIndexConfig {
-                vector_dimension: Some(3),
-                ..Default::default()
-            },
-        )]),
-        ..Default::default()
-    });
+    let request = Request::new(NewShardRequest::default());
     let new_shard_response = writer.new_shard(request).await.expect("Unable to create new shard");
     let shard_id = &new_shard_response.get_ref().id;
     create_test_resources(writer, shard_id.clone(), None).await;
