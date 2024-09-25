@@ -100,10 +100,11 @@ class Reranker(ABC):
             paragraph.score_type = item.score_type
             best_matches.append((item.id, item.score))
 
-        response.best_matches.clear()
         best_matches.sort(key=lambda x: x[1], reverse=True)
+
+        response.best_matches.clear()
         for order, (paragraph_id, _) in enumerate(best_matches[:cut]):
-            paragraph = inverted_response[item.id][0]
+            paragraph = inverted_response[paragraph_id][0]
             paragraph.order = order
             response.best_matches.append(paragraph_id)
 
