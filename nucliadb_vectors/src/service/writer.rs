@@ -32,7 +32,7 @@ use nucliadb_core::protos::ResourceId;
 use nucliadb_core::tracing::{self, *};
 use nucliadb_core::vectors::MergeMetrics;
 use nucliadb_core::vectors::*;
-use nucliadb_core::{IndexFiles, RawReplicaState};
+use nucliadb_core::IndexFiles;
 use nucliadb_procs::measure;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -192,11 +192,6 @@ impl VectorWriter for VectorWriterService {
     fn get_index_files(&self, prefix: &str, ignored_segment_ids: &[String]) -> NodeResult<IndexFiles> {
         // Should be called along with a lock at a higher level to be safe
         let replica_state = replication::get_index_files(&self.path, prefix, ignored_segment_ids)?;
-
-        if replica_state.files.is_empty() {
-            // exit with no changes
-            return Ok(IndexFiles::Other(RawReplicaState::default()));
-        }
 
         Ok(IndexFiles::Other(replica_state))
     }
