@@ -59,8 +59,15 @@ async def maybe_fix_vector_dimensions(context: ExecutionContext, kbid: str) -> N
         if vectorset.vectorset_index_config.vector_dimension != 0:
             return
 
-        logger.info(f"Fixing KB vectorset dimension", extra={"kbid": kbid})
         learning_model_metadata = learning_config.into_semantic_model_metadata()
+        logger.info(
+            f"Fixing KB vectorset dimension",
+            extra={
+                "kbid": kbid,
+                "from": vectorset.vectorset_index_config.vector_dimension,
+                "to": learning_model_metadata.vector_dimension,
+            },
+        )
         vectorset.vectorset_index_config.vector_dimension = learning_model_metadata.vector_dimension
 
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset)
