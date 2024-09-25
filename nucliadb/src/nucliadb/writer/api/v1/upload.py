@@ -890,6 +890,11 @@ async def store_file_on_nuclia_db(
             uuid=rid,
             x_skip_store=False,
         )
+    else:
+        # Use defaults for everything, but don't forget hidden which depends on KB config
+        kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
+        if kb_config and kb_config.hidden_resources_hide_on_creation:
+            writer.basic.hidden = True
 
     async with unique_slug_context_manager:
         if override_resource_title and filename is not None:

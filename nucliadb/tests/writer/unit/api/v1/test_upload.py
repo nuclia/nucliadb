@@ -29,6 +29,7 @@ from nucliadb.writer.api.v1.upload import (
 )
 from nucliadb.writer.tus.exceptions import HTTPConflict, HTTPNotFound
 from nucliadb_models.resource import QueueType
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig
 
 UPLOAD_PACKAGE = "nucliadb.writer.api.v1.upload"
 
@@ -62,6 +63,13 @@ async def get_storage_mock():
     with patch(f"{UPLOAD_PACKAGE}.get_storage") as get_storage_mock:
         get_storage_mock.return_value = Mock()
         yield get_storage_mock
+
+
+@pytest.fixture(scope="function", autouse=True)
+async def kb_config_mock():
+    with patch(f"{UPLOAD_PACKAGE}.datamanagers.atomic.kb.get_config") as mock:
+        mock.return_value = KnowledgeBoxConfig()
+        yield mock
 
 
 @pytest.mark.asyncio
@@ -127,3 +135,44 @@ async def test_validate_field_upload(rid, field, md5, exists: bool, result):
         else:
             with pytest.raises(result):
                 _, result_rid, result_field = await validate_field_upload("kbid", rid, field, md5)
+
+
+@pytest.mark.asyncio
+async def test_store_file_on_nucliadb_sets_hidden(
+    processing_mock, partitioning_mock, transaction_mock, kb_config_mock
+):
+    field = "myfield"
+
+    await store_file_on_nuclia_db(
+        10,
+        "kbid",
+        "/some/path",
+        Request({"type": "http", "headers": []}),
+        "bucket",
+        Source.INGEST,
+        "rid",
+        field,
+        password="mypassword",
+    )
+    transaction_mock.commit.assert_awaited_once()
+    writer_bm = transaction_mock.commit.call_args[0][0]
+    assert writer_bm.basic.hidden is False
+
+    transaction_mock.commit.reset_mock()
+    kb_config_mock.return_value.hidden_resources_enabled = True
+    kb_config_mock.return_value.hidden_resources_hide_on_creation = True
+
+    await store_file_on_nuclia_db(
+        10,
+        "kbid",
+        "/some/path",
+        Request({"type": "http", "headers": []}),
+        "bucket",
+        Source.INGEST,
+        "rid",
+        field,
+        password="mypassword",
+    )
+    transaction_mock.commit.assert_awaited_once()
+    writer_bm = transaction_mock.commit.call_args[0][0]
+    assert writer_bm.basic.hidden is True
