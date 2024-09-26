@@ -1091,7 +1091,7 @@ class PreQueriesStrategy(RagStrategy):
         title="Queries",
         description="List of queries to run before the main query. The results are added to the context with the specified weights for each query. There is a limit of 10 prequeries per request.",
         min_length=1,
-        max_length=10,
+        max_length=15,
     )
     main_query_weight: float = Field(
         default=1.0,
