@@ -102,6 +102,8 @@ class KnowledgeBox:
         description: str = "",
         semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
+        hidden_resources_enabled: bool = False,
+        hidden_resources_hide_on_creation: bool = False,
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
@@ -109,6 +111,10 @@ class KnowledgeBox:
             raise KnowledgeBoxCreationError("A kbid must be provided to create a new KB")
         if not slug:
             raise KnowledgeBoxCreationError("A slug must be provided to create a new KB")
+        if hidden_resources_hide_on_creation and not hidden_resources_enabled:
+            raise KnowledgeBoxCreationError(
+                "Cannot hide new resources if the hidden resources feature is disabled"
+            )
         if semantic_models is None or len(semantic_models) == 0:
             raise KnowledgeBoxCreationError("KB must define at least one semantic model")
 
@@ -180,6 +186,8 @@ class KnowledgeBox:
                     description=description,
                     slug=slug,
                     migration_version=get_latest_version(),
+                    hidden_resources_enabled=hidden_resources_enabled,
+                    hidden_resources_hide_on_creation=hidden_resources_hide_on_creation,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
                 await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
@@ -251,6 +259,13 @@ class KnowledgeBox:
 
         if config and exist != config:
             exist.MergeFrom(config)
+            exist.hidden_resources_enabled = config.hidden_resources_enabled
+            exist.hidden_resources_hide_on_creation = config.hidden_resources_hide_on_creation
+
+        if exist.hidden_resources_hide_on_creation and not exist.hidden_resources_enabled:
+            raise KnowledgeBoxCreationError(
+                "Cannot hide new resources if the hidden resources feature is disabled"
+            )
 
         await datamanagers.kb.set_config(txn, kbid=uuid, config=exist)
 

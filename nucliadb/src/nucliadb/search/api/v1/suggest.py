@@ -31,6 +31,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
+from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -81,6 +82,7 @@ async def suggest_knowledgebox(
     x_forwarded_for: str = Header(""),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
+    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden, include_in_schema=False),
 ) -> Union[KnowledgeboxSuggestResults, HTTPClientError]:
     try:
         return await suggest(
@@ -102,6 +104,7 @@ async def suggest_knowledgebox(
             x_forwarded_for,
             debug,
             highlight,
+            show_hidden,
         )
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
@@ -126,8 +129,10 @@ async def suggest(
     x_forwarded_for: str,
     debug: bool,
     highlight: bool,
+    show_hidden: bool,
 ) -> KnowledgeboxSuggestResults:
     with cache.request_caches():
+        hidden = await filter_hidden_resources(kbid, show_hidden)
         pb_query = suggest_query_to_pb(
             features,
             query,
@@ -138,6 +143,7 @@ async def suggest(
             range_creation_end,
             range_modification_start,
             range_modification_end,
+            hidden,
         )
         results, incomplete_results, queried_nodes = await node_query(kbid, Method.SUGGEST, pb_query)
 

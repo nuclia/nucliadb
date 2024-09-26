@@ -113,6 +113,42 @@ async fn test_suggest_paragraphs(
                 paragraph_labels: vec![],
                 ..Default::default()
             }),
+            ..request.clone()
+        }))
+        .await
+        .unwrap()
+        .into_inner();
+
+    expect_paragraphs(&response, &[]);
+
+    // Inverted filter
+    let response = reader
+        .suggest(Request::new(SuggestRequest {
+            filter: Some(Filter {
+                field_labels: vec!["/s/p/de".to_string()],
+                labels_expression: r#"{"not": {"literal": "/s/p/de"}}"#.to_string(),
+                paragraph_labels: vec![],
+                ..Default::default()
+            }),
+            ..request.clone()
+        }))
+        .await
+        .unwrap()
+        .into_inner();
+
+    expect_paragraphs(
+        &response,
+        &[(&shard.resources["little prince"], "/a/title"), (&shard.resources["little prince"], "/a/summary")],
+    );
+
+    let response = reader
+        .suggest(Request::new(SuggestRequest {
+            filter: Some(Filter {
+                field_labels: vec!["/s/p/en".to_string()],
+                labels_expression: r#"{"not": {"literal": "/s/p/en"}}"#.to_string(),
+                paragraph_labels: vec![],
+                ..Default::default()
+            }),
             ..request
         }))
         .await

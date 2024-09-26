@@ -65,6 +65,58 @@ def broker_resource(kbid: str, rid=None, slug=None, title=None, summary=None) ->
     return bm
 
 
+def broker_resource_with_title_paragraph(
+    kbid: str, rid=None, slug=None, title=None, summary=None
+) -> BrokerMessage:
+    """
+    Returns a broker resource with barebones metadata.
+    """
+    rid = rid or str(uuid.uuid4()).replace("-", "")
+    slug = slug or f"{rid}slug1"
+    bm: BrokerMessage = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        slug=slug,
+        type=BrokerMessage.AUTOCOMMIT,
+    )
+    title = title or "Title Resource"
+    summary = summary or "Summary of document"
+    bm.basic.icon = "text/plain"
+    bm.basic.title = title
+    bm.basic.summary = summary
+    bm.basic.thumbnail = "doc"
+    bm.basic.metadata.useful = True
+    bm.basic.metadata.language = "es"
+    bm.basic.created.FromDatetime(datetime.now())
+    bm.basic.modified.FromDatetime(datetime.now())
+    bm.origin.source = rpb.Origin.Source.WEB
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = title
+    etw.field.field = "title"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.field = "title"
+    fcm.field.field_type = rpb.FieldType.GENERIC
+    p1 = rpb.Paragraph(
+        start=0,
+        end=5,
+    )
+    fcm.metadata.metadata.paragraphs.append(p1)
+    bm.field_metadata.append(fcm)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = summary
+    etw.field.field = "summary"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    bm.source = BrokerMessage.MessageSource.WRITER
+    return bm
+
+
 async def inject_message(writer: WriterStub, message: BrokerMessage):
     resp = await writer.ProcessMessage([message])  # type: ignore
     assert resp.status == OpStatusWriter.Status.OK

@@ -24,7 +24,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from nucliadb_models.conversation import FieldConversation
@@ -123,6 +123,16 @@ class KnowledgeBoxConfig(BaseModel):
         description="This field is deprecated. Use 'learning_configuration' instead.",
     )
 
+    hidden_resources_enabled: bool = Field(
+        default=False,
+        description="Allow hiding resources",
+    )
+
+    hidden_resources_hide_on_creation: bool = Field(
+        default=False,
+        description="Hide newly created resources",
+    )
+
     @field_validator("slug")
     @classmethod
     def id_check(cls, v: Optional[str]) -> Optional[str]:
@@ -149,6 +159,12 @@ class KnowledgeBoxConfig(BaseModel):
         if eip:
             as_dict["configured_external_index_provider"] = {"type": eip["type"].lower()}
         return cls(**as_dict)
+
+    @model_validator(mode="after")
+    def check_hidden_resources(self) -> "KnowledgeBoxConfig":
+        if self.hidden_resources_hide_on_creation and not self.hidden_resources_enabled:
+            raise ValueError("Cannot hide new resources if the hidden resources feature is disabled")
+        return self
 
 
 class KnowledgeBoxObjSummary(BaseModel):

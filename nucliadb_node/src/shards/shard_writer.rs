@@ -617,13 +617,11 @@ impl ShardWriter {
 
         segments.insert("paragraph".to_string(), indexes.paragraphs_index.get_segment_ids()?);
         segments.insert("text".to_string(), indexes.texts_index.get_segment_ids()?);
-        // TODO: return segments for all vector indexes
-        let default_vectors_index = indexes
-            .vectors_indexes
-            .get(DEFAULT_VECTORS_INDEX_NAME)
-            .expect("Default vectors index should never be deleted (yet)");
-        segments.insert("vector".to_string(), default_vectors_index.get_segment_ids()?);
         segments.insert("relation".to_string(), indexes.relations_index.get_segment_ids()?);
+
+        for (key, index) in &indexes.vectors_indexes {
+            segments.insert(format!("vector-{key}"), index.get_segment_ids()?);
+        }
 
         Ok(segments)
     }
@@ -648,7 +646,7 @@ impl ShardWriter {
                     path.clone(),
                     index.get_index_files(
                         path.to_str().unwrap(),
-                        ignored_segment_ids.get("vector").unwrap_or(&Vec::new()),
+                        ignored_segment_ids.get(&format!("vector-{key}")).unwrap_or(&Vec::new()),
                     )?,
                 ));
             }

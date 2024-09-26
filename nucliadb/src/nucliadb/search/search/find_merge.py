@@ -129,8 +129,6 @@ async def set_resource_metadata_value(
 
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
-    find_resources: dict[str, FindResource],
-    best_matches: list[str],
     result_paragraphs: list[TempFindParagraph],
     kbid: str,
     show: list[ResourceProperties],
@@ -138,7 +136,10 @@ async def fetch_find_metadata(
     extracted: list[ExtractedDataTypeName],
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
-):
+) -> tuple[dict[str, FindResource], list[str]]:
+    find_resources: dict[str, FindResource] = {}
+    best_matches: list[str] = []
+
     resources = set()
     operations = []
     max_operations = asyncio.Semaphore(50)
@@ -225,6 +226,8 @@ async def fetch_find_metadata(
                 if task.exception() is not None:  # pragma: no cover
                     logger.error("Error fetching find metadata", exc_info=task.exception())
 
+    return find_resources, best_matches
+
 
 @merge_observer.wrap({"type": "merge_paragraphs_vectors"})
 def merge_paragraphs_vectors(
@@ -233,69 +236,16 @@ def merge_paragraphs_vectors(
     count: int,
     page: int,
     min_score: float,
-    kbid: str,
 ) -> tuple[list[TempFindParagraph], bool]:
-    merged_paragraphs: list[TempFindParagraph] = []
-
     # Flatten the results from several shards to be able to sort them globally
     flat_paragraphs = [
         paragraph for paragraph_shard in paragraphs_shards for paragraph in paragraph_shard
     ]
-    flat_paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
-
-    for paragraph in flat_paragraphs:
-        fuzzy_result = len(paragraph.matches) > 0
-        merged_paragraphs.append(
-            TempFindParagraph(
-                paragraph_index=paragraph,
-                field=paragraph.field,
-                rid=paragraph.uuid,
-                score=paragraph.score.bm25,
-                start=paragraph.start,
-                split=paragraph.split,
-                end=paragraph.end,
-                id=paragraph.paragraph,
-                fuzzy_result=fuzzy_result,
-                page_with_visual=paragraph.metadata.page_with_visual,
-                reference=paragraph.metadata.representation.file,
-                is_a_table=paragraph.metadata.representation.is_a_table,
-            )
-        )
-
-    # Flatten the results from several shards to be able to sort them globally
     flat_vectors = [
         vector for vector_shard in vectors_shards for vector in vector_shard if vector.score >= min_score
     ]
-    flat_vectors.sort(key=lambda r: r.score, reverse=True)
 
-    nextpos = 1
-    for vector in flat_vectors:
-        doc_id_split = vector.doc_id.id.split("/")
-        split = None
-        if len(doc_id_split) == 5:
-            rid, field_type, field, index, position = doc_id_split
-            paragraph_id = f"{rid}/{field_type}/{field}/{position}"
-        elif len(doc_id_split) == 6:
-            rid, field_type, field, split, index, position = doc_id_split
-            paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
-        else:
-            logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
-            continue
-        start, end = position.split("-")
-        merged_paragraphs.insert(
-            nextpos,
-            TempFindParagraph(
-                vector_index=vector,
-                rid=rid,
-                field=f"/{field_type}/{field}",
-                score=vector.score,
-                start=int(start),
-                end=int(end),
-                split=split,
-                id=paragraph_id,
-            ),
-        )
-        nextpos += 3
+    merged_paragraphs: list[TempFindParagraph] = rank_fusion_merge(flat_paragraphs, flat_vectors)
 
     init_position = count * page
     end_position = init_position + count
@@ -353,6 +303,76 @@ def merge_paragraphs_vectors(
     return merged_paragraphs, next_page
 
 
+def rank_fusion_merge(
+    paragraphs: list[ParagraphResult],
+    vectors: list[DocumentScored],
+) -> list[TempFindParagraph]:
+    """Merge results from different indexes using a rank fusion algorithm.
+
+    Given two list of sorted results from keyword and semantic search, this rank
+    fusion algorithm mixes them in the following way:
+    - 1st result from keyword search
+    - 2nd result from semantic search
+    - 2 keyword results and 1 semantic
+
+    """
+    merged_paragraphs: list[TempFindParagraph] = []
+
+    # sort results by it's score before merging them
+    paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
+    vectors.sort(key=lambda r: r.score, reverse=True)
+
+    for paragraph in paragraphs:
+        fuzzy_result = len(paragraph.matches) > 0
+        merged_paragraphs.append(
+            TempFindParagraph(
+                paragraph_index=paragraph,
+                field=paragraph.field,
+                rid=paragraph.uuid,
+                score=paragraph.score.bm25,
+                start=paragraph.start,
+                split=paragraph.split,
+                end=paragraph.end,
+                id=paragraph.paragraph,
+                fuzzy_result=fuzzy_result,
+                page_with_visual=paragraph.metadata.page_with_visual,
+                reference=paragraph.metadata.representation.file,
+                is_a_table=paragraph.metadata.representation.is_a_table,
+            )
+        )
+
+    nextpos = 1
+    for vector in vectors:
+        doc_id_split = vector.doc_id.id.split("/")
+        split = None
+        if len(doc_id_split) == 5:
+            rid, field_type, field, index, position = doc_id_split
+            paragraph_id = f"{rid}/{field_type}/{field}/{position}"
+        elif len(doc_id_split) == 6:
+            rid, field_type, field, split, index, position = doc_id_split
+            paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
+        else:
+            logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
+            continue
+        start, end = position.split("-")
+        merged_paragraphs.insert(
+            nextpos,
+            TempFindParagraph(
+                vector_index=vector,
+                rid=rid,
+                field=f"/{field_type}/{field}",
+                score=vector.score,
+                start=int(start),
+                end=int(end),
+                split=split,
+                id=paragraph_id,
+            ),
+        )
+        nextpos += 3
+
+    return merged_paragraphs
+
+
 @merge_observer.wrap({"type": "find_merge"})
 async def find_merge_results(
     search_responses: list[SearchResponse],
@@ -388,7 +408,7 @@ async def find_merge_results(
         relations.append(response.relation)
 
     result_paragraphs, merged_next_page = merge_paragraphs_vectors(
-        paragraphs, vectors, count, page, min_score_semantic, kbid
+        paragraphs, vectors, count, page, min_score_semantic
     )
     next_page = next_page or merged_next_page
 
@@ -403,9 +423,7 @@ async def find_merge_results(
         best_matches=[],
     )
 
-    await fetch_find_metadata(
-        api_results.resources,
-        api_results.best_matches,
+    resources, best_matches = await fetch_find_metadata(
         result_paragraphs,
         kbid,
         show,
@@ -414,6 +432,8 @@ async def find_merge_results(
         highlight,
         ematches,
     )
+    api_results.resources = resources
+    api_results.best_matches = best_matches
     api_results.relations = await merge_relations_results(relations, requested_relations)
 
     return api_results

@@ -18,32 +18,25 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Migration #10
+import pytest
+from httpx import AsyncClient
 
-Due to a bug in the index nodes, some KBs have been affected in stage with an
-index data loss. Rollover affected KBs
-
-"""
-
-import logging
-
-from nucliadb.migrator.context import ExecutionContext
-
-logger = logging.getLogger(__name__)
-
-# AFFECTED_KBS = [
-#     "1efc5a33-bc5a-490c-8b47-b190beee212d",
-#     "f11d6eb9-da5e-4519-ac3d-e304bfa5c354",
-#     "096d9070-f7be-40c8-a24c-19c89072e3ff",
-#     "848f01bc-341a-4346-b473-6b11b76b26eb",
-# ]
+from nucliadb_models.search import Reranker
 
 
-async def migrate(context: ExecutionContext) -> None: ...
+@pytest.mark.parametrize("reranker", [Reranker.MULTI_MATCH_BOOSTER, Reranker.PREDICT_RERANKER])
+async def test_reranker(
+    nucliadb_reader: AsyncClient,
+    philosophy_books_kb: str,
+    reranker: str,
+):
+    kbid = philosophy_books_kb
 
-
-async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    """
-    We only need 1 rollover migration defined at a time; otherwise, we will
-    possibly run many for a kb when we only ever need to run one
-    """
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "Which is our future?",
+            "reranker": reranker,
+        },
+    )
+    assert resp.status_code == 200
