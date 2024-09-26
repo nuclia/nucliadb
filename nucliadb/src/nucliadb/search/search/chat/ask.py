@@ -22,6 +22,8 @@ import json
 from dataclasses import dataclass
 from typing import AsyncGenerator, Optional, cast
 
+from pydantic_core import ValidationError
+
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger, predict
@@ -35,7 +37,7 @@ from nucliadb.search.predict import (
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
-from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
+from nucliadb.search.search.chat.exceptions import AnswerJsonSchemaTooLong, NoRetrievalResultsError
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
@@ -789,6 +791,12 @@ def calculate_prequeries_for_json_schema(ask_request: AskRequest) -> Optional[Pr
             weight=1.0,
         )
         prequeries.append(prequery)
-    strategy = PreQueriesStrategy(queries=prequeries)
+    try:
+        strategy = PreQueriesStrategy(queries=prequeries)
+    except ValidationError:
+        raise AnswerJsonSchemaTooLong(
+            "Answer JSON schema with too many properties generated too many prequeries"
+        )
+
     ask_request.rag_strategies = [strategy]
     return strategy

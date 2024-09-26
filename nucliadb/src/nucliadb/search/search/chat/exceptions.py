@@ -34,3 +34,7 @@ class NoRetrievalResultsError(Exception):
         self.main_query = main
         self.prequeries = prequeries
         self.prefilters = prefilters
+
+
+class AnswerJsonSchemaTooLong(Exception):
+    pass

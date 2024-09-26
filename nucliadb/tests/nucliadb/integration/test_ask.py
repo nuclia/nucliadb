@@ -33,6 +33,7 @@ from nucliadb.search.predict import (
 )
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
+    AskRequest,
     AskResponseItem,
     ChatRequest,
     FieldExtensionStrategy,
@@ -859,3 +860,40 @@ async def test_all_rag_strategies_combinations(
             },
         )
         assert resp.status_code == 200, resp.text
+
+
+async def test_ask_fails_with_answer_json_schema_too_big(
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+    resources: list[str],
+):
+    kbid = knowledgebox
+    rid = resources[0]
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/resource/{rid}/ask",
+        json=AskRequest(
+            query="",
+            answer_json_schema={
+                "name": "structred_response",
+                "description": "Structured response with custom fields",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        f"property-{i}": {
+                            "type": "string",
+                            "description": f"Yet another property... ({i})",
+                        }
+                        for i in range(50)
+                    },
+                    "required": ["property-0"],
+                },
+            },
+        ).model_dump(),
+    )
+
+    assert resp.status_code == 400
+    assert (
+        resp.json()["detail"]
+        == "Answer JSON schema with too many properties generated too many prequeries"
+    )
