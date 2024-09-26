@@ -271,7 +271,7 @@ pub fn translate(
     })
 }
 
-/// Extract an expression only involving some labels it it's an AND subset of the total expression
+/// Extract an expression only involving some labels if it's an AND subset of the total expression
 pub fn extract_label_filters(expression: &BooleanExpression, labels: &[&str]) -> Option<BooleanExpression> {
     match expression {
         BooleanExpression::Literal(label) if labels.contains(&label.as_str()) => Some(expression.clone()),
