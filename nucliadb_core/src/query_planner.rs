@@ -23,8 +23,8 @@ pub use crate::protos::prost_types::Timestamp as ProtoTimestamp;
 use crate::protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
-use crate::query_language::{self, BooleanExpression, QueryAnalysis, QueryContext};
-use crate::vectors::VectorsContext;
+use crate::query_language::{self, extract_label_filters, BooleanExpression, QueryAnalysis, QueryContext};
+use crate::vectors::{VectorsContext, SEGMENT_TAGS};
 use crate::NodeResult;
 use nucliadb_protos::utils::Security;
 
@@ -175,6 +175,10 @@ pub fn build_query_plan(paragraphs_version: u32, search_request: SearchRequest) 
     let search_query = query_analysis.search_query;
     let vectors_context = VectorsContext {
         filtering_formula: search_query.clone(),
+        segment_filtering_formula: query_analysis
+            .labels_prefilter_query
+            .as_ref()
+            .and_then(|e| extract_label_filters(e, SEGMENT_TAGS)),
     };
     let paragraphs_context = ParagraphsContext {
         filtering_formula: search_query,

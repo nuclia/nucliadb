@@ -70,7 +70,7 @@ fn simple_flow() {
         expected_keys.push(key);
     }
     let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems, None, &CONFIG).unwrap();
+    let reader = data_point::create(&pin, elems, None, &CONFIG, HashSet::new()).unwrap();
     let query = vec![rand::random::<f32>(); 8];
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -102,7 +102,7 @@ fn accuracy_test() {
         elems.push(Elem::new(key, vector, labels, None));
     }
     let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems, None, &CONFIG).unwrap();
+    let reader = data_point::create(&pin, elems, None, &CONFIG, HashSet::new()).unwrap();
     let query = create_query();
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -128,13 +128,13 @@ fn single_graph() {
 
     let elems = vec![Elem::new(key.clone(), vector.clone(), LabelDictionary::default(), None)];
     let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems.clone(), None, &CONFIG).unwrap();
+    let reader = data_point::create(&pin, elems.clone(), None, &CONFIG, HashSet::new()).unwrap();
     let formula = Formula::new();
     let result = reader.search(&HashSet::from([key.clone()]), &vector, &formula, true, 5, &CONFIG, -1.0);
     assert_eq!(result.count(), 0);
 
     let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems, None, &CONFIG).unwrap();
+    let reader = data_point::create(&pin, elems, None, &CONFIG, HashSet::new()).unwrap();
     let result = reader.search(&HashSet::new(), &vector, &formula, true, 5, &CONFIG, -1.0).collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
@@ -153,10 +153,10 @@ fn data_merge() {
     let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), LabelDictionary::default(), None)];
 
     let dp0_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let dp0 = data_point::create(&dp0_pin, elems0, None, &CONFIG).unwrap();
+    let dp0 = data_point::create(&dp0_pin, elems0, None, &CONFIG, HashSet::new()).unwrap();
 
     let dp1_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let dp1 = data_point::create(&dp1_pin, elems1, None, &CONFIG).unwrap();
+    let dp1 = data_point::create(&dp1_pin, elems1, None, &CONFIG, HashSet::new()).unwrap();
 
     let work = &[(HashSet::default(), &dp1), (HashSet::default(), &dp0)];
 
@@ -203,7 +203,7 @@ fn prefiltering_test() {
     }
 
     let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems, None, &CONFIG).unwrap();
+    let reader = data_point::create(&pin, elems, None, &CONFIG, HashSet::new()).unwrap();
     let query = create_query();
     let no_results = 10;
 
@@ -234,7 +234,7 @@ fn fast_data_merge() -> VectorR<()> {
         (0..100).map(|k| Elem::new(format!("trash_{k}"), create_query(), LabelDictionary::default(), None)).collect();
     elems.push(Elem::new("search_0".into(), search_vectors[0].clone(), LabelDictionary::default(), None));
     elems.push(Elem::new("search_1".into(), search_vectors[1].clone(), LabelDictionary::default(), None));
-    let big_segment = data_point::create(&big_segment_pin, elems, None, &CONFIG)?;
+    let big_segment = data_point::create(&big_segment_pin, elems, None, &CONFIG, HashSet::new())?;
 
     let small_segment_dir = tempfile::tempdir()?;
     let small_segment_pin = DataPointPin::create_pin(small_segment_dir.path())?;
@@ -246,6 +246,7 @@ fn fast_data_merge() -> VectorR<()> {
         ],
         None,
         &CONFIG,
+        HashSet::new(),
     )?;
 
     // Merge without deletions

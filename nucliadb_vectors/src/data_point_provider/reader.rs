@@ -29,6 +29,7 @@ use crate::utils;
 use crate::{VectorErr, VectorR};
 use fs2::FileExt;
 use fxhash::FxHashMap;
+use nucliadb_core::query_language::{BooleanExpression, BooleanOperation, Operator};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -113,6 +114,21 @@ fn last_modified(path: &Path) -> std::io::Result<SystemTime> {
     std::fs::metadata(path)?.modified()
 }
 
+fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
+    match expression {
+        BooleanExpression::Literal(tag) => labels.contains(tag),
+        BooleanExpression::Not(expr) => !segment_matches(expr, labels),
+        BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands,
+        }) => operands.iter().all(|op| segment_matches(op, labels)),
+        BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::Or,
+            operands,
+        }) => operands.iter().any(|op| segment_matches(op, labels)),
+    }
+}
+
 impl Reader {
     pub fn open(path: &Path) -> VectorR<Reader> {
         let lock_path = path.join(OPENING_FLAG);
@@ -163,7 +179,11 @@ impl Reader {
         })
     }
 
-    pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
+    pub fn search(
+        &self,
+        request: &dyn SearchRequest,
+        segment_filter: &Option<BooleanExpression>,
+    ) -> VectorR<Vec<Neighbour>> {
         let normalized_query;
         let query = if self.config.normalize_vectors {
             normalized_query = utils::normalize_vector(request.get_query());
@@ -197,6 +217,11 @@ impl Reader {
 
         for open_data_point in self.open_data_points.values() {
             let data_point_journal = open_data_point.journal();
+
+            // Skip this segment if it doesn't match the segment filter
+            if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, data_point_journal.tags())) {
+                continue;
+            }
             let delete_log = TimeSensitiveDLog {
                 time: data_point_journal.time(),
                 dlog: &self.delete_log,

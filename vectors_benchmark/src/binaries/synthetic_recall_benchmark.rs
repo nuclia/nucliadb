@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use nucliadb_core::NodeResult;
 use nucliadb_vectors::{
@@ -58,7 +58,7 @@ fn test_recall_random_data() -> NodeResult<()> {
 
     let config = VectorConfig::default();
     let pin = DataPointPin::create_pin(temp_dir.path())?;
-    let dp = create(&pin, elems_vec, None, &config)?;
+    let dp = create(&pin, elems_vec, None, &config, HashSet::new())?;
 
     // Search a few times
     let correct = (0..100)
@@ -114,6 +114,7 @@ fn test_recall_clustered_data() -> NodeResult<()> {
         elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
         None,
         &config,
+        HashSet::new(),
     )?;
 
     // Search a few times

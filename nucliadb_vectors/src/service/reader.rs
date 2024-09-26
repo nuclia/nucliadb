@@ -116,7 +116,7 @@ impl VectorReader for VectorReaderService {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
 
-        let result = self.index.search(&search_request)?;
+        let result = self.index.search(&search_request, &context.segment_filtering_formula)?;
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");

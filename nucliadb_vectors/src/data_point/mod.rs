@@ -42,6 +42,7 @@ use node::Node;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -209,6 +210,14 @@ where
     let mut operants = operants.iter().collect::<Vec<_>>();
     operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.1.journal().no_nodes()));
 
+    // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
+    let tags = operants[0].1.journal().tags().clone();
+    for (_, dp) in &operants {
+        if dp.journal().tags() != &tags {
+            return Err(crate::VectorErr::InconsistentMergeSegmentTags);
+        }
+    }
+
     // Creating the node store
     let node_producers: Vec<_> = operants.iter().map(|dp| ((&dp.0, Node), dp.1.nodes.as_ref())).collect();
     let has_deletions = data_store::merge(&mut nodes_file, &node_producers, config)?;
@@ -246,6 +255,7 @@ where
         nodes: no_nodes,
         uid: data_point_id,
         ctime: merge_time,
+        tags,
     };
 
     {
@@ -273,6 +283,7 @@ pub fn create(
     elems: Vec<Elem>,
     time: Option<SystemTime>,
     config: &VectorConfig,
+    tags: HashSet<String>,
 ) -> VectorR<OpenDataPoint> {
     // Check dimensions
     if let Some(dim) = config.vector_type.dimension() {
@@ -328,6 +339,7 @@ pub fn create(
         nodes: no_nodes,
         uid: data_point_id,
         ctime: time.unwrap_or_else(SystemTime::now),
+        tags,
     };
     {
         // Saving the journal
@@ -357,11 +369,13 @@ impl DeleteLog for NoDLog {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Journal {
     uid: DpId,
     nodes: usize,
     ctime: SystemTime,
+    #[serde(default)]
+    tags: HashSet<String>,
 }
 impl Journal {
     pub fn id(&self) -> DpId {
@@ -375,6 +389,9 @@ impl Journal {
     }
     pub fn update_time(&mut self, time: SystemTime) {
         self.ctime = time;
+    }
+    pub fn tags(&self) -> &HashSet<String> {
+        &self.tags
     }
 }
 
@@ -640,8 +657,8 @@ impl OpenDataPoint {
     pub fn get_id(&self) -> DpId {
         self.journal.uid
     }
-    pub fn journal(&self) -> Journal {
-        self.journal
+    pub fn journal(&self) -> &Journal {
+        &self.journal
     }
     pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
         let node_storage = &self.nodes;
@@ -681,7 +698,10 @@ impl OpenDataPoint {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::BTreeMap, time::SystemTime};
+    use std::{
+        collections::{BTreeMap, HashSet},
+        time::SystemTime,
+    };
 
     use nucliadb_core::{
         protos::{Position, Representation, SentenceMetadata},
@@ -779,7 +799,7 @@ mod test {
         // Create a data point with random data of different length
         let pin = DataPointPin::create_pin(temp_dir.path())?;
         let elems = (0..100).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp = create(&pin, elems.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+        let dp = create(&pin, elems.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
         let nodes = dp.nodes;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
@@ -819,11 +839,11 @@ mod test {
         // Create two data points with random data of different length
         let pin1 = DataPointPin::create_pin(temp_dir.path())?;
         let elems1 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp1 = create(&pin1, elems1.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+        let dp1 = create(&pin1, elems1.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
 
         let pin2 = DataPointPin::create_pin(temp_dir.path())?;
         let elems2 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp2 = create(&pin2, elems2.iter().cloned().map(|x| x.0).collect(), None, &config)?;
+        let dp2 = create(&pin2, elems2.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
 
         let pin_merged = DataPointPin::create_pin(temp_dir.path())?;
         let merged_dp = merge(&pin_merged, &[(NoDLog, &dp1), (NoDLog, &dp2)], &config, SystemTime::now())?;
@@ -890,6 +910,7 @@ mod test {
             elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
             None,
             &config,
+            HashSet::new(),
         )?;
 
         // Search a few times

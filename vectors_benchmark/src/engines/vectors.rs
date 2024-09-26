@@ -25,6 +25,7 @@ use nucliadb_vectors::data_point_provider::reader::Reader;
 use nucliadb_vectors::data_point_provider::writer::Writer;
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::Formula;
+use std::collections::HashSet;
 use std::time::SystemTime;
 
 lazy_static::lazy_static! {
@@ -64,7 +65,7 @@ impl VectorEngine for Writer {
         }
 
         let data_point_pin = DataPointPin::create_pin(self.location()).unwrap();
-        data_point::create(&data_point_pin, elems, Some(temporal_mark), &config).unwrap();
+        data_point::create(&data_point_pin, elems, Some(temporal_mark), &config, HashSet::new()).unwrap();
 
         self.add_data_point(data_point_pin).unwrap();
         self.record_delete(batch_id.as_bytes(), temporal_mark);
@@ -82,6 +83,6 @@ impl VectorEngine for Reader {
     }
 
     fn search(&self, no_results: usize, query: &[f32]) {
-        self.search(&Request(no_results, query)).unwrap();
+        self.search(&Request(no_results, query), &None).unwrap();
     }
 }

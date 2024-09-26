@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashSet;
+
 use nucliadb_core::NodeResult;
 use nucliadb_vectors::config::VectorType;
 use nucliadb_vectors::data_point_provider::SearchRequest;
@@ -81,17 +83,20 @@ fn test_basic_search(
     // Write some data
     let mut writer = Writer::new(&index_path, config.clone(), "abc".into())?;
     let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, (0..DIMENSION).map(elem).collect(), None, &config)?;
+    data_point::create(&data_point_pin, (0..DIMENSION).map(elem).collect(), None, &config, HashSet::new())?;
     writer.add_data_point(data_point_pin)?;
     writer.commit()?;
 
     // Search for a specific element
     let reader = Reader::open(&index_path)?;
     let search_for = elem(5);
-    let results = reader.search(&Request {
-        vector: search_for.vector,
-        formula: Formula::new(),
-    })?;
+    let results = reader.search(
+        &Request {
+            vector: search_for.vector,
+            formula: Formula::new(),
+        },
+        &None,
+    )?;
     assert_eq!(results.len(), 10);
     assert_eq!(results[0].id(), search_for.key);
     assert_eq!(results[0].score(), 1.0);
@@ -104,10 +109,13 @@ fn test_basic_search(
     vector[44] = 0.5;
     vector[45] = 0.4;
     let reader = Reader::open(&index_path)?;
-    let results = reader.search(&Request {
-        vector,
-        formula: Formula::new(),
-    })?;
+    let results = reader.search(
+        &Request {
+            vector,
+            formula: Formula::new(),
+        },
+        &None,
+    )?;
     assert_eq!(results.len(), 10);
     assert_eq!(results[0].id(), elem(42).key);
     assert!(results[0].score() > 0.2);

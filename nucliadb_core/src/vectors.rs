@@ -37,6 +37,8 @@ pub type VectorsWriterPointer = Box<dyn VectorWriter>;
 pub type ProtosRequest = nodereader::VectorSearchRequest;
 pub type ProtosResponse = nodereader::VectorSearchResponse;
 
+pub const SEGMENT_TAGS: &[&str] = &["/q/h"];
+
 #[derive(Debug, Clone, Copy)]
 pub struct MergeParameters {
     pub max_nodes_in_merge: usize,
@@ -63,6 +65,7 @@ pub struct VectorIndexConfig {
 #[derive(Clone, Default)]
 pub struct VectorsContext {
     pub filtering_formula: Option<BooleanExpression>,
+    pub segment_filtering_formula: Option<BooleanExpression>,
 }
 
 pub struct MergeMetrics {
@@ -133,6 +136,10 @@ impl<'a> ResourceWrapper<'a> {
 
     pub fn id(&self) -> &String {
         &self.resource.shard_id
+    }
+
+    pub fn labels(&self) -> &[String] {
+        &self.resource.labels
     }
 
     pub fn fields(&self) -> impl Iterator<Item = (&String, impl Iterator<Item = ParagraphVectors>)> {

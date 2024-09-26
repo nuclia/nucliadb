@@ -179,7 +179,7 @@ fn test_search(dataset: &Dataset, cycles: usize) -> Vec<(String, Vec<u128>)> {
             let search_result;
 
             let (_, elapsed_time) = measure_time!(microseconds {
-                search_result = reader.search(&query.request).unwrap();
+                search_result = reader.search(&query.request, &None).unwrap();
 
             });
 
