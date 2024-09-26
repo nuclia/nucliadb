@@ -677,6 +677,8 @@ class PineconeIndexManager(ExternalIndexManager):
         return vectorset_vectors
 
     async def _query(self, request: SearchRequest) -> PineconeQueryResults:
+        if len(request.vector) == 0:
+            return PineconeQueryResults(results=QueryResponse(matches=[]))
         vectorset_id = request.vectorset or self.default_vectorset or "__default__"
         index_host = self.get_index_host(vectorset_id=vectorset_id)
         data_plane = self.get_data_plane(index_host=index_host)

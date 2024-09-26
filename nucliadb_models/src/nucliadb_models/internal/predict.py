@@ -66,3 +66,13 @@ class QueryInfo(BaseModel):
     entities: Optional[TokenSearch]
     sentence: Optional[SentenceSearch]
     query: str
+
+
+class RerankModel(BaseModel):
+    question: str
+    user_id: str
+    context: dict[str, str] = {}
+
+
+class RerankResponse(BaseModel):
+    context_scores: dict[str, float] = Field(description="Scores for each context given by the reranker")

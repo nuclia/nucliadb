@@ -29,6 +29,9 @@ from nucliadb.search.search import results_hydrator
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.rerankers import (
+    get_reranker,
+)
 from nucliadb.search.search.results_hydrator.base import (
     ResourceHydrationOptions,
 )
@@ -94,40 +97,7 @@ async def _index_node_retrieval(
     audit = get_audit()
     start_time = time()
 
-    item.min_score = min_score_from_payload(item.min_score)
-
-    if SearchOptions.SEMANTIC in item.features:
-        if should_disable_vector_search(item):
-            item.features.remove(SearchOptions.SEMANTIC)
-
-    query_parser = QueryParser(
-        kbid=kbid,
-        features=item.features,
-        query=item.query,
-        label_filters=item.filters,
-        keyword_filters=item.keyword_filters,
-        faceted=None,
-        sort=None,
-        page_number=item.page_number,
-        page_size=item.page_size,
-        min_score=item.min_score,
-        range_creation_start=item.range_creation_start,
-        range_creation_end=item.range_creation_end,
-        range_modification_start=item.range_modification_start,
-        range_modification_end=item.range_modification_end,
-        fields=item.fields,
-        user_vector=item.vector,
-        vectorset=item.vectorset,
-        with_duplicates=item.with_duplicates,
-        with_synonyms=item.with_synonyms,
-        autofilter=item.autofilter,
-        key_filters=item.resource_filters,
-        security=item.security,
-        generative_model=generative_model,
-        rephrase=item.rephrase,
-        hidden=await filter_hidden_resources(kbid, item.show_hidden),
-        rephrase_prompt=item.rephrase_prompt,
-    )
+    query_parser = await query_parser_from_find_request(kbid, item, generative_model=generative_model)
     with metrics.time("query_parse"):
         pb_query, incomplete_results, autofilters = await query_parser.parse()
 
@@ -152,6 +122,10 @@ async def _index_node_retrieval(
             min_score_semantic=query_parser.min_score.semantic,  # type: ignore
             highlight=item.highlight,
         )
+
+    # once hydrated, we send the results to rerank
+    reranker = query_parser.reranker
+    await reranker.rerank_find_response(kbid, query_parser.query, search_results, query_parser.page_size)
 
     search_time = time() - start_time
     if audit is not None:
@@ -212,35 +186,7 @@ async def _external_index_retrieval(
     Parse the query, query the external index, and hydrate the results.
     """
     # Parse query
-    item.min_score = min_score_from_payload(item.min_score)
-    query_parser = QueryParser(
-        kbid=kbid,
-        features=item.features,
-        query=item.query,
-        label_filters=item.filters,
-        keyword_filters=item.keyword_filters,
-        faceted=None,
-        sort=None,
-        page_number=item.page_number,
-        page_size=item.page_size,
-        min_score=item.min_score,
-        range_creation_start=item.range_creation_start,
-        range_creation_end=item.range_creation_end,
-        range_modification_start=item.range_modification_start,
-        range_modification_end=item.range_modification_end,
-        fields=item.fields,
-        user_vector=item.vector,
-        vectorset=item.vectorset,
-        with_duplicates=item.with_duplicates,
-        with_synonyms=item.with_synonyms,
-        autofilter=item.autofilter,
-        key_filters=item.resource_filters,
-        security=item.security,
-        generative_model=generative_model,
-        rephrase=item.rephrase,
-        hidden=await filter_hidden_resources(kbid, item.show_hidden),
-        rephrase_prompt=item.rephrase_prompt,
-    )
+    query_parser = await query_parser_from_find_request(kbid, item, generative_model=generative_model)
     search_request, incomplete_results, _ = await query_parser.parse()
 
     # Query index
@@ -249,7 +195,7 @@ async def _external_index_retrieval(
     # Hydrate results
     results_min_score = MinScore(
         bm25=0,
-        semantic=item.min_score.semantic or query_parser.min_score.semantic,
+        semantic=query_parser.min_score.semantic,
     )
     retrieval_results = KnowledgeboxFindResults(
         resources={},
@@ -278,6 +224,12 @@ async def _external_index_retrieval(
         max_parallel_operations=50,
     )
 
+    # once hydrated, we send the results to rerank
+    reranker = query_parser.reranker
+    await reranker.rerank_find_response(
+        kbid, query_parser.query, retrieval_results, query_parser.page_size
+    )
+
     # Once hydrated, populate best_matches with the paragraphs ids sorted by score
     scored_paragraphs: list[ScoredParagraph] = [
         ScoredParagraph(id=paragraph.id, score=paragraph.score)
@@ -295,3 +247,47 @@ async def _external_index_retrieval(
 class ScoredParagraph:
     id: str
     score: float
+
+
+async def query_parser_from_find_request(
+    kbid: str, item: FindRequest, *, generative_model: Optional[str] = None
+) -> QueryParser:
+    item.min_score = min_score_from_payload(item.min_score)
+
+    if SearchOptions.SEMANTIC in item.features:
+        if should_disable_vector_search(item):
+            item.features.remove(SearchOptions.SEMANTIC)
+
+    hidden = await filter_hidden_resources(kbid, item.show_hidden)
+
+    reranker = get_reranker(item.reranker)
+    query_parser = QueryParser(
+        kbid=kbid,
+        features=item.features,
+        query=item.query,
+        label_filters=item.filters,
+        keyword_filters=item.keyword_filters,
+        faceted=None,
+        sort=None,
+        page_number=item.page_number,
+        page_size=item.page_size,
+        min_score=item.min_score,
+        range_creation_start=item.range_creation_start,
+        range_creation_end=item.range_creation_end,
+        range_modification_start=item.range_modification_start,
+        range_modification_end=item.range_modification_end,
+        fields=item.fields,
+        user_vector=item.vector,
+        vectorset=item.vectorset,
+        with_duplicates=item.with_duplicates,
+        with_synonyms=item.with_synonyms,
+        autofilter=item.autofilter,
+        key_filters=item.resource_filters,
+        security=item.security,
+        generative_model=generative_model,
+        rephrase=item.rephrase,
+        rephrase_prompt=item.rephrase_prompt,
+        hidden=hidden,
+        reranker=reranker,
+    )
+    return query_parser

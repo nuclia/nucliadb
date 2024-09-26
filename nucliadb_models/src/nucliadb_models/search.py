@@ -382,6 +382,22 @@ class SortOptions(BaseModel):
     order: SortOrder = SortOrder.DESC
 
 
+class Reranker(str, Enum):
+    """Rerankers
+
+    - Multi-match booster: given a set of results from different sources, e.g.,
+      keyword and semantic search boost results appearing in both sets
+
+    - Predict reranker: after retrieval, send the results to Predict API to
+      rerank it. This method uses a reranker model, so one can expect better
+      results at expenses of more latency
+
+    """
+
+    MULTI_MATCH_BOOSTER = "multi_match_booster"
+    PREDICT_RERANKER = "predict"
+
+
 class KnowledgeBoxCount(BaseModel):
     paragraphs: int
     fields: int
@@ -504,6 +520,11 @@ class SearchParamDefaults:
         default=None,
         title="Search features",
         description="List of search features to use. Each value corresponds to a lookup into on of the different indexes. `document`, `paragraph` and `vector` are deprecated, please use `fulltext`, `keyword` and `semantic` instead",  # noqa
+    )
+    reranker = ParamDefault(
+        default=Reranker.MULTI_MATCH_BOOSTER,
+        title="Reranker",
+        description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval",
     )
     debug = ParamDefault(
         default=False,
@@ -1451,6 +1472,7 @@ class FindRequest(BaseSearchRequest):
             SearchOptions.SEMANTIC,
         ]
     )
+    reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
 
     @field_validator("features", mode="after")
     @classmethod
@@ -1481,6 +1503,7 @@ class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
     BOTH = "BOTH"
+    RERANKER = "RERANKER"
 
 
 class FindTextPosition(BaseModel):
