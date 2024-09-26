@@ -65,7 +65,7 @@ impl InnerCache {
 
     pub fn get(&mut self, id: &ShardId) -> NodeResult<CacheResult<ShardId, ShardWriter>> {
         if self.blocked_shards.contains(id) {
-            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
+            return Err(node_error!(ShardNotFoundError(id.clone())));
         }
 
         Ok(self.active_shards.get(id))
@@ -77,7 +77,7 @@ impl InnerCache {
         shard: Arc<ShardWriter>,
     ) -> NodeResult<Arc<ShardWriter>> {
         if self.blocked_shards.contains(&shard.id) {
-            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
+            return Err(node_error!(ShardNotFoundError(shard.id.clone())));
         }
 
         self.active_shards.loaded(guard, &shard);
@@ -157,7 +157,7 @@ impl ShardWriterCache {
         let shard_path = disk_structure::shard_path_by_id(&self.shards_path.clone(), id);
 
         if !ShardMetadata::exists(&shard_path) {
-            return Err(node_error!(ShardNotFoundError("Shard {shard_path:?} is not on disk")));
+            return Err(node_error!(ShardNotFoundError(id.clone())));
         }
         let metadata = metadata_manager.get(id.clone()).expect("Shard metadata not found. This should not happen");
         let shard = ShardWriter::open(metadata)

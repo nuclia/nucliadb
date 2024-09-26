@@ -223,8 +223,15 @@ impl ReplicateWorkerPool {
         tokio::spawn(async move {
             let result = worker.await;
             drop(permit);
-            if result.is_err() {
-                error!("Error replicating shard: {:?}", result);
+            if let Err(e) = result {
+                if let Some(status) = e.downcast_ref::<tonic::Status>() {
+                    if status.code() == tonic::Code::NotFound {
+                        warn!("Error replicating shard, not found in primary: {status:?}");
+                        return;
+                    }
+                }
+
+                error!("Error replicating shard: {e:?}");
             }
         });
         Ok(())
@@ -303,13 +310,24 @@ pub async fn connect_to_primary_and_replicate(
             }
 
             let shard_id = shard_state.shard_id.clone();
-            let shard_lookup;
             let shard_path = disk_structure::shard_path_by_id(&settings.shards_path(), &shard_id);
             let shard = if existing_shards.contains(&shard_id) {
                 let shard_cache_clone = shard_cache.clone();
                 let shard_id_clone = shard_id.clone();
-                shard_lookup = tokio::task::spawn_blocking(move || shard_cache_clone.get(&shard_id_clone)).await?;
-                ShardStub::Shard(shard_lookup?)
+                let shard_lookup = tokio::task::spawn_blocking(move || shard_cache_clone.get(&shard_id_clone)).await?;
+                if let Ok(shard) = shard_lookup {
+                    ShardStub::Shard(shard)
+                } else {
+                    // Shard exists but could not open, delete and recreate
+                    warn!("Could not open replica shard {shard_id}, starting from scratch...");
+                    std::fs::remove_dir_all(&shard_path)?;
+                    std::fs::create_dir(&shard_path)?;
+                    ShardStub::New {
+                        id: shard_id.clone(),
+                        path: shard_path.clone(),
+                        cache: shard_cache.clone(),
+                    }
+                }
             } else {
                 std::fs::create_dir(&shard_path)?;
                 ShardStub::New {
