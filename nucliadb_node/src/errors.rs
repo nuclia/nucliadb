@@ -20,7 +20,7 @@
 use std::fmt::Display;
 
 #[derive(Debug)]
-pub struct ShardNotFoundError(pub &'static str);
+pub struct ShardNotFoundError(pub String);
 
 impl Display for ShardNotFoundError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
