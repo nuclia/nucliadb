@@ -668,7 +668,7 @@ class CatalogRequest(BaseModel):
     range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
-    hidden: SkipJsonSchema[Optional[bool]] = SearchParamDefaults.hidden.to_pydantic_field()
+    hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
 
     @field_validator("faceted")
     @classmethod
@@ -736,7 +736,7 @@ class BaseSearchRequest(BaseModel):
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     resource_filters: List[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
-    show_hidden: SkipJsonSchema[bool] = SearchParamDefaults.show_hidden.to_pydantic_field()
+    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
 
     rephrase: bool = Field(
         default=False,
@@ -1263,7 +1263,7 @@ class AskRequest(BaseModel):
         le=1.0,
     )
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
-    show_hidden: SkipJsonSchema[bool] = SearchParamDefaults.show_hidden.to_pydantic_field()
+    show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
         default=[],
         title="RAG context building strategies",
