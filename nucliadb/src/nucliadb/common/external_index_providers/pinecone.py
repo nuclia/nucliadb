@@ -88,7 +88,6 @@ class PineconeQueryResults(QueryResults):
                 _id=paragraph_id,
                 score=matching_vector.score,
                 order=order,
-                index=vector_id.index,
                 is_a_table=vector_metadata.is_a_table or False,
                 page_with_visual=vector_metadata.page_with_visual or False,
                 representation_file=vector_metadata.representation_file,

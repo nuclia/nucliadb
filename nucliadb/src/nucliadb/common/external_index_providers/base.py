@@ -62,7 +62,6 @@ class TextBlockMatch(BaseModel):
     """
 
     _id: ParagraphId
-    index: Optional[int] = None
     position: TextPosition
     score: float
     order: int
