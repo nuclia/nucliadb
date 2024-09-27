@@ -61,7 +61,7 @@ class TextBlockMatch(BaseModel):
     needed in order to later hydrate retrieval results.
     """
 
-    _id: ParagraphId
+    id: ParagraphId
     position: TextPosition
     score: float
     order: int

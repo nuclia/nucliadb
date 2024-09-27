@@ -85,7 +85,7 @@ class PineconeQueryResults(QueryResults):
             vector_metadata = VectorMetadata.model_validate(matching_vector.metadata)  # noqa
             yield TextBlockMatch(
                 text=None,  # To be filled by the results hydrator
-                _id=paragraph_id,
+                id=paragraph_id,
                 score=matching_vector.score,
                 order=order,
                 is_a_table=vector_metadata.is_a_table or False,

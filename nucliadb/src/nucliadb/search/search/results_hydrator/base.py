@@ -95,12 +95,12 @@ async def hydrate_external(
         ):  # pragma: no cover
             # Ignore text blocks with a score lower than the minimum
             continue
-        resource_id = text_block._id.rid
+        resource_id = text_block.id.rid
         resource_ids.add(resource_id)
         find_resource = retrieval_results.resources.setdefault(
             resource_id, FindResource(id=resource_id, fields={})
         )
-        field_id = text_block._id.field_id.full()
+        field_id = text_block.id.field_id.full()
         find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
 
         async def _hydrate_text_block(**kwargs):
@@ -151,8 +151,8 @@ async def hydrate_text_block(
     """
     Fetch the text for a text block and update the FindParagraph object.
     """
-    text = await paragraphs.get_paragraph_text(kbid=kbid, paragraph_id=text_block._id)
-    text_block_id = text_block._id.full()
+    text = await paragraphs.get_paragraph_text(kbid=kbid, paragraph_id=text_block.id)
+    text_block_id = text_block.id.full()
     field_paragraphs[text_block_id] = FindParagraph(
         score=text_block.score,
         score_type=SCORE_TYPE.VECTOR,
