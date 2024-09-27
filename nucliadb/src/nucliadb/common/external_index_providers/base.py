@@ -26,6 +26,7 @@ from pydantic import BaseModel
 
 from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexingError
+from nucliadb.common.ids import ParagraphId
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
 from nucliadb_models.search import TextPosition
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -60,7 +61,7 @@ class TextBlockMatch(BaseModel):
     needed in order to later hydrate retrieval results.
     """
 
-    id: str
+    _id: ParagraphId
     resource_id: str
     field_id: str
     subfield_id: Optional[str] = None

@@ -160,12 +160,13 @@ async def hydrate_text_block(
             paragraph_end=text_block.position.end,
         ),
     )
-    field_paragraphs[text_block.id] = FindParagraph(
+    text_block_id = text_block._id.full()
+    field_paragraphs[text_block_id] = FindParagraph(
         score=text_block.score,
         score_type=SCORE_TYPE.VECTOR,
         order=text_block.order,
         text=text,
-        id=text_block.id,
+        id=text_block_id,
         labels=text_block.paragraph_labels,
         fuzzy_result=False,
         is_a_table=text_block.is_a_table,
