@@ -117,6 +117,7 @@ async def gcs_storage(gcs, gcs_storage_settings: dict[str, Any]):
         deadletter_bucket=extended_storage_settings.gcs_deadletter_bucket,
         indexing_bucket=extended_storage_settings.gcs_indexing_bucket,
         labels=storage_settings.gcs_bucket_labels,
+        anonymous=True,
     )
     await storage.initialize()
     yield storage

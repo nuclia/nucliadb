@@ -458,25 +458,30 @@ class GCSStorage(Storage):
         labels: Optional[Dict[str, str]] = None,
         url: str = "https://www.googleapis.com",
         scopes: Optional[List[str]] = None,
+        anonymous: bool = False
     ):
-        if account_credentials is None:
+        if anonymous:
             self._json_credentials = None
-        elif isinstance(account_credentials, str) and account_credentials.strip() == "":
-            self._json_credentials = None
+            self._credentials = google.auth.credentials.AnonymousCredentials()
         else:
-            self._json_credentials = json.loads(base64.b64decode(account_credentials))
+            if account_credentials is None:
+                self._json_credentials = None
+            elif isinstance(account_credentials, str) and account_credentials.strip() == "":
+                self._json_credentials = None
+            else:
+                self._json_credentials = json.loads(base64.b64decode(account_credentials))
 
-        if self._json_credentials is not None:
-            self._credentials = service_account.Credentials.from_service_account_info(
-                self._json_credentials,
-                scopes=DEFAULT_SCOPES if scopes is None else scopes,
-            )
-        else:
-            try:
-                self._credentials, self._project = google.auth.default()
-            except DefaultCredentialsError:
-                logger.warning("Setting up without credentials as couldn't find workload identity")
-                self._credentials = None
+            if self._json_credentials is not None:
+                self._credentials = service_account.Credentials.from_service_account_info(
+                    self._json_credentials,
+                    scopes=DEFAULT_SCOPES if scopes is None else scopes,
+                )
+            else:
+                try:
+                    self._credentials, self._project = google.auth.default()
+                except DefaultCredentialsError:
+                    logger.warning("Setting up without credentials as couldn't find workload identity")
+                    self._credentials = None
 
         self.source = CloudFile.GCS
         self.deadletter_bucket = deadletter_bucket
