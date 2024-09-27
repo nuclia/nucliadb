@@ -86,10 +86,8 @@ class PineconeQueryResults(QueryResults):
             yield TextBlockMatch(
                 text=None,  # To be filled by the results hydrator
                 _id=paragraph_id,
-                field_id=paragraph_id.field_id.full(),
                 score=matching_vector.score,
                 order=order,
-                subfield_id=paragraph_id.field_id.subfield_id,
                 index=vector_id.index,
                 is_a_table=vector_metadata.is_a_table or False,
                 page_with_visual=vector_metadata.page_with_visual or False,
