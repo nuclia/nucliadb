@@ -62,7 +62,6 @@ class TextBlockMatch(BaseModel):
     """
 
     _id: ParagraphId
-    resource_id: str
     field_id: str
     subfield_id: Optional[str] = None
     index: Optional[int] = None

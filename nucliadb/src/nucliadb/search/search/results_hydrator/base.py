@@ -96,7 +96,7 @@ async def hydrate_external(
         ):  # pragma: no cover
             # Ignore text blocks with a score lower than the minimum
             continue
-        resource_id = text_block.resource_id
+        resource_id = text_block._id.rid
         resource_ids.add(resource_id)
         find_resource = retrieval_results.resources.setdefault(
             resource_id, FindResource(id=resource_id, fields={})
