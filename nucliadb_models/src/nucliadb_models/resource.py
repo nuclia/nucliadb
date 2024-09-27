@@ -25,7 +25,6 @@ from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator, model_validator
-from pydantic.json_schema import SkipJsonSchema
 
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.external_index_providers import ExternalIndexProvider
@@ -297,7 +296,7 @@ class Resource(BaseModel):
     last_seqid: Optional[int] = None
     last_account_seq: Optional[int] = None
     queue: Optional[QueueType] = None
-    hidden: SkipJsonSchema[Optional[bool]] = None
+    hidden: Optional[bool] = None
 
     origin: Optional[Origin] = None
     extra: Optional[Extra] = None

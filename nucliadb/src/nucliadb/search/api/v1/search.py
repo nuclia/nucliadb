@@ -156,7 +156,7 @@ async def search_knowledgebox(
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
-    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden, include_in_schema=False),
+    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -239,7 +239,7 @@ async def catalog_get(
     range_modification_end: Optional[DateTime] = fastapi_query(
         SearchParamDefaults.range_modification_end
     ),
-    hidden: Optional[bool] = fastapi_query(SearchParamDefaults.hidden, include_in_schema=False),
+    hidden: Optional[bool] = fastapi_query(SearchParamDefaults.hidden),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     item = CatalogRequest(
         query=query,

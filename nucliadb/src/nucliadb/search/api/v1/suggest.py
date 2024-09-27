@@ -82,7 +82,7 @@ async def suggest_knowledgebox(
     x_forwarded_for: str = Header(""),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
-    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden, include_in_schema=False),
+    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
 ) -> Union[KnowledgeboxSuggestResults, HTTPClientError]:
     try:
         return await suggest(

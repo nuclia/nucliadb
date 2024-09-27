@@ -124,7 +124,7 @@ async def find_knowledgebox(
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
-    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden, include_in_schema=False),
+    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     reranker: Reranker = fastapi_query(SearchParamDefaults.reranker),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
