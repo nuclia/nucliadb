@@ -39,7 +39,6 @@ from nucliadb_models.search import (
     FindResource,
     KnowledgeboxFindResults,
     ResourceProperties,
-    TextPosition,
 )
 from nucliadb_telemetry.metrics import Observer
 
@@ -157,8 +156,8 @@ async def hydrate_text_block(
         kbid=kbid,
         paragraph_id=ParagraphId(
             field_id=field_id,
-            paragraph_start=text_block.position_start,
-            paragraph_end=text_block.position_end,
+            paragraph_start=text_block.position.start,
+            paragraph_end=text_block.position.end,
         ),
     )
     field_paragraphs[text_block.id] = FindParagraph(
@@ -172,14 +171,7 @@ async def hydrate_text_block(
         is_a_table=text_block.is_a_table,
         reference=text_block.representation_file,
         page_with_visual=text_block.page_with_visual,
-        position=TextPosition(
-            page_number=text_block.page_number,
-            index=text_block.index or 0,
-            start=text_block.position_start,
-            end=text_block.position_end,
-            start_seconds=text_block.position_start_seconds,
-            end_seconds=text_block.position_end_seconds,
-        ),
+        position=text_block.position,
     )
 
 

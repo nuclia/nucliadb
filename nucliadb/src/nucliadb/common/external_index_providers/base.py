@@ -27,6 +27,7 @@ from pydantic import BaseModel
 from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexingError
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
+from nucliadb_models.search import TextPosition
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     StoredExternalIndexProviderMetadata,
@@ -64,11 +65,7 @@ class TextBlockMatch(BaseModel):
     field_id: str
     subfield_id: Optional[str] = None
     index: Optional[int] = None
-    position_start: int
-    position_end: int
-    position_start_seconds: list[int] = []
-    position_end_seconds: list[int] = []
-    page_number: Optional[int] = None
+    position: TextPosition
     score: float
     order: int
     page_with_visual: bool = False
