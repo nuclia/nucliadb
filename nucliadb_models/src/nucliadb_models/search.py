@@ -1352,7 +1352,7 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         examples=[ANSWER_JSON_SCHEMA_EXAMPLE],
     )
 
-    user_metadata: Optional[Dict[str, Any]] = Field(
+    user_metadata: Optional[Dict[str, str]] = Field(
         default=None,
         title="User metadata",
         description=("Here you can send any metadata like your user_id, the environment from which the request is being sent, etc."
