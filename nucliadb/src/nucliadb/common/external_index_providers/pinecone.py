@@ -38,7 +38,7 @@ from nucliadb.common.external_index_providers.base import (
 )
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.ids import FieldId, ParagraphId, VectorId
-from nucliadb_models.search import TextPosition
+from nucliadb_models.search import SCORE_TYPE, TextPosition
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
@@ -87,7 +87,9 @@ class PineconeQueryResults(QueryResults):
                 paragraph_id=paragraph_id,
                 text=None,  # To be filled by the results hydrator
                 score=matching_vector.score,
+                score_type=SCORE_TYPE.VECTOR,
                 order=order,
+                fuzzy_search=False,  # semantic search doesn't use fuzziness
                 is_a_table=vector_metadata.is_a_table or False,
                 page_with_visual=vector_metadata.page_with_visual or False,
                 representation_file=vector_metadata.representation_file,

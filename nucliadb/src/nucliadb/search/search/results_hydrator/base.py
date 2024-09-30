@@ -32,7 +32,6 @@ from nucliadb.search.search import paragraphs
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
-    SCORE_TYPE,
     FindField,
     FindParagraph,
     FindResource,
@@ -155,7 +154,7 @@ async def hydrate_text_block(
     text_block_id = text_block.paragraph_id.full()
     field_paragraphs[text_block_id] = FindParagraph(
         score=text_block.score,
-        score_type=SCORE_TYPE.VECTOR,
+        score_type=text_block.score_type,
         order=text_block.order,
         text=text,
         id=text_block_id,
