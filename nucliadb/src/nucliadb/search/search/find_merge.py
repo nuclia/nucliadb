@@ -21,7 +21,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Optional, cast
 
-from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import FieldId, ParagraphId, VectorId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
@@ -32,7 +33,6 @@ from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
-    FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
     MinScore,
@@ -236,7 +236,7 @@ def merge_paragraphs_vectors(
     count: int,
     page: int,
     min_score: float,
-) -> tuple[list[TempFindParagraph], bool]:
+) -> tuple[list[TextBlockMatch], bool]:
     # Flatten the results from several shards to be able to sort them globally
     flat_paragraphs = [
         paragraph for paragraph_shard in paragraphs_shards for paragraph in paragraph_shard
@@ -245,68 +245,20 @@ def merge_paragraphs_vectors(
         vector for vector_shard in vectors_shards for vector in vector_shard if vector.score >= min_score
     ]
 
-    merged_paragraphs: list[TempFindParagraph] = rank_fusion_merge(flat_paragraphs, flat_vectors)
+    merged_paragraphs: list[TextBlockMatch] = rank_fusion_merge(flat_paragraphs, flat_vectors)
 
     init_position = count * page
     end_position = init_position + count
     next_page = len(merged_paragraphs) > end_position
     merged_paragraphs = merged_paragraphs[init_position:end_position]
 
-    for merged_paragraph in merged_paragraphs:
-        if merged_paragraph.vector_index is not None:
-            merged_paragraph.paragraph = FindParagraph(
-                score=merged_paragraph.vector_index.score,
-                score_type=SCORE_TYPE.VECTOR,
-                text="",
-                labels=[],  # TODO: Get labels from index
-                page_with_visual=merged_paragraph.vector_index.metadata.page_with_visual,
-                reference=merged_paragraph.vector_index.metadata.representation.file,
-                is_a_table=merged_paragraph.vector_index.metadata.representation.is_a_table,
-                position=TextPosition(
-                    page_number=merged_paragraph.vector_index.metadata.position.page_number,
-                    index=merged_paragraph.vector_index.metadata.position.index,
-                    start=merged_paragraph.start,
-                    end=merged_paragraph.end,
-                    start_seconds=[
-                        x for x in merged_paragraph.vector_index.metadata.position.start_seconds
-                    ],
-                    end_seconds=[x for x in merged_paragraph.vector_index.metadata.position.end_seconds],
-                ),
-                id=merged_paragraph.id,
-                # Vector searches don't have fuzziness
-                fuzzy_result=False,
-            )
-        elif merged_paragraph.paragraph_index is not None:
-            merged_paragraph.paragraph = FindParagraph(
-                score=merged_paragraph.paragraph_index.score.bm25,
-                score_type=SCORE_TYPE.BM25,
-                text="",
-                labels=[x for x in merged_paragraph.paragraph_index.labels],
-                page_with_visual=merged_paragraph.paragraph_index.metadata.page_with_visual,
-                reference=merged_paragraph.paragraph_index.metadata.representation.file,
-                is_a_table=merged_paragraph.paragraph_index.metadata.representation.is_a_table,
-                position=TextPosition(
-                    page_number=merged_paragraph.paragraph_index.metadata.position.page_number,
-                    index=merged_paragraph.paragraph_index.metadata.position.index,
-                    start=merged_paragraph.start,
-                    end=merged_paragraph.end,
-                    start_seconds=[
-                        x for x in merged_paragraph.paragraph_index.metadata.position.start_seconds
-                    ],
-                    end_seconds=[
-                        x for x in merged_paragraph.paragraph_index.metadata.position.end_seconds
-                    ],
-                ),
-                id=merged_paragraph.id,
-                fuzzy_result=merged_paragraph.fuzzy_result,
-            )
     return merged_paragraphs, next_page
 
 
 def rank_fusion_merge(
     paragraphs: list[ParagraphResult],
     vectors: list[DocumentScored],
-) -> list[TempFindParagraph]:
+) -> list[TextBlockMatch]:
     """Merge results from different indexes using a rank fusion algorithm.
 
     Given two list of sorted results from keyword and semantic search, this rank
@@ -316,7 +268,7 @@ def rank_fusion_merge(
     - 2 keyword results and 1 semantic
 
     """
-    merged_paragraphs: list[TempFindParagraph] = []
+    merged_paragraphs: list[TextBlockMatch] = []
 
     # sort results by it's score before merging them
     paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
@@ -325,47 +277,58 @@ def rank_fusion_merge(
     for paragraph in paragraphs:
         fuzzy_result = len(paragraph.matches) > 0
         merged_paragraphs.append(
-            TempFindParagraph(
-                paragraph_index=paragraph,
-                field=paragraph.field,
-                rid=paragraph.uuid,
+            TextBlockMatch(
+                paragraph_id=ParagraphId.from_string(paragraph.paragraph),
                 score=paragraph.score.bm25,
-                start=paragraph.start,
-                split=paragraph.split,
-                end=paragraph.end,
-                id=paragraph.paragraph,
-                fuzzy_result=fuzzy_result,
-                page_with_visual=paragraph.metadata.page_with_visual,
-                reference=paragraph.metadata.representation.file,
+                score_type=SCORE_TYPE.BM25,
+                order=0,  # NOTE: this will be filled later
+                text="",  # NOTE: this will be filled later too
+                position=TextPosition(
+                    page_number=paragraph.metadata.position.page_number,
+                    index=paragraph.metadata.position.index,
+                    start=paragraph.start,
+                    end=paragraph.end,
+                    start_seconds=[x for x in paragraph.metadata.position.start_seconds],
+                    end_seconds=[x for x in paragraph.metadata.position.end_seconds],
+                ),
+                paragraph_labels=[x for x in paragraph.labels],  # XXX could be list(paragraph.labels)?
+                fuzzy_search=fuzzy_result,
                 is_a_table=paragraph.metadata.representation.is_a_table,
+                representation_file=paragraph.metadata.representation.file,
+                page_with_visual=paragraph.metadata.page_with_visual,
             )
         )
 
     nextpos = 1
     for vector in vectors:
-        doc_id_split = vector.doc_id.id.split("/")
-        split = None
-        if len(doc_id_split) == 5:
-            rid, field_type, field, index, position = doc_id_split
-            paragraph_id = f"{rid}/{field_type}/{field}/{position}"
-        elif len(doc_id_split) == 6:
-            rid, field_type, field, split, index, position = doc_id_split
-            paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
-        else:
+        try:
+            vector_id = VectorId.from_string(vector.doc_id.id)
+        except (IndexError, ValueError):
             logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
             continue
-        start, end = position.split("-")
         merged_paragraphs.insert(
             nextpos,
-            TempFindParagraph(
-                vector_index=vector,
-                rid=rid,
-                field=f"/{field_type}/{field}",
+            TextBlockMatch(
+                paragraph_id=ParagraphId.from_vector_id(vector_id),
                 score=vector.score,
-                start=int(start),
-                end=int(end),
-                split=split,
-                id=paragraph_id,
+                score_type=SCORE_TYPE.VECTOR,
+                order=0,  # NOTE: this will be filled later
+                text="",  # NOTE: this will be filled later too
+                position=TextPosition(
+                    page_number=vector.metadata.position.page_number,
+                    index=vector.metadata.position.index,
+                    start=vector_id.vector_start,
+                    end=vector_id.vector_end,
+                    start_seconds=[x for x in vector.metadata.position.start_seconds],
+                    end_seconds=[x for x in vector.metadata.position.end_seconds],
+                ),
+                # TODO: get labels from index
+                field_labels=[],
+                paragraph_labels=[],
+                fuzzy_search=False,  # semantic search doesn't have fuzziness
+                is_a_table=vector.metadata.representation.is_a_table,
+                representation_file=vector.metadata.representation.file,
+                page_with_visual=vector.metadata.page_with_visual,
             ),
         )
         nextpos += 3
