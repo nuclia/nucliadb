@@ -1352,6 +1352,13 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         examples=[ANSWER_JSON_SCHEMA_EXAMPLE],
     )
 
+    user_metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        title="User metadata",
+        description=("Here you can send any metadata like your user_id, the environment from which the request is being sent, etc."
+                     " This metadata can be used later to filter activity logs"),
+    )
+
     @field_validator("rag_strategies", mode="before")
     @classmethod
     def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
