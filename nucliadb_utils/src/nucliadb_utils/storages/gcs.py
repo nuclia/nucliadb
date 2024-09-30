@@ -481,6 +481,7 @@ class GCSStorage(Storage):
         self._executor = executor
         self._upload_url = url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
         self.object_base_url = url + "/storage/v1/b"
+        self._base_url = url
         self._client = None
 
     @property
@@ -566,7 +567,7 @@ class GCSStorage(Storage):
 
     @storage_ops_observer.wrap({"type": "delete_batch"})
     async def _delete_batch(self, uris: list[str], bucket_name: str):
-        batch_url = "https://storage.googleapis.com/batch/storage/v1"
+        batch_url = f"{self._base_url}/batch/storage/v1"
         headers = await self.get_access_headers()
         batch_id = "batch_" + str(datetime.now().timestamp())
         headers["Content-Type"] = f"multipart/mixed; boundary={batch_id}"
@@ -591,9 +592,9 @@ class GCSStorage(Storage):
                 text = await resp.text()
                 raise GoogleCloudException(f"{resp.status}: {text}")
             errored = []
-            part_responses = parse_batch_response(await resp.text())
+            part_responses = parse_batch_response(resp.headers, await resp.text())
             for part_response in part_responses:
-                if part_response.status not in (204, 404):
+                if part_response.status not in (200, 204, 404):
                     errored.append(part_response.content_id)
             if errored:
                 raise GoogleCloudException(f"Failed to delete objects: {errored}")
@@ -819,25 +820,27 @@ def build_batch_request(parts: list[BatchPartRequest], batch_id: str) -> str:
     boundary = batch_id
     batch_request = ""
     for part in parts:
-        batch_request += f"--{boundary}\n"
-        batch_request += f"Content-Type: application/http\n"
-        batch_request += f"Content-ID: {part.content_id}\n"
-        batch_request += f"\n"
-        batch_request += f"{part.method} {part.url} HTTP/1.1\n"
-        batch_request += f"Content-Type: {part.content_type}\n"
-        batch_request += f"Accept: application/json\n"
+        batch_request += f"--{boundary}\r\n"
+        batch_request += f"Content-Type: application/http\r\n"
+        batch_request += f"Content-ID: {part.content_id}\r\n"
+        batch_request += f"\r\n"
+        batch_request += f"{part.method} {part.url} HTTP/1.1\r\n"
+        batch_request += f"Content-Type: {part.content_type}\r\n"
+        batch_request += f"Accept: application/json\r\n"
         if part.content:
-            batch_request += f"Content-Length: {len(part.content)}\n"
-            batch_request += f"\n"
-            batch_request += f"{part.content}\n"
+            batch_request += f"Content-Length: {len(part.content)}\r\n"
+            batch_request += f"\r\n"
+            batch_request += f"{part.content}\r\n"
         else:
-            batch_request += f"Content-Length: 0\n"
+            batch_request += f"Content-Length: 0\r\n\r\n"
+        batch_request += "\r\n\r\n"
     batch_request += f"--{boundary}--"
     return batch_request
 
 
-def parse_batch_response(batch_response: str) -> list[BatchPartResponse]:
-    parts = batch_response.split(f"--batch_")
+def parse_batch_response(headers: dict[str, str], batch_response: str) -> list[BatchPartResponse]:
+    boundary = headers["Content-Type"].split("boundary=")[-1]
+    parts = batch_response.split(f"--{boundary}\r\n")
     responses = []
     for part in parts:
         if not part:
@@ -846,8 +849,11 @@ def parse_batch_response(batch_response: str) -> list[BatchPartResponse]:
         if len(lines) < 5:
             continue
         try:
-            content_id = lines[2].split("Content-ID: ")[1].split("response-")[-1]
-            status = int(lines[4].split("HTTP/1.1 ")[1].split(" ")[0])
+            content_id = [cl.lower() for cl in lines if cl.lower().startswith("content-id:")][0]
+            content_id = content_id.split("content-id: ")[1].split("response-")[-1]
+
+            status = [sl for sl in lines if sl.startswith("HTTP/1.1")][0]
+            status = int(status.split("HTTP/1.1 ")[1].split(" ")[0])
         except (IndexError, ValueError):
             logger.warning(f"Could not parse batch response: {part}")
             content_id = ""
