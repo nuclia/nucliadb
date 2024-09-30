@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
 
@@ -32,8 +31,7 @@ from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.utils import DateTime
 from nucliadb_protos.audit_pb2 import ClientType, TaskType
-from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
-from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
+from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.utils_pb2 import RelationNode
 
 # Bw/c import to avoid breaking users
@@ -1566,24 +1564,6 @@ class FindParagraph(BaseModel):
         title="Is a table",
         description="The referenced image of the paragraph is a table",
     )
-
-
-@dataclass
-class TempFindParagraph:
-    rid: str
-    field: str
-    score: float
-    start: int
-    end: int
-    id: str
-    split: Optional[str] = None
-    paragraph: Optional[FindParagraph] = None
-    vector_index: Optional[DocumentScored] = None
-    paragraph_index: Optional[PBParagraphResult] = None
-    fuzzy_result: bool = False
-    page_with_visual: bool = False
-    reference: Optional[str] = None
-    is_a_table: bool = False
 
 
 class FindField(BaseModel):
