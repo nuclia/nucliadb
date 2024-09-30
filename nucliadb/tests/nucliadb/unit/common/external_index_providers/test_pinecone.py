@@ -208,7 +208,7 @@ def test_iter_matching_text_blocks(query_response):
     text_blocks = list(query_results.iter_matching_text_blocks())
     assert len(text_blocks) == 1
     text_block = text_blocks[0]
-    assert text_block.id == ParagraphId.from_string("rid/f/field/0-10")
+    assert text_block.paragraph_id == ParagraphId.from_string("rid/f/field/0-10")
     assert text_block.score == 0.8
     assert text_block.order == 0
     assert text_block.text is None
