@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator, Callable
+from typing import AsyncGenerator, Callable, Tuple, cast
 
 from nucliadb import logger
 from nucliadb.common import datamanagers
@@ -102,7 +102,7 @@ async def update_resource_metrics(context: ApplicationContext):
             "WHERE labels @> '{/n/s/PENDING}' "
             "AND COALESCE(modified_at, created_at) BETWEEN NOW() - INTERVAL '1 month' AND NOW() - INTERVAL '6 hours'"
         )
-        count = (await cur.fetchone())[0]
+        count = cast(Tuple[int], await cur.fetchone())[0]
         PENDING_RESOURCE_COUNT.set(count)
 
 
