@@ -765,7 +765,7 @@ Please return ONLY the question without any explanation. Just the rephrased ques
         ],
     )
 
-    user_metadata: Optional[dict[str,str]] = Field(
+    user_metadata: Optional[Dict[str, str]] = Field(
         default=None,
         title="User metadata",
         description=(
@@ -773,7 +773,7 @@ Please return ONLY the question without any explanation. Just the rephrased ques
             " This metadata can be leveraged for filtering and analyzing activity logs in future operations."
             " Each key-value pair represents a piece of metadata relevant to the user's request."
         ),
-    ),
+    )
 
     @field_validator("features", mode="after")
     @classmethod
