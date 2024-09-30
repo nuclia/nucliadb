@@ -126,6 +126,16 @@ async def find_knowledgebox(
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     reranker: Reranker = fastapi_query(SearchParamDefaults.reranker),
+    user_metadata: Optional[str] = Query(
+        default=None,
+        title="User metadata",
+        description=(
+            "A dictionary containing optional user-specific metadata, such as user_id, environment, or other contextual information."
+            " This metadata can be leveraged for filtering and analyzing activity logs in future operations."
+            " Each key-value pair represents a piece of metadata relevant to the user's request."
+        ),
+        examples=['{"environment": "prod", "user_id":"1234"}'],
+    ),  # user_metadata is used in an audit request by the AuditMiddleware
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
