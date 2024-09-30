@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import field
 from datetime import datetime
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, cast
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Mapping, Optional, cast
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -838,7 +838,7 @@ def build_batch_request(parts: list[BatchPartRequest], batch_id: str) -> str:
     return batch_request
 
 
-def parse_batch_response(headers: dict[str, str], batch_response: str) -> list[BatchPartResponse]:
+def parse_batch_response(headers: Mapping[str, str], batch_response: str) -> list[BatchPartResponse]:
     boundary = headers["Content-Type"].split("boundary=")[-1]
     parts = batch_response.split(f"--{boundary}\r\n")
     responses = []
@@ -849,11 +849,11 @@ def parse_batch_response(headers: dict[str, str], batch_response: str) -> list[B
         if len(lines) < 5:
             continue
         try:
-            content_id = [cl.lower() for cl in lines if cl.lower().startswith("content-id:")][0]
-            content_id = content_id.split("content-id: ")[1].split("response-")[-1]
+            content_id_line = [cl.lower() for cl in lines if cl.lower().startswith("content-id:")][0]
+            content_id = content_id_line.split("content-id: ")[1].split("response-")[-1]
 
-            status = [sl for sl in lines if sl.startswith("HTTP/1.1")][0]
-            status = int(status.split("HTTP/1.1 ")[1].split(" ")[0])
+            status_line = [sl for sl in lines if sl.startswith("HTTP/1.1")][0]
+            status = int(status_line.split("HTTP/1.1 ")[1].split(" ")[0])
         except (IndexError, ValueError):
             logger.warning(f"Could not parse batch response: {part}")
             content_id = ""
