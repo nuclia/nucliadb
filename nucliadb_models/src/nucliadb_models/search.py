@@ -1355,8 +1355,11 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
     user_metadata: Optional[Dict[str, str]] = Field(
         default=None,
         title="User metadata",
-        description=("Here you can send any metadata like your user_id, the environment from which the request is being sent, etc."
-                     " This metadata can be used later to filter activity logs"),
+        description=(
+            "A dictionary containing optional user-specific metadata, such as user_id, environment, or other contextual information."
+            " This metadata can be leveraged for filtering and analyzing activity logs in future operations."
+            " Each key-value pair represents a piece of metadata relevant to the user's request."
+        ),
     )
 
     @field_validator("rag_strategies", mode="before")
