@@ -18,7 +18,6 @@ COPY nucliadb_paragraphs3 /nucliadb/nucliadb_paragraphs3
 COPY nucliadb_procs /nucliadb/nucliadb_procs
 COPY nucliadb_protos /nucliadb/nucliadb_protos
 COPY nucliadb_relations2 /nucliadb/nucliadb_relations2
-COPY nucliadb_texts2 /nucliadb/nucliadb_texts2
 COPY nucliadb_texts3 /nucliadb/nucliadb_texts3
 COPY nucliadb_vectors /nucliadb/nucliadb_vectors
 COPY vectors_benchmark /nucliadb/vectors_benchmark

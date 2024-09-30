@@ -121,17 +121,10 @@ impl ShardWriter {
         std::fs::create_dir(&shard_path)?;
 
         let ff_context = HashMap::from([("kbid".to_string(), metadata.kbid())]);
-        let texts3_enabled = settings.has_feature(feature_flags::TEXTS3, ff_context);
-        let texts_version = if texts3_enabled {
-            3
-        } else {
-            2
-        };
-
         let versions = Versions {
             paragraphs: versioning::PARAGRAPHS_VERSION,
             vectors: versioning::VECTORS_VERSION,
-            texts: texts_version,
+            texts: versioning::TEXTS_VERSION,
             relations: versioning::RELATIONS_VERSION,
         };
         let versions_path = shard_path.join(VERSION_FILE);
@@ -142,7 +135,7 @@ impl ShardWriter {
         let tsc = TextConfig {
             path: indexes.texts_path(),
         };
-        let text_task = || Some(create_texts_writer(texts_version, tsc));
+        let text_task = || Some(create_texts_writer(versioning::TEXTS_VERSION, tsc));
         let info = info_span!(parent: &span, "text start");
         let text_task = || run_with_telemetry(info, text_task);
 
@@ -694,7 +687,6 @@ pub fn open_paragraphs_writer(version: u32, config: &ParagraphConfig) -> NodeRes
 
 pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
     match version {
-        2 => nucliadb_texts2::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
         3 => nucliadb_texts3::writer::TextWriterService::open(config).map(|i| Box::new(i) as TextsWriterPointer),
         v => Err(node_error!("Invalid text writer version {v}")),
     }
@@ -702,7 +694,6 @@ pub fn open_texts_writer(version: u32, config: &TextConfig) -> NodeResult<TextsW
 
 pub fn create_texts_writer(version: u32, config: TextConfig) -> NodeResult<TextsWriterPointer> {
     match version {
-        2 => nucliadb_texts2::writer::TextWriterService::create(config).map(|i| Box::new(i) as TextsWriterPointer),
         3 => nucliadb_texts3::writer::TextWriterService::create(config).map(|i| Box::new(i) as TextsWriterPointer),
         v => Err(node_error!("Invalid text writer version {v}")),
     }
