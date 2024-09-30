@@ -765,6 +765,16 @@ Please return ONLY the question without any explanation. Just the rephrased ques
         ],
     )
 
+    user_metadata: Optional[dict[str,str]] = Field(
+        default=None,
+        title="User metadata",
+        description=(
+            "A dictionary containing optional user-specific metadata, such as user_id, environment, or other contextual information."
+            " This metadata can be leveraged for filtering and analyzing activity logs in future operations."
+            " Each key-value pair represents a piece of metadata relevant to the user's request."
+        ),
+    ),
+
     @field_validator("features", mode="after")
     @classmethod
     def normalize_features(cls, features: List[SearchOptions]):

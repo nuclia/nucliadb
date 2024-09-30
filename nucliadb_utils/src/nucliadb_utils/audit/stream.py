@@ -19,6 +19,7 @@
 #
 import asyncio
 import contextvars
+import json
 import time
 from datetime import datetime, timezone
 from typing import Callable, List, Optional
@@ -88,8 +89,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         context.audit_request.trace_id = get_trace_id()
 
         if request.url.path.split("/")[-1] in ("ask", "search", "find"):
-            body = (await request.body()).decode()
-            context.audit_request.user_request = body
+            if request.method == "POST":
+                body = (await request.body()).decode()
+                context.audit_request.user_request = body
+            elif request.method == "GET":
+                query_params = json.dumps(request.query_params)
+                context.audit_request.user_request = query_params
 
         response = await call_next(request)
 
