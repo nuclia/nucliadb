@@ -22,22 +22,25 @@ from dataclasses import dataclass
 from typing import Optional, cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.results_hydrator.base import (
+    text_block_to_find_paragraph,
+)
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
+    FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
     MinScore,
     ResourceProperties,
-    TempFindParagraph,
     TextPosition,
 )
 from nucliadb_protos.nodereader_pb2 import (
@@ -72,27 +75,16 @@ class SortableParagraph:
 @merge_observer.wrap({"type": "set_text_value"})
 async def set_text_value(
     kbid: str,
-    result_paragraph: TempFindParagraph,
+    paragraph_id: ParagraphId,
+    find_paragraph: FindParagraph,
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
 ):
     async with max_operations:
-        assert result_paragraph.paragraph
-        assert result_paragraph.paragraph.position
-        _, field_type, field_key = result_paragraph.field.split("/")
-        result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
+        find_paragraph.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
-            paragraph_id=ParagraphId(
-                field_id=FieldId(
-                    rid=result_paragraph.rid,
-                    type=field_type,
-                    key=field_key,
-                    subfield_id=result_paragraph.split,
-                ),
-                paragraph_start=result_paragraph.paragraph.position.start,
-                paragraph_end=result_paragraph.paragraph.position.end,
-            ),
+            paragraph_id=paragraph_id,
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO
@@ -129,7 +121,7 @@ async def set_resource_metadata_value(
 
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
-    result_paragraphs: list[TempFindParagraph],
+    result_paragraphs: list[TextBlockMatch],
     kbid: str,
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
@@ -144,57 +136,51 @@ async def fetch_find_metadata(
     operations = []
     max_operations = asyncio.Semaphore(50)
     paragraphs_to_sort: list[SortableParagraph] = []
-    for result_paragraph in result_paragraphs:
-        if result_paragraph.paragraph is not None:
-            find_resource = find_resources.setdefault(
-                result_paragraph.rid, FindResource(id=result_paragraph.id, fields={})
-            )
-            find_field = find_resource.fields.setdefault(
-                result_paragraph.field, FindField(paragraphs={})
-            )
+    for text_block in result_paragraphs:
+        rid = text_block.paragraph_id.rid
+        find_resource = find_resources.setdefault(rid, FindResource(id=rid, fields={}))
+        field_id = text_block.paragraph_id.field_id.full()
+        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
+        paragraph_id = text_block.paragraph_id.full()
 
-            if result_paragraph.paragraph.id in find_field.paragraphs:
-                # Its a multiple match, boost the score
-                if (
-                    find_field.paragraphs[result_paragraph.paragraph.id].score
-                    < result_paragraph.paragraph.score
-                ):
-                    # Use Vector score if there are both
-                    find_field.paragraphs[result_paragraph.paragraph.id].score = (
-                        result_paragraph.paragraph.score * 2
-                    )
-                    paragraphs_to_sort.append(
-                        SortableParagraph(
-                            rid=result_paragraph.rid,
-                            fid=result_paragraph.field,
-                            pid=result_paragraph.paragraph.id,
-                            score=result_paragraph.paragraph.score,
-                        )
-                    )
-                find_field.paragraphs[result_paragraph.paragraph.id].score_type = SCORE_TYPE.BOTH
-
-            else:
-                find_field.paragraphs[result_paragraph.paragraph.id] = result_paragraph.paragraph
+        if paragraph_id in find_field.paragraphs:
+            # Its a multiple match, boost the score
+            if find_field.paragraphs[paragraph_id].score < text_block.score:
+                # Use Vector score if there are both
+                find_field.paragraphs[paragraph_id].score = text_block.score * 2
                 paragraphs_to_sort.append(
                     SortableParagraph(
-                        rid=result_paragraph.rid,
-                        fid=result_paragraph.field,
-                        pid=result_paragraph.paragraph.id,
-                        score=result_paragraph.paragraph.score,
+                        rid=rid,
+                        fid=field_id,
+                        pid=paragraph_id,
+                        score=text_block.score,
                     )
                 )
-            operations.append(
-                asyncio.create_task(
-                    set_text_value(
-                        kbid=kbid,
-                        result_paragraph=result_paragraph,
-                        highlight=highlight,
-                        ematches=ematches,
-                        max_operations=max_operations,
-                    )
+            find_field.paragraphs[paragraph_id].score_type = SCORE_TYPE.BOTH
+
+        else:
+            find_field.paragraphs[paragraph_id] = text_block_to_find_paragraph(text_block)
+            paragraphs_to_sort.append(
+                SortableParagraph(
+                    rid=rid,
+                    fid=field_id,
+                    pid=paragraph_id,
+                    score=text_block.score,
                 )
             )
-            resources.add(result_paragraph.rid)
+        operations.append(
+            asyncio.create_task(
+                set_text_value(
+                    kbid=kbid,
+                    paragraph_id=text_block.paragraph_id,
+                    find_paragraph=find_field.paragraphs[paragraph_id],
+                    highlight=highlight,
+                    ematches=ematches,
+                    max_operations=max_operations,
+                )
+            )
+        )
+        resources.add(rid)
 
     for order, paragraph in enumerate(
         sorted(paragraphs_to_sort, key=lambda par: par.score, reverse=True)

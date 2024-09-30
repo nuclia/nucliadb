@@ -197,3 +197,19 @@ async def hydrate_resource_metadata(
         find_resources.pop(resource_id, None)
         return
     find_resources[resource_id].updated_from(serialized_resource)
+
+
+def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
+    return FindParagraph(
+        id=text_block.paragraph_id.full(),
+        text=text_block.text or "",
+        score=text_block.score,
+        score_type=text_block.score_type,
+        order=text_block.order,
+        labels=text_block.paragraph_labels,
+        fuzzy_result=text_block.fuzzy_search,
+        is_a_table=text_block.is_a_table,
+        reference=text_block.representation_file,
+        page_with_visual=text_block.page_with_visual,
+        position=text_block.position,
+    )
