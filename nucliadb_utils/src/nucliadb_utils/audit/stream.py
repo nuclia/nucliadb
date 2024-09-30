@@ -93,7 +93,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 body = (await request.body()).decode()
                 context.audit_request.user_request = body
             elif request.method == "GET":
-                query_params = json.dumps(request.query_params)
+                query_params = json.dumps(dict(request.query_params))
                 context.audit_request.user_request = query_params
 
         response = await call_next(request)
