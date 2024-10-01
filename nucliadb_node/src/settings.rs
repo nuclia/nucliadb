@@ -92,10 +92,8 @@ const SENTRY_ENVS: [&str; 2] = ["stage", "prod"];
 const DEFAULT_ENV: &str = "stage";
 
 // Feature flags
-pub mod feature_flags {
-    pub const TEXTS3: &str = "nucliadb_node_texts3";
-}
-const DEFAULT_FEATURE_FLAGS: &str = r#"{"nucliadb_node_texts3": {"rollout": 100}}"#;
+pub mod feature_flags {}
+const DEFAULT_FEATURE_FLAGS: &str = r#"{}"#;
 
 #[derive(Clone)]
 pub struct Settings {

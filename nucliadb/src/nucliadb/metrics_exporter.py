@@ -20,12 +20,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator, Callable
+from typing import AsyncGenerator, Callable, Tuple, cast
 
 from nucliadb import logger
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.maindb.pg import PGDriver
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.migrator.datamanager import MigrationsDataManager
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.logs import setup_logging
@@ -35,6 +37,8 @@ from nucliadb_utils.fastapi.run import serve_metrics
 SHARD_COUNT = metrics.Gauge("nucliadb_node_shard_count", labels={"node": ""})
 
 MIGRATION_COUNT = metrics.Gauge("nucliadb_migration", labels={"type": "", "version": ""})
+
+PENDING_RESOURCE_COUNT = metrics.Gauge("nucliadb_pending_resources_count")
 
 
 async def update_node_metrics(context: ApplicationContext):
@@ -84,6 +88,24 @@ async def update_migration_metrics(context: ApplicationContext):
         MIGRATION_COUNT.set(count, labels=dict(type="kb", version=version))
 
 
+async def update_resource_metrics(context: ApplicationContext):
+    """
+    Report the number of pending resources older than some estimated processing time
+    """
+    driver = get_driver()
+    if not isinstance(driver, PGDriver):
+        return
+
+    async with driver._get_connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT COUNT(*) FROM catalog "
+            "WHERE labels @> '{/n/s/PENDING}' "
+            "AND COALESCE(modified_at, created_at) BETWEEN NOW() - INTERVAL '1 month' AND NOW() - INTERVAL '6 hours'"
+        )
+        count = cast(Tuple[int], await cur.fetchone())[0]
+        PENDING_RESOURCE_COUNT.set(count)
+
+
 async def run_exporter_task(context: ApplicationContext, exporter_task: Callable, interval: int):
     """
     Run coroutine infinitely, catching exceptions and logging them.
@@ -106,6 +128,7 @@ async def run_exporter(context: ApplicationContext):
     for export_task, interval in [
         (update_node_metrics, 10),
         (update_migration_metrics, 60 * 3),
+        (update_resource_metrics, 60 * 5),
     ]:
         tasks.append(asyncio.create_task(run_exporter_task(context, export_task, interval=interval)))
     try:
