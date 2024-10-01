@@ -22,6 +22,7 @@ import pytest
 from pydantic_core import ValidationError
 
 from nucliadb_models import metadata
+from nucliadb_models.search import AuditMetadataBase
 
 
 def test_relation_validator():
@@ -52,3 +53,9 @@ def test_relation_entity_model_validator():
         type=metadata.RelationNodeType.ENTITY,
         group="places",
     )
+
+
+def test_audit_metadata_base_max_size():
+    AuditMetadataBase(audit_metadata={"test": "test1"})
+    with pytest.raises(ValidationError):
+        AuditMetadataBase(audit_metadata={"test": "a" * 1024 * 10})
