@@ -765,11 +765,11 @@ Please return ONLY the question without any explanation. Just the rephrased ques
         ],
     )
 
-    user_metadata: Optional[Dict[str, str]] = Field(
+    audit_metadata: Optional[Dict[str, str]] = Field(
         default=None,
-        title="User metadata",
+        title="Audit metadata",
         description=(
-            "A dictionary containing optional user-specific metadata, such as user_id, environment, or other contextual information."
+            "A dictionary containing optional audit-specific metadata, such as user_id, environment, or other contextual information."
             " This metadata can be leveraged for filtering and analyzing activity logs in future operations."
             " Each key-value pair represents a piece of metadata relevant to the user's request."
         ),
@@ -1362,11 +1362,11 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         examples=[ANSWER_JSON_SCHEMA_EXAMPLE],
     )
 
-    user_metadata: Optional[Dict[str, str]] = Field(
+    audit_metadata: Optional[Dict[str, str]] = Field(
         default=None,
-        title="User metadata",
+        title="Audit metadata",
         description=(
-            "A dictionary containing optional user-specific metadata, such as user_id, environment, or other contextual information."
+            "A dictionary containing optional audit-specific metadata, such as user_id, environment, or other contextual information."
             " This metadata can be leveraged for filtering and analyzing activity logs in future operations."
             " Each key-value pair represents a piece of metadata relevant to the user's request."
         ),
