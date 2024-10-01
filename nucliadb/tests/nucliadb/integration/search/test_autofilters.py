@@ -41,7 +41,6 @@ async def test_autofilters_are_returned(
         return_value=QueryInfo(
             language="en",
             stop_words=[],
-            semantic_threshold=0.7,
             semantic_thresholds={
                 "my-semantic-model": 0.7,
             },
@@ -53,14 +52,13 @@ async def test_autofilters_are_returned(
                 time=0.1,
             ),
             sentence=SentenceSearch(
-                data=Q,
                 vectors={
                     "my-semantic-model": Q,
                     "multilingual": Q,
                 },
-                time=0.1,
                 timings={
                     "my-semantic-model": 0.1,
+                    "multilingual": 0.1,
                 },
             ),
             visual_llm=False,

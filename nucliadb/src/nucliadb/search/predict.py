@@ -561,25 +561,19 @@ class DummyPredictEngine(PredictEngine):
         # vector, probably to test a model in some way. Does it make sense to
         # keep it though?
         if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":  # pragma: no cover
-            data = Qm2023
             vectors[model] = Qm2023
-
         else:
-            data = Q
             vectors[model] = Q
 
         return QueryInfo(
             language="en",
             stop_words=[],
-            semantic_threshold=0.7,
             semantic_thresholds=semantic_thresholds,
             visual_llm=True,
             max_context=self.max_context,
             entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
             sentence=SentenceSearch(
-                data=data,
                 vectors=vectors,
-                time=0.0,
                 timings=timings,
             ),
             query=sentence,

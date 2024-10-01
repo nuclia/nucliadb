@@ -25,7 +25,6 @@ from typing import Any, Awaitable, Optional, Union
 from async_lru import alru_cache
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.vectorsets import BrokenInvariant
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
@@ -88,6 +87,7 @@ class QueryParser:
     """
 
     _query_information_task: Optional[asyncio.Task] = None
+    _get_vectorset_task: Optional[asyncio.Task] = None
     _detected_entities_task: Optional[asyncio.Task] = None
     _entities_meta_cache_task: Optional[asyncio.Task] = None
     _deleted_entities_groups_task: Optional[asyncio.Task] = None
@@ -191,17 +191,44 @@ class QueryParser:
         return self._query_information_task
 
     async def _query_information(self) -> QueryInfo:
-        vectorset = await self.select_vectorset()
+        vectorset = await self.select_query_vectorset()
         return await query_information(
             self.kbid, self.query, vectorset, self.generative_model, self.rephrase, self.rephrase_prompt
         )
 
+    def _get_vectorset(self) -> Awaitable[Optional[str]]:
+        if self._get_vectorset_task is None:
+            self._get_vectorset_task = asyncio.create_task(self._select_vectorset())
+        return self._get_vectorset_task
+
+    async def _select_vectorset(self) -> Optional[str]:
+        if self.vectorset is not None:
+            return self.vectorset
+
+        # When vectorset is not provided we get the default from Predict API
+
+        query_information = await self._get_query_information()
+
+        if query_information.sentence is None:
+            logger.error(
+                "Asking for a vectorset but /query didn't return one", extra={"kbid": self.kbid}
+            )
+            return self.vectorset
+
+        for vectorset in query_information.sentence.vectors.keys():
+            self.vectorset = vectorset
+            break
+
+        return self.vectorset
+
     def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
         if self._get_matryoshka_dimension_task is None:
-            self._get_matryoshka_dimension_task = asyncio.create_task(
-                get_matryoshka_dimension_cached(self.kbid, self.vectorset)
-            )
+            self._get_matryoshka_dimension_task = asyncio.create_task(self._matryoshka_dimension())
         return self._get_matryoshka_dimension_task
+
+    async def _matryoshka_dimension(self) -> Optional[int]:
+        vectorset = await self._select_vectorset()
+        return await get_matryoshka_dimension_cached(self.kbid, vectorset)
 
     def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
         if self._detected_entities_task is None:  # pragma: no cover
@@ -382,12 +409,19 @@ class QueryParser:
             semantic_min_score = self.min_score.semantic
         elif self.has_vector_search and not incomplete:
             query_information = await self._get_query_information()
-            if query_information.semantic_threshold is not None:
-                semantic_min_score = query_information.semantic_threshold
+            vectorset = await self._select_vectorset()
+            if vectorset is not None:
+                semantic_threshold = query_information.semantic_thresholds.get(vectorset, None)
+                if semantic_threshold is not None:
+                    semantic_min_score = semantic_threshold
+                else:
+                    logger.warning(
+                        "Semantic threshold not found in query information, using default",
+                        extra={"kbid": self.kbid},
+                    )
             else:
                 logger.warning(
-                    "Semantic threshold not found in query information, using default",
-                    extra={"kbid": self.kbid},
+                    "Vectorset unset, using default semantic threshold", extra={"kbid": self.kbid}
                 )
         self.min_score.semantic = semantic_min_score
         request.min_score_semantic = self.min_score.semantic
@@ -403,38 +437,24 @@ class QueryParser:
             request.paragraph = True
             node_features.inc({"type": "paragraphs"})
 
-    @alru_cache(maxsize=1)
-    async def select_vectorset(self) -> Optional[str]:
-        """Validate the vectorset parameter and override it with a default if
-        needed.
+    async def select_query_vectorset(self) -> Optional[str]:
+        """Set and return the requested vectorset parameter (if used) validated
+        for the current KB.
+
         """
-        if self.vectorset:
-            # validate vectorset
-            async with datamanagers.with_ro_transaction() as txn:
-                if not await datamanagers.vectorsets.exists(
-                    txn, kbid=self.kbid, vectorset_id=self.vectorset
-                ):
-                    raise InvalidQueryError(
-                        "vectorset",
-                        f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
-                    )
-            return self.vectorset
-        else:
-            # no vectorset specified, get the default one
-            async with datamanagers.with_ro_transaction() as txn:
-                try:
-                    default_vectorset = await datamanagers.vectorsets.get_default_vectorset(
-                        txn, kbid=self.kbid
-                    )
-                except BrokenInvariant:
-                    # XXX: fix to avoid tests complaining too much, it should be
-                    # an error at some point though
-                    return None
-                    # logger.exception("KB has no default vectorset", extra={"kbid": self.kbid})
-                    # raise InvalidQueryError("vectorset", f"KB has no default vectorset") from exc
-                else:
-                    return default_vectorset.vectorset_id
-        return None
+        if not self.vectorset:
+            return None
+
+        # validate vectorset
+        async with datamanagers.with_ro_transaction() as txn:
+            if not await datamanagers.vectorsets.exists(
+                txn, kbid=self.kbid, vectorset_id=self.vectorset
+            ):
+                raise InvalidQueryError(
+                    "vectorset",
+                    f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
+                )
+        return self.vectorset
 
     async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
         if not self.has_vector_search:
@@ -444,7 +464,7 @@ class QueryParser:
 
         incomplete = False
 
-        vectorset = await self.select_vectorset()
+        vectorset = await self._select_vectorset()
         if vectorset is not None:
             request.vectorset = vectorset
 
@@ -463,7 +483,8 @@ class QueryParser:
                         else:
                             incomplete = True
                     else:
-                        query_vector = query_info.sentence.data
+                        for query_vector in query_info.sentence.vectors.values():
+                            break
                 else:
                     incomplete = True
         else:
