@@ -46,6 +46,11 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
     if resource.basic is None:
         raise ValueError("Cannot index into the catalog a resource without basic metadata ")
 
+    created_at = resource.basic.created.ToDatetime()
+    modified_at = resource.basic.modified.ToDatetime()
+    if modified_at < created_at:
+        modified_at = created_at
+
     async with _pg_transaction(txn).connection.cursor() as cur:
         await cur.execute(
             """
@@ -62,8 +67,8 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
                 "kbid": resource.kb.kbid,
                 "rid": resource.uuid,
                 "title": resource.basic.title,
-                "created_at": resource.basic.created.ToDatetime(),
-                "modified_at": resource.basic.modified.ToDatetime(),
+                "created_at": created_at,
+                "modified_at": modified_at,
                 "labels": list(resource.indexer.brain.labels),
             },
         )
