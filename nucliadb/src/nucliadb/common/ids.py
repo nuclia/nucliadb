@@ -71,6 +71,9 @@ class FieldId:
     def __repr__(self) -> str:
         return f"FieldId({self.full()})"
 
+    def short_without_subfield(self) -> str:
+        return f"/{self.type}/{self.key}"
+
     def full(self) -> str:
         if self.subfield_id is None:
             return f"{self.rid}/{self.type}/{self.key}"

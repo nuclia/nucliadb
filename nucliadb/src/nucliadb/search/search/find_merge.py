@@ -139,7 +139,7 @@ async def fetch_find_metadata(
     for text_block in result_paragraphs:
         rid = text_block.paragraph_id.rid
         find_resource = find_resources.setdefault(rid, FindResource(id=rid, fields={}))
-        field_id = text_block.paragraph_id.field_id.full()
+        field_id = text_block.paragraph_id.field_id.short_without_subfield()
         find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
         paragraph_id = text_block.paragraph_id.full()
 
