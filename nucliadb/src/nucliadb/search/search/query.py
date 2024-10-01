@@ -483,8 +483,13 @@ class QueryParser:
                         else:
                             incomplete = True
                     else:
-                        for query_vector in query_info.sentence.vectors.values():
-                            break
+                        for vectorset_id, vector in query_info.sentence.vectors.items():
+                            if vector:
+                                query_vector = vector
+                                break
+                        else:
+                            incomplete = True
+
                 else:
                     incomplete = True
         else:
