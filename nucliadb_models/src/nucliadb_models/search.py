@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
@@ -690,7 +691,33 @@ class MinScore(BaseModel):
     )
 
 
-class BaseSearchRequest(BaseModel):
+AUDIT_METADATA_MAX_BYTES = 1024 * 10  # 10KB
+
+
+class AuditMetadataBase(BaseModel):
+    audit_metadata: Optional[dict[str, str]] = Field(
+        default=None,
+        title="Audit metadata",
+        description=(
+            "A dictionary containing optional audit-specific metadata, such as user_id, environment, or other contextual information."
+            " This metadata can be leveraged for filtering and analyzing activity logs in future operations."
+            " Each key-value pair represents a piece of metadata relevant to the user's request."
+        ),
+        examples=[{"environment": "test", "user": "my-user-123"}],
+    )
+
+    @field_validator("audit_metadata", mode="after")
+    def check_audit_metadata_size(cls, value):
+        if value:
+            size = len(json.dumps(value).encode("utf-8"))
+            if size > AUDIT_METADATA_MAX_BYTES:
+                raise ValueError(
+                    f"Audit metadata size is too large: {size} bytes. Maximum size allowed: {AUDIT_METADATA_MAX_BYTES}"
+                )
+        return value
+
+
+class BaseSearchRequest(AuditMetadataBase):
     query: str = SearchParamDefaults.query.to_pydantic_field()
     fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[List[str], List[Filter]] = Field(
@@ -1186,7 +1213,7 @@ Please return ONLY the question without any explanation. Just the rephrased ques
     )
 
 
-class AskRequest(BaseModel):
+class AskRequest(AuditMetadataBase):
     query: str = SearchParamDefaults.chat_query.to_pydantic_field()
     top_k: int = Field(
         default=20,
