@@ -414,7 +414,7 @@ ExtractedDataTypes = Union[
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/metadata/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}/extracted/{{extracted}}",
+    f"/{KB_PREFIX}/{{kbid}}/metadata/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=200,
     summary="Get extracted metadata for a resource field (by id)",
     response_model=ExtractedDataTypes,
@@ -429,7 +429,9 @@ async def get_extracted_metadata_rid_prefix(
     rid: str,
     field_type: FieldTypeName,
     field_id: str,
-    extracted: ExtractedDataTypeName,
+    extracted: list[ExtractedDataTypeName] = Query(
+        default=[ExtractedDataTypeName.SHORTENED_METADATA],
+    ),
 ) -> Response:
     return await _get_extracted_metadata(
         kbid=kbid,
@@ -441,7 +443,7 @@ async def get_extracted_metadata_rid_prefix(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/metadata/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}/extracted/{{extracted}}",
+    f"/{KB_PREFIX}/{{kbid}}/metadata/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
     status_code=200,
     summary="Get extracted metadata for a resource field (by slug)",
     response_model=ExtractedDataTypes,
@@ -456,7 +458,9 @@ async def get_extracted_metadata_rslug_prefix(
     rslug: str,
     field_type: FieldTypeName,
     field_id: str,
-    extracted: ExtractedDataTypeName,
+    extracted: list[ExtractedDataTypeName] = Query(
+        default=[ExtractedDataTypeName.SHORTENED_METADATA],
+    ),
 ) -> Response:
     return await _get_extracted_metadata(
         kbid=kbid,
@@ -471,7 +475,7 @@ async def _get_extracted_metadata(
     kbid: str,
     field_type: FieldTypeName,
     field_id: str,
-    extracted: ExtractedDataTypeName,
+    extracted: list[ExtractedDataTypeName],
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> Response:
@@ -494,7 +498,7 @@ async def _get_extracted_metadata(
             field,
             extracted_metadata,
             field_type,
-            wanted_extracted_data=[extracted],
+            wanted_extracted_data=extracted,
         )
         return Response(
             content=extracted_metadata.model_dump_json(exclude_unset=True, by_alias=True),

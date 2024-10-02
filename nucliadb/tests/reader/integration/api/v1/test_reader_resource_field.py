@@ -225,11 +225,11 @@ async def test_get_metadata_extracted(nucliadb_reader: AsyncClient, test_resourc
             for extracted_type in list(ExtractedDataTypeName):
                 if by_slug:
                     urls.append(
-                        f"/{KB_PREFIX}/{kbid}/metadata/slug/{rslug}/{fieldtype}/{fieldid}/extracted/{extracted_type.value}",
+                        f"/{KB_PREFIX}/{kbid}/metadata/slug/{rslug}/{fieldtype}/{fieldid}?extracted={extracted_type.value}",
                     )
                 else:
                     urls.append(
-                        f"/{KB_PREFIX}/{kbid}/metadata/resource/{rid}/{fieldtype}/{fieldid}/extracted/{extracted_type.value}",
+                        f"/{KB_PREFIX}/{kbid}/metadata/resource/{rid}/{fieldtype}/{fieldid}?extracted={extracted_type.value}",
                     )
 
     for url in urls:
@@ -239,10 +239,10 @@ async def test_get_metadata_extracted(nucliadb_reader: AsyncClient, test_resourc
     # Try now with a non-existent slug, rid and field
     for url in [
         # Field does not exist
-        f"/{KB_PREFIX}/{kbid}/metadata/resource/{rid}/text/inexistent/extracted/text",
+        f"/{KB_PREFIX}/{kbid}/metadata/resource/{rid}/text/inexistent?extracted=text",
         # Resource does not exist
-        f"/{KB_PREFIX}/{kbid}/metadata/slug/foobar/text/text1/extracted/text",
-        f"/{KB_PREFIX}/{kbid}/metadata/resource/foobar/text/text1/extracted/text",
+        f"/{KB_PREFIX}/{kbid}/metadata/slug/foobar/text/text1?extracted=text",
+        f"/{KB_PREFIX}/{kbid}/metadata/resource/foobar/text/text1?extracted=text",
     ]:
         resp = await nucliadb_reader.get(url)
         assert resp.status_code == 404, f"Failed for url: {url}. Response: {resp.json()}"
