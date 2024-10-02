@@ -30,7 +30,6 @@ from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.common.datamanagers.vectorsets import BrokenInvariant
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import DummyPredictEngine
@@ -141,10 +140,6 @@ async def test_vectorset_parameter_without_default_vectorset(
 
     with (
         predict_query_hook(set_predict_default_vectorset),
-        patch(
-            "nucliadb.search.search.query.datamanagers.vectorsets.get_default_vectorset",
-            side_effect=BrokenInvariant(""),
-        ),
         patch(
             "nucliadb.search.api.v1.search.node_query",
             new=AsyncMock(side_effect=mock_node_query),
