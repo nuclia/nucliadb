@@ -17,14 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.tests.vectors import Q
-from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_models.internal.predict import (
+    Ner,
+    QueryInfo,
+    TokenSearch,
+)
+from tests.utils.predict import predict_query_hook
 
 
 @pytest.mark.asyncio
@@ -33,40 +35,8 @@ async def test_autofilters_are_returned(
     nucliadb_writer: AsyncClient,
     knowledgebox,
     knowledge_graph,
+    mocked_predict,
 ):
-    predict_mock = Mock()
-    set_utility(Utility.PREDICT, predict_mock)
-
-    predict_mock.query = AsyncMock(
-        return_value=QueryInfo(
-            language="en",
-            stop_words=[],
-            semantic_thresholds={
-                "my-semantic-model": 0.7,
-            },
-            entities=TokenSearch(
-                tokens=[
-                    Ner(text="Newton", ner="scientist", start=0, end=1),
-                    Ner(text="Becquer", ner="poet", start=0, end=1),
-                ],
-                time=0.1,
-            ),
-            sentence=SentenceSearch(
-                vectors={
-                    "my-semantic-model": Q,
-                    "multilingual": Q,
-                },
-                timings={
-                    "my-semantic-model": 0.1,
-                    "multilingual": 0.1,
-                },
-            ),
-            visual_llm=False,
-            max_context=10000,
-            query="What relates Newton and Becquer?",
-        )
-    )
-
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/search",
         params={
@@ -91,3 +61,19 @@ async def test_autofilters_are_returned(
     assert "/entities/poet/Gustavo Adolfo Bécquer" in autofilters
     # should also not include deleted entities
     assert "/entities/scientist/Isaac Newsome" not in autofilters
+
+
+@pytest.fixture(scope="function")
+def mocked_predict():
+    def add_entities(query_info: QueryInfo) -> QueryInfo:
+        query_info.entities = TokenSearch(
+            tokens=[
+                Ner(text="Newton", ner="scientist", start=0, end=1),
+                Ner(text="Becquer", ner="poet", start=0, end=1),
+            ],
+            time=0.1,
+        )
+        return query_info
+
+    with predict_query_hook(add_entities):
+        yield

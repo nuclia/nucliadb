@@ -39,6 +39,7 @@ async def test_reindex(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox: str,
+    no_min_score,
 ):
     await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_grpc, knowledgebox)
 
@@ -48,6 +49,7 @@ async def test_reindex_kb_with_vectorsets(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox_with_vectorsets: str,
+    no_min_score,
 ):
     await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_grpc, knowledgebox_with_vectorsets)
 

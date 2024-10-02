@@ -475,6 +475,8 @@ class PredictEngine:
 
 
 class DummyPredictEngine(PredictEngine):
+    default_semantic_threshold = 0.7
+
     def __init__(self):
         self.onprem = True
         self.cluster_url = "http://localhost:8000"
@@ -546,7 +548,7 @@ class DummyPredictEngine(PredictEngine):
             vectors = {}
             timings = {}
             async for vectorset_id, config in datamanagers.vectorsets.iter(txn, kbid=kbid):
-                semantic_thresholds[vectorset_id] = 0.7
+                semantic_thresholds[vectorset_id] = self.default_semantic_threshold
                 vectors[vectorset_id] = [random.random()] * (
                     config.vectorset_index_config.vector_dimension or 1
                 )
@@ -554,7 +556,7 @@ class DummyPredictEngine(PredictEngine):
 
         # and fake data with the passed one too
         model = semantic_model or "<SHOULD-PROVIDE-SEMANTIC-MODEL>"
-        semantic_thresholds[model] = 0.7
+        semantic_thresholds[model] = self.default_semantic_threshold
         timings[model] = 0.0
 
         # HACK: this env variable makes the /query endpoint return a different

@@ -45,19 +45,6 @@ async def get(
     return kb_vectorsets.vectorsets[index]
 
 
-async def get_default_vectorset(
-    txn: Transaction,
-    *,
-    kbid: str,
-) -> knowledgebox_pb2.VectorSetConfig:
-    """XXX: For now, default vectorset is the first on the list, we should
-    implement an API to let users decide which is their default though
-    """
-    async for _, vectorset in iter(txn, kbid=kbid):
-        return vectorset
-    raise BrokenInvariant("KB without vectorsets this shouldn't be possible!")
-
-
 async def exists(txn, *, kbid: str, vectorset_id: str) -> bool:
     kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
     return _find_vectorset(kb_vectorsets, vectorset_id) is not None

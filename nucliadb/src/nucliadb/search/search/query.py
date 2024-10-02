@@ -202,18 +202,21 @@ class QueryParser:
         return self._get_vectorset_task
 
     async def _select_vectorset(self) -> Optional[str]:
-        if self.vectorset is not None:
+        if self.vectorset:
             return self.vectorset
 
         # When vectorset is not provided we get the default from Predict API
 
-        query_information = await self._get_query_information()
+        try:
+            query_information = await self._get_query_information()
+        except SendToPredictError:
+            return None
 
         if query_information.sentence is None:
             logger.error(
                 "Asking for a vectorset but /query didn't return one", extra={"kbid": self.kbid}
             )
-            return self.vectorset
+            return None
 
         for vectorset in query_information.sentence.vectors.keys():
             self.vectorset = vectorset

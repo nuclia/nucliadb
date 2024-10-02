@@ -69,6 +69,7 @@ from nucliadb_utils.utilities import (
     set_utility,
 )
 from tests.utils import inject_message
+from tests.utils.predict import custom_default_min_score
 
 logger = logging.getLogger(__name__)
 
@@ -511,6 +512,12 @@ def predict_mock() -> Mock:  # type: ignore
         clean_utility(Utility.PREDICT)
     else:
         set_utility(Utility.PREDICT, predict)
+
+
+@pytest.fixture(scope="function")
+def no_min_score():
+    with custom_default_min_score(-100):
+        yield
 
 
 @pytest.fixture(scope="function")

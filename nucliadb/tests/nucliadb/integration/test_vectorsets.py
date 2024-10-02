@@ -35,6 +35,9 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.requesters import utils
+from nucliadb_models.internal.predict import (
+    QueryInfo,
+)
 from nucliadb_protos import (
     nodereader_pb2,
     resources_pb2,
@@ -53,6 +56,7 @@ from nucliadb_utils.utilities import (
 from tests.ingest.fixtures import make_extracted_text
 from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
 from tests.utils import inject_message
+from tests.utils.predict import predict_query_hook
 
 DEFAULT_VECTOR_DIMENSION = 512
 VECTORSET_DIMENSION = 12
@@ -110,7 +114,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
 
 @pytest.mark.parametrize(
     "vectorset,expected",
-    [(None, ""), ("", ""), ("myvectorset", "myvectorset")],
+    [(None, "multilingual"), ("", "multilingual"), ("myvectorset", "myvectorset")],
 )
 @pytest.mark.asyncio
 async def test_vectorset_parameter_without_default_vectorset(
@@ -130,7 +134,13 @@ async def test_vectorset_parameter_without_default_vectorset(
         queried_nodes = []  # type: ignore
         return (results, incomplete_results, queried_nodes)
 
+    def set_predict_default_vectorset(query_info: QueryInfo) -> QueryInfo:
+        assert query_info.sentence is not None
+        query_info.sentence.vectors["multilingual"] = [1.0, 2.0, 3.0]
+        return query_info
+
     with (
+        predict_query_hook(set_predict_default_vectorset),
         patch(
             "nucliadb.search.search.query.datamanagers.vectorsets.get_default_vectorset",
             side_effect=BrokenInvariant(""),
@@ -264,7 +274,6 @@ async def test_querying_kb_with_vectorsets(
         @functools.wraps(original)
         async def inner(*args, **kwargs):
             query_info = await original(*args, **kwargs)
-            query_info.sentence.data = [1.0] * dimension
             for vectorset_id, vectorset_dimension in vectorset_dimensions.items():
                 query_info.sentence.vectors[vectorset_id] = [1.0] * vectorset_dimension
             return query_info

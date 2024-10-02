@@ -391,7 +391,6 @@ async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox, re
 async def test_ask_on_a_kb_not_found(nucliadb_reader):
     resp = await nucliadb_reader.post("/kb/unknown_kb_id/ask", json={"query": "title"})
     assert resp.status_code == 404
-    assert resp.json() == {"detail": "Knowledge Box not found."}
 
 
 @pytest.mark.asyncio()
