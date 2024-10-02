@@ -21,12 +21,16 @@ import asyncio
 from dataclasses import dataclass
 from typing import Optional, cast
 
-from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.results_hydrator.base import (
+    text_block_to_find_paragraph,
+)
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
@@ -37,7 +41,6 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     MinScore,
     ResourceProperties,
-    TempFindParagraph,
     TextPosition,
 )
 from nucliadb_protos.nodereader_pb2 import (
@@ -72,27 +75,16 @@ class SortableParagraph:
 @merge_observer.wrap({"type": "set_text_value"})
 async def set_text_value(
     kbid: str,
-    result_paragraph: TempFindParagraph,
+    paragraph_id: ParagraphId,
+    find_paragraph: FindParagraph,
     max_operations: asyncio.Semaphore,
     highlight: bool = False,
     ematches: Optional[list[str]] = None,
 ):
     async with max_operations:
-        assert result_paragraph.paragraph
-        assert result_paragraph.paragraph.position
-        _, field_type, field_key = result_paragraph.field.split("/")
-        result_paragraph.paragraph.text = await paragraphs.get_paragraph_text(
+        find_paragraph.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
-            paragraph_id=ParagraphId(
-                field_id=FieldId(
-                    rid=result_paragraph.rid,
-                    type=field_type,
-                    key=field_key,
-                    subfield_id=result_paragraph.split,
-                ),
-                paragraph_start=result_paragraph.paragraph.position.start,
-                paragraph_end=result_paragraph.paragraph.position.end,
-            ),
+            paragraph_id=paragraph_id,
             highlight=highlight,
             ematches=ematches,
             matches=[],  # TODO
@@ -129,7 +121,7 @@ async def set_resource_metadata_value(
 
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
-    result_paragraphs: list[TempFindParagraph],
+    result_paragraphs: list[TextBlockMatch],
     kbid: str,
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
@@ -144,57 +136,51 @@ async def fetch_find_metadata(
     operations = []
     max_operations = asyncio.Semaphore(50)
     paragraphs_to_sort: list[SortableParagraph] = []
-    for result_paragraph in result_paragraphs:
-        if result_paragraph.paragraph is not None:
-            find_resource = find_resources.setdefault(
-                result_paragraph.rid, FindResource(id=result_paragraph.id, fields={})
-            )
-            find_field = find_resource.fields.setdefault(
-                result_paragraph.field, FindField(paragraphs={})
-            )
+    for text_block in result_paragraphs:
+        rid = text_block.paragraph_id.rid
+        find_resource = find_resources.setdefault(rid, FindResource(id=rid, fields={}))
+        field_id = text_block.paragraph_id.field_id.short_without_subfield()
+        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
+        paragraph_id = text_block.paragraph_id.full()
 
-            if result_paragraph.paragraph.id in find_field.paragraphs:
-                # Its a multiple match, boost the score
-                if (
-                    find_field.paragraphs[result_paragraph.paragraph.id].score
-                    < result_paragraph.paragraph.score
-                ):
-                    # Use Vector score if there are both
-                    find_field.paragraphs[result_paragraph.paragraph.id].score = (
-                        result_paragraph.paragraph.score * 2
-                    )
-                    paragraphs_to_sort.append(
-                        SortableParagraph(
-                            rid=result_paragraph.rid,
-                            fid=result_paragraph.field,
-                            pid=result_paragraph.paragraph.id,
-                            score=result_paragraph.paragraph.score,
-                        )
-                    )
-                find_field.paragraphs[result_paragraph.paragraph.id].score_type = SCORE_TYPE.BOTH
-
-            else:
-                find_field.paragraphs[result_paragraph.paragraph.id] = result_paragraph.paragraph
+        if paragraph_id in find_field.paragraphs:
+            # Its a multiple match, boost the score
+            if find_field.paragraphs[paragraph_id].score < text_block.score:
+                # Use Vector score if there are both
+                find_field.paragraphs[paragraph_id].score = text_block.score * 2
                 paragraphs_to_sort.append(
                     SortableParagraph(
-                        rid=result_paragraph.rid,
-                        fid=result_paragraph.field,
-                        pid=result_paragraph.paragraph.id,
-                        score=result_paragraph.paragraph.score,
+                        rid=rid,
+                        fid=field_id,
+                        pid=paragraph_id,
+                        score=text_block.score,
                     )
                 )
-            operations.append(
-                asyncio.create_task(
-                    set_text_value(
-                        kbid=kbid,
-                        result_paragraph=result_paragraph,
-                        highlight=highlight,
-                        ematches=ematches,
-                        max_operations=max_operations,
-                    )
+            find_field.paragraphs[paragraph_id].score_type = SCORE_TYPE.BOTH
+
+        else:
+            find_field.paragraphs[paragraph_id] = text_block_to_find_paragraph(text_block)
+            paragraphs_to_sort.append(
+                SortableParagraph(
+                    rid=rid,
+                    fid=field_id,
+                    pid=paragraph_id,
+                    score=text_block.score,
                 )
             )
-            resources.add(result_paragraph.rid)
+        operations.append(
+            asyncio.create_task(
+                set_text_value(
+                    kbid=kbid,
+                    paragraph_id=text_block.paragraph_id,
+                    find_paragraph=find_field.paragraphs[paragraph_id],
+                    highlight=highlight,
+                    ematches=ematches,
+                    max_operations=max_operations,
+                )
+            )
+        )
+        resources.add(rid)
 
     for order, paragraph in enumerate(
         sorted(paragraphs_to_sort, key=lambda par: par.score, reverse=True)
@@ -236,7 +222,7 @@ def merge_paragraphs_vectors(
     count: int,
     page: int,
     min_score: float,
-) -> tuple[list[TempFindParagraph], bool]:
+) -> tuple[list[TextBlockMatch], bool]:
     # Flatten the results from several shards to be able to sort them globally
     flat_paragraphs = [
         paragraph for paragraph_shard in paragraphs_shards for paragraph in paragraph_shard
@@ -245,68 +231,20 @@ def merge_paragraphs_vectors(
         vector for vector_shard in vectors_shards for vector in vector_shard if vector.score >= min_score
     ]
 
-    merged_paragraphs: list[TempFindParagraph] = rank_fusion_merge(flat_paragraphs, flat_vectors)
+    merged_paragraphs: list[TextBlockMatch] = rank_fusion_merge(flat_paragraphs, flat_vectors)
 
     init_position = count * page
     end_position = init_position + count
     next_page = len(merged_paragraphs) > end_position
     merged_paragraphs = merged_paragraphs[init_position:end_position]
 
-    for merged_paragraph in merged_paragraphs:
-        if merged_paragraph.vector_index is not None:
-            merged_paragraph.paragraph = FindParagraph(
-                score=merged_paragraph.vector_index.score,
-                score_type=SCORE_TYPE.VECTOR,
-                text="",
-                labels=[],  # TODO: Get labels from index
-                page_with_visual=merged_paragraph.vector_index.metadata.page_with_visual,
-                reference=merged_paragraph.vector_index.metadata.representation.file,
-                is_a_table=merged_paragraph.vector_index.metadata.representation.is_a_table,
-                position=TextPosition(
-                    page_number=merged_paragraph.vector_index.metadata.position.page_number,
-                    index=merged_paragraph.vector_index.metadata.position.index,
-                    start=merged_paragraph.start,
-                    end=merged_paragraph.end,
-                    start_seconds=[
-                        x for x in merged_paragraph.vector_index.metadata.position.start_seconds
-                    ],
-                    end_seconds=[x for x in merged_paragraph.vector_index.metadata.position.end_seconds],
-                ),
-                id=merged_paragraph.id,
-                # Vector searches don't have fuzziness
-                fuzzy_result=False,
-            )
-        elif merged_paragraph.paragraph_index is not None:
-            merged_paragraph.paragraph = FindParagraph(
-                score=merged_paragraph.paragraph_index.score.bm25,
-                score_type=SCORE_TYPE.BM25,
-                text="",
-                labels=[x for x in merged_paragraph.paragraph_index.labels],
-                page_with_visual=merged_paragraph.paragraph_index.metadata.page_with_visual,
-                reference=merged_paragraph.paragraph_index.metadata.representation.file,
-                is_a_table=merged_paragraph.paragraph_index.metadata.representation.is_a_table,
-                position=TextPosition(
-                    page_number=merged_paragraph.paragraph_index.metadata.position.page_number,
-                    index=merged_paragraph.paragraph_index.metadata.position.index,
-                    start=merged_paragraph.start,
-                    end=merged_paragraph.end,
-                    start_seconds=[
-                        x for x in merged_paragraph.paragraph_index.metadata.position.start_seconds
-                    ],
-                    end_seconds=[
-                        x for x in merged_paragraph.paragraph_index.metadata.position.end_seconds
-                    ],
-                ),
-                id=merged_paragraph.id,
-                fuzzy_result=merged_paragraph.fuzzy_result,
-            )
     return merged_paragraphs, next_page
 
 
 def rank_fusion_merge(
     paragraphs: list[ParagraphResult],
     vectors: list[DocumentScored],
-) -> list[TempFindParagraph]:
+) -> list[TextBlockMatch]:
     """Merge results from different indexes using a rank fusion algorithm.
 
     Given two list of sorted results from keyword and semantic search, this rank
@@ -316,7 +254,7 @@ def rank_fusion_merge(
     - 2 keyword results and 1 semantic
 
     """
-    merged_paragraphs: list[TempFindParagraph] = []
+    merged_paragraphs: list[TextBlockMatch] = []
 
     # sort results by it's score before merging them
     paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
@@ -325,47 +263,58 @@ def rank_fusion_merge(
     for paragraph in paragraphs:
         fuzzy_result = len(paragraph.matches) > 0
         merged_paragraphs.append(
-            TempFindParagraph(
-                paragraph_index=paragraph,
-                field=paragraph.field,
-                rid=paragraph.uuid,
+            TextBlockMatch(
+                paragraph_id=ParagraphId.from_string(paragraph.paragraph),
                 score=paragraph.score.bm25,
-                start=paragraph.start,
-                split=paragraph.split,
-                end=paragraph.end,
-                id=paragraph.paragraph,
-                fuzzy_result=fuzzy_result,
-                page_with_visual=paragraph.metadata.page_with_visual,
-                reference=paragraph.metadata.representation.file,
+                score_type=SCORE_TYPE.BM25,
+                order=0,  # NOTE: this will be filled later
+                text="",  # NOTE: this will be filled later too
+                position=TextPosition(
+                    page_number=paragraph.metadata.position.page_number,
+                    index=paragraph.metadata.position.index,
+                    start=paragraph.start,
+                    end=paragraph.end,
+                    start_seconds=[x for x in paragraph.metadata.position.start_seconds],
+                    end_seconds=[x for x in paragraph.metadata.position.end_seconds],
+                ),
+                paragraph_labels=[x for x in paragraph.labels],  # XXX could be list(paragraph.labels)?
+                fuzzy_search=fuzzy_result,
                 is_a_table=paragraph.metadata.representation.is_a_table,
+                representation_file=paragraph.metadata.representation.file,
+                page_with_visual=paragraph.metadata.page_with_visual,
             )
         )
 
     nextpos = 1
     for vector in vectors:
-        doc_id_split = vector.doc_id.id.split("/")
-        split = None
-        if len(doc_id_split) == 5:
-            rid, field_type, field, index, position = doc_id_split
-            paragraph_id = f"{rid}/{field_type}/{field}/{position}"
-        elif len(doc_id_split) == 6:
-            rid, field_type, field, split, index, position = doc_id_split
-            paragraph_id = f"{rid}/{field_type}/{field}/{split}/{position}"
-        else:
+        try:
+            vector_id = VectorId.from_string(vector.doc_id.id)
+        except (IndexError, ValueError):
             logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
             continue
-        start, end = position.split("-")
         merged_paragraphs.insert(
             nextpos,
-            TempFindParagraph(
-                vector_index=vector,
-                rid=rid,
-                field=f"/{field_type}/{field}",
+            TextBlockMatch(
+                paragraph_id=ParagraphId.from_vector_id(vector_id),
                 score=vector.score,
-                start=int(start),
-                end=int(end),
-                split=split,
-                id=paragraph_id,
+                score_type=SCORE_TYPE.VECTOR,
+                order=0,  # NOTE: this will be filled later
+                text="",  # NOTE: this will be filled later too
+                position=TextPosition(
+                    page_number=vector.metadata.position.page_number,
+                    index=vector.metadata.position.index,
+                    start=vector_id.vector_start,
+                    end=vector_id.vector_end,
+                    start_seconds=[x for x in vector.metadata.position.start_seconds],
+                    end_seconds=[x for x in vector.metadata.position.end_seconds],
+                ),
+                # TODO: get labels from index
+                field_labels=[],
+                paragraph_labels=[],
+                fuzzy_search=False,  # semantic search doesn't have fuzziness
+                is_a_table=vector.metadata.representation.is_a_table,
+                representation_file=vector.metadata.representation.file,
+                page_with_visual=vector.metadata.page_with_visual,
             ),
         )
         nextpos += 3

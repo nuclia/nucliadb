@@ -28,12 +28,11 @@ from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 def get_paragraph_result(score):
     start = random.randint(0, 10)
     end = random.randint(start, 20)
-    index = random.randint(0, 100)
     pr = ParagraphResult()
-    pr.uuid = "foo"
+    pr.uuid = "rid"
     pr.score.bm25 = score
     pr.score.booster = 0
-    pr.paragraph = f"id/text/paragraph/{index}/{start}-{end}"
+    pr.paragraph = f"rid/a/title/{start}-{end}"
     pr.start = start
     pr.end = end
     pr.field = "/a/title"
@@ -45,7 +44,7 @@ def get_vector_result(score):
     end = random.randint(start, 20)
     index = random.randint(0, 100)
     vr = DocumentScored()
-    vr.doc_id.id = f"id/vector/paragraph/{index}/{start}-{end}"
+    vr.doc_id.id = f"rid/f/file/{index}/{start}-{end}"
     vr.score = score
     vr.metadata.position.start = start
     vr.metadata.position.end = end
@@ -84,14 +83,14 @@ def test_merge_paragraphs_vectors():
 
     # Check that the paragraphs are ordered by score
     bm25_scores = [
-        paragraph.paragraph.score
-        for paragraph in paragraphs
-        if paragraph.paragraph.score_type == SCORE_TYPE.BM25
+        text_block.score
+        for text_block in paragraphs
+        if text_block.score_type == SCORE_TYPE.BM25
     ]
     vector_scores = [
-        paragraph.paragraph.score
-        for paragraph in paragraphs
-        if paragraph.paragraph.score_type == SCORE_TYPE.VECTOR
+        text_block.score
+        for text_block in paragraphs
+        if text_block.score_type == SCORE_TYPE.VECTOR
     ]
     assert bm25_scores == sorted(bm25_scores, reverse=True)
     assert vector_scores == sorted(vector_scores, reverse=True)
@@ -109,9 +108,9 @@ def test_merge_paragraphs_vectors():
         (8, SCORE_TYPE.VECTOR),
         (9, SCORE_TYPE.VECTOR),
     ]:
-        assert paragraphs[index].paragraph.score_type == score_type
+        assert paragraphs[index].score_type == score_type
         if score_type == SCORE_TYPE.VECTOR:
-            vector_scores.add(paragraphs[index].paragraph.score)
+            vector_scores.add(paragraphs[index].score)
 
     # Check that the vector scores are different
     assert len(vector_scores) == 5

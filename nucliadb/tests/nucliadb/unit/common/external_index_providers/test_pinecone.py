@@ -33,6 +33,7 @@ from nucliadb.common.external_index_providers.pinecone import (
     convert_timestamp_filter,
     convert_to_pinecone_filter,
 )
+from nucliadb.common.ids import ParagraphId
 from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.knowledgebox_pb2 import PineconeIndexMetadata
 from nucliadb_protos.noderesources_pb2 import IndexParagraph, IndexParagraphs
@@ -207,16 +208,13 @@ def test_iter_matching_text_blocks(query_response):
     text_blocks = list(query_results.iter_matching_text_blocks())
     assert len(text_blocks) == 1
     text_block = text_blocks[0]
-    assert text_block.id == "rid/f/field/0-10"
+    assert text_block.paragraph_id == ParagraphId.from_string("rid/f/field/0-10")
     assert text_block.score == 0.8
     assert text_block.order == 0
     assert text_block.text is None
-    assert text_block.index == 0
-    assert text_block.field_id == "rid/f/field"
-    assert text_block.resource_id == "rid"
-    assert text_block.position_end == 10
-    assert text_block.position_start == 0
-    assert text_block.subfield_id is None
+    assert text_block.position.index == 0
+    assert text_block.position.start == 0
+    assert text_block.position.end == 10
 
 
 def test_convert_timestamp_filter():

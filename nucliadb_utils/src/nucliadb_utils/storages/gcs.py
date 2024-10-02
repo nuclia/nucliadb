@@ -458,7 +458,7 @@ class GCSStorage(Storage):
         labels: Optional[Dict[str, str]] = None,
         url: str = "https://www.googleapis.com",
         scopes: Optional[List[str]] = None,
-        anonymous: bool = False
+        anonymous: bool = False,
     ):
         if anonymous:
             self._json_credentials = None

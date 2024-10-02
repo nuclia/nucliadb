@@ -38,6 +38,7 @@ from nucliadb.common.external_index_providers.base import (
 )
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb_models.search import SCORE_TYPE, TextPosition
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodereader_pb2 import SearchRequest, Timestamps
@@ -83,24 +84,25 @@ class PineconeQueryResults(QueryResults):
                 continue
             vector_metadata = VectorMetadata.model_validate(matching_vector.metadata)  # noqa
             yield TextBlockMatch(
+                paragraph_id=paragraph_id,
                 text=None,  # To be filled by the results hydrator
-                id=paragraph_id.full(),
-                resource_id=paragraph_id.field_id.rid,
-                field_id=paragraph_id.field_id.full(),
                 score=matching_vector.score,
+                score_type=SCORE_TYPE.VECTOR,
                 order=order,
-                position_start=paragraph_id.paragraph_start,
-                position_end=paragraph_id.paragraph_end,
-                subfield_id=paragraph_id.field_id.subfield_id,
-                index=vector_id.index,
-                position_start_seconds=list(map(int, vector_metadata.position_start_seconds or [])),
-                position_end_seconds=list(map(int, vector_metadata.position_end_seconds or [])),
+                fuzzy_search=False,  # semantic search doesn't use fuzziness
                 is_a_table=vector_metadata.is_a_table or False,
                 page_with_visual=vector_metadata.page_with_visual or False,
                 representation_file=vector_metadata.representation_file,
                 paragraph_labels=vector_metadata.paragraph_labels or [],
                 field_labels=vector_metadata.field_labels or [],
-                page_number=vector_metadata.page_number,
+                position=TextPosition(
+                    page_number=vector_metadata.page_number,
+                    index=vector_id.index or 0,
+                    start=paragraph_id.paragraph_start,
+                    end=paragraph_id.paragraph_end,
+                    start_seconds=list(map(int, vector_metadata.position_start_seconds or [])),
+                    end_seconds=list(map(int, vector_metadata.position_end_seconds or [])),
+                ),
             )
 
 

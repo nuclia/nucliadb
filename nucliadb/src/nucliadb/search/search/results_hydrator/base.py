@@ -25,7 +25,6 @@ from pydantic import BaseModel
 
 from nucliadb.common.external_index_providers.base import QueryResults as ExternalIndexQueryResults
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
@@ -33,13 +32,11 @@ from nucliadb.search.search import paragraphs
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
-    SCORE_TYPE,
     FindField,
     FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
     ResourceProperties,
-    TextPosition,
 )
 from nucliadb_telemetry.metrics import Observer
 
@@ -97,12 +94,13 @@ async def hydrate_external(
         ):  # pragma: no cover
             # Ignore text blocks with a score lower than the minimum
             continue
-        resource_id = text_block.resource_id
+        resource_id = text_block.paragraph_id.rid
         resource_ids.add(resource_id)
         find_resource = retrieval_results.resources.setdefault(
             resource_id, FindResource(id=resource_id, fields={})
         )
-        find_field = find_resource.fields.setdefault(text_block.field_id, FindField(paragraphs={}))
+        field_id = text_block.paragraph_id.field_id.full()
+        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
 
         async def _hydrate_text_block(**kwargs):
             async with semaphore:
@@ -152,34 +150,20 @@ async def hydrate_text_block(
     """
     Fetch the text for a text block and update the FindParagraph object.
     """
-    field_id = FieldId.from_string(text_block.field_id)
-    text = await paragraphs.get_paragraph_text(
-        kbid=kbid,
-        paragraph_id=ParagraphId(
-            field_id=field_id,
-            paragraph_start=text_block.position_start,
-            paragraph_end=text_block.position_end,
-        ),
-    )
-    field_paragraphs[text_block.id] = FindParagraph(
+    text = await paragraphs.get_paragraph_text(kbid=kbid, paragraph_id=text_block.paragraph_id)
+    text_block_id = text_block.paragraph_id.full()
+    field_paragraphs[text_block_id] = FindParagraph(
         score=text_block.score,
-        score_type=SCORE_TYPE.VECTOR,
+        score_type=text_block.score_type,
         order=text_block.order,
         text=text,
-        id=text_block.id,
+        id=text_block_id,
         labels=text_block.paragraph_labels,
         fuzzy_result=False,
         is_a_table=text_block.is_a_table,
         reference=text_block.representation_file,
         page_with_visual=text_block.page_with_visual,
-        position=TextPosition(
-            page_number=text_block.page_number,
-            index=text_block.index or 0,
-            start=text_block.position_start,
-            end=text_block.position_end,
-            start_seconds=text_block.position_start_seconds,
-            end_seconds=text_block.position_end_seconds,
-        ),
+        position=text_block.position,
     )
 
 
@@ -213,3 +197,19 @@ async def hydrate_resource_metadata(
         find_resources.pop(resource_id, None)
         return
     find_resources[resource_id].updated_from(serialized_resource)
+
+
+def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
+    return FindParagraph(
+        id=text_block.paragraph_id.full(),
+        text=text_block.text or "",
+        score=text_block.score,
+        score_type=text_block.score_type,
+        order=text_block.order,
+        labels=text_block.paragraph_labels,
+        fuzzy_result=text_block.fuzzy_search,
+        is_a_table=text_block.is_a_table,
+        reference=text_block.representation_file,
+        page_with_visual=text_block.page_with_visual,
+        position=text_block.position,
+    )
