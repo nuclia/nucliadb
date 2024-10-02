@@ -555,7 +555,7 @@ class DummyPredictEngine(PredictEngine):
                 timings[vectorset_id] = 0.010
 
         # and fake data with the passed one too
-        model = semantic_model or "<SHOULD-PROVIDE-SEMANTIC-MODEL>"
+        model = semantic_model or "<PREDICT-DEFAULT-SEMANTIC-MODEL>"
         semantic_thresholds[model] = self.default_semantic_threshold
         timings[model] = 0.0
 
