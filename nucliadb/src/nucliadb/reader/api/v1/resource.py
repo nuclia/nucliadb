@@ -43,13 +43,17 @@ from nucliadb.reader.api.models import (
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import (
+    ConversationFieldExtractedData,
     Error,
     ExtractedDataTypeName,
+    FileFieldExtractedData,
+    LinkFieldExtractedData,
     NucliaDBRoles,
     Resource,
     ResourceFieldProperties,
     ResourceList,
     ResourcePagination,
+    TextFieldExtractedData,
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_protos import resources_pb2
@@ -399,3 +403,98 @@ async def _get_resource_field(
         content=resource_field.model_dump_json(exclude_unset=True, by_alias=True),
         media_type="application/json",
     )
+
+
+ExtractedDataTypes = Union[
+    TextFieldExtractedData,
+    FileFieldExtractedData,
+    LinkFieldExtractedData,
+    ConversationFieldExtractedData,
+]
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/metadata/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}/extracted/{{extracted}}",
+    status_code=200,
+    summary="Get extracted metadata for a resource field (by id)",
+    response_model=ExtractedDataTypes,
+    response_model_exclude_unset=True,
+    tags=["Resource fields"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_extracted_metadata_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_type: FieldTypeName,
+    field_id: str,
+    extracted: ExtractedDataTypeName,
+) -> Response:
+    return await _get_extracted_metadata(
+        kbid=kbid,
+        rid=rid,
+        field_type=field_type,
+        field_id=field_id,
+        extracted=extracted,
+    )
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/metadata/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}/extracted/{{extracted}}",
+    status_code=200,
+    summary="Get extracted metadata for a resource field (by slug)",
+    response_model=ExtractedDataTypes,
+    response_model_exclude_unset=True,
+    tags=["Resource fields"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_extracted_metadata_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_type: FieldTypeName,
+    field_id: str,
+    extracted: ExtractedDataTypeName,
+) -> Response:
+    return await _get_extracted_metadata(
+        kbid=kbid,
+        rid=rid,
+        field_type=field_type,
+        field_id=field_id,
+        extracted=extracted,
+    )
+
+
+async def _get_extracted_metadata(
+    kbid: str,
+    rid: str,
+    field_type: FieldTypeName,
+    field_id: str,
+    extracted: ExtractedDataTypeName,
+    rslug: Optional[str] = None,
+) -> Response:
+    storage = await get_storage(service_name=SERVICE_NAME)
+    async with get_driver().transaction() as txn:
+        kb = ORMKnowledgeBox(txn, storage, kbid)
+        if rid is None:
+            assert rslug is not None, "Either rid or rslug must be defined"
+            rid = await kb.get_resource_uuid_by_slug(rslug)
+            if rid is None:
+                raise HTTPException(status_code=404, detail="Resource does not exist")
+        resource = ORMResource(txn, storage, kb, rid)
+        field = await resource.get_field(field_id, FIELD_NAMES_TO_PB_TYPE_MAP[field_type], load=True)
+        if field is None:
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+        extracted_metadata: ExtractedDataTypes = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()
+        await set_resource_field_extracted_data(
+            field,
+            extracted_metadata,
+            field_type,
+            wanted_extracted_data=[extracted],
+        )
+        return Response(
+            content=extracted_metadata.model_dump_json(exclude_unset=True, by_alias=True),
+            media_type="application/json",
+        )

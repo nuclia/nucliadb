@@ -23,6 +23,7 @@ from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
+from nucliadb_models.resource import ExtractedDataTypeName
 
 BASE = ("field_id", "field_type")
 VALUE = ("value",)
@@ -204,3 +205,22 @@ async def test_resource_endpoints_by_slug(nucliadb_reader: AsyncClient, test_res
         f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}/text/text1",
     )
     assert resp.status_code == 404
+
+
+@pytest.mark.deploy_modes("component")
+async def test_get_metadata_extracted(nucliadb_reader: AsyncClient, test_resource):
+    rsc = test_resource
+    kbid = rsc.kb.kbid
+    rid = rsc.uuid
+
+    for fieldid, fieldtype in [
+        ("text1", "text"),
+        ("link1", "link"),
+        ("file1", "file"),
+        ("conv1", "conversation"),
+    ]:
+        for extracted_type in list(ExtractedDataTypeName):
+            resp = await nucliadb_reader.get(
+                f"/{KB_PREFIX}/{kbid}/metadata/{RESOURCE_PREFIX}/{rid}/{fieldtype}/{fieldid}/extracted/{extracted_type.value}",
+            )
+            assert resp.status_code == 200, f"{fieldtype}/{fieldid}/{extracted_type}"
