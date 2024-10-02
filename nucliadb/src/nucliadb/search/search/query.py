@@ -421,7 +421,8 @@ class QueryParser:
                     )
             else:
                 logger.warning(
-                    "Vectorset unset, using default semantic threshold", extra={"kbid": self.kbid}
+                    "Vectorset unset by user or predict, using default semantic threshold",
+                    extra={"kbid": self.kbid},
                 )
         self.min_score.semantic = semantic_min_score
         request.min_score_semantic = self.min_score.semantic
