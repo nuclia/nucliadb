@@ -212,15 +212,37 @@ async def test_get_metadata_extracted(nucliadb_reader: AsyncClient, test_resourc
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
+    rslug = rsc.basic.slug
 
-    for fieldid, fieldtype in [
-        ("text1", "text"),
-        ("link1", "link"),
-        ("file1", "file"),
-        ("conv1", "conversation"),
+    urls = []
+    for by_slug in [False, True]:
+        for fieldid, fieldtype in [
+            ("text1", "text"),
+            ("link1", "link"),
+            ("file1", "file"),
+            ("conv1", "conversation"),
+        ]:
+            for extracted_type in list(ExtractedDataTypeName):
+                if by_slug:
+                    urls.append(
+                        f"/{KB_PREFIX}/{kbid}/metadata/slug/{rslug}/{fieldtype}/{fieldid}/extracted/{extracted_type.value}",
+                    )
+                else:
+                    urls.append(
+                        f"/{KB_PREFIX}/{kbid}/metadata/resource/{rid}/{fieldtype}/{fieldid}/extracted/{extracted_type.value}",
+                    )
+
+    for url in urls:
+        resp = await nucliadb_reader.get(url)
+        assert resp.status_code == 200, f"Failed for url: {url}. Response: {resp.json()}"
+
+    # Try now with a non-existent slug, rid and field
+    for url in [
+        # Field does not exist
+        f"/{KB_PREFIX}/{kbid}/metadata/resource/{rid}/text/inexistent/extracted/text",
+        # Resource does not exist
+        f"/{KB_PREFIX}/{kbid}/metadata/slug/foobar/text/text1/extracted/text",
+        f"/{KB_PREFIX}/{kbid}/metadata/resource/foobar/text/text1/extracted/text",
     ]:
-        for extracted_type in list(ExtractedDataTypeName):
-            resp = await nucliadb_reader.get(
-                f"/{KB_PREFIX}/{kbid}/metadata/{RESOURCE_PREFIX}/{rid}/{fieldtype}/{fieldid}/extracted/{extracted_type.value}",
-            )
-            assert resp.status_code == 200, f"{fieldtype}/{fieldid}/{extracted_type}"
+        resp = await nucliadb_reader.get(url)
+        assert resp.status_code == 404, f"Failed for url: {url}. Response: {resp.json()}"

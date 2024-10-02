@@ -453,14 +453,14 @@ async def get_extracted_metadata_rid_prefix(
 async def get_extracted_metadata_rslug_prefix(
     request: Request,
     kbid: str,
-    rid: str,
+    rslug: str,
     field_type: FieldTypeName,
     field_id: str,
     extracted: ExtractedDataTypeName,
 ) -> Response:
     return await _get_extracted_metadata(
         kbid=kbid,
-        rid=rid,
+        rslug=rslug,
         field_type=field_type,
         field_id=field_id,
         extracted=extracted,
@@ -469,10 +469,10 @@ async def get_extracted_metadata_rslug_prefix(
 
 async def _get_extracted_metadata(
     kbid: str,
-    rid: str,
     field_type: FieldTypeName,
     field_id: str,
     extracted: ExtractedDataTypeName,
+    rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -482,11 +482,13 @@ async def _get_extracted_metadata(
             assert rslug is not None, "Either rid or rslug must be defined"
             rid = await kb.get_resource_uuid_by_slug(rslug)
             if rid is None:
-                raise HTTPException(status_code=404, detail="Resource does not exist")
+                raise HTTPException(status_code=404, detail="Resource or KnowledgeBox does not exist")
         resource = ORMResource(txn, storage, kb, rid)
         field = await resource.get_field(field_id, FIELD_NAMES_TO_PB_TYPE_MAP[field_type], load=True)
-        if field is None:
-            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+        if field is None or field.value is None:
+            raise HTTPException(
+                status_code=404, detail="Field does not exist or it has not been processed yet"
+            )
         extracted_metadata: ExtractedDataTypes = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()
         await set_resource_field_extracted_data(
             field,
