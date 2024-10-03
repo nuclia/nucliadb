@@ -123,7 +123,8 @@ async def test_multiple_search_resource_all(
 @pytest.mark.asyncio
 @pytest.mark.flaky(reruns=3)
 async def test_search_resource_all(
-    search_api: Callable[..., AsyncClient], test_search_resource: str
+    search_api: Callable[..., AsyncClient],
+    test_search_resource: str,
 ) -> None:
     kbid = test_search_resource
     async with search_api(roles=[NucliaDBRoles.READER]) as client:

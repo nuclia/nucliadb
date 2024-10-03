@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+
 import json
 import unittest
 from typing import Optional
@@ -150,8 +151,8 @@ class TestVectorSetAndMatryoshkaParsing:
     @pytest.mark.parametrize(
         "vectorset,matryoshka_dimension,expected_vectorset,expected_dimension",
         [
-            (None, None, "", len(Q)),
-            (None, len(Q) - 20, "", len(Q) - 20),
+            (None, None, "<PREDICT-DEFAULT-SEMANTIC-MODEL>", len(Q)),
+            (None, len(Q) - 20, "<PREDICT-DEFAULT-SEMANTIC-MODEL>", len(Q) - 20),
             ("vectorset_id", None, "vectorset_id", len(Q)),
             ("vectorset_id", len(Q) - 20, "vectorset_id", len(Q) - 20),
         ],
@@ -177,6 +178,7 @@ class TestVectorSetAndMatryoshkaParsing:
             page_size=20,
             min_score=MinScore(bm25=0, semantic=0),
         )
+
         with (
             patch(
                 "nucliadb.search.search.query.datamanagers.vectorsets.exists",

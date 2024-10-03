@@ -475,6 +475,8 @@ class PredictEngine:
 
 
 class DummyPredictEngine(PredictEngine):
+    default_semantic_threshold = 0.7
+
     def __init__(self):
         self.onprem = True
         self.cluster_url = "http://localhost:8000"
@@ -540,46 +542,42 @@ class DummyPredictEngine(PredictEngine):
     ) -> QueryInfo:
         self.calls.append(("query", sentence))
 
+        if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":  # pragma: no cover
+            base_vector = Qm2023
+        else:
+            base_vector = Q
+
         # populate data with existing vectorsets
         async with datamanagers.with_ro_transaction() as txn:
             semantic_thresholds = {}
             vectors = {}
             timings = {}
             async for vectorset_id, config in datamanagers.vectorsets.iter(txn, kbid=kbid):
-                semantic_thresholds[vectorset_id] = 0.7
-                vectors[vectorset_id] = [random.random()] * (
-                    config.vectorset_index_config.vector_dimension or 1
-                )
+                semantic_thresholds[vectorset_id] = self.default_semantic_threshold
+                vectorset_dimension = config.vectorset_index_config.vector_dimension
+                if vectorset_dimension > len(base_vector):
+                    padding = vectorset_dimension - len(base_vector)
+                    vectors[vectorset_id] = base_vector + [random.random()] * padding
+                else:
+                    vectors[vectorset_id] = base_vector[:vectorset_dimension]
+
                 timings[vectorset_id] = 0.010
 
         # and fake data with the passed one too
-        model = semantic_model or "<SHOULD-PROVIDE-SEMANTIC-MODEL>"
-        semantic_thresholds[model] = 0.7
+        model = semantic_model or "<PREDICT-DEFAULT-SEMANTIC-MODEL>"
+        semantic_thresholds[model] = self.default_semantic_threshold
+        vectors[model] = base_vector
         timings[model] = 0.0
-
-        # HACK: this env variable makes the /query endpoint return a different
-        # vector, probably to test a model in some way. Does it make sense to
-        # keep it though?
-        if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":  # pragma: no cover
-            data = Qm2023
-            vectors[model] = Qm2023
-
-        else:
-            data = Q
-            vectors[model] = Q
 
         return QueryInfo(
             language="en",
             stop_words=[],
-            semantic_threshold=0.7,
             semantic_thresholds=semantic_thresholds,
             visual_llm=True,
             max_context=self.max_context,
             entities=TokenSearch(tokens=[Ner(text="text", ner="PERSON", start=0, end=2)], time=0.0),
             sentence=SentenceSearch(
-                data=data,
                 vectors=vectors,
-                time=0.0,
                 timings=timings,
             ),
             query=sentence,

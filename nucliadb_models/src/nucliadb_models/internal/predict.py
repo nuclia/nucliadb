@@ -30,14 +30,15 @@ from pydantic import BaseModel, Field
 
 
 class SentenceSearch(BaseModel):
-    data: List[float] = Field(deprecated=True, default_factory=list)
     vectors: dict[str, List[float]] = Field(
-        default_factory=dict, description="Sentence vectors for each semantic model"
+        default_factory=dict,
+        description="Sentence vectors for each semantic model",
+        min_length=1,
     )
-    time: float = Field(deprecated=True)
     timings: dict[str, float] = Field(
         default_factory=dict,
         description="Time taken to compute the sentence vector for each semantic model",
+        min_length=1,
     )
 
 
@@ -57,9 +58,10 @@ class TokenSearch(BaseModel):
 class QueryInfo(BaseModel):
     language: Optional[str]
     stop_words: List[str] = Field(default_factory=list)
-    semantic_threshold: float = Field(deprecated=True)
     semantic_thresholds: dict[str, float] = Field(
-        default_factory=dict, description="Semantic threshold for each semantic model"
+        default_factory=dict,
+        description="Semantic threshold for each semantic model",
+        min_length=1,
     )
     visual_llm: bool
     max_context: int
