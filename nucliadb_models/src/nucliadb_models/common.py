@@ -60,7 +60,6 @@ class ParamDefault(BaseModel):
     gt: Optional[float] = None
     max_items: Optional[int] = None
     deprecated: bool = False
-    deprecation_message: Optional[str] = None
 
     def to_pydantic_field(self, default=_NOT_SET, **kw) -> Field:  # type: ignore
         """
@@ -76,7 +75,6 @@ class ParamDefault(BaseModel):
             le=self.le,
             max_length=self.max_items,
             deprecated=deprecated,
-            deprecation_message=self.deprecation_message,
             **kw,
         )
 
