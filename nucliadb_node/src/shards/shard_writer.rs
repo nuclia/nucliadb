@@ -37,7 +37,7 @@ use super::indexes::{ShardIndexes, DEFAULT_VECTORS_INDEX_NAME};
 use super::metadata::ShardMetadata;
 use super::versioning::{self, Versions};
 use crate::disk_structure::{self, *};
-use crate::settings::{feature_flags, Settings};
+use crate::settings::Settings;
 use crate::telemetry::run_with_telemetry;
 
 const MAX_LABEL_LENGTH: usize = 32768; // Tantivy max is 2^16 - 4
@@ -106,7 +106,7 @@ impl ShardWriter {
     }
 
     #[measure(actor = "shard", metric = "new")]
-    pub fn new(new: NewShard, shards_path: &Path, settings: &Settings) -> NodeResult<(Self, Arc<ShardMetadata>)> {
+    pub fn new(new: NewShard, shards_path: &Path, _settings: &Settings) -> NodeResult<(Self, Arc<ShardMetadata>)> {
         let span = tracing::Span::current();
 
         if new.vector_configs.is_empty() {
@@ -120,7 +120,6 @@ impl ShardWriter {
 
         std::fs::create_dir(&shard_path)?;
 
-        let ff_context = HashMap::from([("kbid".to_string(), metadata.kbid())]);
         let versions = Versions {
             paragraphs: versioning::PARAGRAPHS_VERSION,
             vectors: versioning::VECTORS_VERSION,
