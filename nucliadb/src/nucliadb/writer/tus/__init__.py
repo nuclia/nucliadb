@@ -21,12 +21,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 from nucliadb.writer.settings import settings as writer_settings
-from nucliadb.writer.tus.azure import AzureBlobStore, AzureFileStorageManager
 from nucliadb.writer.tus.dm import FileDataManager, RedisFileDataManagerFactory
 from nucliadb.writer.tus.exceptions import ManagerNotAvailable
-from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
-from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
-from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.settings import FileBackendConfig, storage_settings
@@ -48,6 +44,8 @@ REDIS_FILE_DATA_MANAGER_FACTORY: Optional[RedisFileDataManagerFactory] = None
 async def initialize():
     global DRIVER
     if storage_settings.file_backend == FileBackendConfig.GCS:
+        from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
+
         storage_backend = GCloudBlobStore()
 
         await storage_backend.initialize(
@@ -64,6 +62,8 @@ async def initialize():
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
     elif storage_settings.file_backend == FileBackendConfig.S3:
+        from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
+
         storage_backend = S3BlobStore()
 
         await storage_backend.initialize(
@@ -83,6 +83,8 @@ async def initialize():
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
     elif storage_settings.file_backend == FileBackendConfig.LOCAL:
+        from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
+
         storage_backend = LocalBlobStore(storage_settings.local_files)
 
         await storage_backend.initialize()
@@ -92,6 +94,8 @@ async def initialize():
         DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
     elif storage_settings.file_backend == FileBackendConfig.AZURE:
+        from nucliadb.writer.tus.azure import AzureBlobStore, AzureFileStorageManager
+
         if storage_settings.azure_account_url is None:
             raise ConfigurationError("AZURE_ACCOUNT_URL env variable not configured")
 
