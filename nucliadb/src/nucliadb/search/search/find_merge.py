@@ -50,6 +50,8 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 from nucliadb_telemetry import metrics
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from . import paragraphs
 from .metrics import merge_observer
@@ -102,6 +104,14 @@ async def set_resource_metadata_value(
     find_resources: dict[str, FindResource],
     max_operations: asyncio.Semaphore,
 ):
+    if ResourceProperties.EXTRACTED in show and has_feature(
+        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
+    ):
+        # Returning extracted metadata in search results is deprecated and this flag
+        # will be set to True for all KBs in the future.
+        show.remove(ResourceProperties.EXTRACTED)
+        extracted = []
+
     async with max_operations:
         serialized_resource = await managed_serialize(
             txn,
