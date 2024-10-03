@@ -23,6 +23,8 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
+from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search import cache
@@ -36,6 +38,7 @@ from nucliadb_models.search import (
     SyncAskResponse,
     parse_max_tokens,
 )
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.authentication import requires
 
 
@@ -62,6 +65,16 @@ async def ask_knowledgebox_endpoint(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
+    breakpoint()
+    bm = BrokerMessage()
+    with open("big_bm.bin", "rb") as f:
+        bm.ParseFromString(f.read())
+
+    bm.kbid = kbid
+    context = get_app_context(request.app)
+    processor = Processor(context.kv_driver, context.blob_storage, None, partition="1")
+    await processor.process(bm, seqid=-1, transaction_check=False)
+
     return await create_ask_response(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
     )

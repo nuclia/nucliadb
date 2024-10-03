@@ -809,3 +809,23 @@ async def test_ingest_update_labels(
         }
         assert f"{rid}/f/some_text" in brain.sentences_to_delete
         assert "/l/names/john" in brain.labels
+
+
+async def test_process_big_bm(
+    local_files,
+    storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    knowledgebox_ingest,
+    stream_processor,
+    stream_audit: StreamAuditStorage,
+    maindb_driver: Driver,
+):
+    bm = BrokerMessage()
+    with open("big_bm.bin", "rb") as f:
+        bm.ParseFromString(f.read())
+
+    bm.kbid = knowledgebox_ingest
+    breakpoint()
+    await stream_processor.process(message=bm, seqid=1)

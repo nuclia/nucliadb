@@ -83,14 +83,10 @@ def test_merge_paragraphs_vectors():
 
     # Check that the paragraphs are ordered by score
     bm25_scores = [
-        text_block.score
-        for text_block in paragraphs
-        if text_block.score_type == SCORE_TYPE.BM25
+        text_block.score for text_block in paragraphs if text_block.score_type == SCORE_TYPE.BM25
     ]
     vector_scores = [
-        text_block.score
-        for text_block in paragraphs
-        if text_block.score_type == SCORE_TYPE.VECTOR
+        text_block.score for text_block in paragraphs if text_block.score_type == SCORE_TYPE.VECTOR
     ]
     assert bm25_scores == sorted(bm25_scores, reverse=True)
     assert vector_scores == sorted(vector_scores, reverse=True)
