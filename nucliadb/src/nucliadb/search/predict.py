@@ -542,6 +542,11 @@ class DummyPredictEngine(PredictEngine):
     ) -> QueryInfo:
         self.calls.append(("query", sentence))
 
+        if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":  # pragma: no cover
+            base_vector = Qm2023
+        else:
+            base_vector = Q
+
         # populate data with existing vectorsets
         async with datamanagers.with_ro_transaction() as txn:
             semantic_thresholds = {}
@@ -549,23 +554,20 @@ class DummyPredictEngine(PredictEngine):
             timings = {}
             async for vectorset_id, config in datamanagers.vectorsets.iter(txn, kbid=kbid):
                 semantic_thresholds[vectorset_id] = self.default_semantic_threshold
-                vectors[vectorset_id] = [random.random()] * (
-                    config.vectorset_index_config.vector_dimension or 1
-                )
+                vectorset_dimension = config.vectorset_index_config.vector_dimension
+                if vectorset_dimension > len(base_vector):
+                    padding = vectorset_dimension - len(base_vector)
+                    vectors[vectorset_id] = base_vector + [random.random()] * padding
+                else:
+                    vectors[vectorset_id] = base_vector[:vectorset_dimension]
+
                 timings[vectorset_id] = 0.010
 
         # and fake data with the passed one too
         model = semantic_model or "<PREDICT-DEFAULT-SEMANTIC-MODEL>"
         semantic_thresholds[model] = self.default_semantic_threshold
+        vectors[model] = base_vector
         timings[model] = 0.0
-
-        # HACK: this env variable makes the /query endpoint return a different
-        # vector, probably to test a model in some way. Does it make sense to
-        # keep it though?
-        if os.environ.get("TEST_SENTENCE_ENCODER") == "multilingual-2023-02-21":  # pragma: no cover
-            vectors[model] = Qm2023
-        else:
-            vectors[model] = Q
 
         return QueryInfo(
             language="en",
