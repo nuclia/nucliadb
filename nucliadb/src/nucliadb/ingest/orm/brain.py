@@ -107,6 +107,8 @@ class ResourceBrain:
         # We should set paragraphs and labels
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
         for subfield, metadata_split in metadata.split_metadata.items():
+            extracted_text_str = extracted_text.split_text[subfield] if extracted_text else None
+
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
@@ -143,9 +145,8 @@ class ResourceBrain:
                     index=index,
                     repeated_in_field=is_paragraph_repeated_in_field(
                         paragraph,
-                        extracted_text,
+                        extracted_text_str,
                         unique_paragraphs,
-                        split=subfield,
                     ),
                     metadata=ParagraphMetadata(
                         position=position,
@@ -164,6 +165,7 @@ class ResourceBrain:
 
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
+        extracted_text_str = extracted_text.text if extracted_text else None
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             denied_classifications = paragraph_classifications.denied.get(key, [])
@@ -196,7 +198,7 @@ class ResourceBrain:
                 field=field_key,
                 index=index,
                 repeated_in_field=is_paragraph_repeated_in_field(
-                    paragraph, extracted_text, unique_paragraphs
+                    paragraph, extracted_text_str, unique_paragraphs
                 ),
                 metadata=ParagraphMetadata(
                     position=position,
@@ -632,28 +634,15 @@ class ResourceBrain:
         extend_unique(self.brain.labels, flatten_resource_labels(self.labels))
 
 
-def get_paragraph_text(
-    extracted_text: ExtractedText, start: int, end: int, split: Optional[str] = None
-) -> str:
-    if split is not None:
-        text = extracted_text.split_text[split]
-    else:
-        text = extracted_text.text
-    return text[start:end]
-
-
 def is_paragraph_repeated_in_field(
     paragraph: Paragraph,
-    extracted_text: Optional[ExtractedText],
+    extracted_text: Optional[str],
     unique_paragraphs: set[str],
-    split: Optional[str] = None,
 ) -> bool:
     if extracted_text is None:
         return False
 
-    paragraph_text = get_paragraph_text(
-        extracted_text, start=paragraph.start, end=paragraph.end, split=split
-    )
+    paragraph_text = extracted_text[paragraph.start : paragraph.end]
     if len(paragraph_text) == 0:
         return False
 
