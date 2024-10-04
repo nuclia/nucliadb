@@ -38,7 +38,6 @@ images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
     "version": "latest",
     "env": {
-        "RUST_LOG": "nucliadb_*=DEBUG",
         "DRIVER": "local",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "dummy_predict": "True",
