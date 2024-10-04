@@ -6,6 +6,7 @@ format:
 .PHONY: lint
 lint:
 	ruff check --config=../ruff.toml .
+	ruff format --check --config=../ruff.toml .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini .
 
 .PHONY: test
