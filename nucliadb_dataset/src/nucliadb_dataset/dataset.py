@@ -209,17 +209,11 @@ class NucliaDBDataset(NucliaDataset):
         )
         with open(filename_tmp, "wb") as sink:
             with pa.ipc.new_stream(sink, self.schema) as writer:
-                try:
-                    for batch in self.streamer:
-                        batch = self._map(batch)
-                        if batch is None:
-                            break
-                        writer.write_batch(batch)
-                        print("AAA")
-                except:
-                    import pdb
-
-                    pdb.set_trace()
+                for batch in self.streamer:
+                    batch = self._map(batch)
+                    if batch is None:
+                        break
+                    writer.write_batch(batch)
         print("-" * 10)
         self.streamer.finalize()
         os.rename(filename_tmp, filename)
