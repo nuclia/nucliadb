@@ -38,6 +38,7 @@ images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
     "version": "latest",
     "env": {
+        "RUST_LOG": "nucliadb_*=DEBUG",
         "DRIVER": "local",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "dummy_predict": "True",
@@ -50,9 +51,7 @@ images.settings["nucliadb"] = {
     },
 }
 
-NUCLIA_DOCS_dataset = (
-    "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia-datasets.export"
-)
+NUCLIA_DOCS_dataset = "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia-datasets.export"
 
 
 MB = 1024 * 1024
@@ -141,7 +140,9 @@ def sdk(nucliadb: NucliaFixture):
 
 @pytest.fixture(scope="function")
 def sdk_async(nucliadb: NucliaFixture):
-    sdk = nucliadb_sdk.NucliaDBAsync(region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url)
+    sdk = nucliadb_sdk.NucliaDBAsync(
+        region=nucliadb_sdk.Region.ON_PREM, url=nucliadb.url
+    )
     return sdk
 
 

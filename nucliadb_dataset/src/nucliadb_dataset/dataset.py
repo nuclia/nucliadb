@@ -52,7 +52,9 @@ class NucliaDataset(object):
 
     def __new__(cls, *args, **kwargs):
         if cls is NucliaDataset:
-            raise TypeError(f"'{cls.__name__}' can't be instantiated, use its child classes")
+            raise TypeError(
+                f"'{cls.__name__}' can't be instantiated, use its child classes"
+            )
         return super().__new__(cls)
 
     def __init__(
@@ -202,14 +204,22 @@ class NucliaDBDataset(NucliaDataset):
 
         self.streamer.initialize(partition_id)
         filename_tmp = f"{filename}.tmp"
-        print(f"Generating partition {partition_id} from {self.streamer.base_url} at {filename}")
+        print(
+            f"Generating partition {partition_id} from {self.streamer.base_url} at {filename}"
+        )
         with open(filename_tmp, "wb") as sink:
             with pa.ipc.new_stream(sink, self.schema) as writer:
-                for batch in self.streamer:
-                    batch = self._map(batch)
-                    if batch is None:
-                        break
-                    writer.write_batch(batch)
+                try:
+                    for batch in self.streamer:
+                        batch = self._map(batch)
+                        if batch is None:
+                            break
+                        writer.write_batch(batch)
+                        print("AAA")
+                except:
+                    import pdb
+
+                    pdb.set_trace()
         print("-" * 10)
         self.streamer.finalize()
         os.rename(filename_tmp, filename)
@@ -236,5 +246,7 @@ def download_all_partitions(
         raise KeyError("Not a valid KB")
 
     task_obj = Task(task)
-    fse = NucliaDBDataset(sdk=sdk, task=task_obj, labels=labels, base_path=path, kbid=kbid)
+    fse = NucliaDBDataset(
+        sdk=sdk, task=task_obj, labels=labels, base_path=path, kbid=kbid
+    )
     return fse.read_all_partitions(path=path)
