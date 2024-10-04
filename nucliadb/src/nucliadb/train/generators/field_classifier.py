@@ -39,9 +39,7 @@ def field_classification_batch_generator(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[FieldClassificationBatch, None]:
-    generator = generate_field_classification_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
+    generator = generate_field_classification_payloads(kbid, trainset, node, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, FieldClassificationBatch)
     return batch_generator
 
@@ -91,9 +89,7 @@ async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> st
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
-        logger.warning(
-            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
+        logger.warning(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
         return ""
 
     text = ""

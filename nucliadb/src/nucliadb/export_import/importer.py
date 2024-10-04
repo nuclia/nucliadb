@@ -93,9 +93,7 @@ async def import_kb(
         await dm.set_metadata("import", metadata)
 
 
-async def import_kb_from_blob_storage(
-    context: ApplicationContext, msg: NatsTaskMessage
-):
+async def import_kb_from_blob_storage(context: ApplicationContext, msg: NatsTaskMessage):
     """
     Imports to a knowledgebox from an export stored in the blob storage service.
     """

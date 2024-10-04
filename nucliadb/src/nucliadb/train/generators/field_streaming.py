@@ -40,9 +40,7 @@ def field_streaming_batch_generator(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[FieldStreamingBatch, None]:
-    generator = generate_field_streaming_payloads(
-        kbid, trainset, node, shard_replica_id
-    )
+    generator = generate_field_streaming_payloads(kbid, trainset, node, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, FieldStreamingBatch)
     return batch_generator
 
@@ -116,9 +114,7 @@ async def generate_field_streaming_payloads(
         yield tl
 
 
-async def get_field_text(
-    kbid: str, rid: str, field: str, field_type: str
-) -> Optional[ExtractedText]:
+async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Optional[ExtractedText]:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
@@ -148,9 +144,7 @@ async def get_field_metadata(
     return field_metadata
 
 
-async def get_field_basic(
-    kbid: str, rid: str, field: str, field_type: str
-) -> Optional[Basic]:
+async def get_field_basic(kbid: str, rid: str, field: str, field_type: str) -> Optional[Basic]:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
