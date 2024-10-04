@@ -2044,7 +2044,7 @@ dependencies = [
     "types-protobuf<5,>=4.24",
     "types-psutil>=5.9.5.17",
     "types-setuptools",
-    "uvicorn<0.19.0",
+    "uvicorn",
 ]
 
 [[package]]
@@ -2250,7 +2250,7 @@ dependencies = [
     "redis>=4.3.4",
     "starlette>=0.21.0",
     "types-aiofiles>=0.8.3",
-    "uvicorn<0.19.0,>=0.16.0",
+    "uvicorn",
 ]
 
 [[package]]
@@ -3968,18 +3968,18 @@ files = [
 
 [[package]]
 name = "uvicorn"
-version = "0.18.3"
-requires_python = ">=3.7"
+version = "0.31.0"
+requires_python = ">=3.8"
 summary = "The lightning-fast ASGI server."
 groups = ["default", "dev", "sidecar"]
 dependencies = [
     "click>=7.0",
     "h11>=0.8",
-    "typing-extensions; python_version < \"3.8\"",
+    "typing-extensions>=4.0; python_version < \"3.11\"",
 ]
 files = [
-    {file = "uvicorn-0.18.3-py3-none-any.whl", hash = "sha256:0abd429ebb41e604ed8d2be6c60530de3408f250e8d2d84967d85ba9e86fe3af"},
-    {file = "uvicorn-0.18.3.tar.gz", hash = "sha256:9a66e7c42a2a95222f76ec24a4b754c158261c4696e683b9dadc72b590e0311b"},
+    {file = "uvicorn-0.31.0-py3-none-any.whl", hash = "sha256:cac7be4dd4d891c363cd942160a7b02e69150dcbc7a36be04d5f4af4b17c8ced"},
+    {file = "uvicorn-0.31.0.tar.gz", hash = "sha256:13bc21373d103859f68fe739608e2eb054a816dea79189bc3ca08ea89a275906"},
 ]
 
 [[package]]
