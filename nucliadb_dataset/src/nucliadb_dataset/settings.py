@@ -37,23 +37,33 @@ settings = Settings()
 
 
 class RunningSettings(BaseSettings):
-    export: ExportType = pydantic.Field(ExportType.FILESYSTEM, description="Destination of export")
-    download_path: str = pydantic.Field(f"{Path.home()}/.nuclia/download", description="Download path")
+    export: ExportType = pydantic.Field(
+        ExportType.FILESYSTEM, description="Destination of export"
+    )
+    download_path: str = pydantic.Field(
+        f"{Path.home()}/.nuclia/download", description="Download path"
+    )
     url: str = pydantic.Field(description="KnowledgeBox URL")
     type: Task = pydantic.Field(description="Dataset Type")
-    labelset: Optional[str] = pydantic.Field(description="For classification which labelset or families")
+    labelset: Optional[str] = pydantic.Field(
+        None, description="For classification which labelset or families"
+    )
 
     datasets_url: str = pydantic.Field(
         "https://europe-1.nuclia.cloud",
         description="Base url for the Nuclia datasets component (excluding /api/v1)™",  # noqa
     )
 
-    apikey: Optional[str] = pydantic.Field(description="API key to upload to Nuclia Datasets™")
+    apikey: Optional[str] = pydantic.Field(
+        None, description="API key to upload to Nuclia Datasets™"
+    )
 
-    environment: Region = pydantic.Field(Region.ON_PREM, description="region or on-prem")
+    environment: Region = pydantic.Field(
+        Region.ON_PREM, description="region or on-prem"
+    )
 
     service_token: Optional[str] = pydantic.Field(
-        description="Service account key to access Nuclia Cloud"
+        None, description="Service account key to access Nuclia Cloud"
     )
 
     batch_size: int = pydantic.Field(64, description="Batch streaming size")
