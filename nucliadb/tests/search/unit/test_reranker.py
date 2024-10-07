@@ -80,10 +80,12 @@ async def test_rerank_find_response():
                     )
                 },
             )
-        }
+        },
+        page_number=0,
+        page_size=20,
     )
 
-    await reranker.rerank_find_response("kbid", "my query", find_response, cut=20)
+    await reranker.rerank_find_response("kbid", "my query", find_response)
 
     import json
 
