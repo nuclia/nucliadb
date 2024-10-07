@@ -538,7 +538,8 @@ class SearchParamDefaults:
     extracted = ParamDefault(
         default=[],
         title="Extracted metadata",
-        description="Controls which parts of the extracted metadata are serialized on search results",
+        description="[Deprecated] Please use GET resource endpoint instead to get extracted metadata",
+        deprecated=True,
     )
     field_type_filter = ParamDefault(
         default=list(FieldTypeName),
