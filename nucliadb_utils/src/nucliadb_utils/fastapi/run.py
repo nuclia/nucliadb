@@ -20,6 +20,7 @@
 import asyncio
 import os
 import sys
+from contextlib import AbstractContextManager, nullcontext
 
 import click
 from fastapi import FastAPI
@@ -34,14 +35,11 @@ STARTUP_FAILURE = 3
 
 
 def metrics_app() -> tuple[Server, Config]:
-    loop_setup = "auto"
-
     metrics_config = Config(
         application_metrics,
         host=running_settings.metrics_host,
         port=running_settings.metrics_port,
-        debug=False,
-        loop=loop_setup,
+        loop="auto",
         http="auto",
         reload=False,
         workers=1,
@@ -63,14 +61,12 @@ async def serve_metrics() -> Server:
 
 
 def run_fastapi_with_metrics(application: FastAPI) -> None:
-    loop_setup = "auto"
     metrics_server, metrics_config = metrics_app()
     config = Config(
         application,
         host=running_settings.serving_host,
         port=running_settings.serving_port,
-        debug=running_settings.debug,
-        loop=loop_setup,
+        loop="auto",
         http="auto",
         reload=False,
         workers=1,
@@ -113,14 +109,22 @@ async def run_server_forever(server: Server, config: Config):
     await start_server(server, config)
     process_id = os.getpid()
 
-    server.install_signal_handlers()
+    # compatibility with uvicorn<0.29
+    capture_signals: AbstractContextManager
+    if hasattr(server, "install_signal_handlers"):  # pragma: no cover
+        server.install_signal_handlers()
+        capture_signals = nullcontext()
+    else:
+        # uvicorn>=0.29
+        capture_signals = server.capture_signals()
 
-    message = "Started server process [%d]"
-    color_message = "Started server process [" + click.style("%d", fg="cyan") + "]"
-    logger.info(message, process_id, extra={"color_message": color_message})
+    with capture_signals:
+        message = "Started server process [%d]"
+        color_message = "Started server process [" + click.style("%d", fg="cyan") + "]"
+        logger.info(message, process_id, extra={"color_message": color_message})
 
-    if server.should_exit:
-        return
+        if server.should_exit:
+            return
 
-    await server.main_loop()
-    await server.shutdown()
+        await server.main_loop()
+        await server.shutdown()

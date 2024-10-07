@@ -41,9 +41,9 @@ from nucliadb_telemetry.settings import (
 from . import context
 
 try:
-    from uvicorn.logging import AccessFormatter  # type: ignore
+    from uvicorn.logging import AccessFormatter
 except ImportError:  # pragma: no cover
-    AccessFormatter = logging.Formatter
+    AccessFormatter = logging.Formatter  # type: ignore
 
 _BUILTIN_ATTRS = set(
     [

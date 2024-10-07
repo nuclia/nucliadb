@@ -78,3 +78,4 @@ class Features:
     SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
     NATS_SYNC_ACK = "nucliadb_nats_sync_ack"
     LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"
+    IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"

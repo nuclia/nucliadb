@@ -20,8 +20,6 @@
 
 from typing import AsyncGenerator
 
-from fastapi import HTTPException
-
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.train import logger
@@ -41,12 +39,6 @@ def field_classification_batch_generator(
     node: AbstractIndexNode,
     shard_replica_id: str,
 ) -> AsyncGenerator[FieldClassificationBatch, None]:
-    if len(trainset.filter.labels) != 1:
-        raise HTTPException(
-            status_code=422,
-            detail="Paragraph Classification should be of 1 labelset",
-        )
-
     generator = generate_field_classification_payloads(kbid, trainset, node, shard_replica_id)
     batch_generator = batchify(generator, trainset.batch_size, FieldClassificationBatch)
     return batch_generator

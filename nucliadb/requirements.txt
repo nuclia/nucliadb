@@ -7,7 +7,7 @@ nucliadb-admin-assets>=1.0.0.post1224
 nucliadb-node-binding>=2.26.0
 
 # external dependencies
-uvicorn<0.19.0
+uvicorn
 argdantic
 
 aiohttp>=3.9.4

@@ -187,9 +187,9 @@ def batch_to_field_streaming_arrow():
             FIELD.append(data.field)
             FIELD_TYPE.append(data.field_type)
             LABELS.append([x for x in data.labels])
-            EXTRACTED_TEXT.append(data.text.SerializeToString().decode())
-            METADATA.append(data.metadata.SerializeToString().decode())
-            BASIC.append(data.basic.SerializeToString().decode())
+            EXTRACTED_TEXT.append(data.text.SerializeToString())
+            METADATA.append(data.metadata.SerializeToString())
+            BASIC.append(data.basic.SerializeToString())
         if len(RID):
             pa_data = [
                 pa.array(SPLIT),
