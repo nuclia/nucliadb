@@ -116,7 +116,7 @@ async def setup_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
     Setup telemetry for a service if it is enabled
     """
     tracer_provider = get_telemetry(service_name)
-    if tracer_provider is not None and not tracer_provider.initialized:  # pragma: no cover
+    if tracer_provider is not None:  # pragma: no cover
         await init_telemetry(tracer_provider)
         set_global_textmap(B3MultiFormat())
 

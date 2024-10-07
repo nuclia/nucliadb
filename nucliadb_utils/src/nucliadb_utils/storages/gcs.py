@@ -504,10 +504,9 @@ class GCSStorage(Storage):
         return self._credentials.token
 
     @storage_ops_observer.wrap({"type": "initialize"})
-    async def initialize(self, service_name: Optional[str] = None):
+    async def initialize(self):
         loop = asyncio.get_event_loop()
 
-        await setup_telemetry(service_name or "GCS_SERVICE")
         self.session = aiohttp.ClientSession(
             loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5)
         )
