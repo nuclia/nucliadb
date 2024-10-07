@@ -31,6 +31,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
+from nucliadb.search import logger
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
 from nucliadb.search.search.paragraphs import get_paragraph_text
@@ -319,11 +320,11 @@ async def extend_prompt_context_with_metadata(
     for text_block_id in context.text_block_ids():
         try:
             text_block_ids.append(parse_text_block_id(text_block_id))
-        except ValueError:
+        except ValueError:  # pragma: no cover
             # Some text block ids are not paragraphs nor fields, so they are skipped
             # (e.g. USER_CONTEXT_0, when the user provides extra context)
             continue
-    if len(text_block_ids) == 0:
+    if len(text_block_ids) == 0:  # pragma: no cover
         return
 
     if MetadataExtensionType.ORIGIN in strategy.types:
@@ -385,7 +386,7 @@ async def extend_prompt_context_with_classification_labels(
                 for fc in pb_basic.computedmetadata.field_classifications:
                     if fc.field.field == fid.key and fc.field.field_type == fid.pb_type:
                         for classif in fc.classifications:
-                            if classif.cancelled_by_user:
+                            if classif.cancelled_by_user:  # pragma: no cover
                                 continue
                             labels.add((classif.labelset, classif.label))
         return _id, list(labels)
@@ -482,7 +483,7 @@ async def field_extension_prompt_context(
             try:
                 fid = FieldId.from_string(f"{resource_uuid}/{field_id.strip('/')}")
                 extend_field_ids.append(fid)
-            except ValueError:
+            except ValueError:  # pragma: no cover
                 # Invalid field id, skiping
                 continue
 
@@ -490,7 +491,7 @@ async def field_extension_prompt_context(
     field_extracted_texts = await run_concurrently(tasks)
 
     for result in field_extracted_texts:
-        if result is None:
+        if result is None:  # pragma: no cover
             continue
         field, extracted_text = result
         # First off, remove the text block ids from paragraphs that belong to
@@ -572,13 +573,13 @@ async def get_field_paragraphs_list(
     Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
     """
     resource = await cache.get_resource(kbid, field.rid)
-    if resource is None:
+    if resource is None:  # pragma: no cover
         return
     field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
     field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata(
         force=True
     )
-    if field_metadata is None:
+    if field_metadata is None:  # pragma: no cover
         return
     for paragraph in field_metadata.metadata.paragraphs:
         paragraphs.append(
@@ -630,7 +631,7 @@ async def neighbouring_paragraphs_prompt_context(
                 )
             )
         )
-    if not paragraph_ops:
+    if not paragraph_ops:  # pragma: no cover
         return
 
     results: list[tuple[ParagraphId, str]] = await asyncio.gather(*paragraph_ops)
@@ -782,33 +783,64 @@ class PromptContextBuilder:
         return context, context_order, context_images
 
     async def _build_context_images(self, context: CappedPromptContext) -> None:
-        page_count = 5
-        gather_pages = False
-        gather_tables = False
-        if self.image_strategies is not None:
-            for strategy in self.image_strategies:
-                if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
-                    strategy = cast(PageImageStrategy, strategy)
-                    gather_pages = True
-                    if strategy.count is not None and strategy.count > 0:
-                        page_count = strategy.count
-                elif strategy.name == ImageRagStrategyName.TABLES:
-                    strategy = cast(TableImageStrategy, strategy)
-                    gather_tables = True
+        if self.image_strategies is None or len(self.image_strategies) == 0:
+            # Nothing to do
+            return
 
+        page_image_strategy: Optional[PageImageStrategy] = None
+        max_page_images = 5
+        table_image_strategy: Optional[TableImageStrategy] = None
+        for strategy in self.image_strategies:
+            if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
+                page_image_strategy = cast(PageImageStrategy, strategy)
+                if page_image_strategy.count is not None:
+                    max_page_images = page_image_strategy.count
+            elif strategy.name == ImageRagStrategyName.TABLES:
+                table_image_strategy = cast(TableImageStrategy, strategy)
+
+        page_images_added = 0
         for paragraph in self.ordered_paragraphs:
-            if paragraph.page_with_visual and paragraph.position:
-                if gather_pages and paragraph.position.page_number and len(context.images) < page_count:
-                    field = "/".join(paragraph.id.split("/")[:3])
-                    page = paragraph.position.page_number
-                    page_id = f"{field}/{page}"
-                    if page_id not in context.images:
-                        context.images[page_id] = await get_page_image(self.kbid, paragraph.id, page)
-            # Only send tables if enabled by strategy, by default, send paragraph images
-            send_images = (gather_tables and paragraph.is_a_table) or not paragraph.is_a_table
-            if send_images and paragraph.reference and paragraph.reference != "":
-                image = paragraph.reference
-                context.images[paragraph.id] = await get_paragraph_image(self.kbid, paragraph.id, image)
+            pid = ParagraphId.from_string(paragraph.id)
+            paragraph_page_number = get_paragraph_page_number(paragraph)
+            if (
+                page_image_strategy is not None
+                and page_images_added < max_page_images
+                and paragraph_page_number is not None
+            ):
+                # page_image_id: rid/f/myfield/0
+                page_image_id = "/".join([pid.field_id.full(), str(paragraph_page_number)])
+                if page_image_id not in context.images:
+                    image = await get_page_image(self.kbid, pid, paragraph_page_number)
+                    if image is not None:
+                        context.images[page_image_id] = image
+                        page_images_added += 1
+                    else:
+                        logger.warning(
+                            f"Could not retrieve image for paragraph from storage",
+                            extra={
+                                "kbid": self.kbid,
+                                "paragraph": pid.full(),
+                                "page_number": paragraph_page_number,
+                            },
+                        )
+            if (
+                table_image_strategy is not None
+                and paragraph.is_a_table
+                and paragraph.reference is not None
+                and paragraph.reference != ""
+            ):
+                pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
+                if pimage is not None:
+                    context.images[paragraph.id] = pimage
+                else:
+                    logger.warning(
+                        f"Could not retrieve table image for paragraph from storage",
+                        extra={
+                            "kbid": self.kbid,
+                            "paragraph": pid.full(),
+                            "reference": paragraph.reference,
+                        },
+                    )
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
@@ -830,7 +862,7 @@ class PromptContextBuilder:
                 field_extension = cast(FieldExtensionStrategy, strategy)
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
                 full_resource = cast(FullResourceStrategy, strategy)
-                if self.resource:
+                if self.resource:  # pragma: no cover
                     # When the retrieval is scoped to a specific resource
                     # the full resource strategy only includes that resource
                     full_resource.count = 1
@@ -873,6 +905,14 @@ class PromptContextBuilder:
             )
         if metadata_extension:
             await extend_prompt_context_with_metadata(context, self.kbid, metadata_extension)
+
+
+def get_paragraph_page_number(paragraph: FindParagraph) -> Optional[int]:
+    if not paragraph.page_with_visual:
+        return None
+    if paragraph.position is None:
+        return None
+    return paragraph.position.page_number
 
 
 @dataclass

@@ -896,3 +896,27 @@ async def test_ask_fails_with_answer_json_schema_too_big(
         resp.json()["detail"]
         == "Answer JSON schema with too many properties generated too many prequeries"
     )
+
+
+async def test_rag_image_rag_strategies(
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
+    resources: list[str],
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        headers={"X-Synchronous": "True"},
+        json={
+            "query": "title",
+            "rag_image_strategies": [
+                {
+                    "name": "page_image",
+                    "count": 2,
+                },
+                {
+                    "name": "tables",
+                },
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text

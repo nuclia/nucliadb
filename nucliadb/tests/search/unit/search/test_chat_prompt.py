@@ -31,11 +31,14 @@ from nucliadb_models.search import (
     FindRequest,
     FindResource,
     HierarchyResourceStrategy,
+    Image,
     KnowledgeboxFindResults,
     MetadataExtensionStrategy,
     MetadataExtensionType,
     MinScore,
+    PageImageStrategy,
     PreQuery,
+    TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2 as rpb2
 
@@ -214,10 +217,10 @@ def find_results():
         facets={},
         resources={
             "resource1": _create_find_result(
-                "resource1/a/title", "Resource 1", SCORE_TYPE.BOTH, order=1
+                "resource1/a/title/0-10", "Resource 1", SCORE_TYPE.BOTH, order=1
             ),
             "resource2": _create_find_result(
-                "resource2/a/title", "Resource 2", SCORE_TYPE.VECTOR, order=2
+                "resource2/a/title/0-10", "Resource 2", SCORE_TYPE.VECTOR, order=2
             ),
         },
         min_score=MinScore(semantic=-1),
@@ -529,3 +532,31 @@ def test_get_ordered_paragraphs():
     assert ordered_paragraphs[3].id == "prequery-2-result/f/f1/10-20"
     assert ordered_paragraphs[4].id == "prequery-1-result/f/f1/0-10"
     assert ordered_paragraphs[5].id == "prequery-1-result/f/f1/10-20"
+
+
+@pytest.mark.asyncio
+async def test_prompt_context_image_context_builder(
+    find_results: KnowledgeboxFindResults,
+):
+    builder = chat_prompt.PromptContextBuilder(
+        kbid="kbid",
+        main_results=find_results,
+        user_context=["Carrots are orange"],
+        image_strategies=[PageImageStrategy(count=10), TableImageStrategy()],
+    )
+    module = "nucliadb.search.search.chat.prompt"
+    with (
+        mock.patch(f"{module}.get_paragraph_page_number", return_value=1),
+        mock.patch(
+            f"{module}.get_page_image",
+            return_value=Image(b64encoded="page_image_data", content_type="image/png"),
+        ),
+        mock.patch(
+            f"{module}.get_paragraph_image",
+            return_value=Image(b64encoded="table_image_data", content_type="image/png"),
+        ),
+    ):
+        context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+        await builder._build_context_images(context)
+        assert len(context.output) == 0
+        assert len(context.images) == 2
