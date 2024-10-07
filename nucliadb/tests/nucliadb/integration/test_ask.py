@@ -537,8 +537,8 @@ async def test_ask_with_json_schema_output(
     assert resp.status_code == 200, resp.text
     results = parse_ask_response(resp)
     assert len(results) == 4
-    assert results[1].item.type == "answer_json"
-    answer_json = results[1].item.object
+    assert results[0].item.type == "answer_json"
+    answer_json = results[0].item.object
     assert answer_json["answer"] == "valid answer to"
     assert answer_json["confidence"] == 0.5
 
