@@ -32,6 +32,8 @@ from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 from nucliadb_protos.resources_pb2 import Paragraph
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 rcache: ContextVar[Optional[dict[str, ResourceORM]]] = ContextVar("rcache", default=None)
 
@@ -43,6 +45,14 @@ async def fetch_resources(
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
 ) -> dict[str, Resource]:
+    if ResourceProperties.EXTRACTED in show and has_feature(
+        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
+    ):
+        # Returning extracted metadata in search results is deprecated and this flag
+        # will be set to True for all KBs in the future.
+        show.remove(ResourceProperties.EXTRACTED)
+        extracted = []
+
     result = {}
     async with get_driver().transaction(read_only=True) as txn:
         tasks = []

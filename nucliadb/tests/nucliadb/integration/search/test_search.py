@@ -256,18 +256,13 @@ async def test_search_returns_labels(
     await inject_message(nucliadb_grpc, bm)
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
+        f"/kb/{knowledgebox}/search?query=Some",
     )
     assert resp.status_code == 200
     content = resp.json()
     assert content["paragraphs"]["results"]
     par = content["paragraphs"]["results"][0]
     assert par["labels"] == ["labelset1/label2", "labelset1/label1"]
-
-    extracted_metadata = content["resources"][bm.uuid]["data"]["files"]["file"]["extracted"]["metadata"][
-        "metadata"
-    ]
-    assert extracted_metadata["classifications"] == [{"label": "label1", "labelset": "labelset1"}]
 
 
 @pytest.mark.asyncio
