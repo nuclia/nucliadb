@@ -39,7 +39,6 @@ from google.oauth2 import service_account  # type: ignore
 
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors, metrics
-from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
@@ -504,10 +503,9 @@ class GCSStorage(Storage):
         return self._credentials.token
 
     @storage_ops_observer.wrap({"type": "initialize"})
-    async def initialize(self, service_name: Optional[str] = None):
+    async def initialize(self):
         loop = asyncio.get_event_loop()
 
-        await setup_telemetry(service_name or "GCS_SERVICE")
         self.session = aiohttp.ClientSession(
             loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5)
         )

@@ -155,7 +155,7 @@ async def get_storage(
             scopes=gcs_scopes,
         )
         set_utility(Utility.STORAGE, gcsutil)
-        await gcsutil.initialize(service_name)
+        await gcsutil.initialize()
         logger.info("Configuring GCS Storage")
 
     elif storage_settings.file_backend == FileBackendConfig.LOCAL:

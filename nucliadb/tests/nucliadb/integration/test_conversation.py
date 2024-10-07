@@ -180,11 +180,18 @@ async def test_find_conversations(
     rid = resource_with_conversation
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/find?query=&show=values&show=extracted&extracted=text",
+        f"/kb/{knowledgebox}/find?query=",
     )
     assert resp.status_code == 200
     results = KnowledgeboxFindResults.model_validate(resp.json())
-    resource = results.resources[rid]
+    matching_rid, matching_resource = results.resources.popitem()
+    assert matching_rid == rid
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text"
+    )
+    assert resp.status_code == 200
+    resource = Resource.model_validate(resp.json())
 
     # Check extracted
     conversation = resource.data.conversations["faq"]  # type: ignore
@@ -194,7 +201,7 @@ async def test_find_conversations(
     assert extracted.text.split_text["2"] == "Split text 2"  # type: ignore
 
     # Check paragraph positions match the split text values
-    field = resource.fields["/c/faq"]
+    field = matching_resource.fields["/c/faq"]
     paragraphs = field.paragraphs
     assert len(paragraphs) == 2
     assert paragraphs[f"{rid}/c/faq/1/0-12"].text == "Split text 1"
