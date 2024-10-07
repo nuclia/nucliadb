@@ -51,6 +51,7 @@ format: # Format the code
 .PHONY: lint
 lint: # Run lint checks
 	ruff check --config=../ruff.toml .
+	ruff format --check --config=../ruff.toml .
 	MYPYPATH=../mypy_stubs mypy --config-file=../mypy.ini . --show-traceback
 
 
