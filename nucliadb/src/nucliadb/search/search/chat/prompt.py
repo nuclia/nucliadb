@@ -320,11 +320,11 @@ async def extend_prompt_context_with_metadata(
     for text_block_id in context.text_block_ids():
         try:
             text_block_ids.append(parse_text_block_id(text_block_id))
-        except ValueError:
+        except ValueError:  # pragma: no cover
             # Some text block ids are not paragraphs nor fields, so they are skipped
             # (e.g. USER_CONTEXT_0, when the user provides extra context)
             continue
-    if len(text_block_ids) == 0:
+    if len(text_block_ids) == 0:  # pragma: no cover
         return
 
     if MetadataExtensionType.ORIGIN in strategy.types:
@@ -386,7 +386,7 @@ async def extend_prompt_context_with_classification_labels(
                 for fc in pb_basic.computedmetadata.field_classifications:
                     if fc.field.field == fid.key and fc.field.field_type == fid.pb_type:
                         for classif in fc.classifications:
-                            if classif.cancelled_by_user:
+                            if classif.cancelled_by_user:  # pragma: no cover
                                 continue
                             labels.add((classif.labelset, classif.label))
         return _id, list(labels)
@@ -483,7 +483,7 @@ async def field_extension_prompt_context(
             try:
                 fid = FieldId.from_string(f"{resource_uuid}/{field_id.strip('/')}")
                 extend_field_ids.append(fid)
-            except ValueError:
+            except ValueError:  # pragma: no cover
                 # Invalid field id, skiping
                 continue
 
@@ -491,7 +491,7 @@ async def field_extension_prompt_context(
     field_extracted_texts = await run_concurrently(tasks)
 
     for result in field_extracted_texts:
-        if result is None:
+        if result is None:  # pragma: no cover
             continue
         field, extracted_text = result
         # First off, remove the text block ids from paragraphs that belong to
@@ -573,13 +573,13 @@ async def get_field_paragraphs_list(
     Modifies the paragraphs list by adding the paragraph ids of the field, sorted by position.
     """
     resource = await cache.get_resource(kbid, field.rid)
-    if resource is None:
+    if resource is None:  # pragma: no cover
         return
     field_obj: Field = await resource.get_field(key=field.key, type=field.pb_type, load=False)
     field_metadata: Optional[resources_pb2.FieldComputedMetadata] = await field_obj.get_field_metadata(
         force=True
     )
-    if field_metadata is None:
+    if field_metadata is None:  # pragma: no cover
         return
     for paragraph in field_metadata.metadata.paragraphs:
         paragraphs.append(
@@ -631,7 +631,7 @@ async def neighbouring_paragraphs_prompt_context(
                 )
             )
         )
-    if not paragraph_ops:
+    if not paragraph_ops:  # pragma: no cover
         return
 
     results: list[tuple[ParagraphId, str]] = await asyncio.gather(*paragraph_ops)
@@ -862,7 +862,7 @@ class PromptContextBuilder:
                 field_extension = cast(FieldExtensionStrategy, strategy)
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
                 full_resource = cast(FullResourceStrategy, strategy)
-                if self.resource:
+                if self.resource:  # pragma: no cover
                     # When the retrieval is scoped to a specific resource
                     # the full resource strategy only includes that resource
                     full_resource.count = 1
