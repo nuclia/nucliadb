@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import base64
+from typing import Optional
 
 from nucliadb.common.ids import ParagraphId
 from nucliadb.search import SERVICE_NAME
@@ -25,7 +26,7 @@ from nucliadb_models.search import Image
 from nucliadb_utils.utilities import get_storage
 
 
-async def get_page_image(kbid: str, paragraph_id: ParagraphId, page_number: int) -> Image:
+async def get_page_image(kbid: str, paragraph_id: ParagraphId, page_number: int) -> Optional[Image]:
     storage = await get_storage(service_name=SERVICE_NAME)
     sf = storage.file_extracted(
         kbid=kbid,
@@ -34,14 +35,17 @@ async def get_page_image(kbid: str, paragraph_id: ParagraphId, page_number: int)
         field=paragraph_id.field_id.key,
         key=f"generated/extracted_images_{page_number}.png",
     )
+    image_bytes = (await sf.storage.downloadbytes(sf.bucket, sf.key)).read()
+    if not image_bytes:
+        return None
     image = Image(
-        b64encoded=base64.b64encode((await sf.storage.downloadbytes(sf.bucket, sf.key)).read()).decode(),
+        b64encoded=base64.b64encode(image_bytes).decode(),
         content_type="image/png",
     )
     return image
 
 
-async def get_paragraph_image(kbid: str, paragraph_id: ParagraphId, reference: str) -> Image:
+async def get_paragraph_image(kbid: str, paragraph_id: ParagraphId, reference: str) -> Optional[Image]:
     storage = await get_storage(service_name=SERVICE_NAME)
     sf = storage.file_extracted(
         kbid=kbid,
@@ -50,8 +54,11 @@ async def get_paragraph_image(kbid: str, paragraph_id: ParagraphId, reference: s
         field=paragraph_id.field_id.key,
         key=f"generated/{reference}",
     )
+    image_bytes = (await sf.storage.downloadbytes(sf.bucket, sf.key)).read()
+    if not image_bytes:
+        return None
     image = Image(
-        b64encoded=base64.b64encode((await sf.storage.downloadbytes(sf.bucket, sf.key)).read()).decode(),
+        b64encoded=base64.b64encode(image_bytes).decode(),
         content_type="image/png",
     )
     return image

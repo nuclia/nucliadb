@@ -31,6 +31,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
+from nucliadb.search import logger
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
 from nucliadb.search.search.paragraphs import get_paragraph_text
@@ -807,22 +808,39 @@ class PromptContextBuilder:
                 and paragraph_page_number is not None
             ):
                 # page_image_id: rid/f/myfield/0
-                page_image_id = "/".join([pid.field_id.full(), paragraph_page_number])  # type: ignore
+                page_image_id = "/".join([pid.field_id.full(), str(paragraph_page_number)])
                 if page_image_id not in context.images:
-                    context.images[page_image_id] = await get_page_image(
-                        self.kbid, pid, paragraph_page_number
-                    )
-                    page_images_added += 1
-
+                    image = await get_page_image(self.kbid, pid, paragraph_page_number)
+                    if image is not None:
+                        context.images[page_image_id] = image
+                        page_images_added += 1
+                    else:
+                        logger.warning(
+                            f"Could not retrieve image for paragraph from storage",
+                            extra={
+                                "kbid": self.kbid,
+                                "paragraph": pid.full(),
+                                "page_number": paragraph_page_number,
+                            },
+                        )
             if (
                 table_image_strategy is not None
                 and paragraph.is_a_table
                 and paragraph.reference is not None
                 and paragraph.reference != ""
             ):
-                context.images[paragraph.id] = await get_paragraph_image(
-                    self.kbid, pid, paragraph.reference
-                )
+                pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
+                if pimage is not None:
+                    context.images[paragraph.id] = pimage
+                else:
+                    logger.warning(
+                        f"Could not retrieve table image for paragraph from storage",
+                        extra={
+                            "kbid": self.kbid,
+                            "paragraph": pid.full(),
+                            "reference": paragraph.reference,
+                        },
+                    )
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:
