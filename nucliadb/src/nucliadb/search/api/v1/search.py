@@ -367,7 +367,7 @@ async def catalog(
             if len(queried_nodes) > 0:
                 queried_shards = [shard_id for _, shard_id in queried_nodes]
                 catalog_results.shards = queried_shards
-            return search_results
+            return catalog_results
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
     except KnowledgeBoxNotFound:

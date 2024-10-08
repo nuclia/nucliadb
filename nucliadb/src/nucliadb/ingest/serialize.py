@@ -209,6 +209,7 @@ async def managed_serialize(
             resource.extra = models.Extra.from_message(orm_resource.extra)
 
     include_errors = ResourceProperties.ERRORS in show
+    include_errors_only = include_errors and not include_values and not include_extracted_data
 
     if ResourceProperties.SECURITY in show:
         await orm_resource.get_security()
@@ -217,12 +218,12 @@ async def managed_serialize(
             for gid in orm_resource.security.access_groups:
                 resource.security.access_groups.append(gid)
 
-    if field_type_filter and (include_values or include_extracted_data):
+    if (field_type_filter and (include_values or include_extracted_data)) or include_errors_only:
         await orm_resource.get_fields()
         resource.data = ResourceData()
         for (field_type, field_id), field in orm_resource.fields.items():
             field_type_name = FIELD_TYPES_MAP[field_type]
-            if field_type_name not in field_type_filter:
+            if field_type_name not in field_type_filter and not include_errors_only:
                 continue
 
             include_value = ResourceProperties.VALUES in show
