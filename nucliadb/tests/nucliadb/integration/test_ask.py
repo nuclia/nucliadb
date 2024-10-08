@@ -972,7 +972,7 @@ async def test_ask_forwarding_rerank_options_to_find(
         assert find_request.reranker == expected_reranker
 
 
-async def test_ask_predict_stream_with_reranking__wip(nucliadb_reader: AsyncClient, knowledgebox: str):
+async def test_ask_predict_stream_with_reranking(nucliadb_reader: AsyncClient, knowledgebox: str):
     kbid = knowledgebox
     top_k = 10
 
@@ -999,7 +999,7 @@ async def test_ask_predict_stream_with_reranking__wip(nucliadb_reader: AsyncClie
                 find_paragraph = FindParagraph(
                     id=paragraph_id,
                     score=score,
-                    score_type=[SCORE_TYPE.BM25, SCORE_TYPE.VECTOR][score % 2],  # type:ignore
+                    score_type=[SCORE_TYPE.BM25, SCORE_TYPE.VECTOR][int(score) % 2],
                     order=order,
                     text=f"resource {rid} - field {field_id} - paragraph {paragraph_id}",
                 )
