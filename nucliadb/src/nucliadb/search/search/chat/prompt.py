@@ -49,6 +49,7 @@ from nucliadb_models.search import (
     MetadataExtensionType,
     NeighbouringParagraphsStrategy,
     PageImageStrategy,
+    ParagraphImageStrategy,
     PreQueryResult,
     PromptContext,
     PromptContextImages,
@@ -790,13 +791,23 @@ class PromptContextBuilder:
         page_image_strategy: Optional[PageImageStrategy] = None
         max_page_images = 5
         table_image_strategy: Optional[TableImageStrategy] = None
+        paragraph_image_strategy: Optional[ParagraphImageStrategy] = None
         for strategy in self.image_strategies:
             if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
-                page_image_strategy = cast(PageImageStrategy, strategy)
-                if page_image_strategy.count is not None:
-                    max_page_images = page_image_strategy.count
+                if page_image_strategy is None:
+                    page_image_strategy = cast(PageImageStrategy, strategy)
+                    if page_image_strategy.count is not None:
+                        max_page_images = page_image_strategy.count
             elif strategy.name == ImageRagStrategyName.TABLES:
-                table_image_strategy = cast(TableImageStrategy, strategy)
+                if table_image_strategy is None:
+                    table_image_strategy = cast(TableImageStrategy, strategy)
+            elif strategy.name == ImageRagStrategyName.PARAGRAPH_IMAGE:
+                if paragraph_image_strategy is None:
+                    paragraph_image_strategy = cast(ParagraphImageStrategy, strategy)
+            else:  # pragma: no cover
+                logger.warning(
+                    "Unknown image strategy", extra={"strategy": strategy.name, "kbid": self.kbid}
+                )
 
         page_images_added = 0
         for paragraph in self.ordered_paragraphs:
@@ -823,18 +834,18 @@ class PromptContextBuilder:
                                 "page_number": paragraph_page_number,
                             },
                         )
-            if (
-                table_image_strategy is not None
-                and paragraph.is_a_table
-                and paragraph.reference is not None
-                and paragraph.reference != ""
+
+            add_table = table_image_strategy is not None and paragraph.is_a_table
+            add_paragraph = paragraph_image_strategy is not None and not paragraph.is_a_table
+            if (add_table or add_paragraph) and (
+                paragraph.reference is not None and paragraph.reference != ""
             ):
                 pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
                 if pimage is not None:
                     context.images[paragraph.id] = pimage
                 else:
                     logger.warning(
-                        f"Could not retrieve table image for paragraph from storage",
+                        f"Could not retrieve image for paragraph from storage",
                         extra={
                             "kbid": self.kbid,
                             "paragraph": pid.full(),
@@ -872,6 +883,10 @@ class PromptContextBuilder:
                 neighbouring_paragraphs = cast(NeighbouringParagraphsStrategy, strategy)
             elif strategy.name == RagStrategyName.METADATA_EXTENSION:
                 metadata_extension = cast(MetadataExtensionStrategy, strategy)
+            else:  # pragma: no cover
+                logger.warning(
+                    "Unknown rag strategy", extra={"strategy": strategy.name, "kbid": self.kbid}
+                )
 
         if full_resource:
             # When full resoure is enabled, only metadata extension is allowed.

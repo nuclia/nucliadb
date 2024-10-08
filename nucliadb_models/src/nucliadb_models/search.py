@@ -946,6 +946,7 @@ class RagStrategyName:
 class ImageRagStrategyName:
     PAGE_IMAGE = "page_image"
     TABLES = "tables"
+    PARAGRAPH_IMAGE = "paragraph_image"
 
 
 class RagStrategy(BaseModel):
@@ -1144,7 +1145,7 @@ class PageImageStrategy(ImageRagStrategy):
 
 
 class ParagraphImageStrategy(ImageRagStrategy):
-    name: Literal["paragraph_image"]
+    name: Literal["paragraph_image"] = "paragraph_image"
 
 
 RagStrategies = Annotated[
@@ -1159,7 +1160,7 @@ RagStrategies = Annotated[
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
-    Union[PageImageStrategy, ParagraphImageStrategy], Field(discriminator="name")
+    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy], Field(discriminator="name")
 ]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]

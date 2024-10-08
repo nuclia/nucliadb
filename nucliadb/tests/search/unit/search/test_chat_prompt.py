@@ -37,6 +37,7 @@ from nucliadb_models.search import (
     MetadataExtensionType,
     MinScore,
     PageImageStrategy,
+    ParagraphImageStrategy,
     PreQuery,
     TableImageStrategy,
 )
@@ -150,20 +151,17 @@ async def test_get_expanded_conversation_messages_missing(kb, messages):
 
 
 def _create_find_result(
-    _id: str, result_text: str, score_type: SCORE_TYPE = SCORE_TYPE.BM25, order=1, score=1
+    paragraph: FindParagraph,
 ):
+    pid = ParagraphId.from_string(paragraph.id)
+    rid = pid.rid
+    fid = f"{pid.field_id.type}/{pid.field_id.key}"
     return FindResource(
-        id=_id.split("/")[0],
+        id=rid,
         fields={
-            "c/conv": FindField(
+            fid: FindField(
                 paragraphs={
-                    _id: FindParagraph(
-                        id=_id,
-                        score=score,
-                        score_type=score_type,
-                        order=order,
-                        text=result_text,
-                    )
+                    pid.full(): paragraph,
                 }
             )
         },
@@ -183,13 +181,31 @@ async def test_default_prompt_context(kb):
             facets={},
             resources={
                 "bmid": _create_find_result(
-                    "bmid/c/conv/ident", result_text, SCORE_TYPE.BM25, score=1, order=1
+                    FindParagraph(
+                        id="bmid/c/conv/ident/0-1",
+                        score=1,
+                        score_type=SCORE_TYPE.BM25,
+                        order=1,
+                        text=result_text,
+                    )
                 ),
                 "vecid": _create_find_result(
-                    "vecid/c/conv/ident", result_text, SCORE_TYPE.VECTOR, score=0, order=2
+                    FindParagraph(
+                        id="vecid/c/conv/ident/0-1",
+                        score=0,
+                        score_type=SCORE_TYPE.VECTOR,
+                        order=2,
+                        text=result_text,
+                    )
                 ),
                 "both_id": _create_find_result(
-                    "both_id/c/conv/ident", result_text, SCORE_TYPE.BOTH, score=2, order=0
+                    FindParagraph(
+                        id="both_id/c/conv/ident/0-1",
+                        score=2,
+                        score_type=SCORE_TYPE.BOTH,
+                        order=0,
+                        text=result_text,
+                    )
                 ),
             },
         )
@@ -205,9 +221,9 @@ async def test_default_prompt_context(kb):
         # context is added at the beginning, indicating that it has the most priority
         paragraph_ids = [pid for pid in prompt_result.keys()]
         assert paragraph_ids == [
-            "both_id/c/conv/ident",
-            "bmid/c/conv/ident",
-            "vecid/c/conv/ident",
+            "both_id/c/conv/ident/0-1",
+            "bmid/c/conv/ident/0-1",
+            "vecid/c/conv/ident/0-1",
         ]
 
 
@@ -217,10 +233,22 @@ def find_results():
         facets={},
         resources={
             "resource1": _create_find_result(
-                "resource1/a/title/0-10", "Resource 1", SCORE_TYPE.BOTH, order=1
+                FindParagraph(
+                    id="resource1/a/title/0-10",
+                    score=1,
+                    score_type=SCORE_TYPE.BOTH,
+                    order=1,
+                    text="Resource 1",
+                )
             ),
             "resource2": _create_find_result(
-                "resource2/a/title/0-10", "Resource 2", SCORE_TYPE.VECTOR, order=2
+                FindParagraph(
+                    id="resource2/a/title/0-10",
+                    score=2,
+                    score_type=SCORE_TYPE.VECTOR,
+                    order=2,
+                    text="Resource 2",
+                )
             ),
         },
         min_score=MinScore(semantic=-1),
@@ -535,14 +563,67 @@ def test_get_ordered_paragraphs():
 
 
 @pytest.mark.asyncio
-async def test_prompt_context_image_context_builder(
-    find_results: KnowledgeboxFindResults,
-):
+async def test_prompt_context_image_context_builder():
+    result_text = " ".join(["text"] * 10)
+    find_results = KnowledgeboxFindResults(
+        facets={},
+        resources={
+            "bmid": _create_find_result(
+                FindParagraph(
+                    id="bmid/f/file/0-1",
+                    score=1,
+                    score_type=SCORE_TYPE.BM25,
+                    order=1,
+                    text=result_text,
+                    is_a_table=True,
+                    reference="table_image_data",
+                    page_with_visual=False,
+                )
+            ),
+            "vecid": _create_find_result(
+                FindParagraph(
+                    id="vecid/f/file/0-1",
+                    score=0,
+                    score_type=SCORE_TYPE.VECTOR,
+                    order=2,
+                    text=result_text,
+                    is_a_table=False,
+                    reference="paragraph_image_data",
+                    page_with_visual=False,
+                )
+            ),
+            "both_id": _create_find_result(
+                FindParagraph(
+                    id="both_id/f/file/0-1",
+                    score=2,
+                    score_type=SCORE_TYPE.BOTH,
+                    order=0,
+                    text=result_text,
+                    is_a_table=False,
+                    reference="page_image_data",
+                    page_with_visual=True,
+                )
+            ),
+        },
+    )
+
+    # By default, no image strategies are provided so no images should be added
     builder = chat_prompt.PromptContextBuilder(
         kbid="kbid",
         main_results=find_results,
         user_context=["Carrots are orange"],
-        image_strategies=[PageImageStrategy(count=10), TableImageStrategy()],
+        image_strategies=[],
+    )
+    context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+    await builder._build_context_images(context)
+    assert len(context.images) == 0
+
+    # Test that the image strategies are applied correctly
+    builder = chat_prompt.PromptContextBuilder(
+        kbid="kbid",
+        main_results=find_results,
+        user_context=["Carrots are orange"],
+        image_strategies=[PageImageStrategy(count=10), TableImageStrategy(), ParagraphImageStrategy()],
     )
     module = "nucliadb.search.search.chat.prompt"
     with (
@@ -559,4 +640,14 @@ async def test_prompt_context_image_context_builder(
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         await builder._build_context_images(context)
         assert len(context.output) == 0
-        assert len(context.images) == 2
+        assert len(context.images) == 6
+        assert set(context.images.keys()) == {
+            # The paragraph images
+            "bmid/f/file/0-1",
+            "both_id/f/file/0-1",
+            "vecid/f/file/0-1",
+            # The page images
+            "bmid/f/file/1",
+            "both_id/f/file/1",
+            "vecid/f/file/1",
+        }
