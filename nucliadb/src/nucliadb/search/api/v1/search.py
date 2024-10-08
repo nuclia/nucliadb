@@ -49,6 +49,7 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     CatalogRequest,
+    CatalogResults,
     KnowledgeboxSearchResults,
     MinScore,
     NucliaDBClientType,
@@ -276,7 +277,7 @@ async def catalog_post(
     request: Request,
     kbid: str,
     item: CatalogRequest,
-) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+) -> Union[CatalogResults, HTTPClientError]:
     return await catalog(kbid, item)
 
 
@@ -340,7 +341,7 @@ async def catalog(
                     count=item.page_size,
                     page=item.page_number,
                     kbid=kbid,
-                    show=[ResourceProperties.BASIC],
+                    show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
                     field_type_filter=[],
                     extracted=[],
                     sort=sort,
@@ -348,28 +349,24 @@ async def catalog(
                     min_score=query_parser.min_score,
                     highlight=False,
                 )
+                catalog_results = CatalogResults(
+                    resources=search_results.resources,
+                    fulltext=search_results.fulltext,
+                )
             else:
-                search_results = KnowledgeboxSearchResults()
-                search_results.fulltext = await pgcatalog_search(query_parser)
-                search_results.resources = await fetch_resources(
-                    resources=[r.rid for r in search_results.fulltext.results],
+                catalog_results = CatalogResults()
+                catalog_results.fulltext = await pgcatalog_search(query_parser)
+                catalog_results.resources = await fetch_resources(
+                    resources=[r.rid for r in catalog_results.fulltext.results],
                     kbid=kbid,
-                    show=[ResourceProperties.BASIC],
+                    show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
                     field_type_filter=[],
                     extracted=[],
                 )
                 queried_nodes = []
-
-            # We don't need sentences, paragraphs or relations on the catalog
-            # response, so we set to None so that fastapi doesn't include them
-            # in the response payload
-            search_results.sentences = None
-            search_results.paragraphs = None
-            search_results.relations = None
-            if item.debug:
-                search_results.nodes = debug_nodes_info(queried_nodes)
-            queried_shards = [shard_id for _, shard_id in queried_nodes]
-            search_results.shards = queried_shards
+            if len(queried_nodes) > 0:
+                queried_shards = [shard_id for _, shard_id in queried_nodes]
+                catalog_results.shards = queried_shards
             return search_results
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
