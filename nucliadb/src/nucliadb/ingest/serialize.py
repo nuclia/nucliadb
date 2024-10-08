@@ -220,7 +220,7 @@ async def managed_serialize(
     if (field_type_filter and (include_values or include_extracted_data)) or include_errors:
         await orm_resource.get_fields()
         resource.data = ResourceData()
-        for (field_type, field_id), field in orm_resource.fields.items():
+        for (field_type, _), field in orm_resource.fields.items():
             field_type_name = FIELD_TYPES_MAP[field_type]
             if field_type_name not in field_type_filter:
                 continue
