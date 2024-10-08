@@ -12,9 +12,9 @@ jobs:
 
     - name: Set up secret file
       env:
-        PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        echo $PYPI_TOKEN >> secrets.txt
+        echo $GITHUB_TOKEN >> secrets.txt
 
     - name: Run tmate
       uses: mxschmitt/action-tmate@v2
