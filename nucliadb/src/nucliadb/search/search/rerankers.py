@@ -177,8 +177,8 @@ def apply_reranking(results: KnowledgeboxFindResults, reranked: list[RankedItem]
         results.best_matches.append(paragraph_id)
 
     # cut uneeded results
-    extra = best_matches[cut:]
-    for paragraph_id, _ in extra:
+    extra = set(inverted_results.keys()) - set(results.best_matches)
+    for paragraph_id in extra:
         _, (field_id, field), (rid, resource) = inverted_results[paragraph_id]
         field.paragraphs.pop(paragraph_id)
         if len(field.paragraphs) == 0:
