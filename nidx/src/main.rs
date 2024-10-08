@@ -17,6 +17,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-fn main() {
-    println!("Hello, world!");
+
+use async_nats::jetstream::consumer::PullConsumer;
+use futures::stream::StreamExt;
+use tokio;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // NATS test
+    let client = async_nats::connect("localhost:4222").await?;
+    let jetstream = async_nats::jetstream::new(client);
+
+    let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
+    let mut msg_stream = consumer.messages().await?;
+    while let Some(Ok(msg)) = msg_stream.next().await {
+        println!("GOT = {:?}", msg);
+        msg.ack().await.unwrap();
+    }
+
+    Ok(())
 }

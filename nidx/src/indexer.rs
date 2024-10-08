@@ -17,18 +17,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::io::{Read, Seek};
-
-use anyhow;
-use nucliadb_core::protos::Resource;
-use object_store::ObjectStore;
-use tempfile::{tempfile, TempDir};
+use std::{
+    io::{Read, Seek},
+    sync::Arc,
+};
 
 use crate::metadata::*;
+use anyhow;
+use nucliadb_core::protos::Resource;
+use object_store::{DynObjectStore, ObjectStore};
+use tempfile::TempDir;
+use tokio::io::AsyncWriteExt;
+use tokio_util::io::SyncIoBridge;
 
 async fn index_resource(
     meta: &NidxMetadata,
-    storage: &impl ObjectStore,
+    storage: Arc<DynObjectStore>,
     shard: &Shard,
     resource: &Resource,
 ) -> anyhow::Result<()> {
@@ -37,9 +41,9 @@ async fn index_resource(
         let dir = index_resource_to_index(&index, resource).await?;
 
         let segment = Segment::create(&meta, index.id).await?;
-        let store_path = format!("{}/{}/{}/{}", shard.kbid, shard.id, index.id, segment.id);
+        let store_path = format!("segment/{}", segment.id);
 
-        pack_and_upload(storage, dir, &store_path).await?;
+        pack_and_upload(storage.clone(), dir, &store_path).await?;
         segment.mark_ready(meta).await?;
     }
     Ok(())
@@ -56,19 +60,18 @@ async fn index_resource_to_index(index: &Index, resource: &Resource) -> anyhow::
     Ok(output_dir)
 }
 
-async fn pack_and_upload(storage: &impl ObjectStore, dir: TempDir, store_path: &str) -> anyhow::Result<()> {
-    // This is all done sync. Can be async and streaming with async_tar, but needs some adapter layers
-    let mut tar_file = tempfile()?;
-    let mut tar = tar::Builder::new(&mut tar_file);
-    tar.append_dir_all(".", dir.path())?;
-    tar.finish()?;
-    drop(tar);
-    drop(dir);
-
-    let mut buf = Vec::new();
-    tar_file.rewind().unwrap();
-    tar_file.read_to_end(&mut buf)?;
-    storage.put(&object_store::path::Path::parse(store_path)?, buf.into()).await?;
+async fn pack_and_upload(storage: Arc<DynObjectStore>, dir: TempDir, store_path: &str) -> anyhow::Result<()> {
+    let mut upload = SyncIoBridge::new(object_store::buffered::BufWriter::new(storage, store_path.into()));
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        let mut tar = tar::Builder::new(&mut upload);
+        tar.mode(tar::HeaderMode::Deterministic);
+        tar.append_dir_all(".", dir.path())?;
+        tar.finish()?;
+        drop(tar);
+        upload.shutdown()?;
+        Ok(())
+    })
+    .await??;
 
     Ok(())
 }
@@ -92,8 +95,8 @@ mod tests {
         let shard = Shard::create(&meta, kbid).await.unwrap();
         let index = Index::create(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
 
-        let storage = object_store::memory::InMemory::new();
-        index_resource(&meta, &storage, &shard, &little_prince("abc")).await.unwrap();
+        let storage = Arc::new(object_store::memory::InMemory::new());
+        index_resource(&meta, storage.clone(), &shard, &little_prince("abc")).await.unwrap();
 
         let segments = index.segments(&meta).await.unwrap();
         assert_eq!(segments.len(), 1);
@@ -101,13 +104,8 @@ mod tests {
         let segment = &segments[0];
         assert_eq!(segment.ready, true);
 
-        let download = storage
-            .get(
-                &object_store::path::Path::parse(format!("{}/{}/{}/{}", shard.kbid, shard.id, index.id, segment.id))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
+        let download =
+            storage.get(&object_store::path::Path::parse(format!("segment/{}", segment.id)).unwrap()).await.unwrap();
         let mut out = File::create("/tmp/output").unwrap();
         out.write_all(&download.bytes().await.unwrap()).unwrap();
     }
