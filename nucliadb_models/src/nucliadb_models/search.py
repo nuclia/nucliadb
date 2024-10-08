@@ -922,7 +922,7 @@ class ChatModel(BaseModel):
     )
     rerank_context: bool = Field(
         default=False,
-        description="Whether to reorder the query context based on a reranker. This option will also make it so the first response will contain the scores given for each context piece.",
+        description="Whether to reorder the query context based on a reranker",
     )
     top_k: Optional[int] = Field(default=None, description="Number of best elements to get from")
 
