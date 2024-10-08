@@ -794,13 +794,20 @@ class PromptContextBuilder:
         paragraph_image_strategy: Optional[ParagraphImageStrategy] = None
         for strategy in self.image_strategies:
             if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
-                page_image_strategy = cast(PageImageStrategy, strategy)
-                if page_image_strategy.count is not None:
-                    max_page_images = page_image_strategy.count
+                if page_image_strategy is None:
+                    page_image_strategy = cast(PageImageStrategy, strategy)
+                    if page_image_strategy.count is not None:
+                        max_page_images = page_image_strategy.count
             elif strategy.name == ImageRagStrategyName.TABLES:
-                table_image_strategy = cast(TableImageStrategy, strategy)
+                if table_image_strategy is None:
+                    table_image_strategy = cast(TableImageStrategy, strategy)
             elif strategy.name == ImageRagStrategyName.PARAGRAPH_IMAGE:
-                paragraph_image_strategy = cast(ParagraphImageStrategy, strategy)
+                if paragraph_image_strategy is None:
+                    paragraph_image_strategy = cast(ParagraphImageStrategy, strategy)
+            else:  # pragma: no cover
+                logger.warning(
+                    "Unknown image strategy", extra={"strategy": strategy.name, "kbid": self.kbid}
+                )
 
         page_images_added = 0
         for paragraph in self.ordered_paragraphs:
@@ -876,6 +883,10 @@ class PromptContextBuilder:
                 neighbouring_paragraphs = cast(NeighbouringParagraphsStrategy, strategy)
             elif strategy.name == RagStrategyName.METADATA_EXTENSION:
                 metadata_extension = cast(MetadataExtensionStrategy, strategy)
+            else:  # pragma: no cover
+                logger.warning(
+                    "Unknown rag strategy", extra={"strategy": strategy.name, "kbid": self.kbid}
+                )
 
         if full_resource:
             # When full resoure is enabled, only metadata extension is allowed.

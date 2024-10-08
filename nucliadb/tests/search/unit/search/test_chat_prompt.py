@@ -607,6 +607,18 @@ async def test_prompt_context_image_context_builder():
         },
     )
 
+    # By default, no image strategies are provided so no images should be added
+    builder = chat_prompt.PromptContextBuilder(
+        kbid="kbid",
+        main_results=find_results,
+        user_context=["Carrots are orange"],
+        image_strategies=[],
+    )
+    context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+    await builder._build_context_images(context)
+    assert len(context.images) == 0
+
+    # Test that the image strategies are applied correctly
     builder = chat_prompt.PromptContextBuilder(
         kbid="kbid",
         main_results=find_results,
