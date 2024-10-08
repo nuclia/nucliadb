@@ -168,6 +168,7 @@ GenerativeResponse = Union[
     JSONGenerativeResponse,
     MetaGenerativeResponse,
     CitationsGenerativeResponse,
+    RerankGenerativeResponse,
     StatusGenerativeResponse,
 ]
 
