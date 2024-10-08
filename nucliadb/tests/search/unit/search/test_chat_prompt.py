@@ -38,8 +38,8 @@ from nucliadb_models.search import (
     MinScore,
     PageImageStrategy,
     ParagraphImageStrategy,
-    TableImageStrategy,
     PreQuery,
+    TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2 as rpb2
 
@@ -148,18 +148,6 @@ async def test_get_expanded_conversation_messages_missing(kb, messages):
         )
         == []
     )
-
-
-"""
-    _id: str,
-    result_text: str,
-    score_type: SCORE_TYPE = SCORE_TYPE.BM25,
-    order=1,
-    score=1,
-    is_a_table=False,
-    reference=None,
-    page_with_visual=False,
-"""
 
 
 def _create_find_result(

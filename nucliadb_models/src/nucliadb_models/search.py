@@ -1134,6 +1134,7 @@ PreQueryResult = tuple[PreQuery, "KnowledgeboxFindResults"]
 class TableImageStrategy(ImageRagStrategy):
     name: Literal["tables"] = "tables"
 
+
 class PageImageStrategy(ImageRagStrategy):
     name: Literal["page_image"] = "page_image"
     count: Optional[int] = Field(

@@ -49,7 +49,6 @@ from nucliadb_models.search import (
     MetadataExtensionType,
     NeighbouringParagraphsStrategy,
     PageImageStrategy,
-    TableImageStrategy,
     ParagraphImageStrategy,
     PreQueryResult,
     PromptContext,
@@ -57,6 +56,7 @@ from nucliadb_models.search import (
     PromptContextOrder,
     RagStrategy,
     RagStrategyName,
+    TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
