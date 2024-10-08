@@ -360,7 +360,7 @@ async def catalog(
                     resources=[r.rid for r in catalog_results.fulltext.results],
                     kbid=kbid,
                     show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
-                    field_type_filter=[],
+                    field_type_filter=list(FieldTypeName),
                     extracted=[],
                 )
                 queried_nodes = []
