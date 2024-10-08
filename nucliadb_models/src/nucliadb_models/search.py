@@ -945,7 +945,7 @@ class RagStrategyName:
 
 class ImageRagStrategyName:
     PAGE_IMAGE = "page_image"
-    TABLES = "tables"
+    PARAGRAPH_IMAGE = "paragraph_image"
 
 
 class RagStrategy(BaseModel):
@@ -1130,10 +1130,6 @@ class PreQueriesStrategy(RagStrategy):
 PreQueryResult = tuple[PreQuery, "KnowledgeboxFindResults"]
 
 
-class TableImageStrategy(ImageRagStrategy):
-    name: Literal["tables"] = "tables"
-
-
 class PageImageStrategy(ImageRagStrategy):
     name: Literal["page_image"] = "page_image"
     count: Optional[int] = Field(
@@ -1144,7 +1140,7 @@ class PageImageStrategy(ImageRagStrategy):
 
 
 class ParagraphImageStrategy(ImageRagStrategy):
-    name: Literal["paragraph_image"]
+    name: Literal["paragraph_image"] = "paragraph_image"
 
 
 RagStrategies = Annotated[

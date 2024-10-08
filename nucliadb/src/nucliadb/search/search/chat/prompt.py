@@ -49,13 +49,13 @@ from nucliadb_models.search import (
     MetadataExtensionType,
     NeighbouringParagraphsStrategy,
     PageImageStrategy,
+    ParagraphImageStrategy,
     PreQueryResult,
     PromptContext,
     PromptContextImages,
     PromptContextOrder,
     RagStrategy,
     RagStrategyName,
-    TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
@@ -789,14 +789,14 @@ class PromptContextBuilder:
 
         page_image_strategy: Optional[PageImageStrategy] = None
         max_page_images = 5
-        table_image_strategy: Optional[TableImageStrategy] = None
+        paragraph_image_strategy: Optional[ParagraphImageStrategy] = None
         for strategy in self.image_strategies:
             if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
                 page_image_strategy = cast(PageImageStrategy, strategy)
                 if page_image_strategy.count is not None:
                     max_page_images = page_image_strategy.count
-            elif strategy.name == ImageRagStrategyName.TABLES:
-                table_image_strategy = cast(TableImageStrategy, strategy)
+            elif strategy.name == ImageRagStrategyName.PARAGRAPH_IMAGE:
+                paragraph_image_strategy = cast(ParagraphImageStrategy, strategy)
 
         page_images_added = 0
         for paragraph in self.ordered_paragraphs:
@@ -824,8 +824,7 @@ class PromptContextBuilder:
                             },
                         )
             if (
-                table_image_strategy is not None
-                and paragraph.is_a_table
+                paragraph_image_strategy is not None
                 and paragraph.reference is not None
                 and paragraph.reference != ""
             ):

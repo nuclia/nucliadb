@@ -37,8 +37,8 @@ from nucliadb_models.search import (
     MetadataExtensionType,
     MinScore,
     PageImageStrategy,
+    ParagraphImageStrategy,
     PreQuery,
-    TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2 as rpb2
 
@@ -542,7 +542,7 @@ async def test_prompt_context_image_context_builder(
         kbid="kbid",
         main_results=find_results,
         user_context=["Carrots are orange"],
-        image_strategies=[PageImageStrategy(count=10), TableImageStrategy()],
+        image_strategies=[PageImageStrategy(count=10), ParagraphImageStrategy()],
     )
     module = "nucliadb.search.search.chat.prompt"
     with (
