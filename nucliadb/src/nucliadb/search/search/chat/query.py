@@ -187,9 +187,11 @@ async def run_main_query(
     if item.reranker != Reranker.PREDICT_RERANKER:
         find_request.reranker = item.reranker
     # We don't support pagination, we always get the top_k results.
-    find_request.page_size = item.top_k
-    find_request.page_number = 0
+    find_request.top_k = item.top_k
     find_request.show_hidden = item.show_hidden
+
+    # this executes the model validators, that can tweak some fields
+    FindRequest.model_validate(find_request)
 
     find_results, incomplete, query_parser = await find(
         kbid,
