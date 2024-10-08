@@ -342,7 +342,7 @@ async def catalog(
                     page=item.page_number,
                     kbid=kbid,
                     show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
-                    field_type_filter=[],
+                    field_type_filter=list(FieldTypeName),
                     extracted=[],
                     sort=sort,
                     requested_relations=pb_query.relation_subgraph,
