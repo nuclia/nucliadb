@@ -196,7 +196,7 @@ def _get_items_to_rerank(results: KnowledgeboxFindResults) -> list[RerankableIte
             score_type=paragraph.score_type,
             content=paragraph.text,
         )
-        for rid, resource in results.resources.items()
-        for field_id, field in resource.fields.items()
+        for resource in results.resources.values()
+        for field in resource.fields.values()
         for paragraph_id, paragraph in field.paragraphs.items()
     ]
