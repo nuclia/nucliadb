@@ -945,6 +945,7 @@ class RagStrategyName:
 
 class ImageRagStrategyName:
     PAGE_IMAGE = "page_image"
+    TABLES = "tables"
     PARAGRAPH_IMAGE = "paragraph_image"
 
 
@@ -1130,6 +1131,9 @@ class PreQueriesStrategy(RagStrategy):
 PreQueryResult = tuple[PreQuery, "KnowledgeboxFindResults"]
 
 
+class TableImageStrategy(ImageRagStrategy):
+    name: Literal["tables"] = "tables"
+
 class PageImageStrategy(ImageRagStrategy):
     name: Literal["page_image"] = "page_image"
     count: Optional[int] = Field(
@@ -1155,7 +1159,7 @@ RagStrategies = Annotated[
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
-    Union[PageImageStrategy, ParagraphImageStrategy], Field(discriminator="name")
+    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy], Field(discriminator="name")
 ]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
