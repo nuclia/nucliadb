@@ -16,5 +16,8 @@ CREATE TABLE indexes (
 
 CREATE TABLE segments (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    index_id BIGINT NOT NULL REFERENCES indexes(id)
+    index_id BIGINT NOT NULL REFERENCES indexes(id),
+    ready BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMP
 );

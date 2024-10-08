@@ -18,36 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use sqlx;
-use uuid::Uuid;
+
+mod index;
+mod segment;
+mod shard;
+
+pub use index::Index;
+pub use index::IndexKind;
+pub use segment::Segment;
+pub use shard::Shard;
 
 pub struct NidxMetadata {
     pool: sqlx::PgPool,
-}
-
-pub struct Shard {
-    pub id: Uuid,
-    pub kbid: Uuid,
-}
-
-#[derive(sqlx::Type, Copy, Clone, PartialEq, Debug)]
-#[sqlx(type_name = "index_kind", rename_all = "lowercase")]
-pub enum IndexKind {
-    Text,
-    Paragraph,
-    Vector,
-    Relation,
-}
-
-pub struct Index {
-    pub id: i64,
-    pub shard_id: Uuid,
-    pub kind: IndexKind,
-    pub name: Option<String>,
-}
-
-pub struct Segment {
-    pub id: i64,
-    pub index_id: i64,
 }
 
 impl NidxMetadata {
@@ -63,75 +45,6 @@ impl NidxMetadata {
             pool,
         })
     }
-
-    pub async fn create_shard(&self, kbid: Uuid) -> Result<Shard, sqlx::Error> {
-        let id =
-            sqlx::query!("INSERT INTO shards (kbid) VALUES ($1) RETURNING id", kbid).fetch_one(&self.pool).await?.id;
-        Ok(Shard {
-            id,
-            kbid,
-        })
-    }
-
-    pub async fn create_index(
-        &self,
-        shard_id: Uuid,
-        kind: IndexKind,
-        name: Option<&str>,
-    ) -> Result<Index, sqlx::Error> {
-        let id = sqlx::query!(
-            r#"INSERT INTO indexes (shard_id, kind, name) VALUES ($1, $2, $3) RETURNING id"#,
-            shard_id,
-            kind as IndexKind,
-            name
-        )
-        .fetch_one(&self.pool)
-        .await?
-        .id;
-        Ok(Index {
-            id,
-            shard_id,
-            kind,
-            name: name.map(|s| s.to_owned()),
-        })
-    }
-
-    pub async fn find_index(&self, shard_id: Uuid, kind: IndexKind, name: Option<&str>) -> sqlx::Result<Index> {
-        sqlx::query_as!(
-            Index,
-            r#"SELECT id, shard_id, kind AS "kind: IndexKind", name FROM indexes where shard_id = $1 AND kind = $2 AND name = $3"#,
-            shard_id,
-            kind as IndexKind,
-            name
-        ).fetch_one(&self.pool).await
-    }
-
-    pub async fn get_indexes_for_shard(&self, shard_id: Uuid) -> sqlx::Result<Vec<Index>> {
-        sqlx::query_as!(
-            Index,
-            r#"SELECT id, shard_id, kind AS "kind: IndexKind", name FROM indexes where shard_id = $1"#,
-            shard_id
-        )
-        .fetch_all(&self.pool)
-        .await
-    }
-
-    pub async fn create_segment(&self, index_id: i64) -> sqlx::Result<Segment> {
-        let id = sqlx::query!(r#"INSERT INTO segments (index_id) VALUES ($1) RETURNING id"#, index_id)
-            .fetch_one(&self.pool)
-            .await?
-            .id;
-        Ok(Segment {
-            id,
-            index_id,
-        })
-    }
-
-    pub async fn get_segments(&self, index_id: i64) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, r#"SELECT id, index_id FROM segments WHERE index_id = $1"#, index_id)
-            .fetch_all(&self.pool)
-            .await
-    }
 }
 
 #[cfg(test)]
@@ -145,15 +58,15 @@ mod tests {
     async fn create_and_find_index(pool: sqlx::PgPool) {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
-        let shard = meta.create_shard(kbid).await.unwrap();
+        let shard = Shard::create(&meta, kbid).await.unwrap();
         assert_eq!(shard.kbid, kbid);
 
-        let index = meta.create_index(shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let index = Index::create(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
         assert_eq!(index.shard_id, shard.id);
         assert_eq!(index.kind, IndexKind::Vector);
         assert_eq!(index.name, Some("multilingual".into()));
 
-        let found = meta.find_index(shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let found = Index::find(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
         assert_eq!(found.id, index.id);
         assert_eq!(found.shard_id, shard.id);
         assert_eq!(found.kind, IndexKind::Vector);

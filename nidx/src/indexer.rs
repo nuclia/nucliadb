@@ -24,7 +24,7 @@ use nucliadb_core::protos::Resource;
 use object_store::ObjectStore;
 use tempfile::{tempfile, TempDir};
 
-use crate::metadata::{Index, IndexKind, NidxMetadata, Shard};
+use crate::metadata::*;
 
 async fn index_resource(
     meta: &NidxMetadata,
@@ -32,14 +32,15 @@ async fn index_resource(
     shard: &Shard,
     resource: &Resource,
 ) -> anyhow::Result<()> {
-    let indexes = meta.get_indexes_for_shard(shard.id).await?;
+    let indexes = shard.indexes(meta).await?;
     for index in indexes {
         let dir = index_resource_to_index(&index, resource).await?;
 
-        let segment = meta.create_segment(index.id).await?;
+        let segment = Segment::create(&meta, index.id).await?;
         let store_path = format!("{}/{}/{}/{}", shard.kbid, shard.id, index.id, segment.id);
 
         pack_and_upload(storage, dir, &store_path).await?;
+        segment.mark_ready(meta).await?;
     }
     Ok(())
 }
@@ -88,16 +89,18 @@ mod tests {
     async fn test_index_resource(pool: sqlx::PgPool) {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
-        let shard = meta.create_shard(kbid).await.unwrap();
-        let index = meta.create_index(shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let shard = Shard::create(&meta, kbid).await.unwrap();
+        let index = Index::create(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
 
         let storage = object_store::memory::InMemory::new();
         index_resource(&meta, &storage, &shard, &little_prince("abc")).await.unwrap();
 
-        let segments = meta.get_segments(index.id).await.unwrap();
+        let segments = index.segments(&meta).await.unwrap();
         assert_eq!(segments.len(), 1);
 
         let segment = &segments[0];
+        assert_eq!(segment.ready, true);
+
         let download = storage
             .get(
                 &object_store::path::Path::parse(format!("{}/{}/{}/{}", shard.kbid, shard.id, index.id, segment.id))
