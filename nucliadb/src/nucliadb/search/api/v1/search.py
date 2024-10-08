@@ -49,7 +49,7 @@ from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     CatalogRequest,
-    CatalogResults,
+    CatalogResponse,
     KnowledgeboxSearchResults,
     MinScore,
     NucliaDBClientType,
@@ -277,7 +277,7 @@ async def catalog_post(
     request: Request,
     kbid: str,
     item: CatalogRequest,
-) -> Union[CatalogResults, HTTPClientError]:
+) -> Union[CatalogResponse, HTTPClientError]:
     return await catalog(kbid, item)
 
 
@@ -349,12 +349,12 @@ async def catalog(
                     min_score=query_parser.min_score,
                     highlight=False,
                 )
-                catalog_results = CatalogResults(
+                catalog_results = CatalogResponse(
                     resources=search_results.resources,
                     fulltext=search_results.fulltext,
                 )
             else:
-                catalog_results = CatalogResults()
+                catalog_results = CatalogResponse()
                 catalog_results.fulltext = await pgcatalog_search(query_parser)
                 catalog_results.resources = await fetch_resources(
                     resources=[r.rid for r in catalog_results.fulltext.results],
