@@ -332,6 +332,14 @@ class KnowledgeboxSearchResults(JsonBaseModel):
     autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
 
+class CatalogResponse(BaseModel):
+    """Catalog results"""
+
+    resources: dict[str, Resource] = {}
+    fulltext: Optional[Resources] = None
+    shards: Optional[list[str]] = None
+
+
 class KnowledgeboxSuggestResults(JsonBaseModel):
     """Suggest on resource results"""
 
