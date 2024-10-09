@@ -340,7 +340,7 @@ class Field:
                 pb.ParseFromString(raw_payload.read())
                 raw_payload.flush()
                 payload.vectors.CopyFrom(pb)
-            vo = payload.vectors
+            vo = actual_payload
             # We know its payload.body
             for key, value in payload.vectors.split_vectors.items():
                 actual_payload.split_vectors[key].CopyFrom(value)
