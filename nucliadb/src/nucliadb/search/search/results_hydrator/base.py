@@ -40,6 +40,8 @@ from nucliadb_models.search import (
     ResourceProperties,
 )
 from nucliadb_telemetry.metrics import Observer
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -122,21 +124,18 @@ async def hydrate_external(
             )
         )
 
-    async def _hydrate_resource_metadata(**kwargs):
-        async with semaphore:
-            await hydrate_resource_metadata(**kwargs)
-
     if len(resource_ids) > 0:
         async with get_driver().transaction(read_only=True) as ro_txn:
             for resource_id in resource_ids:
                 hydrate_ops.append(
                     asyncio.create_task(
-                        _hydrate_resource_metadata(
+                        hydrate_resource_metadata(
                             txn=ro_txn,
                             kbid=kbid,
                             resource_id=resource_id,
                             options=resource_options,
                             find_resources=retrieval_results.resources,
+                            concurrency_control=semaphore,
                         )
                     )
                 )
@@ -205,29 +204,42 @@ async def hydrate_resource_metadata(
     resource_id: str,
     options: ResourceHydrationOptions,
     find_resources: dict[str, FindResource],
+    *,
+    concurrency_control: Optional[asyncio.Semaphore] = None,
+    service_name: Optional[str] = None,
 ) -> None:
     """
     Fetch the various metadata fields of the resource and update the FindResource object.
     """
-    serialized_resource = await managed_serialize(
-        txn=txn,
-        kbid=kbid,
-        rid=resource_id,
-        show=options.show,
-        field_type_filter=options.field_type_filter,
-        extracted=options.extracted,
-    )
-    if serialized_resource is None:
-        logger.warning(
-            "Resource not found in database",
-            extra={
-                "kbid": kbid,
-                "rid": resource_id,
-            },
+    show = options.show
+    extracted = options.extracted
+
+    if ResourceProperties.EXTRACTED in show and has_feature(
+        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
+    ):
+        # Returning extracted metadata in search results is deprecated and this flag
+        # will be set to True for all KBs in the future.
+        show.remove(ResourceProperties.EXTRACTED)
+        extracted = []
+
+    async with AsyncExitStack() as stack:
+        if concurrency_control is not None:
+            await stack.enter_async_context(concurrency_control)
+
+        serialized_resource = await managed_serialize(
+            txn=txn,
+            kbid=kbid,
+            rid=resource_id,
+            show=show,
+            field_type_filter=options.field_type_filter,
+            extracted=extracted,
+            service_name=service_name,
         )
-        find_resources.pop(resource_id, None)
-        return
-    find_resources[resource_id].updated_from(serialized_resource)
+        if serialized_resource is not None:
+            find_resources[resource_id].updated_from(serialized_resource)
+        else:
+            logger.warning("Resource not found in database", extra={"kbid": kbid, "rid": resource_id})
+            find_resources.pop(resource_id, None)
 
 
 def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:

@@ -23,14 +23,13 @@ from typing import cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.results_hydrator.base import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
+    hydrate_resource_metadata,
     text_block_to_find_paragraph,
 )
 from nucliadb_models.common import FieldTypeName
@@ -52,8 +51,6 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from . import paragraphs
 from .metrics import merge_observer
@@ -92,43 +89,6 @@ async def set_text_value(
             ematches=hydration_options.ematches,
             matches=[],  # TODO
         )
-
-
-@merge_observer.wrap({"type": "set_resource_metadada_value"})
-async def set_resource_metadata_value(
-    txn: Transaction,
-    kbid: str,
-    resource: str,
-    hydration_options: ResourceHydrationOptions,
-    find_resources: dict[str, FindResource],
-    max_operations: asyncio.Semaphore,
-):
-    show = hydration_options.show
-    extracted = hydration_options.extracted
-
-    if ResourceProperties.EXTRACTED in show and has_feature(
-        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
-    ):
-        # Returning extracted metadata in search results is deprecated and this flag
-        # will be set to True for all KBs in the future.
-        show.remove(ResourceProperties.EXTRACTED)
-        extracted = []
-
-    async with max_operations:
-        serialized_resource = await managed_serialize(
-            txn,
-            kbid,
-            resource,
-            show=show,
-            field_type_filter=hydration_options.field_type_filter,
-            extracted=extracted,
-            service_name=SERVICE_NAME,
-        )
-        if serialized_resource is not None:
-            find_resources[resource].updated_from(serialized_resource)
-        else:
-            logger.warning(f"Resource {resource} not found in {kbid}")
-            find_resources.pop(resource, None)
 
 
 @merge_observer.wrap({"type": "fetch_find_metadata"})
@@ -201,13 +161,14 @@ async def fetch_find_metadata(
         for resource in resources:
             operations.append(
                 asyncio.create_task(
-                    set_resource_metadata_value(
+                    hydrate_resource_metadata(
                         txn,
-                        kbid=kbid,
-                        resource=resource,
-                        hydration_options=resource_hydration_options,
+                        kbid,
+                        resource_id=resource,
+                        options=resource_hydration_options,
                         find_resources=find_resources,
-                        max_operations=max_operations,
+                        concurrency_control=max_operations,
+                        service_name=SERVICE_NAME,
                     )
                 )
             )
