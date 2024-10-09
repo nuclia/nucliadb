@@ -30,7 +30,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import paragraphs
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
     FindField,
     FindParagraph,
@@ -108,17 +108,14 @@ async def hydrate_external(
         field_id = text_block.paragraph_id.field_id.full()
         find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
 
-        async def _hydrate_text_block(**kwargs):
-            async with semaphore:
-                await hydrate_text_block_and_update_find_paragraph(**kwargs)
-
         hydrate_ops.append(
             asyncio.create_task(
-                _hydrate_text_block(
+                hydrate_text_block_and_update_find_paragraph(
                     kbid=kbid,
                     text_block=text_block,
                     options=text_block_options,
                     field_paragraphs=find_field.paragraphs,
+                    concurrency_control=semaphore,
                 )
             )
         )
@@ -127,7 +124,7 @@ async def hydrate_external(
         for resource_id in resource_ids:
             hydrate_ops.append(
                 asyncio.create_task(
-                    hydrate_resource_metadata(
+                    hydrate_resource_metadata_and_update_find_resources(
                         kbid=kbid,
                         resource_id=resource_id,
                         options=resource_options,
@@ -147,25 +144,17 @@ async def hydrate_text_block_and_update_find_paragraph(
     text_block: TextBlockMatch,
     options: TextBlockHydrationOptions,
     field_paragraphs: dict[str, FindParagraph],
+    *,
+    concurrency_control: Optional[asyncio.Semaphore] = None,
 ) -> None:
     """
     Fetch the text for a text block and update the FindParagraph object.
     """
-    text = await paragraphs.get_paragraph_text(kbid=kbid, paragraph_id=text_block.paragraph_id)
-    text_block_id = text_block.paragraph_id.full()
-    field_paragraphs[text_block_id] = FindParagraph(
-        score=text_block.score,
-        score_type=text_block.score_type,
-        order=text_block.order,
-        text=text,
-        id=text_block_id,
-        labels=text_block.paragraph_labels,
-        fuzzy_result=False,
-        is_a_table=text_block.is_a_table,
-        reference=text_block.representation_file,
-        page_with_visual=text_block.page_with_visual,
-        position=text_block.position,
+    text_block = await hydrate_text_block(
+        kbid, text_block, options, concurrency_control=concurrency_control
     )
+    text_block_id = text_block.paragraph_id.full()
+    field_paragraphs[text_block_id] = text_block_to_find_paragraph(text_block)
 
 
 @hydrator_observer.wrap({"type": "text_block"})
@@ -195,7 +184,7 @@ async def hydrate_text_block(
 
 
 @hydrator_observer.wrap({"type": "resource_metadata"})
-async def hydrate_resource_metadata(
+async def hydrate_resource_metadata_and_update_find_resources(
     kbid: str,
     resource_id: str,
     options: ResourceHydrationOptions,
@@ -207,6 +196,24 @@ async def hydrate_resource_metadata(
     """
     Fetch the various metadata fields of the resource and update the FindResource object.
     """
+    serialized_resource = await hydrate_resource_metadata(
+        kbid, resource_id, options, concurrency_control=concurrency_control, service_name=service_name
+    )
+    if serialized_resource is not None:
+        find_resources[resource_id].updated_from(serialized_resource)
+    else:
+        find_resources.pop(resource_id, None)
+
+
+@hydrator_observer.wrap({"type": "resource_metadata_simple"})
+async def hydrate_resource_metadata(
+    kbid: str,
+    resource_id: str,
+    options: ResourceHydrationOptions,
+    *,
+    concurrency_control: Optional[asyncio.Semaphore] = None,
+    service_name: Optional[str] = None,
+) -> Optional[Resource]:
     show = options.show
     extracted = options.extracted
 
@@ -232,13 +239,11 @@ async def hydrate_resource_metadata(
                 extracted=extracted,
                 service_name=service_name,
             )
-            if serialized_resource is not None:
-                find_resources[resource_id].updated_from(serialized_resource)
-            else:
+            if serialized_resource is None:
                 logger.warning(
                     "Resource not found in database", extra={"kbid": kbid, "rid": resource_id}
                 )
-                find_resources.pop(resource_id, None)
+    return serialized_resource
 
 
 def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:

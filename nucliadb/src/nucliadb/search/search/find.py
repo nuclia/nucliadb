@@ -29,9 +29,7 @@ from nucliadb.search.search import results_hydrator
 from nucliadb.search.search.find_merge import find_merge_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.rerankers import (
-    get_reranker,
-)
+from nucliadb.search.search.rerankers import RerankingOptions, get_reranker
 from nucliadb.search.search.results_hydrator.base import (
     ResourceHydrationOptions,
 )
@@ -125,7 +123,14 @@ async def _index_node_retrieval(
 
     # once hydrated, we send the results to rerank
     reranker = query_parser.reranker
-    await reranker.rerank_find_response(kbid, query_parser.query, search_results)
+    await reranker.rerank_find_response(
+        search_results,
+        RerankingOptions(
+            kbid=kbid,
+            query=query_parser.query,
+            top_k=item.top_k,  # type: ignore
+        ),
+    )
 
     search_time = time() - start_time
     if audit is not None:
@@ -226,7 +231,14 @@ async def _external_index_retrieval(
 
     # once hydrated, we send the results to rerank
     reranker = query_parser.reranker
-    await reranker.rerank_find_response(kbid, query_parser.query, retrieval_results)
+    await reranker.rerank_find_response(
+        retrieval_results,
+        RerankingOptions(
+            kbid=kbid,
+            query=query_parser.query,
+            top_k=item.top_k,  # type: ignore
+        ),
+    )
 
     # Once hydrated, populate best_matches with the paragraphs ids sorted by score
     scored_paragraphs: list[ScoredParagraph] = [
