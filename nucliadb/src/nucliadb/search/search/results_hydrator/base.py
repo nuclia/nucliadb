@@ -110,7 +110,7 @@ async def hydrate_external(
 
         async def _hydrate_text_block(**kwargs):
             async with semaphore:
-                await hydrate_text_block(**kwargs)
+                await hydrate_text_block_and_update_find_paragraph(**kwargs)
 
         hydrate_ops.append(
             asyncio.create_task(
@@ -142,7 +142,7 @@ async def hydrate_external(
 
 
 @hydrator_observer.wrap({"type": "text_block"})
-async def hydrate_text_block(
+async def hydrate_text_block_and_update_find_paragraph(
     kbid: str,
     text_block: TextBlockMatch,
     options: TextBlockHydrationOptions,
@@ -169,7 +169,7 @@ async def hydrate_text_block(
 
 
 @hydrator_observer.wrap({"type": "text_block"})
-async def new_hydrate_text_block(
+async def hydrate_text_block(
     kbid: str,
     text_block: TextBlockMatch,
     options: TextBlockHydrationOptions,
