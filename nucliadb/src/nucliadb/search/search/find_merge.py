@@ -19,14 +19,13 @@
 #
 import asyncio
 from dataclasses import dataclass
-from typing import Union, cast
+from typing import Iterable, Union, cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.rerankers import (
-    MultiMatchBoosterReranker,
     RerankableItem,
     Reranker,
     RerankingOptions,
@@ -99,7 +98,7 @@ async def set_text_value(
 
 @merge_observer.wrap({"type": "hydrate_and_rerank"})
 async def hydrate_and_rerank(
-    text_blocks: list[TextBlockMatch],
+    text_blocks: Iterable[TextBlockMatch],
     kbid: str,
     *,
     resource_hydration_options: ResourceHydrationOptions,
@@ -375,6 +374,7 @@ async def find_merge_results(
     requested_relations: EntitiesSubgraphRequest,
     min_score_bm25: float,
     min_score_semantic: float,
+    reranker: Reranker,
     highlight: bool = False,
 ) -> KnowledgeboxFindResults:
     paragraphs: list[list[ParagraphResult]] = []
@@ -425,7 +425,7 @@ async def find_merge_results(
             highlight=highlight,
             ematches=ematches,
         ),
-        reranker=MultiMatchBoosterReranker(),
+        reranker=reranker,
         reranking_options=RerankingOptions(
             kbid=kbid,
             query=real_query,
