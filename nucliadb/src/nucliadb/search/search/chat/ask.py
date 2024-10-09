@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import dataclasses
 import functools
 import json
-from dataclasses import dataclass
 from typing import AsyncGenerator, Optional, cast
 
 from pydantic_core import ValidationError
@@ -63,6 +63,7 @@ from nucliadb_models.search import (
     AskRequest,
     AskResponseItem,
     AskResponseItemType,
+    AskRetrievalMatch,
     AskTimings,
     AskTokens,
     ChatModel,
@@ -70,6 +71,7 @@ from nucliadb_models.search import (
     CitationsAskResponseItem,
     DebugAskResponseItem,
     ErrorAskResponseItem,
+    FindParagraph,
     FindRequest,
     JSONAskResponseItem,
     KnowledgeboxFindResults,
@@ -99,6 +101,24 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import LimitsExceededError
 
 
+@dataclasses.dataclass
+class RetrievalMatch:
+    paragraph: FindParagraph
+    weighted_score: float
+    main_query_match: bool = False
+    # List of prequery ids for which this paragraph is a match
+    prequery_matches: list[str] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass
+class RetrievalResults:
+    main_query: KnowledgeboxFindResults
+    query_parser: QueryParser
+    main_query_weight: float
+    prequeries: Optional[list[PreQueryResult]] = None
+    sorted_matches: list[RetrievalMatch] = dataclasses.field(default_factory=list)
+
+
 class AskResult:
     def __init__(
         self,
@@ -113,6 +133,7 @@ class AskResult:
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
         metrics: RAGMetrics,
+        sorted_matches: list[RetrievalMatch],
     ):
         # Initial attributes
         self.kbid = kbid
@@ -125,6 +146,7 @@ class AskResult:
         self.prompt_context_order = prompt_context_order
         self.auditor: ChatAuditor = auditor
         self.metrics: RAGMetrics = metrics
+        self.sorted_matches: list[RetrievalMatch] = sorted_matches
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -204,7 +226,18 @@ class AskResult:
             ]
             apply_reranking(self.main_results, reranked)
 
-        yield RetrievalAskResponseItem(results=self.main_results)
+        yield RetrievalAskResponseItem(
+            results=self.main_results,
+            matches=[
+                AskRetrievalMatch(
+                    id=match.paragraph.id,
+                    weighted_score=match.weighted_score,
+                    main_query_match=match.main_query_match,
+                    prequery_matches=match.prequery_matches,
+                )
+                for match in self.sorted_matches
+            ],
+        )
 
         if len(self.prequeries_results) > 0:
             item = PrequeriesAskResponseItem()
@@ -252,18 +285,28 @@ class AskResult:
         if self._citations is not None:
             yield CitationsAskResponseItem(citations=self._citations.citations)
 
-        # Stream out other metadata about the answer if available
+        # Stream out generic metadata about the answer
+        metadata = MetadataAskResponseItem(
+            tokens=AskTokens(input=0, output=0),
+            timings=AskTimings(generative_first_chunk=None, generative_total=None),
+            retrieval_matches=[
+                AskRetrievalMatch(
+                    id=match.paragraph.id,
+                    weighted_score=match.weighted_score,
+                    main_query_match=match.main_query_match,
+                    prequery_matches=match.prequery_matches,
+                )
+                for match in self.sorted_matches
+            ],
+        )
         if self._metadata is not None:
-            yield MetadataAskResponseItem(
-                tokens=AskTokens(
-                    input=self._metadata.input_tokens,
-                    output=self._metadata.output_tokens,
-                ),
-                timings=AskTimings(
-                    generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
-                    generative_total=self._metadata.timings.get("generative"),
-                ),
+            metadata.tokens.input = self._metadata.input_tokens
+            metadata.tokens.output = self._metadata.output_tokens
+            metadata.timings.generative_first_chunk = self._metadata.timings.get(
+                "generative_first_chunk"
             )
+            metadata.timings.generative_total = self._metadata.timings.get("generative")
+        yield metadata
 
         # Stream out the relations results
         should_query_relations = (
@@ -392,7 +435,7 @@ class NotEnoughContextAskResult(AskResult):
         return the find results and the messages indicating that there is not enough
         context in the corpus to answer.
         """
-        yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
+        yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results, matches=[]))
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         status = AnswerStatusCode.NO_CONTEXT
         yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
@@ -463,9 +506,7 @@ async def ask(
         max_tokens_context = await query_parser.get_max_tokens_context()
         prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
-            main_results=retrieval_results.main_query,
-            prequeries_results=retrieval_results.prequeries,
-            main_query_weight=retrieval_results.main_query_weight,
+            ordered_paragraphs=[match.paragraph for match in retrieval_results.sorted_matches],
             resource=resource,
             user_context=user_context,
             strategies=ask_request.rag_strategies,
@@ -531,6 +572,7 @@ async def ask(
         prompt_context_order=prompt_context_order,
         auditor=auditor,
         metrics=metrics,
+        sorted_matches=retrieval_results.sorted_matches,
     )
 
 
@@ -589,14 +631,6 @@ def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
                 query_ids.append(query.id)
             return prequeries
     return None
-
-
-@dataclass
-class RetrievalResults:
-    main_query: KnowledgeboxFindResults
-    query_parser: QueryParser
-    main_query_weight: float
-    prequeries: Optional[list[PreQueryResult]] = None
 
 
 async def retrieval_step(
@@ -660,11 +694,19 @@ async def retrieval_in_kb(
             len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
         ):
             raise NoRetrievalResultsError(main_results, prequeries_results)
+
+    main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
+    sorted_matches = compute_sorted_matches(
+        main_results=main_results,
+        prequeries_results=prequeries_results,
+        main_query_weight=main_query_weight,
+    )
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
         query_parser=query_parser,
-        main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
+        main_query_weight=main_query_weight,
+        sorted_matches=sorted_matches,
     )
 
 
@@ -726,12 +768,76 @@ async def retrieval_in_resource(
             len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
         ):
             raise NoRetrievalResultsError(main_results, prequeries_results)
+    main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
+    sorted_matches = compute_sorted_matches(
+        main_results=main_results,
+        prequeries_results=prequeries_results,
+        main_query_weight=main_query_weight,
+    )
     return RetrievalResults(
         main_query=main_results,
         prequeries=prequeries_results,
         query_parser=query_parser,
-        main_query_weight=prequeries.main_query_weight if prequeries is not None else 1.0,
+        main_query_weight=main_query_weight,
+        sorted_matches=sorted_matches,
     )
+
+
+def compute_sorted_matches(
+    main_results: KnowledgeboxFindResults,
+    prequeries_results: Optional[list[PreQueryResult]] = None,
+    main_query_weight: float = 1.0,
+) -> list[RetrievalMatch]:
+    """
+    Returns the list of matches of the retrieval results, ordered by relevance (descending weighted score).
+
+    If prequeries_results is provided, the paragraphs of the prequeries are weighted according to the
+    normalized weight of the prequery. The paragraph score is not modified, but it is used to determine the order in which they
+    are presented in the LLM prompt context.
+
+    If a paragraph is matched in various prequeries, the final weighted score is the sum of the weighted scores for each prequery.
+
+    `main_query_weight` is the weight given to the paragraphs matching the main query when calculating the final score.
+    """
+
+    def iter_paragraphs(results: KnowledgeboxFindResults):
+        for resource in results.resources.values():
+            for field in resource.fields.values():
+                for paragraph in field.paragraphs.values():
+                    yield paragraph
+
+    total_weights = main_query_weight + sum(prequery.weight for prequery, _ in prequeries_results or [])
+
+    paragraph_id_to_match: dict[str, RetrievalMatch] = {}
+    for paragraph in iter_paragraphs(main_results):
+        rmatch = RetrievalMatch(
+            paragraph=paragraph,
+            weighted_score=paragraph.score * (main_query_weight / total_weights) * 100,
+            main_query_match=True,
+            prequery_matches=[],
+        )
+        paragraph_id_to_match[paragraph.id] = rmatch
+
+    for prequery, prequery_results in prequeries_results or []:
+        prequery_id = cast(str, prequery.id)
+        for paragraph in iter_paragraphs(prequery_results):
+            normalize_weight = (prequery.weight / total_weights) * 100
+            weighted_score = paragraph.score * normalize_weight
+            if paragraph.id in paragraph_id_to_match:
+                rmatch = paragraph_id_to_match[paragraph.id]
+                # If a paragraph is matched in various prequeries, the final score is the
+                # sum of the weighted scores
+                rmatch.weighted_score += weighted_score
+                rmatch.prequery_matches.append(prequery_id)
+            else:
+                paragraph_id_to_match[paragraph.id] = RetrievalMatch(
+                    paragraph=paragraph,
+                    weighted_score=weighted_score,
+                    main_query_match=False,
+                    prequery_matches=[prequery_id],
+                )
+
+    return sorted(paragraph_id_to_match.values(), key=lambda match: match.weighted_score, reverse=True)
 
 
 def calculate_prequeries_for_json_schema(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:

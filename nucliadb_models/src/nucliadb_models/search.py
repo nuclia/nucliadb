@@ -1778,9 +1778,35 @@ class SyncAskResponse(BaseModel):
     )
 
 
+class AskRetrievalMatch(BaseModel):
+    id: str = Field(
+        title="Id",
+        description="Id of the matching text block",
+    )
+
+    weighted_score: float = Field(
+        title="Weighted score",
+        description="Weighted score of the matching text block",
+    )
+
+    main_query_match: bool = Field(
+        title="Main query match",
+        description="Whether the text block is a match of the main query",
+    )
+
+    prequery_matches: list[str] = Field(
+        title="Prequery matches",
+        description="List of prequery ids that the text block is a match of",
+    )
+
+
 class RetrievalAskResponseItem(BaseModel):
     type: Literal["retrieval"] = "retrieval"
     results: KnowledgeboxFindResults
+    matches: list[AskRetrievalMatch] = Field(
+        title="Matches",
+        description="Sorted list of best matching text blocks in the retrieval step. This includes the main query and prequeries results, if any.",
+    )
 
 
 class PrequeriesAskResponseItem(BaseModel):
@@ -1802,6 +1828,10 @@ class MetadataAskResponseItem(BaseModel):
     type: Literal["metadata"] = "metadata"
     tokens: AskTokens
     timings: AskTimings
+    retrieval_matches: list[AskRetrievalMatch] = Field(
+        title="Retrieval matches",
+        description="Sorted list of best matching text blocks in the retrieval step. This includes the main query and prequeries results, if any.",
+    )
 
 
 class CitationsAskResponseItem(BaseModel):
