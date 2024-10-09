@@ -20,7 +20,13 @@
 
 from unittest.mock import AsyncMock, Mock, patch
 
-from nucliadb.search.search.rerankers import PredictReranker, RankedItem, RerankableItem, Reranker
+from nucliadb.search.search.rerankers import (
+    PredictReranker,
+    RankedItem,
+    RerankableItem,
+    Reranker,
+    RerankingOptions,
+)
 from nucliadb_models.internal.predict import RerankResponse
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -39,7 +45,7 @@ class NoopReranker(Reranker):
     def items_needed(self, requested: int, shards: int = 1) -> int:
         return requested
 
-    async def rerank(self, kbid: str, query: str, items: list[RerankableItem]) -> list[RankedItem]:
+    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         return [
             RankedItem(
                 id=item.id,

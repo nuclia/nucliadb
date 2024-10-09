@@ -19,20 +19,27 @@
 #
 import asyncio
 from dataclasses import dataclass
-from typing import cast
+from typing import Union, cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.rerankers import (
+    MultiMatchBoosterReranker,
+    RerankableItem,
+    Reranker,
+    RerankingOptions,
+)
 from nucliadb.search.search.results_hydrator.base import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
     hydrate_resource_metadata,
+    hydrate_text_block,
     text_block_to_find_paragraph,
 )
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
@@ -90,94 +97,163 @@ async def set_text_value(
         )
 
 
-@merge_observer.wrap({"type": "fetch_find_metadata"})
-async def fetch_find_metadata(
-    result_paragraphs: list[TextBlockMatch],
+@merge_observer.wrap({"type": "hydrate_and_rerank"})
+async def hydrate_and_rerank(
+    text_blocks: list[TextBlockMatch],
     kbid: str,
     *,
     resource_hydration_options: ResourceHydrationOptions,
     text_block_hydration_options: TextBlockHydrationOptions,
-) -> tuple[dict[str, FindResource], list[str]]:
-    find_resources: dict[str, FindResource] = {}
-    best_matches: list[str] = []
+    reranker: Reranker,
+    reranking_options: RerankingOptions,
+) -> tuple[list[TextBlockMatch], list[Resource], list[str]]:
+    """Given a list of text blocks from a retrieval operation, hydrate and
+    rerank the results.
 
-    resources = set()
-    operations = []
+    This function returns either the entire list or a subset of updated
+    (hydrated and reranked) text blocks and their corresponding resource
+    metadata. It also returns an ordered list of best matches.
+
+    """
     max_operations = asyncio.Semaphore(50)
-    paragraphs_to_sort: list[SortableParagraph] = []
-    for text_block in result_paragraphs:
+
+    # Iterate text blocks and create text block and resource metadata hydration
+    # tasks depending on the reranker
+    text_blocks_by_id = {}  # useful for faster access to text blocks later
+    resource_hydration_ops = {}
+    text_block_hydration_ops = {}
+    for text_block in text_blocks:
         rid = text_block.paragraph_id.rid
-        find_resource = find_resources.setdefault(rid, FindResource(id=rid, fields={}))
-        field_id = text_block.paragraph_id.field_id.short_without_subfield()
-        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
         paragraph_id = text_block.paragraph_id.full()
 
-        if paragraph_id in find_field.paragraphs:
-            # Its a multiple match, boost the score
-            if find_field.paragraphs[paragraph_id].score < text_block.score:
-                # Use Vector score if there are both
-                find_field.paragraphs[paragraph_id].score = text_block.score * 2
-                paragraphs_to_sort.append(
-                    SortableParagraph(
-                        rid=rid,
-                        fid=field_id,
-                        pid=paragraph_id,
-                        score=text_block.score,
+        text_blocks_by_id[paragraph_id] = text_block
+
+        # rerankers that need extra results may end with less resources than the
+        # ones we see now, so we'll skip this step and recompute the resources
+        # later
+        if not reranker.needs_extra_results:
+            if rid not in resource_hydration_ops:
+                resource_hydration_ops[rid] = asyncio.create_task(
+                    hydrate_resource_metadata(
+                        kbid,
+                        rid,
+                        options=resource_hydration_options,
+                        concurrency_control=max_operations,
+                        service_name=SERVICE_NAME,
                     )
                 )
-            find_field.paragraphs[paragraph_id].score_type = SCORE_TYPE.BOTH
 
-        else:
-            find_field.paragraphs[paragraph_id] = text_block_to_find_paragraph(text_block)
-            paragraphs_to_sort.append(
-                SortableParagraph(
-                    rid=rid,
-                    fid=field_id,
-                    pid=paragraph_id,
-                    score=text_block.score,
+        if paragraph_id not in text_block_hydration_ops:
+            text_block_hydration_ops[paragraph_id] = asyncio.create_task(
+                hydrate_text_block(
+                    kbid,
+                    text_block,
+                    text_block_hydration_options,
+                    concurrency_control=max_operations,
                 )
             )
-        operations.append(
-            asyncio.create_task(
-                set_text_value(
-                    kbid=kbid,
-                    paragraph_id=text_block.paragraph_id,
-                    find_paragraph=find_field.paragraphs[paragraph_id],
-                    hydration_options=text_block_hydration_options,
-                    max_operations=max_operations,
-                )
-            )
+
+    # hydrate only the strictly needed before rerank
+    hydrated_text_blocks: list[TextBlockMatch]
+    hydrated_resources: list[Union[Resource, None]]
+
+    ops = [
+        *text_block_hydration_ops.values(),
+        *resource_hydration_ops.values(),
+    ]
+    FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
+    results = await asyncio.gather(*ops)
+
+    hydrated_text_blocks = results[: len(text_block_hydration_ops)]  # type: ignore
+    hydrated_resources = results[len(text_block_hydration_ops) :]  # type: ignore
+
+    # with the hydrated text, rerank and apply new scores to the text blocks
+    to_rerank = [
+        RerankableItem(
+            id=text_block.paragraph_id.full(),
+            score=text_block.score,
+            score_type=text_block.score_type,
+            content=text_block.text or "",  # TODO: add a warning, this shouldn't usually happen
         )
-        resources.add(rid)
+        for text_block in hydrated_text_blocks
+    ]
+    reranked = await reranker.rerank(to_rerank, reranking_options)
 
-    for order, paragraph in enumerate(
-        sorted(paragraphs_to_sort, key=lambda par: par.score, reverse=True)
-    ):
-        find_resources[paragraph.rid].fields[paragraph.fid].paragraphs[paragraph.pid].order = order
-        best_matches.append(paragraph.pid)
+    matches = []
+    for item in reranked:
+        paragraph_id = item.id
+        score = item.score
+        score_type = item.score_type
+
+        text_block = text_blocks_by_id[paragraph_id]
+        text_block.score = score
+        text_block.score_type = score_type
+
+        matches.append((paragraph_id, score))
+
+    matches.sort(key=lambda x: x[1], reverse=True)
+
+    best_matches = []
+    best_text_blocks = []
+    resource_hydration_ops = {}
+    for order, (paragraph_id, _) in enumerate(matches):
+        text_block = text_blocks_by_id[paragraph_id]
+        text_block.order = order
+        best_matches.append(paragraph_id)
+        best_text_blocks.append(text_block)
+
+        # now we have removed the text block surplus, fetch resource metadata
+        if reranker.needs_extra_results:
+            if rid not in resource_hydration_ops:
+                resource_hydration_ops[rid] = asyncio.create_task(
+                    hydrate_resource_metadata(
+                        kbid,
+                        rid,
+                        options=resource_hydration_options,
+                        concurrency_control=max_operations,
+                        service_name=SERVICE_NAME,
+                    )
+                )
+
+    # Finally, fetch resource metadata if we haven't already done it
+    if reranker.needs_extra_results:
+        ops = list(resource_hydration_ops.values())
+        FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
+        hydrated_resources = await asyncio.gather(*ops)  # type: ignore
+
+    resources = [resource for resource in hydrated_resources if resource is not None]
+
+    return best_text_blocks, resources, best_matches
+
+
+def compose_find_resources(
+    text_blocks: list[TextBlockMatch],
+    resources: list[Resource],
+) -> dict[str, FindResource]:
+    find_resources: dict[str, FindResource] = {}
 
     for resource in resources:
-        operations.append(
-            asyncio.create_task(
-                hydrate_resource_metadata(
-                    kbid,
-                    resource_id=resource,
-                    options=resource_hydration_options,
-                    find_resources=find_resources,
-                    concurrency_control=max_operations,
-                    service_name=SERVICE_NAME,
-                )
-            )
-        )
+        rid = resource.id
+        if rid not in find_resources:
+            find_resources[rid] = FindResource(id=rid, fields={})
+            find_resources[rid].updated_from(resource)
 
-    FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
-    if len(operations) > 0:
-        done, _ = await asyncio.wait(operations)
-        for task in done:
-            if task.exception() is not None:  # pragma: no cover
-                logger.error("Error fetching find metadata", exc_info=task.exception())
+    for text_block in text_blocks:
+        rid = text_block.paragraph_id.rid
+        if rid not in find_resources:
+            # resource not found in db, skipping
+            continue
 
-    return find_resources, best_matches
+        find_resource = find_resources[rid]
+        field_id = text_block.paragraph_id.field_id.full()
+        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
+
+        paragraph_id = text_block.paragraph_id.full()
+        find_paragraph = text_block_to_find_paragraph(text_block)
+
+        find_field.paragraphs[paragraph_id] = find_paragraph
+
+    return find_resources
 
 
 @merge_observer.wrap({"type": "merge_paragraphs_vectors"})
@@ -337,7 +413,7 @@ async def find_merge_results(
         best_matches=[],
     )
 
-    resources, best_matches = await fetch_find_metadata(
+    text_blocks, resources, best_matches = await hydrate_and_rerank(
         result_paragraphs,
         kbid,
         resource_hydration_options=ResourceHydrationOptions(
@@ -349,8 +425,16 @@ async def find_merge_results(
             highlight=highlight,
             ematches=ematches,
         ),
+        reranker=MultiMatchBoosterReranker(),
+        reranking_options=RerankingOptions(
+            kbid=kbid,
+            query=real_query,
+            top_k=count,
+        ),
     )
-    api_results.resources = resources
+    find_resources = compose_find_resources(text_blocks, resources)
+
+    api_results.resources = find_resources
     api_results.best_matches = best_matches
     api_results.relations = await merge_relations_results(relations, requested_relations)
 
