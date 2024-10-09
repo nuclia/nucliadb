@@ -928,6 +928,11 @@ class ChatModel(BaseModel):
         default=None,
         description="The JSON schema to use for the generative model answers",
     )
+    rerank_context: bool = Field(
+        default=False,
+        description="Whether to reorder the query context based on a reranker",
+    )
+    top_k: Optional[int] = Field(default=None, description="Number of best elements to get from")
 
 
 class RephraseModel(BaseModel):
@@ -1287,6 +1292,7 @@ class AskRequest(AuditMetadataBase):
         title="Prompts",
         description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa
     )
+    reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
     citations: bool = Field(
         default=False,
         description="Whether to include the citations for the answer in the response",

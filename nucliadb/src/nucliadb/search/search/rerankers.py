@@ -71,52 +71,10 @@ class Reranker(ABC):
         new scores for each item by id"""
         ...
 
-    async def rerank_find_response(
-        self, kbid: str, query: str, response: KnowledgeboxFindResults, cut: int
-    ):
-        inverted_response = {}
-        to_rerank = []
-        for rid, resource in response.resources.items():
-            for field_id, field in resource.fields.items():
-                for paragraph_id, paragraph in field.paragraphs.items():
-                    inverted_response[paragraph_id] = (
-                        paragraph,
-                        (field_id, field),
-                        (rid, resource),
-                    )
-                    to_rerank.append(
-                        RerankableItem(
-                            id=paragraph_id,
-                            score=paragraph.score,
-                            score_type=paragraph.score_type,
-                            content=paragraph.text,
-                        )
-                    )
+    async def rerank_find_response(self, kbid: str, query: str, response: KnowledgeboxFindResults):
+        to_rerank = _get_items_to_rerank(response)
         reranked = await self.rerank(kbid, query, to_rerank)
-        best_matches = []
-        for item in reranked:
-            paragraph = inverted_response[item.id][0]
-            paragraph.score = item.score
-            paragraph.score_type = item.score_type
-            best_matches.append((item.id, item.score))
-
-        best_matches.sort(key=lambda x: x[1], reverse=True)
-
-        response.best_matches.clear()
-        for order, (paragraph_id, _) in enumerate(best_matches[:cut]):
-            paragraph = inverted_response[paragraph_id][0]
-            paragraph.order = order
-            response.best_matches.append(paragraph_id)
-
-        extra = best_matches[cut:]
-        for paragraph_id, _ in extra:
-            _, (field_id, field), (rid, resource) = inverted_response[paragraph_id]
-            field.paragraphs.pop(paragraph_id)
-            if len(field.paragraphs) == 0:
-                resource.fields.pop(field_id)
-
-            if len(resource.fields) == 0:
-                response.resources.pop(rid)
+        apply_reranking(response, reranked)
 
 
 class PredictReranker(Reranker):
@@ -187,3 +145,58 @@ def get_reranker(kind: search_models.Reranker) -> Reranker:
         logger.warning(f"Unknown reranker requested: {kind}. Using multi-match booster instead")
         reranker = MultiMatchBoosterReranker()
     return reranker
+
+
+def apply_reranking(results: KnowledgeboxFindResults, reranked: list[RankedItem]):
+    inverted_results = {}
+    for rid, resource in results.resources.items():
+        for field_id, field in resource.fields.items():
+            for paragraph_id, paragraph in field.paragraphs.items():
+                inverted_results[paragraph_id] = (
+                    paragraph,
+                    (field_id, field),
+                    (rid, resource),
+                )
+
+    # order results by new score
+    best_matches = []
+    for item in reranked:
+        paragraph = inverted_results[item.id][0]
+        paragraph.score = item.score
+        paragraph.score_type = item.score_type
+        best_matches.append((item.id, item.score))
+
+    best_matches.sort(key=lambda x: x[1], reverse=True)
+
+    # update best matches according to new scores
+    cut = results.page_size
+    results.best_matches.clear()
+    for order, (paragraph_id, _) in enumerate(best_matches[:cut]):
+        paragraph = inverted_results[paragraph_id][0]
+        paragraph.order = order
+        results.best_matches.append(paragraph_id)
+
+    # cut uneeded results
+    extra = set(inverted_results.keys()) - set(results.best_matches)
+    for paragraph_id in extra:
+        _, (field_id, field), (rid, resource) = inverted_results[paragraph_id]
+        field.paragraphs.pop(paragraph_id)
+        if len(field.paragraphs) == 0:
+            resource.fields.pop(field_id)
+
+        if len(resource.fields) == 0:
+            results.resources.pop(rid)
+
+
+def _get_items_to_rerank(results: KnowledgeboxFindResults) -> list[RerankableItem]:
+    return [
+        RerankableItem(
+            id=paragraph_id,
+            score=paragraph.score,
+            score_type=paragraph.score_type,
+            content=paragraph.text,
+        )
+        for resource in results.resources.values()
+        for field in resource.fields.values()
+        for paragraph_id, paragraph in field.paragraphs.items()
+    ]

@@ -34,6 +34,7 @@ from nucliadb.search.predict import (
     JSONGenerativeResponse,
     MetaGenerativeResponse,
     RephraseMissingContextError,
+    RerankGenerativeResponse,
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
@@ -54,8 +55,10 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.rerankers import RankedItem, apply_reranking
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
+    SCORE_TYPE,
     AnswerAskResponseItem,
     AskRequest,
     AskResponseItem,
@@ -82,6 +85,7 @@ from nucliadb_models.search import (
     RagStrategyName,
     Relations,
     RelationsAskResponseItem,
+    Reranker,
     RetrievalAskResponseItem,
     SearchOptions,
     StatusAskResponseItem,
@@ -126,6 +130,7 @@ class AskResult:
         self._answer_text = ""
         self._object: Optional[JSONGenerativeResponse] = None
         self._status: Optional[StatusGenerativeResponse] = None
+        self._reranking: Optional[RerankGenerativeResponse] = None
         self._citations: Optional[CitationsGenerativeResponse] = None
         self._metadata: Optional[MetaGenerativeResponse] = None
         self._relations: Optional[Relations] = None
@@ -171,20 +176,10 @@ class AskResult:
 
     def _ndjson_encode(self, item: AskResponseItemType) -> str:
         result_item = AskResponseItem(item=item)
-        return result_item.model_dump_json(exclude_unset=False, exclude_none=True) + "\n"
+        return result_item.model_dump_json(exclude_none=True) + "\n"
 
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
-        # First stream out the find results
-        yield RetrievalAskResponseItem(results=self.main_results)
-
-        if len(self.prequeries_results) > 0:
-            item = PrequeriesAskResponseItem()
-            for index, (prequery, result) in enumerate(self.prequeries_results):
-                prequery_id = prequery.id or f"prequery_{index}"
-                item.results[prequery_id] = result
-            yield item
-
-        # Then stream out the predict answer
+        # First, stream out the predict answer
         first_chunk_yielded = False
         with self.metrics.time("stream_predict_answer"):
             async for answer_chunk in self._stream_predict_answer_text():
@@ -200,6 +195,23 @@ class AskResult:
                 # to be the moment when the JSON object is yielded, not the text
                 self.metrics.record_first_chunk_yielded()
                 first_chunk_yielded = True
+
+        # Then, rerank and cut (if needed) and stream out the retrieval results
+        if self._reranking is not None:
+            reranked = [
+                RankedItem(id=paragraph_id, score=score, score_type=SCORE_TYPE.RERANKER)
+                for paragraph_id, score in self._reranking.context_scores.items()
+            ]
+            apply_reranking(self.main_results, reranked)
+
+        yield RetrievalAskResponseItem(results=self.main_results)
+
+        if len(self.prequeries_results) > 0:
+            item = PrequeriesAskResponseItem()
+            for index, (prequery, result) in enumerate(self.prequeries_results):
+                prequery_id = prequery.id or f"prequery_{index}"
+                item.results[prequery_id] = result
+            yield item
 
         # Then the status
         if self.status_code == AnswerStatusCode.ERROR:
@@ -321,7 +333,7 @@ class AskResult:
                 self.prompt_context, self.prompt_context_order
             )
             response.prompt_context = sorted_prompt_context
-        return response.model_dump_json(exclude_unset=True)
+        return response.model_dump_json()
 
     async def get_relations_results(self) -> Relations:
         if self._relations is None:
@@ -351,6 +363,8 @@ class AskResult:
                 self._object = item
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
+            elif isinstance(item, RerankGenerativeResponse):
+                self._reranking = item
             elif isinstance(item, CitationsGenerativeResponse):
                 self._citations = item
             elif isinstance(item, MetaGenerativeResponse):
@@ -388,7 +402,7 @@ class NotEnoughContextAskResult(AskResult):
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.main_results,
             status=AnswerStatusCode.NO_CONTEXT,
-        ).model_dump_json(exclude_unset=True)
+        ).model_dump_json()
 
 
 async def ask(
@@ -482,6 +496,8 @@ async def ask(
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,
         json_schema=ask_request.answer_json_schema,
+        rerank_context=ask_request.reranker == Reranker.PREDICT_RERANKER,
+        top_k=ask_request.top_k,
     )
     with metrics.time("stream_start"):
         predict = get_predict()

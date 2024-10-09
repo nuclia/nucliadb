@@ -152,6 +152,11 @@ class CitationsGenerativeResponse(BaseModel):
     citations: dict[str, Any]
 
 
+class RerankGenerativeResponse(BaseModel):
+    type: Literal["rerank"] = "rerank"
+    context_scores: Dict[str, float]
+
+
 class StatusGenerativeResponse(BaseModel):
     type: Literal["status"] = "status"
     code: str
@@ -163,6 +168,7 @@ GenerativeResponse = Union[
     JSONGenerativeResponse,
     MetaGenerativeResponse,
     CitationsGenerativeResponse,
+    RerankGenerativeResponse,
     StatusGenerativeResponse,
 ]
 
