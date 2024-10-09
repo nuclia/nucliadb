@@ -31,6 +31,10 @@ impl Shard {
         sqlx::query_as!(Shard, "INSERT INTO shards (kbid) VALUES ($1) RETURNING *", kbid).fetch_one(&meta.pool).await
     }
 
+    pub async fn get(meta: &NidxMetadata, id: Uuid) -> Result<Shard, sqlx::Error> {
+        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_one(&meta.pool).await
+    }
+
     pub async fn indexes(&self, meta: &NidxMetadata) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,

@@ -29,13 +29,14 @@ use object_store::{DynObjectStore, ObjectStore};
 use tempfile::TempDir;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::SyncIoBridge;
+use uuid::Uuid;
 
-async fn index_resource(
+pub async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
-    shard: &Shard,
     resource: &Resource,
 ) -> anyhow::Result<()> {
+    let shard = Shard::get(&meta, Uuid::parse_str(&resource.shard_id)?).await?;
     let indexes = shard.indexes(meta).await?;
     for index in indexes {
         let dir = index_resource_to_index(&index, resource).await?;
@@ -96,7 +97,7 @@ mod tests {
         let index = Index::create(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
-        index_resource(&meta, storage.clone(), &shard, &little_prince("abc")).await.unwrap();
+        index_resource(&meta, storage.clone(), &little_prince(shard.id.to_string())).await.unwrap();
 
         let segments = index.segments(&meta).await.unwrap();
         assert_eq!(segments.len(), 1);

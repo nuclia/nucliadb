@@ -9,10 +9,14 @@ members = ["nidx_vector"]
 [dependencies]
 anyhow = "1.0.89"
 async-nats = "0.37.0"
+base64 = "0.22.1"
+envy = "0.4.2"
 futures = "0.3.31"
 nidx_vector = { version = "0.1.0", path = "nidx_vector" }
 nucliadb_core = { version = "0.1.0", path = "../nucliadb_core" }
-object_store = "0.11.0"
+object_store = { version = "0.11.0", features = ["gcp", "aws"] }
+serde = "1.0.210"
+serde_with = "3.11.0"
 sqlx = { version = "0.8.2", features = ["postgres", "uuid", "runtime-tokio", "time"] }
 tar = "0.4.42"
 tempfile = "3.13.0"

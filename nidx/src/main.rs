@@ -20,18 +20,31 @@
 
 use async_nats::jetstream::consumer::PullConsumer;
 use futures::stream::StreamExt;
+use nidx::{index_resource, NidxMetadata, Settings};
+use nucliadb_core::protos::{prost::Message, Resource};
 use tokio;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // NATS test
-    let client = async_nats::connect("localhost:4222").await?;
-    let jetstream = async_nats::jetstream::new(client);
+    let settings = Settings::from_env();
+    let indexer_settings = settings.indexer.expect("Indexer not configured");
+    let indexer_storage = indexer_settings.object_store.client();
+    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
 
+    let client = async_nats::connect(indexer_settings.nats_server).await?;
+    let jetstream = async_nats::jetstream::new(client);
     let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
     let mut msg_stream = consumer.messages().await?;
+
     while let Some(Ok(msg)) = msg_stream.next().await {
-        println!("GOT = {:?}", msg);
+        let body = msg.message.payload.clone();
+
+        let get_result =
+            indexer_storage.get(&object_store::path::Path::from(String::from_utf8(body.to_vec()).unwrap())).await?;
+        let bytes = get_result.bytes().await?;
+        let resource = Resource::decode(bytes)?;
+
+        index_resource(&meta, indexer_storage.clone(), &resource).await?;
         msg.ack().await.unwrap();
     }
 

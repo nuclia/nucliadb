@@ -19,6 +19,11 @@
 //
 mod indexer;
 mod metadata;
+mod settings;
+
+pub use indexer::index_resource;
+pub use metadata::NidxMetadata;
+pub use settings::Settings;
 
 #[cfg(test)]
 mod test;
