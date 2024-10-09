@@ -19,6 +19,7 @@
 #
 import asyncio
 import logging
+from contextlib import AsyncExitStack
 from typing import Optional
 
 from pydantic import BaseModel
@@ -60,7 +61,11 @@ class TextBlockHydrationOptions(BaseModel):
     Options for hydrating text blocks (aka paragraphs).
     """
 
-    pass
+    # whether to highlight the text block with `<mark>...</mark>` tags or not
+    highlight: bool = False
+
+    # list of exact matches to highlight
+    ematches: Optional[list[str]] = None
 
 
 @hydrator_observer.wrap({"type": "hydrate_external"})
@@ -165,6 +170,32 @@ async def hydrate_text_block(
         page_with_visual=text_block.page_with_visual,
         position=text_block.position,
     )
+
+
+@hydrator_observer.wrap({"type": "text_block"})
+async def new_hydrate_text_block(
+    kbid: str,
+    text_block: TextBlockMatch,
+    options: TextBlockHydrationOptions,
+    *,
+    concurrency_control: Optional[asyncio.Semaphore] = None,
+) -> TextBlockMatch:
+    """Given a `text_block`, fetch its corresponding text, modify and return the
+    `text_block` object.
+
+    """
+    async with AsyncExitStack() as stack:
+        if concurrency_control is not None:
+            await stack.enter_async_context(concurrency_control)
+
+        text_block.text = await paragraphs.get_paragraph_text(
+            kbid=kbid,
+            paragraph_id=text_block.paragraph_id,
+            highlight=options.highlight,
+            matches=[],  # TODO: this was never implemented
+            ematches=options.ematches,
+        )
+    return text_block
 
 
 @hydrator_observer.wrap({"type": "resource_metadata"})

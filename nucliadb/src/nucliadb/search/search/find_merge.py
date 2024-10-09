@@ -19,7 +19,7 @@
 #
 import asyncio
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
@@ -29,6 +29,8 @@ from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.results_hydrator.base import (
+    ResourceHydrationOptions,
+    TextBlockHydrationOptions,
     text_block_to_find_paragraph,
 )
 from nucliadb_models.common import FieldTypeName
@@ -80,15 +82,14 @@ async def set_text_value(
     paragraph_id: ParagraphId,
     find_paragraph: FindParagraph,
     max_operations: asyncio.Semaphore,
-    highlight: bool = False,
-    ematches: Optional[list[str]] = None,
+    hydration_options: TextBlockHydrationOptions,
 ):
     async with max_operations:
         find_paragraph.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
             paragraph_id=paragraph_id,
-            highlight=highlight,
-            ematches=ematches,
+            highlight=hydration_options.highlight,
+            ematches=hydration_options.ematches,
             matches=[],  # TODO
         )
 
@@ -98,12 +99,13 @@ async def set_resource_metadata_value(
     txn: Transaction,
     kbid: str,
     resource: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
+    hydration_options: ResourceHydrationOptions,
     find_resources: dict[str, FindResource],
     max_operations: asyncio.Semaphore,
 ):
+    show = hydration_options.show
+    extracted = hydration_options.extracted
+
     if ResourceProperties.EXTRACTED in show and has_feature(
         const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
     ):
@@ -117,8 +119,8 @@ async def set_resource_metadata_value(
             txn,
             kbid,
             resource,
-            show,
-            field_type_filter=field_type_filter,
+            show=show,
+            field_type_filter=hydration_options.field_type_filter,
             extracted=extracted,
             service_name=SERVICE_NAME,
         )
@@ -133,11 +135,9 @@ async def set_resource_metadata_value(
 async def fetch_find_metadata(
     result_paragraphs: list[TextBlockMatch],
     kbid: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
-    highlight: bool = False,
-    ematches: Optional[list[str]] = None,
+    *,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
 ) -> tuple[dict[str, FindResource], list[str]]:
     find_resources: dict[str, FindResource] = {}
     best_matches: list[str] = []
@@ -184,8 +184,7 @@ async def fetch_find_metadata(
                     kbid=kbid,
                     paragraph_id=text_block.paragraph_id,
                     find_paragraph=find_field.paragraphs[paragraph_id],
-                    highlight=highlight,
-                    ematches=ematches,
+                    hydration_options=text_block_hydration_options,
                     max_operations=max_operations,
                 )
             )
@@ -206,9 +205,7 @@ async def fetch_find_metadata(
                         txn,
                         kbid=kbid,
                         resource=resource,
-                        show=show,
-                        field_type_filter=field_type_filter,
-                        extracted=extracted,
+                        hydration_options=resource_hydration_options,
                         find_resources=find_resources,
                         max_operations=max_operations,
                     )
@@ -385,11 +382,15 @@ async def find_merge_results(
     resources, best_matches = await fetch_find_metadata(
         result_paragraphs,
         kbid,
-        show,
-        field_type_filter,
-        extracted,
-        highlight,
-        ematches,
+        resource_hydration_options=ResourceHydrationOptions(
+            show=show,
+            extracted=extracted,
+            field_type_filter=field_type_filter,
+        ),
+        text_block_hydration_options=TextBlockHydrationOptions(
+            highlight=highlight,
+            ematches=ematches,
+        ),
     )
     api_results.resources = resources
     api_results.best_matches = best_matches
