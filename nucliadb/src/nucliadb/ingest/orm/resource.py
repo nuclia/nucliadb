@@ -221,8 +221,6 @@ class Resource:
                         self.indexer.apply_field_metadata(
                             field_id,
                             field_metadata,
-                            paragraphs_to_replace=[],
-                            replace_splits={},
                             page_positions=page_positions,
                             extracted_text=await field_obj.get_extracted_text(),
                             basic_user_field_metadata=user_field_metadata,
@@ -330,17 +328,9 @@ class Resource:
                         ),
                         None,
                     )
-                if reindex:
-                    paragraphs_to_replace = [
-                        f"{p.start}-{p.end}" for p in field_metadata.metadata.paragraphs
-                    ]
-                else:
-                    paragraphs_to_replace = []
                 brain.apply_field_metadata(
                     field_key,
                     field_metadata,
-                    paragraphs_to_replace=paragraphs_to_replace,
-                    replace_splits={},
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
                     basic_user_field_metadata=user_field_metadata,
@@ -476,13 +466,10 @@ class Resource:
                 self.all_fields_keys.remove(field)
 
         field_key = self.generate_field_id(FieldID(field_type=type, field=key))
-        vo = await field_obj.get_vectors()
-        if vo is not None:
-            self.indexer.delete_vectors(field_key=field_key, vo=vo)
 
         metadata = await field_obj.get_field_metadata()
         if metadata is not None:
-            self.indexer.delete_metadata(field_key=field_key, metadata=metadata)
+            self.indexer.delete_field(field_key=field_key)
 
         await field_obj.delete()
 
@@ -712,11 +699,7 @@ class Resource:
             field_metadata.field.field_type,
             load=False,
         )
-        (
-            metadata,
-            paragraphs_to_replace,
-            replace_splits,
-        ) = await field_obj.set_field_metadata(field_metadata)
+        metadata = await field_obj.set_field_metadata(field_metadata)
         field_key = self.generate_field_id(field_metadata.field)
 
         page_positions: Optional[FilePagePositions] = None
@@ -738,8 +721,6 @@ class Resource:
             self.indexer.apply_field_metadata,
             field_key,
             metadata,
-            paragraphs_to_replace=paragraphs_to_replace,
-            replace_splits=replace_splits,
             page_positions=page_positions,
             extracted_text=extracted_text,
             basic_user_field_metadata=user_field_metadata,
@@ -764,11 +745,7 @@ class Resource:
             field_vectors.field.field_type,
             load=False,
         )
-        (
-            vo,
-            replace_field_sentences,
-            replace_splits_sentences,
-        ) = await field_obj.set_vectors(field_vectors)
+        vo = await field_obj.set_vectors(field_vectors)
 
         # Prepare vectors to be indexed
 
@@ -797,8 +774,7 @@ class Resource:
                 field_key,
                 vo,
                 vectorset=vectorset_id,
-                replace_field=replace_field_sentences,
-                replace_splits=replace_splits_sentences,
+                replace_field=True,
                 matryoshka_vector_dimension=dimension,
             )
             loop = asyncio.get_running_loop()

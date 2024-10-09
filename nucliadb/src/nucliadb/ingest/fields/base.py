@@ -305,9 +305,7 @@ class Field:
                 self.extracted_text = payload
         return self.extracted_text
 
-    async def set_vectors(
-        self, payload: ExtractedVectorsWrapper
-    ) -> tuple[Optional[VectorObject], bool, list[str]]:
+    async def set_vectors(self, payload: ExtractedVectorsWrapper) -> Optional[VectorObject]:
         vectorset = payload.vectorset_id
         if self.type in SUBFIELDFIELDS:
             try:
@@ -322,8 +320,6 @@ class Field:
 
         sf = self._get_extracted_vectors_storage_field(vectorset)
         vo: Optional[VectorObject] = None
-        replace_field: bool = True
-        replace_splits = []
         if actual_payload is None:
             # Its first extracted text
             if payload.HasField("file"):
@@ -340,20 +336,18 @@ class Field:
                 pb.ParseFromString(raw_payload.read())
                 raw_payload.flush()
                 payload.vectors.CopyFrom(pb)
-            vo = payload.vectors
+            vo = actual_payload
             # We know its payload.body
             for key, value in payload.vectors.split_vectors.items():
                 actual_payload.split_vectors[key].CopyFrom(value)
             for key in payload.vectors.deleted_splits:
                 if key in actual_payload.split_vectors:
-                    replace_splits.append(key)
                     del actual_payload.split_vectors[key]
             if len(payload.vectors.vectors.vectors) > 0:
-                replace_field = True
                 actual_payload.vectors.CopyFrom(payload.vectors.vectors)
             await self.storage.upload_pb(sf, actual_payload)
             self.extracted_vectors = actual_payload
-        return vo, replace_field, replace_splits
+        return vo
 
     async def get_vectors(
         self, vectorset: Optional[str] = None, force: bool = False
@@ -365,9 +359,7 @@ class Field:
                 self.extracted_vectors = payload
         return self.extracted_vectors
 
-    async def set_field_metadata(
-        self, payload: FieldComputedMetadataWrapper
-    ) -> tuple[FieldComputedMetadata, list[str], dict[str, list[str]]]:
+    async def set_field_metadata(self, payload: FieldComputedMetadataWrapper) -> FieldComputedMetadata:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[FieldComputedMetadata] = await self.get_field_metadata(
@@ -397,8 +389,6 @@ class Field:
                 metadata.thumbnail.CopyFrom(cf_split)
             metadata.last_index.FromDatetime(datetime.now())
 
-        paragraphs_to_replace = []
-        replace_splits = {}
         if actual_payload is None:
             # Its first metadata
             await self.storage.upload_pb(sf, payload.metadata)
@@ -409,17 +399,13 @@ class Field:
                 actual_payload.split_metadata[key].CopyFrom(value)
             for key in payload.metadata.deleted_splits:
                 if key in actual_payload.split_metadata:
-                    replace_splits[key] = [
-                        f"{x.start}-{x.end}" for x in actual_payload.split_metadata[key].paragraphs
-                    ]
                     del actual_payload.split_metadata[key]
             if payload.metadata.metadata:
                 actual_payload.metadata.CopyFrom(payload.metadata.metadata)
-                paragraphs_to_replace = [f"{x.start}-{x.end}" for x in metadata.paragraphs]
             await self.storage.upload_pb(sf, actual_payload)
             self.computed_metadata = actual_payload
 
-        return self.computed_metadata, paragraphs_to_replace, replace_splits
+        return self.computed_metadata
 
     async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:

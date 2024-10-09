@@ -58,8 +58,6 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
     br.apply_field_metadata(
         field_key,
         fcmw.metadata,
-        paragraphs_to_replace=[],
-        replace_splits={},
         page_positions={},
         extracted_text=et,
     )
@@ -97,8 +95,6 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
     br.apply_field_metadata(
         field_key,
         fcmw.metadata,
-        paragraphs_to_replace=[],
-        replace_splits={},
         page_positions={},
         extracted_text=et,
     )
@@ -196,8 +192,6 @@ def test_apply_field_metadata_populates_page_number():
     br.apply_field_metadata(
         field_key,
         fcmw.metadata,
-        paragraphs_to_replace=[],
-        replace_splits={},
         page_positions=page_positions,
         extracted_text=None,
     )
