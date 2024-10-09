@@ -30,13 +30,13 @@ from nucliadb.search.search.find_merge import (
     find_merge_results,
     hydrate_and_rerank,
 )
-from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.rerankers import RerankingOptions, get_reranker
-from nucliadb.search.search.results_hydrator.base import (
+from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
 )
+from nucliadb.search.search.metrics import RAGMetrics
+from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.rerankers import RerankingOptions, get_reranker
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
     min_score_from_payload,
