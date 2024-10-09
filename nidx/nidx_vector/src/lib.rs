@@ -30,7 +30,7 @@ impl VectorIndexer {
         VectorIndexer
     }
 
-    pub fn index_resource(&self, output_dir: &Path, resource: &Resource) -> VectorR<()> {
+    pub fn index_resource(&self, output_dir: &Path, resource: &Resource) -> VectorR<bool> {
         let tmp = tempfile::tempdir()?;
 
         // Index resource
@@ -41,9 +41,12 @@ impl VectorIndexer {
 
         // Copy just the segment to the output directory
         let segments = writer.get_segment_ids().unwrap();
-        assert!(segments.len() == 1, "Expected a single segment");
+        if segments.is_empty() {
+            return Ok(false);
+        }
+        assert!(segments.len() <= 1, "Expected a single segment");
         std::fs::rename(tmp.path().join("index").join(&segments[0]), output_dir)?;
 
-        Ok(())
+        Ok(true)
     }
 }
