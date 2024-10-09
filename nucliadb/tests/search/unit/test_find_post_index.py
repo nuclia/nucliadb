@@ -116,7 +116,6 @@ async def test_find_post_index_search(expected_find_response: dict):
     with (
         patch("nucliadb.search.search.find_merge.set_text_value"),
         patch("nucliadb.search.search.find_merge.hydrate_resource_metadata"),
-        patch("nucliadb.search.search.find_merge.get_driver"),
     ):
         find_response = await find_merge_results(
             search_responses,
