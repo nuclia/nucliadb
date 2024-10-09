@@ -305,9 +305,7 @@ class Field:
                 self.extracted_text = payload
         return self.extracted_text
 
-    async def set_vectors(
-        self, payload: ExtractedVectorsWrapper
-    ) -> tuple[Optional[VectorObject], bool, list[str]]:
+    async def set_vectors(self, payload: ExtractedVectorsWrapper) -> Optional[VectorObject]:
         vectorset = payload.vectorset_id
         if self.type in SUBFIELDFIELDS:
             try:
@@ -361,9 +359,7 @@ class Field:
                 self.extracted_vectors = payload
         return self.extracted_vectors
 
-    async def set_field_metadata(
-        self, payload: FieldComputedMetadataWrapper
-    ) -> tuple[FieldComputedMetadata, list[str], dict[str, list[str]]]:
+    async def set_field_metadata(self, payload: FieldComputedMetadataWrapper) -> FieldComputedMetadata:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[FieldComputedMetadata] = await self.get_field_metadata(
