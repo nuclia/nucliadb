@@ -19,16 +19,16 @@
 #
 import asyncio
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
-from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.results_hydrator.base import (
+    ResourceHydrationOptions,
+    TextBlockHydrationOptions,
+    hydrate_resource_metadata,
     text_block_to_find_paragraph,
 )
 from nucliadb_models.common import FieldTypeName
@@ -50,8 +50,6 @@ from nucliadb_protos.nodereader_pb2 import (
     SearchResponse,
 )
 from nucliadb_telemetry import metrics
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from . import paragraphs
 from .metrics import merge_observer
@@ -80,64 +78,25 @@ async def set_text_value(
     paragraph_id: ParagraphId,
     find_paragraph: FindParagraph,
     max_operations: asyncio.Semaphore,
-    highlight: bool = False,
-    ematches: Optional[list[str]] = None,
+    hydration_options: TextBlockHydrationOptions,
 ):
     async with max_operations:
         find_paragraph.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
             paragraph_id=paragraph_id,
-            highlight=highlight,
-            ematches=ematches,
+            highlight=hydration_options.highlight,
+            ematches=hydration_options.ematches,
             matches=[],  # TODO
         )
-
-
-@merge_observer.wrap({"type": "set_resource_metadada_value"})
-async def set_resource_metadata_value(
-    txn: Transaction,
-    kbid: str,
-    resource: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
-    find_resources: dict[str, FindResource],
-    max_operations: asyncio.Semaphore,
-):
-    if ResourceProperties.EXTRACTED in show and has_feature(
-        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
-    ):
-        # Returning extracted metadata in search results is deprecated and this flag
-        # will be set to True for all KBs in the future.
-        show.remove(ResourceProperties.EXTRACTED)
-        extracted = []
-
-    async with max_operations:
-        serialized_resource = await managed_serialize(
-            txn,
-            kbid,
-            resource,
-            show,
-            field_type_filter=field_type_filter,
-            extracted=extracted,
-            service_name=SERVICE_NAME,
-        )
-        if serialized_resource is not None:
-            find_resources[resource].updated_from(serialized_resource)
-        else:
-            logger.warning(f"Resource {resource} not found in {kbid}")
-            find_resources.pop(resource, None)
 
 
 @merge_observer.wrap({"type": "fetch_find_metadata"})
 async def fetch_find_metadata(
     result_paragraphs: list[TextBlockMatch],
     kbid: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
-    highlight: bool = False,
-    ematches: Optional[list[str]] = None,
+    *,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
 ) -> tuple[dict[str, FindResource], list[str]]:
     find_resources: dict[str, FindResource] = {}
     best_matches: list[str] = []
@@ -184,8 +143,7 @@ async def fetch_find_metadata(
                     kbid=kbid,
                     paragraph_id=text_block.paragraph_id,
                     find_paragraph=find_field.paragraphs[paragraph_id],
-                    highlight=highlight,
-                    ematches=ematches,
+                    hydration_options=text_block_hydration_options,
                     max_operations=max_operations,
                 )
             )
@@ -198,29 +156,26 @@ async def fetch_find_metadata(
         find_resources[paragraph.rid].fields[paragraph.fid].paragraphs[paragraph.pid].order = order
         best_matches.append(paragraph.pid)
 
-    async with get_driver().transaction(read_only=True) as txn:
-        for resource in resources:
-            operations.append(
-                asyncio.create_task(
-                    set_resource_metadata_value(
-                        txn,
-                        kbid=kbid,
-                        resource=resource,
-                        show=show,
-                        field_type_filter=field_type_filter,
-                        extracted=extracted,
-                        find_resources=find_resources,
-                        max_operations=max_operations,
-                    )
+    for resource in resources:
+        operations.append(
+            asyncio.create_task(
+                hydrate_resource_metadata(
+                    kbid,
+                    resource_id=resource,
+                    options=resource_hydration_options,
+                    find_resources=find_resources,
+                    concurrency_control=max_operations,
+                    service_name=SERVICE_NAME,
                 )
             )
+        )
 
-        FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
-        if len(operations) > 0:
-            done, _ = await asyncio.wait(operations)
-            for task in done:
-                if task.exception() is not None:  # pragma: no cover
-                    logger.error("Error fetching find metadata", exc_info=task.exception())
+    FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
+    if len(operations) > 0:
+        done, _ = await asyncio.wait(operations)
+        for task in done:
+            if task.exception() is not None:  # pragma: no cover
+                logger.error("Error fetching find metadata", exc_info=task.exception())
 
     return find_resources, best_matches
 
@@ -385,11 +340,15 @@ async def find_merge_results(
     resources, best_matches = await fetch_find_metadata(
         result_paragraphs,
         kbid,
-        show,
-        field_type_filter,
-        extracted,
-        highlight,
-        ematches,
+        resource_hydration_options=ResourceHydrationOptions(
+            show=show,
+            extracted=extracted,
+            field_type_filter=field_type_filter,
+        ),
+        text_block_hydration_options=TextBlockHydrationOptions(
+            highlight=highlight,
+            ematches=ematches,
+        ),
     )
     api_results.resources = resources
     api_results.best_matches = best_matches

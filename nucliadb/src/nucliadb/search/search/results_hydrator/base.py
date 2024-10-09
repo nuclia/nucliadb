@@ -19,13 +19,13 @@
 #
 import asyncio
 import logging
+from contextlib import AsyncExitStack
 from typing import Optional
 
 from pydantic import BaseModel
 
 from nucliadb.common.external_index_providers.base import QueryResults as ExternalIndexQueryResults
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import paragraphs
@@ -39,6 +39,8 @@ from nucliadb_models.search import (
     ResourceProperties,
 )
 from nucliadb_telemetry.metrics import Observer
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +62,11 @@ class TextBlockHydrationOptions(BaseModel):
     Options for hydrating text blocks (aka paragraphs).
     """
 
-    pass
+    # whether to highlight the text block with `<mark>...</mark>` tags or not
+    highlight: bool = False
+
+    # list of exact matches to highlight
+    ematches: Optional[list[str]] = None
 
 
 @hydrator_observer.wrap({"type": "hydrate_external"})
@@ -104,7 +110,7 @@ async def hydrate_external(
 
         async def _hydrate_text_block(**kwargs):
             async with semaphore:
-                await hydrate_text_block(**kwargs)
+                await hydrate_text_block_and_update_find_paragraph(**kwargs)
 
         hydrate_ops.append(
             asyncio.create_task(
@@ -117,31 +123,26 @@ async def hydrate_external(
             )
         )
 
-    async def _hydrate_resource_metadata(**kwargs):
-        async with semaphore:
-            await hydrate_resource_metadata(**kwargs)
-
     if len(resource_ids) > 0:
-        async with get_driver().transaction(read_only=True) as ro_txn:
-            for resource_id in resource_ids:
-                hydrate_ops.append(
-                    asyncio.create_task(
-                        _hydrate_resource_metadata(
-                            txn=ro_txn,
-                            kbid=kbid,
-                            resource_id=resource_id,
-                            options=resource_options,
-                            find_resources=retrieval_results.resources,
-                        )
+        for resource_id in resource_ids:
+            hydrate_ops.append(
+                asyncio.create_task(
+                    hydrate_resource_metadata(
+                        kbid=kbid,
+                        resource_id=resource_id,
+                        options=resource_options,
+                        find_resources=retrieval_results.resources,
+                        concurrency_control=semaphore,
                     )
                 )
+            )
 
     if len(hydrate_ops) > 0:
         await asyncio.gather(*hydrate_ops)
 
 
 @hydrator_observer.wrap({"type": "text_block"})
-async def hydrate_text_block(
+async def hydrate_text_block_and_update_find_paragraph(
     kbid: str,
     text_block: TextBlockMatch,
     options: TextBlockHydrationOptions,
@@ -167,36 +168,77 @@ async def hydrate_text_block(
     )
 
 
+@hydrator_observer.wrap({"type": "text_block"})
+async def hydrate_text_block(
+    kbid: str,
+    text_block: TextBlockMatch,
+    options: TextBlockHydrationOptions,
+    *,
+    concurrency_control: Optional[asyncio.Semaphore] = None,
+) -> TextBlockMatch:
+    """Given a `text_block`, fetch its corresponding text, modify and return the
+    `text_block` object.
+
+    """
+    async with AsyncExitStack() as stack:
+        if concurrency_control is not None:
+            await stack.enter_async_context(concurrency_control)
+
+        text_block.text = await paragraphs.get_paragraph_text(
+            kbid=kbid,
+            paragraph_id=text_block.paragraph_id,
+            highlight=options.highlight,
+            matches=[],  # TODO: this was never implemented
+            ematches=options.ematches,
+        )
+    return text_block
+
+
 @hydrator_observer.wrap({"type": "resource_metadata"})
 async def hydrate_resource_metadata(
-    txn: Transaction,
     kbid: str,
     resource_id: str,
     options: ResourceHydrationOptions,
     find_resources: dict[str, FindResource],
+    *,
+    concurrency_control: Optional[asyncio.Semaphore] = None,
+    service_name: Optional[str] = None,
 ) -> None:
     """
     Fetch the various metadata fields of the resource and update the FindResource object.
     """
-    serialized_resource = await managed_serialize(
-        txn=txn,
-        kbid=kbid,
-        rid=resource_id,
-        show=options.show,
-        field_type_filter=options.field_type_filter,
-        extracted=options.extracted,
-    )
-    if serialized_resource is None:
-        logger.warning(
-            "Resource not found in database",
-            extra={
-                "kbid": kbid,
-                "rid": resource_id,
-            },
-        )
-        find_resources.pop(resource_id, None)
-        return
-    find_resources[resource_id].updated_from(serialized_resource)
+    show = options.show
+    extracted = options.extracted
+
+    if ResourceProperties.EXTRACTED in show and has_feature(
+        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
+    ):
+        # Returning extracted metadata in search results is deprecated and this flag
+        # will be set to True for all KBs in the future.
+        show.remove(ResourceProperties.EXTRACTED)
+        extracted = []
+
+    async with AsyncExitStack() as stack:
+        if concurrency_control is not None:
+            await stack.enter_async_context(concurrency_control)
+
+        async with get_driver().transaction(read_only=True) as ro_txn:
+            serialized_resource = await managed_serialize(
+                txn=ro_txn,
+                kbid=kbid,
+                rid=resource_id,
+                show=show,
+                field_type_filter=options.field_type_filter,
+                extracted=extracted,
+                service_name=service_name,
+            )
+            if serialized_resource is not None:
+                find_resources[resource_id].updated_from(serialized_resource)
+            else:
+                logger.warning(
+                    "Resource not found in database", extra={"kbid": kbid, "rid": resource_id}
+                )
+                find_resources.pop(resource_id, None)
 
 
 def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
