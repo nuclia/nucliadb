@@ -25,13 +25,17 @@ from typing import Optional
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
-from nucliadb.search.search import results_hydrator
-from nucliadb.search.search.find_merge import find_merge_results
+from nucliadb.search.search.find_merge import (
+    compose_find_resources,
+    find_merge_results,
+    hydrate_and_rerank,
+)
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.rerankers import RerankingOptions, get_reranker
 from nucliadb.search.search.results_hydrator.base import (
     ResourceHydrationOptions,
+    TextBlockHydrationOptions,
 )
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
@@ -105,7 +109,7 @@ async def _index_node_retrieval(
         )
     incomplete_results = incomplete_results or query_incomplete_results
 
-    # We need to merge
+    # Rank fusion merge, cut, hydrate and rerank
     with metrics.time("results_merge"):
         search_results = await find_merge_results(
             results,
@@ -118,19 +122,9 @@ async def _index_node_retrieval(
             requested_relations=pb_query.relation_subgraph,
             min_score_bm25=query_parser.min_score.bm25,
             min_score_semantic=query_parser.min_score.semantic,  # type: ignore
+            reranker=query_parser.reranker,
             highlight=item.highlight,
         )
-
-    # once hydrated, we send the results to rerank
-    reranker = query_parser.reranker
-    await reranker.rerank_find_response(
-        search_results,
-        RerankingOptions(
-            kbid=kbid,
-            query=query_parser.query,
-            top_k=item.top_k,  # type: ignore
-        ),
-    )
 
     search_time = time() - start_time
     if audit is not None:
@@ -197,13 +191,31 @@ async def _external_index_retrieval(
     # Query index
     query_results = await external_index_manager.query(search_request)  # noqa
 
-    # Hydrate results
+    # Hydrate and rerank results
+    text_blocks, resources, best_matches = await hydrate_and_rerank(
+        query_results.iter_matching_text_blocks(),
+        kbid,
+        resource_hydration_options=ResourceHydrationOptions(
+            show=item.show,
+            extracted=item.extracted,
+            field_type_filter=item.field_type_filter,
+        ),
+        text_block_hydration_options=TextBlockHydrationOptions(),
+        reranker=query_parser.reranker,
+        reranking_options=RerankingOptions(
+            kbid=kbid,
+            query=search_request.body,
+            top_k=query_parser.page_size,
+        ),
+    )
+    find_resources = compose_find_resources(text_blocks, resources)
+
     results_min_score = MinScore(
         bm25=0,
         semantic=query_parser.min_score.semantic,
     )
     retrieval_results = KnowledgeboxFindResults(
-        resources={},
+        resources=find_resources,
         query=item.query,
         total=0,
         page_number=0,
@@ -211,44 +223,11 @@ async def _external_index_retrieval(
         relations=None,  # Not implemented for external indexes yet
         autofilters=[],  # Not implemented for external indexes yet
         min_score=results_min_score,
-        best_matches=[],
+        best_matches=best_matches,
         # These are not used for external indexes
         shards=None,
         nodes=None,
     )
-    await results_hydrator.hydrate_external(
-        retrieval_results,
-        query_results,
-        kbid=kbid,
-        resource_options=ResourceHydrationOptions(
-            show=item.show,
-            extracted=item.extracted,
-            field_type_filter=item.field_type_filter,
-        ),
-        text_block_min_score=results_min_score.semantic,
-        max_parallel_operations=50,
-    )
-
-    # once hydrated, we send the results to rerank
-    reranker = query_parser.reranker
-    await reranker.rerank_find_response(
-        retrieval_results,
-        RerankingOptions(
-            kbid=kbid,
-            query=query_parser.query,
-            top_k=item.top_k,  # type: ignore
-        ),
-    )
-
-    # Once hydrated, populate best_matches with the paragraphs ids sorted by score
-    scored_paragraphs: list[ScoredParagraph] = [
-        ScoredParagraph(id=paragraph.id, score=paragraph.score)
-        for resource in retrieval_results.resources.values()
-        for field in resource.fields.values()
-        for paragraph in field.paragraphs.values()
-    ]
-    scored_paragraphs.sort(key=lambda par: par.score, reverse=True)
-    retrieval_results.best_matches = [par.id for par in scored_paragraphs]
 
     return retrieval_results, incomplete_results, query_parser
 
