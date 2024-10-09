@@ -367,9 +367,6 @@ class ResourceBrain:
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
     def delete_vectors(self, field_key: str, vo: VectorObject):
-        for subfield, _ in vo.split_vectors.items():
-            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}/{subfield}")
-
         self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
 
     def set_processing_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
