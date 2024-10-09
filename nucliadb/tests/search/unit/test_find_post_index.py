@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -114,8 +114,8 @@ async def test_find_post_index_search(expected_find_response: dict):
     ]
 
     with (
-        patch("nucliadb.search.search.find_merge.set_text_value"),
         patch("nucliadb.search.search.find_merge.hydrate_resource_metadata"),
+        patch("nucliadb.search.search.find_merge.hydrate_text_block"),
     ):
         find_response = await find_merge_results(
             search_responses,
@@ -129,6 +129,7 @@ async def test_find_post_index_search(expected_find_response: dict):
             min_score_bm25=0.2,
             min_score_semantic=0.4,
             highlight=True,
+            reranker=AsyncMock(),
         )
         resp = find_response.model_dump()
         assert expected_find_response == resp

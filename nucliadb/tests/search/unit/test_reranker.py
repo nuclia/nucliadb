@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb.search.search.rerankers import RankedItem, RerankableItem, Reranker
+from nucliadb.search.search.rerankers import RankedItem, RerankableItem, Reranker, RerankingOptions
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
@@ -36,7 +36,7 @@ class NoopReranker(Reranker):
     def items_needed(self, requested: int, shards: int = 1) -> int:
         return requested
 
-    async def rerank(self, kbid: str, query: str, items: list[RerankableItem]) -> list[RankedItem]:
+    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         return [
             RankedItem(
                 id=item.id,
