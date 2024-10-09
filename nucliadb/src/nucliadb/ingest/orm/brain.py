@@ -43,7 +43,7 @@ from nucliadb_protos.resources_pb2 import (
     UserFieldMetadata,
     UserMetadata,
 )
-from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorObject
+from nucliadb_protos.utils_pb2 import Relation, RelationNode
 
 FilePagePositions = dict[int, tuple[int, int]]
 
@@ -336,9 +336,6 @@ class ResourceBrain:
         sentence_pb.metadata.representation.is_a_table = paragraph_pb.metadata.representation.is_a_table
 
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
-
-    def delete_vectors(self, field_key: str, vo: VectorObject):
-        self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
 
     def set_processing_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
         """

@@ -466,9 +466,6 @@ class Resource:
                 self.all_fields_keys.remove(field)
 
         field_key = self.generate_field_id(FieldID(field_type=type, field=key))
-        vo = await field_obj.get_vectors()
-        if vo is not None:
-            self.indexer.delete_vectors(field_key=field_key, vo=vo)
 
         metadata = await field_obj.get_field_metadata()
         if metadata is not None:
