@@ -93,7 +93,6 @@ class ResourceBrain:
         field_key: str,
         metadata: FieldComputedMetadata,
         paragraphs_to_replace: list[str],
-        replace_splits: dict[str, list[str]],
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
         basic_user_field_metadata: Optional[UserFieldMetadata] = None,
@@ -222,34 +221,14 @@ class ResourceBrain:
             for relation in relations.relations:
                 self.brain.relations.append(relation)
 
-        for split, sentences in replace_splits.items():
-            for sentence in sentences:
-                self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}/{split}/{sentence}")
-
         for paragraph_to_delete in paragraphs_to_replace:
             self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}/{paragraph_to_delete}")
 
     def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
         ftype, fkey = field_key.split("/")
-        for subfield, metadata_split in metadata.split_metadata.items():
-            self.brain.paragraphs_to_delete.append(
-                ids.FieldId(rid=self.rid, type=ftype, key=fkey, subfield_id=subfield).full()
-            )
-            # TODO: Bw/c, remove this when paragraph deletion by field_id gets
-            # promoted
-            for paragraph in metadata_split.paragraphs:
-                self.brain.paragraphs_to_delete.append(
-                    f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
-                )
-
         for paragraph in metadata.metadata.paragraphs:
             self.brain.paragraphs_to_delete.append(
                 ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
-            )
-            # TODO: Bw/c, remove this when paragraph deletion by field_id gets
-            # promoted
-            self.brain.paragraphs_to_delete.append(
-                f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             )
 
     def apply_field_vectors(

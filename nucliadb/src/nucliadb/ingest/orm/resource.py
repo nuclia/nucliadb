@@ -222,7 +222,6 @@ class Resource:
                             field_id,
                             field_metadata,
                             paragraphs_to_replace=[],
-                            replace_splits={},
                             page_positions=page_positions,
                             extracted_text=await field_obj.get_extracted_text(),
                             basic_user_field_metadata=user_field_metadata,
@@ -340,7 +339,6 @@ class Resource:
                     field_key,
                     field_metadata,
                     paragraphs_to_replace=paragraphs_to_replace,
-                    replace_splits={},
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
                     basic_user_field_metadata=user_field_metadata,
@@ -715,7 +713,6 @@ class Resource:
         (
             metadata,
             paragraphs_to_replace,
-            replace_splits,
         ) = await field_obj.set_field_metadata(field_metadata)
         field_key = self.generate_field_id(field_metadata.field)
 
@@ -739,7 +736,6 @@ class Resource:
             field_key,
             metadata,
             paragraphs_to_replace=paragraphs_to_replace,
-            replace_splits=replace_splits,
             page_positions=page_positions,
             extracted_text=extracted_text,
             basic_user_field_metadata=user_field_metadata,
