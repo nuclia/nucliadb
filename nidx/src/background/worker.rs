@@ -1,4 +1,3 @@
-use nidx::{background, indexer};
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -18,17 +17,24 @@ use nidx::{background, indexer};
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use tokio;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let args: Vec<_> = std::env::args().collect();
-    match args[1].as_str() {
-        "indexer" => indexer::run().await?,
-        "worker" => background::worker::run().await?,
-        "scheduler" => background::scheduler::run().await?,
-        _ => panic!("Unknown mode {}", args[1]),
-    };
+use apalis::{postgres::PostgresStorage, prelude::*};
+
+use crate::{NidxMetadata, Settings};
+
+use super::merge::send_email;
+
+pub async fn run() -> anyhow::Result<()> {
+    let settings = Settings::from_env();
+    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
+
+    let storage = PostgresStorage::new(meta.pool.clone());
+    Monitor::<TokioExecutor>::new()
+        .register(WorkerBuilder::new(format!("email-worker")).data(0usize).with_storage(storage).build_fn(send_email))
+        .run()
+        .await;
+
+    // tokio::signal::ctrl_c().await.expect("failed to listen for event");
 
     Ok(())
 }

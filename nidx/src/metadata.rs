@@ -29,7 +29,17 @@ pub use segment::Segment;
 pub use shard::Shard;
 
 pub struct NidxMetadata {
-    pool: sqlx::PgPool,
+    pub pool: sqlx::PgPool,
+}
+
+#[derive(Debug)]
+struct MultiMigrator(Vec<sqlx::migrate::Migrator>);
+impl<'s> sqlx::migrate::MigrationSource<'s> for MultiMigrator {
+    fn resolve(
+        self,
+    ) -> futures::future::BoxFuture<'s, Result<Vec<sqlx::migrate::Migration>, sqlx::error::BoxDynError>> {
+        Box::pin(async move { Ok(self.0.iter().flat_map(|m| m.iter().cloned()).collect()) })
+    }
 }
 
 impl NidxMetadata {
@@ -40,7 +50,13 @@ impl NidxMetadata {
     }
 
     pub(crate) async fn new_with_pool(pool: sqlx::PgPool) -> Result<Self, sqlx::Error> {
-        sqlx::migrate!("./migrations").run(&pool).await?;
+        sqlx::migrate::Migrator::new(MultiMigrator(vec![
+            sqlx::migrate!("./migrations"),
+            apalis::postgres::PostgresStorage::migrations(),
+        ]))
+        .await?
+        .run(&pool)
+        .await?;
         Ok(NidxMetadata {
             pool,
         })

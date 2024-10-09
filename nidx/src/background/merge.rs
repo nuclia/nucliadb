@@ -1,4 +1,3 @@
-use nidx::{background, indexer};
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -18,17 +17,21 @@ use nidx::{background, indexer};
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use tokio;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let args: Vec<_> = std::env::args().collect();
-    match args[1].as_str() {
-        "indexer" => indexer::run().await?,
-        "worker" => background::worker::run().await?,
-        "scheduler" => background::scheduler::run().await?,
-        _ => panic!("Unknown mode {}", args[1]),
-    };
+use apalis::prelude::*;
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Email {
+    pub to: String,
+}
+
+impl Job for Email {
+    const NAME: &'static str = "nidx.Email";
+}
+
+/// A function that will be converted into a service.
+pub async fn send_email(job: Email, data: Data<usize>) -> Result<(), Error> {
+    println!("Will send an email {job:?}");
     Ok(())
 }
