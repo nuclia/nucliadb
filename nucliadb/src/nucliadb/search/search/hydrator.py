@@ -79,9 +79,8 @@ async def hydrate_external(
     text_block_min_score: Optional[float] = None,
     max_parallel_operations: int = 50,
 ) -> None:
-    """
-    Hydrates the results of an external index retrieval. This includes fetching the text for the text blocks
-    and the metadata for the resources.
+    """Hydrates the results of an external index retrieval. This includes
+    fetching the text for the text blocks and the metadata for the resources.
 
     Parameters:
     - retrieval_results: The results of the retrieval to be hydrated.
@@ -90,6 +89,7 @@ async def hydrate_external(
     - resource_options: Options for hydrating resources.
     - text_block_options: Options for hydrating text blocks.
     - max_parallel_operations: The maximum number of hydration parallel operations to perform.
+
     """
     hydrate_ops = []
     semaphore = asyncio.Semaphore(max_parallel_operations)
@@ -214,6 +214,7 @@ async def hydrate_resource_metadata(
     concurrency_control: Optional[asyncio.Semaphore] = None,
     service_name: Optional[str] = None,
 ) -> Optional[Resource]:
+    """Fetch resource metadata and return it serialized."""
     show = options.show
     extracted = options.extracted
 

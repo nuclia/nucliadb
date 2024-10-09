@@ -24,18 +24,18 @@ from typing import Iterable, Union, cast
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.merge import merge_relations_results
-from nucliadb.search.search.rerankers import (
-    RerankableItem,
-    Reranker,
-    RerankingOptions,
-)
-from nucliadb.search.search.results_hydrator.base import (
+from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
     hydrate_resource_metadata,
     hydrate_text_block,
     text_block_to_find_paragraph,
+)
+from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.rerankers import (
+    RerankableItem,
+    Reranker,
+    RerankingOptions,
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
