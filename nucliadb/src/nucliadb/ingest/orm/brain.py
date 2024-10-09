@@ -220,7 +220,7 @@ class ResourceBrain:
             for relation in relations.relations:
                 self.brain.relations.append(relation)
 
-    def delete_metadata(self, field_key: str):
+    def delete_field(self, field_key: str):
         ftype, fkey = field_key.split("/")
         full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
         self.brain.paragraphs_to_delete.append(full_field_id)

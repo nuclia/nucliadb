@@ -472,7 +472,7 @@ class Resource:
 
         metadata = await field_obj.get_field_metadata()
         if metadata is not None:
-            self.indexer.delete_metadata(field_key=field_key)
+            self.indexer.delete_field(field_key=field_key)
 
         await field_obj.delete()
 
