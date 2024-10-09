@@ -322,8 +322,6 @@ class Field:
 
         sf = self._get_extracted_vectors_storage_field(vectorset)
         vo: Optional[VectorObject] = None
-        replace_field: bool = True
-        replace_splits = []
         if actual_payload is None:
             # Its first extracted text
             if payload.HasField("file"):
@@ -346,14 +344,12 @@ class Field:
                 actual_payload.split_vectors[key].CopyFrom(value)
             for key in payload.vectors.deleted_splits:
                 if key in actual_payload.split_vectors:
-                    replace_splits.append(key)
                     del actual_payload.split_vectors[key]
             if len(payload.vectors.vectors.vectors) > 0:
-                replace_field = True
                 actual_payload.vectors.CopyFrom(payload.vectors.vectors)
             await self.storage.upload_pb(sf, actual_payload)
             self.extracted_vectors = actual_payload
-        return vo, replace_field, replace_splits
+        return vo
 
     async def get_vectors(
         self, vectorset: Optional[str] = None, force: bool = False

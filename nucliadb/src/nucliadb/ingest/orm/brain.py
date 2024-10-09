@@ -259,10 +259,8 @@ class ResourceBrain:
         *,
         vectorset: Optional[str] = None,
         replace_field: bool = False,
-        replace_splits: Optional[list[str]] = None,
         matryoshka_vector_dimension: Optional[int] = None,
     ):
-        replace_splits = replace_splits or []
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
             _field_id = ids.FieldId(
@@ -317,14 +315,6 @@ class ResourceBrain:
                 vector,
                 vectorset=vectorset,
                 matryoshka_vector_dimension=matryoshka_vector_dimension,
-            )
-
-        for split in replace_splits:
-            self.brain.sentences_to_delete.append(
-                ids.FieldId(rid=self.rid, type=fid.type, key=fid.key, subfield_id=split).full()
-            )
-            self.brain.paragraphs_to_delete.append(
-                ids.FieldId(rid=self.rid, type=fid.type, key=fid.key, subfield_id=split).full()
             )
 
         if replace_field:

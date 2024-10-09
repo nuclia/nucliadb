@@ -764,11 +764,7 @@ class Resource:
             field_vectors.field.field_type,
             load=False,
         )
-        (
-            vo,
-            replace_field_sentences,
-            replace_splits_sentences,
-        ) = await field_obj.set_vectors(field_vectors)
+        vo = await field_obj.set_vectors(field_vectors)
 
         # Prepare vectors to be indexed
 
@@ -797,8 +793,7 @@ class Resource:
                 field_key,
                 vo,
                 vectorset=vectorset_id,
-                replace_field=replace_field_sentences,
-                replace_splits=replace_splits_sentences,
+                replace_field=True,
                 matryoshka_vector_dimension=dimension,
             )
             loop = asyncio.get_running_loop()
