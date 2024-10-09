@@ -221,7 +221,6 @@ class Resource:
                         self.indexer.apply_field_metadata(
                             field_id,
                             field_metadata,
-                            paragraphs_to_replace=[],
                             page_positions=page_positions,
                             extracted_text=await field_obj.get_extracted_text(),
                             basic_user_field_metadata=user_field_metadata,
@@ -329,16 +328,9 @@ class Resource:
                         ),
                         None,
                     )
-                if reindex:
-                    paragraphs_to_replace = [
-                        f"{p.start}-{p.end}" for p in field_metadata.metadata.paragraphs
-                    ]
-                else:
-                    paragraphs_to_replace = []
                 brain.apply_field_metadata(
                     field_key,
                     field_metadata,
-                    paragraphs_to_replace=paragraphs_to_replace,
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
                     basic_user_field_metadata=user_field_metadata,
@@ -480,7 +472,7 @@ class Resource:
 
         metadata = await field_obj.get_field_metadata()
         if metadata is not None:
-            self.indexer.delete_metadata(field_key=field_key, metadata=metadata)
+            self.indexer.delete_metadata(field_key=field_key)
 
         await field_obj.delete()
 
@@ -710,10 +702,7 @@ class Resource:
             field_metadata.field.field_type,
             load=False,
         )
-        (
-            metadata,
-            paragraphs_to_replace,
-        ) = await field_obj.set_field_metadata(field_metadata)
+        metadata = await field_obj.set_field_metadata(field_metadata)
         field_key = self.generate_field_id(field_metadata.field)
 
         page_positions: Optional[FilePagePositions] = None
@@ -735,7 +724,6 @@ class Resource:
             self.indexer.apply_field_metadata,
             field_key,
             metadata,
-            paragraphs_to_replace=paragraphs_to_replace,
             page_positions=page_positions,
             extracted_text=extracted_text,
             basic_user_field_metadata=user_field_metadata,

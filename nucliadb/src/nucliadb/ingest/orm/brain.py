@@ -92,7 +92,6 @@ class ResourceBrain:
         self,
         field_key: str,
         metadata: FieldComputedMetadata,
-        paragraphs_to_replace: list[str],
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
         basic_user_field_metadata: Optional[UserFieldMetadata] = None,
@@ -221,15 +220,11 @@ class ResourceBrain:
             for relation in relations.relations:
                 self.brain.relations.append(relation)
 
-        for paragraph_to_delete in paragraphs_to_replace:
-            self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}/{paragraph_to_delete}")
-
-    def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
+    def delete_metadata(self, field_key: str):
         ftype, fkey = field_key.split("/")
-        for paragraph in metadata.metadata.paragraphs:
-            self.brain.paragraphs_to_delete.append(
-                ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
-            )
+        full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
+        self.brain.paragraphs_to_delete.append(full_field_id)
+        self.brain.sentences_to_delete.append(full_field_id)
 
     def apply_field_vectors(
         self,
@@ -297,12 +292,9 @@ class ResourceBrain:
             )
 
         if replace_field:
-            self.brain.sentences_to_delete.append(
-                ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
-            )
-            self.brain.paragraphs_to_delete.append(
-                ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
-            )
+            full_field_id = ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
+            self.brain.sentences_to_delete.append(full_field_id)
+            self.brain.paragraphs_to_delete.append(full_field_id)
 
     def _apply_field_vector(
         self,

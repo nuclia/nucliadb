@@ -393,7 +393,6 @@ class Field:
                 metadata.thumbnail.CopyFrom(cf_split)
             metadata.last_index.FromDatetime(datetime.now())
 
-        paragraphs_to_replace = []
         if actual_payload is None:
             # Its first metadata
             await self.storage.upload_pb(sf, payload.metadata)
@@ -407,11 +406,10 @@ class Field:
                     del actual_payload.split_metadata[key]
             if payload.metadata.metadata:
                 actual_payload.metadata.CopyFrom(payload.metadata.metadata)
-                paragraphs_to_replace = [f"{x.start}-{x.end}" for x in metadata.paragraphs]
             await self.storage.upload_pb(sf, actual_payload)
             self.computed_metadata = actual_payload
 
-        return self.computed_metadata, paragraphs_to_replace
+        return self.computed_metadata
 
     async def get_field_metadata(self, force: bool = False) -> Optional[FieldComputedMetadata]:
         if self.computed_metadata is None or force:
