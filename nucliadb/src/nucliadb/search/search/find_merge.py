@@ -23,7 +23,6 @@ from typing import cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.results_hydrator.base import (
@@ -157,28 +156,26 @@ async def fetch_find_metadata(
         find_resources[paragraph.rid].fields[paragraph.fid].paragraphs[paragraph.pid].order = order
         best_matches.append(paragraph.pid)
 
-    async with get_driver().transaction(read_only=True) as txn:
-        for resource in resources:
-            operations.append(
-                asyncio.create_task(
-                    hydrate_resource_metadata(
-                        txn,
-                        kbid,
-                        resource_id=resource,
-                        options=resource_hydration_options,
-                        find_resources=find_resources,
-                        concurrency_control=max_operations,
-                        service_name=SERVICE_NAME,
-                    )
+    for resource in resources:
+        operations.append(
+            asyncio.create_task(
+                hydrate_resource_metadata(
+                    kbid,
+                    resource_id=resource,
+                    options=resource_hydration_options,
+                    find_resources=find_resources,
+                    concurrency_control=max_operations,
+                    service_name=SERVICE_NAME,
                 )
             )
+        )
 
-        FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
-        if len(operations) > 0:
-            done, _ = await asyncio.wait(operations)
-            for task in done:
-                if task.exception() is not None:  # pragma: no cover
-                    logger.error("Error fetching find metadata", exc_info=task.exception())
+    FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
+    if len(operations) > 0:
+        done, _ = await asyncio.wait(operations)
+        for task in done:
+            if task.exception() is not None:  # pragma: no cover
+                logger.error("Error fetching find metadata", exc_info=task.exception())
 
     return find_resources, best_matches
 

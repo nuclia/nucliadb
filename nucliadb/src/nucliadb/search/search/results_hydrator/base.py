@@ -26,7 +26,6 @@ from pydantic import BaseModel
 
 from nucliadb.common.external_index_providers.base import QueryResults as ExternalIndexQueryResults
 from nucliadb.common.external_index_providers.base import TextBlockMatch
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import paragraphs
@@ -125,20 +124,18 @@ async def hydrate_external(
         )
 
     if len(resource_ids) > 0:
-        async with get_driver().transaction(read_only=True) as ro_txn:
-            for resource_id in resource_ids:
-                hydrate_ops.append(
-                    asyncio.create_task(
-                        hydrate_resource_metadata(
-                            txn=ro_txn,
-                            kbid=kbid,
-                            resource_id=resource_id,
-                            options=resource_options,
-                            find_resources=retrieval_results.resources,
-                            concurrency_control=semaphore,
-                        )
+        for resource_id in resource_ids:
+            hydrate_ops.append(
+                asyncio.create_task(
+                    hydrate_resource_metadata(
+                        kbid=kbid,
+                        resource_id=resource_id,
+                        options=resource_options,
+                        find_resources=retrieval_results.resources,
+                        concurrency_control=semaphore,
                     )
                 )
+            )
 
     if len(hydrate_ops) > 0:
         await asyncio.gather(*hydrate_ops)
@@ -199,7 +196,6 @@ async def new_hydrate_text_block(
 
 @hydrator_observer.wrap({"type": "resource_metadata"})
 async def hydrate_resource_metadata(
-    txn: Transaction,
     kbid: str,
     resource_id: str,
     options: ResourceHydrationOptions,
@@ -226,20 +222,23 @@ async def hydrate_resource_metadata(
         if concurrency_control is not None:
             await stack.enter_async_context(concurrency_control)
 
-        serialized_resource = await managed_serialize(
-            txn=txn,
-            kbid=kbid,
-            rid=resource_id,
-            show=show,
-            field_type_filter=options.field_type_filter,
-            extracted=extracted,
-            service_name=service_name,
-        )
-        if serialized_resource is not None:
-            find_resources[resource_id].updated_from(serialized_resource)
-        else:
-            logger.warning("Resource not found in database", extra={"kbid": kbid, "rid": resource_id})
-            find_resources.pop(resource_id, None)
+        async with get_driver().transaction(read_only=True) as ro_txn:
+            serialized_resource = await managed_serialize(
+                txn=ro_txn,
+                kbid=kbid,
+                rid=resource_id,
+                show=show,
+                field_type_filter=options.field_type_filter,
+                extracted=extracted,
+                service_name=service_name,
+            )
+            if serialized_resource is not None:
+                find_resources[resource_id].updated_from(serialized_resource)
+            else:
+                logger.warning(
+                    "Resource not found in database", extra={"kbid": kbid, "rid": resource_id}
+                )
+                find_resources.pop(resource_id, None)
 
 
 def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
