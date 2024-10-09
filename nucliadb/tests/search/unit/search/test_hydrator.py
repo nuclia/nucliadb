@@ -24,13 +24,12 @@ from nucliadb.common.ids import ParagraphId
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
-    hydrate_resource_metadata_and_update_find_resources,
-    hydrate_text_block_and_update_find_paragraph,
+    hydrate_resource_metadata,
+    hydrate_text_block,
 )
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
     SCORE_TYPE,
-    FindResource,
     TextPosition,
 )
 
@@ -52,20 +51,12 @@ async def test_hydrate_text_block():
             paragraph_labels=["/t/text/label"],
         )
 
-        field_paragraphs = {}
-        await hydrate_text_block_and_update_find_paragraph(
-            "kbid", text_block, TextBlockHydrationOptions(), field_paragraphs
+        await hydrate_text_block(
+            "kbid",
+            text_block,
+            TextBlockHydrationOptions(),
         )
-
         assert text_block.text == "some text"
-
-        assert len(field_paragraphs) == 1
-        find_paragraph = field_paragraphs["rid/f/field/0/0-10"]
-        assert find_paragraph.text == "some text"
-        assert find_paragraph.score == 0.8
-        assert find_paragraph.score_type == SCORE_TYPE.VECTOR
-        assert find_paragraph.order == 3
-        assert find_paragraph.labels == ["/t/text/label"]
 
 
 async def test_hydrate_resource_metadata():
@@ -73,12 +64,5 @@ async def test_hydrate_resource_metadata():
         patch(f"{MODULE}.managed_serialize", return_value=Resource(id="rid", slug="my-resource")),
         patch(f"{MODULE}.get_driver"),
     ):
-        find_resources = {"rid": FindResource(id="aaa", fields={})}
-        await hydrate_resource_metadata_and_update_find_resources(
-            "kbid", "rid", ResourceHydrationOptions(), find_resources
-        )
-
-        assert len(find_resources) == 1
-        find_resource = find_resources["rid"]
-        assert find_resource.id == "rid"
-        assert find_resource.slug == "my-resource"
+        resource = await hydrate_resource_metadata("kbid", "rid", ResourceHydrationOptions())
+        assert resource == Resource(id="rid", slug="my-resource")
