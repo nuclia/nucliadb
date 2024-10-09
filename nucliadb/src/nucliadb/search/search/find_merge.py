@@ -42,7 +42,6 @@ from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
-    FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
     MinScore,
@@ -57,7 +56,6 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_telemetry import metrics
 
-from . import paragraphs
 from .metrics import merge_observer
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
@@ -76,24 +74,6 @@ class SortableParagraph:
     fid: str
     pid: str
     score: float
-
-
-@merge_observer.wrap({"type": "set_text_value"})
-async def set_text_value(
-    kbid: str,
-    paragraph_id: ParagraphId,
-    find_paragraph: FindParagraph,
-    max_operations: asyncio.Semaphore,
-    hydration_options: TextBlockHydrationOptions,
-):
-    async with max_operations:
-        find_paragraph.text = await paragraphs.get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=paragraph_id,
-            highlight=hydration_options.highlight,
-            ematches=hydration_options.ematches,
-            matches=[],  # TODO
-        )
 
 
 @merge_observer.wrap({"type": "hydrate_and_rerank"})
