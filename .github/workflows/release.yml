@@ -185,7 +185,7 @@ jobs:
                   "component-type": "regional"
                 }
               ],
-              "environment": "${{ inputs.environment }}",
+              "environment": "stage",
               "promo_production": false,
               "skip_argo_health": false,
               "skip_promo_queue": false,
