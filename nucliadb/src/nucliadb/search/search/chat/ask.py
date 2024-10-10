@@ -105,9 +105,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
 class RetrievalMatch:
     paragraph: FindParagraph
     weighted_score: float
-    main_query_match: bool = False
-    # List of prequery ids for which this paragraph is a match
-    prequery_matches: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
@@ -231,9 +228,6 @@ class AskResult:
             matches=[
                 AskRetrievalMatch(
                     id=match.paragraph.id,
-                    weighted_score=match.weighted_score,
-                    main_query_match=match.main_query_match,
-                    prequery_matches=match.prequery_matches,
                 )
                 for match in self.sorted_matches
             ],
@@ -286,27 +280,17 @@ class AskResult:
             yield CitationsAskResponseItem(citations=self._citations.citations)
 
         # Stream out generic metadata about the answer
-        metadata = MetadataAskResponseItem(
-            tokens=AskTokens(input=0, output=0),
-            timings=AskTimings(generative_first_chunk=None, generative_total=None),
-            retrieval_matches=[
-                AskRetrievalMatch(
-                    id=match.paragraph.id,
-                    weighted_score=match.weighted_score,
-                    main_query_match=match.main_query_match,
-                    prequery_matches=match.prequery_matches,
-                )
-                for match in self.sorted_matches
-            ],
-        )
         if self._metadata is not None:
-            metadata.tokens.input = self._metadata.input_tokens
-            metadata.tokens.output = self._metadata.output_tokens
-            metadata.timings.generative_first_chunk = self._metadata.timings.get(
-                "generative_first_chunk"
+            yield MetadataAskResponseItem(
+                tokens=AskTokens(
+                    input=self._metadata.input_tokens,
+                    output=self._metadata.output_tokens,
+                ),
+                timings=AskTimings(
+                    generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
+                    generative_total=self._metadata.timings.get("generative"),
+                ),
             )
-            metadata.timings.generative_total = self._metadata.timings.get("generative")
-        yield metadata
 
         # Stream out the relations results
         should_query_relations = (
@@ -358,12 +342,20 @@ class AskResult:
                 prequery_id = prequery.id or f"prequery_{index}"
                 prequeries_results[prequery_id] = result
 
+        best_matches = [
+            AskRetrievalMatch(
+                id=match.paragraph.id,
+            )
+            for match in self.sorted_matches
+        ]
+
         response = SyncAskResponse(
             answer=self._answer_text,
             answer_json=answer_json,
             status=self.status_code.prettify(),
             relations=self._relations,
             retrieval_results=self.main_results,
+            retrieval_best_matches=best_matches,
             prequeries=prequeries_results,
             citations=citations,
             metadata=metadata,
@@ -807,34 +799,28 @@ def compute_sorted_matches(
                     yield paragraph
 
     total_weights = main_query_weight + sum(prequery.weight for prequery, _ in prequeries_results or [])
-
     paragraph_id_to_match: dict[str, RetrievalMatch] = {}
     for paragraph in iter_paragraphs(main_results):
+        normalized_weight = main_query_weight / total_weights
         rmatch = RetrievalMatch(
             paragraph=paragraph,
-            weighted_score=paragraph.score * (main_query_weight / total_weights) * 100,
-            main_query_match=True,
-            prequery_matches=[],
+            weighted_score=paragraph.score * normalized_weight,
         )
         paragraph_id_to_match[paragraph.id] = rmatch
 
     for prequery, prequery_results in prequeries_results or []:
-        prequery_id = cast(str, prequery.id)
         for paragraph in iter_paragraphs(prequery_results):
-            normalize_weight = (prequery.weight / total_weights) * 100
-            weighted_score = paragraph.score * normalize_weight
+            normalized_weight = prequery.weight / total_weights
+            weighted_score = paragraph.score * normalized_weight
             if paragraph.id in paragraph_id_to_match:
                 rmatch = paragraph_id_to_match[paragraph.id]
                 # If a paragraph is matched in various prequeries, the final score is the
                 # sum of the weighted scores
                 rmatch.weighted_score += weighted_score
-                rmatch.prequery_matches.append(prequery_id)
             else:
                 paragraph_id_to_match[paragraph.id] = RetrievalMatch(
                     paragraph=paragraph,
                     weighted_score=weighted_score,
-                    main_query_match=False,
-                    prequery_matches=[prequery_id],
                 )
 
     return sorted(paragraph_id_to_match.values(), key=lambda match: match.weighted_score, reverse=True)
