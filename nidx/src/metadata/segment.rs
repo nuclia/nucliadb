@@ -18,25 +18,40 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use super::NidxMetadata;
-use sqlx::types::time::PrimitiveDateTime;
+use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 
 pub struct Segment {
     pub id: i64,
     pub index_id: i64,
     pub ready: bool,
+    pub seq: i64,
+    pub records: Option<i64>,
+    pub size_bytes: Option<i64>,
     pub created_at: PrimitiveDateTime,
     pub deleted_at: Option<PrimitiveDateTime>,
 }
 
 impl Segment {
-    pub async fn create(meta: &NidxMetadata, index_id: i64) -> sqlx::Result<Segment> {
-        sqlx::query_as!(Segment, r#"INSERT INTO segments (index_id) VALUES ($1) RETURNING *"#, index_id)
+    pub async fn create(meta: &NidxMetadata, index_id: i64, seq: i64) -> sqlx::Result<Segment> {
+        sqlx::query_as!(Segment, r#"INSERT INTO segments (index_id, seq) VALUES ($1, $2) RETURNING *"#, index_id, seq)
             .fetch_one(&meta.pool)
             .await
     }
 
-    pub async fn mark_ready(&self, meta: &NidxMetadata) -> sqlx::Result<()> {
-        sqlx::query!("UPDATE segments SET ready = true WHERE id = $1", self.id).execute(&meta.pool).await?;
+    pub async fn mark_ready(
+        &self,
+        meta: impl Executor<'_, Database = Postgres>,
+        records: i64,
+        size_bytes: i64,
+    ) -> sqlx::Result<()> {
+        sqlx::query!(
+            "UPDATE segments SET ready = true, records = $1, size_bytes = $2 WHERE id = $3",
+            records,
+            size_bytes,
+            self.id,
+        )
+        .execute(meta)
+        .await?;
         Ok(())
     }
 }

@@ -19,14 +19,19 @@
 //
 use sqlx;
 
+mod deletion;
 mod index;
 mod segment;
 mod shard;
 
+pub use deletion::Deletion;
 pub use index::Index;
 pub use index::IndexKind;
 pub use segment::Segment;
 pub use shard::Shard;
+
+/// A random ID to identify the lock we use during migration
+const MIGRATION_LOCK_ID: i64 = 5324678839066546102;
 
 pub struct NidxMetadata {
     pub pool: sqlx::PgPool,
@@ -50,16 +55,25 @@ impl NidxMetadata {
     }
 
     pub(crate) async fn new_with_pool(pool: sqlx::PgPool) -> Result<Self, sqlx::Error> {
-        sqlx::migrate::Migrator::new(MultiMigrator(vec![
+        let migrator = sqlx::migrate::Migrator::new(MultiMigrator(vec![
             sqlx::migrate!("./migrations"),
             apalis::postgres::PostgresStorage::migrations(),
         ]))
-        .await?
-        .run(&pool)
         .await?;
+        {
+            // Run migrations inside a transaction that holds a global lock, avoids races
+            let mut tx = pool.begin().await?;
+            sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID).execute(&mut *tx).await?;
+            migrator.run(&pool).await?;
+            tx.commit().await?;
+        }
         Ok(NidxMetadata {
             pool,
         })
+    }
+
+    pub async fn transaction(&self) -> Result<sqlx::Transaction<sqlx::Postgres>, sqlx::Error> {
+        self.pool.begin().await
     }
 }
 

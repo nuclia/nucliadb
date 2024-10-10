@@ -17,28 +17,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use super::{index::*, NidxMetadata};
+use sqlx::{self, Executor, Postgres};
+use uuid::Uuid;
 
-use apalis::postgres::PostgresStorage;
-use apalis::prelude::*;
+pub struct Deletion {
+    pub index_id: i64,
+    pub seq: i64,
+    pub key: String,
+}
 
-use crate::{NidxMetadata, Settings};
-
-use super::merge::Email;
-
-pub async fn run() -> anyhow::Result<()> {
-    let settings = Settings::from_env();
-    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
-    let mut storage = PostgresStorage::new(meta.pool.clone());
-
-    for _ in 0..10 {
-        storage
-            .push(Email {
-                to: "juanito@juan.com".into(),
-            })
-            .await?;
+impl Deletion {
+    pub async fn create(
+        meta: impl Executor<'_, Database = Postgres>,
+        index_id: i64,
+        seq: i64,
+        key: &str,
+    ) -> Result<Deletion, sqlx::Error> {
+        sqlx::query_as!(
+            Deletion,
+            "INSERT INTO deletions (index_id, seq, key) VALUES ($1, $2, $3) RETURNING *",
+            index_id,
+            seq,
+            key
+        )
+        .fetch_one(meta)
+        .await
     }
-
-    storage.vacuum().await?;
-
-    Ok(())
 }

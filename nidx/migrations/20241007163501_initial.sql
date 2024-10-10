@@ -18,6 +18,15 @@ CREATE TABLE segments (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     index_id BIGINT NOT NULL REFERENCES indexes(id),
     ready BOOLEAN NOT NULL DEFAULT FALSE,
+    seq BIGINT NOT NULL,
+    records BIGINT,
+    size_bytes BIGINT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMP
+);
+
+CREATE TABLE deletions (
+    index_id BIGINT NOT NULL REFERENCES indexes(id),
+    seq BIGINT NOT NULL,
+    key TEXT NOT NULL
 );

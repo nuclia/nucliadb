@@ -30,7 +30,7 @@ impl VectorIndexer {
         VectorIndexer
     }
 
-    pub fn index_resource(&self, output_dir: &Path, resource: &Resource) -> VectorR<bool> {
+    pub fn index_resource<'a>(&self, output_dir: &Path, resource: &'a Resource) -> VectorR<(i64, &'a Vec<String>)> {
         let tmp = tempfile::tempdir()?;
 
         // Index resource
@@ -42,11 +42,11 @@ impl VectorIndexer {
         // Copy just the segment to the output directory
         let segments = writer.get_segment_ids().unwrap();
         if segments.is_empty() {
-            return Ok(false);
+            return Ok((0, &resource.sentences_to_delete));
         }
         assert!(segments.len() <= 1, "Expected a single segment");
         std::fs::rename(tmp.path().join("index").join(&segments[0]), output_dir)?;
 
-        Ok(true)
+        return Ok((writer.count().unwrap() as i64, &resource.sentences_to_delete));
     }
 }

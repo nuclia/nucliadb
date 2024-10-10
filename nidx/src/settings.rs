@@ -146,6 +146,7 @@ mod tests {
             ("METADATA_DATABASE_URL", "postgresql://localhost"),
             ("INDEXER_OBJECT_STORE", "file"),
             ("INDEXER_FILE_PATH", "a"),
+            ("INDEXER_NATS_SERVER", "a"),
         ];
         let settings: Settings = envy::from_iter(env.iter().map(|(a, b)| (a.to_string(), b.to_string()))).unwrap();
         assert_eq!(settings.metadata.database_url, "postgresql://localhost");
