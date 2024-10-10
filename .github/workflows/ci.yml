@@ -430,7 +430,8 @@ jobs:
     name: Trigger deploy
     if: github.event_name == 'push'
     needs:
-      - ci-passed
+      - build-node-binaries
+      - build-virtual-env
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
     with:

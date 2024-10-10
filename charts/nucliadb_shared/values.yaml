@@ -25,7 +25,7 @@ maindb:
 storage:
   file_backend: gcs
 
-  gcs_base64_creds: XX
+  gcs_base64_creds:
   gcs_bucket: nucliadb_{kbid}
   gcs_location: XX
   gcs_project: XX
