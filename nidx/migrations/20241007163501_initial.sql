@@ -14,6 +14,14 @@ CREATE TABLE indexes (
     UNIQUE (shard_id, kind, name)
 );
 
+CREATE TABLE merge_jobs (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    retries SMALLINT NOT NULL DEFAULT 0,
+    enqueued_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    started_at TIMESTAMP,
+    running_at TIMESTAMP
+);
+
 CREATE TABLE segments (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     index_id BIGINT NOT NULL REFERENCES indexes(id),
@@ -21,6 +29,7 @@ CREATE TABLE segments (
     seq BIGINT NOT NULL,
     records BIGINT,
     size_bytes BIGINT,
+    merge_job_id BIGINT REFERENCES merge_jobs(id) ON DELETE SET NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMP
 );
@@ -28,5 +37,6 @@ CREATE TABLE segments (
 CREATE TABLE deletions (
     index_id BIGINT NOT NULL REFERENCES indexes(id),
     seq BIGINT NOT NULL,
-    key TEXT NOT NULL
+    keys TEXT[] NOT NULL,
+    PRIMARY KEY (index_id, seq)
 );

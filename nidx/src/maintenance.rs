@@ -17,28 +17,5 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-
-use apalis::postgres::PostgresStorage;
-use apalis::prelude::*;
-
-use crate::{NidxMetadata, Settings};
-
-use super::merge::Email;
-
-pub async fn run() -> anyhow::Result<()> {
-    let settings = Settings::from_env();
-    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
-    let mut storage = PostgresStorage::new(meta.pool.clone());
-
-    for _ in 0..10 {
-        storage
-            .push(Email {
-                to: "juanito@juan.com".into(),
-            })
-            .await?;
-    }
-
-    storage.vacuum().await?;
-
-    Ok(())
-}
+pub mod scheduler;
+pub mod worker;

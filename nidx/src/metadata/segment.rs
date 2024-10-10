@@ -27,6 +27,7 @@ pub struct Segment {
     pub seq: i64,
     pub records: Option<i64>,
     pub size_bytes: Option<i64>,
+    pub merge_job_id: Option<i64>,
     pub created_at: PrimitiveDateTime,
     pub deleted_at: Option<PrimitiveDateTime>,
 }
@@ -53,5 +54,15 @@ impl Segment {
         .execute(meta)
         .await?;
         Ok(())
+    }
+
+    pub async fn delete_many(meta: impl Executor<'_, Database = Postgres>, segment_ids: &[i64]) -> sqlx::Result<()> {
+        let affected =
+            sqlx::query!("DELETE FROM merge_jobs WHERE id = ANY($1)", segment_ids).execute(meta).await?.rows_affected();
+        if affected != segment_ids.len() as u64 {
+            Err(sqlx::Error::RowNotFound)
+        } else {
+            Ok(())
+        }
     }
 }

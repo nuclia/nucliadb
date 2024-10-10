@@ -79,9 +79,7 @@ async fn index_resource(
         let size = pack_and_upload(storage.clone(), dir, &store_path).await?;
         let mut tx = meta.transaction().await?;
         segment.mark_ready(&mut *tx, records, size).await?;
-        for d in deletions {
-            Deletion::create(&mut *tx, index.id, seq, d).await?;
-        }
+        Deletion::create(&mut *tx, index.id, seq, &deletions).await?;
         tx.commit().await?;
     }
     Ok(())

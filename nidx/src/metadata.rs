@@ -21,12 +21,14 @@ use sqlx;
 
 mod deletion;
 mod index;
+mod merge_job;
 mod segment;
 mod shard;
 
 pub use deletion::Deletion;
 pub use index::Index;
 pub use index::IndexKind;
+pub use merge_job::MergeJob;
 pub use segment::Segment;
 pub use shard::Shard;
 
@@ -37,16 +39,6 @@ pub struct NidxMetadata {
     pub pool: sqlx::PgPool,
 }
 
-#[derive(Debug)]
-struct MultiMigrator(Vec<sqlx::migrate::Migrator>);
-impl<'s> sqlx::migrate::MigrationSource<'s> for MultiMigrator {
-    fn resolve(
-        self,
-    ) -> futures::future::BoxFuture<'s, Result<Vec<sqlx::migrate::Migration>, sqlx::error::BoxDynError>> {
-        Box::pin(async move { Ok(self.0.iter().flat_map(|m| m.iter().cloned()).collect()) })
-    }
-}
-
 impl NidxMetadata {
     pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
         let pool = sqlx::postgres::PgPoolOptions::new().connect(database_url).await?;
@@ -55,18 +47,12 @@ impl NidxMetadata {
     }
 
     pub(crate) async fn new_with_pool(pool: sqlx::PgPool) -> Result<Self, sqlx::Error> {
-        let migrator = sqlx::migrate::Migrator::new(MultiMigrator(vec![
-            sqlx::migrate!("./migrations"),
-            apalis::postgres::PostgresStorage::migrations(),
-        ]))
-        .await?;
-        {
-            // Run migrations inside a transaction that holds a global lock, avoids races
-            let mut tx = pool.begin().await?;
-            sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID).execute(&mut *tx).await?;
-            migrator.run(&pool).await?;
-            tx.commit().await?;
-        }
+        // Run migrations inside a transaction that holds a global lock, avoids races
+        let mut tx = pool.begin().await?;
+        sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID).execute(&mut *tx).await?;
+        sqlx::migrate!("./migrations").run(&pool).await?;
+        tx.commit().await?;
+
         Ok(NidxMetadata {
             pool,
         })

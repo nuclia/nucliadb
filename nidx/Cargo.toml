@@ -8,7 +8,6 @@ members = ["nidx_vector"]
 
 [dependencies]
 anyhow = "1.0.89"
-apalis = { version = "0.5.5", features = ["postgres"] }
 async-nats = "0.37.0"
 base64 = "0.22.1"
 envy = "0.4.2"

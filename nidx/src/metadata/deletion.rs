@@ -17,14 +17,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use super::{index::*, NidxMetadata};
 use sqlx::{self, Executor, Postgres};
-use uuid::Uuid;
 
 pub struct Deletion {
     pub index_id: i64,
     pub seq: i64,
-    pub key: String,
+    pub keys: Vec<String>,
 }
 
 impl Deletion {
@@ -32,14 +30,14 @@ impl Deletion {
         meta: impl Executor<'_, Database = Postgres>,
         index_id: i64,
         seq: i64,
-        key: &str,
+        keys: &[String],
     ) -> Result<Deletion, sqlx::Error> {
         sqlx::query_as!(
             Deletion,
-            "INSERT INTO deletions (index_id, seq, key) VALUES ($1, $2, $3) RETURNING *",
+            "INSERT INTO deletions (index_id, seq, keys) VALUES ($1, $2, $3) RETURNING *",
             index_id,
             seq,
-            key
+            keys
         )
         .fetch_one(meta)
         .await
