@@ -181,7 +181,7 @@ jobs:
               "components": [
                 {
                   "chart-version": "${{ steps.version_step.outputs.helm_version }}",
-                  "component": "nucliadb",
+                  "component": "nucliadb_standalone",
                   "component-type": "regional"
                 }
               ],
