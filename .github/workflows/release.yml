@@ -177,22 +177,22 @@ jobs:
           event-type: test-new-promotions
           client-payload: |-
             {
-              commit-sha: "${{ github.sha }}",
-              components: [
+              "commit-sha": "${{ github.sha }}",
+              "components": [
                 {
-                  chart-version: "${{ steps.version_step.outputs.helm_version }}",
-                  component: "nucliadb",
-                  component-type: "regional"
+                  "chart-version": "${{ steps.version_step.outputs.helm_version }}",
+                  "component": "nucliadb",
+                  "component-type": "regional"
                 }
               ],
-              environment: "stage",
-              promo_production: false,
-              skip_argo_health: false,
-              skip_promo_queue: false,
-              slack_team: "S06B7JZMC76",
-              team: "nucliadb",
-              tests: {
-                run-e2e: true,
-                run-nua-e2e: false
+              "environment": "${{ inputs.environment }}",
+              "promo_production": false,
+              "skip_argo_health": false,
+              "skip_promo_queue": false,
+              "slack_team": "S06B7JZMC76",
+              "team": "nucliadb",
+              "tests": {
+                "run-e2e": false,
+                "run-nua-e2e": false
               }
             }
