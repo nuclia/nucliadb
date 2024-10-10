@@ -98,33 +98,34 @@ jobs:
         helm package charts/nucliadb_shared
         curl --data-binary "@nucliadb_shared-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
-    - name: Repository Dispatch
+    - name: Send to promotion queue
+      id: send-to-promo
       uses: peter-evans/repository-dispatch@v3
-      if: ${{ inputs.environment == 'stage' }}
       with:
         token: ${{ steps.app-token.outputs.token }}
-        repository: nuclia/nucliadb_deploy
-        event-type: promote
-        client-payload: '{"component": "nucliadb_shared", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
-
-    - name: Checkout tooling repository
-      uses: actions/checkout@v4
-      if: ${{ inputs.environment == 'dev' }}
-      with:
-        repository: nuclia/tooling
-        ref: main
-        token: ${{ steps.app-token.outputs.token }}
-    
-    - name: Promote to Nuclia
-      uses: ./.github/actions/promote
-      if: ${{ inputs.environment == 'dev' }}
-      with:
-        component: nucliadb_shared
-        chart-version: ${{ steps.version_step.outputs.version_number }}
-        environment: ${{ inputs.environment }}
-        ghapp-nuclia-service-bot-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
-        ghapp-nuclia-service-bot-pk: ${{ secrets.PK_GHAPP_NUCLIABOT }}
-        argocd-appset-file: "./repo-core-apps/apps/nucliadb_shared.applicationSet.yaml"
+        repository: nuclia/core-apps
+        event-type: test-new-promotions
+        client-payload: |-
+          {
+            commit-sha: "${{ github.sha }}",
+            components: [
+              {
+                chart-version: "${{ steps.version_step.outputs.version_number }}"",
+                component: "nucliadb_shared",
+                component-type: "regional"
+              }
+            ],
+            environment: "${{ inputs.environment }}",
+            promo_production: false,
+            skip_argo_health: false,
+            skip_promo_queue: false,
+            slack_team: "S06B7JZMC76",
+            team: "nucliadb",
+            tests: {
+              run-e2e: true,
+              run-nua-e2e: false
+            }
+          }
 
   deploy-nucliadb-node:
     name: Deploy Node
@@ -180,44 +181,44 @@ jobs:
           helm package charts/nucliadb_node
           curl --data-binary "@nucliadb_node-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
-      - name: Repository Dispatch
+      - name: Send to promotion queue
+        id: send-to-promo
         uses: peter-evans/repository-dispatch@v3
-        if: ${{ inputs.environment == 'stage' }}
         with:
           token: ${{ steps.app-token.outputs.token }}
-          repository: nuclia/nucliadb_deploy
-          event-type: promote
-          client-payload: '{"component": "nucliadb_node", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
+          repository: nuclia/core-apps
+          event-type: test-new-promotions
+          client-payload: |-
+            {
+              commit-sha: "${{ github.sha }}",
+              components: [
+                {
+                  chart-version: "${{ steps.version_step.outputs.version_number }}"",
+                  component: "nucliadb_node",
+                  component-type: "regional"
+                }
+              ],
+              environment: "${{ inputs.environment }}",
+              promo_production: false,
+              skip_argo_health: false,
+              skip_promo_queue: false,
+              slack_team: "S06B7JZMC76",
+              team: "nucliadb",
+              tests: {
+                run-e2e: true,
+                run-nua-e2e: false
+              }
+            }
 
-      - name: Checkout tooling repository
-        uses: actions/checkout@v4
-        if: ${{ inputs.environment == 'dev' }}
-        with:
-          repository: nuclia/tooling
-          ref: main
-          token: ${{ steps.app-token.outputs.token }}
-
-      - name: Promote to Nuclia
-        uses: ./.github/actions/promote
-        if: ${{ inputs.environment == 'dev' }}
-        with:
-          component: nucliadb_node
-          chart-version: ${{ steps.version_step.outputs.version_number }}
-          environment: ${{ inputs.environment }}
-          ghapp-nuclia-service-bot-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
-          ghapp-nuclia-service-bot-pk: ${{ secrets.PK_GHAPP_NUCLIABOT }}
-          argocd-appset-file: "./repo-core-apps/apps/nucliadb_node.applicationSet.yaml"
-
-  deploy-nucliadb-component:
+  upload-charts-nucliadb-component:
     name: Deploy NucliaDB component
     runs-on: ubuntu-latest
+    outputs:
+      version_number: ${{ steps.version_step.outputs.version_number }}
     needs:
       - build-python-images
       - deploy-nucliadb-shared
     strategy:
-      # nucliadb_deploy pipeline has issues with too many parallel invocations
-      max-parallel: 1
-      fail-fast: false
       matrix:
         component:
           - ingest
@@ -271,30 +272,66 @@ jobs:
           helm package charts/nucliadb_${{ matrix.component }}
           curl --data-binary "@nucliadb_${{ matrix.component }}-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
-      - name: Repository Dispatch
+
+  deploy-nucliadb-components:
+    name: Deploy NucliaDB components
+    runs-on: ubuntu-latest
+    needs:
+      - upload-charts-nucliadb-component
+    steps:
+      - name: Generate a token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
+          private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+          owner: nuclia
+
+      - name: Send to promotion queue
+        id: send-to-promo
         uses: peter-evans/repository-dispatch@v3
-        if: ${{ inputs.environment == 'stage' }}
         with:
           token: ${{ steps.app-token.outputs.token }}
-          repository: nuclia/nucliadb_deploy
-          event-type: promote
-          client-payload: '{"component": "nucliadb_${{ matrix.component }}", "chart-version": "${{ steps.version_step.outputs.version_number }}" }'
-
-      - name: Checkout tooling repository
-        uses: actions/checkout@v4
-        if: ${{ inputs.environment == 'dev' }}
-        with:
-          repository: nuclia/tooling
-          ref: main
-          token: ${{ steps.app-token.outputs.token }}
-
-      - name: Promote to Nuclia
-        uses: ./.github/actions/promote
-        if: ${{ inputs.environment == 'dev' }}
-        with:
-          component: nucliadb_${{ matrix.component }}
-          chart-version: ${{ steps.version_step.outputs.version_number }}
-          environment: ${{ inputs.environment }}
-          ghapp-nuclia-service-bot-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
-          ghapp-nuclia-service-bot-pk: ${{ secrets.PK_GHAPP_NUCLIABOT }}
-          argocd-appset-file: "./repo-core-apps/apps/nucliadb_${{ matrix.component }}.applicationSet.yaml"
+          repository: nuclia/core-apps
+          event-type: test-new-promotions
+          client_payload: |-
+            {
+              commit-sha: "${{ github.sha }}",
+              components: [
+                {
+                  chart-version: "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}"",
+                  component: "ingest",
+                  component-type: "regional"
+                },
+                {
+                  chart-version: "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
+                  component: "reader",
+                  component-type: "regional"
+                },
+                {
+                  chart-version: "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
+                  component: "search",
+                  component-type: "regional"
+                },
+                {
+                  chart-version: "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
+                  component: "train",
+                  component-type: "regional"
+                },
+                {
+                  chart-version: "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
+                  component: "writer",
+                  component-type: "regional"
+                }
+              ],
+              environment: "${{ inputs.environment }}",
+              promo_production: false,
+              skip_argo_health: false,
+              skip_promo_queue: false,
+              slack_team: "S06B7JZMC76",
+              team: "nucliadb",
+              tests: {
+                run-e2e: true,
+                run-nua-e2e: false
+              }
+            }
