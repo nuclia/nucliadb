@@ -19,7 +19,7 @@
 #
 import json
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
+from typing import Any, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -169,10 +169,10 @@ class JsonBaseModel(BaseModel):
 
 
 class Facet(BaseModel):
-    facetresults: Dict[str, int]
+    facetresults: dict[str, int]
 
 
-FacetsResult = Dict[str, Any]
+FacetsResult = dict[str, Any]
 
 
 class TextPosition(BaseModel):
@@ -180,8 +180,8 @@ class TextPosition(BaseModel):
     index: int
     start: int
     end: int
-    start_seconds: Optional[List[int]] = None
-    end_seconds: Optional[List[int]] = None
+    start_seconds: Optional[list[int]] = None
+    end_seconds: Optional[list[int]] = None
 
 
 class Sentence(BaseModel):
@@ -195,7 +195,7 @@ class Sentence(BaseModel):
 
 
 class Sentences(BaseModel):
-    results: List[Sentence] = []
+    results: list[Sentence] = []
     facets: FacetsResult
     page_number: int = 0
     page_size: int = 20
@@ -211,15 +211,15 @@ class Paragraph(BaseModel):
     field_type: str
     field: str
     text: str
-    labels: List[str] = []
-    start_seconds: Optional[List[int]] = None
-    end_seconds: Optional[List[int]] = None
+    labels: list[str] = []
+    start_seconds: Optional[list[int]] = None
+    end_seconds: Optional[list[int]] = None
     position: Optional[TextPosition] = None
     fuzzy_result: bool = False
 
 
 class Paragraphs(BaseModel):
-    results: List[Paragraph] = []
+    results: list[Paragraph] = []
     facets: Optional[FacetsResult] = None
     query: Optional[str] = None
     total: int = 0
@@ -241,7 +241,7 @@ class ResourceResult(BaseModel):
 
 
 class Resources(BaseModel):
-    results: List[ResourceResult]
+    results: list[ResourceResult]
     facets: Optional[FacetsResult] = None
     query: Optional[str] = None
     total: int = 0
@@ -283,20 +283,20 @@ class DirectionalRelation(BaseModel):
 
 
 class EntitySubgraph(BaseModel):
-    related_to: List[DirectionalRelation]
+    related_to: list[DirectionalRelation]
 
 
 # TODO: uncomment and implement (next iteration)
 # class RelationPath(BaseModel):
 #     origin: str
 #     destination: str
-#     path: List[DirectionalRelation]
+#     path: list[DirectionalRelation]
 
 
 class Relations(BaseModel):
-    entities: Dict[str, EntitySubgraph]
+    entities: dict[str, EntitySubgraph]
     # TODO: implement in the next iteration of knowledge graph search
-    # graph: List[RelationPath]
+    # graph: list[RelationPath]
 
 
 class RelatedEntity(BaseModel, frozen=True):
@@ -306,7 +306,7 @@ class RelatedEntity(BaseModel, frozen=True):
 
 class RelatedEntities(BaseModel):
     total: int = 0
-    entities: List[RelatedEntity] = []
+    entities: list[RelatedEntity] = []
 
 
 class ResourceSearchResults(JsonBaseModel):
@@ -315,21 +315,21 @@ class ResourceSearchResults(JsonBaseModel):
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
     relations: Optional[Relations] = None
-    nodes: Optional[List[Dict[str, str]]] = None
-    shards: Optional[List[str]] = None
+    nodes: Optional[list[dict[str, str]]] = None
+    shards: Optional[list[str]] = None
 
 
 class KnowledgeboxSearchResults(JsonBaseModel):
     """Search on knowledgebox results"""
 
-    resources: Dict[str, Resource] = {}
+    resources: dict[str, Resource] = {}
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
     fulltext: Optional[Resources] = None
     relations: Optional[Relations] = None
-    nodes: Optional[List[Dict[str, str]]] = None
-    shards: Optional[List[str]] = None
-    autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
+    nodes: Optional[list[dict[str, str]]] = None
+    shards: Optional[list[str]] = None
+    autofilters: list[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
 
 
 class CatalogResponse(BaseModel):
@@ -345,7 +345,7 @@ class KnowledgeboxSuggestResults(JsonBaseModel):
 
     paragraphs: Optional[Paragraphs] = None
     entities: Optional[RelatedEntities] = None
-    shards: Optional[List[str]] = None
+    shards: Optional[list[str]] = None
 
 
 class KnowledgeboxCounters(BaseModel):
@@ -353,7 +353,7 @@ class KnowledgeboxCounters(BaseModel):
     paragraphs: int
     fields: int
     sentences: int
-    shards: Optional[List[str]] = None
+    shards: Optional[list[str]] = None
     index_size: float = Field(default=0.0, title="Index size (bytes)")
 
 
@@ -635,10 +635,10 @@ class SearchParamDefaults:
 
 
 class Filter(BaseModel):
-    all: Optional[List[str]] = Field(default=None, min_length=1)
-    any: Optional[List[str]] = Field(default=None, min_length=1)
-    none: Optional[List[str]] = Field(default=None, min_length=1)
-    not_all: Optional[List[str]] = Field(default=None, min_length=1)
+    all: Optional[list[str]] = Field(default=None, min_length=1)
+    any: Optional[list[str]] = Field(default=None, min_length=1)
+    none: Optional[list[str]] = Field(default=None, min_length=1)
+    not_all: Optional[list[str]] = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_filter(self) -> Self:
@@ -649,16 +649,16 @@ class Filter(BaseModel):
 
 class CatalogRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
-    filters: Union[List[str], List[Filter]] = Field(
+    filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
-    faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
+    faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.catalog_page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.catalog_page_size.to_pydantic_field()
-    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field(deprecated=True)
+    shards: list[str] = SearchParamDefaults.shards.to_pydantic_field(deprecated=True)
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
     with_status: Optional[ResourceProcessingStatus] = Field(
         default=None,
@@ -726,8 +726,8 @@ class AuditMetadataBase(BaseModel):
 
 class BaseSearchRequest(AuditMetadataBase):
     query: str = SearchParamDefaults.query.to_pydantic_field()
-    fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: Union[List[str], List[Filter]] = Field(
+    fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
+    filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
@@ -750,7 +750,7 @@ class BaseSearchRequest(AuditMetadataBase):
     range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
-    features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
+    features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             SearchOptions.KEYWORD,
             SearchOptions.FULLTEXT,
@@ -759,16 +759,16 @@ class BaseSearchRequest(AuditMetadataBase):
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
-    show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    field_type_filter: List[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
-    extracted: List[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
-    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    vector: Optional[List[float]] = SearchParamDefaults.vector.to_pydantic_field()
+    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
+    field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
+    shards: list[str] = SearchParamDefaults.shards.to_pydantic_field()
+    vector: Optional[list[float]] = SearchParamDefaults.vector.to_pydantic_field()
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
-    resource_filters: List[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
 
@@ -801,7 +801,7 @@ Please return ONLY the question without any explanation. Just the rephrased ques
 
     @field_validator("features", mode="after")
     @classmethod
-    def normalize_features(cls, features: List[SearchOptions]):
+    def normalize_features(cls, features: list[SearchOptions]):
         return [feature.normalized() for feature in features]
 
     @model_validator(mode="after")
@@ -815,7 +815,7 @@ Please return ONLY the question without any explanation. Just the rephrased ques
 
 
 class SearchRequest(BaseSearchRequest):
-    faceted: List[str] = SearchParamDefaults.faceted.to_pydantic_field()
+    faceted: list[str] = SearchParamDefaults.faceted.to_pydantic_field()
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
 
     @field_validator("faceted")
@@ -882,15 +882,15 @@ class ChatModel(BaseModel):
         title="System prompt",
         description="Optional system prompt input by the user",
     )
-    query_context: Dict[str, str] = Field(
+    query_context: dict[str, str] = Field(
         default={},
         description="The information retrieval context for the current query",
     )
-    query_context_order: Optional[Dict[str, int]] = Field(
+    query_context_order: Optional[dict[str, int]] = Field(
         default=None,
         description="The order of the query context elements. This is used to sort the context elements by relevance before sending them to the generative model",  # noqa
     )
-    chat_history: List[ChatContextMessage] = Field(
+    chat_history: list[ChatContextMessage] = Field(
         default=[], description="The chat conversation history"
     )
     truncate: bool = Field(
@@ -915,7 +915,7 @@ class ChatModel(BaseModel):
 
     max_tokens: Optional[int] = Field(default=None, description="Maximum characters to generate")
 
-    query_context_images: Dict[str, Image] = Field(
+    query_context_images: dict[str, Image] = Field(
         default={},
         description="The information retrieval context for the current query, each image is a base64 encoded string",
     )
@@ -924,7 +924,7 @@ class ChatModel(BaseModel):
         default=False,
         description="If set to true, the response will be in markdown format",
     )
-    json_schema: Optional[Dict[str, Any]] = Field(
+    json_schema: Optional[dict[str, Any]] = Field(
         default=None,
         description="The JSON schema to use for the generative model answers",
     )
@@ -937,9 +937,9 @@ class ChatModel(BaseModel):
 
 class RephraseModel(BaseModel):
     question: str
-    chat_history: List[ChatContextMessage] = []
+    chat_history: list[ChatContextMessage] = []
     user_id: str
-    user_context: List[str] = []
+    user_context: list[str] = []
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
@@ -1235,8 +1235,8 @@ class AskRequest(AuditMetadataBase):
         le=200,
         description="The top most relevant results to fetch at the retrieval step. The maximum number of results allowed is 200.",
     )
-    fields: List[str] = SearchParamDefaults.fields.to_pydantic_field()
-    filters: Union[List[str], List[Filter]] = Field(
+    fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
+    filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
@@ -1262,7 +1262,7 @@ class AskRequest(AuditMetadataBase):
         title="Minimum score",
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa
     )
-    features: List[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
+    features: list[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
     range_creation_start: Optional[DateTime] = (
         SearchParamDefaults.range_creation_start.to_pydantic_field()
     )
@@ -1273,12 +1273,12 @@ class AskRequest(AuditMetadataBase):
     range_modification_end: Optional[DateTime] = (
         SearchParamDefaults.range_modification_end.to_pydantic_field()
     )
-    show: List[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    field_type_filter: List[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
-    extracted: List[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
-    shards: List[str] = SearchParamDefaults.shards.to_pydantic_field()
-    context: Optional[List[ChatContextMessage]] = SearchParamDefaults.chat_context.to_pydantic_field()
-    extra_context: Optional[List[str]] = Field(
+    show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
+    field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
+    shards: list[str] = SearchParamDefaults.shards.to_pydantic_field()
+    context: Optional[list[ChatContextMessage]] = SearchParamDefaults.chat_context.to_pydantic_field()
+    extra_context: Optional[list[str]] = Field(
         default=None,
         title="Extra query context",
         description="""Additional context that is added to the retrieval context sent to the LLM.
@@ -1286,7 +1286,7 @@ class AskRequest(AuditMetadataBase):
     )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
-    resource_filters: List[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
     prompt: Optional[Union[str, CustomPrompt]] = Field(
         default=None,
         title="Prompts",
@@ -1382,7 +1382,7 @@ If empty, the default strategy is used, which simply adds the text of the matchi
         description="If set to true, the response will be in markdown format",
     )
 
-    answer_json_schema: Optional[Dict[str, Any]] = Field(
+    answer_json_schema: Optional[dict[str, Any]] = Field(
         default=None,
         title="Answer JSON schema",
         description="""Desired JSON schema for the LLM answer.
@@ -1427,7 +1427,7 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
 
     @field_validator("features", mode="after")
     @classmethod
-    def normalize_features(cls, features: List[ChatOptions]):
+    def normalize_features(cls, features: list[ChatOptions]):
         return [feature.normalized() for feature in features]
 
 
@@ -1437,7 +1437,7 @@ class ChatRequest(AskRequest):
 
 
 class SummarizeResourceModel(BaseModel):
-    fields: Dict[str, str] = {}
+    fields: dict[str, str] = {}
 
 
 class SummaryKind(str, Enum):
@@ -1450,7 +1450,7 @@ class SummarizeModel(BaseModel):
     Model for the summarize predict api request payload
     """
 
-    resources: Dict[str, SummarizeResourceModel] = {}
+    resources: dict[str, SummarizeResourceModel] = {}
     generative_model: Optional[str] = None
     user_prompt: Optional[str] = None
     summary_kind: SummaryKind = SummaryKind.SIMPLE
@@ -1473,7 +1473,7 @@ class SummarizeRequest(BaseModel):
         description="Optional custom prompt input by the user",
     )
 
-    resources: List[str] = Field(
+    resources: list[str] = Field(
         ...,
         min_length=1,
         max_length=100,
@@ -1494,7 +1494,7 @@ class SummarizedResource(BaseModel):
 
 
 class SummarizedResponse(BaseModel):
-    resources: Dict[str, SummarizedResource] = Field(
+    resources: dict[str, SummarizedResource] = Field(
         default={},
         title="Resources",
         description="Individual resource summaries. The key is the resource id or slug.",
@@ -1507,7 +1507,7 @@ class SummarizedResponse(BaseModel):
 
 
 class FindRequest(BaseSearchRequest):
-    features: List[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
+    features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             SearchOptions.KEYWORD,
             SearchOptions.SEMANTIC,
@@ -1549,8 +1549,8 @@ class SCORE_TYPE(str, Enum):
 
 class FindTextPosition(BaseModel):
     page_number: Optional[int] = None
-    start_seconds: Optional[List[int]] = None
-    end_seconds: Optional[List[int]] = None
+    start_seconds: Optional[list[int]] = None
+    end_seconds: Optional[list[int]] = None
     index: int
     start: int
     end: int
@@ -1562,7 +1562,7 @@ class FindParagraph(BaseModel):
     order: int = Field(default=0, ge=0)
     text: str
     id: str
-    labels: Optional[List[str]] = []
+    labels: Optional[list[str]] = []
     position: Optional[TextPosition] = None
     fuzzy_result: bool = False
     page_with_visual: bool = Field(
@@ -1583,11 +1583,11 @@ class FindParagraph(BaseModel):
 
 
 class FindField(BaseModel):
-    paragraphs: Dict[str, FindParagraph]
+    paragraphs: dict[str, FindParagraph]
 
 
 class FindResource(Resource):
-    fields: Dict[str, FindField]
+    fields: dict[str, FindField]
 
     def updated_from(self, origin: Resource):
         for key in origin.model_fields.keys():
@@ -1597,7 +1597,7 @@ class FindResource(Resource):
 class KnowledgeboxFindResults(JsonBaseModel):
     """Find on knowledgebox results"""
 
-    resources: Dict[str, FindResource]
+    resources: dict[str, FindResource]
     relations: Optional[Relations] = None
     query: Optional[str] = None
     total: int = 0
@@ -1611,23 +1611,23 @@ class KnowledgeboxFindResults(JsonBaseModel):
         default=False,
         description="Pagination will be deprecated, please, refer to `top_k` in the request",
     )
-    nodes: Optional[List[Dict[str, str]]] = Field(
+    nodes: Optional[list[dict[str, str]]] = Field(
         default=None,
         title="Nodes",
         description="List of nodes queried in the search",
     )
-    shards: Optional[List[str]] = Field(
+    shards: Optional[list[str]] = Field(
         default=None,
         title="Shards",
         description="The list of shard replica ids used for the search.",
     )
-    autofilters: List[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
+    autofilters: list[str] = ModelParamDefaults.applied_autofilters.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
         default=MinScore(),
         title="Minimum result score",
         description="The minimum scores that have been used for the search operation.",
     )
-    best_matches: List[str] = Field(
+    best_matches: list[str] = Field(
         default=[],
         title="Best matches",
         description="List of ids of best matching paragraphs. The list is sorted by decreasing relevance (most relevant first).",  # noqa
@@ -1723,12 +1723,19 @@ class SyncAskMetadata(BaseModel):
     )
 
 
+class AskRetrievalMatch(BaseModel):
+    id: str = Field(
+        title="Id",
+        description="Id of the matching text block",
+    )
+
+
 class SyncAskResponse(BaseModel):
     answer: str = Field(
         title="Answer",
         description="The generative answer to the query",
     )
-    answer_json: Optional[Dict[str, Any]] = Field(
+    answer_json: Optional[dict[str, Any]] = Field(
         default=None,
         title="Answer JSON",
         description="The generative JSON answer to the query. This is returned only if the answer_json_schema parameter is provided in the request.",  # noqa
@@ -1741,7 +1748,12 @@ class SyncAskResponse(BaseModel):
         title="Retrieval results",
         description="The retrieval results of the query",
     )
-    prequeries: Optional[Dict[str, KnowledgeboxFindResults]] = Field(
+    retrieval_best_matches: list[AskRetrievalMatch] = Field(
+        default=[],
+        title="Retrieval best matches",
+        description="Sorted list of best matching text blocks in the retrieval step. This includes the main query and prequeries results, if any.",
+    )
+    prequeries: Optional[dict[str, KnowledgeboxFindResults]] = Field(
         default=None,
         title="Prequeries",
         description="The retrieval results of the prequeries",
@@ -1781,6 +1793,11 @@ class SyncAskResponse(BaseModel):
 class RetrievalAskResponseItem(BaseModel):
     type: Literal["retrieval"] = "retrieval"
     results: KnowledgeboxFindResults
+    best_matches: list[AskRetrievalMatch] = Field(
+        default=[],
+        title="Best matches",
+        description="Sorted list of best matching text blocks in the retrieval step. This includes the main query and prequeries results, if any.",
+    )
 
 
 class PrequeriesAskResponseItem(BaseModel):
@@ -1795,7 +1812,7 @@ class AnswerAskResponseItem(BaseModel):
 
 class JSONAskResponseItem(BaseModel):
     type: Literal["answer_json"] = "answer_json"
-    object: Dict[str, Any]
+    object: dict[str, Any]
 
 
 class MetadataAskResponseItem(BaseModel):

@@ -18,8 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-from nucliadb.search.search.chat.ask import calculate_prequeries_for_json_schema
-from nucliadb_models.search import AskRequest, ChatOptions, SearchOptions
+from nucliadb.search.search.chat.ask import calculate_prequeries_for_json_schema, compute_best_matches
+from nucliadb_models.search import (
+    SCORE_TYPE,
+    AskRequest,
+    ChatOptions,
+    FindField,
+    FindParagraph,
+    FindRequest,
+    FindResource,
+    KnowledgeboxFindResults,
+    PreQuery,
+    SearchOptions,
+)
 
 
 def test_calculate_prequeries_for_json_schema():
@@ -65,3 +76,130 @@ def test_calculate_prequeries_for_json_schema():
         assert preq.request.show == []
         # Min score is propagated from the main query
         assert preq.request.min_score == 0.1
+
+
+def test_compute_best_matches():
+    main_results = KnowledgeboxFindResults(
+        resources={
+            "main-result": FindResource(
+                id="main-result",
+                fields={
+                    "f/f1": FindField(
+                        paragraphs={
+                            "main-result/f/f1/0-10": FindParagraph(
+                                id="main-result/f/f1/0-10",
+                                score=2,
+                                score_type=SCORE_TYPE.BM25,
+                                order=0,
+                                text="First Paragraph text",
+                            ),
+                            "main-result/f/f1/10-20": FindParagraph(
+                                id="main-result/f/f1/10-20",
+                                score=1,
+                                score_type=SCORE_TYPE.BM25,
+                                order=1,
+                                text="Second paragraph text",
+                            ),
+                        }
+                    )
+                },
+            )
+        },
+    )
+    prequery_1 = PreQuery(
+        request=FindRequest(query="prequery_1"),
+        weight=10,
+    )
+    prequery_1_results = KnowledgeboxFindResults(
+        resources={
+            "prequery-1-result": FindResource(
+                id="prequery-1-result",
+                fields={
+                    "f/f1": FindField(
+                        paragraphs={
+                            "prequery-1-result/f/f1/0-10": FindParagraph(
+                                id="prequery-1-result/f/f1/0-10",
+                                score=2,
+                                score_type=SCORE_TYPE.BM25,
+                                order=0,
+                                text="First Paragraph text",
+                            ),
+                            "prequery-1-result/f/f1/10-20": FindParagraph(
+                                id="prequery-1-result/f/f1/10-20",
+                                score=1,
+                                score_type=SCORE_TYPE.BM25,
+                                order=1,
+                                text="Second paragraph text",
+                            ),
+                        }
+                    )
+                },
+            )
+        },
+    )
+    prequery_2 = PreQuery(
+        request=FindRequest(query="prequery_2"),
+        weight=90,
+    )
+    prequery_2_results = KnowledgeboxFindResults(
+        resources={
+            "prequery-2-result": FindResource(
+                id="prequery-2-result",
+                fields={
+                    "f/f1": FindField(
+                        paragraphs={
+                            "prequery-2-result/f/f1/0-10": FindParagraph(
+                                id="prequery-2-result/f/f1/0-10",
+                                score=2,
+                                score_type=SCORE_TYPE.BM25,
+                                order=0,
+                                text="First Paragraph text",
+                            ),
+                            "prequery-2-result/f/f1/10-20": FindParagraph(
+                                id="prequery-2-result/f/f1/10-20",
+                                score=1,
+                                score_type=SCORE_TYPE.BM25,
+                                order=1,
+                                text="Second paragraph text",
+                            ),
+                        }
+                    )
+                },
+            )
+        },
+    )
+    best_matches = compute_best_matches(
+        main_results=main_results,
+        prequeries_results=[
+            (prequery_1, prequery_1_results),
+            (prequery_2, prequery_2_results),
+        ],
+    )
+    assert len(best_matches) == 6
+    # The first paragraphs come from the prequery with the highest weight
+    assert best_matches[0].paragraph.id == "prequery-2-result/f/f1/0-10"
+    assert best_matches[1].paragraph.id == "prequery-2-result/f/f1/10-20"
+    # The second paragraphs come from the prequery with the lowest weight
+    assert best_matches[2].paragraph.id == "prequery-1-result/f/f1/0-10"
+    assert best_matches[3].paragraph.id == "prequery-1-result/f/f1/10-20"
+    # The last paragraphs come from the main results
+    assert best_matches[4].paragraph.id == "main-result/f/f1/0-10"
+    assert best_matches[5].paragraph.id == "main-result/f/f1/10-20"
+
+    # Test that the main query weight can be set to a huge
+    # value so that the main results are always at the beginning
+    best_matches = compute_best_matches(
+        main_results=main_results,
+        prequeries_results=[
+            (prequery_1, prequery_1_results),
+            (prequery_2, prequery_2_results),
+        ],
+        main_query_weight=1000,
+    )
+    assert len(best_matches) == 6
+    assert best_matches[0].paragraph.id == "main-result/f/f1/0-10"
+    assert best_matches[1].paragraph.id == "main-result/f/f1/10-20"
+    assert best_matches[2].paragraph.id == "prequery-2-result/f/f1/0-10"
+    assert best_matches[3].paragraph.id == "prequery-2-result/f/f1/10-20"
+    assert best_matches[4].paragraph.id == "prequery-1-result/f/f1/0-10"
+    assert best_matches[5].paragraph.id == "prequery-1-result/f/f1/10-20"

@@ -44,13 +44,11 @@ from nucliadb_models.search import (
     HierarchyResourceStrategy,
     ImageRagStrategy,
     ImageRagStrategyName,
-    KnowledgeboxFindResults,
     MetadataExtensionStrategy,
     MetadataExtensionType,
     NeighbouringParagraphsStrategy,
     PageImageStrategy,
     ParagraphImageStrategy,
-    PreQueryResult,
     PromptContext,
     PromptContextImages,
     PromptContextOrder,
@@ -742,9 +740,7 @@ class PromptContextBuilder:
     def __init__(
         self,
         kbid: str,
-        main_results: KnowledgeboxFindResults,
-        prequeries_results: Optional[list[PreQueryResult]] = None,
-        main_query_weight: float = 1.0,
+        ordered_paragraphs: list[FindParagraph],
         resource: Optional[str] = None,
         user_context: Optional[list[str]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
@@ -753,9 +749,7 @@ class PromptContextBuilder:
         visual_llm: bool = False,
     ):
         self.kbid = kbid
-        self.ordered_paragraphs = get_ordered_paragraphs(
-            main_results, prequeries_results, main_query_weight
-        )
+        self.ordered_paragraphs = ordered_paragraphs
         self.resource = resource
         self.user_context = user_context
         self.strategies = strategies
@@ -942,57 +936,6 @@ def _clean_paragraph_text(paragraph: FindParagraph) -> str:
     # Do not send highlight marks on prompt context
     text = text.replace("<mark>", "").replace("</mark>", "")
     return text
-
-
-def get_ordered_paragraphs(
-    main_results: KnowledgeboxFindResults,
-    prequeries_results: Optional[list[PreQueryResult]] = None,
-    main_query_weight: float = 1.0,
-) -> list[FindParagraph]:
-    """
-    Returns the list of paragraphs in the results, ordered by relevance (descending score).
-
-    If prequeries_results is provided, the paragraphs of the prequeries are weighted according to the
-    normalized weight of the prequery. The paragraph score is not modified, but it is used to determine the order in which they
-    are presented in the LLM prompt context.
-
-    If a paragraph is matched in various prequeries, the final weighted score is the sum of the weighted scores for each prequery.
-
-    `main_query_weight` is the weight given to the paragraphs matching the main query when calculating the final score.
-    """
-
-    def iter_paragraphs(results: KnowledgeboxFindResults):
-        for resource in results.resources.values():
-            for field in resource.fields.values():
-                for paragraph in field.paragraphs.values():
-                    yield paragraph
-
-    total_weights = main_query_weight + sum(prequery.weight for prequery, _ in prequeries_results or [])
-
-    paragraph_id_to_paragraph = {}
-    paragraph_id_to_score = {}
-    for paragraph in iter_paragraphs(main_results):
-        paragraph_id_to_paragraph[paragraph.id] = paragraph
-        weighted_score = paragraph.score * (main_query_weight / total_weights) * 100
-        paragraph_id_to_score[paragraph.id] = weighted_score
-
-    for prequery, prequery_results in prequeries_results or []:
-        for paragraph in iter_paragraphs(prequery_results):
-            normalize_weight = (prequery.weight / total_weights) * 100
-            weighted_score = paragraph.score * normalize_weight
-            if paragraph.id in paragraph_id_to_score:
-                # If a paragraph is matched in various prequeries, the final score is the
-                # sum of the weighted scores
-                paragraph_id_to_paragraph[paragraph.id] = paragraph
-                paragraph_id_to_score[paragraph.id] += weighted_score
-            else:
-                paragraph_id_to_paragraph[paragraph.id] = paragraph
-                paragraph_id_to_score[paragraph.id] = weighted_score
-
-    ids_ordered_by_score = sorted(
-        paragraph_id_to_paragraph.keys(), key=lambda pid: paragraph_id_to_score[pid], reverse=True
-    )
-    return [paragraph_id_to_paragraph[pid] for pid in ids_ordered_by_score]
 
 
 def get_neighbouring_paragraph_indexes(

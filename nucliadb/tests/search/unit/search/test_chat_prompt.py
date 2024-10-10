@@ -28,7 +28,6 @@ from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
     FindParagraph,
-    FindRequest,
     FindResource,
     HierarchyResourceStrategy,
     Image,
@@ -38,7 +37,6 @@ from nucliadb_models.search import (
     MinScore,
     PageImageStrategy,
     ParagraphImageStrategy,
-    PreQuery,
     TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2 as rpb2
@@ -150,6 +148,15 @@ async def test_get_expanded_conversation_messages_missing(kb, messages):
     )
 
 
+def get_ordered_paragraphs(find_results):
+    paragraphs = []
+    for resource in find_results.resources.values():
+        for field in resource.fields.values():
+            paragraphs.extend(field.paragraphs.values())
+    paragraphs.sort(key=lambda p: p.order)
+    return paragraphs
+
+
 def _create_find_result(
     paragraph: FindParagraph,
 ):
@@ -209,12 +216,10 @@ async def test_default_prompt_context(kb):
                 ),
             },
         )
-        ordered_paragraphs = chat_prompt.get_ordered_paragraphs(find_results)
-
         await chat_prompt.default_prompt_context(
             context,
             "kbid",
-            ordered_paragraphs,
+            get_ordered_paragraphs(find_results),
         )
         prompt_result = context.output
         # Check that the results are sorted by increasing order and that the extra
@@ -260,7 +265,9 @@ async def test_prompt_context_builder_prepends_user_context(
     find_results: KnowledgeboxFindResults,
 ):
     builder = chat_prompt.PromptContextBuilder(
-        kbid="kbid", main_results=find_results, user_context=["Carrots are orange"]
+        kbid="kbid",
+        ordered_paragraphs=get_ordered_paragraphs(find_results),
+        user_context=["Carrots are orange"],
     )
 
     async def _mock_build_context(context, *args, **kwargs):
@@ -347,7 +354,7 @@ async def test_hierarchy_promp_context(kb):
                 )
             },
         )
-        ordered_paragraphs = chat_prompt.get_ordered_paragraphs(find_results)
+        ordered_paragraphs = get_ordered_paragraphs(find_results)
         await chat_prompt.hierarchy_prompt_context(
             context, "kbid", ordered_paragraphs, HierarchyResourceStrategy()
         )
@@ -435,133 +442,6 @@ async def test_extend_prompt_context_with_metadata():
         assert "DOCUMENT EXTRA METADATA" in text_block
 
 
-def test_get_ordered_paragraphs():
-    main_results = KnowledgeboxFindResults(
-        resources={
-            "main-result": FindResource(
-                id="main-result",
-                fields={
-                    "f/f1": FindField(
-                        paragraphs={
-                            "main-result/f/f1/0-10": FindParagraph(
-                                id="main-result/f/f1/0-10",
-                                score=2,
-                                score_type=SCORE_TYPE.BM25,
-                                order=0,
-                                text="First Paragraph text",
-                            ),
-                            "main-result/f/f1/10-20": FindParagraph(
-                                id="main-result/f/f1/10-20",
-                                score=1,
-                                score_type=SCORE_TYPE.BM25,
-                                order=1,
-                                text="Second paragraph text",
-                            ),
-                        }
-                    )
-                },
-            )
-        },
-    )
-    prequery_1 = PreQuery(
-        request=FindRequest(query="prequery_1"),
-        weight=10,
-    )
-    prequery_1_results = KnowledgeboxFindResults(
-        resources={
-            "prequery-1-result": FindResource(
-                id="prequery-1-result",
-                fields={
-                    "f/f1": FindField(
-                        paragraphs={
-                            "prequery-1-result/f/f1/0-10": FindParagraph(
-                                id="prequery-1-result/f/f1/0-10",
-                                score=2,
-                                score_type=SCORE_TYPE.BM25,
-                                order=0,
-                                text="First Paragraph text",
-                            ),
-                            "prequery-1-result/f/f1/10-20": FindParagraph(
-                                id="prequery-1-result/f/f1/10-20",
-                                score=1,
-                                score_type=SCORE_TYPE.BM25,
-                                order=1,
-                                text="Second paragraph text",
-                            ),
-                        }
-                    )
-                },
-            )
-        },
-    )
-    prequery_2 = PreQuery(
-        request=FindRequest(query="prequery_2"),
-        weight=90,
-    )
-    prequery_2_results = KnowledgeboxFindResults(
-        resources={
-            "prequery-2-result": FindResource(
-                id="prequery-2-result",
-                fields={
-                    "f/f1": FindField(
-                        paragraphs={
-                            "prequery-2-result/f/f1/0-10": FindParagraph(
-                                id="prequery-2-result/f/f1/0-10",
-                                score=2,
-                                score_type=SCORE_TYPE.BM25,
-                                order=0,
-                                text="First Paragraph text",
-                            ),
-                            "prequery-2-result/f/f1/10-20": FindParagraph(
-                                id="prequery-2-result/f/f1/10-20",
-                                score=1,
-                                score_type=SCORE_TYPE.BM25,
-                                order=1,
-                                text="Second paragraph text",
-                            ),
-                        }
-                    )
-                },
-            )
-        },
-    )
-    ordered_paragraphs = chat_prompt.get_ordered_paragraphs(
-        main_results=main_results,
-        prequeries_results=[
-            (prequery_1, prequery_1_results),
-            (prequery_2, prequery_2_results),
-        ],
-    )
-    assert len(ordered_paragraphs) == 6
-    # The first paragraphs come from the prequery with the highest weight
-    assert ordered_paragraphs[0].id == "prequery-2-result/f/f1/0-10"
-    assert ordered_paragraphs[1].id == "prequery-2-result/f/f1/10-20"
-    # The second paragraphs come from the prequery with the lowest weight
-    assert ordered_paragraphs[2].id == "prequery-1-result/f/f1/0-10"
-    assert ordered_paragraphs[3].id == "prequery-1-result/f/f1/10-20"
-    # The last paragraphs come from the main results
-    assert ordered_paragraphs[4].id == "main-result/f/f1/0-10"
-    assert ordered_paragraphs[5].id == "main-result/f/f1/10-20"
-
-    # Test that the main query weight can be set to a huge
-    # value so that the main results are always at the beginning
-    ordered_paragraphs = chat_prompt.get_ordered_paragraphs(
-        main_results=main_results,
-        prequeries_results=[
-            (prequery_1, prequery_1_results),
-            (prequery_2, prequery_2_results),
-        ],
-        main_query_weight=1000,
-    )
-    assert len(ordered_paragraphs) == 6
-    assert ordered_paragraphs[0].id == "main-result/f/f1/0-10"
-    assert ordered_paragraphs[1].id == "main-result/f/f1/10-20"
-    assert ordered_paragraphs[2].id == "prequery-2-result/f/f1/0-10"
-    assert ordered_paragraphs[3].id == "prequery-2-result/f/f1/10-20"
-    assert ordered_paragraphs[4].id == "prequery-1-result/f/f1/0-10"
-    assert ordered_paragraphs[5].id == "prequery-1-result/f/f1/10-20"
-
-
 @pytest.mark.asyncio
 async def test_prompt_context_image_context_builder():
     result_text = " ".join(["text"] * 10)
@@ -610,7 +490,7 @@ async def test_prompt_context_image_context_builder():
     # By default, no image strategies are provided so no images should be added
     builder = chat_prompt.PromptContextBuilder(
         kbid="kbid",
-        main_results=find_results,
+        ordered_paragraphs=get_ordered_paragraphs(find_results),
         user_context=["Carrots are orange"],
         image_strategies=[],
     )
@@ -621,7 +501,7 @@ async def test_prompt_context_image_context_builder():
     # Test that the image strategies are applied correctly
     builder = chat_prompt.PromptContextBuilder(
         kbid="kbid",
-        main_results=find_results,
+        ordered_paragraphs=get_ordered_paragraphs(find_results),
         user_context=["Carrots are orange"],
         image_strategies=[PageImageStrategy(count=10), TableImageStrategy(), ParagraphImageStrategy()],
     )
