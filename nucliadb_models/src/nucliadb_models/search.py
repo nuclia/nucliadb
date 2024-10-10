@@ -1793,8 +1793,9 @@ class SyncAskResponse(BaseModel):
 class RetrievalAskResponseItem(BaseModel):
     type: Literal["retrieval"] = "retrieval"
     results: KnowledgeboxFindResults
-    matches: list[AskRetrievalMatch] = Field(
-        title="Matches",
+    best_matches: list[AskRetrievalMatch] = Field(
+        default=[],
+        title="Best matches",
         description="Sorted list of best matching text blocks in the retrieval step. This includes the main query and prequeries results, if any.",
     )
 

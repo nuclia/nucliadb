@@ -225,7 +225,7 @@ class AskResult:
 
         yield RetrievalAskResponseItem(
             results=self.main_results,
-            matches=[
+            best_matches=[
                 AskRetrievalMatch(
                     id=match.paragraph.id,
                 )
@@ -427,7 +427,7 @@ class NotEnoughContextAskResult(AskResult):
         return the find results and the messages indicating that there is not enough
         context in the corpus to answer.
         """
-        yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results, matches=[]))
+        yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         status = AnswerStatusCode.NO_CONTEXT
         yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
