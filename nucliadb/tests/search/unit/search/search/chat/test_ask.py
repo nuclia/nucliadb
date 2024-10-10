@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-from nucliadb.search.search.chat.ask import calculate_prequeries_for_json_schema, compute_sorted_matches
+from nucliadb.search.search.chat.ask import calculate_prequeries_for_json_schema, compute_best_matches
 from nucliadb_models.search import (
     SCORE_TYPE,
     AskRequest,
@@ -78,7 +78,7 @@ def test_calculate_prequeries_for_json_schema():
         assert preq.request.min_score == 0.1
 
 
-def test_compute_sorted_matches():
+def test_compute_best_matches():
     main_results = KnowledgeboxFindResults(
         resources={
             "main-result": FindResource(
@@ -168,27 +168,27 @@ def test_compute_sorted_matches():
             )
         },
     )
-    sorted_matches = compute_sorted_matches(
+    best_matches = compute_best_matches(
         main_results=main_results,
         prequeries_results=[
             (prequery_1, prequery_1_results),
             (prequery_2, prequery_2_results),
         ],
     )
-    assert len(sorted_matches) == 6
+    assert len(best_matches) == 6
     # The first paragraphs come from the prequery with the highest weight
-    assert sorted_matches[0].paragraph.id == "prequery-2-result/f/f1/0-10"
-    assert sorted_matches[1].paragraph.id == "prequery-2-result/f/f1/10-20"
+    assert best_matches[0].paragraph.id == "prequery-2-result/f/f1/0-10"
+    assert best_matches[1].paragraph.id == "prequery-2-result/f/f1/10-20"
     # The second paragraphs come from the prequery with the lowest weight
-    assert sorted_matches[2].paragraph.id == "prequery-1-result/f/f1/0-10"
-    assert sorted_matches[3].paragraph.id == "prequery-1-result/f/f1/10-20"
+    assert best_matches[2].paragraph.id == "prequery-1-result/f/f1/0-10"
+    assert best_matches[3].paragraph.id == "prequery-1-result/f/f1/10-20"
     # The last paragraphs come from the main results
-    assert sorted_matches[4].paragraph.id == "main-result/f/f1/0-10"
-    assert sorted_matches[5].paragraph.id == "main-result/f/f1/10-20"
+    assert best_matches[4].paragraph.id == "main-result/f/f1/0-10"
+    assert best_matches[5].paragraph.id == "main-result/f/f1/10-20"
 
     # Test that the main query weight can be set to a huge
     # value so that the main results are always at the beginning
-    sorted_matches = compute_sorted_matches(
+    best_matches = compute_best_matches(
         main_results=main_results,
         prequeries_results=[
             (prequery_1, prequery_1_results),
@@ -196,10 +196,10 @@ def test_compute_sorted_matches():
         ],
         main_query_weight=1000,
     )
-    assert len(sorted_matches) == 6
-    assert sorted_matches[0].paragraph.id == "main-result/f/f1/0-10"
-    assert sorted_matches[1].paragraph.id == "main-result/f/f1/10-20"
-    assert sorted_matches[2].paragraph.id == "prequery-2-result/f/f1/0-10"
-    assert sorted_matches[3].paragraph.id == "prequery-2-result/f/f1/10-20"
-    assert sorted_matches[4].paragraph.id == "prequery-1-result/f/f1/0-10"
-    assert sorted_matches[5].paragraph.id == "prequery-1-result/f/f1/10-20"
+    assert len(best_matches) == 6
+    assert best_matches[0].paragraph.id == "main-result/f/f1/0-10"
+    assert best_matches[1].paragraph.id == "main-result/f/f1/10-20"
+    assert best_matches[2].paragraph.id == "prequery-2-result/f/f1/0-10"
+    assert best_matches[3].paragraph.id == "prequery-2-result/f/f1/10-20"
+    assert best_matches[4].paragraph.id == "prequery-1-result/f/f1/0-10"
+    assert best_matches[5].paragraph.id == "prequery-1-result/f/f1/10-20"

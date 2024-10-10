@@ -113,7 +113,7 @@ class RetrievalResults:
     query_parser: QueryParser
     main_query_weight: float
     prequeries: Optional[list[PreQueryResult]] = None
-    sorted_matches: list[RetrievalMatch] = dataclasses.field(default_factory=list)
+    best_matches: list[RetrievalMatch] = dataclasses.field(default_factory=list)
 
 
 class AskResult:
@@ -130,7 +130,7 @@ class AskResult:
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
         metrics: RAGMetrics,
-        sorted_matches: list[RetrievalMatch],
+        best_matches: list[RetrievalMatch],
     ):
         # Initial attributes
         self.kbid = kbid
@@ -143,7 +143,7 @@ class AskResult:
         self.prompt_context_order = prompt_context_order
         self.auditor: ChatAuditor = auditor
         self.metrics: RAGMetrics = metrics
-        self.sorted_matches: list[RetrievalMatch] = sorted_matches
+        self.best_matches: list[RetrievalMatch] = best_matches
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -229,7 +229,7 @@ class AskResult:
                 AskRetrievalMatch(
                     id=match.paragraph.id,
                 )
-                for match in self.sorted_matches
+                for match in self.best_matches
             ],
         )
 
@@ -346,7 +346,7 @@ class AskResult:
             AskRetrievalMatch(
                 id=match.paragraph.id,
             )
-            for match in self.sorted_matches
+            for match in self.best_matches
         ]
 
         response = SyncAskResponse(
@@ -498,7 +498,7 @@ async def ask(
         max_tokens_context = await query_parser.get_max_tokens_context()
         prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
-            ordered_paragraphs=[match.paragraph for match in retrieval_results.sorted_matches],
+            ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
             resource=resource,
             user_context=user_context,
             strategies=ask_request.rag_strategies,
@@ -564,7 +564,7 @@ async def ask(
         prompt_context_order=prompt_context_order,
         auditor=auditor,
         metrics=metrics,
-        sorted_matches=retrieval_results.sorted_matches,
+        best_matches=retrieval_results.best_matches,
     )
 
 
@@ -688,7 +688,7 @@ async def retrieval_in_kb(
             raise NoRetrievalResultsError(main_results, prequeries_results)
 
     main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
-    sorted_matches = compute_sorted_matches(
+    best_matches = compute_best_matches(
         main_results=main_results,
         prequeries_results=prequeries_results,
         main_query_weight=main_query_weight,
@@ -698,7 +698,7 @@ async def retrieval_in_kb(
         prequeries=prequeries_results,
         query_parser=query_parser,
         main_query_weight=main_query_weight,
-        sorted_matches=sorted_matches,
+        best_matches=best_matches,
     )
 
 
@@ -761,7 +761,7 @@ async def retrieval_in_resource(
         ):
             raise NoRetrievalResultsError(main_results, prequeries_results)
     main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
-    sorted_matches = compute_sorted_matches(
+    best_matches = compute_best_matches(
         main_results=main_results,
         prequeries_results=prequeries_results,
         main_query_weight=main_query_weight,
@@ -771,11 +771,11 @@ async def retrieval_in_resource(
         prequeries=prequeries_results,
         query_parser=query_parser,
         main_query_weight=main_query_weight,
-        sorted_matches=sorted_matches,
+        best_matches=best_matches,
     )
 
 
-def compute_sorted_matches(
+def compute_best_matches(
     main_results: KnowledgeboxFindResults,
     prequeries_results: Optional[list[PreQueryResult]] = None,
     main_query_weight: float = 1.0,
