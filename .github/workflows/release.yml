@@ -168,10 +168,31 @@ jobs:
           helm package charts/nucliadb
           curl --data-binary "@nucliadb-${{ steps.version_step.outputs.helm_version }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
-      - name: Repository Dispatch
+      - name: Send to promotion queue
+        id: send-to-promo
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.app-token.outputs.token }}
-          repository: nuclia/nucliadb_deploy
-          event-type: promote
-          client-payload: '{"component": "nucliadb_standalone", "chart-version": "${{ steps.version_step.outputs.helm_version }}" }'
+          repository: nuclia/core-apps
+          event-type: test-new-promotions
+          client-payload: |-
+            {
+              "commit-sha": "${{ github.sha }}",
+              "components": [
+                {
+                  "chart-version": "${{ steps.version_step.outputs.helm_version }}",
+                  "component": "nucliadb",
+                  "component-type": "regional"
+                }
+              ],
+              "environment": "${{ inputs.environment }}",
+              "promo_production": false,
+              "skip_argo_health": false,
+              "skip_promo_queue": false,
+              "slack_team": "S06B7JZMC76",
+              "team": "nucliadb",
+              "tests": {
+                "run-e2e": false,
+                "run-nua-e2e": false
+              }
+            }
