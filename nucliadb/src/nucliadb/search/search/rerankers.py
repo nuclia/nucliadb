@@ -118,10 +118,13 @@ class PredictReranker(Reranker):
 
         predict = get_predict()
 
+        # Conversion to format expected by predict. At the same time,
+        # deduplicates paragraphs found in different indices
+        context = {item.id: item.content for item in items}
         request = RerankModel(
             question=options.query,
             user_id="",  # TODO
-            context={item.id: item.content for item in items},
+            context=context,
         )
         response = await predict.rerank(options.kbid, request)
 
@@ -149,8 +152,11 @@ class MultiMatchBoosterReranker(Reranker):
         return requested
 
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
+        """Given a list of rerankable items, boost matches that appear multiple
+        times. The returned list can be smaller than the initial, as repeated
+        matches are deduplicated.
+        """
         reranked_by_id = {}
-
         for item in items:
             if item.id not in reranked_by_id:
                 reranked_by_id[item.id] = RankedItem(
@@ -158,7 +164,6 @@ class MultiMatchBoosterReranker(Reranker):
                     score=item.score,
                     score_type=item.score_type,
                 )
-
             else:
                 # it's a mutiple match, boost the score
                 if reranked_by_id[item.id].score < item.score:
