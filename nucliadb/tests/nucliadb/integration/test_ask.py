@@ -918,13 +918,25 @@ async def test_rag_image_rag_strategies(
         headers={"X-Synchronous": "True"},
         json={
             "query": "title",
-            "rag_image_strategies": [
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        headers={"X-Synchronous": "True"},
+        json={
+            "query": "title",
+            "rag_images_strategies": [
                 {
                     "name": "page_image",
                     "count": 2,
                 },
                 {
                     "name": "tables",
+                },
+                {
+                    "name": "paragraph_image",
                 },
             ],
         },

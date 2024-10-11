@@ -781,7 +781,6 @@ class PromptContextBuilder:
         if self.image_strategies is None or len(self.image_strategies) == 0:
             # Nothing to do
             return
-
         page_image_strategy: Optional[PageImageStrategy] = None
         max_page_images = 5
         table_image_strategy: Optional[TableImageStrategy] = None
@@ -802,7 +801,6 @@ class PromptContextBuilder:
                 logger.warning(
                     "Unknown image strategy", extra={"strategy": strategy.name, "kbid": self.kbid}
                 )
-
         page_images_added = 0
         for paragraph in self.ordered_paragraphs:
             pid = ParagraphId.from_string(paragraph.id)
