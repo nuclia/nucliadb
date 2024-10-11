@@ -85,21 +85,6 @@ class Reranker(ABC):
         """
         ...
 
-    async def rerank_find_response(self, response: KnowledgeboxFindResults, options: RerankingOptions):
-        to_rerank = [
-            RerankableItem(
-                id=paragraph_id,
-                score=paragraph.score,
-                score_type=paragraph.score_type,
-                content=paragraph.text,
-            )
-            for resource in response.resources.values()
-            for field in resource.fields.values()
-            for paragraph_id, paragraph in field.paragraphs.items()
-        ]
-        reranked = await self.rerank(to_rerank, options)
-        apply_reranking(response, reranked)
-
 
 class PredictReranker(Reranker):
     @property

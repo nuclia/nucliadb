@@ -26,6 +26,8 @@ from nucliadb.search.search.rerankers import (
     RerankableItem,
     Reranker,
     RerankingOptions,
+    apply_reranking,
+    sort_reranked,
 )
 from nucliadb_models.internal.predict import RerankResponse
 from nucliadb_models.search import (
@@ -37,7 +39,7 @@ from nucliadb_models.search import (
 )
 
 
-class NoopReranker(Reranker):
+class DummyReranker(Reranker):
     @property
     def needs_extra_results(self) -> bool:
         return False
@@ -46,7 +48,7 @@ class NoopReranker(Reranker):
         return requested
 
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
-        return [
+        reranked = [
             RankedItem(
                 id=item.id,
                 score=item.score,
@@ -54,11 +56,13 @@ class NoopReranker(Reranker):
             )
             for item in items
         ]
+        sort_reranked(reranked)
+        return reranked
 
 
 async def test_rerank_find_response():
     """Validate manipulation of find response by the reranker"""
-    reranker: Reranker = NoopReranker()
+    reranker: Reranker = DummyReranker()
 
     find_response = KnowledgeboxFindResults(
         resources={
@@ -94,11 +98,19 @@ async def test_rerank_find_response():
         page_size=20,
     )
 
-    await reranker.rerank_find_response("kbid", "my query", find_response)
-
-    import json
-
-    print(json.dumps(find_response.model_dump(), indent=4))
+    to_rerank = [
+        RerankableItem(
+            id=paragraph_id,
+            score=paragraph.score,
+            score_type=paragraph.score_type,
+            content=paragraph.text,
+        )
+        for resource in find_response.resources.values()
+        for field in resource.fields.values()
+        for paragraph_id, paragraph in field.paragraphs.items()
+    ]
+    reranked = await reranker.rerank(to_rerank, RerankingOptions(kbid="kbid", query="my query", top_k=3))
+    apply_reranking(find_response, reranked)
 
     ranking = []
     for resource in find_response.resources.values():
