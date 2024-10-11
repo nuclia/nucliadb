@@ -225,7 +225,7 @@ def compose_find_resources(
             continue
 
         find_resource = find_resources[rid]
-        field_id = text_block.paragraph_id.field_id.full()
+        field_id = text_block.paragraph_id.field_id.short_without_subfield()
         find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
 
         paragraph_id = text_block.paragraph_id.full()
