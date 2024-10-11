@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
       - name: Restore venv
@@ -69,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up PDM
-        uses: pdm-project/setup-pdm@v3
+        uses: pdm-project/setup-pdm@v4
         with:
           python-version: "3.12.5"
       - name: Restore venv
@@ -127,7 +127,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
       - name: Restore venv
@@ -161,7 +161,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Set up PDM
-        uses: pdm-project/setup-pdm@v3
+        uses: pdm-project/setup-pdm@v4
         with:
           python-version: "3.12.5"
           cache: true
@@ -183,7 +183,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
       - name: Restore venv
@@ -206,7 +206,7 @@ jobs:
         run: source .venv/bin/activate && make -C nucliadb_sidecar test-cov
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./nucliadb_sidecar/coverage.xml
           flags: nucliadb_sidecar
@@ -223,7 +223,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
       - name: Restore venv
@@ -249,7 +249,7 @@ jobs:
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb-search
@@ -287,7 +287,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
 
@@ -300,7 +300,7 @@ jobs:
 
       - name: Run NucliaDB tests
         # These tests can be flaky, let's retry them...
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         env:
           TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
         with:
@@ -310,7 +310,7 @@ jobs:
           command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" || make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb
@@ -338,7 +338,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
 
@@ -353,7 +353,7 @@ jobs:
         run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb-${{ matrix.component }}
@@ -382,7 +382,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12.5"
 
@@ -397,7 +397,7 @@ jobs:
         run: source .venv/bin/activate && make -C ${{ matrix.package }} test-cov
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./${{ matrix.package }}/coverage.xml
           flags: ${{ matrix.package }}

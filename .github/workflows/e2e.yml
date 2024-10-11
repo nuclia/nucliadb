@@ -84,7 +84,7 @@ jobs:
           kubectl -n nucliadb wait --timeout=1m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-1
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12.5
           cache: "pip"
