@@ -18,11 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from nucliadb.search.search.find_merge import find_merge_results
+from nucliadb.search.search.rerankers import MultiMatchBoosterReranker
+from nucliadb_models.resource import Resource
 from nucliadb_models.search import SCORE_TYPE, ResourceProperties
 from nucliadb_protos import nodereader_pb2, noderesources_pb2
 
@@ -113,9 +115,18 @@ async def test_find_post_index_search(expected_find_response: dict):
         )
     ]
 
+    async def mock_hydrate_resource_metadata(kbid: str, rid: str, *args, **kwargs):
+        return Resource(id=rid)
+
     with (
-        patch("nucliadb.search.search.find_merge.hydrate_resource_metadata"),
-        patch("nucliadb.search.search.find_merge.hydrate_text_block"),
+        patch(
+            "nucliadb.search.search.find_merge.hydrate_resource_metadata",
+            side_effect=mock_hydrate_resource_metadata,
+        ),
+        patch(
+            "nucliadb.search.search.hydrator.paragraphs.get_paragraph_text",
+            return_value="extracted text",
+        ),
     ):
         find_response = await find_merge_results(
             search_responses,
@@ -129,7 +140,7 @@ async def test_find_post_index_search(expected_find_response: dict):
             min_score_bm25=0.2,
             min_score_semantic=0.4,
             highlight=True,
-            reranker=AsyncMock(),
+            reranker=MultiMatchBoosterReranker(),
         )
         resp = find_response.model_dump()
         assert expected_find_response == resp
@@ -146,10 +157,9 @@ def expected_find_response():
     yield {
         "autofilters": [],
         "best_matches": [
+            "rid-2/f/field-b/subfield-y/0-17",
             "rid-3/t/field-c/0-30",
             "rid-1/f/field-a/10-20",
-            "rid-2/f/field-b/subfield-y/0-17",
-            "rid-2/f/field-b/subfield-y/0-17",
             "rid-2/f/field-b/subfield-x/100-150",
         ],
         "min_score": {"bm25": 0.2, "semantic": 0.4},
@@ -174,7 +184,7 @@ def expected_find_response():
                                 "id": "rid-1/f/field-a/10-20",
                                 "is_a_table": False,
                                 "labels": ["/a/title"],
-                                "order": 1,
+                                "order": 2,
                                 "page_with_visual": False,
                                 "position": {
                                     "end": 20,
@@ -187,7 +197,7 @@ def expected_find_response():
                                 "reference": "",
                                 "score": 1.125,
                                 "score_type": SCORE_TYPE.BM25,
-                                "text": "",
+                                "text": "extracted text",
                             }
                         }
                     }
@@ -223,7 +233,7 @@ def expected_find_response():
                                 "id": "rid-2/f/field-b/subfield-x/100-150",
                                 "is_a_table": False,
                                 "labels": [],
-                                "order": 4,
+                                "order": 3,
                                 "page_with_visual": False,
                                 "position": {
                                     "end": 150,
@@ -236,14 +246,14 @@ def expected_find_response():
                                 "reference": "",
                                 "score": 0.6399999856948853,
                                 "score_type": SCORE_TYPE.BM25,
-                                "text": "",
+                                "text": "extracted text",
                             },
                             "rid-2/f/field-b/subfield-y/0-17": {
                                 "fuzzy_result": False,
                                 "id": "rid-2/f/field-b/subfield-y/0-17",
                                 "is_a_table": True,
                                 "labels": [],
-                                "order": 3,
+                                "order": 0,
                                 "page_with_visual": True,
                                 "position": {
                                     "end": 17,
@@ -256,7 +266,7 @@ def expected_find_response():
                                 "reference": "myfile.pdf",
                                 "score": 1.7799999713897705,
                                 "score_type": SCORE_TYPE.BOTH,
-                                "text": "",
+                                "text": "extracted text",
                             },
                         }
                     }
@@ -292,7 +302,7 @@ def expected_find_response():
                                 "id": "rid-3/t/field-c/0-30",
                                 "is_a_table": False,
                                 "labels": [],
-                                "order": 0,
+                                "order": 1,
                                 "page_with_visual": False,
                                 "position": {
                                     "end": 30,
@@ -305,7 +315,7 @@ def expected_find_response():
                                 "reference": "",
                                 "score": 1.5,
                                 "score_type": SCORE_TYPE.VECTOR,
-                                "text": "",
+                                "text": "extracted text",
                             }
                         }
                     }

@@ -98,14 +98,18 @@ async def hydrate_and_rerank(
 
     # Iterate text blocks and create text block and resource metadata hydration
     # tasks depending on the reranker
-    text_blocks_by_id = {}  # useful for faster access to text blocks later
+    text_blocks_by_id: dict[str, TextBlockMatch] = {}  # useful for faster access to text blocks later
     resource_hydration_ops = {}
     text_block_hydration_ops = []
     for text_block in text_blocks:
         rid = text_block.paragraph_id.rid
         paragraph_id = text_block.paragraph_id.full()
 
-        text_blocks_by_id[paragraph_id] = text_block
+        # If we find multiple results (from different indexes) with different
+        # metadata, this statement will only get the metadata from the first on
+        # the list. We assume metadata is the same on all indexes, otherwise
+        # this would be a BUG
+        text_blocks_by_id.setdefault(paragraph_id, text_block)
 
         # rerankers that need extra results may end with less resources than the
         # ones we see now, so we'll skip this step and recompute the resources
