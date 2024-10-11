@@ -100,7 +100,7 @@ async def hydrate_and_rerank(
     # tasks depending on the reranker
     text_blocks_by_id = {}  # useful for faster access to text blocks later
     resource_hydration_ops = {}
-    text_block_hydration_ops = {}
+    text_block_hydration_ops = []
     for text_block in text_blocks:
         rid = text_block.paragraph_id.rid
         paragraph_id = text_block.paragraph_id.full()
@@ -122,8 +122,8 @@ async def hydrate_and_rerank(
                     )
                 )
 
-        if paragraph_id not in text_block_hydration_ops:
-            text_block_hydration_ops[paragraph_id] = asyncio.create_task(
+        text_block_hydration_ops.append(
+            asyncio.create_task(
                 hydrate_text_block(
                     kbid,
                     text_block,
@@ -131,13 +131,14 @@ async def hydrate_and_rerank(
                     concurrency_control=max_operations,
                 )
             )
+        )
 
     # hydrate only the strictly needed before rerank
     hydrated_text_blocks: list[TextBlockMatch]
     hydrated_resources: list[Union[Resource, None]]
 
     ops = [
-        *text_block_hydration_ops.values(),
+        *text_block_hydration_ops,
         *resource_hydration_ops.values(),
     ]
     FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
