@@ -412,7 +412,9 @@ class KnowledgeBoxCount(BaseModel):
 
 
 class SearchParamDefaults:
-    query = ParamDefault(default="", title="Query", description="The query to search for")
+    query = ParamDefault(
+        default="", title="Query", description="The query to search for", max_items=20_000
+    )
     suggest_query = ParamDefault(
         default=..., title="Query", description="The query to get suggestions for"
     )
@@ -446,6 +448,7 @@ class SearchParamDefaults:
         default=...,
         title="Query",
         description="The query to get a generative answer for",
+        max_items=20_000,
     )
     shards = ParamDefault(
         default=[],
