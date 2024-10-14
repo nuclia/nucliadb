@@ -137,13 +137,12 @@ async def test_predict_reranker_dont_call_predict_with_empty_results():
     ) as get_predict:
         reranker = PredictReranker()
 
-        await reranker.rerank("kbid", "my query", items=[])
+        await reranker.rerank(items=[], options=Mock())
         assert get_predict.call_count == 0
 
         reranked = await reranker.rerank(
-            "kbid",
-            "my query",
             items=[RerankableItem(id="id", score=1, score_type=SCORE_TYPE.VECTOR, content="bla bla")],
+            options=RerankingOptions(kbid="kbid", query="my query", top_k=20),
         )
         assert get_predict.call_count == 1
 
