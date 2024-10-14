@@ -21,5 +21,5 @@ sqlx = { version = "0.8.2", features = ["postgres", "uuid", "runtime-tokio", "ti
 tar = "0.4.42"
 tempfile = "3.13.0"
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "signal"] }
-tokio-util = { version = "0.7.12", features = ["io", "io-util"] }
+tokio-util = { version = "0.7.12", features = ["io", "io-util", "compat"] }
 uuid = { version = "1.10.0", features = ["v4"] }

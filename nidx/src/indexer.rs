@@ -98,7 +98,7 @@ async fn index_resource_to_index<'a>(
     Ok((output_dir, records, deletions))
 }
 
-struct WriteCounter<T> {
+pub struct WriteCounter<T> {
     writer: SyncIoBridge<T>,
     counter: usize,
 }
@@ -120,14 +120,14 @@ impl<T> WriteCounter<T>
 where
     T: tokio::io::AsyncWrite + Unpin,
 {
-    fn new(writer: T) -> Self {
+    pub fn new(writer: T) -> Self {
         let writer = SyncIoBridge::new(writer);
         Self {
             writer,
             counter: 0,
         }
     }
-    fn finish(&mut self) -> std::io::Result<usize> {
+    pub fn finish(&mut self) -> std::io::Result<usize> {
         self.writer.shutdown()?;
         Ok(self.counter)
     }

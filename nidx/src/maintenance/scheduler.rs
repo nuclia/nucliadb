@@ -28,7 +28,7 @@ pub async fn run() -> anyhow::Result<()> {
     let settings = Settings::from_env();
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
 
-    MergeJob::create(&meta, &[]).await?;
+    MergeJob::create(&meta, &[1, 2]).await?;
 
     loop {
         let retry_jobs = sqlx::query_as!(MergeJob, "UPDATE merge_jobs SET started_at = NULL, running_at = NULL, retries = retries + 1 WHERE running_at < NOW() - INTERVAL '5 seconds' AND retries < 2 RETURNING *").fetch_all(&meta.pool).await?;
@@ -54,8 +54,8 @@ pub async fn run() -> anyhow::Result<()> {
             println!("Job has been running for a while {}", j.id);
         }
 
+        // TODO: Delete non-ready segments
+
         sleep(Duration::from_secs(5)).await;
     }
-
-    Ok(())
 }

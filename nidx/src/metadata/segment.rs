@@ -58,7 +58,7 @@ impl Segment {
 
     pub async fn delete_many(meta: impl Executor<'_, Database = Postgres>, segment_ids: &[i64]) -> sqlx::Result<()> {
         let affected =
-            sqlx::query!("DELETE FROM merge_jobs WHERE id = ANY($1)", segment_ids).execute(meta).await?.rows_affected();
+            sqlx::query!("DELETE FROM segments WHERE id = ANY($1)", segment_ids).execute(meta).await?.rows_affected();
         if affected != segment_ids.len() as u64 {
             Err(sqlx::Error::RowNotFound)
         } else {
