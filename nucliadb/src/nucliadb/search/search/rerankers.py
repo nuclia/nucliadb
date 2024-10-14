@@ -89,6 +89,9 @@ class PredictReranker(Reranker):
         return math.ceil(max(reranker_requested, actual_requested) / shards)
 
     async def rerank(self, kbid: str, query: str, items: list[RerankableItem]) -> list[RankedItem]:
+        if len(items) == 0:
+            return []
+
         predict = get_predict()
 
         request = RerankModel(

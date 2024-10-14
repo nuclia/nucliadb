@@ -18,7 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb.search.search.rerankers import RankedItem, RerankableItem, Reranker
+from unittest.mock import AsyncMock, Mock, patch
+
+from nucliadb.search.search.rerankers import PredictReranker, RankedItem, RerankableItem, Reranker
+from nucliadb_models.internal.predict import RerankResponse
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
@@ -105,3 +108,28 @@ async def test_rerank_find_response():
     ]
     assert ranking == expected
     assert find_response.best_matches == [x[3] for x in expected]
+
+
+async def test_predict_reranker_dont_call_predict_with_empty_results():
+    predict = AsyncMock()
+    predict.rerank.return_value = RerankResponse(context_scores={"id": 10})
+
+    with patch(
+        "nucliadb.search.search.rerankers.get_predict", new=Mock(return_value=predict)
+    ) as get_predict:
+        reranker = PredictReranker()
+
+        await reranker.rerank("kbid", "my query", items=[])
+        assert get_predict.call_count == 0
+
+        reranked = await reranker.rerank(
+            "kbid",
+            "my query",
+            items=[RerankableItem(id="id", score=1, score_type=SCORE_TYPE.VECTOR, content="bla bla")],
+        )
+        assert get_predict.call_count == 1
+
+        assert len(reranked) == 1
+        assert reranked[0].id == "id"
+        assert reranked[0].score == 10
+        assert reranked[0].score_type == SCORE_TYPE.RERANKER
