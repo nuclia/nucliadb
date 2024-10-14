@@ -1,4 +1,4 @@
-use nidx::{indexer, maintenance};
+use nidx::{indexer, maintenance, searcher};
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -27,6 +27,7 @@ async fn main() -> anyhow::Result<()> {
         "indexer" => indexer::run().await?,
         "worker" => maintenance::worker::run().await?,
         "scheduler" => maintenance::scheduler::run().await?,
+        "searcher" => searcher::run().await?,
         _ => panic!("Unknown mode {}", args[1]),
     };
 

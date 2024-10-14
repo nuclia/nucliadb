@@ -20,6 +20,7 @@
 pub mod indexer;
 pub mod maintenance;
 mod metadata;
+pub mod searcher;
 mod settings;
 
 pub use metadata::NidxMetadata;

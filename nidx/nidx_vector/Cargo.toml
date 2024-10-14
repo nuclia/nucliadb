@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 nucliadb_core = { version = "0.1.0", path = "../../nucliadb_core" }
 nucliadb_vectors = { version = "0.1.0", path = "../../nucliadb_vectors" }
+serde_json = "1.0.128"
 tempfile = "3.13.0"
 uuid = { version = "1.10.0", features = ["v4"] }

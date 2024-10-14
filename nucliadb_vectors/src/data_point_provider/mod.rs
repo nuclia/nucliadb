@@ -23,7 +23,7 @@ pub mod reader;
 pub mod writer;
 
 pub mod replication;
-mod state;
+pub mod state;
 
 use crate::config::VectorConfig;
 use crate::data_types::dtrie_ram::DTrie;

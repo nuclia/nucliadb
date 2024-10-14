@@ -96,6 +96,8 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     }
 
     println!("Downloaded to {work_dir:?}, merging");
+    // TODO: Handle deletions
+    // TODO: Maybe compact deletions (single entry for multiple keys) if possible? Maybe this goes as a separate task in scheduler
     let merged =
         nidx_vector::VectorIndexer::new().merge(work_dir.path(), &segments.iter().map(|s| s.id).collect::<Vec<_>>())?;
     println!("Merged to {merged:?}");
@@ -125,7 +127,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     job.finish(&mut *tx).await?;
     tx.commit().await?;
 
-    // Stop keep alives
+    // Stop keep alives. TODO: Stop on failure as well
     keepalive.abort();
 
     // Delete task if successful. Mark as failed otherwise?

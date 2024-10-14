@@ -1,3 +1,5 @@
+use std::fs::{File, OpenOptions};
+use std::io::Seek;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -20,15 +22,21 @@
 use std::path::Path;
 use std::time::SystemTime;
 
-use nucliadb_core::protos::Resource;
+use nucliadb_core::protos::prost_types::Duration;
+use nucliadb_core::protos::{Resource, VectorSearchRequest};
 use nucliadb_core::vectors::VectorWriter;
 use nucliadb_vectors::data_point::DataPointPin;
+use nucliadb_vectors::data_point_provider::reader::Reader;
+use nucliadb_vectors::data_point_provider::state::write_state;
+use nucliadb_vectors::data_point_provider::{self, SearchRequest};
+use nucliadb_vectors::formula::Formula;
 use nucliadb_vectors::{
     config::VectorConfig,
     data_point::{self, open, NoDLog},
     service::VectorWriterService,
     VectorR,
 };
+use tempfile::{tempdir, TempDir};
 
 pub struct VectorIndexer;
 
@@ -83,5 +91,79 @@ impl VectorIndexer {
         )?;
 
         Ok(destination.id().to_string())
+    }
+}
+
+pub struct VectorSearcher {
+    index_dir: TempDir,
+    reader: data_point_provider::reader::Reader,
+}
+
+impl VectorSearcher {
+    pub fn new(
+        segments_dir: &Path,
+        index_id: i64,
+        segments: Vec<(i64, i64)>,
+        deletions: Vec<(i64, String)>,
+    ) -> VectorR<Self> {
+        let index_dir = tempdir()?;
+        let mut index_state = data_point_provider::state::State::default();
+
+        for (segment_id, seq) in segments {
+            // Give it a uuid for a name
+            let uuid = uuid::Uuid::new_v4();
+            let segment_path = segments_dir.join(format!("{index_id}/{segment_id}"));
+            std::os::unix::fs::symlink(&segment_path, index_dir.path().join(uuid.to_string()))?;
+            index_state.data_point_list.push(uuid);
+
+            // Tweak time in journal
+            let mut journal_file =
+                OpenOptions::new().read(true).write(true).open(&segment_path.join("journal.json"))?;
+            let mut journal: serde_json::Value = serde_json::from_reader(&journal_file)?;
+            journal["ctime"]["secs_since_epoch"] = serde_json::Value::from(seq);
+            journal["ctime"]["nanos_since_epoch"] = serde_json::Value::from(0);
+            journal_file.seek(std::io::SeekFrom::Start(0))?;
+            serde_json::to_writer(&mut journal_file, &journal)?;
+            let len = journal_file.seek(std::io::SeekFrom::Current(0))?;
+            journal_file.set_len(len)?;
+            drop(journal_file);
+        }
+
+        for (seq, key) in deletions {
+            index_state
+                .delete_log
+                .insert(key.as_bytes(), SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(seq as u64));
+        }
+
+        // Write state
+        let mut state_file = File::create(index_dir.path().join("state.bincode"))?;
+        write_state(&mut state_file, &index_state)?;
+        drop(state_file);
+
+        // Open reader using the recently created data
+        let reader = Reader::open(index_dir.path())?;
+
+        Ok(VectorSearcher {
+            index_dir,
+            reader,
+        })
+    }
+
+    pub fn dummy_search(&self) -> VectorR<usize> {
+        Ok(self
+            .reader
+            .search(
+                &(
+                    20,
+                    &VectorSearchRequest {
+                        vector: Vec::from(&[0.1; 1024]),
+                        min_score: -1.0,
+                        ..Default::default()
+                    },
+                    Formula::new(),
+                ),
+                &None,
+            )?
+            .len())
     }
 }

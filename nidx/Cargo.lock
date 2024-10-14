@@ -1584,6 +1584,7 @@ version = "0.1.0"
 dependencies = [
  "nucliadb_core",
  "nucliadb_vectors",
+ "serde_json",
  "tempfile",
  "uuid 1.10.0",
 ]
