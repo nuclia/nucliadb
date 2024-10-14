@@ -26,8 +26,8 @@ from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import (
+    build_find_response,
     compose_find_resources,
-    find_merge_results,
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import (
@@ -111,19 +111,20 @@ async def _index_node_retrieval(
 
     # Rank fusion merge, cut, hydrate and rerank
     with metrics.time("results_merge"):
-        search_results = await find_merge_results(
+        search_results = await build_find_response(
             results,
-            count=item.page_size,
-            page=item.page_number,
             kbid=kbid,
+            query=pb_query.body,
+            relation_subgraph_query=pb_query.relations.subgraph,
+            min_score_bm25=pb_query.min_score_bm25,
+            min_score_semantic=pb_query.min_score_semantic,
+            page_size=item.page_size,
+            page_number=item.page_number,
             show=item.show,
-            field_type_filter=item.field_type_filter,
             extracted=item.extracted,
-            requested_relations=pb_query.relation_subgraph,
-            min_score_bm25=query_parser.min_score.bm25,
-            min_score_semantic=query_parser.min_score.semantic,  # type: ignore
-            reranker=query_parser.reranker,
+            field_type_filter=item.field_type_filter,
             highlight=item.highlight,
+            reranker=query_parser.reranker,
         )
 
     search_time = time() - start_time
