@@ -373,6 +373,7 @@ message FieldText {
     string body = 1;
     Format format = 2;
     string md5 = 3;
+    bool split_on_blankline = 4;
 }
 
 message Block {

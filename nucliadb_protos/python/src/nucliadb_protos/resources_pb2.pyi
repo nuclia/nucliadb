@@ -1524,17 +1524,20 @@ class FieldText(google.protobuf.message.Message):
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
     MD5_FIELD_NUMBER: builtins.int
+    SPLIT_ON_BLANKLINE_FIELD_NUMBER: builtins.int
     body: builtins.str
     format: global___FieldText.Format.ValueType
     md5: builtins.str
+    split_on_blankline: builtins.bool
     def __init__(
         self,
         *,
         body: builtins.str = ...,
         format: global___FieldText.Format.ValueType = ...,
         md5: builtins.str = ...,
+        split_on_blankline: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "md5", b"md5"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "md5", b"md5", "split_on_blankline", b"split_on_blankline"]) -> None: ...
 
 global___FieldText = FieldText
 

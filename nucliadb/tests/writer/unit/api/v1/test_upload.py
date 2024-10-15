@@ -28,6 +28,7 @@ from nucliadb.writer.api.v1.upload import (
     validate_field_upload,
 )
 from nucliadb.writer.tus.exceptions import HTTPConflict, HTTPNotFound
+from nucliadb_models.file import FileProcessingOptions
 from nucliadb_models.resource import QueueType
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig
 
@@ -176,3 +177,26 @@ async def test_store_file_on_nucliadb_sets_hidden(
     transaction_mock.commit.assert_awaited_once()
     writer_bm = transaction_mock.commit.call_args[0][0]
     assert writer_bm.basic.hidden is True
+
+
+@pytest.mark.asyncio
+async def test_store_file_on_nucliadb_sets_processing_options(
+    processing_mock, partitioning_mock, transaction_mock, kb_config_mock
+):
+    field = "myfield"
+    processing_options = FileProcessingOptions(aitables=True)
+    await store_file_on_nuclia_db(
+        10,
+        "kbid",
+        "/some/path",
+        Request({"type": "http", "headers": []}),
+        "bucket",
+        Source.INGEST,
+        "rid",
+        field,
+        password="mypassword",
+        file_processing_options=processing_options,
+    )
+    processing_mock.convert_internal_filefield_to_str.assert_awaited_once()
+    file_field = processing_mock.convert_internal_filefield_to_str.call_args[0][0]
+    assert file_field.processing_options.aitables is True

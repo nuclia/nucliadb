@@ -66,6 +66,7 @@ class FieldText(BaseModel):
     body: Optional[str] = None
     format: Optional[TextFormat] = None
     md5: Optional[str] = None
+    split_on_blankline: Optional[bool] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldText) -> _T:
@@ -93,6 +94,10 @@ If you need to store more text, consider using a file field instead or splitting
         default=TextFormat.PLAIN,
         description="The format of the text.",
     )
+    split_on_blankline: bool = Field(
+        default=False,
+        description="If true, the text will be split into blocks separated by blank lines. This only applies to plain text.",
+    )
 
     @model_validator(mode="after")
     def check_text_format(self) -> Self:
@@ -116,7 +121,7 @@ class PushTextFormat(TextFormatValue, Enum):  # type: ignore
 class Text(BaseModel):
     body: str
     format: PushTextFormat
-    split_text_blocks_on_blankline: bool = Field(
+    split_on_blankline: bool = Field(
         default=False,
         description="If true, the text will be split into blocks separated by blank lines. This only applies to plain text.",
     )

@@ -890,6 +890,7 @@ async def store_file_on_nuclia_db(
             writer.slug = item.slug
             toprocess.slug = item.slug
 
+        # These are the global processing options at the resource level
         toprocess.processing_options = item.processing_options
 
         kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
@@ -931,7 +932,9 @@ async def store_file_on_nuclia_db(
             file_field.file.filename = filename
         file_field.file.uri = path
         file_field.file.source = source
+
         if file_processing_options:
+            # Field-level processing options
             file_field.processing_options.aitables = file_processing_options.aitables
 
         if md5:

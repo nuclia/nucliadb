@@ -986,3 +986,34 @@ async def test_dates_are_properly_validated(
     assert resp.status_code == 200, resp.text
 
     assert resp.json()["origin"]["created"] == "0001-01-01T00:00:00Z"
+
+
+@pytest.mark.asyncio
+async def test_text_fields_store_split_on_blanklines(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "texts": {
+                "text1": {
+                    "body": "My text",
+                    "split_on_blankline": True,
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    resource = Resource.model_validate(data)
+    assert resource.data.texts["text1"].value.split_on_blankline is True  # type: ignore

@@ -897,6 +897,8 @@ pub struct FieldText {
     pub format: i32,
     #[prost(string, tag = "3")]
     pub md5: ::prost::alloc::string::String,
+    #[prost(bool, tag = "4")]
+    pub split_on_blankline: bool,
 }
 /// Nested message and enum types in `FieldText`.
 pub mod field_text {
