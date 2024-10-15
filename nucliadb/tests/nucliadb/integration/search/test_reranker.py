@@ -24,7 +24,9 @@ from httpx import AsyncClient
 from nucliadb_models.search import Reranker
 
 
-@pytest.mark.parametrize("reranker", [Reranker.MULTI_MATCH_BOOSTER, Reranker.PREDICT_RERANKER])
+@pytest.mark.parametrize(
+    "reranker", [Reranker.MULTI_MATCH_BOOSTER, Reranker.PREDICT_RERANKER, Reranker.NOOP]
+)
 async def test_reranker(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,

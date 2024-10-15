@@ -184,7 +184,9 @@ async def run_main_query(
     find_request.rephrase_prompt = parse_rephrase_prompt(item)
     # predict reranker will be done in their stream to avoid a round trip
     # between nucliadb and predict
-    if item.reranker != Reranker.PREDICT_RERANKER:
+    if item.reranker == Reranker.PREDICT_RERANKER:
+        find_request.reranker = Reranker.NOOP
+    else:
         find_request.reranker = item.reranker
     # We don't support pagination, we always get the top_k results.
     find_request.top_k = item.top_k
