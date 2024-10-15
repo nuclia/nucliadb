@@ -121,7 +121,7 @@ class PredictReranker(Reranker):
             )
             for id, score in response.context_scores.items()
         ]
-        sort_reranked(reranked)
+        sort_by_score(reranked)
         best = reranked[: options.top_k]
         return best
 
@@ -161,7 +161,7 @@ class MultiMatchBoosterReranker(Reranker):
                 reranked_by_id[item.id].score_type = SCORE_TYPE.BOTH
 
         reranked = list(reranked_by_id.values())
-        sort_reranked(reranked)
+        sort_by_score(reranked)
         return reranked
 
 
@@ -177,7 +177,7 @@ def get_reranker(kind: search_models.Reranker) -> Reranker:
     return reranker
 
 
-def sort_reranked(items: list[RankedItem]):
+def sort_by_score(items: list[RankedItem]):
     """Sort `items` in place by decreasing score"""
     items.sort(key=lambda item: item.score, reverse=True)
 

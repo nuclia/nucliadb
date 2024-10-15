@@ -27,7 +27,7 @@ from nucliadb.search.search.rerankers import (
     Reranker,
     RerankingOptions,
     apply_reranking,
-    sort_reranked,
+    sort_by_score,
 )
 from nucliadb_models.internal.predict import RerankResponse
 from nucliadb_models.search import (
@@ -56,7 +56,7 @@ class DummyReranker(Reranker):
             )
             for item in items
         ]
-        sort_reranked(reranked)
+        sort_by_score(reranked)
         return reranked
 
 
