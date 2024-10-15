@@ -20,19 +20,18 @@ use std::io::Seek;
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::path::Path;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
-use nucliadb_core::protos::prost_types::Duration;
 use nucliadb_core::protos::{Resource, VectorSearchRequest};
 use nucliadb_core::vectors::VectorWriter;
 use nucliadb_vectors::data_point::DataPointPin;
-use nucliadb_vectors::data_point_provider::reader::Reader;
+use nucliadb_vectors::data_point_provider;
+use nucliadb_vectors::data_point_provider::reader::{Reader, TimeSensitiveDLog};
 use nucliadb_vectors::data_point_provider::state::write_state;
-use nucliadb_vectors::data_point_provider::{self, SearchRequest};
 use nucliadb_vectors::formula::Formula;
 use nucliadb_vectors::{
     config::VectorConfig,
-    data_point::{self, open, NoDLog},
+    data_point::{self, open},
     service::VectorWriterService,
     VectorR,
 };
@@ -65,32 +64,53 @@ impl VectorIndexer {
         return Ok((writer.count().unwrap() as i64, &resource.sentences_to_delete));
     }
 
-    pub fn merge(&self, work_dir: &Path, segments: &[i64]) -> VectorR<String> {
+    pub fn merge(
+        &self,
+        work_dir: &Path,
+        segments: &[(i64, i64)],
+        deletions: &Vec<(i64, &Vec<String>)>,
+    ) -> VectorR<(String, usize)> {
+        // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
+        // Wait and see how the Tantivy indexes turn out
+        let mut delete_log = data_point_provider::DTrie::new();
+        for d in deletions {
+            let time = SystemTime::UNIX_EPOCH + Duration::from_secs(d.0 as u64);
+            for k in d.1 {
+                delete_log.insert(k.as_bytes(), time);
+            }
+        }
+
         // Rename (nucliadb_vectors wants uuid, we use i64 as segment ids) and open the segments
         let segment_ids: Vec<_> = segments
             .iter()
-            .map(|s| {
+            .map(|(sid, seq)| {
                 let uuid = uuid::Uuid::new_v4();
-                std::fs::rename(work_dir.join(s.to_string()), work_dir.join(uuid.to_string())).unwrap();
-                uuid
+                std::fs::rename(work_dir.join(sid.to_string()), work_dir.join(uuid.to_string())).unwrap();
+                (uuid, seq)
             })
-            .map(|dpid| {
+            .map(|(dpid, seq)| {
                 let dp = data_point::DataPointPin::open_pin(work_dir, dpid).unwrap();
                 let open_dp = open(&dp).unwrap();
-                (NoDLog, open_dp)
+                (
+                    TimeSensitiveDLog {
+                        dlog: &delete_log,
+                        time: SystemTime::UNIX_EPOCH + Duration::from_secs(*seq as u64),
+                    },
+                    open_dp,
+                )
             })
             .collect();
 
         // Do the merge
         let destination = DataPointPin::create_pin(work_dir).unwrap();
-        nucliadb_vectors::data_point::merge(
+        let open_destination = nucliadb_vectors::data_point::merge(
             &destination,
             &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(),
             &VectorConfig::default(),
             SystemTime::now(),
         )?;
 
-        Ok(destination.id().to_string())
+        Ok((destination.id().to_string(), open_destination.journal().no_nodes()))
     }
 }
 
@@ -157,7 +177,8 @@ impl VectorSearcher {
                     20,
                     &VectorSearchRequest {
                         vector: Vec::from(&[0.1; 1024]),
-                        min_score: -1.0,
+                        min_score: -10.0,
+                        with_duplicates: true,
                         ..Default::default()
                     },
                     Formula::new(),

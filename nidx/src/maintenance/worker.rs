@@ -29,7 +29,7 @@ use tokio_util::io::SyncIoBridge;
 
 use crate::{
     indexer::WriteCounter,
-    metadata::{MergeJob, Segment},
+    metadata::{Deletion, MergeJob, Segment},
     NidxMetadata, Settings,
 };
 
@@ -69,7 +69,17 @@ pub async fn download_segment(
 }
 
 pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObjectStore>) -> anyhow::Result<()> {
+    // TODO: It's weird that we take the index_id from the first segment. There is no check to ensure all segments are from the same index
+    // we just trust the scheduler to do the right thing. Maybe add a job param and check here? Should jobs be generic or keep the merge_job idea?
     let segments = job.segments(meta).await?;
+    let deletions = sqlx::query_as!(
+        Deletion,
+        "SELECT * FROM deletions WHERE index_id = $1 AND seq <= $2 ORDER BY seq",
+        segments[0].index_id,
+        job.seq
+    )
+    .fetch_all(&meta.pool)
+    .await?;
 
     // Start keep alive to mark progress
     let pool = meta.pool.clone();
@@ -96,15 +106,15 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     }
 
     println!("Downloaded to {work_dir:?}, merging");
-    // TODO: Handle deletions
-    // TODO: Maybe compact deletions (single entry for multiple keys) if possible? Maybe this goes as a separate task in scheduler
-    let merged =
-        nidx_vector::VectorIndexer::new().merge(work_dir.path(), &segments.iter().map(|s| s.id).collect::<Vec<_>>())?;
+    let (merged, merged_records) = nidx_vector::VectorIndexer::new().merge(
+        work_dir.path(),
+        &segments.iter().map(|s| (s.id, s.seq)).collect::<Vec<_>>(),
+        &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>(),
+    )?;
     println!("Merged to {merged:?}");
 
-    // Upload (HACK: copied code from indexer)
-    let seq = segments.iter().map(|s| s.seq).max().unwrap();
-    let segment = Segment::create(&meta, segments[0].index_id, seq).await?;
+    // Upload (copied code from indexer)
+    let segment = Segment::create(&meta, segments[0].index_id, job.seq).await?;
     let store_path = format!("segment/{}", segment.id);
 
     let mut upload = WriteCounter::new(object_store::buffered::BufWriter::new(storage, store_path.into()));
@@ -120,14 +130,14 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     .await??;
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at
-    let records = segments.iter().map(|s| s.records.unwrap()).sum();
     let mut tx = meta.transaction().await?;
-    segment.mark_ready(&mut *tx, records, size).await?;
+    segment.mark_ready(&mut *tx, merged_records as i64, size).await?;
     Segment::delete_many(&mut *tx, &segments.iter().map(|s| s.id).collect::<Vec<_>>()).await?;
     job.finish(&mut *tx).await?;
     tx.commit().await?;
 
-    // Stop keep alives. TODO: Stop on failure as well
+    // Stop keep alives. TODO: Stop on failure as well. This probably makes more sense on the outer function and/or wrapped in an struct with Drop
+    // It currently works because everything panics on error
     keepalive.abort();
 
     // Delete task if successful. Mark as failed otherwise?

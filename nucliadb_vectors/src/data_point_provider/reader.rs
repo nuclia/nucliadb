@@ -37,9 +37,9 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 #[derive(Clone, Copy)]
-struct TimeSensitiveDLog<'a> {
-    dlog: &'a DTrie,
-    time: SystemTime,
+pub struct TimeSensitiveDLog<'a> {
+    pub dlog: &'a DTrie,
+    pub time: SystemTime,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {

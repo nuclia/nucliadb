@@ -23,13 +23,11 @@ use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 pub struct Segment {
     pub id: i64,
     pub index_id: i64,
-    pub ready: bool,
     pub seq: i64,
     pub records: Option<i64>,
     pub size_bytes: Option<i64>,
     pub merge_job_id: Option<i64>,
-    pub created_at: PrimitiveDateTime,
-    pub deleted_at: Option<PrimitiveDateTime>,
+    pub delete_at: Option<PrimitiveDateTime>,
 }
 
 impl Segment {
@@ -46,7 +44,7 @@ impl Segment {
         size_bytes: i64,
     ) -> sqlx::Result<()> {
         sqlx::query!(
-            "UPDATE segments SET ready = true, records = $1, size_bytes = $2 WHERE id = $3",
+            "UPDATE segments SET delete_at = NULL, records = $1, size_bytes = $2 WHERE id = $3",
             records,
             size_bytes,
             self.id,

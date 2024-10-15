@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(segments.len(), 1);
 
         let segment = &segments[0];
-        assert_eq!(segment.ready, true);
+        assert_eq!(segment.delete_at, None);
         assert_eq!(segment.records, Some(1));
 
         let download =

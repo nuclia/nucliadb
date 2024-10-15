@@ -26,7 +26,7 @@ pub mod replication;
 pub mod state;
 
 use crate::config::VectorConfig;
-use crate::data_types::dtrie_ram::DTrie;
+pub use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::formula::Formula;
 use crate::VectorR;

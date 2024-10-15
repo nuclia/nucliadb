@@ -17,6 +17,7 @@ CREATE TABLE indexes (
 CREATE TABLE merge_jobs (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     retries SMALLINT NOT NULL DEFAULT 0,
+    seq BIGINT NOT NULL,
     enqueued_at TIMESTAMP NOT NULL DEFAULT NOW(),
     started_at TIMESTAMP,
     running_at TIMESTAMP
@@ -25,13 +26,11 @@ CREATE TABLE merge_jobs (
 CREATE TABLE segments (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     index_id BIGINT NOT NULL REFERENCES indexes(id),
-    ready BOOLEAN NOT NULL DEFAULT FALSE,
     seq BIGINT NOT NULL,
     records BIGINT,
     size_bytes BIGINT,
     merge_job_id BIGINT REFERENCES merge_jobs(id) ON DELETE SET NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMP
+    delete_at TIMESTAMP DEFAULT NOW() + INTERVAL '5 minutes'
 );
 
 CREATE TABLE deletions (

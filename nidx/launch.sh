@@ -1,1 +1,1 @@
-RUST_LOG=debug DATABASE_URL=postgresql://postgres@localhost/test METADATA_DATABASE_URL=postgresql://postgres@localhost/test INDEXER_NATS_SERVER=nats://localhost:4222 INDEXER_OBJECT_STORE=file INDEXER_FILE_PATH=../data/blob/fake/ cargo run $1
+RUST_LOG=debug DATABASE_URL=postgresql://postgres@localhost/test METADATA_DATABASE_URL=postgresql://postgres@localhost/test INDEXER_NATS_SERVER=nats://localhost:4222 INDEXER_OBJECT_STORE=file INDEXER_FILE_PATH=../data/blob/fake/ cargo run $@

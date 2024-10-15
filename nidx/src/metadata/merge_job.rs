@@ -24,16 +24,18 @@ use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 pub struct MergeJob {
     pub id: i64,
     pub retries: i16,
+    pub seq: i64,
     pub enqueued_at: PrimitiveDateTime,
     pub started_at: Option<PrimitiveDateTime>,
     pub running_at: Option<PrimitiveDateTime>,
 }
 
 impl MergeJob {
-    pub async fn create(meta: &NidxMetadata, segment_ids: &[i64]) -> sqlx::Result<MergeJob> {
+    pub async fn create(meta: &NidxMetadata, segment_ids: &[i64], seq: i64) -> sqlx::Result<MergeJob> {
         let mut tx = meta.transaction().await?;
-        let job =
-            sqlx::query_as!(MergeJob, "INSERT INTO merge_jobs DEFAULT VALUES RETURNING *").fetch_one(&mut *tx).await?;
+        let job = sqlx::query_as!(MergeJob, "INSERT INTO merge_jobs (seq) VALUES ($1) RETURNING *", seq)
+            .fetch_one(&mut *tx)
+            .await?;
         let affected = sqlx::query!(
             "UPDATE segments SET merge_job_id = $1 WHERE id = ANY($2) AND merge_job_id IS NULL",
             job.id,

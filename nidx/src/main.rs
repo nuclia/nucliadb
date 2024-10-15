@@ -18,18 +18,28 @@ use nidx::{indexer, maintenance, searcher};
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use tokio;
+use tokio::{self, task::JoinSet};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<_> = std::env::args().collect();
-    match args[1].as_str() {
-        "indexer" => indexer::run().await?,
-        "worker" => maintenance::worker::run().await?,
-        "scheduler" => maintenance::scheduler::run().await?,
-        "searcher" => searcher::run().await?,
-        _ => panic!("Unknown mode {}", args[1]),
-    };
+    let args_str: Vec<_> = args.iter().map(|a| a.as_str()).collect();
+
+    let mut tasks = JoinSet::new();
+    if args_str.contains(&"indexer") {
+        tasks.spawn(indexer::run());
+    }
+    if args_str.contains(&"worker") {
+        tasks.spawn(maintenance::worker::run());
+    }
+    if args_str.contains(&"scheduler") {
+        tasks.spawn(maintenance::scheduler::run());
+    }
+    if args_str.contains(&"searcher") {
+        tasks.spawn(searcher::run());
+    }
+
+    tasks.join_next().await.unwrap()??;
 
     Ok(())
 }

@@ -18,8 +18,8 @@ use crate::{metadata::Index, NidxMetadata, Settings};
 #[derive(Clone)]
 pub struct SearchOperation {
     seq: i64,
-    segment_id: Option<i64>,
-    deleted_keys: Option<Vec<String>>,
+    segment_ids: Vec<i64>,
+    deleted_keys: Vec<String>,
 }
 
 pub async fn run() -> anyhow::Result<()> {
@@ -58,8 +58,8 @@ async fn run_search(
 ) -> anyhow::Result<()> {
     loop {
         tokio::time::sleep(Duration::from_millis(500)).await;
+        let meta_read = index_metadata.read().await;
         let meta: Vec<SearchOperation> = {
-            let meta_read = index_metadata.read().await;
             let index_1 = meta_read.get(&1);
             if let Some(index_1) = index_1 {
                 index_1.iter().cloned().collect()
@@ -69,15 +69,18 @@ async fn run_search(
             }
         };
 
-        let empty = Vec::new();
+        println!(
+            "Opening searcher for {:?}",
+            meta.iter().flat_map(|m| m.segment_ids.iter().map(|sid| (*sid, m.seq))).collect::<Vec<_>>()
+        );
         let searcher = VectorSearcher::new(
             &work_dir,
             1,
-            meta.iter().filter_map(|m| m.segment_id.map(|sid| (sid, m.seq))).collect(),
-            meta.iter()
-                .flat_map(|m| m.deleted_keys.as_ref().unwrap_or(&empty).iter().map(|d| (m.seq, d.clone())))
-                .collect(),
+            meta.iter().flat_map(|m| m.segment_ids.iter().map(|sid| (*sid, m.seq))).collect(),
+            meta.iter().flat_map(|m| m.deleted_keys.iter().map(|d| (m.seq, d.clone()))).collect(),
         )?;
+        println!("Open searcher");
+        drop(meta_read); // Keep lock until searcher is loaded, to avoid deletions from happening while opening
         println!("Did search with {} results", searcher.dummy_search()?);
     }
 }
@@ -96,48 +99,53 @@ async fn run_sync(
             let read_index_metadata = index_metadata.read().await;
             let empty = vec![];
             let current_meta = read_index_metadata.get(&index_id).unwrap_or(&empty);
-            let current_seqs: HashSet<_> = current_meta.iter().map(|s| s.seq).collect();
-            let new_meta = sqlx::query_as!(SearchOperation, r#"SELECT COALESCE(segments.seq, deletions.seq) AS "seq!", segments.id AS "segment_id?", deletions.keys AS "deleted_keys?" FROM segments NATURAL FULL JOIN deletions WHERE segments.ready = true ORDER BY 1"#).fetch_all(&meta.pool).await?;
-            let new_seqs: HashSet<_> = new_meta.iter().map(|s| s.seq).collect();
-
-            // Calculate deletions
-            let deleted_segments = current_meta
-                .iter()
-                .filter_map(|m| {
-                    if new_seqs.contains(&m.seq) {
-                        None
-                    } else {
-                        m.segment_id
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            let new_segments = new_meta
-                .iter()
-                .filter_map(|m| {
-                    if current_seqs.contains(&m.seq) {
-                        None
-                    } else {
-                        m.segment_id
-                    }
-                })
-                .collect::<Vec<_>>();
+            let current_segs: HashSet<i64> = current_meta.iter().flat_map(|s| s.segment_ids.clone()).collect();
             drop(read_index_metadata);
 
-            // New segments
+            let new_meta = sqlx::query_as!(
+                SearchOperation,
+                r#"WITH ready_segments AS (
+                    SELECT index_id, seq, array_agg(id) AS segment_ids
+                       FROM segments
+                       WHERE delete_at IS NULL
+                       GROUP BY index_id, seq
+                       )
+                       SELECT
+                       COALESCE(ready_segments.seq, deletions.seq) AS "seq!",
+                       COALESCE(segment_ids, '{}') AS "segment_ids!",
+                       COALESCE(deletions.keys, '{}') AS "deleted_keys!"
+                       FROM ready_segments
+                       NATURAL FULL OUTER JOIN deletions
+                       WHERE index_id = 1
+                       ORDER BY seq;"#
+            )
+            .fetch_all(&meta.pool)
+            .await?;
+            let new_segs: HashSet<i64> = new_meta.iter().flat_map(|s| s.segment_ids.clone()).collect();
+
+            // Calculate deletions
+            let deleted_segments = current_segs.difference(&new_segs);
+            let new_segments = new_segs.difference(&current_segs);
+
+            // Download new segments
             for segment_id in new_segments {
-                download_segment(storage.clone(), segment_id, work_dir.join(format!("{index_id}/{segment_id}")))
+                download_segment(storage.clone(), *segment_id, work_dir.join(format!("{index_id}/{segment_id}")))
                     .await?;
             }
 
             // Switch meta
+            println!("Metadata updating {:?}", new_meta[0].segment_ids);
             index_metadata.write().await.insert(index_id, new_meta);
+            println!("Metadata updated, deleting {:?}", deleted_segments);
 
             // Delete unneeded segments
             for d in deleted_segments {
                 std::fs::remove_dir_all(work_dir.join(format!("{index_id}/{d}")))?;
             }
+            println!("Deleted");
         }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }
 
