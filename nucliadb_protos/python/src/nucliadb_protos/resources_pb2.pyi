@@ -1925,6 +1925,21 @@ class FieldLink(google.protobuf.message.Message):
 global___FieldLink = FieldLink
 
 @typing.final
+class FileProcessingOptions(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AITABLES_FIELD_NUMBER: builtins.int
+    aitables: builtins.bool
+    def __init__(
+        self,
+        *,
+        aitables: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["aitables", b"aitables"]) -> None: ...
+
+global___FileProcessingOptions = FileProcessingOptions
+
+@typing.final
 class FieldFile(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1950,6 +1965,7 @@ class FieldFile(google.protobuf.message.Message):
     PASSWORD_FIELD_NUMBER: builtins.int
     URL_FIELD_NUMBER: builtins.int
     HEADERS_FIELD_NUMBER: builtins.int
+    PROCESSING_OPTIONS_FIELD_NUMBER: builtins.int
     language: builtins.str
     password: builtins.str
     url: builtins.str
@@ -1959,6 +1975,8 @@ class FieldFile(google.protobuf.message.Message):
     def file(self) -> global___CloudFile: ...
     @property
     def headers(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    @property
+    def processing_options(self) -> global___FileProcessingOptions: ...
     def __init__(
         self,
         *,
@@ -1968,9 +1986,10 @@ class FieldFile(google.protobuf.message.Message):
         password: builtins.str = ...,
         url: builtins.str = ...,
         headers: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        processing_options: global___FileProcessingOptions | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["added", b"added", "file", b"file"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["added", b"added", "file", b"file", "headers", b"headers", "language", b"language", "password", b"password", "url", b"url"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["added", b"added", "file", b"file", "processing_options", b"processing_options"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["added", b"added", "file", b"file", "headers", b"headers", "language", b"language", "password", b"password", "processing_options", b"processing_options", "url", b"url"]) -> None: ...
 
 global___FieldFile = FieldFile
 

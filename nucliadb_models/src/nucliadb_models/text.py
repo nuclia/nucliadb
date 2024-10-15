@@ -116,3 +116,7 @@ class PushTextFormat(TextFormatValue, Enum):  # type: ignore
 class Text(BaseModel):
     body: str
     format: PushTextFormat
+    split_text_blocks_on_blankline: bool = Field(
+        default=False,
+        description="If true, the text will be split into blocks separated by blank lines. This only applies to plain text.",
+    )

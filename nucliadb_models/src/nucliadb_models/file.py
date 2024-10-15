@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_models import CloudLink, File
 from nucliadb_protos import resources_pb2
@@ -63,6 +63,14 @@ class FileField(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
     file: File
+
+
+class FileProcessingOptions(BaseModel):
+    aitables: bool = Field(
+        default=False,
+        title="AI Tables",
+        description="Whether to process tables detected on the document with AI. This is only available for application/pdf files.",
+    )
 
 
 # Processing classes (Those used to sent to push endpoints)

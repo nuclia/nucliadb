@@ -473,6 +473,10 @@ message FieldLink {
 }
 
 
+message FileProcessingOptions {
+    bool aitables = 1;
+}
+
 
 message FieldFile {
     google.protobuf.Timestamp added = 1;
@@ -481,6 +485,7 @@ message FieldFile {
     string password = 4;
     string url = 5;
     map<string, string> headers = 6;
+    FileProcessingOptions processing_options = 7;
 }
 
 

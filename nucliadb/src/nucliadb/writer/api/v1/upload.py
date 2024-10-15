@@ -65,6 +65,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, Metadata
+from nucliadb_protos.resources_pb2 import FileProcessingOptions as PBFileProcessingOptions
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -667,6 +668,7 @@ async def upload(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_processing_options: Optional[str] = Header(default=None),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -675,6 +677,7 @@ async def upload(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_processing_options=x_processing_options,
     )
 
 
@@ -688,6 +691,7 @@ async def _upload(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_processing_options: Optional[str] = None,
 ) -> ResourceFileUploaded:
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
@@ -781,6 +785,7 @@ async def _upload(
             path=path,
             request=request,
             bucket=storage_manager.storage.get_bucket_name(kbid),
+            file_processing_options=FileProcessingOptions.from_header(x_processing_options),
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
@@ -840,6 +845,7 @@ async def store_file_on_nuclia_db(
     language: Optional[str] = None,
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
+    file_processing_options: Optional[FileProcessingOptions] = None,
 ) -> Optional[int]:
     # File is on NucliaDB Storage at path
     partitioning = get_partitioning()
@@ -912,6 +918,8 @@ async def store_file_on_nuclia_db(
             file_field.file.filename = filename
         file_field.file.uri = path
         file_field.file.source = source
+        if file_processing_options:
+            file_field.processing_options.aitables = file_processing_options.aitables
 
         if md5:
             file_field.file.md5 = md5

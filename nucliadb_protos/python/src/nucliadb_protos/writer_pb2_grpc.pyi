@@ -128,6 +128,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldType as FieldType,
     FileExtractedData as FileExtractedData,
     FilePages as FilePages,
+    FileProcessingOptions as FileProcessingOptions,
     GENERIC as GENERIC,
     LINK as LINK,
     LargeComputedMetadata as LargeComputedMetadata,

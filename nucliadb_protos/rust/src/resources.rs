@@ -1161,6 +1161,12 @@ pub struct FieldLink {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileProcessingOptions {
+    #[prost(bool, tag = "1")]
+    pub aitables: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldFile {
     #[prost(message, optional, tag = "1")]
     pub added: ::core::option::Option<::prost_types::Timestamp>,
@@ -1177,6 +1183,8 @@ pub struct FieldFile {
         ::prost::alloc::string::String,
         ::prost::alloc::string::String,
     >,
+    #[prost(message, optional, tag = "7")]
+    pub processing_options: ::core::option::Option<FileProcessingOptions>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
