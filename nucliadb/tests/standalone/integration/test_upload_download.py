@@ -366,6 +366,7 @@ async def test_content_type_validation(
         "video/x-ms-wmv",
         "video/YouTube",
         "multipart/form-data",
+        "text/plain+blankline",
     ],
 )
 def test_valid_content_types(content_type):
@@ -376,6 +377,8 @@ def test_valid_content_types(content_type):
     "content_type",
     [
         "multipart/form-data;boundary=--------------------------472719318099714047986957",
+        "application/pdf+aitablexxx",
+        "text/plain+blanklinesss",
     ],
 )
 def test_invalid_content_types(content_type):
