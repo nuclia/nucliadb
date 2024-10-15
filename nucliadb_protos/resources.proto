@@ -153,6 +153,12 @@ message NestedListPosition {
     repeated NestedPosition positions = 1;
 }
 
+message EmailMetadata {
+    string subject = 0;
+    Timestamp sent_date = 1;
+    repeated string participants = 2;
+ }
+
 message FileExtractedData {
     string language = 1;
     string md5 = 2;
@@ -170,9 +176,8 @@ message FileExtractedData {
     string icon = 11;
     map<string, NestedPosition> nested_position = 12 [deprecated = true];
     map<string, NestedListPosition> nested_list_position = 13;
-    google.protobuf.Timestamp date = 14;
-    string title = 15;
-    repeated string colaborators =16;
+    EmailMetadata email_metadata = 14;
+
 }
 
 message LinkExtractedData {
