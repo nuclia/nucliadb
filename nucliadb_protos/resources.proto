@@ -154,9 +154,9 @@ message NestedListPosition {
 }
 
 message EmailMetadata {
-    string subject = 0;
-    Timestamp sent_date = 1;
-    repeated string participants = 2;
+    string subject = 1;
+    google.protobuf.Timestamp sent_date = 2;
+    repeated string participants = 3;
  }
 
 message FileExtractedData {
@@ -177,7 +177,7 @@ message FileExtractedData {
     map<string, NestedPosition> nested_position = 12 [deprecated = true];
     map<string, NestedListPosition> nested_list_position = 13;
     EmailMetadata email_metadata = 14;
-
+    
 }
 
 message LinkExtractedData {
