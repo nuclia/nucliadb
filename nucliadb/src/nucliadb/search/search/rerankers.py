@@ -86,6 +86,30 @@ class Reranker(ABC):
         ...
 
 
+class NoopReranker(Reranker):
+    """No-operation reranker. Given a list of items to rerank, it does nothing
+    with them and return the items in the same order. It can be use to not alter
+    the previous ordering.
+    """
+
+    @property
+    def needs_extra_results(self) -> bool:
+        return False
+
+    def items_needed(self, requested: int, shards: int = 1) -> int:
+        return requested
+
+    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
+        return [
+            RankedItem(
+                id=item.id,
+                score=item.score,
+                score_type=item.score_type,
+            )
+            for item in items
+        ]
+
+
 class PredictReranker(Reranker):
     @property
     def needs_extra_results(self) -> bool:
@@ -121,7 +145,7 @@ class PredictReranker(Reranker):
             )
             for id, score in response.context_scores.items()
         ]
-        sort_reranked(reranked)
+        sort_by_score(reranked)
         best = reranked[: options.top_k]
         return best
 
@@ -161,7 +185,7 @@ class MultiMatchBoosterReranker(Reranker):
                 reranked_by_id[item.id].score_type = SCORE_TYPE.BOTH
 
         reranked = list(reranked_by_id.values())
-        sort_reranked(reranked)
+        sort_by_score(reranked)
         return reranked
 
 
@@ -171,13 +195,15 @@ def get_reranker(kind: search_models.Reranker) -> Reranker:
         reranker = PredictReranker()
     elif kind == search_models.Reranker.MULTI_MATCH_BOOSTER:
         reranker = MultiMatchBoosterReranker()
+    elif kind == search_models.Reranker.NOOP:
+        reranker = NoopReranker()
     else:
         logger.warning(f"Unknown reranker requested: {kind}. Using multi-match booster instead")
         reranker = MultiMatchBoosterReranker()
     return reranker
 
 
-def sort_reranked(items: list[RankedItem]):
+def sort_by_score(items: list[RankedItem]):
     """Sort `items` in place by decreasing score"""
     items.sort(key=lambda item: item.score, reverse=True)
 
