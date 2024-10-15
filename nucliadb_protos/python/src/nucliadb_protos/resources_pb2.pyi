@@ -525,6 +525,30 @@ class NestedListPosition(google.protobuf.message.Message):
 global___NestedListPosition = NestedListPosition
 
 @typing.final
+class EmailMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUBJECT_FIELD_NUMBER: builtins.int
+    SENT_DATE_FIELD_NUMBER: builtins.int
+    PARTICIPANTS_FIELD_NUMBER: builtins.int
+    subject: builtins.str
+    @property
+    def sent_date(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    @property
+    def participants(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        subject: builtins.str = ...,
+        sent_date: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        participants: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["sent_date", b"sent_date"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["participants", b"participants", "sent_date", b"sent_date", "subject", b"subject"]) -> None: ...
+
+global___EmailMetadata = EmailMetadata
+
+@typing.final
 class FileExtractedData(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -645,6 +669,7 @@ class FileExtractedData(google.protobuf.message.Message):
     ICON_FIELD_NUMBER: builtins.int
     NESTED_POSITION_FIELD_NUMBER: builtins.int
     NESTED_LIST_POSITION_FIELD_NUMBER: builtins.int
+    EMAIL_METADATA_FIELD_NUMBER: builtins.int
     language: builtins.str
     md5: builtins.str
     field: builtins.str
@@ -667,6 +692,8 @@ class FileExtractedData(google.protobuf.message.Message):
     def nested_position(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___NestedPosition]: ...
     @property
     def nested_list_position(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___NestedListPosition]: ...
+    @property
+    def email_metadata(self) -> global___EmailMetadata: ...
     def __init__(
         self,
         *,
@@ -683,9 +710,10 @@ class FileExtractedData(google.protobuf.message.Message):
         icon: builtins.str = ...,
         nested_position: collections.abc.Mapping[builtins.str, global___NestedPosition] | None = ...,
         nested_list_position: collections.abc.Mapping[builtins.str, global___NestedListPosition] | None = ...,
+        email_metadata: global___EmailMetadata | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_thumbnail", b"file_thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["field", b"field", "file_generated", b"file_generated", "file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_rows_previews", b"file_rows_previews", "file_thumbnail", b"file_thumbnail", "icon", b"icon", "language", b"language", "md5", b"md5", "metadata", b"metadata", "nested", b"nested", "nested_list_position", b"nested_list_position", "nested_position", b"nested_position"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["email_metadata", b"email_metadata", "file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_thumbnail", b"file_thumbnail"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["email_metadata", b"email_metadata", "field", b"field", "file_generated", b"file_generated", "file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_rows_previews", b"file_rows_previews", "file_thumbnail", b"file_thumbnail", "icon", b"icon", "language", b"language", "md5", b"md5", "metadata", b"metadata", "nested", b"nested", "nested_list_position", b"nested_list_position", "nested_position", b"nested_position"]) -> None: ...
 
 global___FileExtractedData = FileExtractedData
 

@@ -412,6 +412,16 @@ pub struct NestedListPosition {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EmailMetadata {
+    #[prost(string, tag = "1")]
+    pub subject: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub sent_date: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(string, repeated, tag = "3")]
+    pub participants: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileExtractedData {
     #[prost(string, tag = "1")]
     pub language: ::prost::alloc::string::String,
@@ -457,6 +467,8 @@ pub struct FileExtractedData {
         ::prost::alloc::string::String,
         NestedListPosition,
     >,
+    #[prost(message, optional, tag = "14")]
+    pub email_metadata: ::core::option::Option<EmailMetadata>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
