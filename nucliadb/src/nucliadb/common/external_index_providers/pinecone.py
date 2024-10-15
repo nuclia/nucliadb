@@ -694,13 +694,7 @@ class PineconeIndexManager(ExternalIndexManager):
             filter=filter,
             timeout=self.query_timeout,
         )
-        # filter by min score manually, as Pinecone don't implement this feature
-        results = QueryResponse(
-            matches=[
-                match for match in query_results.matches if match.score >= request.min_score_semantic
-            ]
-        )
-        return PineconeQueryResults(results=results)
+        return PineconeQueryResults(results=query_results)
 
     async def _get_index_counts(self) -> IndexCounts:
         if self.kbid in COUNTERS_CACHE:
