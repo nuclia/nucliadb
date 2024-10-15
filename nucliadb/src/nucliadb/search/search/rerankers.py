@@ -227,6 +227,7 @@ def apply_reranking(results: KnowledgeboxFindResults, reranked: list[RankedItem]
                 )
 
     # update results and best matches according to new scores
+    results.best_matches.clear()
     for order, item in enumerate(reranked):
         paragraph_id = item.id
         paragraph = inverted_results[paragraph_id][0]
