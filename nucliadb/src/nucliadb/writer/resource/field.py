@@ -169,7 +169,9 @@ def parse_text_field(
 ) -> None:
     writer.texts[key].body = text_field.body
     writer.texts[key].format = resources_pb2.FieldText.Format.Value(text_field.format.value)
-    writer.texts[key].split_on_blankline = text_field.split_on_blankline
+    writer.texts[
+        key
+    ].processing_options.split_on_blankline = text_field.processing_options.split_on_blankline
     etw = resources_pb2.ExtractedTextWrapper()
     etw.field.field = key
     etw.field.field_type = resources_pb2.FieldType.TEXT
@@ -178,7 +180,7 @@ def parse_text_field(
     toprocess.textfield[key] = models.Text(
         body=text_field.body,
         format=getattr(models.PushTextFormat, text_field.format.value),
-        split_on_blankline=text_field.split_on_blankline,
+        processing_options=text_field.processing_options,
     )
 
 

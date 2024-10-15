@@ -1495,6 +1495,21 @@ class Metadata(google.protobuf.message.Message):
 global___Metadata = Metadata
 
 @typing.final
+class TextProcessingOptions(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPLIT_ON_BLANKLINE_FIELD_NUMBER: builtins.int
+    split_on_blankline: builtins.bool
+    def __init__(
+        self,
+        *,
+        split_on_blankline: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["split_on_blankline", b"split_on_blankline"]) -> None: ...
+
+global___TextProcessingOptions = TextProcessingOptions
+
+@typing.final
 class FieldText(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1524,20 +1539,22 @@ class FieldText(google.protobuf.message.Message):
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
     MD5_FIELD_NUMBER: builtins.int
-    SPLIT_ON_BLANKLINE_FIELD_NUMBER: builtins.int
+    PROCESSING_OPTIONS_FIELD_NUMBER: builtins.int
     body: builtins.str
     format: global___FieldText.Format.ValueType
     md5: builtins.str
-    split_on_blankline: builtins.bool
+    @property
+    def processing_options(self) -> global___TextProcessingOptions: ...
     def __init__(
         self,
         *,
         body: builtins.str = ...,
         format: global___FieldText.Format.ValueType = ...,
         md5: builtins.str = ...,
-        split_on_blankline: builtins.bool = ...,
+        processing_options: global___TextProcessingOptions | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "md5", b"md5", "split_on_blankline", b"split_on_blankline"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["processing_options", b"processing_options"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "md5", b"md5", "processing_options", b"processing_options"]) -> None: ...
 
 global___FieldText = FieldText
 

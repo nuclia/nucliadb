@@ -361,6 +361,12 @@ message Metadata {
     Status status = 5;
 }
 
+
+message TextProcessingOptions {
+    bool split_on_blankline = 1;
+}
+
+
 message FieldText {
     enum Format {
         PLAIN = 0;
@@ -373,7 +379,7 @@ message FieldText {
     string body = 1;
     Format format = 2;
     string md5 = 3;
-    bool split_on_blankline = 4;
+    TextProcessingOptions processing_options = 4;
 }
 
 message Block {

@@ -173,6 +173,7 @@ from nucliadb_protos.resources_pb2 import (
     RowsPreview as RowsPreview,
     Sentence as Sentence,
     TEXT as TEXT,
+    TextProcessingOptions as TextProcessingOptions,
     TokenSplit as TokenSplit,
     UserFieldMetadata as UserFieldMetadata,
     UserMetadata as UserMetadata,

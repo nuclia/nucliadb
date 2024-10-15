@@ -59,6 +59,13 @@ TEXT_FORMAT_TO_MIMETYPE = {
 }
 
 
+class TextProcessingOptions(BaseModel):
+    split_on_blankline: bool = Field(
+        default=False,
+        description="If true, the text will be split into blocks separated by blank lines. This only applies to plain text.",
+    )
+
+
 # Visualization classes (Those used on reader endpoints)
 
 
@@ -66,7 +73,7 @@ class FieldText(BaseModel):
     body: Optional[str] = None
     format: Optional[TextFormat] = None
     md5: Optional[str] = None
-    split_on_blankline: Optional[bool] = None
+    processing_options: Optional[TextProcessingOptions] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldText) -> _T:
@@ -94,9 +101,10 @@ If you need to store more text, consider using a file field instead or splitting
         default=TextFormat.PLAIN,
         description="The format of the text.",
     )
-    split_on_blankline: bool = Field(
-        default=False,
-        description="If true, the text will be split into blocks separated by blank lines. This only applies to plain text.",
+
+    processing_options: TextProcessingOptions = Field(
+        default=TextProcessingOptions(),
+        description="Options for processing the text.",
     )
 
     @model_validator(mode="after")
@@ -121,7 +129,4 @@ class PushTextFormat(TextFormatValue, Enum):  # type: ignore
 class Text(BaseModel):
     body: str
     format: PushTextFormat
-    split_on_blankline: bool = Field(
-        default=False,
-        description="If true, the text will be split into blocks separated by blank lines. This only applies to plain text.",
-    )
+    processing_options: TextProcessingOptions = TextProcessingOptions()

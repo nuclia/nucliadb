@@ -1002,7 +1002,7 @@ async def test_text_fields_store_split_on_blanklines(
             "texts": {
                 "text1": {
                     "body": "My text",
-                    "split_on_blankline": True,
+                    "processing_options": {"split_on_blankline": True},
                 }
             },
         },
@@ -1016,4 +1016,4 @@ async def test_text_fields_store_split_on_blanklines(
     assert resp.status_code == 200
     data = resp.json()
     resource = Resource.model_validate(data)
-    assert resource.data.texts["text1"].value.split_on_blankline is True  # type: ignore
+    assert resource.data.texts["text1"].value.processing_options.split_on_blankline is True  # type: ignore

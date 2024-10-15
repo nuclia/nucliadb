@@ -890,6 +890,12 @@ pub mod metadata {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TextProcessingOptions {
+    #[prost(bool, tag = "1")]
+    pub split_on_blankline: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldText {
     #[prost(string, tag = "1")]
     pub body: ::prost::alloc::string::String,
@@ -897,8 +903,8 @@ pub struct FieldText {
     pub format: i32,
     #[prost(string, tag = "3")]
     pub md5: ::prost::alloc::string::String,
-    #[prost(bool, tag = "4")]
-    pub split_on_blankline: bool,
+    #[prost(message, optional, tag = "4")]
+    pub processing_options: ::core::option::Option<TextProcessingOptions>,
 }
 /// Nested message and enum types in `FieldText`.
 pub mod field_text {
