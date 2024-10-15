@@ -55,7 +55,7 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.rerankers import RankedItem, apply_reranking, sort_by_score
+from nucliadb.search.search.rerankers import RankedItem, apply_reranking, sort_reranked
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -221,7 +221,7 @@ class AskResult:
                 RankedItem(id=paragraph_id, score=score, score_type=SCORE_TYPE.RERANKER)
                 for paragraph_id, score in self._reranking.context_scores.items()
             ]
-            sort_by_score(reranked)
+            sort_reranked(reranked)
             apply_reranking(self.main_results, reranked)
 
         yield RetrievalAskResponseItem(
