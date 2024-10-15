@@ -102,7 +102,7 @@ pub async fn run() -> anyhow::Result<()> {
         .fetch_all(&meta.pool)
         .await?;
         for m in merges {
-            if m.len() > 1 {
+            if m.len() > 3 {
                 MergeJob::create(&meta, &m, oldest_confirmed_seq as i64).await?;
             }
         }

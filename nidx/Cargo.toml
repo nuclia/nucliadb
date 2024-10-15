@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["nidx_vector"]
+members = ["nidx_vector", "nidx_fulltext"]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -13,6 +13,7 @@ base64 = "0.22.1"
 envy = "0.4.2"
 futures = "0.3.31"
 nidx_vector = { version = "0.1.0", path = "nidx_vector" }
+nidx_fulltext = { version = "0.1.0", path = "nidx_fulltext" }
 nucliadb_core = { version = "0.1.0", path = "../nucliadb_core" }
 object_store = { version = "0.11.0", features = ["gcp", "aws"] }
 serde = "1.0.210"

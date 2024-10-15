@@ -85,16 +85,14 @@ async fn index_resource(
     Ok(())
 }
 
-async fn index_resource_to_index<'a>(
-    index: &Index,
-    resource: &'a Resource,
-) -> anyhow::Result<(TempDir, i64, &'a Vec<String>)> {
+async fn index_resource_to_index(index: &Index, resource: &Resource) -> anyhow::Result<(TempDir, i64, Vec<String>)> {
     let output_dir = tempfile::tempdir()?;
-    let indexer = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer::new(),
+    let (records, deletions) = match index.kind {
+        IndexKind::Vector => nidx_vector::VectorIndexer::new().index_resource(output_dir.path(), resource)?,
+        IndexKind::Text => nidx_fulltext::TextIndexer::new().index_resource(output_dir.path(), resource)?,
         _ => unimplemented!(),
     };
-    let (records, deletions) = indexer.index_resource(output_dir.path(), resource)?;
+
     Ok((output_dir, records, deletions))
 }
 

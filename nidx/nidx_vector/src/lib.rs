@@ -44,7 +44,7 @@ impl VectorIndexer {
         VectorIndexer
     }
 
-    pub fn index_resource<'a>(&self, output_dir: &Path, resource: &'a Resource) -> VectorR<(i64, &'a Vec<String>)> {
+    pub fn index_resource<'a>(&self, output_dir: &Path, resource: &'a Resource) -> VectorR<(i64, Vec<String>)> {
         let tmp = tempfile::tempdir()?;
 
         // Index resource
@@ -56,18 +56,18 @@ impl VectorIndexer {
         // Copy just the segment to the output directory
         let segments = writer.get_segment_ids().unwrap();
         if segments.is_empty() {
-            return Ok((0, &resource.sentences_to_delete));
+            return Ok((0, resource.sentences_to_delete.clone()));
         }
         assert!(segments.len() <= 1, "Expected a single segment");
         std::fs::rename(tmp.path().join("index").join(&segments[0]), output_dir)?;
 
-        return Ok((writer.count().unwrap() as i64, &resource.sentences_to_delete));
+        return Ok((writer.count().unwrap() as i64, resource.sentences_to_delete.clone()));
     }
 
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: &[(i64, i64)],
+        segments: &[(i64, i64, i64)],
         deletions: &Vec<(i64, &Vec<String>)>,
     ) -> VectorR<(String, usize)> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
@@ -83,7 +83,7 @@ impl VectorIndexer {
         // Rename (nucliadb_vectors wants uuid, we use i64 as segment ids) and open the segments
         let segment_ids: Vec<_> = segments
             .iter()
-            .map(|(sid, seq)| {
+            .map(|(sid, seq, _)| {
                 let uuid = uuid::Uuid::new_v4();
                 std::fs::rename(work_dir.join(sid.to_string()), work_dir.join(uuid.to_string())).unwrap();
                 (uuid, seq)

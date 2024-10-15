@@ -29,7 +29,7 @@ use tokio_util::io::SyncIoBridge;
 
 use crate::{
     indexer::WriteCounter,
-    metadata::{Deletion, MergeJob, Segment},
+    metadata::{Deletion, Index, MergeJob, Segment},
     NidxMetadata, Settings,
 };
 
@@ -90,7 +90,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
             job2.keep_alive(&pool).await.unwrap();
         }
     });
-    let work_dir = tempdir()?;
+    let work_dir: tempfile::TempDir = tempdir()?;
 
     // Download segments
     let downloads: Vec<_> = segments
@@ -106,11 +106,14 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     }
 
     println!("Downloaded to {work_dir:?}, merging");
-    let (merged, merged_records) = nidx_vector::VectorIndexer::new().merge(
-        work_dir.path(),
-        &segments.iter().map(|s| (s.id, s.seq)).collect::<Vec<_>>(),
-        &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>(),
-    )?;
+    let ssegments = &segments.iter().map(|s| (s.id, s.seq, s.records.unwrap())).collect::<Vec<_>>();
+    let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
+    // HACK: Get index, match on kind
+    let (merged, merged_records) = match segments[0].index_id {
+        1 => nidx_vector::VectorIndexer::new().merge(work_dir.path(), ssegments, ddeletions)?,
+        2 => nidx_fulltext::TextIndexer::new().merge(work_dir.path(), ssegments, ddeletions)?,
+        _ => unimplemented!(),
+    };
     println!("Merged to {merged:?}");
 
     // Upload (copied code from indexer)

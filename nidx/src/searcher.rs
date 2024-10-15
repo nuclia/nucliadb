@@ -7,6 +7,7 @@ use std::{
 };
 
 use futures::TryStreamExt;
+use nidx_fulltext::TextSearcher;
 use nidx_vector::VectorSearcher;
 use object_store::DynObjectStore;
 use tempfile::{env::temp_dir, tempdir};
@@ -38,21 +39,26 @@ pub async fn run() -> anyhow::Result<()> {
         indexer_storage.clone(),
         index_metadata.clone(),
     ));
-    let search_task = tokio::task::spawn(run_search(work_dir.path().to_path_buf(), index_metadata.clone()));
+    let vector_search_task =
+        tokio::task::spawn(run_vector_search(work_dir.path().to_path_buf(), index_metadata.clone()));
+    let text_search_task = tokio::task::spawn(run_text_search(work_dir.path().to_path_buf(), index_metadata.clone()));
 
     tokio::select! {
         r = sync_task => {
             println!("sync_task() completed first {:?}", r)
         }
-        r = search_task => {
-            println!("search_task() completed {:?}", r)
+        r = vector_search_task => {
+            println!("vector_search_task() completed {:?}", r)
+        }
+        r = text_search_task => {
+            println!("text_search_task() completed {:?}", r)
         }
     }
 
     Ok(())
 }
 
-async fn run_search(
+async fn run_vector_search(
     work_dir: PathBuf,
     index_metadata: Arc<RwLock<HashMap<i64, Vec<SearchOperation>>>>,
 ) -> anyhow::Result<()> {
@@ -69,19 +75,42 @@ async fn run_search(
             }
         };
 
-        println!(
-            "Opening searcher for {:?}",
-            meta.iter().flat_map(|m| m.segment_ids.iter().map(|sid| (*sid, m.seq))).collect::<Vec<_>>()
-        );
         let searcher = VectorSearcher::new(
             &work_dir,
             1,
             meta.iter().flat_map(|m| m.segment_ids.iter().map(|sid| (*sid, m.seq))).collect(),
             meta.iter().flat_map(|m| m.deleted_keys.iter().map(|d| (m.seq, d.clone()))).collect(),
         )?;
-        println!("Open searcher");
         drop(meta_read); // Keep lock until searcher is loaded, to avoid deletions from happening while opening
-        println!("Did search with {} results", searcher.dummy_search()?);
+        println!("Did vector search with {} results", searcher.dummy_search()?);
+    }
+}
+
+async fn run_text_search(
+    work_dir: PathBuf,
+    index_metadata: Arc<RwLock<HashMap<i64, Vec<SearchOperation>>>>,
+) -> anyhow::Result<()> {
+    loop {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let meta_read = index_metadata.read().await;
+        let meta: Vec<SearchOperation> = {
+            let index_2 = meta_read.get(&2);
+            if let Some(index_2) = index_2 {
+                index_2.iter().cloned().collect()
+            } else {
+                println!("No metadata for index 2 yet");
+                continue;
+            }
+        };
+
+        let searcher = TextSearcher::new(
+            &work_dir,
+            2,
+            meta.iter().flat_map(|m| m.segment_ids.iter().map(|sid| (*sid, m.seq))).collect(),
+            meta.iter().flat_map(|m| m.deleted_keys.iter().map(|d| (m.seq, d.clone()))).collect(),
+        )?;
+        drop(meta_read); // Keep lock until searcher is loaded, to avoid deletions from happening while opening
+        println!("Did text search with {:?} results", searcher.dummy_search()?);
     }
 }
 
@@ -116,8 +145,9 @@ async fn run_sync(
                        COALESCE(deletions.keys, '{}') AS "deleted_keys!"
                        FROM ready_segments
                        NATURAL FULL OUTER JOIN deletions
-                       WHERE index_id = 1
-                       ORDER BY seq;"#
+                       WHERE index_id = $1
+                       ORDER BY seq;"#,
+                index_id
             )
             .fetch_all(&meta.pool)
             .await?;
@@ -134,15 +164,12 @@ async fn run_sync(
             }
 
             // Switch meta
-            println!("Metadata updating {:?}", new_meta[0].segment_ids);
             index_metadata.write().await.insert(index_id, new_meta);
-            println!("Metadata updated, deleting {:?}", deleted_segments);
 
             // Delete unneeded segments
             for d in deleted_segments {
                 std::fs::remove_dir_all(work_dir.join(format!("{index_id}/{d}")))?;
             }
-            println!("Deleted");
         }
 
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -154,7 +181,6 @@ pub async fn download_segment(
     segment_id: i64,
     output_dir: PathBuf,
 ) -> anyhow::Result<()> {
-    println!("Download {segment_id}");
     let path = object_store::path::Path::parse(format!("segment/{}", segment_id)).unwrap();
     let response = storage.get(&path).await?.into_stream();
     let reader = response.map_err(|_| std::io::Error::last_os_error()).into_async_read(); // HACK: Mapping errors randomly
