@@ -22,12 +22,15 @@ from unittest.mock import patch
 
 import pytest
 
-from nucliadb.search.search.find_merge import find_merge_results
+from nucliadb.search.search.find_merge import build_find_response
+from nucliadb.search.search.rerankers import MultiMatchBoosterReranker
+from nucliadb_models.resource import Resource
 from nucliadb_models.search import SCORE_TYPE, ResourceProperties
 from nucliadb_protos import nodereader_pb2, noderesources_pb2
 
 
 async def test_find_post_index_search(expected_find_response: dict):
+    query = "How should I validate this?"
     search_responses = [
         nodereader_pb2.SearchResponse(
             paragraph=nodereader_pb2.ParagraphSearchResponse(
@@ -87,7 +90,7 @@ async def test_find_post_index_search(expected_find_response: dict):
                 ],
                 page_number=0,
                 result_per_page=20,
-                query="How should I validate this?",
+                query=query,
                 next_page=False,
                 bm25=True,
             ),
@@ -113,22 +116,34 @@ async def test_find_post_index_search(expected_find_response: dict):
         )
     ]
 
+    async def mock_hydrate_resource_metadata(kbid: str, rid: str, *args, **kwargs):
+        return Resource(id=rid)
+
     with (
-        patch("nucliadb.search.search.find_merge.set_text_value"),
-        patch("nucliadb.search.search.find_merge.hydrate_resource_metadata"),
+        patch("nucliadb.search.search.find.get_external_index_manager", return_value=None),
+        patch(
+            "nucliadb.search.search.find_merge.hydrate_resource_metadata",
+            side_effect=mock_hydrate_resource_metadata,
+        ),
+        patch(
+            "nucliadb.search.search.hydrator.paragraphs.get_paragraph_text",
+            return_value="extracted text",
+        ),
     ):
-        find_response = await find_merge_results(
+        find_response = await build_find_response(
             search_responses,
-            count=20,
-            page=0,
             kbid="kbid",
+            query=query,
+            relation_subgraph_query=nodereader_pb2.EntitiesSubgraphRequest(),
+            page_size=20,
+            page_number=0,
+            min_score_bm25=0.2,
+            min_score_semantic=0.4,
             show=[ResourceProperties.BASIC],
             field_type_filter=[],
             extracted=[],
-            requested_relations=nodereader_pb2.EntitiesSubgraphRequest(),
-            min_score_bm25=0.2,
-            min_score_semantic=0.4,
             highlight=True,
+            reranker=MultiMatchBoosterReranker(),
         )
         resp = find_response.model_dump()
         assert expected_find_response == resp
@@ -145,10 +160,9 @@ def expected_find_response():
     yield {
         "autofilters": [],
         "best_matches": [
+            "rid-2/f/field-b/subfield-y/0-17",
             "rid-3/t/field-c/0-30",
             "rid-1/f/field-a/10-20",
-            "rid-2/f/field-b/subfield-y/0-17",
-            "rid-2/f/field-b/subfield-y/0-17",
             "rid-2/f/field-b/subfield-x/100-150",
         ],
         "min_score": {"bm25": 0.2, "semantic": 0.4},
@@ -173,7 +187,7 @@ def expected_find_response():
                                 "id": "rid-1/f/field-a/10-20",
                                 "is_a_table": False,
                                 "labels": ["/a/title"],
-                                "order": 1,
+                                "order": 2,
                                 "page_with_visual": False,
                                 "position": {
                                     "end": 20,
@@ -186,7 +200,7 @@ def expected_find_response():
                                 "reference": "",
                                 "score": 1.125,
                                 "score_type": SCORE_TYPE.BM25,
-                                "text": "",
+                                "text": "extracted text",
                             }
                         }
                     }
@@ -222,7 +236,7 @@ def expected_find_response():
                                 "id": "rid-2/f/field-b/subfield-x/100-150",
                                 "is_a_table": False,
                                 "labels": [],
-                                "order": 4,
+                                "order": 3,
                                 "page_with_visual": False,
                                 "position": {
                                     "end": 150,
@@ -235,14 +249,14 @@ def expected_find_response():
                                 "reference": "",
                                 "score": 0.6399999856948853,
                                 "score_type": SCORE_TYPE.BM25,
-                                "text": "",
+                                "text": "extracted text",
                             },
                             "rid-2/f/field-b/subfield-y/0-17": {
                                 "fuzzy_result": False,
                                 "id": "rid-2/f/field-b/subfield-y/0-17",
                                 "is_a_table": True,
                                 "labels": [],
-                                "order": 3,
+                                "order": 0,
                                 "page_with_visual": True,
                                 "position": {
                                     "end": 17,
@@ -255,7 +269,7 @@ def expected_find_response():
                                 "reference": "myfile.pdf",
                                 "score": 1.7799999713897705,
                                 "score_type": SCORE_TYPE.BOTH,
-                                "text": "",
+                                "text": "extracted text",
                             },
                         }
                     }
@@ -291,7 +305,7 @@ def expected_find_response():
                                 "id": "rid-3/t/field-c/0-30",
                                 "is_a_table": False,
                                 "labels": [],
-                                "order": 0,
+                                "order": 1,
                                 "page_with_visual": False,
                                 "position": {
                                     "end": 30,
@@ -304,7 +318,7 @@ def expected_find_response():
                                 "reference": "",
                                 "score": 1.5,
                                 "score_type": SCORE_TYPE.VECTOR,
-                                "text": "",
+                                "text": "extracted text",
                             }
                         }
                     }

@@ -49,6 +49,18 @@ class RankedItem:
     score_type: SCORE_TYPE
 
 
+@dataclass
+class RerankingOptions:
+    kbid: str
+
+    # Query used to retrieve the results to be reranked. Smart rerankers will use it
+    query: str
+
+    # Number of results requested by the user (can be different from the amount
+    # of retrieval results)
+    top_k: int
+
+
 class Reranker(ABC):
     @abstractproperty
     def needs_extra_results(self) -> bool: ...
@@ -66,15 +78,12 @@ class Reranker(ABC):
         ...
 
     @abstractmethod
-    async def rerank(self, kbid: str, query: str, items: list[RerankableItem]) -> list[RankedItem]:
+    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         """Given a query and a set of resources, rerank elements and return the
-        new scores for each item by id"""
-        ...
+        list of reranked items sorted by decreasing score.
 
-    async def rerank_find_response(self, kbid: str, query: str, response: KnowledgeboxFindResults):
-        to_rerank = _get_items_to_rerank(response)
-        reranked = await self.rerank(kbid, query, to_rerank)
-        apply_reranking(response, reranked)
+        """
+        ...
 
 
 class PredictReranker(Reranker):
@@ -88,29 +97,33 @@ class PredictReranker(Reranker):
         actual_requested = requested * shards
         return math.ceil(max(reranker_requested, actual_requested) / shards)
 
-    async def rerank(self, kbid: str, query: str, items: list[RerankableItem]) -> list[RankedItem]:
+    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         if len(items) == 0:
             return []
 
         predict = get_predict()
 
+        # Conversion to format expected by predict. At the same time,
+        # deduplicates paragraphs found in different indices
+        context = {item.id: item.content for item in items}
         request = RerankModel(
-            question=query,
+            question=options.query,
             user_id="",  # TODO
-            context={item.id: item.content for item in items},
+            context=context,
         )
-        response = await predict.rerank(kbid, request)
+        response = await predict.rerank(options.kbid, request)
 
-        reranked = []
-        for id, score in response.context_scores.items():
-            reranked.append(
-                RankedItem(
-                    id=id,
-                    score=score,
-                    score_type=SCORE_TYPE.RERANKER,
-                )
+        reranked = [
+            RankedItem(
+                id=id,
+                score=score,
+                score_type=SCORE_TYPE.RERANKER,
             )
-        return reranked
+            for id, score in response.context_scores.items()
+        ]
+        sort_reranked(reranked)
+        best = reranked[: options.top_k]
+        return best
 
 
 class MultiMatchBoosterReranker(Reranker):
@@ -123,18 +136,32 @@ class MultiMatchBoosterReranker(Reranker):
     def items_needed(self, requested: int, shards: int = 1) -> int:
         return requested
 
-    async def rerank(self, kbid: str, query: str, items: list[RerankableItem]) -> list[RankedItem]:
-        # TODO: not implemented yet, as the reranking code is coupled with
-        # hydration and response composition in find_merge.py
-        reranked = []
+    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
+        """Given a list of rerankable items, boost matches that appear multiple
+        times. The returned list can be smaller than the initial, as repeated
+        matches are deduplicated.
+        """
+        reranked_by_id = {}
         for item in items:
-            reranked.append(
-                RankedItem(
+            if item.id not in reranked_by_id:
+                reranked_by_id[item.id] = RankedItem(
                     id=item.id,
                     score=item.score,
                     score_type=item.score_type,
                 )
-            )
+            else:
+                # it's a mutiple match, boost the score
+                if reranked_by_id[item.id].score < item.score:
+                    # previous implementation noted that we are using vector
+                    # score x2 when we find a multiple match. However, this may
+                    # not be true, as the same paragraph could come in any
+                    # position in the rank fusioned result list
+                    reranked_by_id[item.id].score = item.score * 2
+
+                reranked_by_id[item.id].score_type = SCORE_TYPE.BOTH
+
+        reranked = list(reranked_by_id.values())
+        sort_reranked(reranked)
         return reranked
 
 
@@ -150,7 +177,19 @@ def get_reranker(kind: search_models.Reranker) -> Reranker:
     return reranker
 
 
+def sort_reranked(items: list[RankedItem]):
+    """Sort `items` in place by decreasing score"""
+    items.sort(key=lambda item: item.score, reverse=True)
+
+
 def apply_reranking(results: KnowledgeboxFindResults, reranked: list[RankedItem]):
+    """Given a list of reranked items, update the find results payload.
+
+    *ATENTION* we assume `reranked` is an ordered list of decreasing relevance
+    and contains *only* the items relevant for this response. Any paragraph not
+    found in `reranked` will be removed from the `results`
+
+    """
     inverted_results = {}
     for rid, resource in results.resources.items():
         for field_id, field in resource.fields.items():
@@ -161,25 +200,16 @@ def apply_reranking(results: KnowledgeboxFindResults, reranked: list[RankedItem]
                     (rid, resource),
                 )
 
-    # order results by new score
-    best_matches = []
-    for item in reranked:
-        paragraph = inverted_results[item.id][0]
+    # update results and best matches according to new scores
+    for order, item in enumerate(reranked):
+        paragraph_id = item.id
+        paragraph = inverted_results[paragraph_id][0]
         paragraph.score = item.score
         paragraph.score_type = item.score_type
-        best_matches.append((item.id, item.score))
-
-    best_matches.sort(key=lambda x: x[1], reverse=True)
-
-    # update best matches according to new scores
-    cut = results.page_size
-    results.best_matches.clear()
-    for order, (paragraph_id, _) in enumerate(best_matches[:cut]):
-        paragraph = inverted_results[paragraph_id][0]
         paragraph.order = order
         results.best_matches.append(paragraph_id)
 
-    # cut uneeded results
+    # prune uneeded results (not appearing in `reranked`)
     extra = set(inverted_results.keys()) - set(results.best_matches)
     for paragraph_id in extra:
         _, (field_id, field), (rid, resource) = inverted_results[paragraph_id]
@@ -189,17 +219,3 @@ def apply_reranking(results: KnowledgeboxFindResults, reranked: list[RankedItem]
 
         if len(resource.fields) == 0:
             results.resources.pop(rid)
-
-
-def _get_items_to_rerank(results: KnowledgeboxFindResults) -> list[RerankableItem]:
-    return [
-        RerankableItem(
-            id=paragraph_id,
-            score=paragraph.score,
-            score_type=paragraph.score_type,
-            content=paragraph.text,
-        )
-        for resource in results.resources.values()
-        for field in resource.fields.values()
-        for paragraph_id, paragraph in field.paragraphs.items()
-    ]

@@ -18,25 +18,29 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from dataclasses import dataclass
-from typing import cast
+from typing import Any, Iterable, Union
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.search.merge import merge_relations_results
-from nucliadb.search.search.results_hydrator.base import (
+from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
     hydrate_resource_metadata,
+    hydrate_text_block,
     text_block_to_find_paragraph,
 )
+from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.rerankers import (
+    RerankableItem,
+    Reranker,
+    RerankingOptions,
+)
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
     SCORE_TYPE,
     FindField,
-    FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
     MinScore,
@@ -47,11 +51,13 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
     EntitiesSubgraphRequest,
     ParagraphResult,
+    ParagraphSearchResponse,
+    RelationSearchResponse,
     SearchResponse,
+    VectorSearchResponse,
 )
 from nucliadb_telemetry import metrics
 
-from . import paragraphs
 from .metrics import merge_observer
 
 FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
@@ -60,155 +66,153 @@ FIND_FETCH_OPS_DISTRIBUTION = metrics.Histogram(
 )
 
 
-def _round(x: float) -> float:
-    return round(x, ndigits=3)
-
-
-@dataclass
-class SortableParagraph:
-    rid: str
-    fid: str
-    pid: str
-    score: float
-
-
-@merge_observer.wrap({"type": "set_text_value"})
-async def set_text_value(
-    kbid: str,
-    paragraph_id: ParagraphId,
-    find_paragraph: FindParagraph,
-    max_operations: asyncio.Semaphore,
-    hydration_options: TextBlockHydrationOptions,
-):
-    async with max_operations:
-        find_paragraph.text = await paragraphs.get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=paragraph_id,
-            highlight=hydration_options.highlight,
-            ematches=hydration_options.ematches,
-            matches=[],  # TODO
-        )
-
-
-@merge_observer.wrap({"type": "fetch_find_metadata"})
-async def fetch_find_metadata(
-    result_paragraphs: list[TextBlockMatch],
-    kbid: str,
+@merge_observer.wrap({"type": "find_merge"})
+async def build_find_response(
+    search_responses: list[SearchResponse],
     *,
-    resource_hydration_options: ResourceHydrationOptions,
-    text_block_hydration_options: TextBlockHydrationOptions,
-) -> tuple[dict[str, FindResource], list[str]]:
-    find_resources: dict[str, FindResource] = {}
-    best_matches: list[str] = []
+    kbid: str,
+    query: str,
+    relation_subgraph_query: EntitiesSubgraphRequest,
+    page_size: int,
+    page_number: int,
+    min_score_bm25: float,
+    min_score_semantic: float,
+    reranker: Reranker,
+    show: list[ResourceProperties] = [],
+    extracted: list[ExtractedDataTypeName] = [],
+    field_type_filter: list[FieldTypeName] = [],
+    highlight: bool = False,
+) -> KnowledgeboxFindResults:
+    # merge
+    search_response = merge_shard_responses(search_responses)
+    merged_text_blocks: list[TextBlockMatch] = rank_fusion_merge(
+        search_response.paragraph.results,
+        filter(
+            lambda x: x.score >= min_score_semantic,
+            search_response.vector.documents,
+        ),
+    )
 
-    resources = set()
-    operations = []
-    max_operations = asyncio.Semaphore(50)
-    paragraphs_to_sort: list[SortableParagraph] = []
-    for text_block in result_paragraphs:
-        rid = text_block.paragraph_id.rid
-        find_resource = find_resources.setdefault(rid, FindResource(id=rid, fields={}))
-        field_id = text_block.paragraph_id.field_id.short_without_subfield()
-        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
-        paragraph_id = text_block.paragraph_id.full()
+    # cut
+    text_blocks_page, next_page = cut_page(merged_text_blocks, page_size, page_number)
 
-        if paragraph_id in find_field.paragraphs:
-            # Its a multiple match, boost the score
-            if find_field.paragraphs[paragraph_id].score < text_block.score:
-                # Use Vector score if there are both
-                find_field.paragraphs[paragraph_id].score = text_block.score * 2
-                paragraphs_to_sort.append(
-                    SortableParagraph(
-                        rid=rid,
-                        fid=field_id,
-                        pid=paragraph_id,
-                        score=text_block.score,
-                    )
-                )
-            find_field.paragraphs[paragraph_id].score_type = SCORE_TYPE.BOTH
+    # hydrate and rerank
+    resource_hydration_options = ResourceHydrationOptions(
+        show=show, extracted=extracted, field_type_filter=field_type_filter
+    )
+    text_block_hydration_options = TextBlockHydrationOptions(highlight=highlight)
+    reranking_options = RerankingOptions(kbid=kbid, query=query, top_k=page_size)
+    text_blocks, resources, best_matches = await hydrate_and_rerank(
+        text_blocks_page,
+        kbid,
+        resource_hydration_options=resource_hydration_options,
+        text_block_hydration_options=text_block_hydration_options,
+        reranker=reranker,
+        reranking_options=reranking_options,
+    )
 
-        else:
-            find_field.paragraphs[paragraph_id] = text_block_to_find_paragraph(text_block)
-            paragraphs_to_sort.append(
-                SortableParagraph(
-                    rid=rid,
-                    fid=field_id,
-                    pid=paragraph_id,
-                    score=text_block.score,
-                )
-            )
-        operations.append(
-            asyncio.create_task(
-                set_text_value(
-                    kbid=kbid,
-                    paragraph_id=text_block.paragraph_id,
-                    find_paragraph=find_field.paragraphs[paragraph_id],
-                    hydration_options=text_block_hydration_options,
-                    max_operations=max_operations,
-                )
-            )
-        )
-        resources.add(rid)
+    # build relations graph
+    relations = await merge_relations_results([search_response.relation], relation_subgraph_query)
 
-    for order, paragraph in enumerate(
-        sorted(paragraphs_to_sort, key=lambda par: par.score, reverse=True)
-    ):
-        find_resources[paragraph.rid].fields[paragraph.fid].paragraphs[paragraph.pid].order = order
-        best_matches.append(paragraph.pid)
+    # compose response
+    find_resources = compose_find_resources(text_blocks, resources)
 
-    for resource in resources:
-        operations.append(
-            asyncio.create_task(
-                hydrate_resource_metadata(
-                    kbid,
-                    resource_id=resource,
-                    options=resource_hydration_options,
-                    find_resources=find_resources,
-                    concurrency_control=max_operations,
-                    service_name=SERVICE_NAME,
-                )
-            )
-        )
+    next_page = search_response.paragraph.next_page or next_page
+    total_paragraphs = search_response.paragraph.total
 
-    FIND_FETCH_OPS_DISTRIBUTION.observe(len(operations))
-    if len(operations) > 0:
-        done, _ = await asyncio.wait(operations)
-        for task in done:
-            if task.exception() is not None:  # pragma: no cover
-                logger.error("Error fetching find metadata", exc_info=task.exception())
-
-    return find_resources, best_matches
+    find_results = KnowledgeboxFindResults(
+        query=query,
+        resources=find_resources,
+        best_matches=best_matches,
+        relations=relations,
+        total=total_paragraphs,
+        page_number=page_number,
+        page_size=page_size,
+        next_page=next_page,
+        min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
+    )
+    return find_results
 
 
-@merge_observer.wrap({"type": "merge_paragraphs_vectors"})
-def merge_paragraphs_vectors(
-    paragraphs_shards: list[list[ParagraphResult]],
-    vectors_shards: list[list[DocumentScored]],
-    count: int,
-    page: int,
-    min_score: float,
-) -> tuple[list[TextBlockMatch], bool]:
-    # Flatten the results from several shards to be able to sort them globally
-    flat_paragraphs = [
-        paragraph for paragraph_shard in paragraphs_shards for paragraph in paragraph_shard
-    ]
-    flat_vectors = [
-        vector for vector_shard in vectors_shards for vector in vector_shard if vector.score >= min_score
-    ]
+def merge_shard_responses(
+    responses: list[SearchResponse],
+) -> SearchResponse:
+    """Merge search responses into a single response as if there were no shards
+    involved.
 
-    merged_paragraphs: list[TextBlockMatch] = rank_fusion_merge(flat_paragraphs, flat_vectors)
+    ATENTION! This is not a complete merge, we are only merging the fields
+    needed to compose a /find response.
 
-    init_position = count * page
-    end_position = init_position + count
-    next_page = len(merged_paragraphs) > end_position
-    merged_paragraphs = merged_paragraphs[init_position:end_position]
+    """
+    paragraphs = []
+    vectors = []
+    relations = []
+    for response in responses:
+        paragraphs.append(response.paragraph)
+        vectors.append(response.vector)
+        relations.append(response.relation)
 
-    return merged_paragraphs, next_page
+    merged = SearchResponse(
+        paragraph=merge_shards_keyword_responses(paragraphs),
+        vector=merge_shards_semantic_responses(vectors),
+        relation=merge_shards_relation_responses(relations),
+    )
+    return merged
 
 
+def merge_shards_keyword_responses(
+    keyword_responses: list[ParagraphSearchResponse],
+) -> ParagraphSearchResponse:
+    """Merge keyword (paragraph) search responses into a single response as if
+    there were no shards involved.
+
+    ATENTION! This is not a complete merge, we are only merging the fields
+    needed to compose a /find response.
+
+    """
+    merged = ParagraphSearchResponse()
+    for response in keyword_responses:
+        merged.query = response.query
+        merged.next_page = merged.next_page or response.next_page
+        merged.total += response.total
+        merged.results.extend(response.results)
+        merged.ematches.extend(response.ematches)
+
+    return merged
+
+
+def merge_shards_semantic_responses(
+    semantic_responses: list[VectorSearchResponse],
+) -> VectorSearchResponse:
+    """Merge semantic (vector) search responses into a single response as if
+    there were no shards involved.
+
+    ATENTION! This is not a complete merge, we are only merging the fields
+    needed to compose a /find response.
+
+    """
+    merged = VectorSearchResponse()
+    for response in semantic_responses:
+        merged.documents.extend(response.documents)
+
+    return merged
+
+
+def merge_shards_relation_responses(
+    relation_responses: list[RelationSearchResponse],
+) -> RelationSearchResponse:
+    merged = RelationSearchResponse()
+    for response in relation_responses:
+        merged.prefix.nodes.extend(response.prefix.nodes)
+        merged.subgraph.relations.extend(response.subgraph.relations)
+
+    return merged
+
+
+@merge_observer.wrap({"type": "rank_fusion_merge"})
 def rank_fusion_merge(
-    paragraphs: list[ParagraphResult],
-    vectors: list[DocumentScored],
+    paragraphs: Iterable[ParagraphResult],
+    vectors: Iterable[DocumentScored],
 ) -> list[TextBlockMatch]:
     """Merge results from different indexes using a rank fusion algorithm.
 
@@ -222,8 +226,8 @@ def rank_fusion_merge(
     merged_paragraphs: list[TextBlockMatch] = []
 
     # sort results by it's score before merging them
-    paragraphs.sort(key=lambda r: r.score.bm25, reverse=True)
-    vectors.sort(key=lambda r: r.score, reverse=True)
+    paragraphs = [p for p in sorted(paragraphs, key=lambda r: r.score.bm25, reverse=True)]
+    vectors = [v for v in sorted(vectors, key=lambda r: r.score, reverse=True)]
 
     for paragraph in paragraphs:
         fuzzy_result = len(paragraph.matches) > 0
@@ -287,71 +291,178 @@ def rank_fusion_merge(
     return merged_paragraphs
 
 
-@merge_observer.wrap({"type": "find_merge"})
-async def find_merge_results(
-    search_responses: list[SearchResponse],
-    count: int,
-    page: int,
+def cut_page(items: list[Any], page_size: int, page_number: int) -> tuple[list[Any], bool]:
+    """Return a slice of `items` representing the specified page and a boolean
+    indicating whether there is a next page or not"""
+    start = page_size * page_number
+    end = start + page_size
+    next_page = len(items) > end
+    return items[start:end], next_page
+
+
+@merge_observer.wrap({"type": "hydrate_and_rerank"})
+async def hydrate_and_rerank(
+    text_blocks: Iterable[TextBlockMatch],
     kbid: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
-    requested_relations: EntitiesSubgraphRequest,
-    min_score_bm25: float,
-    min_score_semantic: float,
-    highlight: bool = False,
-) -> KnowledgeboxFindResults:
-    paragraphs: list[list[ParagraphResult]] = []
-    vectors: list[list[DocumentScored]] = []
-    relations = []
+    *,
+    resource_hydration_options: ResourceHydrationOptions,
+    text_block_hydration_options: TextBlockHydrationOptions,
+    reranker: Reranker,
+    reranking_options: RerankingOptions,
+) -> tuple[list[TextBlockMatch], list[Resource], list[str]]:
+    """Given a list of text blocks from a retrieval operation, hydrate and
+    rerank the results.
 
-    next_page = True
-    ematches: list[str] = []
-    real_query = ""
-    total_paragraphs = 0
-    for response in search_responses:
-        # Iterate over answers from different logic shards
-        ematches.extend(response.paragraph.ematches)
-        real_query = response.paragraph.query
-        next_page = next_page and response.paragraph.next_page
-        total_paragraphs += response.paragraph.total
+    This function returns either the entire list or a subset of updated
+    (hydrated and reranked) text blocks and their corresponding resource
+    metadata. It also returns an ordered list of best matches.
 
-        paragraphs.append(cast(list[ParagraphResult], response.paragraph.results))
-        vectors.append(cast(list[DocumentScored], response.vector.documents))
+    """
+    max_operations = asyncio.Semaphore(50)
 
-        relations.append(response.relation)
+    # Iterate text blocks and create text block and resource metadata hydration
+    # tasks depending on the reranker
+    text_blocks_by_id: dict[str, TextBlockMatch] = {}  # useful for faster access to text blocks later
+    resource_hydration_ops = {}
+    text_block_hydration_ops = []
+    for text_block in text_blocks:
+        rid = text_block.paragraph_id.rid
+        paragraph_id = text_block.paragraph_id.full()
 
-    result_paragraphs, merged_next_page = merge_paragraphs_vectors(
-        paragraphs, vectors, count, page, min_score_semantic
-    )
-    next_page = next_page or merged_next_page
+        # If we find multiple results (from different indexes) with different
+        # metadata, this statement will only get the metadata from the first on
+        # the list. We assume metadata is the same on all indexes, otherwise
+        # this would be a BUG
+        text_blocks_by_id.setdefault(paragraph_id, text_block)
 
-    api_results = KnowledgeboxFindResults(
-        resources={},
-        query=real_query,
-        total=total_paragraphs,
-        page_number=page,
-        page_size=count,
-        next_page=next_page,
-        min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
-        best_matches=[],
-    )
+        # rerankers that need extra results may end with less resources than the
+        # ones we see now, so we'll skip this step and recompute the resources
+        # later
+        if not reranker.needs_extra_results:
+            if rid not in resource_hydration_ops:
+                resource_hydration_ops[rid] = asyncio.create_task(
+                    hydrate_resource_metadata(
+                        kbid,
+                        rid,
+                        options=resource_hydration_options,
+                        concurrency_control=max_operations,
+                        service_name=SERVICE_NAME,
+                    )
+                )
 
-    resources, best_matches = await fetch_find_metadata(
-        result_paragraphs,
-        kbid,
-        resource_hydration_options=ResourceHydrationOptions(
-            show=show,
-            extracted=extracted,
-            field_type_filter=field_type_filter,
-        ),
-        text_block_hydration_options=TextBlockHydrationOptions(
-            highlight=highlight,
-            ematches=ematches,
-        ),
-    )
-    api_results.resources = resources
-    api_results.best_matches = best_matches
-    api_results.relations = await merge_relations_results(relations, requested_relations)
+        text_block_hydration_ops.append(
+            asyncio.create_task(
+                hydrate_text_block(
+                    kbid,
+                    text_block,
+                    text_block_hydration_options,
+                    concurrency_control=max_operations,
+                )
+            )
+        )
 
-    return api_results
+    # hydrate only the strictly needed before rerank
+    hydrated_text_blocks: list[TextBlockMatch]
+    hydrated_resources: list[Union[Resource, None]]
+
+    ops = [
+        *text_block_hydration_ops,
+        *resource_hydration_ops.values(),
+    ]
+    FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
+    results = await asyncio.gather(*ops)
+
+    hydrated_text_blocks = results[: len(text_block_hydration_ops)]  # type: ignore
+    hydrated_resources = results[len(text_block_hydration_ops) :]  # type: ignore
+
+    # with the hydrated text, rerank and apply new scores to the text blocks
+    to_rerank = [
+        RerankableItem(
+            id=text_block.paragraph_id.full(),
+            score=text_block.score,
+            score_type=text_block.score_type,
+            content=text_block.text or "",  # TODO: add a warning, this shouldn't usually happen
+        )
+        for text_block in hydrated_text_blocks
+    ]
+    reranked = await reranker.rerank(to_rerank, reranking_options)
+
+    matches = []
+    for item in reranked:
+        paragraph_id = item.id
+        score = item.score
+        score_type = item.score_type
+
+        text_block = text_blocks_by_id[paragraph_id]
+        text_block.score = score
+        text_block.score_type = score_type
+
+        matches.append((paragraph_id, score))
+
+    matches.sort(key=lambda x: x[1], reverse=True)
+
+    best_matches = []
+    best_text_blocks = []
+    resource_hydration_ops = {}
+    for order, (paragraph_id, _) in enumerate(matches):
+        text_block = text_blocks_by_id[paragraph_id]
+        text_block.order = order
+        best_matches.append(paragraph_id)
+        best_text_blocks.append(text_block)
+
+        # now we have removed the text block surplus, fetch resource metadata
+        if reranker.needs_extra_results:
+            if rid not in resource_hydration_ops:
+                resource_hydration_ops[rid] = asyncio.create_task(
+                    hydrate_resource_metadata(
+                        kbid,
+                        rid,
+                        options=resource_hydration_options,
+                        concurrency_control=max_operations,
+                        service_name=SERVICE_NAME,
+                    )
+                )
+
+    # Finally, fetch resource metadata if we haven't already done it
+    if reranker.needs_extra_results:
+        ops = list(resource_hydration_ops.values())
+        FIND_FETCH_OPS_DISTRIBUTION.observe(len(ops))
+        hydrated_resources = await asyncio.gather(*ops)  # type: ignore
+
+    resources = [resource for resource in hydrated_resources if resource is not None]
+
+    return best_text_blocks, resources, best_matches
+
+
+def compose_find_resources(
+    text_blocks: list[TextBlockMatch],
+    resources: list[Resource],
+) -> dict[str, FindResource]:
+    find_resources: dict[str, FindResource] = {}
+
+    for resource in resources:
+        rid = resource.id
+        if rid not in find_resources:
+            find_resources[rid] = FindResource(id=rid, fields={})
+            find_resources[rid].updated_from(resource)
+
+    for text_block in text_blocks:
+        rid = text_block.paragraph_id.rid
+        if rid not in find_resources:
+            # resource not found in db, skipping
+            continue
+
+        find_resource = find_resources[rid]
+        field_id = text_block.paragraph_id.field_id.short_without_subfield()
+        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
+
+        paragraph_id = text_block.paragraph_id.full()
+        find_paragraph = text_block_to_find_paragraph(text_block)
+
+        find_field.paragraphs[paragraph_id] = find_paragraph
+
+    return find_resources
+
+
+def _round(x: float) -> float:
+    return round(x, ndigits=3)
