@@ -61,11 +61,11 @@ from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import content_types
+from nucliadb_models.file import FileProcessingOptions
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, Metadata
-from nucliadb_protos.resources_pb2 import FileProcessingOptions as PBFileProcessingOptions
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -607,6 +607,10 @@ async def upload_rslug_prefix(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_processing_options: Optional[str] = Header(
+        default=None,
+        description="Base64 encoded FileProcessingOptions",
+    ),  # type: ignore
 ) -> ResourceFileUploaded:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _upload(
@@ -618,6 +622,7 @@ async def upload_rslug_prefix(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_processing_options=x_processing_options,
     )
 
 
@@ -639,6 +644,10 @@ async def upload_rid_prefix(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_processing_options: Optional[str] = Header(
+        default=None,
+        description="Base64 encoded FileProcessingOptions",
+    ),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -649,6 +658,7 @@ async def upload_rid_prefix(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_processing_options=x_processing_options,
     )
 
 
@@ -668,7 +678,10 @@ async def upload(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
-    x_processing_options: Optional[str] = Header(default=None),  # type: ignore
+    x_processing_options: Optional[str] = Header(
+        default=None,
+        description="Base64 encoded FileProcessingOptions",
+    ),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -785,7 +798,7 @@ async def _upload(
             path=path,
             request=request,
             bucket=storage_manager.storage.get_bucket_name(kbid),
-            file_processing_options=FileProcessingOptions.from_header(x_processing_options),
+            file_processing_options=parse_file_processing_options_header(x_processing_options),
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
@@ -961,3 +974,18 @@ def maybe_b64decode(some_string: str) -> str:
     except ValueError:
         # not b64encoded
         return some_string
+
+
+def parse_file_processing_options_header(
+    x_processing_options: Optional[str],
+) -> Optional[FileProcessingOptions]:
+    if x_processing_options is None:
+        return None
+    try:
+        encoded = base64.b64decode(x_processing_options)
+        return FileProcessingOptions.model_validate_json(encoded)
+    except Exception as ex:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid x-processing-options header: {ex}",
+        )
