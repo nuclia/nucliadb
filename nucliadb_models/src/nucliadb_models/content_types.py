@@ -84,6 +84,17 @@ def guess(filename: str) -> Optional[str]:
     return guessed
 
 
+# WARNING: These are custom hacks to flag some features at processing time.
+# Please DO NOT add new content types here, use the proper mimetype instead
+# and find a better solution for flagging processing options to the pipeline.
+PROCESSING_FEATURE_CONTENT_TYPE_SUFFIXES = {
+    # This triggers table processing with visual LLMs when added to application/pdf
+    "+aitable",
+    # This makes processing split paragraphs by blank lines when added to text/plain
+    "+blankline",
+}
+
+
 def valid(content_type: str) -> bool:
     """
     Check if a content type is valid.
@@ -92,8 +103,9 @@ def valid(content_type: str) -> bool:
     >>> valid("invalid")
     False
     """
-    # The AI tables feature has been implemented via a custom mimetype suffix.
-    # Keep this until we have a better solution to handle this.
-    content_type = content_type.split("+aitable")[0]
+    for feature_suffix in PROCESSING_FEATURE_CONTENT_TYPE_SUFFIXES:
+        if content_type.endswith(feature_suffix):
+            content_type = content_type.split(feature_suffix)[0]
+            break
     in_standard = mimetypes.guess_extension(content_type, strict=False) is not None
     return in_standard or content_type in EXTRA_VALID_CONTENT_TYPES
