@@ -20,7 +20,15 @@
 
 from unittest.mock import AsyncMock, Mock, patch
 
-from nucliadb.search.search.rerankers import PredictReranker, RankedItem, RerankableItem, Reranker
+from nucliadb.search.search.rerankers import (
+    PredictReranker,
+    RankedItem,
+    RerankableItem,
+    Reranker,
+    RerankingOptions,
+    apply_reranking,
+    sort_by_score,
+)
 from nucliadb_models.internal.predict import RerankResponse
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -31,7 +39,7 @@ from nucliadb_models.search import (
 )
 
 
-class NoopReranker(Reranker):
+class DummyReranker(Reranker):
     @property
     def needs_extra_results(self) -> bool:
         return False
@@ -39,8 +47,8 @@ class NoopReranker(Reranker):
     def items_needed(self, requested: int, shards: int = 1) -> int:
         return requested
 
-    async def rerank(self, kbid: str, query: str, items: list[RerankableItem]) -> list[RankedItem]:
-        return [
+    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
+        reranked = [
             RankedItem(
                 id=item.id,
                 score=item.score,
@@ -48,11 +56,13 @@ class NoopReranker(Reranker):
             )
             for item in items
         ]
+        sort_by_score(reranked)
+        return reranked
 
 
 async def test_rerank_find_response():
     """Validate manipulation of find response by the reranker"""
-    reranker: Reranker = NoopReranker()
+    reranker: Reranker = DummyReranker()
 
     find_response = KnowledgeboxFindResults(
         resources={
@@ -88,11 +98,19 @@ async def test_rerank_find_response():
         page_size=20,
     )
 
-    await reranker.rerank_find_response("kbid", "my query", find_response)
-
-    import json
-
-    print(json.dumps(find_response.model_dump(), indent=4))
+    to_rerank = [
+        RerankableItem(
+            id=paragraph_id,
+            score=paragraph.score,
+            score_type=paragraph.score_type,
+            content=paragraph.text,
+        )
+        for resource in find_response.resources.values()
+        for field in resource.fields.values()
+        for paragraph_id, paragraph in field.paragraphs.items()
+    ]
+    reranked = await reranker.rerank(to_rerank, RerankingOptions(kbid="kbid", query="my query", top_k=3))
+    apply_reranking(find_response, reranked)
 
     ranking = []
     for resource in find_response.resources.values():
@@ -119,13 +137,12 @@ async def test_predict_reranker_dont_call_predict_with_empty_results():
     ) as get_predict:
         reranker = PredictReranker()
 
-        await reranker.rerank("kbid", "my query", items=[])
+        await reranker.rerank(items=[], options=Mock())
         assert get_predict.call_count == 0
 
         reranked = await reranker.rerank(
-            "kbid",
-            "my query",
             items=[RerankableItem(id="id", score=1, score_type=SCORE_TYPE.VECTOR, content="bla bla")],
+            options=RerankingOptions(kbid="kbid", query="my query", top_k=20),
         )
         assert get_predict.call_count == 1
 

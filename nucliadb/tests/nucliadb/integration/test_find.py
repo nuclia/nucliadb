@@ -238,7 +238,7 @@ async def test_story_7286(
     )
     assert resp.status_code == 200
 
-    with patch("nucliadb.search.search.results_hydrator.base.managed_serialize", return_value=None):
+    with patch("nucliadb.search.search.hydrator.managed_serialize", return_value=None):
         # should get no result (because serialize returns None, as the resource is not found in the DB)
         resp = await nucliadb_reader.post(
             f"/kb/{knowledgebox}/find",
@@ -463,3 +463,27 @@ async def test_find_keyword_filters(
             assert (
                 rid in body["resources"]
             ), f"Keyword filters: {keyword_filters}, expected rids: {expected_rids}"
+
+
+async def test_find_highlight(
+    nucliadb_reader: AsyncClient,
+    philosophy_books_kb: str,
+):
+    kbid = philosophy_books_kb
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "Who was Marcus Aurelius?",
+            "features": ["keyword", "semantic", "relations"],
+            "highlight": True,
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    assert len(body["resources"]) == 1
+    match = body["resources"].popitem()[1]["fields"]["/a/summary"]["paragraphs"].popitem()[1]
+    assert match["order"] == 0
+    assert match["score_type"] == "BM25"
+    assert "<mark>Marcus</mark> Aurelius" in match["text"]
