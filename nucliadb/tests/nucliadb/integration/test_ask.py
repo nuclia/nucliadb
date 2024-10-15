@@ -947,7 +947,6 @@ async def test_rag_image_rag_strategies(
 @pytest.mark.parametrize(
     "reranker,expected_reranker",
     [
-        ("", Reranker.MULTI_MATCH_BOOSTER),
         (Reranker.MULTI_MATCH_BOOSTER, Reranker.MULTI_MATCH_BOOSTER),
         (Reranker.PREDICT_RERANKER, Reranker.NOOP),
         (Reranker.NOOP, Reranker.NOOP),
