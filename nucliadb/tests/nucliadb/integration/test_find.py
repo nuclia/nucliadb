@@ -487,6 +487,3 @@ async def test_find_highlight(
     assert match["order"] == 0
     assert match["score_type"] == "BM25"
     assert "<mark>Marcus</mark> Aurelius" in match["text"]
-
-    __import__("pdb").set_trace()
-    pass
