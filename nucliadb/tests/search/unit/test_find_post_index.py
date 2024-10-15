@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -30,7 +29,7 @@ from nucliadb_models.search import SCORE_TYPE, ResourceProperties
 from nucliadb_protos import nodereader_pb2, noderesources_pb2
 
 
-async def test_find_post_index_search(expected_find_response: dict[str, Any]):
+async def test_find_post_index_search(expected_find_response: dict):
     query = "How should I validate this?"
     search_responses = [
         nodereader_pb2.SearchResponse(

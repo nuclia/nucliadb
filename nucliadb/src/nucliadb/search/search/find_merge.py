@@ -100,10 +100,7 @@ async def build_find_response(
     resource_hydration_options = ResourceHydrationOptions(
         show=show, extracted=extracted, field_type_filter=field_type_filter
     )
-    text_block_hydration_options = TextBlockHydrationOptions(
-        highlight=highlight,
-        ematches=search_response.paragraph.ematches,  # type: ignore
-    )
+    text_block_hydration_options = TextBlockHydrationOptions(highlight=highlight)
     reranking_options = RerankingOptions(kbid=kbid, query=query, top_k=page_size)
     text_blocks, resources, best_matches = await hydrate_and_rerank(
         text_blocks_page,
