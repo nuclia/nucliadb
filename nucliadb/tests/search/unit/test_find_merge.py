@@ -20,7 +20,7 @@
 
 import random
 
-from nucliadb.search.search.find_merge import cut_page, rank_fusion_merge
+from nucliadb.search.search.find_merge import merge_paragraphs_vectors
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
@@ -71,14 +71,12 @@ def test_merge_paragraphs_vectors():
         score = max(5 / float(i + 1), 1)
         shard2_vectors.append(get_vector_result(score))
 
-    min_score_semantic = 1
-    paragraphs, next_page = cut_page(
-        rank_fusion_merge(
-            [*shard1_paragraphs, *shard2_paragraphs],
-            filter(lambda x: x.score >= min_score_semantic, [*shard1_vectors, *shard2_vectors]),
-        ),
+    paragraphs, next_page = merge_paragraphs_vectors(
+        [shard1_paragraphs, shard2_paragraphs],
+        [shard1_vectors, shard2_vectors],
         20,
         0,
+        min_score=1,
     )
     assert not next_page
     assert len(paragraphs) == 10

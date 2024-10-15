@@ -18,25 +18,4 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pytest
-from httpx import AsyncClient
-
-from nucliadb_models.search import Reranker
-
-
-@pytest.mark.parametrize("reranker", [Reranker.MULTI_MATCH_BOOSTER, Reranker.PREDICT_RERANKER])
-async def test_reranker(
-    nucliadb_reader: AsyncClient,
-    philosophy_books_kb: str,
-    reranker: str,
-):
-    kbid = philosophy_books_kb
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "query": "Which is our future?",
-            "reranker": reranker,
-        },
-    )
-    assert resp.status_code == 200
+from nucliadb.search.search.results_hydrator.base import hydrate_external  # noqa

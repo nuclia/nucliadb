@@ -392,22 +392,17 @@ class SortOptions(BaseModel):
 class Reranker(str, Enum):
     """Rerankers
 
-    - Multi-match booster (default): given a set of results from different
-      sources, e.g., keyword and semantic search boost results appearing in both
-      sets
+    - Multi-match booster: given a set of results from different sources, e.g.,
+      keyword and semantic search boost results appearing in both sets
 
     - Predict reranker: after retrieval, send the results to Predict API to
       rerank it. This method uses a reranker model, so one can expect better
       results at expenses of more latency
 
-    - No-operation (noop) reranker: maintain order and do not rerank the results
-      after retrieval
-
     """
 
     MULTI_MATCH_BOOSTER = "multi_match_booster"
     PREDICT_RERANKER = "predict"
-    NOOP = "noop"
 
 
 class KnowledgeBoxCount(BaseModel):
