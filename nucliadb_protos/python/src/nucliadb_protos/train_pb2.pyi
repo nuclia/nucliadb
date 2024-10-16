@@ -67,7 +67,6 @@ from nucliadb_protos.resources_pb2 import (
     CloudFile as CloudFile,
     ComputedMetadata as ComputedMetadata,
     Conversation as Conversation,
-    EmailMetadata as EmailMetadata,
     Entity as Entity,
     Extra as Extra,
     ExtractedTextWrapper as ExtractedTextWrapper,
