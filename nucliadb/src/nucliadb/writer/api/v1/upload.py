@@ -609,7 +609,7 @@ async def upload_rslug_prefix(
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
     x_processing_options: Optional[str] = Header(
         default=None,
-        description="Base64 encoded FileProcessingOptions",
+        description="Base64 encoded FileProcessingOptions as JSON",
     ),  # type: ignore
 ) -> ResourceFileUploaded:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
@@ -646,7 +646,7 @@ async def upload_rid_prefix(
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
     x_processing_options: Optional[str] = Header(
         default=None,
-        description="Base64 encoded FileProcessingOptions",
+        description="Base64 encoded FileProcessingOptions as JSON",
     ),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
@@ -680,7 +680,7 @@ async def upload(
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
     x_processing_options: Optional[str] = Header(
         default=None,
-        description="Base64 encoded FileProcessingOptions",
+        description="Base64 encoded FileProcessingOptions as JSON",
     ),  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(

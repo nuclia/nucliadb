@@ -482,6 +482,7 @@ message FieldLink {
 
 message FileProcessingOptions {
     bool aitables = 1;
+    bool split_on_blankline = 2;
 }
 
 

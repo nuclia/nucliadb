@@ -1172,6 +1172,8 @@ pub struct FieldLink {
 pub struct FileProcessingOptions {
     #[prost(bool, tag = "1")]
     pub aitables: bool,
+    #[prost(bool, tag = "2")]
+    pub split_on_blankline: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

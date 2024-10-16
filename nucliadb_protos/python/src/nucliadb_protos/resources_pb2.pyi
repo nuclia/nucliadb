@@ -1949,13 +1949,16 @@ class FileProcessingOptions(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     AITABLES_FIELD_NUMBER: builtins.int
+    SPLIT_ON_BLANKLINE_FIELD_NUMBER: builtins.int
     aitables: builtins.bool
+    split_on_blankline: builtins.bool
     def __init__(
         self,
         *,
         aitables: builtins.bool = ...,
+        split_on_blankline: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["aitables", b"aitables"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["aitables", b"aitables", "split_on_blankline", b"split_on_blankline"]) -> None: ...
 
 global___FileProcessingOptions = FileProcessingOptions
 

@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -24,6 +25,7 @@ from fastapi.requests import Request
 
 from nucliadb.ingest.processing import ProcessingInfo, Source
 from nucliadb.writer.api.v1.upload import (
+    parse_file_processing_options_header,
     store_file_on_nuclia_db,
     validate_field_upload,
 )
@@ -200,3 +202,10 @@ async def test_store_file_on_nucliadb_sets_processing_options(
     processing_mock.convert_internal_filefield_to_str.assert_awaited_once()
     file_field = processing_mock.convert_internal_filefield_to_str.call_args[0][0]
     assert file_field.processing_options.aitables is True
+
+
+def test_parse_file_processing_options_header():
+    fpo = FileProcessingOptions(aitables=True, split_on_blankline=True)
+    x_processing_options = base64.b64encode(fpo.model_dump_json().encode()).decode()
+    parsed = parse_file_processing_options_header(x_processing_options)
+    assert parsed == fpo

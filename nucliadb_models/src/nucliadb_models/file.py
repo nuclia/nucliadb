@@ -59,17 +59,25 @@ class FieldFile(BaseModel):
 # Creation and update classes (Those used on writer endpoints)
 
 
-class FileField(BaseModel):
-    language: Optional[str] = None
-    password: Optional[str] = None
-    file: File
-
-
 class FileProcessingOptions(BaseModel):
     aitables: bool = Field(
         default=False,
         title="AI Tables",
         description="Whether to process tables detected on the document with AI. This is only available for application/pdf files.",
+    )
+    split_on_blankline: bool = Field(
+        default=False,
+        description="If true, the extraceted text will be split into blocks separated by blank lines. This only applies to plain text files.",
+    )
+
+
+class FileField(BaseModel):
+    language: Optional[str] = None
+    password: Optional[str] = None
+    file: File
+    processing_options: FileProcessingOptions = Field(
+        default=FileProcessingOptions(),
+        description="Options for processing the file.",
     )
 
 

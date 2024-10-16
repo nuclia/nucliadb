@@ -213,6 +213,10 @@ async def parse_internal_file_field(
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
+    writer.files[key].processing_options.aitables = file_field.processing_options.aitables
+    writer.files[
+        key
+    ].processing_options.split_on_blankline = file_field.processing_options.split_on_blankline
 
     processing = get_processing()
 
