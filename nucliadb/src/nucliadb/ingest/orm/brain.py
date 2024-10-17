@@ -111,7 +111,7 @@ class ResourceBrain:
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
 
-                denied_classifications = user_paragraph_classifications.denied.get(key, [])
+                denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
                 position = TextPosition(
                     index=index,
                     start=paragraph.start,
@@ -152,21 +152,21 @@ class ResourceBrain:
                         representation=representation,
                     ),
                 )
-                p.labels.append(f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}")
-                for classification in paragraph.classifications:
-                    label = f"/l/{classification.labelset}/{classification.label}"
-                    if label not in denied_classifications:
-                        p.labels.append(label)
-
-                # Add user annotated labels to paragraphs
-                extend_unique(p.labels, user_paragraph_classifications.valid.get(key, []))  # type: ignore
-
+                paragraph_labels = set()
+                paragraph_labels.add(f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}")
+                paragraph_labels.update(
+                    f"/l/{classification.labelset}/{classification.label}"
+                    for classification in paragraph.classifications
+                )
+                paragraph_labels.update(set(user_paragraph_classifications.valid.get(key, [])))
+                paragraph_labels.difference_update(denied_classifications)
+                p.labels.extend(list(paragraph_labels))
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         extracted_text_str = extracted_text.text if extracted_text else None
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
-            denied_classifications = user_paragraph_classifications.denied.get(key, [])
+            denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
             position = TextPosition(
                 index=index,
                 start=paragraph.start,
@@ -204,16 +204,15 @@ class ResourceBrain:
                     representation=representation,
                 ),
             )
-            p.labels.append(f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}")
-
-            for classification in paragraph.classifications:
-                label = f"/l/{classification.labelset}/{classification.label}"
-                if label not in denied_classifications:
-                    p.labels.append(label)
-
-            # Add user annotated labels to paragraphs
-            extend_unique(p.labels, user_paragraph_classifications.valid.get(key, []))  # type: ignore
-
+            paragraph_labels = set()
+            paragraph_labels.add(f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}")
+            paragraph_labels.update(
+                f"/l/{classification.labelset}/{classification.label}"
+                for classification in paragraph.classifications
+            )
+            paragraph_labels.update(set(user_paragraph_classifications.valid.get(key, [])))
+            paragraph_labels.difference_update(denied_classifications)
+            p.labels.extend(list(paragraph_labels))
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         for relations in metadata.metadata.relations:
