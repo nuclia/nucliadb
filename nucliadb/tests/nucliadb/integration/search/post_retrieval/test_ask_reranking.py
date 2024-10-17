@@ -18,17 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""/ask endpoint + reranking tests
-
-Here we'll test the integration of /ask with reranking. /ask has some particular
-behavior depending on the reranker.
-
-When predict reranker is requested, /ask does a retrieval without reranking, the
-actual reranking is done by predict and scores are returned in the stream.
-
-Other reranking strategies are done in nucliadb side directly.
-
-"""
+"""/ask endpoint + reranking tests"""
 
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -56,11 +46,6 @@ async def test_ask_forwarding_rerank_options_to_find(
     reranker: Reranker,
     expected_reranker: Reranker,
 ):
-    """/ask endpoint has a reranker option that forwards to find. However, if
-    predict reranker is requested, it won't be used in the find, we'll get the
-    reranking from the predict stream (thus, avoiding a round trip to predict).
-
-    """
     kbid = "kbid"
     find_mock = AsyncMock(return_value=(KnowledgeboxFindResults(resources={}), False, Mock()))
 
