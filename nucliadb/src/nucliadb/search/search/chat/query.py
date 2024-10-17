@@ -45,7 +45,6 @@ from nucliadb_models.search import (
     PromptContextOrder,
     Relations,
     RephraseModel,
-    Reranker,
     SearchOptions,
     parse_rephrase_prompt,
 )
@@ -182,10 +181,7 @@ async def run_main_query(
     find_request.debug = item.debug
     find_request.rephrase = item.rephrase
     find_request.rephrase_prompt = parse_rephrase_prompt(item)
-    # predict reranker will be done in their stream to avoid a round trip
-    # between nucliadb and predict
-    if item.reranker != Reranker.PREDICT_RERANKER:
-        find_request.reranker = item.reranker
+    find_request.reranker = item.reranker
     # We don't support pagination, we always get the top_k results.
     find_request.top_k = item.top_k
     find_request.show_hidden = item.show_hidden

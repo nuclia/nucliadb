@@ -29,23 +29,16 @@ from nucliadb.search.predict import (
     AnswerStatusCode,
     CitationsGenerativeResponse,
     GenerativeChunk,
-    GenerativeResponse,
     JSONGenerativeResponse,
-    RerankGenerativeResponse,
     StatusGenerativeResponse,
 )
-from nucliadb.search.search.chat.ask import RetrievalResults
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
-    SCORE_TYPE,
     AskRequest,
     AskResponseItem,
     ChatRequest,
     FieldExtensionStrategy,
-    FindField,
-    FindParagraph,
     FindRequest,
-    FindResource,
     FullResourceStrategy,
     HierarchyResourceStrategy,
     KnowledgeboxFindResults,
@@ -947,7 +940,7 @@ async def test_rag_image_rag_strategies(
 @pytest.mark.parametrize(
     "reranker,expected_reranker",
     [
-        (Reranker.PREDICT_RERANKER, Reranker.MULTI_MATCH_BOOSTER),
+        (Reranker.PREDICT_RERANKER, Reranker.PREDICT_RERANKER),
         (Reranker.MULTI_MATCH_BOOSTER, Reranker.MULTI_MATCH_BOOSTER),
     ],
 )
@@ -982,126 +975,3 @@ async def test_ask_forwarding_rerank_options_to_find(
 
         assert find_request.top_k == 10
         assert find_request.reranker == expected_reranker
-
-
-async def test_ask_predict_stream_with_reranking(nucliadb_reader: AsyncClient, knowledgebox: str):
-    kbid = knowledgebox
-    top_k = 10
-
-    query_parser = AsyncMock()
-    query_parser.get_max_tokens_context = AsyncMock(return_value=1000)
-    query_parser.get_max_tokens_answer = Mock(return_value=1000)
-
-    results = KnowledgeboxFindResults(resources={}, page_size=top_k)
-    reranking = {}
-    score = 0.0
-    order = 5 * 5 * 5 - 1
-    for r in range(5):
-        rid = f"rid-{r}"
-        find_resource = FindResource(id=rid, fields={})
-
-        for f in range(5):
-            field_id = f"/t/my-text-{f}"
-            find_field = FindField(paragraphs={})
-
-            for p in range(5):
-                start = p * 10
-                end = (p + 1) * 10
-                paragraph_id = f"{rid}{field_id}/{start}-{end}"
-                find_paragraph = FindParagraph(
-                    id=paragraph_id,
-                    score=score,
-                    score_type=[SCORE_TYPE.BM25, SCORE_TYPE.VECTOR][int(score) % 2],
-                    order=order,
-                    text=f"resource {rid} - field {field_id} - paragraph {paragraph_id}",
-                )
-                score += 1
-                order -= 1
-
-                find_field.paragraphs[paragraph_id] = find_paragraph
-                reranking[paragraph_id] = 100 - score
-            find_resource.fields[field_id] = find_field
-        results.resources[rid] = find_resource
-
-    retrieval = RetrievalResults(
-        main_query=results,
-        main_query_weight=1,
-        query_parser=query_parser,
-    )
-
-    context_scores = {}
-    count = 0
-    for paragraph_id, score in sorted(reranking.items(), key=lambda x: x[1], reverse=True):
-        context_scores[paragraph_id] = score
-        count += 1
-        if count == top_k:
-            break
-
-    predict = get_predict()
-    predict_stream: list[GenerativeResponse] = [
-        RerankGenerativeResponse(context_scores=context_scores),
-        JSONGenerativeResponse(object={"answer": "valid answer to", "confidence": 0.5}),
-    ]
-    predict.ndjson_answer = [  # type: ignore
-        GenerativeChunk(chunk=chunk).model_dump_json() + "\n" for chunk in predict_stream
-    ]
-
-    with patch("nucliadb.search.search.chat.ask.retrieval_step", return_value=retrieval):
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/ask",
-            headers={
-                "x-synchronous": "true",
-            },
-            json={
-                "query": "title",
-                "reranker": "predict",
-                "top_k": top_k,
-            },
-        )
-        assert resp.status_code == 200, resp.text
-
-        response = resp.json()
-
-        assert response["retrieval_results"]["page_size"] == top_k
-        assert len(response["retrieval_results"]["resources"]) == 1
-        assert len(response["retrieval_results"]["resources"]["rid-0"]["fields"]) == 2
-        assert (
-            len(
-                response["retrieval_results"]["resources"]["rid-0"]["fields"]["/t/my-text-0"][
-                    "paragraphs"
-                ]
-            )
-            == 5
-        )
-        assert (
-            len(
-                response["retrieval_results"]["resources"]["rid-0"]["fields"]["/t/my-text-1"][
-                    "paragraphs"
-                ]
-            )
-            == 5
-        )
-
-        for resource in response["retrieval_results"]["resources"].values():
-            for field in resource["fields"].values():
-                for paragraph in field["paragraphs"].values():
-                    assert paragraph["score_type"] == SCORE_TYPE.RERANKER
-
-        assert response["retrieval_results"]["best_matches"] == [
-            "rid-0/t/my-text-0/0-10",
-            "rid-0/t/my-text-0/10-20",
-            "rid-0/t/my-text-0/20-30",
-            "rid-0/t/my-text-0/30-40",
-            "rid-0/t/my-text-0/40-50",
-            "rid-0/t/my-text-1/0-10",
-            "rid-0/t/my-text-1/10-20",
-            "rid-0/t/my-text-1/20-30",
-            "rid-0/t/my-text-1/30-40",
-            "rid-0/t/my-text-1/40-50",
-        ]
-
-        fields = response["retrieval_results"]["resources"]["rid-0"]["fields"]
-        assert fields["/t/my-text-0"]["paragraphs"]["rid-0/t/my-text-0/0-10"]["score"] == 99
-        assert fields["/t/my-text-0"]["paragraphs"]["rid-0/t/my-text-0/0-10"]["order"] == 0
-        assert fields["/t/my-text-1"]["paragraphs"]["rid-0/t/my-text-1/40-50"]["score"] == 90
-        assert fields["/t/my-text-1"]["paragraphs"]["rid-0/t/my-text-1/40-50"]["order"] == 9
