@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use nidx::{indexer, maintenance, searcher};
+use nidx::{indexer, maintenance, searcher, Settings};
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.

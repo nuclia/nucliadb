@@ -22,6 +22,7 @@ pub mod maintenance;
 mod metadata;
 pub mod searcher;
 mod settings;
+mod upload;
 
 pub use metadata::NidxMetadata;
 pub use settings::Settings;

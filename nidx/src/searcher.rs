@@ -1,7 +1,6 @@
-use core::sync;
 use std::{
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
@@ -10,11 +9,11 @@ use futures::TryStreamExt;
 use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
 use object_store::DynObjectStore;
-use tempfile::{env::temp_dir, tempdir};
-use tokio::sync::{Mutex, RwLock};
+use tempfile::tempdir;
+use tokio::sync::RwLock;
 use tokio_util::{compat::FuturesAsyncReadCompatExt, io::SyncIoBridge};
 
-use crate::{metadata::Index, NidxMetadata, Settings};
+use crate::{NidxMetadata, Settings};
 
 #[derive(Clone)]
 pub struct SearchOperation {
@@ -26,19 +25,13 @@ pub struct SearchOperation {
 pub async fn run() -> anyhow::Result<()> {
     let work_dir = tempdir()?;
     let settings = Settings::from_env();
-    let indexer_settings = settings.indexer.expect("Indexer not configured");
-    let indexer_storage = indexer_settings.object_store.client();
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
-    let storage = indexer_settings.object_store.client();
+    let storage = settings.storage.expect("Storage settings needed").object_store.client();
 
     let index_metadata = Arc::new(RwLock::new(HashMap::new()));
 
-    let sync_task = tokio::task::spawn(run_sync(
-        meta,
-        work_dir.path().to_path_buf(),
-        indexer_storage.clone(),
-        index_metadata.clone(),
-    ));
+    let sync_task =
+        tokio::task::spawn(run_sync(meta, work_dir.path().to_path_buf(), storage.clone(), index_metadata.clone()));
     let vector_search_task =
         tokio::task::spawn(run_vector_search(work_dir.path().to_path_buf(), index_metadata.clone()));
     let text_search_task = tokio::task::spawn(run_text_search(work_dir.path().to_path_buf(), index_metadata.clone()));

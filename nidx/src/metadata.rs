@@ -64,6 +64,7 @@ impl NidxMetadata {
 
 #[cfg(test)]
 mod tests {
+    use shard::Shard;
     use sqlx;
     use uuid::Uuid;
 

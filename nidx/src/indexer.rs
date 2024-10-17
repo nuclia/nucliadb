@@ -1,3 +1,4 @@
+use crate::upload::pack_and_upload;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -20,14 +21,16 @@
 use crate::{metadata::*, Settings};
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
+use async_nats::Message;
 use futures::stream::StreamExt;
 use nidx_types::Seq;
+use nucliadb_core::protos::prost::Message as _;
+use nucliadb_core::protos::IndexMessage;
 use nucliadb_core::protos::Resource;
-use nucliadb_core::protos::{prost::Message, IndexMessage};
 use object_store::{DynObjectStore, ObjectStore};
+use std::path::Path;
 use std::sync::Arc;
-use tempfile::TempDir;
-use tokio_util::io::SyncIoBridge;
+use tracing::*;
 use uuid::Uuid;
 
 pub async fn run() -> anyhow::Result<()> {
@@ -46,19 +49,45 @@ pub async fn run() -> anyhow::Result<()> {
     let mut subscription = consumer.messages().await?;
 
     while let Some(Ok(msg)) = subscription.next().await {
-        let seq = msg.info().unwrap().stream_sequence.into();
-        let body = msg.message.payload.clone();
-        let index_message = IndexMessage::decode(body)?;
+        let info = match msg.info() {
+            Ok(info) => info,
+            Err(e) => {
+                error!("Invalid NATS message {e:?}, skipping");
+                let _ = msg.ack().await;
+                continue;
+            }
+        };
+        let seq = info.stream_sequence.into();
+        info!(?seq, "Processing indexing message");
+        let (msg, acker) = msg.split();
 
-        let get_result = indexer_storage.get(&object_store::path::Path::from(index_message.storage_key)).await?;
-        let bytes = get_result.bytes().await?;
-        let resource = Resource::decode(bytes)?;
+        let resource = match download_message(indexer_storage.clone(), msg).await {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("Error downloading index message {e:?}");
+                continue;
+            }
+        };
 
-        index_resource(&meta, indexer_storage.clone(), &resource, seq).await?;
-        msg.ack().await.unwrap();
+        match index_resource(&meta, segment_storage.clone(), &resource, seq).await {
+            Ok(()) => acker.ack().await.unwrap(),
+            Err(e) => {
+                warn!("Error processing index message {e:?}")
+            }
+        }
     }
 
     Ok(())
+}
+
+pub async fn download_message(storage: Arc<DynObjectStore>, msg: Message) -> anyhow::Result<Resource> {
+    let index_message = IndexMessage::decode(msg.payload)?;
+
+    let get_result = storage.get(&object_store::path::Path::from(index_message.storage_key)).await?;
+    let bytes = get_result.bytes().await?;
+    let resource = Resource::decode(bytes)?;
+
+    Ok(resource)
 }
 
 async fn index_resource(
@@ -68,96 +97,47 @@ async fn index_resource(
     seq: Seq,
 ) -> anyhow::Result<()> {
     let shard_id = Uuid::parse_str(&resource.shard_id)?;
-    println!("Indexing for shard {shard_id}");
-    let shard = Shard::get(&meta, shard_id).await?;
+    let indexes = Index::for_shard(&meta, shard_id).await?;
 
-    let indexes = shard.indexes(meta).await?;
     for index in indexes {
-        let (dir, records, deletions) = index_resource_to_index(&index, resource).await?;
+        let output_dir = tempfile::tempdir()?;
+        let (records, deletions) = index_resource_to_index(&index, resource, output_dir.path()).await?;
         if records == 0 {
             continue;
         }
 
+        // Create the segment first so we can track it if the upload gets interrupted
         let segment = Segment::create(&meta, index.id, seq).await?;
-        let store_path = format!("segment/{}", segment.id);
+        let size = pack_and_upload(storage.clone(), output_dir.path(), &segment.id.storage_key()).await?;
 
-        let size = pack_and_upload(storage.clone(), dir, &store_path).await?;
+        // Mark the segment as visible and write the deletions at the same time
         let mut tx = meta.transaction().await?;
-        segment.mark_ready(&mut *tx, records, size).await?;
+        segment.mark_ready(&mut *tx, records, size as i64).await?;
         Deletion::create(&mut *tx, index.id, seq, &deletions).await?;
         tx.commit().await?;
     }
     Ok(())
 }
 
-async fn index_resource_to_index(index: &Index, resource: &Resource) -> anyhow::Result<(TempDir, i64, Vec<String>)> {
-    let output_dir = tempfile::tempdir()?;
+async fn index_resource_to_index(
+    index: &Index,
+    resource: &Resource,
+    output_dir: &Path,
+) -> anyhow::Result<(i64, Vec<String>)> {
     let (records, deletions) = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer::new().index_resource(output_dir.path(), resource)?,
-        IndexKind::Text => nidx_text::TextIndexer::new().index_resource(output_dir.path(), resource)?,
+        IndexKind::Vector => nidx_vector::VectorIndexer::new().index_resource(output_dir, resource)?,
+        IndexKind::Text => nidx_text::TextIndexer::new().index_resource(output_dir, resource)?,
         _ => unimplemented!(),
     };
 
-    Ok((output_dir, records, deletions))
-}
-
-pub struct WriteCounter<T> {
-    writer: SyncIoBridge<T>,
-    counter: usize,
-}
-impl<T> std::io::Write for WriteCounter<T>
-where
-    T: tokio::io::AsyncWrite + Unpin,
-{
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let bytes = self.writer.write(buf)?;
-        self.counter += bytes;
-        Ok(bytes)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.writer.flush()
-    }
-}
-impl<T> WriteCounter<T>
-where
-    T: tokio::io::AsyncWrite + Unpin,
-{
-    pub fn new(writer: T) -> Self {
-        let writer = SyncIoBridge::new(writer);
-        Self {
-            writer,
-            counter: 0,
-        }
-    }
-    pub fn finish(&mut self) -> std::io::Result<usize> {
-        self.writer.shutdown()?;
-        Ok(self.counter)
-    }
-}
-
-async fn pack_and_upload(storage: Arc<DynObjectStore>, dir: TempDir, store_path: &str) -> anyhow::Result<i64> {
-    let mut upload = WriteCounter::new(object_store::buffered::BufWriter::new(storage, store_path.into()));
-    let size = tokio::task::spawn_blocking(move || -> anyhow::Result<i64> {
-        let mut tar = tar::Builder::new(&mut upload);
-        tar.mode(tar::HeaderMode::Deterministic);
-        tar.append_dir_all(".", dir.path())?;
-        tar.finish()?;
-        drop(tar);
-        let bytes = upload.finish()?;
-        Ok(bytes as i64)
-    })
-    .await??;
-
-    Ok(size)
+    Ok((records, deletions))
 }
 
 #[cfg(test)]
 mod tests {
-
-    use std::fs::File;
     use std::io::{Seek, Write};
 
+    use tempfile::tempfile;
     use uuid::Uuid;
 
     use super::*;
@@ -181,9 +161,8 @@ mod tests {
         assert_eq!(segment.delete_at, None);
         assert_eq!(segment.records, Some(1));
 
-        let download =
-            storage.get(&object_store::path::Path::parse(format!("segment/{}", segment.id)).unwrap()).await.unwrap();
-        let mut out = File::create("/tmp/output").unwrap();
+        let download = storage.get(&object_store::path::Path::parse(segment.id.storage_key()).unwrap()).await.unwrap();
+        let mut out = tempfile().unwrap();
         out.write_all(&download.bytes().await.unwrap()).unwrap();
         let downloaded_size = out.seek(std::io::SeekFrom::Current(0)).unwrap() as i64;
         assert_eq!(downloaded_size, segment.size_bytes.unwrap());

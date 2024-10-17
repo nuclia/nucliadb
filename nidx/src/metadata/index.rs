@@ -74,12 +74,22 @@ impl Index {
     pub async fn find(meta: &NidxMetadata, shard_id: Uuid, kind: IndexKind, name: Option<&str>) -> sqlx::Result<Index> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes where shard_id = $1 AND kind = $2 AND name = $3"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3"#,
             shard_id,
             kind as IndexKind,
             name
         )
         .fetch_one(&meta.pool)
+        .await
+    }
+
+    pub async fn for_shard(meta: &NidxMetadata, shard_id: Uuid) -> sqlx::Result<Vec<Index>> {
+        sqlx::query_as!(
+            Index,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE shard_id = $1"#,
+            shard_id
+        )
+        .fetch_all(&meta.pool)
         .await
     }
 

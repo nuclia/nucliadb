@@ -28,8 +28,8 @@ use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::SyncIoBridge;
 
 use crate::{
-    indexer::WriteCounter,
     metadata::{Deletion, Index, IndexId, IndexKind, MergeJob, Segment, SegmentId},
+    upload::pack_and_upload,
     NidxMetadata, Settings,
 };
 
@@ -55,15 +55,13 @@ pub async fn download_segment(
     segment_id: SegmentId,
     output_dir: PathBuf,
 ) -> anyhow::Result<()> {
-    println!("Download {segment_id}");
-    let path = object_store::path::Path::parse(format!("segment/{}", segment_id)).unwrap();
+    let path = object_store::path::Path::parse(segment_id.storage_key()).unwrap();
     let response = storage.get(&path).await?.into_stream();
     let reader = response.map_err(|_| std::io::Error::last_os_error()).into_async_read(); // HACK: Mapping errors randomly
     let reader = SyncIoBridge::new(reader.compat());
 
     let mut tar = tar::Archive::new(reader);
-    tokio::task::spawn_blocking(move || tar.unpack(output_dir.join(format!("{segment_id}"))).unwrap()).await?;
-    println!("Downloaded {segment_id}");
+    tokio::task::spawn_blocking(move || tar.unpack(output_dir.join(segment_id.local_path())).unwrap()).await?;
 
     Ok(())
 }
@@ -106,7 +104,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     }
 
     println!("Downloaded to {work_dir:?}, merging");
-    let ssegments = &segments.iter().map(|s| (s.id.to_string(), s.seq, s.records.unwrap())).collect::<Vec<_>>();
+    let ssegments = &segments.iter().map(|s| (s.id.local_path(), s.seq, s.records.unwrap())).collect::<Vec<_>>();
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 
     let index = Index::get(meta, segments[0].index_id).await?;
@@ -117,25 +115,13 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     };
     println!("Merged to {merged:?}");
 
-    // Upload (copied code from indexer)
+    // Upload
     let segment = Segment::create(&meta, segments[0].index_id, job.seq).await?;
-    let store_path = format!("segment/{}", segment.id);
-
-    let mut upload = WriteCounter::new(object_store::buffered::BufWriter::new(storage, store_path.into()));
-    let size = tokio::task::spawn_blocking(move || -> anyhow::Result<i64> {
-        let mut tar = tar::Builder::new(&mut upload);
-        tar.mode(tar::HeaderMode::Deterministic);
-        tar.append_dir_all(".", work_dir.path().join(merged))?;
-        tar.finish()?;
-        drop(tar);
-        let bytes = upload.finish()?;
-        Ok(bytes as i64)
-    })
-    .await??;
+    let size = pack_and_upload(storage, &work_dir.path().join(merged), &segment.id.storage_key()).await?;
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at
     let mut tx = meta.transaction().await?;
-    segment.mark_ready(&mut *tx, merged_records as i64, size).await?;
+    segment.mark_ready(&mut *tx, merged_records as i64, size as i64).await?;
     Segment::delete_many(&mut *tx, &segments.iter().map(|s| s.id).collect::<Vec<_>>()).await?;
     job.finish(&mut *tx).await?;
     tx.commit().await?;

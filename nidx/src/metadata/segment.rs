@@ -1,5 +1,3 @@
-use std::path::Display;
-
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -31,9 +29,14 @@ impl From<i64> for SegmentId {
         Self(value)
     }
 }
-impl std::fmt::Display for SegmentId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+impl SegmentId {
+    pub fn storage_key(&self) -> String {
+        format!("segment/{}", self.0)
+    }
+
+    #[deprecated]
+    pub fn local_path(&self) -> String {
+        format!("{}", self.0)
     }
 }
 
