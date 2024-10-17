@@ -34,7 +34,6 @@ from nucliadb.search.predict import (
     JSONGenerativeResponse,
     MetaGenerativeResponse,
     RephraseMissingContextError,
-    RerankGenerativeResponse,
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
@@ -146,7 +145,6 @@ class AskResult:
         self._answer_text = ""
         self._object: Optional[JSONGenerativeResponse] = None
         self._status: Optional[StatusGenerativeResponse] = None
-        self._reranking: Optional[RerankGenerativeResponse] = None
         self._citations: Optional[CitationsGenerativeResponse] = None
         self._metadata: Optional[MetaGenerativeResponse] = None
         self._relations: Optional[Relations] = None
@@ -387,8 +385,6 @@ class AskResult:
                 self._object = item
             elif isinstance(item, StatusGenerativeResponse):
                 self._status = item
-            elif isinstance(item, RerankGenerativeResponse):
-                self._reranking = item
             elif isinstance(item, CitationsGenerativeResponse):
                 self._citations = item
             elif isinstance(item, MetaGenerativeResponse):
