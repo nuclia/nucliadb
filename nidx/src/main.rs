@@ -1,6 +1,3 @@
-use std::collections::HashSet;
-
-use nidx::{indexer, maintenance, searcher};
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -20,9 +17,12 @@ use nidx::{indexer, maintenance, searcher};
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use tokio::{self, task::JoinSet};
 
-#[tokio::main]
+use nidx::{indexer, maintenance, searcher};
+use std::collections::HashSet;
+use tokio::{main, task::JoinSet};
+
+#[main]
 async fn main() -> anyhow::Result<()> {
     let args: HashSet<_> = std::env::args().skip(1).collect();
 

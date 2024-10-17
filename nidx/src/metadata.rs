@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use sqlx;
 
 mod deletion;
 mod index;
@@ -66,7 +65,6 @@ impl NidxMetadata {
 #[cfg(test)]
 mod tests {
     use shard::Shard;
-    use sqlx;
     use uuid::Uuid;
 
     use super::*;

@@ -106,7 +106,7 @@ async fn index_resource(
     seq: Seq,
 ) -> anyhow::Result<()> {
     let shard_id = Uuid::parse_str(&resource.shard_id)?;
-    let indexes = Index::for_shard(&meta, shard_id).await?;
+    let indexes = Index::for_shard(meta, shard_id).await?;
 
     for index in indexes {
         let output_dir = tempfile::tempdir()?;
@@ -116,7 +116,7 @@ async fn index_resource(
         }
 
         // Create the segment first so we can track it if the upload gets interrupted
-        let segment = Segment::create(&meta, index.id, seq).await?;
+        let segment = Segment::create(meta, index.id, seq).await?;
         let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
 
         // Mark the segment as visible and write the deletions at the same time
@@ -134,8 +134,7 @@ async fn index_resource_to_index(
     output_dir: &Path,
 ) -> anyhow::Result<(i64, Vec<String>)> {
     let (records, deletions) = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer::new().index_resource(output_dir, resource)?,
-        IndexKind::Text => nidx_text::TextIndexer::new().index_resource(output_dir, resource)?,
+        IndexKind::Vector => nidx_vector::VectorIndexer.index_resource(output_dir, resource)?,
         _ => unimplemented!(),
     };
 
@@ -173,7 +172,7 @@ mod tests {
         let download = storage.get(&object_store::path::Path::parse(segment.id.storage_key()).unwrap()).await.unwrap();
         let mut out = tempfile().unwrap();
         out.write_all(&download.bytes().await.unwrap()).unwrap();
-        let downloaded_size = out.seek(std::io::SeekFrom::Current(0)).unwrap() as i64;
+        let downloaded_size = out.stream_position().unwrap() as i64;
         assert_eq!(downloaded_size, segment.size_bytes.unwrap());
     }
 }

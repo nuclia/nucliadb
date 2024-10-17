@@ -172,7 +172,7 @@ pub async fn schedule_merges(meta: &NidxMetadata, consumer: &mut PullConsumer) -
     .await?;
     for m in merges {
         if m.len() > 3 {
-            MergeJob::create(&meta, &m, oldest_confirmed_seq as i64).await?;
+            MergeJob::create(meta, &m, oldest_confirmed_seq as i64).await?;
         }
     }
 

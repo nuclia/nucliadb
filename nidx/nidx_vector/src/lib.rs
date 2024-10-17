@@ -41,11 +41,7 @@ use tempfile::{tempdir, TempDir};
 pub struct VectorIndexer;
 
 impl VectorIndexer {
-    pub fn new() -> Self {
-        VectorIndexer
-    }
-
-    pub fn index_resource<'a>(&self, output_dir: &Path, resource: &'a Resource) -> VectorR<(i64, Vec<String>)> {
+    pub fn index_resource(&self, output_dir: &Path, resource: &Resource) -> VectorR<(i64, Vec<String>)> {
         let tmp = tempfile::tempdir()?;
 
         // Index resource
@@ -62,7 +58,7 @@ impl VectorIndexer {
         assert!(segments.len() <= 1, "Expected a single segment");
         std::fs::rename(tmp.path().join("index").join(&segments[0]), output_dir)?;
 
-        return Ok((writer.count().unwrap() as i64, resource.sentences_to_delete.clone()));
+        Ok((writer.count().unwrap() as i64, resource.sentences_to_delete.clone()))
     }
 
     pub fn merge(
@@ -145,7 +141,7 @@ impl VectorSearcher {
             journal["ctime"]["nanos_since_epoch"] = serde_json::Value::from(0);
             journal_file.seek(std::io::SeekFrom::Start(0))?;
             serde_json::to_writer(&mut journal_file, &journal)?;
-            let len = journal_file.seek(std::io::SeekFrom::Current(0))?;
+            let len = journal_file.stream_position()?;
             journal_file.set_len(len)?;
             drop(journal_file);
         }

@@ -19,7 +19,7 @@
 //
 pub mod indexer;
 pub mod maintenance;
-mod metadata;
+pub mod metadata;
 pub mod searcher;
 mod settings;
 mod upload;

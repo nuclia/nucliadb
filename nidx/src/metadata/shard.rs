@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use super::{index::*, NidxMetadata};
-use sqlx;
 use uuid::Uuid;
 
 pub struct Shard {

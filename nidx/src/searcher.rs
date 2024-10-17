@@ -6,7 +6,6 @@ use std::{
 };
 
 use futures::TryStreamExt;
-use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
@@ -34,7 +33,6 @@ pub async fn run() -> anyhow::Result<()> {
         tokio::task::spawn(run_sync(meta, work_dir.path().to_path_buf(), storage.clone(), index_metadata.clone()));
     let vector_search_task =
         tokio::task::spawn(run_vector_search(work_dir.path().to_path_buf(), index_metadata.clone()));
-    let text_search_task = tokio::task::spawn(run_text_search(work_dir.path().to_path_buf(), index_metadata.clone()));
 
     tokio::select! {
         r = sync_task => {
@@ -42,9 +40,6 @@ pub async fn run() -> anyhow::Result<()> {
         }
         r = vector_search_task => {
             println!("vector_search_task() completed {:?}", r)
-        }
-        r = text_search_task => {
-            println!("text_search_task() completed {:?}", r)
         }
     }
 
@@ -61,7 +56,7 @@ async fn run_vector_search(
         let meta: Vec<SearchOperation> = {
             let index_1 = meta_read.get(&1);
             if let Some(index_1) = index_1 {
-                index_1.iter().cloned().collect()
+                index_1.to_vec()
             } else {
                 println!("No metadata for index 1 yet");
                 continue;
@@ -76,34 +71,6 @@ async fn run_vector_search(
         )?;
         drop(meta_read); // Keep lock until searcher is loaded, to avoid deletions from happening while opening
         println!("Did vector search with {} results", searcher.dummy_search()?);
-    }
-}
-
-async fn run_text_search(
-    work_dir: PathBuf,
-    index_metadata: Arc<RwLock<HashMap<i64, Vec<SearchOperation>>>>,
-) -> anyhow::Result<()> {
-    loop {
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        let meta_read = index_metadata.read().await;
-        let meta: Vec<SearchOperation> = {
-            let index_2 = meta_read.get(&2);
-            if let Some(index_2) = index_2 {
-                index_2.iter().cloned().collect()
-            } else {
-                println!("No metadata for index 2 yet");
-                continue;
-            }
-        };
-
-        let searcher = TextSearcher::new(
-            &work_dir,
-            2,
-            meta.iter().flat_map(|m| m.segment_ids.iter().map(|sid| (*sid, m.seq))).collect(),
-            meta.iter().flat_map(|m| m.deleted_keys.iter().map(|d| (m.seq, d.clone()))).collect(),
-        )?;
-        drop(meta_read); // Keep lock until searcher is loaded, to avoid deletions from happening while opening
-        println!("Did text search with {:?} results", searcher.dummy_search()?);
     }
 }
 
