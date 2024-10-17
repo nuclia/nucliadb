@@ -30,8 +30,8 @@ impl From<i64> for SegmentId {
     }
 }
 impl SegmentId {
-    pub fn storage_key(&self) -> String {
-        format!("segment/{}", self.0)
+    pub fn storage_key(&self) -> object_store::path::Path {
+        format!("segment/{}", self.0).into()
     }
 
     #[deprecated]

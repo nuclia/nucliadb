@@ -70,11 +70,15 @@ pub async fn run() -> anyhow::Result<()> {
         };
 
         match index_resource(&meta, segment_storage.clone(), &resource, seq).await {
-            Ok(()) => acker.ack().await.unwrap(),
+            Ok(()) => {
+                if let Err(e) = acker.ack().await {
+                    warn!("Error ack'ing NATS message {e:?}")
+                }
+            }
             Err(e) => {
                 warn!("Error processing index message {e:?}")
             }
-        }
+        };
     }
 
     Ok(())
@@ -108,7 +112,7 @@ async fn index_resource(
 
         // Create the segment first so we can track it if the upload gets interrupted
         let segment = Segment::create(&meta, index.id, seq).await?;
-        let size = pack_and_upload(storage.clone(), output_dir.path(), &segment.id.storage_key()).await?;
+        let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
 
         // Mark the segment as visible and write the deletions at the same time
         let mut tx = meta.transaction().await?;

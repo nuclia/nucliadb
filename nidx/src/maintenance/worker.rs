@@ -26,6 +26,7 @@ use object_store::DynObjectStore;
 use tempfile::tempdir;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::SyncIoBridge;
+use tracing::*;
 
 use crate::{
     metadata::{Deletion, Index, IndexId, IndexKind, MergeJob, Segment, SegmentId},
@@ -41,10 +42,10 @@ pub async fn run() -> anyhow::Result<()> {
     loop {
         let job = MergeJob::take(&meta.pool).await?;
         if let Some(job) = job {
-            println!("Running job {}", job.id);
+            info!(job.id, "Running job");
             run_job(&meta, &job, storage.clone()).await?;
         } else {
-            println!("No jobs, waiting for more");
+            debug!("No jobs, waiting for more");
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
     }
@@ -117,7 +118,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
 
     // Upload
     let segment = Segment::create(&meta, segments[0].index_id, job.seq).await?;
-    let size = pack_and_upload(storage, &work_dir.path().join(merged), &segment.id.storage_key()).await?;
+    let size = pack_and_upload(storage, &work_dir.path().join(merged), segment.id.storage_key()).await?;
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at
     let mut tx = meta.transaction().await?;

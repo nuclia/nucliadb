@@ -34,6 +34,7 @@ pub use shard::Shard;
 /// A random ID to identify the lock we use during migration
 const MIGRATION_LOCK_ID: i64 = 5324678839066546102;
 
+#[derive(Clone)]
 pub struct NidxMetadata {
     pub pool: sqlx::PgPool,
 }
