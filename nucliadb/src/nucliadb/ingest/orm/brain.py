@@ -580,14 +580,10 @@ class ResourceBrain:
                                 paragraph_annotation.key
                             ].labels.append(label)
 
-        for label in flatten_resource_labels(labels):
-            if label not in self.brain.texts[field_key].labels:
-                self.brain.texts[field_key].labels.append(label)
+        self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
 
     def compute_labels(self):
-        for label in flatten_resource_labels(self.labels):
-            if label not in self.brain.labels:
-                self.brain.labels.append(label)
+        self.brain.labels.extend(flatten_resource_labels(self.labels))
 
 
 def is_paragraph_repeated_in_field(
