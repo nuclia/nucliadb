@@ -592,6 +592,8 @@ class Resource:
             await self._apply_file_extracted_data(file_extracted_data)
             extracted_languages.append(file_extracted_data.language)
 
+        await self.maybe_update_resource_title_from_file_extracted_data(message)
+
         # Metadata should go first
         for field_metadata in message.field_metadata:
             await self._apply_field_computed_metadata(field_metadata)
@@ -696,8 +698,15 @@ class Resource:
         await field_file.set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
-        if file_extracted_data.title:
-            await self.update_resource_title(file_extracted_data.title)
+
+    async def maybe_update_resource_title_from_file_extracted_data(self, message: BrokerMessage):
+        """
+        Update the resource title with the first file that has a title extracted.
+        """
+        for file_extracted_data in message.file_extracted_data:
+            if file_extracted_data.title != "":
+                await self.update_resource_title(file_extracted_data.title)
+                break
 
     async def _apply_field_computed_metadata(self, field_metadata: FieldComputedMetadataWrapper):
         assert self.basic is not None
@@ -1202,11 +1211,6 @@ def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
     if basic.summary or not summary_text:
         return False
     basic.summary = summary_text
-    return True
-
-
-def update_basic_title(basic: PBBasic, file_extracted_title: str) -> bool:
-    basic.title = file_extracted_title
     return True
 
 
