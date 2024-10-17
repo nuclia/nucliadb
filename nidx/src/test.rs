@@ -19,9 +19,8 @@
 //
 use std::{collections::HashMap, time::SystemTime};
 
-use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::protos::*;
-use resource::ResourceStatus;
+use nidx_protos::prost_types::Timestamp;
+use nidx_protos::*;
 use uuid::Uuid;
 
 pub fn minimal_resource(shard_id: String) -> Resource {
@@ -34,7 +33,7 @@ pub fn minimal_resource(shard_id: String) -> Resource {
     };
 
     let metadata = IndexMetadata {
-        created: Some(timestamp.clone()),
+        created: Some(timestamp),
         modified: Some(timestamp),
     };
 
@@ -44,7 +43,7 @@ pub fn minimal_resource(shard_id: String) -> Resource {
             shard_id,
             uuid: resource_id,
         }),
-        status: ResourceStatus::Processed as i32,
+        status: resource::ResourceStatus::Processed as i32,
         metadata: Some(metadata),
         ..Default::default()
     }

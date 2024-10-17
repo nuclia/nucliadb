@@ -22,20 +22,14 @@ use std::io::Seek;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use config::VectorConfig;
+use data_point::{open, DataPointPin};
+use data_point_provider::reader::{Reader, TimeSensitiveDLog};
+use data_point_provider::state::write_state;
+use formula::Formula;
+use nidx_protos::{Resource, VectorSearchRequest};
 use nidx_types::Seq;
-use nucliadb_core::protos::{Resource, VectorSearchRequest};
-use nucliadb_core::vectors::VectorWriter;
-use nucliadb_vectors::data_point::DataPointPin;
-use nucliadb_vectors::data_point_provider;
-use nucliadb_vectors::data_point_provider::reader::{Reader, TimeSensitiveDLog};
-use nucliadb_vectors::data_point_provider::state::write_state;
-use nucliadb_vectors::formula::Formula;
-use nucliadb_vectors::{
-    config::VectorConfig,
-    data_point::{self, open},
-    service::VectorWriterService,
-    VectorR,
-};
+use service::VectorWriterService;
 use tempfile::{tempdir, TempDir};
 
 pub struct VectorIndexer;
@@ -45,9 +39,7 @@ impl VectorIndexer {
         let tmp = tempfile::tempdir()?;
 
         // Index resource
-        let mut writer =
-            VectorWriterService::create(&tmp.path().join("index"), "Don't care".into(), VectorConfig::default())
-                .unwrap();
+        let mut writer = VectorWriterService::create(&tmp.path().join("index"), VectorConfig::default()).unwrap();
         writer.set_resource(resource.into()).unwrap();
 
         // Copy just the segment to the output directory
@@ -77,7 +69,7 @@ impl VectorIndexer {
             }
         }
 
-        // Rename (nucliadb_vectors wants uuid, we use i64 as segment ids) and open the segments
+        // Rename (nidx_vector wants uuid, we use i64 as segment ids) and open the segments
         let segment_ids: Vec<_> = segments
             .iter()
             .map(|(segment_path, seq, _)| {
@@ -100,7 +92,7 @@ impl VectorIndexer {
 
         // Do the merge
         let destination = DataPointPin::create_pin(work_dir).unwrap();
-        let open_destination = nucliadb_vectors::data_point::merge(
+        let open_destination = data_point::merge(
             &destination,
             &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(),
             &VectorConfig::default(),
@@ -185,3 +177,53 @@ impl VectorSearcher {
             .len())
     }
 }
+
+//
+// nidx_vector code
+//
+pub mod config;
+pub mod data_point;
+pub mod data_point_provider;
+mod data_types;
+pub mod formula;
+pub mod query_language;
+pub mod service;
+mod utils;
+mod vector_types;
+
+use thiserror::Error;
+#[derive(Debug, Error)]
+pub enum VectorErr {
+    #[error("Error using bincode: {0}")]
+    BincodeError(#[from] bincode::Error),
+    #[error("Error using fst: {0}")]
+    FstError(#[from] fst::Error),
+    #[error("json error: {0}")]
+    SJ(#[from] serde_json::Error),
+    #[error("IO error: {0}")]
+    IoErr(#[from] std::io::Error),
+    #[error("This index does not have an alive writer")]
+    NoWriterError,
+    #[error("Only one writer can be open at the same time")]
+    MultipleWritersError,
+    #[error("Writer has uncommitted changes, please commit or abort")]
+    UncommittedChangesError,
+    #[error("Garbage collection delayed")]
+    WorkDelayed,
+    #[error("Merger is already initialized")]
+    MergerAlreadyInitialized,
+    #[error("Can not merge zero datapoints")]
+    EmptyMerge,
+    #[error("Inconsistent dimensions")]
+    InconsistentDimensions,
+    #[error("UTF8 decoding error: {0}")]
+    FromUtf8Error(#[from] std::string::FromUtf8Error),
+    #[error("Some of the merged segments were not found")]
+    MissingMergedSegments,
+    #[error("Not all of the merged segments have the same tags")]
+    InconsistentMergeSegmentTags,
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(&'static str),
+}
+
+pub type VectorR<O> = Result<O, VectorErr>;
