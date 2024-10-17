@@ -20,7 +20,6 @@
 import json
 from itertools import combinations
 from unittest import mock
-from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -41,13 +40,11 @@ from nucliadb_models.search import (
     FindRequest,
     FullResourceStrategy,
     HierarchyResourceStrategy,
-    KnowledgeboxFindResults,
     MetadataExtensionStrategy,
     MetadataExtensionType,
     PreQueriesStrategy,
     PreQuery,
     RagStrategies,
-    Reranker,
     SyncAskResponse,
 )
 
@@ -935,43 +932,3 @@ async def test_rag_image_rag_strategies(
         },
     )
     assert resp.status_code == 200, resp.text
-
-
-@pytest.mark.parametrize(
-    "reranker,expected_reranker",
-    [
-        (Reranker.PREDICT_RERANKER, Reranker.PREDICT_RERANKER),
-        (Reranker.MULTI_MATCH_BOOSTER, Reranker.MULTI_MATCH_BOOSTER),
-    ],
-)
-async def test_ask_forwarding_rerank_options_to_find(
-    nucliadb_reader: AsyncClient,
-    reranker: str,
-    expected_reranker: str,
-):
-    """/ask endpoint has a reranker option that forwards to find. However, if
-    predict reranker is requested, it won't be used in the find, we'll get the
-    reranking from the predict stream (thus, avoiding a round trip to predict).
-
-    """
-    kbid = "kbid"
-    find_mock = AsyncMock(return_value=(KnowledgeboxFindResults(resources={}), False, Mock()))
-
-    with patch("nucliadb.search.search.chat.query.find", new=find_mock):
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/ask",
-            headers={"X-Synchronous": "True"},
-            json={
-                "query": "my query",
-                "reranker": reranker,
-                "top_k": 10,
-            },
-        )
-        assert resp.status_code == 200, resp.text
-
-        assert find_mock.call_count == 1
-        find_request = find_mock.call_args.args[1]
-        assert isinstance(find_request, FindRequest)
-
-        assert find_request.top_k == 10
-        assert find_request.reranker == expected_reranker

@@ -21,10 +21,12 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb_models.search import Reranker
+from nucliadb_models.search import KnowledgeboxFindResults, Reranker
 
 
-@pytest.mark.parametrize("reranker", [Reranker.MULTI_MATCH_BOOSTER, Reranker.PREDICT_RERANKER])
+@pytest.mark.parametrize(
+    "reranker", [Reranker.MULTI_MATCH_BOOSTER, Reranker.PREDICT_RERANKER, Reranker.NOOP]
+)
 async def test_reranker(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
@@ -32,11 +34,30 @@ async def test_reranker(
 ):
     kbid = philosophy_books_kb
 
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
+    ask_resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/ask",
+        headers={
+            "x-synchronous": "true",
+        },
         json={
-            "query": "Which is our future?",
+            "query": "the",
             "reranker": reranker,
+            "min_score": {"bm25": 0, "semantic": -10},
         },
     )
-    assert resp.status_code == 200
+    assert ask_resp.status_code == 200
+
+    find_resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "the",
+            "reranker": reranker,
+            "min_score": {"bm25": 0, "semantic": -10},
+        },
+    )
+    assert find_resp.status_code == 200
+
+    find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
+    ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])
+    assert find_retrieval == ask_retrieval
+    assert len(find_retrieval.best_matches) == 7

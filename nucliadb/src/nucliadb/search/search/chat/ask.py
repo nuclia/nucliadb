@@ -190,7 +190,7 @@ class AskResult:
 
     def _ndjson_encode(self, item: AskResponseItemType) -> str:
         result_item = AskResponseItem(item=item)
-        return result_item.model_dump_json(exclude_none=True) + "\n"
+        return result_item.model_dump_json(exclude_none=True, by_alias=True) + "\n"
 
     async def _stream(self) -> AsyncGenerator[AskResponseItemType, None]:
         # First, stream out the predict answer
@@ -355,7 +355,7 @@ class AskResult:
                 self.prompt_context, self.prompt_context_order
             )
             response.prompt_context = sorted_prompt_context
-        return response.model_dump_json()
+        return response.model_dump_json(exclude_none=True, by_alias=True)
 
     async def get_relations_results(self) -> Relations:
         if self._relations is None:

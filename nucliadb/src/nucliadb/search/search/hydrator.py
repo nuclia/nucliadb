@@ -24,18 +24,14 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from nucliadb.common.external_index_providers.base import QueryResults as ExternalIndexQueryResults
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search.search import paragraphs
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
-    FindField,
     FindParagraph,
-    FindResource,
-    KnowledgeboxFindResults,
     ResourceProperties,
 )
 from nucliadb_telemetry.metrics import Observer
@@ -69,105 +65,6 @@ class TextBlockHydrationOptions(BaseModel):
     ematches: Optional[list[str]] = None
 
 
-@hydrator_observer.wrap({"type": "hydrate_external"})
-async def hydrate_external(
-    retrieval_results: KnowledgeboxFindResults,
-    query_results: ExternalIndexQueryResults,
-    kbid: str,
-    resource_options: ResourceHydrationOptions = ResourceHydrationOptions(),
-    text_block_options: TextBlockHydrationOptions = TextBlockHydrationOptions(),
-    text_block_min_score: Optional[float] = None,
-    max_parallel_operations: int = 50,
-) -> None:
-    """
-    Hydrates the results of an external index retrieval. This includes fetching the text for the text blocks
-    and the metadata for the resources.
-
-    Parameters:
-    - retrieval_results: The results of the retrieval to be hydrated.
-    - query_results: The results of the query to the external index.
-    - kbid: The knowledge base id.
-    - resource_options: Options for hydrating resources.
-    - text_block_options: Options for hydrating text blocks.
-    - max_parallel_operations: The maximum number of hydration parallel operations to perform.
-    """
-    hydrate_ops = []
-    semaphore = asyncio.Semaphore(max_parallel_operations)
-    resource_ids = set()
-    for text_block in query_results.iter_matching_text_blocks():
-        if (
-            text_block_min_score is not None and text_block.score < text_block_min_score
-        ):  # pragma: no cover
-            # Ignore text blocks with a score lower than the minimum
-            continue
-        resource_id = text_block.paragraph_id.rid
-        resource_ids.add(resource_id)
-        find_resource = retrieval_results.resources.setdefault(
-            resource_id, FindResource(id=resource_id, fields={})
-        )
-        field_id = text_block.paragraph_id.field_id.full()
-        find_field = find_resource.fields.setdefault(field_id, FindField(paragraphs={}))
-
-        async def _hydrate_text_block(**kwargs):
-            async with semaphore:
-                await hydrate_text_block_and_update_find_paragraph(**kwargs)
-
-        hydrate_ops.append(
-            asyncio.create_task(
-                _hydrate_text_block(
-                    kbid=kbid,
-                    text_block=text_block,
-                    options=text_block_options,
-                    field_paragraphs=find_field.paragraphs,
-                )
-            )
-        )
-
-    if len(resource_ids) > 0:
-        for resource_id in resource_ids:
-            hydrate_ops.append(
-                asyncio.create_task(
-                    hydrate_resource_metadata(
-                        kbid=kbid,
-                        resource_id=resource_id,
-                        options=resource_options,
-                        find_resources=retrieval_results.resources,
-                        concurrency_control=semaphore,
-                    )
-                )
-            )
-
-    if len(hydrate_ops) > 0:
-        await asyncio.gather(*hydrate_ops)
-
-
-@hydrator_observer.wrap({"type": "text_block"})
-async def hydrate_text_block_and_update_find_paragraph(
-    kbid: str,
-    text_block: TextBlockMatch,
-    options: TextBlockHydrationOptions,
-    field_paragraphs: dict[str, FindParagraph],
-) -> None:
-    """
-    Fetch the text for a text block and update the FindParagraph object.
-    """
-    text = await paragraphs.get_paragraph_text(kbid=kbid, paragraph_id=text_block.paragraph_id)
-    text_block_id = text_block.paragraph_id.full()
-    field_paragraphs[text_block_id] = FindParagraph(
-        score=text_block.score,
-        score_type=text_block.score_type,
-        order=text_block.order,
-        text=text,
-        id=text_block_id,
-        labels=text_block.paragraph_labels,
-        fuzzy_result=False,
-        is_a_table=text_block.is_a_table,
-        reference=text_block.representation_file,
-        page_with_visual=text_block.page_with_visual,
-        position=text_block.position,
-    )
-
-
 @hydrator_observer.wrap({"type": "text_block"})
 async def hydrate_text_block(
     kbid: str,
@@ -194,19 +91,16 @@ async def hydrate_text_block(
     return text_block
 
 
-@hydrator_observer.wrap({"type": "resource_metadata"})
+@hydrator_observer.wrap({"type": "resource_metadata_simple"})
 async def hydrate_resource_metadata(
     kbid: str,
     resource_id: str,
     options: ResourceHydrationOptions,
-    find_resources: dict[str, FindResource],
     *,
     concurrency_control: Optional[asyncio.Semaphore] = None,
     service_name: Optional[str] = None,
-) -> None:
-    """
-    Fetch the various metadata fields of the resource and update the FindResource object.
-    """
+) -> Optional[Resource]:
+    """Fetch resource metadata and return it serialized."""
     show = options.show
     extracted = options.extracted
 
@@ -232,13 +126,11 @@ async def hydrate_resource_metadata(
                 extracted=extracted,
                 service_name=service_name,
             )
-            if serialized_resource is not None:
-                find_resources[resource_id].updated_from(serialized_resource)
-            else:
+            if serialized_resource is None:
                 logger.warning(
                     "Resource not found in database", extra={"kbid": kbid, "rid": resource_id}
                 )
-                find_resources.pop(resource_id, None)
+    return serialized_resource
 
 
 def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
