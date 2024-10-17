@@ -20,8 +20,8 @@
 
 mod common;
 
-use nidx_fulltext::reader::TextReaderService;
-use nidx_fulltext::writer::TextWriterService;
+use nidx_text::reader::TextReaderService;
+use nidx_text::writer::TextWriterService;
 use nucliadb_core::texts::*;
 use nucliadb_core::NodeResult;
 use tantivy::collector::{Count, TopDocs};

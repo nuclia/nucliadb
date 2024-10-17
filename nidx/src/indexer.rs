@@ -18,9 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use crate::{metadata::*, Settings};
-use anyhow;
+use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
 use futures::stream::StreamExt;
+use nidx_types::Seq;
 use nucliadb_core::protos::Resource;
 use nucliadb_core::protos::{prost::Message, IndexMessage};
 use object_store::{DynObjectStore, ObjectStore};
@@ -31,17 +32,21 @@ use uuid::Uuid;
 
 pub async fn run() -> anyhow::Result<()> {
     let settings = Settings::from_env();
-    let indexer_settings = settings.indexer.expect("Indexer not configured");
-    let indexer_storage = indexer_settings.object_store.client();
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
 
-    let client = async_nats::connect(indexer_settings.nats_server).await?;
-    let jetstream = async_nats::jetstream::new(client);
-    let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
-    let mut msg_stream = consumer.messages().await?;
+    let indexer_settings = settings.indexer.ok_or(anyhow!("Indexer settings required"))?;
+    let indexer_storage = indexer_settings.object_store.client();
 
-    while let Some(Ok(msg)) = msg_stream.next().await {
-        let seq = msg.info().unwrap().stream_sequence as i64;
+    let storage_settings = settings.storage.ok_or(anyhow!("Storage settings required"))?;
+    let segment_storage = storage_settings.object_store.client();
+
+    let nats_client = async_nats::connect(indexer_settings.nats_server).await?;
+    let jetstream = async_nats::jetstream::new(nats_client);
+    let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
+    let mut subscription = consumer.messages().await?;
+
+    while let Some(Ok(msg)) = subscription.next().await {
+        let seq = msg.info().unwrap().stream_sequence.into();
         let body = msg.message.payload.clone();
         let index_message = IndexMessage::decode(body)?;
 
@@ -60,7 +65,7 @@ async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
     resource: &Resource,
-    seq: i64,
+    seq: Seq,
 ) -> anyhow::Result<()> {
     let shard_id = Uuid::parse_str(&resource.shard_id)?;
     println!("Indexing for shard {shard_id}");
@@ -89,7 +94,7 @@ async fn index_resource_to_index(index: &Index, resource: &Resource) -> anyhow::
     let output_dir = tempfile::tempdir()?;
     let (records, deletions) = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer::new().index_resource(output_dir.path(), resource)?,
-        IndexKind::Text => nidx_fulltext::TextIndexer::new().index_resource(output_dir.path(), resource)?,
+        IndexKind::Text => nidx_text::TextIndexer::new().index_resource(output_dir.path(), resource)?,
         _ => unimplemented!(),
     };
 
@@ -167,7 +172,7 @@ mod tests {
         let index = Index::create(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
-        index_resource(&meta, storage.clone(), &little_prince(shard.id.to_string()), 123).await.unwrap();
+        index_resource(&meta, storage.clone(), &little_prince(shard.id.to_string()), 123i64.into()).await.unwrap();
 
         let segments = index.segments(&meta).await.unwrap();
         assert_eq!(segments.len(), 1);

@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+nidx_types = { version = "0.1.0", path = "../nidx_types" }
 nucliadb_core = { version = "0.1.0", path = "../../nucliadb_core" }
 nucliadb_vectors = { version = "0.1.0", path = "../../nucliadb_vectors" }
 serde_json = "1.0.128"

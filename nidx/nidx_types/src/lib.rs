@@ -17,33 +17,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use sqlx::{self, Executor, Postgres};
 
-use nidx_types::Seq;
-
-use super::IndexId;
-
-pub struct Deletion {
-    pub index_id: IndexId,
-    pub seq: Seq,
-    pub keys: Vec<String>,
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub struct Seq(i64);
+impl From<i64> for Seq {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
 }
-
-impl Deletion {
-    pub async fn create(
-        meta: impl Executor<'_, Database = Postgres>,
-        index_id: IndexId,
-        seq: Seq,
-        keys: &[String],
-    ) -> Result<Deletion, sqlx::Error> {
-        sqlx::query_as!(
-            Deletion,
-            "INSERT INTO deletions (index_id, seq, keys) VALUES ($1, $2, $3) RETURNING *",
-            index_id as IndexId,
-            i64::from(&seq),
-            keys
-        )
-        .fetch_one(meta)
-        .await
+impl From<u64> for Seq {
+    fn from(value: u64) -> Self {
+        Self(value as i64)
+    }
+}
+impl From<&Seq> for i64 {
+    fn from(value: &Seq) -> Self {
+        value.0
     }
 }

@@ -30,8 +30,16 @@ pub enum IndexKind {
     Relation,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, sqlx::Type)]
+pub struct IndexId(i64);
+impl From<i64> for IndexId {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+
 pub struct Index {
-    pub id: i64,
+    pub id: IndexId,
     pub shard_id: Uuid,
     pub kind: IndexKind,
     pub name: Option<String>,
@@ -45,7 +53,7 @@ impl Index {
         kind: IndexKind,
         name: Option<&str>,
     ) -> Result<Index, sqlx::Error> {
-        let id = sqlx::query!(
+        let id: IndexId = sqlx::query_scalar!(
             r#"INSERT INTO indexes (shard_id, kind, name) VALUES ($1, $2, $3) RETURNING id"#,
             shard_id,
             kind as IndexKind,
@@ -53,7 +61,7 @@ impl Index {
         )
         .fetch_one(&meta.pool)
         .await?
-        .id;
+        .into();
         Ok(Index {
             id,
             shard_id,
@@ -75,7 +83,19 @@ impl Index {
         .await
     }
 
+    pub async fn get(meta: &NidxMetadata, id: IndexId) -> sqlx::Result<Index> {
+        sqlx::query_as!(
+            Index,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE id = $1"#,
+            id as IndexId
+        )
+        .fetch_one(&meta.pool)
+        .await
+    }
+
     pub async fn segments(&self, meta: &NidxMetadata) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, r#"SELECT * FROM segments WHERE index_id = $1"#, self.id).fetch_all(&meta.pool).await
+        sqlx::query_as!(Segment, r#"SELECT * FROM segments WHERE index_id = $1"#, self.id as IndexId)
+            .fetch_all(&meta.pool)
+            .await
     }
 }

@@ -26,10 +26,9 @@ mod segment;
 mod shard;
 
 pub use deletion::Deletion;
-pub use index::Index;
-pub use index::IndexKind;
+pub use index::{Index, IndexId, IndexKind};
 pub use merge_job::MergeJob;
-pub use segment::Segment;
+pub use segment::{Segment, SegmentId};
 pub use shard::Shard;
 
 /// A random ID to identify the lock we use during migration

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use nidx::{indexer, maintenance, searcher};
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
@@ -22,24 +24,25 @@ use tokio::{self, task::JoinSet};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args: Vec<_> = std::env::args().collect();
-    let args_str: Vec<_> = args.iter().map(|a| a.as_str()).collect();
+    let args: HashSet<_> = std::env::args().skip(1).collect();
 
     let mut tasks = JoinSet::new();
-    if args_str.contains(&"indexer") {
-        tasks.spawn(indexer::run());
-    }
-    if args_str.contains(&"worker") {
-        tasks.spawn(maintenance::worker::run());
-    }
-    if args_str.contains(&"scheduler") {
-        tasks.spawn(maintenance::scheduler::run());
-    }
-    if args_str.contains(&"searcher") {
-        tasks.spawn(searcher::run());
-    }
+    args.iter().for_each(|arg| {
+        match arg.as_str() {
+            "indexer" => tasks.spawn(indexer::run()),
+            "worker" => tasks.spawn(maintenance::worker::run()),
+            "scheduler" => tasks.spawn(maintenance::scheduler::run()),
+            "searcher" => tasks.spawn(searcher::run()),
+            other => panic!("Unknown component: {other}"),
+        };
+    });
 
-    tasks.join_next().await.unwrap()??;
+    while let Some(join_result) = tasks.join_next().await {
+        let task_result = join_result?;
+        if let Err(e) = task_result {
+            panic!("Task finished with error, stopping: {e:?}");
+        }
+    }
 
     Ok(())
 }

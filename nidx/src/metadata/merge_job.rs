@@ -18,13 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use super::{NidxMetadata, Segment};
+use nidx_types::Seq;
 use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 
 #[derive(Clone)]
 pub struct MergeJob {
     pub id: i64,
     pub retries: i16,
-    pub seq: i64,
+    pub seq: Seq,
     pub enqueued_at: PrimitiveDateTime,
     pub started_at: Option<PrimitiveDateTime>,
     pub running_at: Option<PrimitiveDateTime>,

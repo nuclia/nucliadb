@@ -27,6 +27,7 @@ pub mod writer;
 use std::fs::{File, OpenOptions};
 use std::path::Path;
 
+use nidx_types::Seq;
 use nucliadb_core::protos::DocumentSearchRequest;
 use nucliadb_core::texts::FieldReader;
 use nucliadb_core::{
@@ -80,8 +81,8 @@ impl TextIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: &[(i64, i64, i64)],
-        deletions: &Vec<(i64, &Vec<String>)>,
+        segments: &[(String, Seq, i64)],
+        deletions: &Vec<(Seq, &Vec<String>)>,
     ) -> NodeResult<(String, usize)> {
         // Move all segment data into the same directory. TODO: Do this while downloading/unpacking
         let mut segment_uuids = Vec::new();
@@ -141,7 +142,7 @@ impl TextIndexer {
                     .unwrap();
 
                 println!(
-                    "MMMM segment {} with seq {} and deletions {:?}, deleted = {:?}",
+                    "MMMM segment {} with seq {:?} and deletions {:?}, deleted = {:?}",
                     sidd, segment_seq, deletions, deleted
                 );
                 Some(ReadOnlyBitSet::from(&bitset).into())

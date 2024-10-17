@@ -29,7 +29,7 @@ use tokio_util::io::SyncIoBridge;
 
 use crate::{
     indexer::WriteCounter,
-    metadata::{Deletion, Index, MergeJob, Segment},
+    metadata::{Deletion, Index, IndexId, IndexKind, MergeJob, Segment, SegmentId},
     NidxMetadata, Settings,
 };
 
@@ -52,7 +52,7 @@ pub async fn run() -> anyhow::Result<()> {
 
 pub async fn download_segment(
     storage: Arc<DynObjectStore>,
-    segment_id: i64,
+    segment_id: SegmentId,
     output_dir: PathBuf,
 ) -> anyhow::Result<()> {
     println!("Download {segment_id}");
@@ -75,8 +75,8 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let deletions = sqlx::query_as!(
         Deletion,
         "SELECT * FROM deletions WHERE index_id = $1 AND seq <= $2 ORDER BY seq",
-        segments[0].index_id,
-        job.seq
+        segments[0].index_id as IndexId,
+        i64::from(&job.seq)
     )
     .fetch_all(&meta.pool)
     .await?;
@@ -106,12 +106,13 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     }
 
     println!("Downloaded to {work_dir:?}, merging");
-    let ssegments = &segments.iter().map(|s| (s.id, s.seq, s.records.unwrap())).collect::<Vec<_>>();
+    let ssegments = &segments.iter().map(|s| (s.id.to_string(), s.seq, s.records.unwrap())).collect::<Vec<_>>();
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
-    // HACK: Get index, match on kind
-    let (merged, merged_records) = match segments[0].index_id {
-        1 => nidx_vector::VectorIndexer::new().merge(work_dir.path(), ssegments, ddeletions)?,
-        2 => nidx_fulltext::TextIndexer::new().merge(work_dir.path(), ssegments, ddeletions)?,
+
+    let index = Index::get(meta, segments[0].index_id).await?;
+    let (merged, merged_records) = match index.kind {
+        IndexKind::Vector => nidx_vector::VectorIndexer::new().merge(work_dir.path(), ssegments, ddeletions)?,
+        IndexKind::Text => nidx_text::TextIndexer::new().merge(work_dir.path(), ssegments, ddeletions)?,
         _ => unimplemented!(),
     };
     println!("Merged to {merged:?}");

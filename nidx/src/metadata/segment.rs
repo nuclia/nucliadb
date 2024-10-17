@@ -1,3 +1,5 @@
+use std::path::Display;
+
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -17,13 +19,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use super::NidxMetadata;
+use super::{IndexId, NidxMetadata};
+use nidx_types::Seq;
 use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 
+#[derive(Copy, Clone, Debug, PartialEq, sqlx::Type)]
+#[sqlx(transparent)]
+pub struct SegmentId(i64);
+impl From<i64> for SegmentId {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+impl std::fmt::Display for SegmentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 pub struct Segment {
-    pub id: i64,
-    pub index_id: i64,
-    pub seq: i64,
+    pub id: SegmentId,
+    pub index_id: IndexId,
+    pub seq: Seq,
     pub records: Option<i64>,
     pub size_bytes: Option<i64>,
     pub merge_job_id: Option<i64>,
@@ -31,10 +48,15 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub async fn create(meta: &NidxMetadata, index_id: i64, seq: i64) -> sqlx::Result<Segment> {
-        sqlx::query_as!(Segment, r#"INSERT INTO segments (index_id, seq) VALUES ($1, $2) RETURNING *"#, index_id, seq)
-            .fetch_one(&meta.pool)
-            .await
+    pub async fn create(meta: &NidxMetadata, index_id: IndexId, seq: Seq) -> sqlx::Result<Segment> {
+        sqlx::query_as!(
+            Segment,
+            r#"INSERT INTO segments (index_id, seq) VALUES ($1, $2) RETURNING *"#,
+            index_id as IndexId,
+            i64::from(&seq)
+        )
+        .fetch_one(&meta.pool)
+        .await
     }
 
     pub async fn mark_ready(
@@ -47,16 +69,21 @@ impl Segment {
             "UPDATE segments SET delete_at = NULL, records = $1, size_bytes = $2 WHERE id = $3",
             records,
             size_bytes,
-            self.id,
+            self.id as SegmentId,
         )
         .execute(meta)
         .await?;
         Ok(())
     }
 
-    pub async fn delete_many(meta: impl Executor<'_, Database = Postgres>, segment_ids: &[i64]) -> sqlx::Result<()> {
-        let affected =
-            sqlx::query!("DELETE FROM segments WHERE id = ANY($1)", segment_ids).execute(meta).await?.rows_affected();
+    pub async fn delete_many(
+        meta: impl Executor<'_, Database = Postgres>,
+        segment_ids: &[SegmentId],
+    ) -> sqlx::Result<()> {
+        let affected = sqlx::query!("DELETE FROM segments WHERE id = ANY($1)", segment_ids as &[SegmentId])
+            .execute(meta)
+            .await?
+            .rows_affected();
         if affected != segment_ids.len() as u64 {
             Err(sqlx::Error::RowNotFound)
         } else {

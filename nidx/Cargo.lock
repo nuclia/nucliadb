@@ -1642,7 +1642,8 @@ dependencies = [
  "base64 0.22.1",
  "envy",
  "futures",
- "nidx_fulltext",
+ "nidx_text",
+ "nidx_types",
  "nidx_vector",
  "nucliadb_core",
  "object_store",
@@ -1657,10 +1658,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "nidx_fulltext"
+name = "nidx_text"
 version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
+ "nidx_types",
  "nucliadb_core",
  "nucliadb_procs",
  "serde_json",
@@ -1670,9 +1672,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nidx_types"
+version = "0.1.0"
+
+[[package]]
 name = "nidx_vector"
 version = "0.1.0"
 dependencies = [
+ "nidx_types",
  "nucliadb_core",
  "nucliadb_vectors",
  "serde_json",

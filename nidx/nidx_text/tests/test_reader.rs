@@ -18,9 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nidx_text::reader::TextReaderService;
+use nidx_text::writer::TextWriterService;
 use nucliadb_core::texts::*;
-use nidx_fulltext::reader::TextReaderService;
-use nidx_fulltext::writer::TextWriterService;
 use tempfile::TempDir;
 
 #[test]

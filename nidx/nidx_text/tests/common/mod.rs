@@ -28,8 +28,8 @@ use nucliadb_core::protos;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::{Resource, ResourceId};
 use nucliadb_core::texts::*;
-use nidx_fulltext::reader::TextReaderService;
-use nidx_fulltext::writer::TextWriterService;
+use nidx_text::reader::TextReaderService;
+use nidx_text::writer::TextWriterService;
 use tempfile::TempDir;
 
 pub fn test_reader() -> TextReaderService {

@@ -111,9 +111,9 @@ pub struct IndexerSettings {
 }
 
 #[derive(Deserialize, Debug)]
-struct StorageSettings {
+pub struct StorageSettings {
     #[serde(flatten)]
-    object_store: ObjectStoreConfig,
+    pub object_store: ObjectStoreConfig,
 }
 
 with_prefix!(metadata "metadata_");
@@ -122,10 +122,18 @@ with_prefix!(storage "storage_");
 
 #[derive(Deserialize, Debug)]
 pub struct Settings {
+    /// Connection to the metadata database
+    /// Mandatory for all components
     #[serde(flatten, with = "metadata")]
     pub metadata: MetadataSettings,
+
+    /// Indexing configuration, should match nucliadb
+    /// Required by indexer and scheduler
     #[serde(flatten, with = "indexer")]
     pub indexer: Option<IndexerSettings>,
+
+    /// Storage configuration for our segments
+    /// Required by indexer, worker, searcher
     #[serde(flatten, with = "storage")]
     pub storage: Option<StorageSettings>,
 }

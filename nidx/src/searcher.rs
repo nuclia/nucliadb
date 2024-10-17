@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::TryStreamExt;
-use nidx_fulltext::TextSearcher;
+use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
 use object_store::DynObjectStore;
 use tempfile::{env::temp_dir, tempdir};

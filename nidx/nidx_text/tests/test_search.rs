@@ -19,7 +19,7 @@
 //
 
 mod common;
-use nidx_fulltext::reader::TextReaderService;
+use nidx_text::reader::TextReaderService;
 use nucliadb_core::protos::{order_by::OrderField, order_by::OrderType, OrderBy};
 use nucliadb_core::protos::{DocumentSearchRequest, Faceted, Filter};
 use nucliadb_core::query_planner::{PreFilterRequest, ValidFieldCollector};
