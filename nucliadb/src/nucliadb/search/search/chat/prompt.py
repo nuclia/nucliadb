@@ -875,7 +875,8 @@ class PromptContextBuilder:
                 neighbouring_paragraphs = cast(NeighbouringParagraphsStrategy, strategy)
             elif strategy.name == RagStrategyName.METADATA_EXTENSION:
                 metadata_extension = cast(MetadataExtensionStrategy, strategy)
-            else:  # pragma: no cover
+            elif strategy.name != RagStrategyName.PREQUERIES:  # pragma: no cover
+                # Prequeries are not handled here
                 logger.warning(
                     "Unknown rag strategy", extra={"strategy": strategy.name, "kbid": self.kbid}
                 )

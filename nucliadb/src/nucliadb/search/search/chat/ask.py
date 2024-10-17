@@ -87,7 +87,6 @@ from nucliadb_models.search import (
     RagStrategyName,
     Relations,
     RelationsAskResponseItem,
-    Reranker,
     RetrievalAskResponseItem,
     SearchOptions,
     StatusAskResponseItem,
@@ -529,7 +528,7 @@ async def ask(
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,
         json_schema=ask_request.answer_json_schema,
-        rerank_context=ask_request.reranker == Reranker.PREDICT_RERANKER,
+        rerank_context=False,
         top_k=ask_request.top_k,
     )
     with metrics.time("stream_start"):
