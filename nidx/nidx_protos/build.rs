@@ -21,6 +21,7 @@
 use std::io::Result;
 
 fn main() -> Result<()> {
+    println!("cargo:rerun-if-changed=../../nucliadb_protos");
     prost_build::compile_protos(
         &[
             "../../nucliadb_protos/nodereader.proto",

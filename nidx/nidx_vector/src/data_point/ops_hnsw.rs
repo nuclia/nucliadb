@@ -56,7 +56,7 @@ pub trait Hnsw {
 
 ///  Tuples ([`Address`], [`f32`]) can not be stored in a [`BinaryHeap`] because [`f32`] does not
 /// implement [`Ord`]. [`Cnx`] is an application of the new-type pattern that lets us bypass the
-/// orphan rules and store such tuples in a [`BinaryHeap`].  
+/// orphan rules and store such tuples in a [`BinaryHeap`].
 #[derive(Clone, Copy)]
 struct Cnx(Address, f32);
 impl Eq for Cnx {}
