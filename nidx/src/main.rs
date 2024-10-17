@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use nidx::{indexer, maintenance, searcher, Settings};
+use nidx::{indexer, maintenance, searcher};
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -25,6 +25,8 @@ use tokio::{self, task::JoinSet};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: HashSet<_> = std::env::args().skip(1).collect();
+
+    tracing_subscriber::fmt::init();
 
     let mut tasks = JoinSet::new();
     args.iter().for_each(|arg| {

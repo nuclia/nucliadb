@@ -26,3 +26,4 @@ tokio-util = { version = "0.7.12", features = ["io", "io-util", "compat"] }
 uuid = { version = "1.10.0", features = ["v4"] }
 nidx_types = { version = "0.1.0", path = "nidx_types" }
 tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
