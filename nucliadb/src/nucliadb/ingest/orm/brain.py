@@ -67,7 +67,7 @@ class ResourceBrain:
         self.rid = rid
         ridobj = ResourceID(uuid=rid)
         self.brain: PBBrainResource = PBBrainResource(resource=ridobj)
-        self.labels: dict[str, list[str]] = deepcopy(BASE_LABELS)
+        self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
 
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
@@ -100,7 +100,9 @@ class ResourceBrain:
         unique_paragraphs: set[str] = set()
 
         # Expose also user classifications
-        user_paragraph_classifications = self._get_paragraph_user_classifications(basic_user_field_metadata)
+        user_paragraph_classifications = self._get_paragraph_user_classifications(
+            basic_user_field_metadata
+        )
 
         # We should set paragraphs and labels
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
@@ -426,47 +428,47 @@ class ResourceBrain:
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
         if origin is not None:
             if origin.source_id:
-                self.labels["o"] = [origin.source_id]
+                self.labels["o"].add(origin.source_id)
             # origin tags
             for tag in origin.tags:
-                self.labels["t"].append(tag)
+                self.labels["t"].add(tag)
             # origin source
             if origin.source_id != "":
-                self.labels["u"].append(f"s/{origin.source_id}")
+                self.labels["u"].add(f"s/{origin.source_id}")
 
             if origin.path:
-                self.labels["p"].append(origin.path.lstrip("/"))
+                self.labels["p"].add(origin.path.lstrip("/"))
 
             # origin contributors
             for contrib in origin.colaborators:
-                self.labels["u"].append(f"o/{contrib}")
+                self.labels["u"].add(f"o/{contrib}")
 
             for key, value in origin.metadata.items():
-                self.labels["m"].append(f"{key[:255]}/{value[:255]}")
+                self.labels["m"].add(f"{key[:255]}/{value[:255]}")
 
         # icon
-        self.labels["n"].append(f"i/{basic.icon}")
+        self.labels["n"].add(f"i/{basic.icon}")
 
         # processing status
         status_tag = self.get_processing_status_tag(basic.metadata)
-        self.labels["n"].append(f"s/{status_tag}")
+        self.labels["n"].add(f"s/{status_tag}")
 
         # main language
         if basic.metadata.language:
-            self.labels["s"].append(f"p/{basic.metadata.language}")
+            self.labels["s"].add(f"p/{basic.metadata.language}")
 
         # all language
         for lang in basic.metadata.languages:
-            self.labels["s"].append(f"s/{lang}")
+            self.labels["s"].add(f"s/{lang}")
 
         # labels
         for classification in basic.usermetadata.classifications:
-            self.labels["l"].append(f"{classification.labelset}/{classification.label}")
+            self.labels["l"].add(f"{classification.labelset}/{classification.label}")
 
         # hidden
         if basic.hidden:
             _, p1, p2 = LABEL_HIDDEN.split("/")
-            self.labels[p1].append(p2)
+            self.labels[p1].add(p2)
 
         self.compute_labels()
 
@@ -474,14 +476,14 @@ class ResourceBrain:
         self,
         field_key: str,
         metadata: FieldMetadata,
-        labels: dict[str, list[str]],
+        labels: dict[str, set[str]],
         relation_node_document: RelationNode,
-        user_canceled_labels: list[str],
+        user_canceled_labels: set[str],
     ):
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
-                labels["l"].append(label)
+                labels["l"].add(label)
                 relation_node_label = RelationNode(
                     value=label,
                     ntype=RelationNode.NodeType.LABEL,
@@ -495,7 +497,7 @@ class ResourceBrain:
                 )
 
         for klass_entity, _ in metadata.positions.items():
-            labels["e"].append(klass_entity)
+            labels["e"].add(klass_entity)
             entity_array = klass_entity.split("/")
             if len(entity_array) == 1:
                 raise AttributeError(f"Entity should be with type {klass_entity}")
@@ -520,17 +522,15 @@ class ResourceBrain:
         basic_user_metadata: Optional[UserMetadata] = None,
         basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
     ):
+        user_canceled_labels: set[str] = set()
         if basic_user_metadata is not None:
-            user_canceled_labels = [
+            user_canceled_labels.update(
                 f"/l/{classification.labelset}/{classification.label}"
                 for classification in basic_user_metadata.classifications
                 if classification.cancelled_by_user
-            ]
-        else:
-            user_canceled_labels = []
-
+            )
         relation_node_resource = RelationNode(value=uuid, ntype=RelationNode.NodeType.RESOURCE)
-        labels: dict[str, list[str]] = {"l": [], "e": []}
+        labels: dict[str, set[str]] = {"l": set(), "e": set()}
         if metadata is not None:
             for meta in metadata.split_metadata.values():
                 self.process_field_metadata(
@@ -551,7 +551,7 @@ class ResourceBrain:
         if basic_user_fieldmetadata is not None:
             for token in basic_user_fieldmetadata.token:
                 if token.cancelled_by_user is False:
-                    labels["e"].append(f"{token.klass}/{token.token}")
+                    labels["e"].add(f"{token.klass}/{token.token}")
                     relation_node_entity = RelationNode(
                         value=token.token,
                         ntype=RelationNode.NodeType.ENTITY,
@@ -579,13 +579,15 @@ class ResourceBrain:
                             self.brain.paragraphs[field_key].paragraphs[
                                 paragraph_annotation.key
                             ].labels.append(label)
-        extend_unique(
-            self.brain.texts[field_key].labels,  # type: ignore
-            flatten_resource_labels(labels),
-        )
+
+        for label in flatten_resource_labels(labels):
+            if label not in self.brain.texts[field_key].labels:
+                self.brain.texts[field_key].labels.append(label)
 
     def compute_labels(self):
-        extend_unique(self.brain.labels, flatten_resource_labels(self.labels))
+        for label in flatten_resource_labels(self.labels):
+            if label not in self.brain.labels:
+                self.brain.labels.append(label)
 
 
 def is_paragraph_repeated_in_field(
