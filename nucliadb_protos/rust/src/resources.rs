@@ -457,6 +457,8 @@ pub struct FileExtractedData {
         ::prost::alloc::string::String,
         NestedListPosition,
     >,
+    #[prost(string, tag = "14")]
+    pub title: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

@@ -170,6 +170,7 @@ message FileExtractedData {
     string icon = 11;
     map<string, NestedPosition> nested_position = 12 [deprecated = true];
     map<string, NestedListPosition> nested_list_position = 13;
+    string title = 14;
 }
 
 

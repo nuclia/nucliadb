@@ -585,7 +585,7 @@ class Resource:
 
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
-            await self.maybe_update_title_metadata(link_extracted_data)
+            await self.maybe_update_resource_title_from_link(link_extracted_data)
             extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
@@ -647,19 +647,27 @@ class Resource:
 
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
 
-    async def maybe_update_title_metadata(self, link_extracted_data: LinkExtractedData):
+    async def maybe_update_resource_title_from_link(self, link_extracted_data: LinkExtractedData):
+        """
+        When parsing link extracted data, we want to replace the resource title for the first link
+        that gets processed and has a title, and only if the current title is a URL, which we take
+        as a hint that the title was not set by the user.
+        """
         assert self.basic is not None
         if not link_extracted_data.title:
             return
         if not (self.basic.title.startswith("http") or self.basic.title == ""):
             return
-
         title = link_extracted_data.title
-        self.basic.title = title
+        await self.update_resource_title(title)
+
+    async def update_resource_title(self, computed_title: str) -> None:
+        assert self.basic is not None
+        self.basic.title = computed_title
         # Extracted text
         field = await self.get_field("title", FieldType.GENERIC, load=False)
         etw = ExtractedTextWrapper()
-        etw.body.text = title
+        etw.body.text = computed_title
         await field.set_extracted_text(etw)
 
         # Field computed metadata
@@ -671,9 +679,8 @@ class Resource:
         fcm = await field.get_field_metadata(force=True)
         if fcm is not None:
             fcmw.metadata.CopyFrom(fcm)
-
         fcmw.metadata.metadata.ClearField("paragraphs")
-        paragraph = Paragraph(start=0, end=len(title), kind=Paragraph.TypeParagraph.TITLE)
+        paragraph = Paragraph(start=0, end=len(computed_title), kind=Paragraph.TypeParagraph.TITLE)
         fcmw.metadata.metadata.paragraphs.append(paragraph)
 
         await field.set_field_metadata(fcmw)
@@ -689,6 +696,8 @@ class Resource:
         await field_file.set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
+        if file_extracted_data.title:
+            await self.update_resource_title(file_extracted_data.title)
 
     async def _apply_field_computed_metadata(self, field_metadata: FieldComputedMetadataWrapper):
         assert self.basic is not None
@@ -1193,6 +1202,11 @@ def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
     if basic.summary or not summary_text:
         return False
     basic.summary = summary_text
+    return True
+
+
+def update_basic_title(basic: PBBasic, file_extracted_title: str) -> bool:
+    basic.title = file_extracted_title
     return True
 
 

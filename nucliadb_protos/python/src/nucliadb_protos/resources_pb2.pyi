@@ -645,10 +645,12 @@ class FileExtractedData(google.protobuf.message.Message):
     ICON_FIELD_NUMBER: builtins.int
     NESTED_POSITION_FIELD_NUMBER: builtins.int
     NESTED_LIST_POSITION_FIELD_NUMBER: builtins.int
+    TITLE_FIELD_NUMBER: builtins.int
     language: builtins.str
     md5: builtins.str
     field: builtins.str
     icon: builtins.str
+    title: builtins.str
     @property
     def metadata(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     @property
@@ -683,9 +685,10 @@ class FileExtractedData(google.protobuf.message.Message):
         icon: builtins.str = ...,
         nested_position: collections.abc.Mapping[builtins.str, global___NestedPosition] | None = ...,
         nested_list_position: collections.abc.Mapping[builtins.str, global___NestedListPosition] | None = ...,
+        title: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_thumbnail", b"file_thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["field", b"field", "file_generated", b"file_generated", "file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_rows_previews", b"file_rows_previews", "file_thumbnail", b"file_thumbnail", "icon", b"icon", "language", b"language", "md5", b"md5", "metadata", b"metadata", "nested", b"nested", "nested_list_position", b"nested_list_position", "nested_position", b"nested_position"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["field", b"field", "file_generated", b"file_generated", "file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_rows_previews", b"file_rows_previews", "file_thumbnail", b"file_thumbnail", "icon", b"icon", "language", b"language", "md5", b"md5", "metadata", b"metadata", "nested", b"nested", "nested_list_position", b"nested_list_position", "nested_position", b"nested_position", "title", b"title"]) -> None: ...
 
 global___FileExtractedData = FileExtractedData
 
