@@ -58,6 +58,11 @@ pub async fn run() -> anyhow::Result<()> {
             }
         };
         let seq = info.stream_sequence.into();
+        if info.delivered > 5 {
+            warn!(?seq, "Message exhausted retries, skipping");
+            let _ = msg.ack().await;
+            continue;
+        }
         info!(?seq, "Processing indexing message");
         let (msg, acker) = msg.split();
 
