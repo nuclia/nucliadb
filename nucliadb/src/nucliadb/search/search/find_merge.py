@@ -415,6 +415,7 @@ async def hydrate_and_rerank(
 
         # now we have removed the text block surplus, fetch resource metadata
         if reranker.needs_extra_results:
+            rid = ParagraphId.from_string(paragraph_id).rid
             if rid not in resource_hydration_ops:
                 resource_hydration_ops[rid] = asyncio.create_task(
                     hydrate_resource_metadata(
