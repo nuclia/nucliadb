@@ -55,10 +55,8 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.rerankers import RankedItem, apply_reranking, sort_by_score
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
-    SCORE_TYPE,
     AnswerAskResponseItem,
     AskRequest,
     AskResponseItem,
@@ -87,7 +85,6 @@ from nucliadb_models.search import (
     RagStrategyName,
     Relations,
     RelationsAskResponseItem,
-    Reranker,
     RetrievalAskResponseItem,
     SearchOptions,
     StatusAskResponseItem,
@@ -214,15 +211,6 @@ class AskResult:
                 # to be the moment when the JSON object is yielded, not the text
                 self.metrics.record_first_chunk_yielded()
                 first_chunk_yielded = True
-
-        # Then, rerank and cut (if needed) and stream out the retrieval results
-        if self._reranking is not None:
-            reranked = [
-                RankedItem(id=paragraph_id, score=score, score_type=SCORE_TYPE.RERANKER)
-                for paragraph_id, score in self._reranking.context_scores.items()
-            ]
-            sort_by_score(reranked)
-            apply_reranking(self.main_results, reranked)
 
         yield RetrievalAskResponseItem(
             results=self.main_results,
@@ -530,7 +518,7 @@ async def ask(
         max_tokens=query_parser.get_max_tokens_answer(),
         query_context_images=prompt_context_images,
         json_schema=ask_request.answer_json_schema,
-        rerank_context=ask_request.reranker == Reranker.PREDICT_RERANKER,
+        rerank_context=False,
         top_k=ask_request.top_k,
     )
     with metrics.time("stream_start"):
