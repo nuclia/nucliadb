@@ -1,5 +1,3 @@
-use std::fs::{File, OpenOptions};
-use std::io::Seek;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -19,8 +17,6 @@ use std::io::Seek;
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
 
 use config::VectorConfig;
 use data_point::{open, DataPointPin};
@@ -29,6 +25,10 @@ use data_point_provider::state::write_state;
 use nidx_protos::{Resource, VectorSearchRequest};
 use nidx_types::Seq;
 use service::{VectorReaderService, VectorWriterService, VectorsContext};
+use std::fs::{File, OpenOptions};
+use std::io::Seek;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 use tempfile::{tempdir, TempDir};
 
 pub struct VectorIndexer;
