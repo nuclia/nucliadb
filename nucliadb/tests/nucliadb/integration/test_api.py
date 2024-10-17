@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -986,3 +987,50 @@ async def test_dates_are_properly_validated(
     assert resp.status_code == 200, resp.text
 
     assert resp.json()["origin"]["created"] == "0001-01-01T00:00:00Z"
+
+
+@pytest.mark.asyncio
+async def test_file_computed_titles_are_set_on_resource_title(
+    nucliadb_writer,
+    nucliadb_grpc,
+    nucliadb_reader,
+    knowledgebox,
+):
+    # Create a resource with an email field
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "my_email.eml",
+            "files": {
+                "email": {
+                    "file": {
+                        "filename": "my_email.eml",
+                        "payload": base64.b64encode(b"email content").decode(),
+                        "content_type": "message/rfc822",
+                    }
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Simulate processing file extracted data with a computed title
+    extracted_title = "Subject : My Email"
+    bm = BrokerMessage()
+    bm.type = BrokerMessage.MessageType.AUTOCOMMIT
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid
+    bm.kbid = kbid
+    fed = FileExtractedData()
+    fed.field = "email"
+    fed.title = extracted_title
+    bm.file_extracted_data.append(fed)
+    resp = await nucliadb_grpc.ProcessMessage([bm])
+    assert resp.status == OpStatusWriter.Status.OK
+
+    # Check that the resource title changed
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == extracted_title
