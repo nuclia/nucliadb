@@ -24,12 +24,11 @@ use std::time::{Duration, SystemTime};
 
 use config::VectorConfig;
 use data_point::{open, DataPointPin};
-use data_point_provider::reader::{Reader, TimeSensitiveDLog};
+use data_point_provider::reader::TimeSensitiveDLog;
 use data_point_provider::state::write_state;
-use formula::Formula;
 use nidx_protos::{Resource, VectorSearchRequest};
 use nidx_types::Seq;
-use service::VectorWriterService;
+use service::{VectorReaderService, VectorWriterService, VectorsContext};
 use tempfile::{tempdir, TempDir};
 
 pub struct VectorIndexer;
@@ -105,7 +104,7 @@ impl VectorIndexer {
 
 pub struct VectorSearcher {
     _index_dir: TempDir,
-    reader: data_point_provider::reader::Reader,
+    reader: VectorReaderService,
 }
 
 impl VectorSearcher {
@@ -114,7 +113,7 @@ impl VectorSearcher {
         index_id: i64,
         segments: Vec<(i64, i64)>,
         deletions: Vec<(i64, String)>,
-    ) -> VectorR<Self> {
+    ) -> anyhow::Result<Self> {
         let index_dir = tempdir()?;
         let mut index_state = data_point_provider::state::State::default();
 
@@ -150,7 +149,7 @@ impl VectorSearcher {
         drop(state_file);
 
         // Open reader using the recently created data
-        let reader = Reader::open(index_dir.path())?;
+        let reader = VectorReaderService::open(index_dir.path())?;
 
         Ok(VectorSearcher {
             _index_dir: index_dir,
@@ -158,22 +157,19 @@ impl VectorSearcher {
         })
     }
 
-    pub fn dummy_search(&self) -> VectorR<usize> {
+    pub fn dummy_search(&self) -> anyhow::Result<usize> {
         Ok(self
             .reader
             .search(
-                &(
-                    20,
-                    &VectorSearchRequest {
-                        vector: Vec::from(&[0.1; 1024]),
-                        min_score: -10.0,
-                        with_duplicates: true,
-                        ..Default::default()
-                    },
-                    Formula::new(),
-                ),
-                &None,
+                &VectorSearchRequest {
+                    vector: Vec::from(&[0.1; 1024]),
+                    min_score: -10.0,
+                    with_duplicates: true,
+                    ..Default::default()
+                },
+                &VectorsContext::default(),
             )?
+            .documents
             .len())
     }
 }
@@ -208,8 +204,6 @@ pub enum VectorErr {
     MultipleWritersError,
     #[error("Writer has uncommitted changes, please commit or abort")]
     UncommittedChangesError,
-    #[error("Garbage collection delayed")]
-    WorkDelayed,
     #[error("Merger is already initialized")]
     MergerAlreadyInitialized,
     #[error("Can not merge zero datapoints")]

@@ -21,7 +21,6 @@ use nidx_protos::ResourceId;
 
 use crate::config::VectorConfig;
 use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
-use crate::data_point_provider::garbage_collector;
 use crate::data_point_provider::state::read_state;
 use crate::data_point_provider::writer::Writer;
 use crate::utils;
@@ -123,16 +122,6 @@ impl Debug for VectorWriterService {
 
 impl VectorWriterService {
     #[tracing::instrument(skip_all)]
-    fn force_garbage_collection(&mut self) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    fn reload(&mut self) -> anyhow::Result<()> {
-        Ok(self.index.reload()?)
-    }
-
-    #[tracing::instrument(skip_all)]
     pub fn count(&self) -> anyhow::Result<usize> {
         Ok(self.index.size())
     }
@@ -219,17 +208,6 @@ impl VectorWriterService {
         let took = time.elapsed().as_secs_f64();
         debug!("{id:?} - Ending at {took} ms");
 
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all)]
-    fn garbage_collection(&mut self) -> anyhow::Result<()> {
-        let time = Instant::now();
-
-        garbage_collector::collect_garbage(self.index.location())?;
-
-        let took = time.elapsed().as_secs_f64();
-        debug!("Garbage collection {took} ms");
         Ok(())
     }
 }
