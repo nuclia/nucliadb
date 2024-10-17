@@ -25,7 +25,7 @@ mod search_query;
 pub mod writer;
 
 use std::fs::{File, OpenOptions};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use nidx_types::Seq;
 use nucliadb_core::protos::DocumentSearchRequest;
@@ -38,15 +38,15 @@ use nucliadb_core::{
 use reader::TextReaderService;
 use schema::{timestamp_to_datetime_utc, TextSchema};
 use serde_json::Value;
-use tantivy::fastfield::{write_alive_bitset, AliveBitSet};
-use tantivy::IndexMeta;
+use tantivy::fastfield::write_alive_bitset;
+use tantivy::SegmentReader;
 use tantivy::{
     directory::MmapDirectory,
     doc,
     indexer::merge_filtered_segments,
-    query::{BitSetDocSet, Query, TermSetQuery},
+    query::{Query, TermSetQuery},
     schema::Facet,
-    Index, IndexReader, SegmentId, SegmentMeta, SegmentReader, SingleSegmentIndexWriter, Term,
+    Index, SegmentId, SingleSegmentIndexWriter, Term,
 };
 use tantivy_common::{ReadOnlyBitSet, TerminatingWrite};
 use tempfile::{tempdir, TempDir};
@@ -81,13 +81,12 @@ impl TextIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: &[(String, Seq, i64)],
+        segments: &[(PathBuf, Seq, i64)],
         deletions: &Vec<(Seq, &Vec<String>)>,
     ) -> NodeResult<(String, usize)> {
         // Move all segment data into the same directory. TODO: Do this while downloading/unpacking
         let mut segment_uuids = Vec::new();
-        for (s, _, num_docs) in segments {
-            let segment_dir = work_dir.join(s.to_string());
+        for (segment_dir, _, num_docs) in segments {
             let mut uuid = None;
             for segment_file in std::fs::read_dir(&segment_dir)? {
                 let name = segment_file?.file_name();
@@ -115,7 +114,7 @@ impl TextIndexer {
         let deletions = segments
             .iter()
             .zip(tantivy_segments.iter())
-            .map(|((sidd, segment_seq, _), segment)| {
+            .map(|((_, segment_seq, _), segment)| {
                 let uuid = index.schema().get_field("uuid").unwrap();
                 let query = Box::new(TermSetQuery::new(deletions.iter().flat_map(|(deletion_seq, keys)| {
                     if segment_seq < deletion_seq {
@@ -140,11 +139,6 @@ impl TextIndexer {
                         }
                     })
                     .unwrap();
-
-                println!(
-                    "MMMM segment {} with seq {:?} and deletions {:?}, deleted = {:?}",
-                    sidd, segment_seq, deletions, deleted
-                );
                 Some(ReadOnlyBitSet::from(&bitset).into())
             })
             .collect::<Vec<_>>();
@@ -225,7 +219,7 @@ fn index_document(writer: &mut SingleSegmentIndexWriter, resource: &Resource, sc
 }
 
 pub struct TextSearcher {
-    index_dir: TempDir,
+    _index_dir: TempDir,
     reader: TextReaderService,
 }
 
@@ -333,7 +327,7 @@ impl TextSearcher {
 
         let reader = index.reader()?;
         Ok(Self {
-            index_dir,
+            _index_dir: index_dir,
             reader: TextReaderService {
                 index,
                 schema: TextSchema::new(),

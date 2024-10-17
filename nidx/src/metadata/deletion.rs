@@ -46,4 +46,19 @@ impl Deletion {
         .fetch_one(meta)
         .await
     }
+
+    pub async fn for_index_and_seq(
+        meta: impl Executor<'_, Database = Postgres>,
+        index_id: IndexId,
+        seq: Seq,
+    ) -> Result<Vec<Deletion>, sqlx::Error> {
+        sqlx::query_as!(
+            Deletion,
+            "SELECT * FROM deletions WHERE index_id = $1 AND seq <= $2",
+            index_id as IndexId,
+            i64::from(&seq)
+        )
+        .fetch_all(meta)
+        .await
+    }
 }

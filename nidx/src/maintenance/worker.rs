@@ -20,7 +20,6 @@
 
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
-use anyhow::Ok;
 use futures::TryStreamExt;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
@@ -29,7 +28,7 @@ use tokio_util::io::SyncIoBridge;
 use tracing::*;
 
 use crate::{
-    metadata::{Deletion, Index, IndexId, IndexKind, MergeJob, Segment, SegmentId},
+    metadata::{Deletion, Index, IndexKind, MergeJob, Segment, SegmentId},
     upload::pack_and_upload,
     NidxMetadata, Settings,
 };
@@ -43,7 +42,24 @@ pub async fn run() -> anyhow::Result<()> {
         let job = MergeJob::take(&meta.pool).await?;
         if let Some(job) = job {
             info!(job.id, "Running job");
-            run_job(&meta, &job, storage.clone()).await?;
+
+            // Start keep alive to mark progress
+            let pool = meta.pool.clone();
+            let job2 = job.clone();
+            let keepalive = tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_secs(45)).await;
+                    job2.keep_alive(&pool).await.unwrap();
+                }
+            });
+
+            match run_job(&meta, &job, storage.clone()).await {
+                Ok(_) => info!(job.id, "Job completed"),
+                Err(e) => warn!(job.id, ?e, "Job failed"),
+            }
+
+            // Stop keep alives
+            keepalive.abort();
         } else {
             debug!("No jobs, waiting for more");
             tokio::time::sleep(Duration::from_secs(5)).await;
@@ -56,47 +72,33 @@ pub async fn download_segment(
     segment_id: SegmentId,
     output_dir: PathBuf,
 ) -> anyhow::Result<()> {
-    let path = object_store::path::Path::parse(segment_id.storage_key()).unwrap();
-    let response = storage.get(&path).await?.into_stream();
+    let response = storage.get(&segment_id.storage_key()).await?.into_stream();
     let reader = response.map_err(|_| std::io::Error::last_os_error()).into_async_read(); // HACK: Mapping errors randomly
     let reader = SyncIoBridge::new(reader.compat());
 
     let mut tar = tar::Archive::new(reader);
-    tokio::task::spawn_blocking(move || tar.unpack(output_dir.join(segment_id.local_path())).unwrap()).await?;
+    tokio::task::spawn_blocking(move || tar.unpack(output_dir).unwrap()).await?;
 
     Ok(())
 }
 
 pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObjectStore>) -> anyhow::Result<()> {
-    // TODO: It's weird that we take the index_id from the first segment. There is no check to ensure all segments are from the same index
-    // we just trust the scheduler to do the right thing. Maybe add a job param and check here? Should jobs be generic or keep the merge_job idea?
+    // TODO: It's weird that we take the index_id from the first segment. Maybe add a job param and check here? Should jobs be generic or keep the merge_job idea?
     let segments = job.segments(meta).await?;
-    let deletions = sqlx::query_as!(
-        Deletion,
-        "SELECT * FROM deletions WHERE index_id = $1 AND seq <= $2 ORDER BY seq",
-        segments[0].index_id as IndexId,
-        i64::from(&job.seq)
-    )
-    .fetch_all(&meta.pool)
-    .await?;
-
-    // Start keep alive to mark progress
-    let pool = meta.pool.clone();
-    let job2 = (*job).clone();
-    let keepalive = tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            job2.keep_alive(&pool).await.unwrap();
-        }
-    });
+    let index = Index::get(meta, segments[0].index_id).await?;
+    for s in &segments {
+        assert!(s.index_id == index.id);
+    }
+    let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, job.seq).await?;
     let work_dir: tempfile::TempDir = tempdir()?;
 
     // Download segments
     let downloads: Vec<_> = segments
         .iter()
-        .map(|s| {
+        .enumerate()
+        .map(|(i, s)| {
             let storage = storage.clone();
-            let work_dir = work_dir.path().to_owned();
+            let work_dir = work_dir.path().join(i.to_string());
             tokio::spawn(download_segment(storage, s.id, work_dir))
         })
         .collect();
@@ -104,8 +106,12 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
         d.await??;
     }
 
-    println!("Downloaded to {work_dir:?}, merging");
-    let ssegments = &segments.iter().map(|s| (s.id.local_path(), s.seq, s.records.unwrap())).collect::<Vec<_>>();
+    // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
+    let ssegments = &segments
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (work_dir.path().join(i.to_string()), s.seq, s.records.unwrap()))
+        .collect::<Vec<_>>();
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 
     let index = Index::get(meta, segments[0].index_id).await?;
@@ -114,7 +120,6 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
         IndexKind::Text => nidx_text::TextIndexer::new().merge(work_dir.path(), ssegments, ddeletions)?,
         _ => unimplemented!(),
     };
-    println!("Merged to {merged:?}");
 
     // Upload
     let segment = Segment::create(&meta, segments[0].index_id, job.seq).await?;
@@ -124,16 +129,9 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let mut tx = meta.transaction().await?;
     segment.mark_ready(&mut *tx, merged_records as i64, size as i64).await?;
     Segment::delete_many(&mut *tx, &segments.iter().map(|s| s.id).collect::<Vec<_>>()).await?;
+    // Delete task if successful. Mark as failed otherwise?
     job.finish(&mut *tx).await?;
     tx.commit().await?;
-
-    // Stop keep alives. TODO: Stop on failure as well. This probably makes more sense on the outer function and/or wrapped in an struct with Drop
-    // It currently works because everything panics on error
-    keepalive.abort();
-
-    // Delete task if successful. Mark as failed otherwise?
-    // The scheduler will requeue this if no activity in a while
-    // job.finish(meta).await?;
 
     Ok(())
 }

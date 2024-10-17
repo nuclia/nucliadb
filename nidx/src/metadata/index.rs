@@ -31,6 +31,7 @@ pub enum IndexKind {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, sqlx::Type)]
+#[sqlx(transparent)]
 pub struct IndexId(i64);
 impl From<i64> for IndexId {
     fn from(value: i64) -> Self {

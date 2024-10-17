@@ -19,7 +19,7 @@ use std::io::Seek;
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use nidx_types::Seq;
@@ -68,7 +68,7 @@ impl VectorIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: &[(String, Seq, i64)],
+        segments: &[(PathBuf, Seq, i64)],
         deletions: &Vec<(Seq, &Vec<String>)>,
     ) -> VectorR<(String, usize)> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
@@ -84,9 +84,9 @@ impl VectorIndexer {
         // Rename (nucliadb_vectors wants uuid, we use i64 as segment ids) and open the segments
         let segment_ids: Vec<_> = segments
             .iter()
-            .map(|(sid, seq, _)| {
+            .map(|(segment_path, seq, _)| {
                 let uuid = uuid::Uuid::new_v4();
-                std::fs::rename(work_dir.join(sid.to_string()), work_dir.join(uuid.to_string())).unwrap();
+                std::fs::rename(segment_path, work_dir.join(uuid.to_string())).unwrap();
                 (uuid, seq)
             })
             .map(|(dpid, seq)| {
@@ -116,7 +116,7 @@ impl VectorIndexer {
 }
 
 pub struct VectorSearcher {
-    index_dir: TempDir,
+    _index_dir: TempDir,
     reader: data_point_provider::reader::Reader,
 }
 
@@ -165,7 +165,7 @@ impl VectorSearcher {
         let reader = Reader::open(index_dir.path())?;
 
         Ok(VectorSearcher {
-            index_dir,
+            _index_dir: index_dir,
             reader,
         })
     }
