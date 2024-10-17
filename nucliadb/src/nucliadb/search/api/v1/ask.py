@@ -67,13 +67,6 @@ async def ask_knowledgebox_endpoint(
     )
 
 
-def default(obj):
-    "Convert sets to lists when dumping json"
-    if isinstance(obj, set):
-        return list(obj)
-    raise TypeError
-
-
 @handled_ask_exceptions
 async def create_ask_response(
     kbid: str,

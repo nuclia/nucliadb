@@ -26,8 +26,8 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Type
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_FIELDS, KB_RESOURCE_SLUG
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -378,28 +378,6 @@ class Resource:
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type)
         return self.fields
-
-    async def _deprecated_scan_fields_ids(
-        self,
-    ) -> AsyncIterator[tuple[FieldType.ValueType, str]]:
-        logger.warning("Scanning fields ids. This is not optimal.")
-        prefix = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
-        allfields = set()
-        async for key in self.txn.keys(prefix, count=-1):
-            # The [6:8] `slicing purpose is to match exactly the two
-            # splitted parts corresponding to type and field, and nothing else!
-            type, field = key.split("/")[6:8]
-            type_id = FIELD_TYPE_STR_TO_PB.get(type)
-            if type_id is None:
-                raise AttributeError("Invalid field type")
-            result = (type_id, field)
-            if result not in allfields:
-                # fields can have errors that are stored in a subkey:
-                # - field key       -> kbs/kbid/r/ruuid/f/myfield
-                # - field error key -> kbs/kbid/r/ruuid/f/myfield/errors
-                # and that would return duplicates here.
-                yield result
-            allfields.add(result)
 
     async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
         # Use a set to make sure we don't have duplicate field ids

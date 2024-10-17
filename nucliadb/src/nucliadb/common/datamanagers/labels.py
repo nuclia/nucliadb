@@ -17,12 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 from typing import Optional
 
 import orjson
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
+
+logger = logging.getLogger(__name__)
 
 KB_LABELS = "/kbs/{kbid}/labels"
 KB_LABELSET = "/kbs/{kbid}/labels/{id}"
@@ -54,6 +57,9 @@ async def _get_labelset_ids_bw_compat(txn: Transaction, *, kbid: str) -> list[st
 
 
 async def _deprecated_scan_labelset_ids(txn: Transaction, *, kbid: str) -> list[str]:
+    logger.warning(
+        "Scanning labelset ids. This is not optimal and should have been migrated.", extra={"kbid": kbid}
+    )
     labelsets = []
     labels_key = KB_LABELS.format(kbid=kbid)
     async for key in txn.keys(labels_key, count=-1, include_start=False):

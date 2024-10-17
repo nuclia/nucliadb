@@ -31,12 +31,13 @@ from grpc import aio
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB, Resource
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
 from nucliadb.tests.vectors import V1, V2, V3

@@ -17,38 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
 
-from nucliadb.common import datamanagers
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb.migrator.migrator import logger
-from nucliadb_protos.resources_pb2 import AllFieldIDs, FieldID
 
 
 async def migrate(context: ExecutionContext) -> None: ...
 
 
-async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    async for resource_id in datamanagers.resources.iterate_resource_ids(kbid=kbid):
-        async with context.kv_driver.transaction() as txn:
-            resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)
-            if resource is None:
-                logger.warning(f"kb={kbid} rid={resource_id}: resource not found. Skipping...")
-                continue
-
-            all_fields: Optional[AllFieldIDs] = await resource.get_all_field_ids(for_update=True)
-            if all_fields is not None:
-                logger.warning(f"kb={kbid} rid={resource_id}: already has all fields key. Skipping...")
-                continue
-
-            # Migrate resource
-            logger.warning(f"kb={kbid} rid={resource_id}: migrating...")
-            all_fields = AllFieldIDs()
-            async for (
-                field_type,
-                field_id,
-            ) in resource._deprecated_scan_fields_ids():
-                fid = FieldID(field_type=field_type, field=field_id)
-                all_fields.fields.append(fid)
-            await resource.set_all_field_ids(all_fields)
-            await txn.commit()
+async def migrate_kb(context: ExecutionContext, kbid: str) -> None: ...

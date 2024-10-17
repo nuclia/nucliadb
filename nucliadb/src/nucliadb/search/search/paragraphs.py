@@ -22,9 +22,8 @@ import re
 import string
 from typing import Optional
 
-from nucliadb.common.ids import ParagraphId
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
-from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search.search import cache
 from nucliadb_telemetry import metrics

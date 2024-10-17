@@ -22,7 +22,7 @@ from collections import OrderedDict
 from typing import AsyncGenerator, cast
 
 from nucliadb.common.cluster.base import AbstractIndexNode
-from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_protos.dataset_pb2 import (

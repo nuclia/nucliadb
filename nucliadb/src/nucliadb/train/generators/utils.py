@@ -21,9 +21,9 @@
 from contextvars import ContextVar
 from typing import Any, AsyncGenerator, AsyncIterator, Optional, Type
 
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.train import SERVICE_NAME, logger
 from nucliadb.train.types import T
