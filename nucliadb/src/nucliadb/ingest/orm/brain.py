@@ -100,7 +100,7 @@ class ResourceBrain:
         unique_paragraphs: set[str] = set()
 
         # Expose also user classifications
-        paragraph_classifications = self._get_paragraph_user_classifications(basic_user_field_metadata)
+        user_paragraph_classifications = self._get_paragraph_user_classifications(basic_user_field_metadata)
 
         # We should set paragraphs and labels
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
@@ -111,7 +111,7 @@ class ResourceBrain:
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
 
-                denied_classifications = paragraph_classifications.denied.get(key, [])
+                denied_classifications = user_paragraph_classifications.denied.get(key, [])
                 position = TextPosition(
                     index=index,
                     start=paragraph.start,
@@ -159,14 +159,14 @@ class ResourceBrain:
                         p.labels.append(label)
 
                 # Add user annotated labels to paragraphs
-                extend_unique(p.labels, paragraph_classifications.valid.get(key, []))  # type: ignore
+                extend_unique(p.labels, user_paragraph_classifications.valid.get(key, []))  # type: ignore
 
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         extracted_text_str = extracted_text.text if extracted_text else None
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
-            denied_classifications = paragraph_classifications.denied.get(key, [])
+            denied_classifications = user_paragraph_classifications.denied.get(key, [])
             position = TextPosition(
                 index=index,
                 start=paragraph.start,
@@ -212,7 +212,7 @@ class ResourceBrain:
                     p.labels.append(label)
 
             # Add user annotated labels to paragraphs
-            extend_unique(p.labels, paragraph_classifications.valid.get(key, []))  # type: ignore
+            extend_unique(p.labels, user_paragraph_classifications.valid.get(key, []))  # type: ignore
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
@@ -634,12 +634,3 @@ class ParagraphPages:
             if len(self._materialized) > 0:
                 return self._materialized[-1]
             return 0
-
-
-def extend_unique(a: list, b: list):
-    """
-    Prevents extending with duplicate elements
-    """
-    for item in b:
-        if item not in a:
-            a.append(item)
