@@ -21,8 +21,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nucliadb.common.ids import ParagraphId
-from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb_models.search import (
     SCORE_TYPE,
