@@ -706,6 +706,7 @@ class Resource:
         for file_extracted_data in message.file_extracted_data:
             if file_extracted_data.title != "":
                 await self.update_resource_title(file_extracted_data.title)
+                # Break after the first file with a title is found
                 break
 
     async def _apply_field_computed_metadata(self, field_metadata: FieldComputedMetadataWrapper):
