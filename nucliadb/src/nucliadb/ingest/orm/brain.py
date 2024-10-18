@@ -154,8 +154,8 @@ class ResourceBrain:
                         representation=representation,
                     ),
                 )
-                paragraph_labels = set()
-                paragraph_labels.add(f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}")
+                paragraph_kind_label = f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+                paragraph_labels = {paragraph_kind_label}
                 paragraph_labels.update(
                     f"/l/{classification.labelset}/{classification.label}"
                     for classification in paragraph.classifications
@@ -163,6 +163,7 @@ class ResourceBrain:
                 paragraph_labels.update(set(user_paragraph_classifications.valid.get(key, [])))
                 paragraph_labels.difference_update(denied_classifications)
                 p.labels.extend(list(paragraph_labels))
+
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         extracted_text_str = extracted_text.text if extracted_text else None
@@ -206,8 +207,8 @@ class ResourceBrain:
                     representation=representation,
                 ),
             )
-            paragraph_labels = set()
-            paragraph_labels.add(f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}")
+            paragraph_kind_label = f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+            paragraph_labels = {paragraph_kind_label}
             paragraph_labels.update(
                 f"/l/{classification.labelset}/{classification.label}"
                 for classification in paragraph.classifications
@@ -215,6 +216,7 @@ class ResourceBrain:
             paragraph_labels.update(set(user_paragraph_classifications.valid.get(key, [])))
             paragraph_labels.difference_update(denied_classifications)
             p.labels.extend(list(paragraph_labels))
+
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         for relations in metadata.metadata.relations:
@@ -428,7 +430,7 @@ class ResourceBrain:
     def _set_resource_labels(self, basic: Basic, origin: Optional[Origin]):
         if origin is not None:
             if origin.source_id:
-                self.labels["o"].add(origin.source_id)
+                self.labels["o"] = {origin.source_id}
             # origin tags
             for tag in origin.tags:
                 self.labels["t"].add(tag)
