@@ -23,6 +23,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 use futures::TryStreamExt;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
+use tokio::task::JoinSet;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::SyncIoBridge;
 use tracing::*;
@@ -93,18 +94,13 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let work_dir: tempfile::TempDir = tempdir()?;
 
     // Download segments
-    let downloads: Vec<_> = segments
-        .iter()
-        .enumerate()
-        .map(|(i, s)| {
-            let storage = storage.clone();
-            let work_dir = work_dir.path().join(i.to_string());
-            tokio::spawn(download_segment(storage, s.id, work_dir))
-        })
-        .collect();
-    for d in downloads {
-        d.await??;
-    }
+    let mut download_tasks = JoinSet::new();
+    segments.iter().enumerate().for_each(|(i, s)| {
+        let storage = storage.clone();
+        let work_dir = work_dir.path().join(i.to_string());
+        download_tasks.spawn(download_segment(storage, s.id, work_dir));
+    });
+    download_tasks.join_all().await;
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
     let ssegments = &segments
