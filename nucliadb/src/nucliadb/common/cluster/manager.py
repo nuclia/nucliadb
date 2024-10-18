@@ -539,7 +539,7 @@ class StandaloneKBShardManager(KBShardManager):
                 for replica_id, node_id in self.indexing_replicas(shard):
                     indexpb.node = node_id
                     indexpb.shard = replica_id
-                    await nats.js.publish("nidx.1", indexpb.SerializeToString())
+                    await nats.js.publish("nidx", indexpb.SerializeToString())
 
 
 def get_all_shard_nodes(
