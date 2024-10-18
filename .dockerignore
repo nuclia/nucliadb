@@ -29,5 +29,5 @@ lib
 logs
 nats-server
 nucliadb_writer/nats-server
-target/*
+**/target/*
 tests/*

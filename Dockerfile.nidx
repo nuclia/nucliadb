@@ -1,0 +1,13 @@
+#
+# Dockerfile for nucliadb's index node, compiling nidx in the docker build.
+# For a version that uses pre-built binaries (outside Docker) see `Dockerfile.nidx_prebuild`
+#
+
+FROM rust:1.82.0-bookworm AS builder
+RUN apt update && apt install -y protobuf-compiler
+COPY nucliadb_protos/*proto /app/nucliadb_protos/
+COPY nidx /app/nidx
+RUN cd /app/nidx && cargo build --locked --release
+
+FROM debian:bookworm-slim AS nidx
+COPY --from=builder /app/nidx/target/release/nidx /usr/local/bin

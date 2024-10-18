@@ -59,6 +59,15 @@ jobs:
     secrets:
       inherit
 
+  build-nidx-image:
+    name: Build nidx image
+    uses: ./.github/workflows/_build-img-nucliadb.yml
+    with:
+      file: Dockerfile.nidx
+      image-name: nidx
+    secrets:
+      inherit
+
   upload-chart-nucliadb-shared:
     name: Deploy nucliadb shared
     runs-on: ubuntu-latest
