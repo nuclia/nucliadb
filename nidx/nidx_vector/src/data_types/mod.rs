@@ -1,0 +1,68 @@
+// Copyright (C) 2021 Bosutech XXI S.L.
+//
+// nucliadb is offered under the AGPL v3.0 and as commercial software.
+// For commercial licensing, contact us at info@nuclia.com.
+//
+// AGPL:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
+
+pub mod data_store;
+pub mod dtrie_ram;
+pub mod trie;
+pub mod trie_ram;
+
+pub mod usize_utils {
+    pub const USIZE_LEN: usize = (usize::BITS / 8) as usize;
+    pub fn usize_from_slice_le(v: &[u8]) -> usize {
+        let mut buff = [0; USIZE_LEN];
+        buff.copy_from_slice(v);
+        usize::from_le_bytes(buff)
+    }
+    pub const U32_LEN: usize = (u32::BITS / 8) as usize;
+    pub fn u32_from_slice_le(v: &[u8]) -> u32 {
+        let mut buff = [0; U32_LEN];
+        buff.copy_from_slice(v);
+        u32::from_le_bytes(buff)
+    }
+}
+
+pub trait DeleteLog: std::marker::Sync {
+    fn is_deleted(&self, _: &[u8]) -> bool;
+}
+
+impl<'a, D: DeleteLog> DeleteLog for &'a D {
+    fn is_deleted(&self, x: &[u8]) -> bool {
+        D::is_deleted(self, x)
+    }
+}
+
+impl DeleteLog for dtrie_ram::DTrie {
+    fn is_deleted(&self, key: &[u8]) -> bool {
+        self.get(key).is_some()
+    }
+}
+
+impl<Dl: DeleteLog, S: data_store::Interpreter> data_store::Interpreter for (Dl, S) {
+    fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
+        self.1.get_key(x)
+    }
+    fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
+        self.1.read_exact(x)
+    }
+    fn keep_in_merge(&self, x: &[u8]) -> bool {
+        let key = self.1.get_key(x);
+        !self.0.is_deleted(key)
+    }
+}

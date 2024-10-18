@@ -1,0 +1,28 @@
+[package]
+name = "nidx"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["nidx_vector", "nidx_types", "nidx_protos"]
+
+[dependencies]
+anyhow = "1.0.89"
+async-nats = "0.37.0"
+base64 = "0.22.1"
+envy = "0.4.2"
+futures = "0.3.31"
+nidx_vector = { version = "0.1.0", path = "nidx_vector" }
+object_store = { version = "0.11.0", features = ["gcp", "aws"] }
+serde = "1.0.210"
+serde_with = "3.11.0"
+sqlx = { version = "0.8.2", features = ["postgres", "uuid", "runtime-tokio", "time"] }
+tar = "0.4.42"
+tempfile = "3.13.0"
+tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "signal"] }
+tokio-util = { version = "0.7.12", features = ["io", "io-util", "compat"] }
+uuid = { version = "1.10.0", features = ["v4"] }
+nidx_types = { version = "0.1.0", path = "nidx_types" }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+nidx_protos = { version = "0.1.0", path = "nidx_protos" }

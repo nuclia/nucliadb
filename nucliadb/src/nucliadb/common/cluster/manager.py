@@ -508,6 +508,39 @@ class StandaloneKBShardManager(KBShardManager):
                 self._resource_change_event(kb, shardreplica.node, shardreplica.shard.id)
             )
 
+            # HACK: send to nidx
+            import os
+
+            if os.environ.get("NIDX"):
+                from nucliadb_utils.nats import NatsConnectionManager
+
+                storage = await get_storage()
+                storage.indexing_bucket = "fake"
+                indexpb = IndexMessage()
+
+                storage_key = await storage.indexing(
+                    resource, txid, partition, kb=kb, logical_shard=shard.shard
+                )
+
+                indexpb.typemessage = TypeMessage.CREATION
+                indexpb.storage_key = storage_key
+                indexpb.kbid = kb
+                if partition:
+                    indexpb.partition = partition
+                indexpb.source = source
+                indexpb.resource = resource.resource.uuid
+
+                nats = NatsConnectionManager(
+                    service_name="nidx",
+                    nats_servers=["nats://localhost:4222"],
+                )
+                await nats.initialize()
+
+                for replica_id, node_id in self.indexing_replicas(shard):
+                    indexpb.node = node_id
+                    indexpb.shard = replica_id
+                    await nats.js.publish("nidx", indexpb.SerializeToString())
+
 
 def get_all_shard_nodes(
     shard: writer_pb2.ShardObject,

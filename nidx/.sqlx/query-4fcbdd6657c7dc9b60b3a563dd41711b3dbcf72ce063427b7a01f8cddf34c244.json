@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO deletions (index_id, seq, keys) VALUES ($1, $2, $3) RETURNING *",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "seq",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "keys",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4fcbdd6657c7dc9b60b3a563dd41711b3dbcf72ce063427b7a01f8cddf34c244"
+}

@@ -27,15 +27,34 @@ jobs:
   clippy-rust:
     name: "Pre-checks: Clippy lint"
     runs-on: ubuntu-latest
-    permissions: write-all
     steps:
       - uses: actions/checkout@v4
       - run: rustup component add clippy
       - uses: Swatinem/rust-cache@v2
-      - uses: actions-rs/clippy-check@v1
+      - name: clippy
+        run: cargo clippy
+
+  nidx-format-rust:
+    name: "nidx: Rust code Format"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: rustfmt
+        run: cd nidx && cargo fmt --check
+
+  nidx-clippy-rust:
+    name: "nidx: Clippy lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add clippy
+      - uses: Swatinem/rust-cache@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-targets
+          workspaces: nidx
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+      - name: clippy
+        run: cd nidx && cargo clippy
 
   updated-protos:
     name: "Pre-checks: Protos up-to-date"
@@ -213,7 +232,6 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-
   nucliadb-search-tests:
     name: NucliaDB search tests
     runs-on: ubuntu-latest
@@ -262,14 +280,36 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
-    - uses: actions-rs/cargo@v1
-      env:
-        RUST_BACKTRACE: 1
-      name: cargo test
-      with:
-        command: test
-        args: --workspace --all-features
+    - name: test
+      run: cargo test --workspace --all-features
 
+  nidx-tests:
+    name: nidx tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 1s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: nidx
+    - name: Install Protoc
+      uses: arduino/setup-protoc@v3
+    - name: test
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
+        SQLX_OFFLINE: true
+      run: cd nidx && cargo test --workspace --all-features
 
   nucliadb-tests:
     name: NucliaDB tests
@@ -317,7 +357,6 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-
   nucliadb-components-tests:
     name: NucliaDB components tests
     runs-on: ubuntu-latest
@@ -359,7 +398,6 @@ jobs:
           flags: nucliadb-${{ matrix.component }}
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
 
   python-packages-tests:
     name: Python packages tests
