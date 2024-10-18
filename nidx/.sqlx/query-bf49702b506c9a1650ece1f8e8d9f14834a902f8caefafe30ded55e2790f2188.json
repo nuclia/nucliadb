@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM deletions WHERE index_id = $1 AND seq <= $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "seq",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "keys",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bf49702b506c9a1650ece1f8e8d9f14834a902f8caefafe30ded55e2790f2188"
+}
