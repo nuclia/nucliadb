@@ -23,10 +23,10 @@ pub mod reader;
 pub mod writer;
 
 pub mod replication;
-pub mod state;
+mod state;
 
 use crate::config::VectorConfig;
-pub use crate::data_types::dtrie_ram::DTrie;
+use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::formula::Formula;
 use crate::VectorR;
