@@ -17,7 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use super::{index::*, NidxMetadata};
+use super::index::*;
+use sqlx::{Executor, Postgres};
 use uuid::Uuid;
 
 pub struct Shard {
@@ -26,21 +27,21 @@ pub struct Shard {
 }
 
 impl Shard {
-    pub async fn create(meta: &NidxMetadata, kbid: Uuid) -> Result<Shard, sqlx::Error> {
-        sqlx::query_as!(Shard, "INSERT INTO shards (kbid) VALUES ($1) RETURNING *", kbid).fetch_one(&meta.pool).await
+    pub async fn create(meta: impl Executor<'_, Database = Postgres>, kbid: Uuid) -> Result<Shard, sqlx::Error> {
+        sqlx::query_as!(Shard, "INSERT INTO shards (kbid) VALUES ($1) RETURNING *", kbid).fetch_one(meta).await
     }
 
-    pub async fn get(meta: &NidxMetadata, id: Uuid) -> Result<Shard, sqlx::Error> {
-        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_one(&meta.pool).await
+    pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> Result<Shard, sqlx::Error> {
+        sqlx::query_as(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_one(meta).await
     }
 
-    pub async fn indexes(&self, meta: &NidxMetadata) -> sqlx::Result<Vec<Index>> {
+    pub async fn indexes(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
             r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes where shard_id = $1"#,
             self.id
         )
-        .fetch_all(&meta.pool)
+        .fetch_all(meta)
         .await
     }
 }
