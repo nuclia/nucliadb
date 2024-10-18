@@ -32,7 +32,7 @@ impl Shard {
     }
 
     pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> Result<Shard, sqlx::Error> {
-        sqlx::query_as(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_one(meta).await
+        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_one(meta).await
     }
 
     pub async fn indexes(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Index>> {
