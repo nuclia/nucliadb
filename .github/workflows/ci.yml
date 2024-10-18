@@ -49,6 +49,8 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup component add clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nidx
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
       - name: clippy
@@ -289,14 +291,18 @@ jobs:
         image: postgres:15
         env:
           POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 1s
           --health-timeout 5s
           --health-retries 10
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: nidx
     - name: Install Protoc
       uses: arduino/setup-protoc@v3
     - name: test
