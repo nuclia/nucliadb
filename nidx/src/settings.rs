@@ -1,9 +1,3 @@
-use std::sync::Arc;
-
-use object_store::aws::AmazonS3Builder;
-use object_store::local::LocalFileSystem;
-use object_store::memory::InMemory;
-use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -23,11 +17,17 @@ use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as base64;
 use base64::Engine;
+use object_store::aws::AmazonS3Builder;
+use object_store::local::LocalFileSystem;
+use object_store::memory::InMemory;
+use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
 use serde::Deserialize;
 use serde_with::with_prefix;
+
 #[derive(Deserialize, Debug)]
 #[serde(tag = "object_store", rename_all = "lowercase")]
 pub enum ObjectStoreConfig {

@@ -73,15 +73,15 @@ mod tests {
     async fn create_and_find_index(pool: sqlx::PgPool) {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
-        let shard = Shard::create(&meta, kbid).await.unwrap();
+        let shard = Shard::create(&meta.pool, kbid).await.unwrap();
         assert_eq!(shard.kbid, kbid);
 
-        let index = Index::create(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
         assert_eq!(index.shard_id, shard.id);
         assert_eq!(index.kind, IndexKind::Vector);
         assert_eq!(index.name, Some("multilingual".into()));
 
-        let found = Index::find(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let found = Index::find(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
         assert_eq!(found.id, index.id);
         assert_eq!(found.shard_id, shard.id);
         assert_eq!(found.kind, IndexKind::Vector);
