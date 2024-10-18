@@ -25,12 +25,11 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union, cast
 import yaml
 from pydantic import BaseModel
 
-from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.search import logger
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image

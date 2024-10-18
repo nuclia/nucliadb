@@ -21,8 +21,8 @@ import asyncio
 from contextvars import ContextVar
 from typing import Optional
 
+from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.orm.resource import FIELD_TYPE_STR_TO_PB
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import managed_serialize
 from nucliadb.search import SERVICE_NAME, logger

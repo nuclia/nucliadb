@@ -23,19 +23,19 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
-BASE_LABELS: dict[str, list[str]] = {
-    "t": [],  # doc tags
-    "l": [],  # doc labels
-    "n": [],  # type of element: i (Icon). s (Processing Status)
-    "e": [],  # entities e/type/entityid
-    "s": [],  # languages p (Principal) s (ALL)
-    "u": [],  # contributors s (Source) o (Origin)
-    "f": [],  # field keyword field (field/keyword)
-    "fg": [],  # field keyword (keywords) flat
-    "m": [],  # origin metadata in the form of (key/value). Max key/value size is 255
-    "p": [],  # origin metadata in the form of (key/value). Max key/value size is 255
-    "k": [],  # kind of text paragraph to be stored
-    "q": [],  # reserved for internal use: h (hidden)
+BASE_LABELS: dict[str, set[str]] = {
+    "t": set(),  # doc tags
+    "l": set(),  # doc labels
+    "n": set(),  # type of element: i (Icon). s (Processing Status)
+    "e": set(),  # entities e/type/entityid
+    "s": set(),  # languages p (Principal) s (ALL)
+    "u": set(),  # contributors s (Source) o (Origin)
+    "f": set(),  # field keyword field (field/keyword)
+    "fg": set(),  # field keyword (keywords) flat
+    "m": set(),  # origin metadata in the form of (key/value). Max key/value size is 255
+    "p": set(),  # origin metadata in the form of (key/value). Max key/value size is 255
+    "k": set(),  # kind of text paragraph to be stored
+    "q": set(),  # reserved for internal use: h (hidden)
 }
 
 
@@ -81,7 +81,7 @@ def translate_system_to_alias_label(label: str) -> str:
         return label
 
 
-def flatten_resource_labels(tags_dict: dict[str, list[str]]) -> list[str]:
+def flatten_resource_labels(tags_dict: dict[str, set[str]]) -> list[str]:
     flat_tags = []
     for key, values in tags_dict.items():
         for value in values:
