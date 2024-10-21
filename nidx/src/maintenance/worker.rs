@@ -23,6 +23,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 use futures::TryStreamExt;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
+use tokio::task::JoinSet;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::SyncIoBridge;
 use tracing::*;
@@ -84,8 +85,8 @@ pub async fn download_segment(
 
 pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObjectStore>) -> anyhow::Result<()> {
     // TODO: It's weird that we take the index_id from the first segment. Maybe add a job param and check here? Should jobs be generic or keep the merge_job idea?
-    let segments = job.segments(meta).await?;
-    let index = Index::get(meta, segments[0].index_id).await?;
+    let segments = job.segments(&meta.pool).await?;
+    let index = Index::get(&meta.pool, segments[0].index_id).await?;
     for s in &segments {
         assert!(s.index_id == index.id);
     }
@@ -93,18 +94,13 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let work_dir: tempfile::TempDir = tempdir()?;
 
     // Download segments
-    let downloads: Vec<_> = segments
-        .iter()
-        .enumerate()
-        .map(|(i, s)| {
-            let storage = storage.clone();
-            let work_dir = work_dir.path().join(i.to_string());
-            tokio::spawn(download_segment(storage, s.id, work_dir))
-        })
-        .collect();
-    for d in downloads {
-        d.await??;
-    }
+    let mut download_tasks = JoinSet::new();
+    segments.iter().enumerate().for_each(|(i, s)| {
+        let storage = storage.clone();
+        let work_dir = work_dir.path().join(i.to_string());
+        download_tasks.spawn(download_segment(storage, s.id, work_dir));
+    });
+    download_tasks.join_all().await;
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
     let ssegments = &segments
@@ -114,14 +110,14 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
         .collect::<Vec<_>>();
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 
-    let index = Index::get(meta, segments[0].index_id).await?;
+    let index = Index::get(&meta.pool, segments[0].index_id).await?;
     let (merged, merged_records) = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?,
         _ => unimplemented!(),
     };
 
     // Upload
-    let segment = Segment::create(meta, segments[0].index_id, job.seq).await?;
+    let segment = Segment::create(&meta.pool, segments[0].index_id, job.seq).await?;
     let size = pack_and_upload(storage, &work_dir.path().join(merged), segment.id.storage_key()).await?;
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at

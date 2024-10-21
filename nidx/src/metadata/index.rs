@@ -17,8 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use super::{segment::Segment, NidxMetadata};
-use sqlx::{self, types::JsonValue};
+use super::segment::Segment;
+use sqlx::{self, types::JsonValue, Executor, Postgres};
 use uuid::Uuid;
 
 #[derive(sqlx::Type, Copy, Clone, PartialEq, Debug)]
@@ -49,7 +49,7 @@ pub struct Index {
 
 impl Index {
     pub async fn create(
-        meta: &NidxMetadata,
+        meta: impl Executor<'_, Database = Postgres>,
         shard_id: Uuid,
         kind: IndexKind,
         name: Option<&str>,
@@ -60,7 +60,7 @@ impl Index {
             kind as IndexKind,
             name
         )
-        .fetch_one(&meta.pool)
+        .fetch_one(meta)
         .await?
         .into();
         Ok(Index {
@@ -72,7 +72,12 @@ impl Index {
         })
     }
 
-    pub async fn find(meta: &NidxMetadata, shard_id: Uuid, kind: IndexKind, name: Option<&str>) -> sqlx::Result<Index> {
+    pub async fn find(
+        meta: impl Executor<'_, Database = Postgres>,
+        shard_id: Uuid,
+        kind: IndexKind,
+        name: Option<&str>,
+    ) -> sqlx::Result<Index> {
         sqlx::query_as!(
             Index,
             r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3"#,
@@ -80,33 +85,33 @@ impl Index {
             kind as IndexKind,
             name
         )
-        .fetch_one(&meta.pool)
+        .fetch_one(meta)
         .await
     }
 
-    pub async fn for_shard(meta: &NidxMetadata, shard_id: Uuid) -> sqlx::Result<Vec<Index>> {
+    pub async fn for_shard(meta: impl Executor<'_, Database = Postgres>, shard_id: Uuid) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
             r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE shard_id = $1"#,
             shard_id
         )
-        .fetch_all(&meta.pool)
+        .fetch_all(meta)
         .await
     }
 
-    pub async fn get(meta: &NidxMetadata, id: IndexId) -> sqlx::Result<Index> {
+    pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: IndexId) -> sqlx::Result<Index> {
         sqlx::query_as!(
             Index,
             r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE id = $1"#,
             id as IndexId
         )
-        .fetch_one(&meta.pool)
+        .fetch_one(meta)
         .await
     }
 
-    pub async fn segments(&self, meta: &NidxMetadata) -> sqlx::Result<Vec<Segment>> {
+    pub async fn segments(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Segment>> {
         sqlx::query_as!(Segment, r#"SELECT * FROM segments WHERE index_id = $1"#, self.id as IndexId)
-            .fetch_all(&meta.pool)
+            .fetch_all(meta)
             .await
     }
 }

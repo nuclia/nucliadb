@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use super::{IndexId, NidxMetadata};
+use super::IndexId;
 use nidx_types::Seq;
 use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 
@@ -51,14 +51,18 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub async fn create(meta: &NidxMetadata, index_id: IndexId, seq: Seq) -> sqlx::Result<Segment> {
+    pub async fn create(
+        meta: impl Executor<'_, Database = Postgres>,
+        index_id: IndexId,
+        seq: Seq,
+    ) -> sqlx::Result<Segment> {
         sqlx::query_as!(
             Segment,
             r#"INSERT INTO segments (index_id, seq) VALUES ($1, $2) RETURNING *"#,
             index_id as IndexId,
             i64::from(&seq)
         )
-        .fetch_one(&meta.pool)
+        .fetch_one(meta)
         .await
     }
 
