@@ -230,6 +230,7 @@ jobs:
   upload-chart-nidx:
     name: Upload nidx chart
     runs-on: ubuntu-latest
+    if: inputs.environment == 'dev'
     needs:
       - build-nidx-image
     steps:
@@ -281,10 +282,12 @@ jobs:
   deploy-nucliadb-components:
     name: Deploy NucliaDB components
     runs-on: ubuntu-latest
+    if: ${{ !failure() && !cancelled() }}
     needs:
       - upload-chart-nucliadb-shared
       - upload-charts-nucliadb-component
       - upload-chart-nucliadb-node
+      - upload-chart-nidx
     steps:
       - name: Generate a token
         id: app-token
@@ -305,6 +308,11 @@ jobs:
             {
               "commit-sha": "${{ github.sha }}",
               "components": [
+                ${{ needs.upload-chart-nidx.result == 'skipped' && ' ' || format('{{
+                  "chart-version": "{0}",
+                  "component": "nidx",
+                  "component-type": "regional"
+                }},', needs.upload-charts-nucliadb-component.outputs.version_number) }}
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
                   "component": "nucliadb_shared",
