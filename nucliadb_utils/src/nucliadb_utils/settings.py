@@ -109,6 +109,10 @@ class StorageSettings(BaseSettings):
         default=None,
         description="If using LOCAL `file_backend` storage, directory where files should be stored",
     )
+    local_indexing_bucket: Optional[str] = Field(
+        default=None,
+        description="If using LOCAL `file_backend` storage, subdirectory where indexing data is stored",
+    )
     upload_token_expiration: int = Field(
         default=3,
         description="Number of days that uploaded files are kept in Nulia's processing engine",
@@ -182,6 +186,7 @@ class IndexingSettings(BaseSettings):
     index_jetstream_servers: List[str] = []
     index_jetstream_auth: Optional[str] = None
     index_local: bool = False
+    index_nidx_subject: Optional[str] = None
 
 
 indexing_settings = IndexingSettings()

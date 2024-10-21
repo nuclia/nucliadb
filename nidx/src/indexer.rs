@@ -21,7 +21,6 @@ use crate::upload::pack_and_upload;
 use crate::{metadata::*, Settings};
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
-use async_nats::Message;
 use futures::stream::StreamExt;
 use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
@@ -63,10 +62,15 @@ pub async fn run() -> anyhow::Result<()> {
             let _ = msg.ack().await;
             continue;
         }
-        info!(?seq, "Processing indexing message");
+
         let (msg, acker) = msg.split();
 
-        let resource = match download_message(indexer_storage.clone(), msg).await {
+        let Ok(index_message) = IndexMessage::decode(msg.payload) else {
+            warn!("Error decoding index message");
+            continue;
+        };
+
+        let resource = match download_message(indexer_storage.clone(), &index_message.storage_key).await {
             Ok(r) => r,
             Err(e) => {
                 warn!("Error downloading index message {e:?}");
@@ -74,7 +78,7 @@ pub async fn run() -> anyhow::Result<()> {
             }
         };
 
-        match index_resource(&meta, segment_storage.clone(), &resource, seq).await {
+        match index_resource(&meta, segment_storage.clone(), &index_message.shard, &resource, seq).await {
             Ok(()) => {
                 if let Err(e) = acker.ack().await {
                     warn!("Error ack'ing NATS message {e:?}")
@@ -89,10 +93,8 @@ pub async fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn download_message(storage: Arc<DynObjectStore>, msg: Message) -> anyhow::Result<Resource> {
-    let index_message = IndexMessage::decode(msg.payload)?;
-
-    let get_result = storage.get(&object_store::path::Path::from(index_message.storage_key)).await?;
+pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -> anyhow::Result<Resource> {
+    let get_result = storage.get(&object_store::path::Path::from(storage_key)).await?;
     let bytes = get_result.bytes().await?;
     let resource = Resource::decode(bytes)?;
 
@@ -102,11 +104,14 @@ pub async fn download_message(storage: Arc<DynObjectStore>, msg: Message) -> any
 async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
+    shard_id: &str,
     resource: &Resource,
     seq: Seq,
 ) -> anyhow::Result<()> {
-    let shard_id = Uuid::parse_str(&resource.shard_id)?;
+    let shard_id = Uuid::parse_str(shard_id)?;
     let indexes = Index::for_shard(&meta.pool, shard_id).await?;
+
+    info!(?seq, ?shard_id, "Indexing message to shard");
 
     for index in indexes {
         let output_dir = tempfile::tempdir()?;
@@ -160,7 +165,15 @@ mod tests {
         let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
-        index_resource(&meta, storage.clone(), &little_prince(shard.id.to_string()), 123i64.into()).await.unwrap();
+        index_resource(
+            &meta,
+            storage.clone(),
+            &shard.id.to_string(),
+            &little_prince(shard.id.to_string()),
+            123i64.into(),
+        )
+        .await
+        .unwrap();
 
         let segments = index.segments(&meta.pool).await.unwrap();
         assert_eq!(segments.len(), 1);

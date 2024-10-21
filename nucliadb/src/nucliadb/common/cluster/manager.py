@@ -36,6 +36,7 @@ from nucliadb.common.cluster.exceptions import (
     ShardsNotFound,
 )
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.nidx import get_nidx
 from nucliadb_protos import (
     knowledgebox_pb2,
     nodereader_pb2,
@@ -322,6 +323,7 @@ class KBShardManager:
     ) -> None:
         indexing = get_indexing()
         storage = await get_storage()
+        nidx = get_nidx()
 
         await storage.delete_indexing(resource_uid=uuid, txid=txid, kb=kb, logical_shard=shard.shard)
 
@@ -335,6 +337,17 @@ class KBShardManager:
             indexpb.partition = partition
             indexpb.kbid = kb
             await indexing.index(indexpb, node_id)
+
+        if nidx is not None:
+            indexpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
+            indexpb.node = node_id
+            indexpb.shard = shard.shard
+            indexpb.txid = txid
+            indexpb.resource = uuid
+            indexpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
+            indexpb.partition = partition
+            indexpb.kbid = kb
+            await nidx.index(indexpb)
 
     async def add_resource(
         self,
@@ -356,7 +369,7 @@ class KBShardManager:
 
         storage = await get_storage()
         indexing = get_indexing()
-
+        nidx = get_nidx()
         indexpb = IndexMessage()
 
         if reindex_id is not None:
@@ -382,6 +395,10 @@ class KBShardManager:
             indexpb.node = node_id
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
+
+        if nidx is not None:
+            indexpb.shard = shard.shard
+            await nidx.index(indexpb)
 
     def should_create_new_shard(self, num_paragraphs: int) -> bool:
         return num_paragraphs > settings.max_shard_paragraphs
@@ -482,6 +499,17 @@ class StandaloneKBShardManager(KBShardManager):
                 self._resource_change_event(kb, shardreplica.node, shardreplica.shard.id)
             )
 
+        nidx = get_nidx()
+        if nidx is not None:
+            indexpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
+            indexpb.shard = shard.shard
+            indexpb.txid = txid
+            indexpb.resource = uuid
+            indexpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
+            indexpb.partition = partition
+            indexpb.kbid = kb
+            await nidx.index(indexpb)
+
     @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
     async def add_resource(
         self,
@@ -508,38 +536,22 @@ class StandaloneKBShardManager(KBShardManager):
                 self._resource_change_event(kb, shardreplica.node, shardreplica.shard.id)
             )
 
-            # HACK: send to nidx
-            import os
+        nidx = get_nidx()
+        storage = await get_storage()
+        if nidx is not None:
+            indexpb = IndexMessage()
+            storage_key = await storage.indexing(
+                resource, txid, partition, kb=kb, logical_shard=shard.shard
+            )
 
-            if os.environ.get("NIDX"):
-                from nucliadb_utils.nats import NatsConnectionManager
+            indexpb.typemessage = TypeMessage.CREATION
+            indexpb.storage_key = storage_key
+            indexpb.kbid = kb
+            indexpb.source = source
+            indexpb.resource = resource.resource.uuid
+            indexpb.shard = shard.shard
 
-                storage = await get_storage()
-                storage.indexing_bucket = "fake"
-                indexpb = IndexMessage()
-
-                storage_key = await storage.indexing(
-                    resource, txid, partition, kb=kb, logical_shard=shard.shard
-                )
-
-                indexpb.typemessage = TypeMessage.CREATION
-                indexpb.storage_key = storage_key
-                indexpb.kbid = kb
-                if partition:
-                    indexpb.partition = partition
-                indexpb.source = source
-                indexpb.resource = resource.resource.uuid
-
-                nats = NatsConnectionManager(
-                    service_name="nidx",
-                    nats_servers=["nats://localhost:4222"],
-                )
-                await nats.initialize()
-
-                for replica_id, node_id in self.indexing_replicas(shard):
-                    indexpb.node = node_id
-                    indexpb.shard = replica_id
-                    await nats.js.publish("nidx", indexpb.SerializeToString())
+            await nidx.index(indexpb)
 
 
 def get_all_shard_nodes(
