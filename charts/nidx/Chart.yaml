@@ -1,6 +1,6 @@
 apiVersion: v1
-description: nidx indexer chart
-name: nidx_indexer
+description: nidx chart
+name: nidx
 version: 99999.99999.99999
 appVersion: 99999.99999.99999
 keywords:
