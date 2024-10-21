@@ -218,10 +218,11 @@ class LocalStorage(Storage):
     field_klass = LocalStorageField
     chunk_size = CHUNK_SIZE
 
-    def __init__(self, local_testing_files: str):
+    def __init__(self, local_testing_files: str, indexing_bucket: Optional[str]):
         self.local_testing_files = local_testing_files.rstrip("/")
         self.bucket_format = "ndb_{kbid}"
         self.source = CloudFile.LOCAL
+        self.indexing_bucket = indexing_bucket
 
     async def initialize(self):
         pass
