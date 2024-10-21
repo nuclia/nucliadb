@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nidx-indexer
+  labels:
+    app: nidx-indexer
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nidx-indexer
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      name: nidx-indexer
+      annotations:
+        {{- with .Values.excludeOutboundPorts }}
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ . }}"
+        {{- end }}
+        {{- with .Values.excludeInboundPorts }}
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ . }}"
+        {{- end }}
+      labels:
+        app: nidx-indexer
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.indexer.nodeSelector | nindent 8 }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.indexer.topologySpreadConstraints | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.indexer.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.indexer.tolerations | nindent 8 }}
+      dnsPolicy: ClusterFirst
+      serviceAccount: {{ .Values.indexer.serviceAccount | default "default" }}
+      containers:
+      - name: nidx-indexer
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        command: ["nidx", "indexer"]
+        env:
+          {{- include "toEnv" .Values.env | nindent 10 }}
+        ports:
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}

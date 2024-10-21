@@ -37,7 +37,7 @@ pub enum ObjectStoreConfig {
     },
     Gcs {
         bucket: String,
-        base64_creds: String,
+        base64_creds: Option<String>,
         endpoint: Option<String>,
     },
     S3 {
@@ -58,15 +58,19 @@ impl ObjectStoreConfig {
                 endpoint,
             } => {
                 let mut builder = GoogleCloudStorageBuilder::new().with_bucket_name(bucket.clone());
-                if !base64_creds.is_empty() {
-                    let service_account_key = base64.decode(base64_creds).unwrap();
-                    builder = builder.with_service_account_key(String::from_utf8(service_account_key).unwrap());
-                } else if let Some(endpoint) = endpoint {
-                    // Anonymous with local endpoint (for testing)
-                    builder = builder.with_service_account_key(
-                        format!(r#"{{"gcs_base_url": "{endpoint}", "disable_oauth": true, "private_key":"","private_key_id":"","client_email":""}}"#),
-                    );
-                }
+                match (base64_creds, endpoint) {
+                    (Some(creds), _) if !creds.is_empty() => {
+                        let service_account_key = base64.decode(creds).unwrap();
+                        builder = builder.with_service_account_key(String::from_utf8(service_account_key).unwrap());
+                    }
+                    (_, Some(endpoint)) => {
+                        // Anonymous with local endpoint (for testing)
+                        builder = builder.with_service_account_key(
+                            format!(r#"{{"gcs_base_url": "{endpoint}", "disable_oauth": true, "private_key":"","private_key_id":"","client_email":""}}"#),
+                        );
+                    }
+                    _ => {}
+                };
                 Arc::new(builder.build().unwrap())
             }
             Self::S3 {
