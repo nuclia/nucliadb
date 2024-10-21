@@ -472,7 +472,8 @@ class ResourceBrain:
             _, p1, p2 = LABEL_HIDDEN.split("/")
             self.labels[p1].add(p2)
 
-        self.compute_labels()
+        self.brain.ClearField("labels")
+        self.brain.labels.extend(flatten_resource_labels(self.labels))
 
     def process_field_metadata(
         self,
@@ -583,9 +584,6 @@ class ResourceBrain:
                             ].labels.append(label)
 
         self.brain.texts[field_key].labels.extend(flatten_resource_labels(labels))
-
-    def compute_labels(self):
-        self.brain.labels.extend(flatten_resource_labels(self.labels))
 
 
 def is_paragraph_repeated_in_field(
