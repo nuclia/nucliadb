@@ -16,12 +16,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from unittest.mock import patch
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
 
+from nucliadb_telemetry import context
 from nucliadb_telemetry.fastapi.context import ContextInjectorMiddleware
 
 app = FastAPI()
@@ -34,12 +34,23 @@ def get_kb(kbid: str):
 
 @pytest.mark.asyncio
 async def test_context_injected():
-    app.add_middleware(ContextInjectorMiddleware)
+    scope = {
+        "app": app,
+        "path": "/api/v1/kb/123",
+        "method": "GET",
+        "type": "http",
+    }
 
-    transport = ASGITransport(app=app)  # type: ignore
-    client = AsyncClient(transport=transport, base_url="http://test/api/v1")
+    mdlw = ContextInjectorMiddleware(app)
 
-    with patch("nucliadb_telemetry.fastapi.context.context.add_context") as add_context:
-        await client.get("/kb/123")
-        assert add_context.call_count == 1
-        assert add_context.call_args[0][0] == {"kbid": "123"}
+    found_ctx = {}
+
+    async def receive(*args, **kwargs):
+        found_ctx.update(context.get_context())
+        return {
+            "type": "http.disconnect",
+        }
+
+    await mdlw(scope, receive, AsyncMock())
+
+    assert found_ctx == {"kbid": "123"}
