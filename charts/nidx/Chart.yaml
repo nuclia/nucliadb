@@ -1,0 +1,15 @@
+apiVersion: v1
+description: nidx indexer chart
+name: nidx_indexer
+version: 99999.99999.99999
+appVersion: 99999.99999.99999
+keywords:
+  - nucliadb
+  - nuclia
+home: https://nuclia.com
+icon: https://nuclia.com/wp-content/uploads/2021/12/logo-fooer.png
+sources:
+  - https://github.com/nuclia/nucliadb
+maintainers:
+  - name: Nuclia
+    email: nucliadb@nuclia.com
