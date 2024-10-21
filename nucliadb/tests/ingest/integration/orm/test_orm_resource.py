@@ -427,6 +427,8 @@ async def test_generate_index_message_contains_all_metadata(
         "/o/My Source",
         "/n/s/PROCESSED",
     }
+    # Make sure there are no duplicates
+    assert len(index_message.labels) == len(set(index_message.labels))
 
     # Check texts are populated with field extracted text and field computed labels
     expected_fields = {

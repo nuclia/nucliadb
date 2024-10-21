@@ -106,7 +106,7 @@ async fn index_resource(
     seq: Seq,
 ) -> anyhow::Result<()> {
     let shard_id = Uuid::parse_str(&resource.shard_id)?;
-    let indexes = Index::for_shard(meta, shard_id).await?;
+    let indexes = Index::for_shard(&meta.pool, shard_id).await?;
 
     for index in indexes {
         let output_dir = tempfile::tempdir()?;
@@ -116,7 +116,7 @@ async fn index_resource(
         }
 
         // Create the segment first so we can track it if the upload gets interrupted
-        let segment = Segment::create(meta, index.id, seq).await?;
+        let segment = Segment::create(&meta.pool, index.id, seq).await?;
         let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
 
         // Mark the segment as visible and write the deletions at the same time
@@ -156,13 +156,13 @@ mod tests {
     async fn test_index_resource(pool: sqlx::PgPool) {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
-        let shard = Shard::create(&meta, kbid).await.unwrap();
-        let index = Index::create(&meta, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let shard = Shard::create(&meta.pool, kbid).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
         index_resource(&meta, storage.clone(), &little_prince(shard.id.to_string()), 123i64.into()).await.unwrap();
 
-        let segments = index.segments(&meta).await.unwrap();
+        let segments = index.segments(&meta.pool).await.unwrap();
         assert_eq!(segments.len(), 1);
 
         let segment = &segments[0];
