@@ -339,15 +339,15 @@ class KBShardManager:
             await indexing.index(indexpb, node_id)
 
         if nidx is not None:
-            indexpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
-            indexpb.node = node_id
-            indexpb.shard = shard.shard
-            indexpb.txid = txid
-            indexpb.resource = uuid
-            indexpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
-            indexpb.partition = partition
-            indexpb.kbid = kb
-            await nidx.index(indexpb)
+            nidxpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
+            nidxpb.node = node_id
+            nidxpb.shard = shard.shard
+            nidxpb.txid = txid
+            nidxpb.resource = uuid
+            nidxpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
+            nidxpb.partition = partition
+            nidxpb.kbid = kb
+            await nidx.index(nidxpb)
 
     async def add_resource(
         self,
@@ -537,8 +537,8 @@ class StandaloneKBShardManager(KBShardManager):
             )
 
         nidx = get_nidx()
-        storage = await get_storage()
         if nidx is not None:
+            storage = await get_storage()
             indexpb = IndexMessage()
             storage_key = await storage.indexing(
                 resource, txid, partition, kb=kb, logical_shard=shard.shard
