@@ -228,7 +228,7 @@ jobs:
           curl --data-binary "@nucliadb_${{ matrix.component }}-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
 
   upload-chart-nidx:
-    name: Upload Node chart
+    name: Upload nidx chart
     runs-on: ubuntu-latest
     needs:
       - build-nidx-image
@@ -255,7 +255,7 @@ jobs:
         env:
           CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#node:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nidx/values.yaml
+          sed -i.bak "s#IMAGE_TO_REPLACE#nidx:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nidx/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nidx/values.yaml
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
