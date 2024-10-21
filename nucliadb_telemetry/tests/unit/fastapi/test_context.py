@@ -33,7 +33,7 @@ def get_kb(kbid: str):
 
 
 @pytest.mark.asyncio
-async def test_context_injected(app):
+async def test_context_injected():
     app.add_middleware(ContextInjectorMiddleware)
 
     transport = ASGITransport(app=app)  # type: ignore
