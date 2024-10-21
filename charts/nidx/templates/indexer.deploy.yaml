@@ -32,14 +32,22 @@ spec:
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
     spec:
+      {{- with .Values.indexer.nodeSelector }}
       nodeSelector:
-        {{- toYaml .Values.indexer.nodeSelector | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.indexer.topologySpreadConstraints }}
       topologySpreadConstraints:
-        {{- toYaml .Values.indexer.topologySpreadConstraints | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.indexer.affinity }}
       affinity:
-        {{- toYaml .Values.indexer.affinity | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.indexer.tolerations }}
       tolerations:
-        {{- toYaml .Values.indexer.tolerations | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       dnsPolicy: ClusterFirst
       serviceAccount: {{ .Values.indexer.serviceAccount | default "default" }}
       containers:
@@ -49,5 +57,7 @@ spec:
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
         ports:
+        {{- with .Values.indexer.resources }}
         resources:
-          {{- toYaml .Values.resources | nindent 10 }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
