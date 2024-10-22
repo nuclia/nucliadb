@@ -36,7 +36,7 @@ use crate::{
 
 pub async fn run() -> anyhow::Result<()> {
     let settings = Settings::from_env();
-    let storage = settings.indexer.as_ref().unwrap().object_store.client();
+    let storage = settings.storage.as_ref().unwrap().object_store.client();
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
 
     loop {
@@ -100,7 +100,10 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
         let work_dir = work_dir.path().join(i.to_string());
         download_tasks.spawn(download_segment(storage, s.id, work_dir));
     });
-    download_tasks.join_all().await;
+    let results = download_tasks.join_all().await;
+    for r in results {
+        r?;
+    }
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
     let ssegments = &segments
