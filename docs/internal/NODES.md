@@ -1,12 +1,12 @@
 # NODE
 
-Nodes are the underlying index that fullfills a GRPC API to deliver indexing on Text, Vectors and Relations.
+Nodes are the underlying index that fulfils a GRPC API to deliver indexing on Text, Vectors and Relations.
 
 ## Architecture
 
 Each node is composed by multiple shards and each shard have four indexes. In order to prioritize reads we split each node on three containers: reader, writer and sidecar.
 
-Reader is responsible of search functionallity via a GRPC interface, Writer is responsible on writing via a GRPC interface and Sidecar connects to a stream of indexing information and injects information on the writer.
+Reader is responsible for search functionality via a GRPC interface, Writer is responsible for writing via a GRPC interface and Sidecar connects to a stream of indexing information and injects information on the writer.
 
 <p align="center">
   <img src="../assets/images/nodes.svg" alt="Nuclia" height="200" style="background-color: white">

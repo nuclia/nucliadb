@@ -6,7 +6,7 @@ NucliaDB security model is based on three roles:
 - READER
 - WRITER
 
-Roles are passed through the HTTP Header `X-NUCLIADB-ROLES` and writen
+Roles are passed through the HTTP Header `X-NUCLIADB-ROLES` and written
 in upper case. Multiple roles can be sent appending them with
 semicolons, e.g., `X-NUCLIADB-ROLES: MANAGER;READER`.
 
