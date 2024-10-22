@@ -103,7 +103,7 @@ The hierarchy of tags is the following:
 - `/l`: user and processor provided labels: `/l/{labelset}/{label}`
   - Example: `/l/movie-genre/science-fiction`
 
-- `/n`: miscellanious resource metadata labels
+- `/n`: miscellaneous resource metadata labels
   - `/n/i`: mime type of resource
     - Example filters: `/n/i/application/pdf` or `/n/i/movie/mp4`
 
