@@ -63,7 +63,7 @@ async def _add_to_labelset_ids(txn: Transaction, *, kbid: str, labelsets: list[s
     previous = await _get_labelset_ids(txn, kbid=kbid)
     if previous is not None:
         updated.update(previous)
-    if set(previous or {}) != updated:
+    if previous is None or previous != updated:
         await _set_labelset_ids(txn, kbid=kbid, labelsets=list(updated))
 
 
