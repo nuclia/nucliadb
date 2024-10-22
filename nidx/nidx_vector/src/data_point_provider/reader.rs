@@ -20,16 +20,14 @@
 
 use crate::data_point::{self, DataPointPin, OpenDataPoint};
 pub use crate::data_point::{DpId, Neighbour};
-use crate::data_point_provider::state::read_state;
+use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
-use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::query_language::{BooleanExpression, BooleanOperation, Operator};
 use crate::utils;
 use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
-use fs2::FileExt;
 use fxhash::FxHashMap;
 use nidx_protos::prost::*;
 use nidx_protos::{
@@ -37,8 +35,6 @@ use nidx_protos::{
 };
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
 use tracing::*;
 
@@ -108,16 +104,10 @@ impl Fssc {
 
 pub struct Reader {
     config: VectorConfig,
-    path: PathBuf,
     open_data_points: FxHashMap<DpId, OpenDataPoint>,
     delete_log: DTrie,
     number_of_embeddings: usize,
     dimension: Option<usize>,
-    state_last_modified: SystemTime,
-}
-
-fn last_modified(path: &Path) -> std::io::Result<SystemTime> {
-    std::fs::metadata(path)?.modified()
 }
 
 fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
@@ -186,37 +176,19 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl Reader {
-    pub fn open(path: &Path) -> VectorR<Reader> {
-        let lock_path = path.join(OPENING_FLAG);
-        let lock_file = File::create(lock_path)?;
-        lock_file.lock_shared()?;
-
-        let config = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
-            // Old indexes may not have this file so in that case the
-            // metadata file they should have is created.
-            let metadata = VectorConfig::default();
-            IndexMetadata::write(&metadata, path).map(|_| metadata)
-        })?;
-
-        let state_path = path.join(STATE);
-        let state_last_modified = last_modified(&state_path)?;
-        let state_file = File::open(state_path)?;
-        let state = read_state(&state_file)?;
-        let data_point_list = state.data_point_list;
-        let delete_log = state.delete_log;
+    pub fn open(segments: &[DataPointPin], config: VectorConfig, delete_log: DTrie) -> VectorR<Reader> {
         let mut dimension = None;
         let mut data_point_pins = Vec::new();
         let mut open_data_points = FxHashMap::default();
         let mut number_of_embeddings = 0;
 
-        for data_point_id in data_point_list {
-            let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
-            let open_data_point = data_point::open(&data_point_pin)?;
+        for data_point_pin in segments {
+            let open_data_point = data_point::open(data_point_pin)?;
             let data_point_journal = open_data_point.journal();
 
             number_of_embeddings += data_point_journal.no_nodes();
             data_point_pins.push(data_point_pin);
-            open_data_points.insert(data_point_id, open_data_point);
+            open_data_points.insert(data_point_pin.id(), open_data_point);
         }
 
         if let Some(data_point_pin) = data_point_pins.first() {
@@ -230,8 +202,6 @@ impl Reader {
             delete_log,
             number_of_embeddings,
             dimension,
-            path: path.to_path_buf(),
-            state_last_modified,
         })
     }
 
@@ -395,22 +365,12 @@ impl Reader {
         self.number_of_embeddings
     }
 
-    pub fn location(&self) -> &Path {
-        &self.path
-    }
-
     pub fn config(&self) -> &VectorConfig {
         &self.config
     }
 
     pub fn embedding_dimension(&self) -> Option<usize> {
         self.dimension
-    }
-
-    pub fn needs_update(&self) -> VectorR<bool> {
-        let state_path = self.path.join(STATE);
-        let state_modified = last_modified(&state_path)?;
-        Ok(self.state_last_modified < state_modified)
     }
 }
 
@@ -424,13 +384,12 @@ mod tests {
 
     use super::*;
     use crate::config::{Similarity, VectorConfig, VectorType};
-    use crate::data_point_provider::writer::Writer;
     use crate::indexer::{index_resource, ResourceWrapper};
 
     #[test]
     fn test_key_prefix_search() -> anyhow::Result<()> {
         let dir = TempDir::new().unwrap();
-        let shard_path = dir.path().join("vectors");
+        let index_path = dir.path();
         let vsc = VectorConfig {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
@@ -493,15 +452,11 @@ mod tests {
             ..Default::default()
         };
 
-        let mut writer = Writer::new(&shard_path, vsc).unwrap();
-        let (Some(pin), _deletions) = index_resource(ResourceWrapper::from(&resource), &shard_path, writer.config())?
-        else {
+        let (Some(pin), _deletions) = index_resource(ResourceWrapper::from(&resource), index_path, &vsc)? else {
             panic!("No segment indexed")
         };
-        writer.add_data_point(pin)?;
-        writer.commit()?;
 
-        let reader = Reader::open(&shard_path).unwrap();
+        let reader = Reader::open(&[pin], vsc, DTrie::new()).unwrap();
         let mut request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -527,7 +482,7 @@ mod tests {
     #[test]
     fn test_new_vector_reader() -> anyhow::Result<()> {
         let dir = TempDir::new().unwrap();
-        let shard_path = dir.path().join("vectors");
+        let index_path = dir.path();
         let vsc = VectorConfig {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
@@ -590,15 +545,11 @@ mod tests {
             ..Default::default()
         };
 
-        let mut writer = Writer::new(&shard_path, vsc).unwrap();
-        let (Some(pin), _deletions) = index_resource(ResourceWrapper::from(&resource), &shard_path, writer.config())?
-        else {
+        let (Some(pin), _deletions) = index_resource(ResourceWrapper::from(&resource), index_path, &vsc)? else {
             panic!("No segment indexed")
         };
-        writer.add_data_point(pin)?;
-        writer.commit()?;
 
-        let reader = Reader::open(&shard_path).unwrap();
+        let reader = Reader::open(&[pin], vsc, DTrie::new()).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -659,7 +610,7 @@ mod tests {
     #[test]
     fn test_vectors_deduplication() -> anyhow::Result<()> {
         let dir = TempDir::new().unwrap();
-        let shard_path = dir.path().join("vectors");
+        let index_path = dir.path();
         let vsc = VectorConfig {
             similarity: Similarity::Cosine,
             normalize_vectors: false,
@@ -718,15 +669,11 @@ mod tests {
             ..Default::default()
         };
 
-        let mut writer = Writer::new(&shard_path, vsc).unwrap();
-        let (Some(pin), _deletions) = index_resource(ResourceWrapper::from(&resource), &shard_path, writer.config())?
-        else {
+        let (Some(pin), _deletions) = index_resource(ResourceWrapper::from(&resource), index_path, &vsc)? else {
             panic!("No segment indexed")
         };
-        writer.add_data_point(pin)?;
-        writer.commit()?;
 
-        let reader = Reader::open(&shard_path).unwrap();
+        let reader = Reader::open(&[pin], vsc, DTrie::new()).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),

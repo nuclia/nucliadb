@@ -23,7 +23,7 @@ use std::collections::{HashMap, HashSet};
 use nidx_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSearchRequest, VectorSentence};
 use nidx_vector::config::VectorConfig;
 use nidx_vector::data_point_provider::reader::{Reader, VectorsContext};
-use nidx_vector::data_point_provider::writer::Writer;
+use nidx_vector::data_point_provider::DTrie;
 use nidx_vector::indexer::{index_resource, ResourceWrapper};
 use nidx_vector::query_language::BooleanExpression;
 use tempfile::tempdir;
@@ -64,30 +64,26 @@ fn resource(labels: Vec<String>) -> Resource {
 #[test]
 fn test_hidden_search() -> anyhow::Result<()> {
     let workdir = tempdir()?;
-    let index_path = workdir.path().join("vectors");
-    let mut writer = Writer::new(&index_path, VectorConfig::default())?;
+    let index_path = workdir.path();
+    let config = VectorConfig::default();
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];
     let hidden_resource = resource(labels);
-    let (Some(pin), _deletions) =
-        index_resource(ResourceWrapper::from(&hidden_resource), &index_path, writer.config())?
+    let (Some(pin_hidden), _deletions) = index_resource(ResourceWrapper::from(&hidden_resource), index_path, &config)?
     else {
         panic!("No segment indexed")
     };
-    writer.add_data_point(pin)?;
 
     let visible_resource = resource(vec![]);
-    let (Some(pin), _deletions) =
-        index_resource(ResourceWrapper::from(&visible_resource), &index_path, writer.config())?
+    let (Some(pin_visible), _deletions) =
+        index_resource(ResourceWrapper::from(&visible_resource), index_path, &config)?
     else {
         panic!("No segment indexed")
     };
-    writer.add_data_point(pin)?;
-    writer.commit()?;
 
     // Find all resources
-    let reader = Reader::open(&index_path)?;
+    let reader = Reader::open(&[pin_hidden, pin_visible], config, DTrie::new())?;
     let request = VectorSearchRequest {
         vector: vec![0.5, 0.5, 0.5, 0.5],
         min_score: -1.0,
