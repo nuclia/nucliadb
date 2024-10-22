@@ -21,9 +21,7 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone)]
 pub struct DTrie {
     value: Option<SystemTime>,
     go_table: HashMap<u8, Box<DTrie>>,

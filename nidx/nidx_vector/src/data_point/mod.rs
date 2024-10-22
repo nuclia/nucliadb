@@ -41,7 +41,6 @@ use nidx_types::SegmentMetadata;
 use node::Node;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 use std::{fs, io};
@@ -233,7 +232,7 @@ impl DeleteLog for NoDLog {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Address(usize);
 impl Address {
     #[cfg(test)]

@@ -100,10 +100,6 @@ mod vector_types;
 use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum VectorErr {
-    #[error("Error using bincode: {0}")]
-    BincodeError(#[from] bincode::Error),
-    #[error("json error: {0}")]
-    SJ(#[from] serde_json::Error),
     #[error("IO error: {0}")]
     IoErr(#[from] std::io::Error),
     #[error("This index does not have an alive writer")]

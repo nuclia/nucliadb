@@ -21,13 +21,12 @@
 use std::collections::HashMap;
 
 use ops_hnsw::{Hnsw, Layer};
-use serde::{Deserialize, Serialize};
 
 use super::*;
 
 const NO_EDGES: [(Address, Edge); 0] = [];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EntryPoint {
     pub node: Address,
     pub layer: usize,

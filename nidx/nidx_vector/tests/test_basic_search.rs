@@ -38,7 +38,7 @@ fn elem(index: usize) -> Elem {
     Elem::new(format!("key_{index}"), vector, LabelDictionary::default(), None)
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct Request {
     vector: Vec<f32>,
     formula: Formula,
