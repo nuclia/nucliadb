@@ -29,6 +29,7 @@ message RelationMetadata {
     optional int32 source_end = 3;
     optional int32 to_start = 4;
     optional int32 to_end = 5;
+    optional string origin = 6; // Where this relation was computed (for Data Augmentations this will be the task id)
 }
 
 // Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index.
