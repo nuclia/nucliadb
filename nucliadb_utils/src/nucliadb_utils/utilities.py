@@ -84,6 +84,7 @@ class Utility(str, Enum):
     USAGE = "usage"
     ENDECRYPTOR = "endecryptor"
     PINECONE_SESSION = "pinecone_session"
+    NIDX = "nidx"
 
 
 def get_utility(ident: Union[Utility, str]):
@@ -165,6 +166,7 @@ async def get_storage(
 
         localutil = LocalStorage(
             local_testing_files=storage_settings.local_files,
+            indexing_bucket=storage_settings.local_indexing_bucket,
         )
         set_utility(Utility.STORAGE, localutil)
         await localutil.initialize()

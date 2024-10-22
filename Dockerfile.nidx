@@ -10,4 +10,5 @@ COPY nidx /app/nidx
 RUN cd /app/nidx && cargo build --locked --release
 
 FROM debian:bookworm-slim AS nidx
+RUN apt update && apt install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/nidx/target/release/nidx /usr/local/bin
