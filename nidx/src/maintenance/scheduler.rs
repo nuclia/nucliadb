@@ -76,8 +76,18 @@ pub async fn run() -> anyhow::Result<()> {
 
     tasks.spawn(async move {
         loop {
-            if let Err(e) = schedule_merges(&meta, &mut consumer).await {
-                warn!(?e, "Error in schedule_merges task");
+            match consumer.info().await {
+                Ok(consumer_info) => {
+                    let oldest_confirmed_seq = consumer_info.ack_floor.stream_sequence;
+                    let oldest_pending_seq = oldest_confirmed_seq + 1;
+
+                    if let Err(e) = schedule_merges(&meta, oldest_pending_seq as i64).await {
+                        warn!(?e, "Error in schedule_merges task");
+                    }
+                }
+                Err(e) => {
+                    warn!(?e, "Error while getting consumer information");
+                }
             }
             sleep(Duration::from_secs(15)).await;
         }
@@ -158,23 +168,112 @@ pub async fn purge_deletions(meta: &NidxMetadata, consumer: &mut PullConsumer) -
     Ok(())
 }
 
-pub async fn schedule_merges(meta: &NidxMetadata, consumer: &mut PullConsumer) -> anyhow::Result<()> {
-    let oldest_confirmed_seq = consumer.info().await?.ack_floor.stream_sequence;
-    let oldest_pending_seq = oldest_confirmed_seq + 1;
-
-    // Enqueue merges. Right now, merge everything that we can
+/// Enqueue merge jobs for segments older than `before_seq` that aren't already
+/// scheduled or marked to delete. Right now we merge everything that we can
+async fn schedule_merges(meta: &NidxMetadata, before_seq: i64) -> anyhow::Result<()> {
     // TODO: better merge algorithm
-    let merges = sqlx::query_scalar!(
-        r#"SELECT array_agg(id) AS "segment_ids!" FROM segments WHERE delete_at IS NULL AND merge_job_id IS NULL AND seq < $1 GROUP BY index_id"#,
-        oldest_pending_seq as i64
+    let merges = sqlx::query!(
+        r#"SELECT index_id, array_agg(id) AS "segment_ids!" FROM segments WHERE delete_at IS NULL AND merge_job_id IS NULL AND seq < $1 GROUP BY index_id"#,
+        before_seq
     )
     .fetch_all(&meta.pool)
     .await?;
     for m in merges {
-        if m.len() > 3 {
-            MergeJob::create(meta, &m, oldest_confirmed_seq as i64).await?;
+        if m.segment_ids.len() > 3 {
+            MergeJob::create(meta, m.index_id.into(), &m.segment_ids, before_seq).await?;
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod merge_scheduling {
+        use std::collections::HashSet;
+
+        use nidx_types::Seq;
+        use uuid::Uuid;
+
+        use super::*;
+
+        use crate::metadata::{Index, IndexId, IndexKind, NidxMetadata, Shard};
+
+        #[sqlx::test]
+        async fn test_schedule_merges_for_shard_with_single_index(pool: sqlx::PgPool) {
+            let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await.unwrap();
+            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+            let mut seq: i64 = 0;
+
+            for _ in 0..10 {
+                let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await.unwrap();
+                segment.mark_ready(&meta.pool, 50, 1000).await.unwrap();
+                seq += 1;
+            }
+
+            // creation of shards/indexes/segments don't trigger any merge job
+            assert!(MergeJob::take(&meta.pool).await.unwrap().is_none());
+
+            schedule_merges(&meta, 100).await.unwrap();
+
+            // one job has been scheduled for the index
+            let mut jobs = vec![];
+            while let Some(job) = MergeJob::take(&meta.pool).await.unwrap() {
+                jobs.push(job)
+            }
+            assert_eq!(jobs.len(), 1);
+            assert_eq!(IndexId::from(jobs[0].index_id), index.id);
+        }
+
+        #[sqlx::test]
+        async fn test_schedule_merges_for_shard_with_multiple_indexes(pool: sqlx::PgPool) {
+            let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await.unwrap();
+
+            let indexes = vec![
+                Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap(),
+                Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("english")).await.unwrap(),
+                Index::create(&meta.pool, shard.id, IndexKind::Text, Some("fulltext")).await.unwrap(),
+                Index::create(&meta.pool, shard.id, IndexKind::Paragraph, Some("keyword")).await.unwrap(),
+                Index::create(&meta.pool, shard.id, IndexKind::Relation, Some("relation")).await.unwrap(),
+            ];
+            let mut seq: i64 = 0;
+
+            for index in indexes.iter() {
+                for _ in 0..10 {
+                    let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await.unwrap();
+                    segment.mark_ready(&meta.pool, 50, 1000).await.unwrap();
+                    seq += 1;
+                }
+            }
+
+            schedule_merges(&meta, 100).await.unwrap();
+
+            let mut jobs = vec![];
+            while let Some(job) = MergeJob::take(&meta.pool).await.unwrap() {
+                jobs.push(job);
+            }
+
+            // scheduled a job per index
+
+            assert_eq!(jobs.len(), indexes.len());
+
+            let mut indexes_ids = HashSet::new();
+            for index in indexes.iter() {
+                indexes_ids.insert(index.id);
+            }
+
+            let mut job_indexes = HashSet::new();
+            for job in jobs.iter() {
+                job_indexes.insert(IndexId::from(job.index_id));
+            }
+
+            assert_eq!(indexes_ids, job_indexes);
+        }
+    }
 }
