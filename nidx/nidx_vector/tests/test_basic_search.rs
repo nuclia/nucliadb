@@ -25,7 +25,7 @@ use nidx_vector::data_point_provider::{DTrie, SearchRequest};
 use nidx_vector::formula::Formula;
 use nidx_vector::{
     config::{Similarity, VectorConfig},
-    data_point::{self, DataPointPin, Elem, LabelDictionary},
+    data_point::{self, Elem, LabelDictionary},
     data_point_provider::reader::Reader,
 };
 use rstest::rstest;
@@ -72,7 +72,7 @@ fn test_basic_search(
     #[values(VectorType::DenseF32Unaligned, VectorType::DenseF32 { dimension: DIMENSION })] vector_type: VectorType,
 ) -> anyhow::Result<()> {
     let workdir = tempdir()?;
-    let index_path = workdir.path();
+    let segment_path = workdir.path();
     let config = VectorConfig {
         similarity,
         vector_type,
@@ -80,11 +80,10 @@ fn test_basic_search(
     };
 
     // Write some data
-    let data_point_pin = DataPointPin::create_pin(index_path)?;
-    data_point::create(&data_point_pin, (0..DIMENSION).map(elem).collect(), None, &config, HashSet::new())?;
+    data_point::create(segment_path, (0..DIMENSION).map(elem).collect(), None, &config, HashSet::new())?;
 
     // Search for a specific element
-    let reader = Reader::open(&[data_point_pin], config, DTrie::new())?;
+    let reader = Reader::open(&[segment_path], config, DTrie::new())?;
     let search_for = elem(5);
     let results = reader._search(
         &Request {

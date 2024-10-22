@@ -63,27 +63,20 @@ fn resource(labels: Vec<String>) -> Resource {
 
 #[test]
 fn test_hidden_search() -> anyhow::Result<()> {
-    let workdir = tempdir()?;
-    let index_path = workdir.path();
     let config = VectorConfig::default();
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];
     let hidden_resource = resource(labels);
-    let (Some(pin_hidden), _deletions) = index_resource(ResourceWrapper::from(&hidden_resource), index_path, &config)?
-    else {
-        panic!("No segment indexed")
-    };
+    let hidden_dir = tempdir()?;
+    index_resource(ResourceWrapper::from(&hidden_resource), hidden_dir.path(), &config)?;
 
     let visible_resource = resource(vec![]);
-    let (Some(pin_visible), _deletions) =
-        index_resource(ResourceWrapper::from(&visible_resource), index_path, &config)?
-    else {
-        panic!("No segment indexed")
-    };
+    let visible_dir = tempdir()?;
+    index_resource(ResourceWrapper::from(&visible_resource), visible_dir.path(), &config)?;
 
     // Find all resources
-    let reader = Reader::open(&[pin_hidden, pin_visible], config, DTrie::new())?;
+    let reader = Reader::open(&[hidden_dir.path(), visible_dir.path()], config, DTrie::new())?;
     let request = VectorSearchRequest {
         vector: vec![0.5, 0.5, 0.5, 0.5],
         min_score: -1.0,

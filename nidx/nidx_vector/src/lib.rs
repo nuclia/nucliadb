@@ -19,7 +19,7 @@
 //
 
 use config::VectorConfig;
-use data_point::{open, DataPointPin};
+use data_point::open;
 use data_point_provider::reader::TimeSensitiveDLog;
 use indexer::index_resource;
 use nidx_protos::Resource;
@@ -31,17 +31,10 @@ pub struct VectorIndexer;
 
 impl VectorIndexer {
     pub fn index_resource(&self, output_dir: &Path, resource: &Resource) -> VectorR<(i64, Vec<String>)> {
-        let tmp = tempfile::tempdir()?;
-
         // Index resource
-        let (segment, deletions) = index_resource(resource.into(), tmp.path(), &VectorConfig::default()).unwrap();
+        let (records, deletions) = index_resource(resource.into(), output_dir, &VectorConfig::default()).unwrap();
 
-        let Some(segment) = segment else {
-            return Ok((0, resource.sentences_to_delete.clone()));
-        };
-        std::fs::rename(tmp.path().join(segment.id().to_string()), output_dir)?;
-
-        Ok((segment.read_journal()?.no_nodes() as i64, deletions))
+        Ok((records as i64, deletions))
     }
 
     pub fn merge(
@@ -49,7 +42,7 @@ impl VectorIndexer {
         work_dir: &Path,
         segments: &[(PathBuf, Seq, i64)],
         deletions: &Vec<(Seq, &Vec<String>)>,
-    ) -> VectorR<(String, usize)> {
+    ) -> VectorR<usize> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
         // Wait and see how the Tantivy indexes turn out
         let mut delete_log = data_point_provider::DTrie::new();
@@ -63,14 +56,8 @@ impl VectorIndexer {
         // Rename (nidx_vector wants uuid, we use i64 as segment ids) and open the segments
         let segment_ids: Vec<_> = segments
             .iter()
-            .map(|(segment_path, seq, _)| {
-                let uuid = uuid::Uuid::new_v4();
-                std::fs::rename(segment_path, work_dir.join(uuid.to_string())).unwrap();
-                (uuid, seq)
-            })
-            .map(|(dpid, seq)| {
-                let dp = data_point::DataPointPin::open_pin(work_dir, dpid).unwrap();
-                let open_dp = open(&dp).unwrap();
+            .map(|(segment_path, seq, _records)| {
+                let open_dp = open(segment_path).unwrap();
                 (
                     TimeSensitiveDLog {
                         dlog: &delete_log,
@@ -82,15 +69,14 @@ impl VectorIndexer {
             .collect();
 
         // Do the merge
-        let destination = DataPointPin::create_pin(work_dir).unwrap();
         let open_destination = data_point::merge(
-            &destination,
+            work_dir,
             &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(),
             &VectorConfig::default(),
             SystemTime::now(),
         )?;
 
-        Ok((destination.id().to_string(), open_destination.journal().no_nodes()))
+        Ok(open_destination.journal().no_nodes())
     }
 }
 

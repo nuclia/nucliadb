@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::config::VectorConfig;
-use crate::data_point::{self, DataPointPin, Elem, LabelDictionary};
+use crate::data_point::{self, Elem, LabelDictionary};
 use crate::utils;
 use anyhow::anyhow;
 use nidx_protos::{noderesources, prost::*};
@@ -106,7 +106,7 @@ pub fn index_resource(
     resource: ResourceWrapper,
     output_path: &Path,
     config: &VectorConfig,
-) -> anyhow::Result<(Option<DataPointPin>, Vec<String>)> {
+) -> anyhow::Result<(usize, Vec<String>)> {
     let time = Instant::now();
 
     let id = resource.id();
@@ -149,16 +149,16 @@ pub fn index_resource(
         return Err(anyhow!("Inconsistent dimensions on insert"));
     }
 
-    let mut segment = None;
-    if !elems.is_empty() {
+    let records = if !elems.is_empty() {
         let tags = resource.labels().iter().filter(|t| SEGMENT_TAGS.contains(&t.as_str())).cloned().collect();
-        let pin = DataPointPin::create_pin(output_path)?;
-        data_point::create(&pin, elems, None, config, tags)?;
-        segment = Some(pin);
-    }
+        let data_point = data_point::create(output_path, elems, None, config, tags)?;
+        data_point.journal().no_nodes()
+    } else {
+        0
+    };
 
     let v = time.elapsed().as_millis();
     debug!("{id:?} - Main index set resource: ends {v} ms");
 
-    Ok((segment, resource.sentences_to_delete().map(|d| d.to_owned()).collect()))
+    Ok((records, resource.sentences_to_delete().map(|d| d.to_owned()).collect()))
 }

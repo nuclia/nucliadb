@@ -111,14 +111,14 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 
     let index = Index::get(&meta.pool, segments[0].index_id).await?;
-    let (merged, merged_records) = match index.kind {
+    let merged_records = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?,
         _ => unimplemented!(),
     };
 
     // Upload
     let segment = Segment::create(&meta.pool, segments[0].index_id, job.seq).await?;
-    let size = pack_and_upload(storage, &work_dir.path().join(merged), segment.id.storage_key()).await?;
+    let size = pack_and_upload(storage, work_dir.path(), segment.id.storage_key()).await?;
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at
     let mut tx = meta.transaction().await?;
