@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nidx-scheduler
+  labels:
+    app: nidx-scheduler
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  # Only 1 scheduler max running at a time, even during deployment (stop before starting).
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      app: nidx-scheduler
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      name: nidx-scheduler
+      annotations:
+        {{- with .Values.excludeOutboundPorts }}
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ . }}"
+        {{- end }}
+        {{- with .Values.excludeInboundPorts }}
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ . }}"
+        {{- end }}
+      labels:
+        app: nidx-scheduler
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      {{- with .Values.scheduler.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.scheduler.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.scheduler.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.scheduler.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      dnsPolicy: ClusterFirst
+      serviceAccount: {{ .Values.scheduler.serviceAccount | default "default" }}
+      containers:
+      - name: nidx-scheduler
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        command: ["nidx", "scheduler"]
+        env:
+          {{- include "toEnv" .Values.env | nindent 10 }}
+        ports:
+        {{- with .Values.scheduler.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
