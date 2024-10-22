@@ -165,6 +165,35 @@ async def test_sync_ask_returns_prompt_context(
         assert resp_data.prompt_context is None
 
 
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("debug", (True, False))
+async def test_sync_ask_returns_rephrased_query(
+    nucliadb_reader: AsyncClient, knowledgebox, resource, debug
+):
+    # Make sure prompt context is returned if debug is True
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={"query": "title", "debug": debug, "extra_context": ["foo", "bar"]},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
+    if debug:
+        assert resp_data.rephrased_query
+    else:
+        assert resp_data.rephrased_query is None
+
+    # If no rephrase happened, rephrased query should be None
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={"query": "title", "debug": debug},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200, resp.text
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
+    assert resp_data.rephrased_query is None
+
+
 @pytest.fixture
 async def resources(nucliadb_writer, knowledgebox):
     kbid = knowledgebox
