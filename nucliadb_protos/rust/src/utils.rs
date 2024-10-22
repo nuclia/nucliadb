@@ -85,6 +85,9 @@ pub struct RelationMetadata {
     pub to_start: ::core::option::Option<i32>,
     #[prost(int32, optional, tag = "5")]
     pub to_end: ::core::option::Option<i32>,
+    /// Where this relation was computed (for Data Augmentations this will be the task id)
+    #[prost(string, optional, tag = "6")]
+    pub origin: ::core::option::Option<::prost::alloc::string::String>,
 }
 /// Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index.
 #[allow(clippy::derive_partial_eq_without_eq)]
