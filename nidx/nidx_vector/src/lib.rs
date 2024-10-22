@@ -21,9 +21,9 @@
 use config::VectorConfig;
 use data_point::{open, DataPointPin};
 use data_point_provider::reader::TimeSensitiveDLog;
+use indexer::index_resource;
 use nidx_protos::Resource;
 use nidx_types::Seq;
-use service::VectorWriterService;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -34,18 +34,14 @@ impl VectorIndexer {
         let tmp = tempfile::tempdir()?;
 
         // Index resource
-        let mut writer = VectorWriterService::create(&tmp.path().join("index"), VectorConfig::default()).unwrap();
-        writer.set_resource(resource.into()).unwrap();
+        let (segment, deletions) = index_resource(resource.into(), tmp.path(), &VectorConfig::default()).unwrap();
 
-        // Copy just the segment to the output directory
-        let segments = writer.get_segment_ids().unwrap();
-        if segments.is_empty() {
+        let Some(segment) = segment else {
             return Ok((0, resource.sentences_to_delete.clone()));
-        }
-        assert!(segments.len() <= 1, "Expected a single segment");
-        std::fs::rename(tmp.path().join("index").join(&segments[0]), output_dir)?;
+        };
+        std::fs::rename(tmp.path().join(segment.id().to_string()), output_dir)?;
 
-        Ok((writer.count().unwrap() as i64, resource.sentences_to_delete.clone()))
+        Ok((segment.read_journal()?.no_nodes() as i64, deletions))
     }
 
     pub fn merge(
@@ -106,8 +102,9 @@ pub mod data_point;
 pub mod data_point_provider;
 mod data_types;
 pub mod formula;
+pub mod indexer;
+mod query_io;
 pub mod query_language;
-pub mod service;
 mod utils;
 mod vector_types;
 

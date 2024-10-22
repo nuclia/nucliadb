@@ -89,7 +89,7 @@ fn test_basic_search(
     // Search for a specific element
     let reader = Reader::open(&index_path)?;
     let search_for = elem(5);
-    let results = reader.search(
+    let results = reader._search(
         &Request {
             vector: search_for.vector,
             formula: Formula::new(),
@@ -108,7 +108,7 @@ fn test_basic_search(
     vector[44] = 0.5;
     vector[45] = 0.4;
     let reader = Reader::open(&index_path)?;
-    let results = reader.search(
+    let results = reader._search(
         &Request {
             vector,
             formula: Formula::new(),
