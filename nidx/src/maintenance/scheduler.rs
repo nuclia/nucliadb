@@ -22,6 +22,7 @@ use std::{sync::Arc, time::Duration};
 
 use async_nats::jetstream::consumer::PullConsumer;
 use futures::StreamExt;
+use nidx_types::Seq;
 use object_store::DynObjectStore;
 use tokio::{task::JoinSet, time::sleep};
 use tracing::*;
@@ -81,7 +82,7 @@ pub async fn run() -> anyhow::Result<()> {
                     let oldest_confirmed_seq = consumer_info.ack_floor.stream_sequence;
                     let oldest_pending_seq = oldest_confirmed_seq + 1;
 
-                    if let Err(e) = schedule_merges(&meta, oldest_pending_seq as i64).await {
+                    if let Err(e) = schedule_merges(&meta, Seq::from(oldest_pending_seq)).await {
                         warn!(?e, "Error in schedule_merges task");
                     }
                 }
@@ -170,11 +171,11 @@ pub async fn purge_deletions(meta: &NidxMetadata, consumer: &mut PullConsumer) -
 
 /// Enqueue merge jobs for segments older than `before_seq` that aren't already
 /// scheduled or marked to delete. Right now we merge everything that we can
-async fn schedule_merges(meta: &NidxMetadata, before_seq: i64) -> anyhow::Result<()> {
+async fn schedule_merges(meta: &NidxMetadata, before_seq: Seq) -> anyhow::Result<()> {
     // TODO: better merge algorithm
     let merges = sqlx::query!(
-        r#"SELECT index_id, array_agg(id) AS "segment_ids!" FROM segments WHERE delete_at IS NULL AND merge_job_id IS NULL AND seq < $1 GROUP BY index_id"#,
-        before_seq
+        r#"SELECT index_id, array_agg(id) AS "segment_ids!: Vec<SegmentId>" FROM segments WHERE delete_at IS NULL AND merge_job_id IS NULL AND seq < $1 GROUP BY index_id"#,
+        i64::from(before_seq),
     )
     .fetch_all(&meta.pool)
     .await?;
@@ -218,7 +219,7 @@ mod tests {
             // creation of shards/indexes/segments don't trigger any merge job
             assert!(MergeJob::take(&meta.pool).await.unwrap().is_none());
 
-            schedule_merges(&meta, 100).await.unwrap();
+            schedule_merges(&meta, Seq::from(100)).await.unwrap();
 
             // one job has been scheduled for the index
             let mut jobs = vec![];
@@ -252,7 +253,7 @@ mod tests {
                 }
             }
 
-            schedule_merges(&meta, 100).await.unwrap();
+            schedule_merges(&meta, Seq::from(100)).await.unwrap();
 
             let mut jobs = vec![];
             while let Some(job) = MergeJob::take(&meta.pool).await.unwrap() {

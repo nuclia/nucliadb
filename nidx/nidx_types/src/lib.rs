@@ -30,6 +30,16 @@ impl From<u64> for Seq {
         Self(value as i64)
     }
 }
+impl From<i32> for Seq {
+    fn from(value: i32) -> Self {
+        Self(value as i64)
+    }
+}
+impl From<Seq> for i64 {
+    fn from(value: Seq) -> Self {
+        value.0
+    }
+}
 impl From<&Seq> for i64 {
     fn from(value: &Seq) -> Self {
         value.0
