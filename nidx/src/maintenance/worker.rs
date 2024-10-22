@@ -84,11 +84,14 @@ pub async fn download_segment(
 }
 
 pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObjectStore>) -> anyhow::Result<()> {
-    // TODO: It's weird that we take the index_id from the first segment. Maybe add a job param and check here? Should jobs be generic or keep the merge_job idea?
+    // TODO: Should jobs be generic or keep the merge_job idea?
     let segments = job.segments(&meta.pool).await?;
-    let index = Index::get(&meta.pool, segments[0].index_id).await?;
+    let index = Index::get(&meta.pool, job.index_id).await?;
     for s in &segments {
-        assert!(s.index_id == index.id);
+        assert!(
+            s.index_id == index.id,
+            "Jobs must only use segments from a single index or we could end with a multi-index merge!"
+        );
     }
     let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, job.seq).await?;
     let work_dir: tempfile::TempDir = tempdir()?;
