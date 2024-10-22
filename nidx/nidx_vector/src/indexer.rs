@@ -22,6 +22,7 @@ use crate::data_point::{self, Elem, LabelDictionary};
 use crate::utils;
 use anyhow::anyhow;
 use nidx_protos::{noderesources, prost::*};
+use nidx_types::SegmentMetadata;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
@@ -106,7 +107,7 @@ pub fn index_resource(
     resource: ResourceWrapper,
     output_path: &Path,
     config: &VectorConfig,
-) -> anyhow::Result<(usize, Vec<String>)> {
+) -> anyhow::Result<(Option<SegmentMetadata>, Vec<String>)> {
     let time = Instant::now();
 
     let id = resource.id();
@@ -149,16 +150,16 @@ pub fn index_resource(
         return Err(anyhow!("Inconsistent dimensions on insert"));
     }
 
-    let records = if !elems.is_empty() {
-        let tags = resource.labels().iter().filter(|t| SEGMENT_TAGS.contains(&t.as_str())).cloned().collect();
-        let data_point = data_point::create(output_path, elems, None, config, tags)?;
-        data_point.journal().no_nodes()
-    } else {
-        0
-    };
+    let deletions = resource.sentences_to_delete().map(|d| d.to_owned()).collect();
+    if elems.is_empty() {
+        return Ok((None, deletions));
+    }
+
+    let tags = resource.labels().iter().filter(|t| SEGMENT_TAGS.contains(&t.as_str())).cloned().collect();
+    let data_point = data_point::create(output_path, elems, config, tags)?;
 
     let v = time.elapsed().as_millis();
     debug!("{id:?} - Main index set resource: ends {v} ms");
 
-    Ok((records, resource.sentences_to_delete().map(|d| d.to_owned()).collect()))
+    Ok((Some(data_point.into_metadata()), deletions))
 }

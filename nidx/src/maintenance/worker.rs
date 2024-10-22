@@ -18,9 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashSet, path::PathBuf, sync::Arc, time::Duration};
 
 use futures::TryStreamExt;
+use nidx_types::SegmentMetadata;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
@@ -103,10 +104,19 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     download_tasks.join_all().await;
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
-    let ssegments = &segments
+    let ssegments = segments
         .iter()
         .enumerate()
-        .map(|(i, s)| (work_dir.path().join(i.to_string()), s.seq, s.records.unwrap()))
+        .map(|(i, s)| {
+            (
+                SegmentMetadata {
+                    path: work_dir.path().join(i.to_string()),
+                    records: s.records.unwrap() as usize,
+                    tags: HashSet::new(), // TODO: Record tags in database
+                },
+                s.seq,
+            )
+        })
         .collect::<Vec<_>>();
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 

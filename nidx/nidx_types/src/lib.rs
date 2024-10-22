@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::{collections::HashSet, path::PathBuf};
+
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Seq(i64);
 impl From<i64> for Seq {
@@ -34,4 +36,10 @@ impl From<&Seq> for i64 {
     fn from(value: &Seq) -> Self {
         value.0
     }
+}
+
+pub struct SegmentMetadata {
+    pub path: PathBuf,
+    pub records: usize,
+    pub tags: HashSet<String>,
 }

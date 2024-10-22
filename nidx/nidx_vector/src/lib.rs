@@ -23,8 +23,8 @@ use data_point::open;
 use data_point_provider::reader::TimeSensitiveDLog;
 use indexer::index_resource;
 use nidx_protos::Resource;
-use nidx_types::Seq;
-use std::path::{Path, PathBuf};
+use nidx_types::{SegmentMetadata, Seq};
+use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 pub struct VectorIndexer;
@@ -32,15 +32,19 @@ pub struct VectorIndexer;
 impl VectorIndexer {
     pub fn index_resource(&self, output_dir: &Path, resource: &Resource) -> VectorR<(i64, Vec<String>)> {
         // Index resource
-        let (records, deletions) = index_resource(resource.into(), output_dir, &VectorConfig::default()).unwrap();
+        let (segment, deletions) = index_resource(resource.into(), output_dir, &VectorConfig::default()).unwrap();
 
-        Ok((records as i64, deletions))
+        if let Some(segment) = segment {
+            Ok((segment.records as i64, deletions))
+        } else {
+            Ok((0, deletions))
+        }
     }
 
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: &[(PathBuf, Seq, i64)],
+        segments: Vec<(SegmentMetadata, Seq)>,
         deletions: &Vec<(Seq, &Vec<String>)>,
     ) -> VectorR<usize> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
@@ -55,13 +59,13 @@ impl VectorIndexer {
 
         // Rename (nidx_vector wants uuid, we use i64 as segment ids) and open the segments
         let segment_ids: Vec<_> = segments
-            .iter()
-            .map(|(segment_path, seq, _records)| {
-                let open_dp = open(segment_path).unwrap();
+            .into_iter()
+            .map(|(meta, seq)| {
+                let open_dp = open(meta).unwrap();
                 (
                     TimeSensitiveDLog {
                         dlog: &delete_log,
-                        time: SystemTime::UNIX_EPOCH + Duration::from_secs(i64::from(seq) as u64),
+                        time: SystemTime::UNIX_EPOCH + Duration::from_secs(i64::from(&seq) as u64),
                     },
                     open_dp,
                 )
@@ -73,10 +77,9 @@ impl VectorIndexer {
             work_dir,
             &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(),
             &VectorConfig::default(),
-            SystemTime::now(),
         )?;
 
-        Ok(open_destination.journal().no_nodes())
+        Ok(open_destination.no_nodes())
     }
 }
 

@@ -80,10 +80,10 @@ fn test_basic_search(
     };
 
     // Write some data
-    data_point::create(segment_path, (0..DIMENSION).map(elem).collect(), None, &config, HashSet::new())?;
+    let segment = data_point::create(segment_path, (0..DIMENSION).map(elem).collect(), &config, HashSet::new())?;
 
     // Search for a specific element
-    let reader = Reader::open(&[segment_path], config, DTrie::new())?;
+    let reader = Reader::open(vec![(segment.into_metadata(), 0i64.into())], config, DTrie::new())?;
     let search_for = elem(5);
     let results = reader._search(
         &Request {

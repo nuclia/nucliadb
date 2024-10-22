@@ -37,14 +37,13 @@ use disk_hnsw::DiskHnsw;
 use fs::{File, OpenOptions};
 use io::{BufWriter, Write};
 use memmap2::Mmap;
+use nidx_types::SegmentMetadata;
 use node::Node;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::io::BufReader;
 use std::path::Path;
-use std::time::SystemTime;
 use std::{fs, io};
 
 pub use ops_hnsw::DataRetriever;
@@ -53,24 +52,15 @@ pub use uuid::Uuid as DpId;
 mod file_names {
     pub const NODES: &str = "nodes.kv";
     pub const HNSW: &str = "index.hnsw";
-    pub const JOURNAL: &str = "journal.json";
 }
 
-pub fn delete(dir: &Path, uid: DpId) -> VectorR<()> {
-    let uid = uid.to_string();
-    let id = dir.join(uid);
-    fs::remove_dir_all(id)?;
-    Ok(())
-}
-
-pub fn open(path: &Path) -> VectorR<OpenDataPoint> {
+pub fn open(metadata: SegmentMetadata) -> VectorR<OpenDataPoint> {
+    let path = &metadata.path;
     let nodes_file = File::open(path.join(file_names::NODES))?;
-    let journal_file = File::open(path.join(file_names::JOURNAL))?;
     let hnsw_file = File::open(path.join(file_names::HNSW))?;
 
     let nodes = unsafe { Mmap::map(&nodes_file)? };
     let index = unsafe { Mmap::map(&hnsw_file)? };
-    let journal: Journal = serde_json::from_reader(BufReader::new(journal_file))?;
 
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
@@ -80,7 +70,7 @@ pub fn open(path: &Path) -> VectorR<OpenDataPoint> {
     }
 
     Ok(OpenDataPoint {
-        journal,
+        metadata,
         nodes,
         index,
     })
@@ -90,7 +80,6 @@ pub fn merge<Dlog>(
     data_point_path: &Path,
     operants: &[(Dlog, &OpenDataPoint)],
     config: &VectorConfig,
-    merge_time: SystemTime,
 ) -> VectorR<OpenDataPoint>
 where
     Dlog: DeleteLog,
@@ -102,13 +91,6 @@ where
     nodes_file_options.create(true);
     let mut nodes_file = nodes_file_options.open(nodes_path)?;
 
-    let journal_path = data_point_path.join(file_names::JOURNAL);
-    let mut journal_file_options = OpenOptions::new();
-    journal_file_options.read(true);
-    journal_file_options.write(true);
-    journal_file_options.create(true);
-    let mut journal_file = journal_file_options.open(journal_path)?;
-
     let hnsw_path = data_point_path.join(file_names::HNSW);
     let mut hnsw_file_options = OpenOptions::new();
     hnsw_file_options.read(true);
@@ -118,12 +100,12 @@ where
 
     // Sort largest operant first so we reuse as much of the HNSW as possible
     let mut operants = operants.iter().collect::<Vec<_>>();
-    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.1.journal().no_nodes()));
+    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.1.metadata.records));
 
     // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
-    let tags = operants[0].1.journal().tags().clone();
+    let tags = operants[0].1.metadata.tags.clone();
     for (_, dp) in &operants {
-        if dp.journal().tags() != &tags {
+        if dp.metadata.tags != tags {
             return Err(crate::VectorErr::InconsistentMergeSegmentTags);
         }
     }
@@ -161,19 +143,6 @@ where
 
     let index = unsafe { Mmap::map(&hnsw_file)? };
 
-    let journal = Journal {
-        nodes: no_nodes,
-        uid: uuid::Uuid::new_v4(),
-        ctime: merge_time,
-        tags,
-    };
-
-    {
-        let mut journalf_buffer = BufWriter::new(&mut journal_file);
-        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
-        journalf_buffer.flush()?;
-    }
-
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
@@ -181,20 +150,20 @@ where
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    let metadata = SegmentMetadata {
+        path: data_point_path.to_path_buf(),
+        records: no_nodes,
+        tags,
+    };
+
     Ok(OpenDataPoint {
-        journal,
+        metadata,
         nodes,
         index,
     })
 }
 
-pub fn create(
-    path: &Path,
-    elems: Vec<Elem>,
-    time: Option<SystemTime>,
-    config: &VectorConfig,
-    tags: HashSet<String>,
-) -> VectorR<OpenDataPoint> {
+pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSet<String>) -> VectorR<OpenDataPoint> {
     // Check dimensions
     if let Some(dim) = config.vector_type.dimension() {
         if elems.iter().any(|elem| elem.vector.len() != dim) {
@@ -207,12 +176,6 @@ pub fn create(
     nodes_file_options.write(true);
     nodes_file_options.create(true);
     let mut nodesf = nodes_file_options.open(path.join(file_names::NODES))?;
-
-    let mut journal_file_options = OpenOptions::new();
-    journal_file_options.read(true);
-    journal_file_options.write(true);
-    journal_file_options.create(true);
-    let mut journalf = journal_file_options.open(path.join(file_names::JOURNAL))?;
 
     let mut hnsw_file_options = OpenOptions::new();
     hnsw_file_options.read(true);
@@ -243,19 +206,6 @@ pub fn create(
     }
     let index = unsafe { Mmap::map(&hnswf)? };
 
-    let journal = Journal {
-        nodes: no_nodes,
-        uid: uuid::Uuid::new_v4(),
-        ctime: time.unwrap_or_else(SystemTime::now),
-        tags,
-    };
-    {
-        // Saving the journal
-        let mut journalf_buffer = BufWriter::new(&mut journalf);
-        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
-        journalf_buffer.flush()?;
-    }
-
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
@@ -263,8 +213,14 @@ pub fn create(
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    let metadata = SegmentMetadata {
+        path: path.to_path_buf(),
+        records: no_nodes,
+        tags,
+    };
+
     Ok(OpenDataPoint {
-        journal,
+        metadata,
         nodes,
         index,
     })
@@ -274,32 +230,6 @@ pub struct NoDLog;
 impl DeleteLog for NoDLog {
     fn is_deleted(&self, _: &[u8]) -> bool {
         false
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Journal {
-    uid: DpId,
-    nodes: usize,
-    ctime: SystemTime,
-    #[serde(default)]
-    tags: HashSet<String>,
-}
-impl Journal {
-    pub fn id(&self) -> DpId {
-        self.uid
-    }
-    pub fn no_nodes(&self) -> usize {
-        self.nodes
-    }
-    pub fn time(&self) -> SystemTime {
-        self.ctime
-    }
-    pub fn update_time(&mut self, time: SystemTime) {
-        self.ctime = time;
-    }
-    pub fn tags(&self) -> &HashSet<String> {
-        &self.tags
     }
 }
 
@@ -543,7 +473,7 @@ impl Neighbour {
 }
 
 pub struct OpenDataPoint {
-    journal: Journal,
+    metadata: SegmentMetadata,
     nodes: Mmap,
     index: Mmap,
 }
@@ -555,32 +485,24 @@ impl AsRef<OpenDataPoint> for OpenDataPoint {
 }
 
 impl OpenDataPoint {
+    pub fn into_metadata(self) -> SegmentMetadata {
+        self.metadata
+    }
+
+    pub fn no_nodes(&self) -> usize {
+        self.metadata.records
+    }
+
+    pub fn tags(&self) -> &HashSet<String> {
+        &self.metadata.tags
+    }
+
     pub fn stored_len(&self) -> Option<usize> {
         if data_store::stored_elements(&self.nodes) == 0 {
             return None;
         }
         let node = data_store::get_value(Node, &self.nodes, 0);
         Some(dense_f32_unaligned::vector_len(Node::vector(node)) as usize)
-    }
-    pub fn get_id(&self) -> DpId {
-        self.journal.uid
-    }
-    pub fn journal(&self) -> &Journal {
-        &self.journal
-    }
-    pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
-        let node_storage = &self.nodes;
-        let length = data_store::stored_elements(node_storage);
-        let data_iterator = (0..length).map(|i| data_store::get_value(Node, node_storage, i));
-        let mut keys = Vec::new();
-        for data in data_iterator {
-            let raw_key = Node.get_key(data);
-            if !delete_log.is_deleted(raw_key) {
-                let string_key = String::from_utf8_lossy(raw_key).to_string();
-                keys.push(string_key);
-            }
-        }
-        keys
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -598,7 +520,8 @@ impl OpenDataPoint {
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
         let filter = FormulaFilter::new(filter);
         let ops = HnswOps::new(&tracker);
-        let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);
+        let neighbours =
+            ops.search(Address(self.metadata.records), self.index.as_ref(), results, filter, with_duplicates);
 
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
     }
@@ -606,10 +529,7 @@ impl OpenDataPoint {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        collections::{BTreeMap, HashSet},
-        time::SystemTime,
-    };
+    use std::collections::{BTreeMap, HashSet};
 
     use nidx_protos::{Position, Representation, SentenceMetadata};
     use rand::{rngs::SmallRng, Rng, SeedableRng};
@@ -704,7 +624,7 @@ mod test {
         // Create a data point with random data of different length
         let path = temp_dir.path();
         let elems = (0..100).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp = create(path, elems.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
+        let dp = create(path, elems.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
         let nodes = dp.nodes;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
@@ -743,14 +663,14 @@ mod test {
         // Create two data points with random data of different length
         let path1 = tempdir()?;
         let elems1 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp1 = create(path1.path(), elems1.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
+        let dp1 = create(path1.path(), elems1.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
 
         let path2 = tempdir()?;
         let elems2 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp2 = create(path2.path(), elems2.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
+        let dp2 = create(path2.path(), elems2.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
 
         let path_merged = tempdir()?;
-        let merged_dp = merge(path_merged.path(), &[(NoDLog, &dp1), (NoDLog, &dp2)], &config, SystemTime::now())?;
+        let merged_dp = merge(path_merged.path(), &[(NoDLog, &dp1), (NoDLog, &dp2)], &config)?;
         let nodes = merged_dp.nodes;
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
@@ -811,7 +731,6 @@ mod test {
         let dp = create(
             temp_dir.path(),
             elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
-            None,
             &config,
             HashSet::new(),
         )?;

@@ -32,9 +32,11 @@ use nidx_protos::prost::*;
 use nidx_protos::{
     DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
 };
+use nidx_types::SegmentMetadata;
+use nidx_types::Seq;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::time::Duration;
 use std::time::{Instant, SystemTime};
 use tracing::*;
 
@@ -104,7 +106,7 @@ impl Fssc {
 
 pub struct Reader {
     config: VectorConfig,
-    open_data_points: Vec<OpenDataPoint>,
+    open_data_points: Vec<(OpenDataPoint, Seq)>,
     delete_log: DTrie,
     number_of_embeddings: usize,
     dimension: Option<usize>,
@@ -176,23 +178,20 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl Reader {
-    pub fn open(segments: &[&Path], config: VectorConfig, delete_log: DTrie) -> VectorR<Reader> {
+    pub fn open(segments: Vec<(SegmentMetadata, Seq)>, config: VectorConfig, delete_log: DTrie) -> VectorR<Reader> {
         let mut dimension = None;
-        let mut data_point_pins = Vec::new();
         let mut open_data_points = Vec::new();
         let mut number_of_embeddings = 0;
 
-        for data_point_pin in segments {
-            let open_data_point = data_point::open(data_point_pin)?;
-            let data_point_journal = open_data_point.journal();
+        for (metadata, seq) in segments {
+            let open_data_point = data_point::open(metadata)?;
 
-            number_of_embeddings += data_point_journal.no_nodes();
-            data_point_pins.push(data_point_pin);
-            open_data_points.push(open_data_point);
+            number_of_embeddings += open_data_point.no_nodes();
+            open_data_points.push((open_data_point, seq));
         }
 
         if let Some(open_data_point) = open_data_points.first() {
-            dimension = open_data_point.stored_len();
+            dimension = open_data_point.0.stored_len();
         }
 
         Ok(Reader {
@@ -240,15 +239,14 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for open_data_point in &self.open_data_points {
-            let data_point_journal = open_data_point.journal();
-
+        for (open_data_point, seq) in &self.open_data_points {
             // Skip this segment if it doesn't match the segment filter
-            if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, data_point_journal.tags())) {
+            if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
                 continue;
             }
+            let secs: i64 = seq.into();
             let delete_log = TimeSensitiveDLog {
-                time: data_point_journal.time(),
+                time: SystemTime::UNIX_EPOCH + Duration::from_secs(secs as u64),
                 dlog: &self.delete_log,
             };
             let partial_solution = open_data_point.search(
@@ -346,20 +344,6 @@ impl Reader {
         })
     }
 
-    pub fn keys(&self) -> VectorR<Vec<String>> {
-        let mut keys = vec![];
-        for open_data_point in &self.open_data_points {
-            let data_point_journal = open_data_point.journal();
-            let delete_log = TimeSensitiveDLog {
-                time: data_point_journal.time(),
-                dlog: &self.delete_log,
-            };
-            let mut results = open_data_point.get_keys(&delete_log);
-            keys.append(&mut results);
-        }
-        Ok(keys)
-    }
-
     pub fn size(&self) -> usize {
         self.number_of_embeddings
     }
@@ -451,9 +435,9 @@ mod tests {
             ..Default::default()
         };
 
-        index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
-        let reader = Reader::open(&[segment_path], vsc, DTrie::new()).unwrap();
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let mut request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -542,9 +526,9 @@ mod tests {
             ..Default::default()
         };
 
-        index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
-        let reader = Reader::open(&[segment_path], vsc, DTrie::new()).unwrap();
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -664,9 +648,9 @@ mod tests {
             ..Default::default()
         };
 
-        index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
-        let reader = Reader::open(&[segment_path], vsc, DTrie::new()).unwrap();
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
