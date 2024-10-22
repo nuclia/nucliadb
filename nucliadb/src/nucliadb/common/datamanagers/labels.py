@@ -59,16 +59,12 @@ async def _get_labelset_ids(txn: Transaction, *, kbid: str) -> Optional[list[str
 
 
 async def _add_to_labelset_ids(txn: Transaction, *, kbid: str, labelsets: list[str]) -> None:
+    updated = set(labelsets)
     previous = await _get_labelset_ids(txn, kbid=kbid)
-    needs_set = False
-    if previous is None:
-        needs_set = True
-    for labelset in labelsets:
-        if labelset not in previous:
-            needs_set = True
-            previous.append(labelset)
-    if needs_set:
-        await _set_labelset_ids(txn, kbid=kbid, labelsets=previous)
+    if previous is not None:
+        updated.update(previous)
+    if set(previous or {}) != updated:
+        await _set_labelset_ids(txn, kbid=kbid, labelsets=list(updated))
 
 
 async def _delete_from_labelset_ids(txn: Transaction, *, kbid: str, labelsets: list[str]) -> None:
@@ -76,13 +72,10 @@ async def _delete_from_labelset_ids(txn: Transaction, *, kbid: str, labelsets: l
     if previous is None:
         # Nothing to delete
         return
-    needs_set = False
-    for labelset in labelsets:
-        if labelset in previous:
-            needs_set = True
-            previous.remove(labelset)
-    if needs_set:
-        await _set_labelset_ids(txn, kbid=kbid, labelsets=previous)
+    previous_set = set(previous)
+    updated = previous_set - set(labelsets)
+    if previous_set != updated:
+        await _set_labelset_ids(txn, kbid=kbid, labelsets=list(updated))
 
 
 async def _set_labelset_ids(txn: Transaction, *, kbid: str, labelsets: list[str]) -> None:
