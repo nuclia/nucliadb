@@ -38,6 +38,7 @@ impl From<&Seq> for i64 {
     }
 }
 
+#[derive(Clone)]
 pub struct SegmentMetadata {
     pub path: PathBuf,
     pub records: usize,

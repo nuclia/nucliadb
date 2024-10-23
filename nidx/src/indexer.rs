@@ -128,6 +128,7 @@ async fn index_resource(
         let mut tx = meta.transaction().await?;
         segment.mark_ready(&mut *tx, records, size as i64).await?;
         Deletion::create(&mut *tx, index.id, seq, &deletions).await?;
+        index.updated(&mut *tx).await?;
         tx.commit().await?;
     }
     Ok(())
@@ -162,7 +163,7 @@ mod tests {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
-        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
         index_resource(

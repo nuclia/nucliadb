@@ -121,6 +121,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let mut tx = meta.transaction().await?;
     segment.mark_ready(&mut *tx, merged_records as i64, size as i64).await?;
     Segment::delete_many(&mut *tx, &segments.iter().map(|s| s.id).collect::<Vec<_>>()).await?;
+    index.updated(&mut *tx).await?;
     // Delete task if successful. Mark as failed otherwise?
     job.finish(&mut *tx).await?;
     tx.commit().await?;

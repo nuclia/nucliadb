@@ -47,7 +47,7 @@ pub struct Index {
     pub id: IndexId,
     pub shard_id: Uuid,
     pub kind: IndexKind,
-    pub name: Option<String>,
+    pub name: String,
     pub configuration: JsonValue,
     pub updated_at: PrimitiveDateTime,
 }
@@ -57,7 +57,7 @@ impl Index {
         meta: impl Executor<'_, Database = Postgres>,
         shard_id: Uuid,
         kind: IndexKind,
-        name: Option<&str>,
+        name: &str,
     ) -> Result<Index, sqlx::Error> {
         let inserted = sqlx::query!(
             r#"INSERT INTO indexes (shard_id, kind, name) VALUES ($1, $2, $3) RETURNING id AS "id: IndexId", updated_at"#,
@@ -71,7 +71,7 @@ impl Index {
             id: inserted.id,
             shard_id,
             kind,
-            name: name.map(|s| s.to_owned()),
+            name: name.to_owned(),
             configuration: JsonValue::Null,
             updated_at: inserted.updated_at,
         })
@@ -81,8 +81,9 @@ impl Index {
         meta: impl Executor<'_, Database = Postgres>,
         shard_id: Uuid,
         kind: IndexKind,
-        name: Option<&str>,
+        name: &str,
     ) -> sqlx::Result<Index> {
+        println!("{shard_id:?} {kind:?} {name:?}");
         sqlx::query_as!(
             Index,
             r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3"#,
@@ -112,6 +113,11 @@ impl Index {
         )
         .fetch_one(meta)
         .await
+    }
+
+    pub async fn updated(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
+        sqlx::query!("UPDATE indexes SET updated_at = NOW() WHERE id = $1", self.id as IndexId).execute(meta).await?;
+        Ok(())
     }
 
     pub async fn recently_updated(
