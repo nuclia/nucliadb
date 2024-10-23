@@ -129,7 +129,7 @@ async def find_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-    x_nidx: Annotated[str | None, Header()] = None,
+    x_nidx: Annotated[Optional[str], Header()] = None,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
         security = None
@@ -189,7 +189,7 @@ async def find_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-    x_nidx: Annotated[str | None, Header()] = None,
+    x_nidx: Annotated[Optional[str], Header()] = None,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     return await _find_endpoint(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, x_nidx
@@ -203,7 +203,7 @@ async def _find_endpoint(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-    x_nidx: str | None,
+    x_nidx: Optional[str],
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
         maybe_log_request_payload(kbid, "/find", item)

@@ -113,6 +113,7 @@ async def node_query(
     use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
+    nidx: bool = False,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -169,7 +170,7 @@ async def node_query(
                 from nucliadb.common.cluster.index_node import IndexNode
 
                 node = IndexNode(
-                    id=id,
+                    id="nidx",
                     address=settings.nidx_address,
                     shard_count=0,
                     available_disk=0,
