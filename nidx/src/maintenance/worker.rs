@@ -20,6 +20,7 @@
 
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
+use anyhow::anyhow;
 use futures::TryStreamExt;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
@@ -36,7 +37,7 @@ use crate::{
 
 pub async fn run() -> anyhow::Result<()> {
     let settings = Settings::from_env();
-    let storage = settings.indexer.as_ref().unwrap().object_store.client();
+    let storage = settings.storage.as_ref().unwrap().object_store.client();
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
 
     loop {
@@ -100,7 +101,11 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
         let work_dir = work_dir.path().join(i.to_string());
         download_tasks.spawn(download_segment(storage, s.id, work_dir));
     });
-    download_tasks.join_all().await;
+    match download_tasks.join_all().await.into_iter().reduce(Result::and) {
+        None => return Err(anyhow!("No segments downloaded")),
+        Some(Err(e)) => return Err(e),
+        Some(Ok(())) => {}
+    };
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
     let ssegments = &segments
