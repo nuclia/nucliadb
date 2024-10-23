@@ -266,15 +266,8 @@ mod tests {
 
             assert_eq!(jobs.len(), indexes.len());
 
-            let mut indexes_ids = HashSet::new();
-            for index in indexes.iter() {
-                indexes_ids.insert(index.id);
-            }
-
-            let mut job_indexes = HashSet::new();
-            for job in jobs.iter() {
-                job_indexes.insert(IndexId::from(job.index_id));
-            }
+            let indexes_ids: HashSet<_> = indexes.iter().map(|i| i.id).collect();
+            let job_indexes: HashSet<_> = jobs.iter().map(|j| j.index_id).collect();
 
             assert_eq!(indexes_ids, job_indexes);
 
