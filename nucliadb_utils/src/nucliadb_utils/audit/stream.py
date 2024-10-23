@@ -30,8 +30,9 @@ import nats
 from fastapi import Request
 from google.protobuf.timestamp_pb2 import Timestamp
 from opentelemetry.trace import format_trace_id, get_current_span
+from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.responses import Response, StreamingResponse
+from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, ChatContext, ClientType, RetrievedContext
@@ -98,11 +99,15 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        if isinstance(response, StreamingResponse):
-            response = self.wrap_streaming_response(response, context)
-        else:
-            self.enqueue_pending(context)
+        # This task will run when the response finishes streaming
+        # When dealing with streaming responses, AND if we depend on any state that only will be available once
+        # the request is fully finished, the response we have after the dispatch call_next is not enough, as
+        # there, no iteration of the streaming response has been done yet.
+        response.background = BackgroundTask(self.enqueue_pending, context)
 
+        # It is safe to reset the context here since the asyncio task for generating the streaming response is
+        # already running. If we want to spawn a different task during streaming and we want that task be able
+        # to read the context_var, we need to manually pass the context into that task.
         request_context_var.reset(token)
 
         return response
@@ -115,29 +120,6 @@ class AuditMiddleware(BaseHTTPMiddleware):
             context.audit_request.request_time = time.monotonic() - context.start_time
             if self.audit_utility is not None:
                 self.audit_utility.send(context.audit_request)
-
-    def wrap_streaming_response(
-        self, response: StreamingResponse, context: RequestContext
-    ) -> StreamingResponse:
-        """
-        When dealing with streaming responses, AND if we depend on any state that only will be available once
-        the request is fully finished, the response we have after the dispatch call_next is not enough, as
-        there, no iteration of the streaming response has been done yet.
-
-        This is why we need to rewrap to be able to to the auditing at the _real_ request end without losing
-        any audit bits.
-        """
-        original_body_iterator = response.body_iterator
-
-        async def custom_body_iterator():
-            try:
-                async for chunk in original_body_iterator:
-                    yield chunk
-            finally:
-                self.enqueue_pending(context)
-
-        response.body_iterator = custom_body_iterator()
-        return response
 
 
 KB_USAGE_STREAM_SUBJECT = "kb-usage.nuclia_db"
