@@ -219,7 +219,7 @@ mod tests {
             // creation of shards/indexes/segments don't trigger any merge job
             assert!(MergeJob::take(&meta.pool).await.unwrap().is_none());
 
-            schedule_merges(&meta, Seq::from(100)).await.unwrap();
+            schedule_merges(&meta, 100i64.into()).await.unwrap();
 
             // one job has been scheduled for the index
             let mut jobs = vec![];
@@ -253,7 +253,7 @@ mod tests {
                 }
             }
 
-            schedule_merges(&meta, Seq::from(100)).await.unwrap();
+            schedule_merges(&meta, 100i64.into()).await.unwrap();
 
             let mut jobs = vec![];
             while let Some(job) = MergeJob::take(&meta.pool).await.unwrap() {
