@@ -23,7 +23,7 @@ use std::collections::HashSet;
 use crate::data_point::{Address, DataRetriever};
 
 /// Is a singleton clause.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AtomClause {
     KeyPrefix(String),
     Label(String),
@@ -96,7 +96,7 @@ impl AtomClause {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BooleanOperator {
     Not,
     Or,
@@ -106,7 +106,7 @@ pub enum BooleanOperator {
 /// Is a clause formed by the conjuction of several LabelClauses. Additionally this
 /// clause has a threshold that specifies the minimum number of AtomClauses that have to
 /// succeed in order for the overall conjuction to be satisfied.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CompoundClause {
     operator: BooleanOperator,
     operands: Vec<Clause>,
@@ -139,7 +139,7 @@ impl CompoundClause {
 }
 
 /// Wrapper that unifies the different types of clauses a formula may have.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Clause {
     Atom(AtomClause),
     Compound(CompoundClause),
@@ -168,7 +168,7 @@ impl From<CompoundClause> for Clause {
 
 /// Once applied to a given address, the formula becomes a boolean
 /// expression that evaluates to whether the address is valid or not.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Formula {
     clauses: Vec<Clause>,
 }
@@ -242,7 +242,7 @@ mod tests {
         assert!(!formula.run(ADDRESS, &retriever));
 
         #[rustfmt::skip] let inner = vec![
-            Clause::Atom(AtomClause::label(L1.to_string())), 
+            Clause::Atom(AtomClause::label(L1.to_string())),
             Clause::Atom(AtomClause::label(L2.to_string()))
         ];
         let mut formula = Formula::new();

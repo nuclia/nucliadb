@@ -18,10 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashSet, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
+use nidx_types::SegmentMetadata;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
@@ -108,22 +109,31 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     };
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
-    let ssegments = &segments
+    let ssegments = segments
         .iter()
         .enumerate()
-        .map(|(i, s)| (work_dir.path().join(i.to_string()), s.seq, s.records.unwrap()))
+        .map(|(i, s)| {
+            (
+                SegmentMetadata {
+                    path: work_dir.path().join(i.to_string()),
+                    records: s.records.unwrap() as usize,
+                    tags: HashSet::new(), // TODO: Record tags in database
+                },
+                s.seq,
+            )
+        })
         .collect::<Vec<_>>();
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 
     let index = Index::get(&meta.pool, segments[0].index_id).await?;
-    let (merged, merged_records) = match index.kind {
+    let merged_records = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?,
         _ => unimplemented!(),
     };
 
     // Upload
     let segment = Segment::create(&meta.pool, segments[0].index_id, job.seq).await?;
-    let size = pack_and_upload(storage, &work_dir.path().join(merged), segment.id.storage_key()).await?;
+    let size = pack_and_upload(storage, work_dir.path(), segment.id.storage_key()).await?;
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at
     let mut tx = meta.transaction().await?;
