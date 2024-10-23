@@ -20,7 +20,7 @@
 import dataclasses
 import functools
 import json
-from typing import AsyncGenerator, Optional, cast
+from typing import Any, AsyncGenerator, Optional, cast
 
 from pydantic_core import ValidationError
 
@@ -127,6 +127,7 @@ class AskResult:
         auditor: ChatAuditor,
         metrics: RAGMetrics,
         best_matches: list[RetrievalMatch],
+        rephrased_query: Optional[str],
     ):
         # Initial attributes
         self.kbid = kbid
@@ -140,6 +141,7 @@ class AskResult:
         self.auditor: ChatAuditor = auditor
         self.metrics: RAGMetrics = metrics
         self.best_matches: list[RetrievalMatch] = best_matches
+        self.rephrased_query: Optional[str] = rephrased_query
 
         # Computed from the predict chat answer stream
         self._answer_text = ""
@@ -289,13 +291,14 @@ class AskResult:
 
         # Stream out debug information
         if self.ask_request_with_debug_flag:
-            yield DebugAskResponseItem(
-                metadata={
-                    "prompt_context": sorted_prompt_context_list(
-                        self.prompt_context, self.prompt_context_order
-                    )
-                }
-            )
+            debug_metadata: dict[str, Any] = {
+                "prompt_context": sorted_prompt_context_list(
+                    self.prompt_context, self.prompt_context_order
+                )
+            }
+            if self.rephrased_query is not None:
+                debug_metadata["rephrased_query"] = self.rephrased_query
+            yield DebugAskResponseItem(metadata=debug_metadata)
 
     async def json(self) -> str:
         # First, run the stream in memory to get all the data in memory
@@ -399,11 +402,15 @@ class AskResult:
 class NotEnoughContextAskResult(AskResult):
     def __init__(
         self,
+        ask_request: AskRequest,
         main_results: Optional[KnowledgeboxFindResults] = None,
         prequeries_results: Optional[list[PreQueryResult]] = None,
+        rephrased_query: Optional[str] = None,
     ):
+        self.ask_request = ask_request
         self.main_results = main_results or KnowledgeboxFindResults(resources={}, min_score=None)
         self.prequeries_results = prequeries_results or []
+        self.rephrased_query = rephrased_query
         self.nuclia_learning_id = None
 
     async def ndjson_stream(self) -> AsyncGenerator[str, None]:
@@ -413,6 +420,11 @@ class NotEnoughContextAskResult(AskResult):
         context in the corpus to answer.
         """
         yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
+        if self.ask_request_with_debug_flag:
+            debug_metadata: dict[str, Any] = {}
+            if self.rephrased_query is not None:
+                debug_metadata["rephrased_query"] = self.rephrased_query
+            yield self._ndjson_encode(DebugAskResponseItem(metadata=debug_metadata))
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         status = AnswerStatusCode.NO_CONTEXT
         yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
@@ -422,6 +434,7 @@ class NotEnoughContextAskResult(AskResult):
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.main_results,
             status=AnswerStatusCode.NO_CONTEXT,
+            rephrased_query=self.rephrased_query if self.ask_request_with_debug_flag else None,
         ).model_dump_json()
 
 
@@ -471,8 +484,10 @@ async def ask(
         # If a retrieval was attempted but no results were found,
         # early return the ask endpoint without querying the generative model
         return NotEnoughContextAskResult(
+            ask_request=ask_request,
             main_results=err.main_query,
             prequeries_results=err.prequeries,
+            rephrased_query=rephrased_query,
         )
 
     query_parser = retrieval_results.query_parser
@@ -506,6 +521,8 @@ async def ask(
         query_context=prompt_context,
         query_context_order=prompt_context_order,
         chat_history=chat_history,
+        # The LLM question is always the user query no matter if there was a rephrase step.
+        # This is on purpose as our current rephrasing strategy is meant to improve retrieval context.
         question=user_query,
         truncate=True,
         citations=ask_request.citations,
@@ -550,6 +567,7 @@ async def ask(
         auditor=auditor,
         metrics=metrics,
         best_matches=retrieval_results.best_matches,
+        rephrased_query=rephrased_query,
     )
 
 

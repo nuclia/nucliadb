@@ -1792,6 +1792,11 @@ class SyncAskResponse(BaseModel):
         title="Prompt context",
         description="The prompt context used to generate the answer. Returned only if the debug flag is set to true",
     )
+    rephrased_query: Optional[str] = Field(
+        default=None,
+        title="Rephrased query",
+        description="The rephrased query used in the retrieval step. Returned only if the request involved rephrasing the query.",
+    )
     metadata: Optional[SyncAskMetadata] = Field(
         default=None,
         title="Metadata",
