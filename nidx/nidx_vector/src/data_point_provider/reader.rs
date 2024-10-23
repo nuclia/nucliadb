@@ -243,6 +243,7 @@ impl Reader {
             if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
                 continue;
             }
+            let secs: i64 = seq.into();
             let delete_log = TimeSensitiveDLog {
                 time: *seq,
                 dlog: &self.delete_log,
