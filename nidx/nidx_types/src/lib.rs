@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Hash)]
 pub struct Seq(i64);
 impl From<i64> for Seq {
     fn from(value: i64) -> Self {

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT index_id, array_agg(id) AS \"segment_ids!: Vec<SegmentId>\" FROM segments WHERE delete_at IS NULL AND merge_job_id IS NULL AND seq < $1 GROUP BY index_id",
+  "query": "SELECT index_id, array_agg(id) AS \"segment_ids!: Vec<SegmentId>\" FROM segments WHERE delete_at IS NULL AND merge_job_id IS NULL AND seq <= $1 GROUP BY index_id",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       null
     ]
   },
-  "hash": "cb900580a736cfef89280fb78a434273df974ab600714e31720c2a0f0c9d5b50"
+  "hash": "3c57c7059d4823d07c20d50520eda813a28f97d286f2c1197f7cddddc169ef23"
 }
