@@ -20,7 +20,7 @@
 
 use std::{collections::HashSet, path::PathBuf};
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Seq(i64);
 impl From<i64> for Seq {
     fn from(value: i64) -> Self {
@@ -38,6 +38,7 @@ impl From<&Seq> for i64 {
     }
 }
 
+#[derive(Clone)]
 pub struct SegmentMetadata {
     pub path: PathBuf,
     pub records: usize,

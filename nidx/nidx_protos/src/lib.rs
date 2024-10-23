@@ -19,19 +19,19 @@
 //
 
 pub mod utils {
-    include!(concat!(env!("OUT_DIR"), "/utils.rs"));
+    tonic::include_proto!("utils");
 }
 
 pub mod nodereader {
-    include!(concat!(env!("OUT_DIR"), "/nodereader.rs"));
+    tonic::include_proto!("nodereader");
 }
 
 pub mod noderesources {
-    include!(concat!(env!("OUT_DIR"), "/noderesources.rs"));
+    tonic::include_proto!("noderesources");
 }
 
 pub mod nodewriter {
-    include!(concat!(env!("OUT_DIR"), "/nodewriter.rs"));
+    tonic::include_proto!("nodewriter");
 }
 
 pub use nodereader::*;

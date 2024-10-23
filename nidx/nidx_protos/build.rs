@@ -22,7 +22,7 @@ use std::io::Result;
 
 fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=../../nucliadb_protos");
-    prost_build::compile_protos(
+    tonic_build::configure().emit_rerun_if_changed(false).compile_protos(
         &[
             "../../nucliadb_protos/nodereader.proto",
             "../../nucliadb_protos/noderesources.proto",

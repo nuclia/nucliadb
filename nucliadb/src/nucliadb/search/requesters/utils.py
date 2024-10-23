@@ -113,6 +113,7 @@ async def node_query(
     use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
+    nidx: bool = False,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -136,6 +137,7 @@ async def node_query(
     use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
+    nidx: bool = False,
 ) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
     timeout = timeout or settings.search_timeout
     use_read_replica_nodes = use_read_replica_nodes and has_feature(
@@ -162,6 +164,20 @@ async def node_query(
                 use_read_replica_nodes=use_read_replica_nodes,
                 target_shard_replicas=target_shard_replicas,
             )
+
+            # nidx testing
+            if nidx and settings.nidx_address:
+                from nucliadb.common.cluster.index_node import IndexNode
+
+                node = IndexNode(
+                    id="nidx",
+                    address=settings.nidx_address,
+                    shard_count=0,
+                    available_disk=0,
+                    dummy=False,
+                    primary_id=None,
+                )
+                shard_id = shard_obj.shard
         except KeyError:
             incomplete_results = True
         else:

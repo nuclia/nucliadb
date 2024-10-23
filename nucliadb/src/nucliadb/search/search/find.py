@@ -63,6 +63,7 @@ async def find(
     x_forwarded_for: str,
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
+    nidx: bool = False,
 ) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
     if item.page_number > 0:
         logger.warning("Someone is still using pagination!", extra={"kbid": kbid, "endpoint": "search"})
@@ -77,13 +78,7 @@ async def find(
         )
     else:
         return await _index_node_retrieval(
-            kbid,
-            item,
-            x_ndb_client,
-            x_nucliadb_user,
-            x_forwarded_for,
-            generative_model,
-            metrics,
+            kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, generative_model, metrics, nidx
         )
 
 
@@ -95,6 +90,7 @@ async def _index_node_retrieval(
     x_forwarded_for: str,
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
+    nidx: bool = False,
 ) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
     audit = get_audit()
     start_time = time()
@@ -105,7 +101,7 @@ async def _index_node_retrieval(
 
     with metrics.time("node_query"):
         results, query_incomplete_results, queried_nodes = await node_query(
-            kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
+            kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards, nidx=nidx
         )
     incomplete_results = incomplete_results or query_incomplete_results
 

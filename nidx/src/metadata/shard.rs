@@ -38,7 +38,7 @@ impl Shard {
     pub async fn indexes(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes where shard_id = $1"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes where shard_id = $1"#,
             self.id
         )
         .fetch_all(meta)
