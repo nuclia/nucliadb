@@ -20,6 +20,8 @@
 
 pub mod reader;
 
+use nidx_types::Seq;
+
 use crate::config::VectorConfig;
 pub use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
@@ -38,7 +40,7 @@ pub trait SearchRequest {
 #[derive(Clone, Copy)]
 struct TimeSensitiveDLog<'a> {
     dlog: &'a DTrie,
-    time: u64,
+    time: Seq,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {

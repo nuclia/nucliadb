@@ -42,7 +42,7 @@ use tracing::*;
 #[derive(Clone, Copy)]
 pub struct TimeSensitiveDLog<'a> {
     pub dlog: &'a DTrie,
-    pub time: u64,
+    pub time: Seq,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {
@@ -243,9 +243,8 @@ impl Reader {
             if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
                 continue;
             }
-            let seq: i64 = seq.into();
             let delete_log = TimeSensitiveDLog {
-                time: seq as u64,
+                time: *seq,
                 dlog: &self.delete_log,
             };
             let partial_solution = open_data_point.search(

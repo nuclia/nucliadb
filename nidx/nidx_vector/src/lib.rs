@@ -51,7 +51,7 @@ impl VectorIndexer {
         // Wait and see how the Tantivy indexes turn out
         let mut delete_log = data_point_provider::DTrie::new();
         for d in deletions {
-            let time = i64::from(&d.0) as u64;
+            let time = d.0;
             for k in d.1 {
                 delete_log.insert(k.as_bytes(), time);
             }
@@ -64,7 +64,7 @@ impl VectorIndexer {
                 (
                     TimeSensitiveDLog {
                         dlog: &delete_log,
-                        time: (i64::from(&seq) as u64),
+                        time: seq,
                     },
                     open_dp,
                 )
@@ -100,7 +100,7 @@ impl VectorSearcher {
             }
 
             for key in deleted_keys {
-                delete_log.insert(key.as_bytes(), i64::from(&seq) as u64);
+                delete_log.insert(key.as_bytes(), seq);
             }
         }
 
