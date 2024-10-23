@@ -21,7 +21,7 @@ use super::IndexId;
 use nidx_types::Seq;
 use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 
-#[derive(Copy, Clone, Debug, PartialEq, sqlx::Type)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(transparent)]
 pub struct SegmentId(i64);
 impl From<i64> for SegmentId {
@@ -32,11 +32,6 @@ impl From<i64> for SegmentId {
 impl SegmentId {
     pub fn storage_key(&self) -> object_store::path::Path {
         format!("segment/{}", self.0).into()
-    }
-
-    #[deprecated]
-    pub fn local_path(&self) -> String {
-        format!("{}", self.0)
     }
 }
 

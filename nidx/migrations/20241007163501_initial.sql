@@ -11,6 +11,7 @@ CREATE TABLE indexes (
     kind index_kind NOT NULL,
     name TEXT,
     configuration JSON,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (shard_id, kind, name)
 );
 

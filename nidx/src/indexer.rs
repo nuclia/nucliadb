@@ -1,4 +1,3 @@
-use crate::upload::pack_and_upload;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -18,6 +17,7 @@ use crate::upload::pack_and_upload;
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::segment_store::pack_and_upload;
 use crate::{metadata::*, Settings};
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;

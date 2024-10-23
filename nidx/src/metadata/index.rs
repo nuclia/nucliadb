@@ -18,7 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use super::segment::Segment;
-use sqlx::{self, types::JsonValue, Executor, Postgres};
+use sqlx::{
+    self,
+    types::{time::PrimitiveDateTime, JsonValue},
+    Executor, Postgres,
+};
 use uuid::Uuid;
 
 #[derive(sqlx::Type, Copy, Clone, PartialEq, Debug)]
@@ -30,7 +34,7 @@ pub enum IndexKind {
     Relation,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, sqlx::Type)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(transparent)]
 pub struct IndexId(i64);
 impl From<i64> for IndexId {
@@ -45,6 +49,7 @@ pub struct Index {
     pub kind: IndexKind,
     pub name: Option<String>,
     pub configuration: JsonValue,
+    pub updated_at: PrimitiveDateTime,
 }
 
 impl Index {
@@ -54,21 +59,21 @@ impl Index {
         kind: IndexKind,
         name: Option<&str>,
     ) -> Result<Index, sqlx::Error> {
-        let id: IndexId = sqlx::query_scalar!(
-            r#"INSERT INTO indexes (shard_id, kind, name) VALUES ($1, $2, $3) RETURNING id"#,
+        let inserted = sqlx::query!(
+            r#"INSERT INTO indexes (shard_id, kind, name) VALUES ($1, $2, $3) RETURNING id AS "id: IndexId", updated_at"#,
             shard_id,
             kind as IndexKind,
             name
         )
         .fetch_one(meta)
-        .await?
-        .into();
+        .await?;
         Ok(Index {
-            id,
+            id: inserted.id,
             shard_id,
             kind,
             name: name.map(|s| s.to_owned()),
             configuration: JsonValue::Null,
+            updated_at: inserted.updated_at,
         })
     }
 
@@ -80,7 +85,7 @@ impl Index {
     ) -> sqlx::Result<Index> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3"#,
             shard_id,
             kind as IndexKind,
             name
@@ -92,7 +97,7 @@ impl Index {
     pub async fn for_shard(meta: impl Executor<'_, Database = Postgres>, shard_id: Uuid) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE shard_id = $1"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE shard_id = $1"#,
             shard_id
         )
         .fetch_all(meta)
@@ -102,10 +107,23 @@ impl Index {
     pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: IndexId) -> sqlx::Result<Index> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration FROM indexes WHERE id = $1"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE id = $1"#,
             id as IndexId
         )
         .fetch_one(meta)
+        .await
+    }
+
+    pub async fn recently_updated(
+        meta: impl Executor<'_, Database = Postgres>,
+        newer_than: PrimitiveDateTime,
+    ) -> sqlx::Result<Vec<Index>> {
+        sqlx::query_as!(
+            Index,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE updated_at > $1"#,
+            newer_than
+        )
+        .fetch_all(meta)
         .await
     }
 
