@@ -203,60 +203,62 @@ mod tests {
         use crate::metadata::{Index, IndexId, IndexKind, NidxMetadata, Shard};
 
         #[sqlx::test]
-        async fn test_schedule_merges_for_shard_with_single_index(pool: sqlx::PgPool) {
-            let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
+        async fn test_schedule_merges_for_shard_with_single_index(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
-            let shard = Shard::create(&meta.pool, kbid).await.unwrap();
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await?;
             let mut seq: i64 = 0;
 
             for _ in 0..10 {
-                let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await.unwrap();
-                segment.mark_ready(&meta.pool, 50, 1000).await.unwrap();
+                let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await?;
+                segment.mark_ready(&meta.pool, 50, 1000).await?;
                 seq += 1;
             }
 
             // creation of shards/indexes/segments don't trigger any merge job
-            assert!(MergeJob::take(&meta.pool).await.unwrap().is_none());
+            assert!(MergeJob::take(&meta.pool).await?.is_none());
 
-            schedule_merges(&meta, 100i64.into()).await.unwrap();
+            schedule_merges(&meta, 100i64.into()).await?;
 
             // one job has been scheduled for the index
             let mut jobs = vec![];
-            while let Some(job) = MergeJob::take(&meta.pool).await.unwrap() {
+            while let Some(job) = MergeJob::take(&meta.pool).await? {
                 jobs.push(job)
             }
             assert_eq!(jobs.len(), 1);
             assert_eq!(IndexId::from(jobs[0].index_id), index.id);
+
+            Ok(())
         }
 
         #[sqlx::test]
-        async fn test_schedule_merges_for_shard_with_multiple_indexes(pool: sqlx::PgPool) {
-            let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
+        async fn test_schedule_merges_for_shard_with_multiple_indexes(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
-            let shard = Shard::create(&meta.pool, kbid).await.unwrap();
+            let shard = Shard::create(&meta.pool, kbid).await?;
 
             let indexes = vec![
-                Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap(),
-                Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("english")).await.unwrap(),
-                Index::create(&meta.pool, shard.id, IndexKind::Text, Some("fulltext")).await.unwrap(),
-                Index::create(&meta.pool, shard.id, IndexKind::Paragraph, Some("keyword")).await.unwrap(),
-                Index::create(&meta.pool, shard.id, IndexKind::Relation, Some("relation")).await.unwrap(),
+                Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("english")).await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Text, Some("fulltext")).await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Paragraph, Some("keyword")).await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Relation, Some("relation")).await?,
             ];
             let mut seq: i64 = 0;
 
             for index in indexes.iter() {
                 for _ in 0..10 {
-                    let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await.unwrap();
-                    segment.mark_ready(&meta.pool, 50, 1000).await.unwrap();
+                    let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await?;
+                    segment.mark_ready(&meta.pool, 50, 1000).await?;
                     seq += 1;
                 }
             }
 
-            schedule_merges(&meta, 100i64.into()).await.unwrap();
+            schedule_merges(&meta, 100i64.into()).await?;
 
             let mut jobs = vec![];
-            while let Some(job) = MergeJob::take(&meta.pool).await.unwrap() {
+            while let Some(job) = MergeJob::take(&meta.pool).await? {
                 jobs.push(job);
             }
 
@@ -275,6 +277,8 @@ mod tests {
             }
 
             assert_eq!(indexes_ids, job_indexes);
+
+            Ok(())
         }
     }
 }
