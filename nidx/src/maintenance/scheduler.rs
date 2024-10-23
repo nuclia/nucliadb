@@ -247,8 +247,8 @@ mod tests {
             ];
             let mut seq: i64 = 0;
 
-            for index in indexes.iter() {
-                for _ in 0..10 {
+            for _ in 0..10 {
+                for index in indexes.iter() {
                     let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await?;
                     segment.mark_ready(&meta.pool, 50, 1000).await?;
                     seq += 1;
