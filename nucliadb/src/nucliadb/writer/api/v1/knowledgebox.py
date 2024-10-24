@@ -30,7 +30,7 @@ from nucliadb.common.external_index_providers.exceptions import ExternalIndexCre
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.writer import logger
+from nucliadb.writer import embeddings, logger
 from nucliadb.writer.api.utils import only_for_onprem
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
@@ -249,26 +249,22 @@ def to_pinecone_serverless_cloud_pb(
 
 
 @api.post(
-    f"/{KB_PREFIX}/{{kbid}}/embeddings",
+    f"/{KB_PREFIX}/{{kbid}}/embeddings/{{embedding_id}}",
     status_code=200,
     summary="Add Embeddings to Knowledge Box",
     tags=["Knowledge Boxes"],
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def add_embeddings(request: Request, kbid: str) -> Response:
-    """
-    TODO
-    - Check if embedding model already exists on kb, otherwise return 409
-    - Patch learning config models
-    - Add vectorset in index
-    - Start task to recompute embeddings for that kb
-    """
+async def add_embeddings(request: Request, kbid: str, embedding_id: str) -> Response:
     if is_onprem_nucliadb():
         raise HTTPException(
             status_code=403,
             detail="This endpoint is only available for hosted NucliaDB",
         )
+
+    await embeddings.add(kbid, embedding_id)
+
     return Response(status_code=200)
 
 
@@ -281,22 +277,12 @@ async def add_embeddings(request: Request, kbid: str) -> Response:
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def delete_embeddings(request: Request, kbid: str, embedding_id: str) -> Response:
-    """
-    TODO
-    - Check if embedding model exists on kb, otherwise return 404
-    - Patch learning config models
-    - Delete vectorset from index
-    - Start cleanup for storage
-    - Cancell any task ongoing for those embeddings on that kb
-    """
     if is_onprem_nucliadb():
         raise HTTPException(
             status_code=403,
             detail="This endpoint is only available for hosted NucliaDB",
         )
-    config = await learning_proxy.get_configuration(kbid)
-    if embedding_id not in config.semantic_models:
-        raise HTTPException(status_code=404, detail="Embedding model not found")
-    await learning_proxy.set_configuration(kbid, config)
+
+    await embeddings.delete(kbid, embedding_id)
 
     return Response(status_code=200)
