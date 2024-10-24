@@ -22,6 +22,10 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/configuration'
           method:
             regex: "POST|PATCH|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/vectorsets/.*'
+          method:
+            regex: "POST|PATCH|DELETE|OPTIONS"
       route:
         - destination:
             port:
