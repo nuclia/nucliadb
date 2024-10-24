@@ -1359,15 +1359,15 @@ If empty, the default strategy is used, which simply adds the text of the matchi
         ],
     )
     rag_images_strategies: list[RagImagesStrategies] = Field(
-        default=[ParagraphImageStrategy()],
+        default=[],
         title="RAG image context building strategies",
         description=(
             "Options for tweaking how the image based context for the LLM model is crafted:\n"
             "- `page_image` will add the full page image of the matching resources to the context.\n"
             "- `tables` will send the table images for the paragraphs that contain tables and matched the retrieval query.\n"
             "- `paragraph_image` will add the images of the paragraphs that contain images (images for tables are not included).\n"
-            "By default, the `paragraph_image` strategy is used. Note that this is only available for LLM models that support visual inputs."
-        ),  # noqa
+            "No image strategy is used by default. Note that this is only available for LLM models that support visual inputs. If the model does not support visual inputs, the image strategies will be ignored."
+        ),
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
 
