@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::{collections::HashSet, path::PathBuf};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Hash)]
 pub struct Seq(i64);
@@ -39,4 +40,10 @@ impl From<&Seq> for i64 {
     fn from(value: &Seq) -> Self {
         value.0
     }
+}
+
+pub struct SegmentMetadata {
+    pub path: PathBuf,
+    pub records: usize,
+    pub tags: HashSet<String>,
 }

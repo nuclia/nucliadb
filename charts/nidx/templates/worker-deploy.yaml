@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nidx-worker
+  labels:
+    app: nidx-worker
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nidx-worker
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      name: nidx-worker
+      annotations:
+        {{- with .Values.excludeOutboundPorts }}
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ . }}"
+        {{- end }}
+        {{- with .Values.excludeInboundPorts }}
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ . }}"
+        {{- end }}
+      labels:
+        app: nidx-worker
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      dnsPolicy: ClusterFirst
+      serviceAccount: {{ .Values.worker.serviceAccount | default "default" }}
+      containers:
+      - name: nidx-worker
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        command: ["nidx", "worker"]
+        env:
+          {{- include "toEnv" .Values.env | nindent 10 }}
+        ports:
+        {{- with .Values.worker.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}

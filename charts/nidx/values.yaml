@@ -9,3 +9,5 @@ image: IMAGE_TO_REPLACE
 
 env: {}
 indexer: {}
+scheduler: {}
+worker: {}

@@ -19,10 +19,12 @@
 //
 
 use std::collections::HashSet;
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
+
+use tempfile::tempdir;
 
 use crate::config::{Similarity, VectorConfig};
-use crate::data_point::{self, DataPointPin, DeleteLog, Elem, LabelDictionary};
+use crate::data_point::{self, DeleteLog, Elem, LabelDictionary};
 use crate::formula::{AtomClause, Formula};
 use crate::VectorR;
 
@@ -69,8 +71,7 @@ fn simple_flow() {
         elems.push(Elem::new(key.clone(), vector, labels, None));
         expected_keys.push(key);
     }
-    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems, None, &CONFIG, HashSet::new()).unwrap();
+    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let query = vec![rand::random::<f32>(); 8];
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -78,9 +79,6 @@ fn simple_flow() {
         acc
     });
     let result = reader.search(&HashSet::new(), &query, &formula, true, no_results, &CONFIG, -1.0);
-    let got_keys = reader.get_keys(&HashSet::new());
-    assert!(got_keys.iter().all(|k| expected_keys.contains(k)));
-    assert_eq!(got_keys.len(), expected_keys.len());
     assert_eq!(result.count(), no_results);
 }
 
@@ -101,8 +99,7 @@ fn accuracy_test() {
         let labels = labels_dictionary.clone();
         elems.push(Elem::new(key, vector, labels, None));
     }
-    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems, None, &CONFIG, HashSet::new()).unwrap();
+    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let query = create_query();
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -127,14 +124,13 @@ fn single_graph() {
     let vector = create_query();
 
     let elems = vec![Elem::new(key.clone(), vector.clone(), LabelDictionary::default(), None)];
-    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems.clone(), None, &CONFIG, HashSet::new()).unwrap();
+    let reader = data_point::create(temp_dir.path(), elems.clone(), &CONFIG, HashSet::new()).unwrap();
     let formula = Formula::new();
     let result = reader.search(&HashSet::from([key.clone()]), &vector, &formula, true, 5, &CONFIG, -1.0);
     assert_eq!(result.count(), 0);
 
-    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems, None, &CONFIG, HashSet::new()).unwrap();
+    let temp_dir = tempfile::tempdir().unwrap();
+    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let result = reader.search(&HashSet::new(), &vector, &formula, true, 5, &CONFIG, -1.0).collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
@@ -142,9 +138,7 @@ fn single_graph() {
 }
 
 #[test]
-fn data_merge() {
-    let temp_dir = tempfile::tempdir().unwrap();
-
+fn data_merge() -> anyhow::Result<()> {
     let key0 = "KEY_0".to_string();
     let vector0 = create_query();
     let elems0 = vec![Elem::new(key0.clone(), vector0.clone(), LabelDictionary::default(), None)];
@@ -152,16 +146,16 @@ fn data_merge() {
     let vector1 = create_query();
     let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), LabelDictionary::default(), None)];
 
-    let dp0_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let dp0 = data_point::create(&dp0_pin, elems0, None, &CONFIG, HashSet::new()).unwrap();
+    let dp0_path = tempdir()?;
+    let dp0 = data_point::create(dp0_path.path(), elems0, &CONFIG, HashSet::new()).unwrap();
 
-    let dp1_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let dp1 = data_point::create(&dp1_pin, elems1, None, &CONFIG, HashSet::new()).unwrap();
+    let dp1_path = tempdir()?;
+    let dp1 = data_point::create(dp1_path.path(), elems1, &CONFIG, HashSet::new()).unwrap();
 
     let work = &[(HashSet::default(), &dp1), (HashSet::default(), &dp0)];
 
-    let dp_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let dp = data_point::merge(&dp_pin, work, &CONFIG, SystemTime::now()).unwrap();
+    let dp_path = tempdir()?;
+    let dp = data_point::merge(dp_path.path(), work, &CONFIG).unwrap();
 
     let formula = Formula::new();
     let result: Vec<_> = dp.search(&HashSet::new(), &vector1, &formula, true, 1, &CONFIG, -1.0).collect();
@@ -173,13 +167,16 @@ fn data_merge() {
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key0.as_bytes());
     let dlog = HashSet::from([key1, key0]);
-    let dp0 = data_point::open(&dp0_pin).unwrap();
-    let dp1 = data_point::open(&dp1_pin).unwrap();
+    let dp0 = data_point::open(dp0.metadata).unwrap();
+    let dp1 = data_point::open(dp1.metadata).unwrap();
     let work = &[(&dlog, &dp1), (&dlog, &dp0)];
-    let dp_pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let dp = data_point::merge(&dp_pin, work, &CONFIG, SystemTime::now()).unwrap();
 
-    assert_eq!(dp.journal().no_nodes(), 0);
+    let dp_path = tempdir()?;
+    let dp = data_point::merge(dp_path.path(), work, &CONFIG).unwrap();
+
+    assert_eq!(dp.metadata.records, 0);
+
+    Ok(())
 }
 
 #[test]
@@ -202,8 +199,7 @@ fn prefiltering_test() {
         elems.push(Elem::new(key, vector, labels, None));
     }
 
-    let pin = DataPointPin::create_pin(temp_dir.path()).unwrap();
-    let reader = data_point::create(&pin, elems, None, &CONFIG, HashSet::new()).unwrap();
+    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
     let query = create_query();
     let no_results = 10;
 
@@ -229,22 +225,19 @@ fn fast_data_merge() -> VectorR<()> {
     let search_vectors = [create_query(), create_query(), create_query(), create_query()];
 
     let big_segment_dir = tempfile::tempdir()?;
-    let big_segment_pin = DataPointPin::create_pin(big_segment_dir.path())?;
     let mut elems: Vec<_> =
         (0..100).map(|k| Elem::new(format!("trash_{k}"), create_query(), LabelDictionary::default(), None)).collect();
     elems.push(Elem::new("search_0".into(), search_vectors[0].clone(), LabelDictionary::default(), None));
     elems.push(Elem::new("search_1".into(), search_vectors[1].clone(), LabelDictionary::default(), None));
-    let big_segment = data_point::create(&big_segment_pin, elems, None, &CONFIG, HashSet::new())?;
+    let big_segment = data_point::create(big_segment_dir.path(), elems, &CONFIG, HashSet::new())?;
 
     let small_segment_dir = tempfile::tempdir()?;
-    let small_segment_pin = DataPointPin::create_pin(small_segment_dir.path())?;
     let small_segment = data_point::create(
-        &small_segment_pin,
+        small_segment_dir.path(),
         vec![
             Elem::new("search_2".into(), search_vectors[2].clone(), LabelDictionary::default(), None),
             Elem::new("search_3".into(), search_vectors[3].clone(), LabelDictionary::default(), None),
         ],
-        None,
         &CONFIG,
         HashSet::new(),
     )?;
@@ -252,9 +245,8 @@ fn fast_data_merge() -> VectorR<()> {
     // Merge without deletions
     let mut work = [(HashSet::default(), &big_segment), (HashSet::default(), &small_segment)];
     let output_dir = tempfile::tempdir()?;
-    let dp_pin = DataPointPin::create_pin(output_dir.path())?;
     let t = Instant::now();
-    let dp = data_point::merge(&dp_pin, &work, &CONFIG, SystemTime::now())?;
+    let dp = data_point::merge(output_dir.path(), &work, &CONFIG)?;
     let fast_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {
@@ -269,9 +261,8 @@ fn fast_data_merge() -> VectorR<()> {
     work[0].0.insert("search_0".into());
     work[1].0.insert("search_2".into());
     let output_dir = tempfile::tempdir()?;
-    let dp_pin = DataPointPin::create_pin(output_dir.path())?;
     let t = Instant::now();
-    let dp = data_point::merge(&dp_pin, &work, &CONFIG, SystemTime::now())?;
+    let dp = data_point::merge(output_dir.path(), &work, &CONFIG)?;
     let slow_merge_time = t.elapsed();
 
     for (i, v) in search_vectors.iter().enumerate() {

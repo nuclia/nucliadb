@@ -18,23 +18,27 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::data_point::{self, DataPointPin, OpenDataPoint};
+use crate::data_point::{self, OpenDataPoint};
 pub use crate::data_point::{DpId, Neighbour};
-use crate::data_point_provider::state::read_state;
+use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
-use crate::data_point_provider::{IndexMetadata, SearchRequest, OPENING_FLAG, STATE};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::query_language::{BooleanExpression, BooleanOperation, Operator};
 use crate::utils;
+use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
-use fs2::FileExt;
-use fxhash::FxHashMap;
+use nidx_protos::prost::*;
+use nidx_protos::{
+    DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
+};
+use nidx_types::SegmentMetadata;
+use nidx_types::Seq;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::Duration;
+use std::time::{Instant, SystemTime};
+use tracing::*;
 
 #[derive(Clone, Copy)]
 pub struct TimeSensitiveDLog<'a> {
@@ -102,16 +106,10 @@ impl Fssc {
 
 pub struct Reader {
     config: VectorConfig,
-    path: PathBuf,
-    open_data_points: FxHashMap<DpId, OpenDataPoint>,
+    open_data_points: Vec<(OpenDataPoint, Seq)>,
     delete_log: DTrie,
     number_of_embeddings: usize,
     dimension: Option<usize>,
-    state_last_modified: SystemTime,
-}
-
-fn last_modified(path: &Path) -> std::io::Result<SystemTime> {
-    std::fs::metadata(path)?.modified()
 }
 
 fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
@@ -129,43 +127,71 @@ fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> 
     }
 }
 
+// In an ideal world this should be part of the actual request, but since
+// we use protos all the way down the stack here we are. Once the protos use
+// is restricted to only the upper layer, this type won't be needed anymore.
+#[derive(Clone, Default)]
+pub struct VectorsContext {
+    pub filtering_formula: Option<BooleanExpression>,
+    pub segment_filtering_formula: Option<BooleanExpression>,
+}
+
+impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
+    fn with_duplicates(&self) -> bool {
+        self.1.with_duplicates
+    }
+    fn get_filter(&self) -> &Formula {
+        &self.2
+    }
+    fn get_query(&self) -> &[f32] {
+        &self.1.vector
+    }
+    fn no_results(&self) -> usize {
+        self.0
+    }
+    fn min_score(&self) -> f32 {
+        self.1.min_score
+    }
+}
+
+impl TryFrom<Neighbour> for DocumentScored {
+    type Error = String;
+    fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
+        let id = std::str::from_utf8(neighbour.id());
+        let metadata = neighbour.metadata().map(SentenceMetadata::decode);
+        let labels = neighbour.labels();
+        let Ok(id) = id.map(|i| i.to_string()) else {
+            return Err("Id could not be decoded".to_string());
+        };
+        let Ok(metadata) = metadata.transpose() else {
+            return Err("The metadata could not be decoded".to_string());
+        };
+        Ok(DocumentScored {
+            labels,
+            metadata,
+            doc_id: Some(DocumentVectorIdentifier {
+                id,
+            }),
+            score: neighbour.score(),
+        })
+    }
+}
+
 impl Reader {
-    pub fn open(path: &Path) -> VectorR<Reader> {
-        let lock_path = path.join(OPENING_FLAG);
-        let lock_file = File::create(lock_path)?;
-        lock_file.lock_shared()?;
-
-        let config = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
-            // Old indexes may not have this file so in that case the
-            // metadata file they should have is created.
-            let metadata = VectorConfig::default();
-            IndexMetadata::write(&metadata, path).map(|_| metadata)
-        })?;
-
-        let state_path = path.join(STATE);
-        let state_last_modified = last_modified(&state_path)?;
-        let state_file = File::open(state_path)?;
-        let state = read_state(&state_file)?;
-        let data_point_list = state.data_point_list;
-        let delete_log = state.delete_log;
+    pub fn open(segments: Vec<(SegmentMetadata, Seq)>, config: VectorConfig, delete_log: DTrie) -> VectorR<Reader> {
         let mut dimension = None;
-        let mut data_point_pins = Vec::new();
-        let mut open_data_points = FxHashMap::default();
+        let mut open_data_points = Vec::new();
         let mut number_of_embeddings = 0;
 
-        for data_point_id in data_point_list {
-            let data_point_pin = DataPointPin::open_pin(path, data_point_id)?;
-            let open_data_point = data_point::open(&data_point_pin)?;
-            let data_point_journal = open_data_point.journal();
+        for (metadata, seq) in segments {
+            let open_data_point = data_point::open(metadata)?;
 
-            number_of_embeddings += data_point_journal.no_nodes();
-            data_point_pins.push(data_point_pin);
-            open_data_points.insert(data_point_id, open_data_point);
+            number_of_embeddings += open_data_point.no_nodes();
+            open_data_points.push((open_data_point, seq));
         }
 
-        if let Some(data_point_pin) = data_point_pins.first() {
-            let open_data_point = &open_data_points[&data_point_pin.id()];
-            dimension = open_data_point.stored_len();
+        if let Some(open_data_point) = open_data_points.first() {
+            dimension = open_data_point.0.stored_len();
         }
 
         Ok(Reader {
@@ -174,12 +200,10 @@ impl Reader {
             delete_log,
             number_of_embeddings,
             dimension,
-            path: path.to_path_buf(),
-            state_last_modified,
         })
     }
 
-    pub fn search(
+    pub fn _search(
         &self,
         request: &dyn SearchRequest,
         segment_filter: &Option<BooleanExpression>,
@@ -215,15 +239,14 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for open_data_point in self.open_data_points.values() {
-            let data_point_journal = open_data_point.journal();
-
+        for (open_data_point, seq) in &self.open_data_points {
             // Skip this segment if it doesn't match the segment filter
-            if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, data_point_journal.tags())) {
+            if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
                 continue;
             }
+            let secs: i64 = seq.into();
             let delete_log = TimeSensitiveDLog {
-                time: data_point_journal.time(),
+                time: SystemTime::UNIX_EPOCH + Duration::from_secs(secs as u64),
                 dlog: &self.delete_log,
             };
             let partial_solution = open_data_point.search(
@@ -243,26 +266,86 @@ impl Reader {
         Ok(ffsv.into())
     }
 
-    pub fn keys(&self) -> VectorR<Vec<String>> {
-        let mut keys = vec![];
-        for open_data_point in self.open_data_points.values() {
-            let data_point_journal = open_data_point.journal();
-            let delete_log = TimeSensitiveDLog {
-                time: data_point_journal.time(),
-                dlog: &self.delete_log,
-            };
-            let mut results = open_data_point.get_keys(&delete_log);
-            keys.append(&mut results);
+    pub fn search(
+        &self,
+        request: &VectorSearchRequest,
+        context: &VectorsContext,
+    ) -> anyhow::Result<VectorSearchResponse> {
+        let time = Instant::now();
+
+        let id = Some(&request.id);
+        let offset = request.result_per_page * request.page_number;
+        let total_to_get = offset + request.result_per_page;
+        let offset = offset as usize;
+        let total_to_get = total_to_get as usize;
+
+        let field_labels = request.field_labels.iter().cloned().map(AtomClause::label);
+        let mut formula = Formula::new();
+
+        if !request.field_labels.is_empty() {
+            let field_atoms = field_labels.map(Clause::Atom).collect();
+            let field_clause = CompoundClause::new(BooleanOperator::And, field_atoms);
+            formula.extend(field_clause);
         }
-        Ok(keys)
+
+        if !request.key_filters.is_empty() {
+            let (field_ids, resource_ids) = request.key_filters.iter().cloned().partition(|k| k.contains('/'));
+            let clause_labels = AtomClause::key_set(resource_ids, field_ids);
+            formula.extend(clause_labels);
+        }
+
+        if !request.field_filters.is_empty() {
+            let mut field_atoms: Vec<Clause> = vec![];
+            for field in request.field_filters.iter() {
+                // split "a/title" into "a" and "title"
+                let parts = field.split('/').collect::<Vec<&str>>();
+                let field_type = parts.first().unwrap_or(&"").to_string();
+                let field_name = parts.get(1).unwrap_or(&"").to_string();
+                let atom_clause = Clause::Atom(AtomClause::key_field(field_type, field_name));
+                field_atoms.push(atom_clause);
+            }
+            let compound = CompoundClause::new(BooleanOperator::Or, field_atoms);
+            formula.extend(compound);
+        }
+
+        if let Some(filter) = context.filtering_formula.as_ref() {
+            let clause = query_io::map_expression(filter);
+            formula.extend(clause);
+        }
+
+        let search_request = (total_to_get, request, formula);
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Searching: starts at {v} ms");
+
+        let result = self._search(&search_request, &context.segment_filtering_formula)?;
+
+        let v = time.elapsed().as_millis();
+        debug!("{id:?} - Searching: ends at {v} ms");
+        debug!("{id:?} - Creating results: starts at {v} ms");
+
+        let documents = result
+            .into_iter()
+            .enumerate()
+            .filter(|(idx, _)| *idx >= offset)
+            .map(|(_, v)| v)
+            .flat_map(DocumentScored::try_from)
+            .collect::<Vec<_>>();
+        let v = time.elapsed().as_millis();
+
+        debug!("{id:?} - Creating results: ends at {v} ms");
+
+        let took = time.elapsed().as_secs_f64();
+        debug!("{id:?} - Ending at {took} ms");
+
+        Ok(VectorSearchResponse {
+            documents,
+            page_number: request.page_number,
+            result_per_page: request.result_per_page,
+        })
     }
 
     pub fn size(&self) -> usize {
         self.number_of_embeddings
-    }
-
-    pub fn location(&self) -> &Path {
-        &self.path
     }
 
     pub fn config(&self) -> &VectorConfig {
@@ -272,10 +355,329 @@ impl Reader {
     pub fn embedding_dimension(&self) -> Option<usize> {
         self.dimension
     }
+}
 
-    pub fn needs_update(&self) -> VectorR<bool> {
-        let state_path = self.path.join(STATE);
-        let state_modified = last_modified(&state_path)?;
-        Ok(self.state_last_modified < state_modified)
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use nidx_protos::resource::ResourceStatus;
+    use nidx_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorsetSentences};
+    use tempfile::TempDir;
+
+    use super::*;
+    use crate::config::{Similarity, VectorConfig, VectorType};
+    use crate::indexer::{index_resource, ResourceWrapper};
+
+    #[test]
+    fn test_key_prefix_search() -> anyhow::Result<()> {
+        let dir = TempDir::new().unwrap();
+        let segment_path = dir.path();
+        let vsc = VectorConfig {
+            similarity: Similarity::Cosine,
+            normalize_vectors: false,
+            vector_type: VectorType::DenseF32 {
+                dimension: 3,
+            },
+        };
+        let raw_sentences = [
+            ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
+            ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
+            ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
+            ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
+        ];
+        let resource_id = ResourceId {
+            shard_id: "DOC".to_string(),
+            uuid: "DOC/KEY".to_string(),
+        };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
+        let paragraph = IndexParagraph {
+            start: 0,
+            end: 0,
+            sentences: sentences.clone(),
+            vectorsets_sentences: HashMap::from([(
+                "__default__".to_string(),
+                VectorsetSentences {
+                    sentences,
+                },
+            )]),
+            field: "".to_string(),
+            labels: vec!["1".to_string()],
+            index: 3,
+            split: "".to_string(),
+            repeated_in_field: false,
+            metadata: None,
+        };
+        let paragraphs = IndexParagraphs {
+            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+        };
+        let resource = Resource {
+            resource: Some(resource_id),
+            metadata: None,
+            texts: HashMap::with_capacity(0),
+            status: ResourceStatus::Processed as i32,
+            labels: vec!["2".to_string()],
+            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs_to_delete: vec![],
+            sentences_to_delete: vec![],
+            relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
+            shard_id: "DOC".to_string(),
+            ..Default::default()
+        };
+
+        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
+        let mut request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            field_labels: vec!["1".to_string()],
+            key_filters: vec!["DOC/KEY/1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: true,
+            ..Default::default()
+        };
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
+        assert_eq!(result.documents.len(), 4);
+
+        request.key_filters = vec!["DOC/KEY/0".to_string()];
+        let result = reader.search(&request, &context).unwrap();
+        assert_eq!(result.documents.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_new_vector_reader() -> anyhow::Result<()> {
+        let dir = TempDir::new().unwrap();
+        let segment_path = dir.path();
+        let vsc = VectorConfig {
+            similarity: Similarity::Cosine,
+            normalize_vectors: false,
+            vector_type: VectorType::DenseF32 {
+                dimension: 3,
+            },
+        };
+        let raw_sentences = [
+            ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
+            ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
+            ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
+            ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
+        ];
+        let resource_id = ResourceId {
+            shard_id: "DOC".to_string(),
+            uuid: "DOC/KEY".to_string(),
+        };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
+        let paragraph = IndexParagraph {
+            start: 0,
+            end: 0,
+            sentences: sentences.clone(),
+            vectorsets_sentences: HashMap::from([(
+                "__default__".to_string(),
+                VectorsetSentences {
+                    sentences,
+                },
+            )]),
+            field: "".to_string(),
+            labels: vec!["1".to_string()],
+            index: 3,
+            split: "".to_string(),
+            repeated_in_field: false,
+            metadata: None,
+        };
+        let paragraphs = IndexParagraphs {
+            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+        };
+        let resource = Resource {
+            resource: Some(resource_id),
+            metadata: None,
+            texts: HashMap::with_capacity(0),
+            status: ResourceStatus::Processed as i32,
+            labels: vec!["2".to_string()],
+            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs_to_delete: vec![],
+            sentences_to_delete: vec![],
+            relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
+            shard_id: "DOC".to_string(),
+            ..Default::default()
+        };
+
+        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            field_labels: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: true,
+            ..Default::default()
+        };
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
+        assert_eq!(result.documents.len(), 4);
+
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            field_labels: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: false,
+            ..Default::default()
+        };
+        let result = reader.search(&request, &context).unwrap();
+        assert_eq!(result.documents.len(), 3);
+
+        // Check that min_score works
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            field_labels: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: false,
+            min_score: 900.0,
+            ..Default::default()
+        };
+        let result = reader.search(&request, &context).unwrap();
+        assert_eq!(result.documents.len(), 0);
+
+        let bad_request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0],
+            field_labels: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: false,
+            ..Default::default()
+        };
+        assert!(reader.search(&bad_request, &context).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_vectors_deduplication() -> anyhow::Result<()> {
+        let dir = TempDir::new().unwrap();
+        let segment_path = dir.path();
+        let vsc = VectorConfig {
+            similarity: Similarity::Cosine,
+            normalize_vectors: false,
+            vector_type: VectorType::DenseF32 {
+                dimension: 3,
+            },
+        };
+        let raw_sentences =
+            [("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]), ("DOC/KEY/1/2".to_string(), vec![1.0, 2.0, 3.0])];
+        let resource_id = ResourceId {
+            shard_id: "DOC".to_string(),
+            uuid: "DOC/KEY".to_string(),
+        };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
+        let paragraph = IndexParagraph {
+            start: 0,
+            end: 0,
+            sentences: sentences.clone(),
+            vectorsets_sentences: HashMap::from([(
+                "__default__".to_string(),
+                VectorsetSentences {
+                    sentences,
+                },
+            )]),
+            field: "".to_string(),
+            labels: vec!["1".to_string()],
+            index: 3,
+            split: "".to_string(),
+            repeated_in_field: false,
+            metadata: None,
+        };
+        let paragraphs = IndexParagraphs {
+            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+        };
+        let resource = Resource {
+            resource: Some(resource_id),
+            metadata: None,
+            texts: HashMap::with_capacity(0),
+            status: ResourceStatus::Processed as i32,
+            labels: vec!["2".to_string()],
+            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs_to_delete: vec![],
+            sentences_to_delete: vec![],
+            relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
+            shard_id: "DOC".to_string(),
+            ..Default::default()
+        };
+
+        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            field_labels: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: true,
+            ..Default::default()
+        };
+        let context = VectorsContext::default();
+        let result = reader.search(&request, &context).unwrap();
+        assert_eq!(result.documents.len(), 2);
+
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            field_labels: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            with_duplicates: false,
+            ..Default::default()
+        };
+        let result = reader.search(&request, &context).unwrap();
+        assert_eq!(result.documents.len(), 1);
+
+        Ok(())
     }
 }

@@ -29,6 +29,7 @@ from nucliadb.common.cluster.discovery.utils import (
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.nidx import start_nidx_utility
 from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer import service as consumer_service
@@ -60,6 +61,9 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     await start_transaction_utility(SERVICE_NAME)
     if not cluster_settings.standalone_mode and indexing_settings.index_jetstream_servers is not None:
         await start_indexing_utility(SERVICE_NAME)
+
+    if indexing_settings.index_nidx_subject is not None:
+        await start_nidx_utility()
 
     await start_audit_utility(SERVICE_NAME)
 
