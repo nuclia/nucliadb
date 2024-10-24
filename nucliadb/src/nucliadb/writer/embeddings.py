@@ -53,7 +53,6 @@ from nucliadb_utils.utilities import get_storage
 async def add(kbid: str, embedding_id: str) -> None:
     await add_semantic_model_to_learning_config(kbid, semantic_model=embedding_id)
     await add_vectorset_to_index(kbid, vectorset_id=embedding_id)
-
     # TODO: Start a task to recompute the embeddings for this kb
     return
 
@@ -61,7 +60,6 @@ async def add(kbid: str, embedding_id: str) -> None:
 async def delete(kbid: str, embedding_id: str) -> None:
     await delete_semantic_model_from_learning_config(kbid, semantic_model=embedding_id)
     await delete_vectorset_from_index(kbid, vectorset_id=embedding_id)
-
     # TODO: Cancel any ongoing task for this embedding on this kb
     # TODO: Finally, spawn a task to clean up the storage
     return
@@ -78,9 +76,7 @@ async def add_semantic_model_to_learning_config(kbid: str, semantic_model: str):
 
 async def delete_semantic_model_from_learning_config(kbid: str, semantic_model: str):
     config = await learning_proxy.get_configuration(kbid)
-    if config is None:
-        raise HTTPException(status_code=404, detail="Learning configuration not found")
-    if semantic_model in config.semantic_models:
+    if config is not None and semantic_model not in config.semantic_models:
         config.semantic_models.remove(semantic_model)
         await learning_proxy.set_configuration(kbid, config.model_dump())
 
