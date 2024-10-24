@@ -40,10 +40,19 @@ pub async fn run() -> anyhow::Result<()> {
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
     let storage = settings.storage.expect("Storage settings needed").object_store.client();
 
-    let index_metadata = Arc::new(SearchMetadata::new(work_dir.path().to_path_buf()));
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
+    let index_metadata = Arc::new(SearchMetadata::new(work_dir.path().to_path_buf(), tx));
     let index_cache = Arc::new(IndexCache::new(index_metadata.clone(), meta.clone()));
 
     let sync_task = tokio::task::spawn(run_sync(meta.clone(), storage.clone(), index_metadata.clone()));
+
+    let index_cache_copy = index_cache.clone();
+    let refresher_task = tokio::task::spawn(async move {
+        while let Some(index_id) = rx.recv().await {
+            // TODO: Do something smarter
+            index_cache_copy.remove(&index_id).await;
+        }
+    });
 
     let api = grpc::SearchServer::new(meta.clone(), index_cache);
     let api_task = tokio::task::spawn(api.serve());
@@ -54,6 +63,9 @@ pub async fn run() -> anyhow::Result<()> {
         }
         r = api_task => {
             println!("api_task() completed first {:?}", r)
+        }
+        r = refresher_task => {
+            println!("refresher_task() completed first {:?}", r)
         }
     }
 

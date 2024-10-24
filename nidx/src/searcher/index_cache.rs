@@ -67,6 +67,10 @@ impl IndexCache {
         }
     }
 
+    pub async fn remove(&self, id: &IndexId) {
+        self.cache.lock().await.remove(id);
+    }
+
     pub async fn load(&self, id: &IndexId) -> anyhow::Result<Arc<IndexSearcher>> {
         let read = self.metadata.get(id).await;
         let read2 = read.get().await;

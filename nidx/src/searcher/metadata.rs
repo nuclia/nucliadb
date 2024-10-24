@@ -25,7 +25,7 @@ use std::{
 };
 
 use nidx_types::Seq;
-use tokio::sync::{OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
+use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
 
 use crate::metadata::{Index, IndexId, SegmentId};
 
@@ -56,13 +56,15 @@ impl Operations {
 pub struct SearchMetadata {
     work_dir: PathBuf,
     synced_metadata: Arc<RwLock<HashMap<IndexId, RwLock<IndexMetadata>>>>,
+    changes: Sender<IndexId>,
 }
 
 impl SearchMetadata {
-    pub fn new(work_dir: PathBuf) -> Self {
+    pub fn new(work_dir: PathBuf, changes: Sender<IndexId>) -> Self {
         SearchMetadata {
             work_dir,
             synced_metadata: Arc::new(RwLock::new(HashMap::new())),
+            changes,
         }
     }
 
@@ -84,6 +86,7 @@ impl SearchMetadata {
     }
 
     pub async fn set(&self, index: Index, operations: Operations) {
+        let index_id = index.id;
         let read_meta = self.synced_metadata.read().await;
         let existing_meta = read_meta.get(&index.id);
         if let Some(existing_meta) = existing_meta {
@@ -98,6 +101,7 @@ impl SearchMetadata {
                 }),
             );
         }
+        self.changes.send(index_id).await.unwrap();
     }
 
     pub async fn get<'a>(&self, index_id: &IndexId) -> GuardedIndexMetadata {
