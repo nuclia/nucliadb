@@ -27,3 +27,7 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 nidx_protos = { version = "0.1.0", path = "nidx_protos" }
 tonic = "0.12.3"
+lru = "0.12.5"
+
+[dev-dependencies]
+rand = "0.8.5"

@@ -28,19 +28,19 @@ use tonic::{transport::Server, Request, Response, Result, Status};
 
 use crate::NidxMetadata;
 
-use super::{metadata::SearchMetadata, shard_search::search};
+use super::{index_cache::IndexCache, shard_search::search};
 use tracing::*;
 
 pub struct SearchServer {
     meta: NidxMetadata,
-    index_metadata: Arc<SearchMetadata>,
+    index_cache: Arc<IndexCache>,
 }
 
 impl SearchServer {
-    pub fn new(meta: NidxMetadata, index_metadata: Arc<SearchMetadata>) -> Self {
+    pub fn new(meta: NidxMetadata, index_cache: Arc<IndexCache>) -> Self {
         SearchServer {
             meta,
-            index_metadata,
+            index_cache,
         }
     }
 
@@ -101,7 +101,7 @@ impl NodeReader for SearchServer {
     }
 
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        let response = search(&self.meta, self.index_metadata.clone(), request.into_inner()).await;
+        let response = search(&self.meta, self.index_cache.clone(), request.into_inner()).await;
         match response {
             Ok(response) => Ok(Response::new(response)),
             Err(e) => {

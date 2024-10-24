@@ -19,24 +19,20 @@
 //
 
 mod grpc;
+mod index_cache;
 mod metadata;
 mod shard_search;
 mod sync;
 
+use index_cache::IndexCache;
 use metadata::SearchMetadata;
 use sync::run_sync;
 
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use tempfile::tempdir;
 
-use crate::{
-    metadata::{IndexId, SegmentId},
-    NidxMetadata, Settings,
-};
+use crate::{NidxMetadata, Settings};
 
 pub async fn run() -> anyhow::Result<()> {
     let work_dir = tempdir()?;
@@ -45,10 +41,11 @@ pub async fn run() -> anyhow::Result<()> {
     let storage = settings.storage.expect("Storage settings needed").object_store.client();
 
     let index_metadata = Arc::new(SearchMetadata::new(work_dir.path().to_path_buf()));
+    let index_cache = Arc::new(IndexCache::new(index_metadata.clone(), meta.clone()));
 
     let sync_task = tokio::task::spawn(run_sync(meta.clone(), storage.clone(), index_metadata.clone()));
 
-    let api = grpc::SearchServer::new(meta.clone(), index_metadata.clone());
+    let api = grpc::SearchServer::new(meta.clone(), index_cache);
     let api_task = tokio::task::spawn(api.serve());
 
     tokio::select! {
@@ -61,8 +58,4 @@ pub async fn run() -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-fn segment_path(work_dir: &Path, index_id: &IndexId, segment_id: &SegmentId) -> PathBuf {
-    work_dir.join(format!("{index_id:?}/{segment_id:?}"))
 }

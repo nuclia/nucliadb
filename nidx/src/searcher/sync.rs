@@ -20,7 +20,6 @@
 
 use std::{cmp::max, sync::Arc, time::Duration};
 
-use nidx_types::Seq;
 use object_store::DynObjectStore;
 use sqlx::types::time::PrimitiveDateTime;
 
@@ -49,12 +48,6 @@ pub async fn run_sync(
 
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
-}
-
-pub struct SearcherSyncOperation {
-    seq: Seq,
-    segment_ids: Vec<SegmentId>,
-    deleted_keys: Vec<String>,
 }
 
 async fn sync_index(
