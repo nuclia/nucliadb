@@ -30,7 +30,7 @@ pub enum IndexKind {
     Relation,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, sqlx::Type)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(transparent)]
 pub struct IndexId(i64);
 impl From<i64> for IndexId {
