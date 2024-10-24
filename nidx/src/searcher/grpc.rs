@@ -18,27 +18,26 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{collections::HashMap, pin::Pin, sync::Arc};
+use std::{pin::Pin, sync::Arc};
 
 use futures::Stream;
 use nidx_protos::node_reader_server::NodeReader;
 use nidx_protos::*;
 use node_reader_server::NodeReaderServer;
-use tokio::sync::RwLock;
 use tonic::{transport::Server, Request, Response, Result, Status};
 
-use crate::{metadata::IndexId, NidxMetadata};
+use crate::NidxMetadata;
 
-use super::{shard_search::search, SearcherOperation};
+use super::{metadata::SearchMetadata, shard_search::search};
 use tracing::*;
 
 pub struct SearchServer {
     meta: NidxMetadata,
-    index_metadata: Arc<RwLock<HashMap<IndexId, Vec<SearcherOperation>>>>,
+    index_metadata: Arc<SearchMetadata>,
 }
 
 impl SearchServer {
-    pub fn new(meta: NidxMetadata, index_metadata: Arc<RwLock<HashMap<IndexId, Vec<SearcherOperation>>>>) -> Self {
+    pub fn new(meta: NidxMetadata, index_metadata: Arc<SearchMetadata>) -> Self {
         SearchServer {
             meta,
             index_metadata,

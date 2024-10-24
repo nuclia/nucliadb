@@ -18,22 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use nidx_protos::{SearchRequest, SearchResponse, VectorSearchRequest};
 use nidx_vector::{config::VectorConfig, data_point_provider::reader::VectorsContext, VectorSearcher};
-use tokio::sync::RwLock;
 
-use crate::{
-    metadata::{Index, IndexId},
-    NidxMetadata,
-};
+use crate::{metadata::Index, NidxMetadata};
 
-use super::SearcherOperation;
+use super::metadata::SearchMetadata;
 
 pub async fn search(
     meta: &NidxMetadata,
-    index_metadata: Arc<RwLock<HashMap<IndexId, Vec<SearcherOperation>>>>,
+    index_metadata: Arc<SearchMetadata>,
     search_request: SearchRequest,
 ) -> anyhow::Result<SearchResponse> {
     // TODO: Bring all query parsing code from nucliadb_vectors and use all indexes

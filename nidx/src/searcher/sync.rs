@@ -18,32 +18,25 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{
-    cmp::max,
-    collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
+use std::{cmp::max, sync::Arc, time::Duration};
 
-use nidx_types::{SegmentMetadata, Seq};
+use nidx_types::Seq;
 use object_store::DynObjectStore;
 use sqlx::types::time::PrimitiveDateTime;
-use tokio::sync::RwLock;
 
 use crate::{
-    metadata::{Index, IndexId, Segment, SegmentId},
+    metadata::{Index, IndexId, SegmentId},
+    searcher::metadata::SeqMetadata,
     segment_store::download_segment,
     NidxMetadata,
 };
 
-use super::{segment_path, SearcherOperation};
+use super::metadata::{Operations, SearchMetadata};
 
 pub async fn run_sync(
     meta: NidxMetadata,
-    work_dir: PathBuf,
     storage: Arc<DynObjectStore>,
-    index_metadata: Arc<RwLock<HashMap<IndexId, Vec<SearcherOperation>>>>,
+    index_metadata: Arc<SearchMetadata>,
 ) -> anyhow::Result<()> {
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
     loop {
@@ -51,7 +44,7 @@ pub async fn run_sync(
         for index in indexes {
             // TODO: Handle errors
             last_updated_at = max(last_updated_at, index.updated_at);
-            sync_index(&meta, &work_dir, storage.clone(), index_metadata.clone(), index).await?;
+            sync_index(&meta, storage.clone(), index_metadata.clone(), index).await?;
         }
 
         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -66,19 +59,12 @@ pub struct SearcherSyncOperation {
 
 async fn sync_index(
     meta: &NidxMetadata,
-    work_dir: &Path,
     storage: Arc<DynObjectStore>,
-    index_metadata: Arc<RwLock<HashMap<IndexId, Vec<SearcherOperation>>>>,
+    index_metadata: Arc<SearchMetadata>,
     index: Index,
 ) -> anyhow::Result<()> {
-    let read_index_metadata = index_metadata.read().await;
-    let empty = vec![];
-    let current_meta = read_index_metadata.get(&index.id).unwrap_or(&empty);
-    let current_segs: HashSet<SegmentId> = current_meta.iter().flat_map(|s| s.segments.iter().map(|s| s.0)).collect();
-    drop(read_index_metadata);
-
     let new_meta = sqlx::query_as!(
-        SearcherSyncOperation,
+        SeqMetadata,
         r#"WITH ready_segments AS (
             SELECT index_id, seq, array_agg(id) AS segment_ids
                 FROM segments
@@ -97,53 +83,23 @@ async fn sync_index(
     )
     .fetch_all(&meta.pool)
     .await?;
-    let new_segs: HashSet<SegmentId> = new_meta.iter().flat_map(|s| s.segment_ids.clone()).collect();
 
-    // Calculate deletions
-    let deleted_segments = current_segs.difference(&new_segs);
-    let new_segments = new_segs.difference(&current_segs);
+    let operations = Operations(new_meta);
+
+    let diff = index_metadata.diff(&index.id, &operations).await;
 
     // Download new segments
-    for segment_id in new_segments {
-        download_segment(storage.clone(), *segment_id, segment_path(work_dir, &index.id, segment_id)).await?;
+    for segment_id in diff.added_segments {
+        download_segment(storage.clone(), segment_id, index_metadata.segment_location(&index.id, &segment_id)).await?;
     }
 
     // Switch meta
-    let segments = sqlx::query_as!(
-        Segment,
-        "SELECT * FROM segments WHERE id = ANY($1)",
-        new_segs.iter().collect::<Vec<&SegmentId>>() as Vec<&SegmentId>
-    )
-    .fetch_all(&meta.pool)
-    .await?;
-    let segment_meta_map: HashMap<SegmentId, Segment> = segments.into_iter().map(|s| (s.id, s)).collect();
-    let new_full_meta = new_meta
-        .into_iter()
-        .map(|op| SearcherOperation {
-            seq: op.seq,
-            deleted_keys: op.deleted_keys,
-            segments: op
-                .segment_ids
-                .iter()
-                .map(|sid| {
-                    let segment = segment_meta_map.get(sid).unwrap();
-                    (
-                        *sid,
-                        SegmentMetadata {
-                            records: segment.records.unwrap() as usize,
-                            tags: HashSet::new(),
-                            path: segment_path(work_dir, &index.id, sid),
-                        },
-                    )
-                })
-                .collect(),
-        })
-        .collect();
-    index_metadata.write().await.insert(index.id, new_full_meta);
+    let index_id = index.id;
+    index_metadata.set(index, operations).await;
 
     // Delete unneeded segments
-    for segment_id in deleted_segments {
-        std::fs::remove_dir_all(segment_path(work_dir, &index.id, segment_id))?;
+    for segment_id in diff.removed_segments {
+        std::fs::remove_dir_all(index_metadata.segment_location(&index_id, &segment_id))?;
     }
 
     Ok(())

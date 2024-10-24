@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -32,6 +34,10 @@ impl From<i64> for SegmentId {
 impl SegmentId {
     pub fn storage_key(&self) -> object_store::path::Path {
         format!("segment/{}", self.0).into()
+    }
+
+    pub fn local_path(&self, index_id: &IndexId) -> PathBuf {
+        format!("{}/{}", index_id.0, self.0).into()
     }
 }
 

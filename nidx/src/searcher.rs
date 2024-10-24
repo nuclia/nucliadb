@@ -19,31 +19,24 @@
 //
 
 mod grpc;
+mod metadata;
 mod shard_search;
 mod sync;
 
-use nidx_types::{SegmentMetadata, Seq};
+use metadata::SearchMetadata;
 use sync::run_sync;
 
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use tempfile::tempdir;
-use tokio::sync::RwLock;
 
 use crate::{
     metadata::{IndexId, SegmentId},
     NidxMetadata, Settings,
 };
-
-pub struct SearcherOperation {
-    seq: Seq,
-    segments: Vec<(SegmentId, SegmentMetadata)>,
-    deleted_keys: Vec<String>,
-}
 
 pub async fn run() -> anyhow::Result<()> {
     let work_dir = tempdir()?;
@@ -51,14 +44,9 @@ pub async fn run() -> anyhow::Result<()> {
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
     let storage = settings.storage.expect("Storage settings needed").object_store.client();
 
-    let index_metadata = Arc::new(RwLock::new(HashMap::new()));
+    let index_metadata = Arc::new(SearchMetadata::new(work_dir.path().to_path_buf()));
 
-    let sync_task = tokio::task::spawn(run_sync(
-        meta.clone(),
-        work_dir.path().to_path_buf(),
-        storage.clone(),
-        index_metadata.clone(),
-    ));
+    let sync_task = tokio::task::spawn(run_sync(meta.clone(), storage.clone(), index_metadata.clone()));
 
     let api = grpc::SearchServer::new(meta.clone(), index_metadata.clone());
     let api_task = tokio::task::spawn(api.serve());
