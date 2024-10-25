@@ -17,13 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use super::{NidxMetadata, Segment};
+use super::{IndexId, NidxMetadata, Segment, SegmentId};
 use nidx_types::Seq;
 use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 
 #[derive(Clone)]
 pub struct MergeJob {
     pub id: i64,
+    pub index_id: IndexId,
     pub retries: i16,
     pub seq: Seq,
     pub enqueued_at: PrimitiveDateTime,
@@ -32,15 +33,25 @@ pub struct MergeJob {
 }
 
 impl MergeJob {
-    pub async fn create(meta: &NidxMetadata, segment_ids: &[i64], seq: i64) -> sqlx::Result<MergeJob> {
+    pub async fn create(
+        meta: &NidxMetadata,
+        index_id: IndexId,
+        segment_ids: &[SegmentId],
+        seq: Seq,
+    ) -> sqlx::Result<MergeJob> {
         let mut tx = meta.transaction().await?;
-        let job = sqlx::query_as!(MergeJob, "INSERT INTO merge_jobs (seq) VALUES ($1) RETURNING *", seq)
-            .fetch_one(&mut *tx)
-            .await?;
+        let job = sqlx::query_as!(
+            MergeJob,
+            "INSERT INTO merge_jobs (seq, index_id) VALUES ($1, $2) RETURNING *",
+            i64::from(seq),
+            index_id as IndexId,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
         let affected = sqlx::query!(
             "UPDATE segments SET merge_job_id = $1 WHERE id = ANY($2) AND merge_job_id IS NULL",
             job.id,
-            segment_ids
+            segment_ids as &[SegmentId]
         )
         .execute(&mut *tx)
         .await?

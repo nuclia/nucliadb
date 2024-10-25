@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO merge_jobs (seq) VALUES ($1) RETURNING *",
+  "query": "INSERT INTO merge_jobs (seq, index_id) VALUES ($1, $2) RETURNING *",
   "describe": {
     "columns": [
       {
@@ -10,32 +10,38 @@
       },
       {
         "ordinal": 1,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
         "name": "retries",
         "type_info": "Int2"
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "seq",
         "type_info": "Int8"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "enqueued_at",
         "type_info": "Timestamp"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "started_at",
         "type_info": "Timestamp"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "running_at",
         "type_info": "Timestamp"
       }
     ],
     "parameters": {
       "Left": [
+        "Int8",
         "Int8"
       ]
     },
@@ -44,9 +50,10 @@
       false,
       false,
       false,
+      false,
       true,
       true
     ]
   },
-  "hash": "1af431638ce0a7566f7e869992a46a4d5d214ae4decd000eba0ec36bd2e84809"
+  "hash": "4963bae09292bcd89667bd199a6995e7fe10118f26e1a695a7213abadfc88751"
 }

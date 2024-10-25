@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-
 use std::{collections::HashSet, path::PathBuf};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -30,6 +29,11 @@ impl From<i64> for Seq {
 impl From<u64> for Seq {
     fn from(value: u64) -> Self {
         Self(value as i64)
+    }
+}
+impl From<Seq> for i64 {
+    fn from(value: Seq) -> Self {
+        value.0
     }
 }
 impl From<&Seq> for i64 {
