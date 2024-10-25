@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["nidx_vector", "nidx_types", "nidx_protos"]
+members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests"]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -30,4 +30,5 @@ tonic = "0.12.3"
 lru = "0.12.5"
 
 [dev-dependencies]
+nidx_tests = { path = "nidx_tests" }
 rand = "0.8.5"

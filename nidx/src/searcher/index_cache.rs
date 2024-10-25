@@ -31,7 +31,7 @@ use tokio::sync::{Mutex, Semaphore};
 use crate::metadata::{IndexId, Segment, SegmentId};
 use crate::NidxMetadata;
 
-use super::metadata::SearchMetadata;
+use super::sync::SyncMetadata;
 
 pub enum IndexSearcher {
     Vector(VectorSearcher),
@@ -39,15 +39,15 @@ pub enum IndexSearcher {
 
 pub struct IndexCache {
     cache: Mutex<ResourceCache<IndexId, IndexSearcher>>,
-    metadata: Arc<SearchMetadata>,
+    sync_metadata: Arc<SyncMetadata>,
     metadb: NidxMetadata,
 }
 
 impl IndexCache {
-    pub fn new(metadata: Arc<SearchMetadata>, metadb: NidxMetadata) -> Self {
+    pub fn new(metadata: Arc<SyncMetadata>, metadb: NidxMetadata) -> Self {
         IndexCache {
             cache: ResourceCache::new_unbounded().into(),
-            metadata,
+            sync_metadata: metadata,
             metadb,
         }
     }
@@ -72,7 +72,7 @@ impl IndexCache {
     }
 
     pub async fn load(&self, id: &IndexId) -> anyhow::Result<Arc<IndexSearcher>> {
-        let read = self.metadata.get(id).await;
+        let read = self.sync_metadata.get(id).await;
         let read2 = read.get().await;
         let Some(meta) = read2 else {
             return Err(anyhow!("Index not found"));
@@ -102,7 +102,7 @@ impl IndexCache {
                     op.segment_ids
                         .iter()
                         .map(|sid| nidx_types::SegmentMetadata {
-                            path: self.metadata.segment_location(id, sid),
+                            path: self.sync_metadata.segment_location(id, sid),
                             records: segments[sid].records.unwrap() as usize,
                             tags: HashSet::new(),
                         })

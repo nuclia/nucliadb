@@ -26,6 +26,3 @@ mod settings;
 
 pub use metadata::NidxMetadata;
 pub use settings::Settings;
-
-#[cfg(test)]
-mod test;

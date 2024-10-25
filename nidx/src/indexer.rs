@@ -101,7 +101,7 @@ pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -
     Ok(resource)
 }
 
-async fn index_resource(
+pub async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
     shard_id: &str,
@@ -156,7 +156,7 @@ mod tests {
 
     use super::*;
     use crate::metadata::{IndexKind, NidxMetadata};
-    use crate::test::*;
+    use nidx_tests::*;
 
     #[sqlx::test]
     async fn test_index_resource(pool: sqlx::PgPool) {

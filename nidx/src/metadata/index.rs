@@ -83,7 +83,6 @@ impl Index {
         kind: IndexKind,
         name: &str,
     ) -> sqlx::Result<Index> {
-        println!("{shard_id:?} {kind:?} {name:?}");
         sqlx::query_as!(
             Index,
             r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3"#,

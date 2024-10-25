@@ -20,19 +20,66 @@
 
 mod grpc;
 mod index_cache;
-mod metadata;
 mod shard_search;
 mod sync;
 
 use index_cache::IndexCache;
-use metadata::SearchMetadata;
+use object_store::DynObjectStore;
 use sync::run_sync;
+use sync::SyncMetadata;
 
+use std::path::Path;
 use std::sync::Arc;
 
 use tempfile::tempdir;
 
 use crate::{NidxMetadata, Settings};
+
+pub use index_cache::IndexSearcher;
+
+pub struct SyncedSearcher {
+    index_cache: Arc<IndexCache>,
+    sync_metadata: Arc<SyncMetadata>,
+    meta: NidxMetadata,
+}
+
+impl SyncedSearcher {
+    pub fn new(meta: NidxMetadata, work_dir: &Path) -> Self {
+        let sync_metadata = Arc::new(SyncMetadata::new(work_dir.to_path_buf()));
+        let index_cache = Arc::new(IndexCache::new(sync_metadata.clone(), meta.clone()));
+
+        Self {
+            meta,
+            index_cache,
+            sync_metadata,
+        }
+    }
+
+    pub async fn run(&self, storage: Arc<DynObjectStore>) {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
+        let index_cache_copy = self.index_cache.clone();
+        let refresher_task = tokio::task::spawn(async move {
+            while let Some(index_id) = rx.recv().await {
+                // TODO: Do something smarter
+                index_cache_copy.remove(&index_id).await;
+            }
+        });
+        let sync_task =
+            tokio::task::spawn(run_sync(self.meta.clone(), storage.clone(), self.sync_metadata.clone(), tx));
+        tokio::select! {
+            r = sync_task => {
+                println!("sync_task() completed first {:?}", r)
+            }
+            r = refresher_task => {
+                println!("refresher_task() completed first {:?}", r)
+            }
+        }
+    }
+
+    pub fn index_cache(&self) -> Arc<IndexCache> {
+        self.index_cache.clone()
+    }
+}
 
 pub async fn run() -> anyhow::Result<()> {
     let work_dir = tempdir()?;
@@ -40,32 +87,18 @@ pub async fn run() -> anyhow::Result<()> {
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
     let storage = settings.storage.expect("Storage settings needed").object_store.client();
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
-    let index_metadata = Arc::new(SearchMetadata::new(work_dir.path().to_path_buf(), tx));
-    let index_cache = Arc::new(IndexCache::new(index_metadata.clone(), meta.clone()));
+    let searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
 
-    let sync_task = tokio::task::spawn(run_sync(meta.clone(), storage.clone(), index_metadata.clone()));
-
-    let index_cache_copy = index_cache.clone();
-    let refresher_task = tokio::task::spawn(async move {
-        while let Some(index_id) = rx.recv().await {
-            // TODO: Do something smarter
-            index_cache_copy.remove(&index_id).await;
-        }
-    });
-
-    let api = grpc::SearchServer::new(meta.clone(), index_cache);
+    let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
     let api_task = tokio::task::spawn(api.serve());
+    let search_task = tokio::task::spawn(async move { searcher.run(storage).await });
 
     tokio::select! {
-        r = sync_task => {
+        r = search_task => {
             println!("sync_task() completed first {:?}", r)
         }
         r = api_task => {
             println!("api_task() completed first {:?}", r)
-        }
-        r = refresher_task => {
-            println!("refresher_task() completed first {:?}", r)
         }
     }
 

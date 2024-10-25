@@ -45,7 +45,7 @@ impl NidxMetadata {
         Self::new_with_pool(pool).await
     }
 
-    pub(crate) async fn new_with_pool(pool: sqlx::PgPool) -> Result<Self, sqlx::Error> {
+    pub async fn new_with_pool(pool: sqlx::PgPool) -> Result<Self, sqlx::Error> {
         // Run migrations inside a transaction that holds a global lock, avoids races
         let mut tx = pool.begin().await?;
         sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID).execute(&mut *tx).await?;
