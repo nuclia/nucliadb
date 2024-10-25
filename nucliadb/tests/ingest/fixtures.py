@@ -29,6 +29,7 @@ import nats
 import pytest
 from grpc import aio
 
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
@@ -342,13 +343,23 @@ TEST_CLOUDFILE = rpb.CloudFile(
 
 
 # HELPERS
+async def kb_vectorsets(kb):
+    vectorsets = []
+    async for _, vs in datamanagers.vectorsets.iter(kb.txn, kbid=kb.kbid):
+        vectorsets.append(vs)
+    return vectorsets
 
 
 async def make_field(field, extracted_text):
+    vectorsets = await kb_vectorsets(field.resource.kb)
     await field.set_extracted_text(make_extracted_text(field.id, body=extracted_text))
     await field.set_field_metadata(make_field_metadata(field.id))
     await field.set_large_field_metadata(make_field_large_metadata(field.id))
-    await field.set_vectors(make_extracted_vectors(field.id))
+    if len(vectorsets) >= 2:
+        for idx, vs in enumerate(vectorsets):
+            await field.set_vectors(make_extracted_vectors(field.id, vs, idx))
+    else:
+        await field.set_vectors(make_extracted_vectors(field.id))
 
 
 def make_extracted_text(field_id, body: str):
@@ -394,10 +405,16 @@ def make_field_large_metadata(field_id):
     return ex1
 
 
-def make_extracted_vectors(field_id):
+def make_extracted_vectors(field_id, vectorset=None, vectorset_idx=None):
     ex1 = rpb.ExtractedVectorsWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
-    v1 = rpb.Vector(start=0, end=20, vector=b"ansjkdn")
+    if vectorset:
+        ex1.vectorset_id = vectorset.vectorset_id
+        dimension = vectorset.vectorset_index_config.vector_dimension
+        # We set a distinctive vector that we can later check
+        v1 = rpb.Vector(start=0, end=20, vector=[float(vectorset_idx)] * dimension)
+    else:
+        v1 = rpb.Vector(start=0, end=20, vector=b"ansjkdn")
     ex1.vectors.vectors.vectors.append(v1)
     return ex1
 
