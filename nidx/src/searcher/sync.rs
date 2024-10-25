@@ -273,12 +273,12 @@ mod tests {
     }
 
     fn downloaded_segments(work_dir: &Path) -> anyhow::Result<Vec<SegmentId>> {
-        Ok(std::fs::read_dir(work_dir)?
-            .map(|entry| {
-                let name: i64 = entry.unwrap().file_name().to_str().unwrap().parse().unwrap();
-                name.into()
-            })
-            .collect())
+        let mut segment_ids: Vec<_> = std::fs::read_dir(work_dir)?
+            .map(|entry| entry.unwrap().file_name().to_str().unwrap().parse::<i64>().unwrap())
+            .collect();
+
+        segment_ids.sort();
+        Ok(segment_ids.into_iter().map(SegmentId::from).collect())
     }
 
     #[sqlx::test]
