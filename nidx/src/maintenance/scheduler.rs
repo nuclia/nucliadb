@@ -68,8 +68,17 @@ pub async fn run() -> anyhow::Result<()> {
     let mut consumer2 = consumer.clone();
     tasks.spawn(async move {
         loop {
-            if let Err(e) = purge_deletions(&meta2, &mut consumer2).await {
-                warn!(?e, "Error in purge_deletions task");
+            match consumer2.info().await {
+                Ok(consumer_info) => {
+                    let oldest_confirmed_seq = consumer_info.ack_floor.stream_sequence;
+                    let oldest_pending_seq = oldest_confirmed_seq + 1;
+                    if let Err(e) = purge_deletions(&meta2, oldest_pending_seq).await {
+                        warn!(?e, "Error in purge_deletions task");
+                    }
+                }
+                Err(e) => {
+                    warn!(?e, "Error while getting consumer information");
+                }
             }
             sleep(Duration::from_secs(15)).await;
         }
@@ -145,10 +154,7 @@ pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) 
     Ok(())
 }
 
-pub async fn purge_deletions(meta: &NidxMetadata, consumer: &mut PullConsumer) -> anyhow::Result<()> {
-    let oldest_confirmed_seq = consumer.info().await?.ack_floor.stream_sequence;
-    let oldest_pending_seq = oldest_confirmed_seq + 1;
-
+pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> anyhow::Result<()> {
     // Purge deletions that don't apply to any segment and won't apply to any segment pending to process
     sqlx::query!(
         "WITH oldest_segments AS (

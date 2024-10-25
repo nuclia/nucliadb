@@ -213,6 +213,7 @@ mod tests {
     use tempfile::tempdir;
 
     use crate::{
+        maintenance::scheduler::purge_deletions,
         metadata::{Deletion, Index, Segment, SegmentId, Shard},
         searcher::sync::{sync_index, Operations, SyncMetadata},
         NidxMetadata,
@@ -359,7 +360,7 @@ mod tests {
         }
 
         // Purge old deletions
-        sqlx::query!("DELETE FROM deletions").execute(&meta.pool).await?;
+        purge_deletions(&meta, 10).await?;
 
         sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
         assert_eq!(rx.try_recv()?, index.id);
