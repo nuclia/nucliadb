@@ -61,7 +61,7 @@ class Field:
     type: str = "x"
     value: Optional[Any]
     extracted_text: Optional[ExtractedText]
-    extracted_vectors: Optional[VectorObject]
+    extracted_vectors: dict[Optional[str], VectorObject]
     computed_metadata: Optional[FieldComputedMetadata]
     large_computed_metadata: Optional[LargeComputedMetadata]
     question_answers: Optional[FieldQuestionAnswers]
@@ -78,7 +78,7 @@ class Field:
 
         self.value = None
         self.extracted_text: Optional[ExtractedText] = None
-        self.extracted_vectors = None
+        self.extracted_vectors = {}
         self.computed_metadata = None
         self.large_computed_metadata = None
         self.question_answers = None
@@ -306,7 +306,7 @@ class Field:
         return self.extracted_text
 
     async def set_vectors(self, payload: ExtractedVectorsWrapper) -> Optional[VectorObject]:
-        vectorset = payload.vectorset_id
+        vectorset = payload.vectorset_id or None
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[VectorObject] = await self.get_vectors(
@@ -328,7 +328,7 @@ class Field:
             else:
                 await self.storage.upload_pb(sf, payload.vectors)
                 vo = payload.vectors
-                self.extracted_vectors = payload.vectors
+                self.extracted_vectors[vectorset] = payload.vectors
         else:
             if payload.HasField("file"):
                 raw_payload = await self.storage.downloadbytescf(payload.file)
@@ -346,18 +346,22 @@ class Field:
             if len(payload.vectors.vectors.vectors) > 0:
                 actual_payload.vectors.CopyFrom(payload.vectors.vectors)
             await self.storage.upload_pb(sf, actual_payload)
-            self.extracted_vectors = actual_payload
+            self.extracted_vectors[vectorset] = actual_payload
         return vo
 
     async def get_vectors(
         self, vectorset: Optional[str] = None, force: bool = False
     ) -> Optional[VectorObject]:
-        if self.extracted_vectors is None or force:
+        # compat with vectorsets coming from protobuffers where no value is
+        # empty string instead of None. This shouldn't be handled here but we
+        # have to make sure it gets the correct vectorset
+        vectorset = vectorset or None
+        if self.extracted_vectors.get(vectorset, None) is None or force:
             sf = self._get_extracted_vectors_storage_field(vectorset)
             payload = await self.storage.download_pb(sf, VectorObject)
             if payload is not None:
-                self.extracted_vectors = payload
-        return self.extracted_vectors
+                self.extracted_vectors[vectorset] = payload
+        return self.extracted_vectors.get(vectorset, None)
 
     async def set_field_metadata(self, payload: FieldComputedMetadataWrapper) -> FieldComputedMetadata:
         if self.type in SUBFIELDFIELDS:
