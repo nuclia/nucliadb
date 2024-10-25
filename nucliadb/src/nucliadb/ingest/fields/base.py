@@ -352,12 +352,16 @@ class Field:
     async def get_vectors(
         self, vectorset: Optional[str] = None, force: bool = False
     ) -> Optional[VectorObject]:
-        if self.extracted_vectors.get(vectorset or None, None) is None or force:
+        # compat with vectorsets coming from protobuffers where no value is
+        # empty string instead of None. This shouldn't be handled here but we
+        # have to make sure it gets the correct vectorset
+        vectorset = vectorset or None
+        if self.extracted_vectors.get(vectorset, None) is None or force:
             sf = self._get_extracted_vectors_storage_field(vectorset)
             payload = await self.storage.download_pb(sf, VectorObject)
             if payload is not None:
                 self.extracted_vectors[vectorset] = payload
-        return self.extracted_vectors[vectorset]
+        return self.extracted_vectors.get(vectorset, None)
 
     async def set_field_metadata(self, payload: FieldComputedMetadataWrapper) -> FieldComputedMetadata:
         if self.type in SUBFIELDFIELDS:

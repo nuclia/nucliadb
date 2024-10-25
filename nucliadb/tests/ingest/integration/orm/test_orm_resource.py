@@ -22,7 +22,6 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
-from tests.ingest.fixtures import create_resource
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.broker_message import generate_broker_message
@@ -49,6 +48,7 @@ from nucliadb_protos.writer_pb2 import (
     FieldID,
     Paragraph,
 )
+from tests.ingest.fixtures import create_resource
 
 
 @pytest.mark.asyncio
