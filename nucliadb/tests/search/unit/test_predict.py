@@ -60,7 +60,6 @@ async def test_dummy_predict_engine():
     pe = DummyPredictEngine()
     await pe.initialize()
     await pe.finalize()
-    await pe.send_feedback("kbid", Mock(), "", "", "")
     assert await pe.rephrase_query("kbid", Mock())
     assert await pe.chat_query_ndjson("kbid", Mock())
     assert await pe.detect_entities("kbid", "some sentence")
@@ -145,16 +144,6 @@ def session_limits_exceeded():
     [
         ("detect_entities", ["kbid", "sentence"]),
         ("chat_query_ndjson", ["kbid", ChatModel(question="foo", user_id="bar")]),
-        (
-            "send_feedback",
-            [
-                "kbid",
-                FeedbackRequest(ident="foo", good=True, task=FeedbackTasks.CHAT),
-                "",
-                "",
-                "",
-            ],
-        ),
         ("rephrase_query", ["kbid", RephraseModel(question="foo", user_id="bar")]),
     ],
 )
@@ -175,7 +164,6 @@ async def test_predict_engine_handles_limits_exceeded_error(session_limits_excee
     [
         ("chat_query_ndjson", ["kbid", Mock()], True, None),
         ("rephrase_query", ["kbid", Mock()], True, None),
-        ("send_feedback", ["kbid", MagicMock(), "", "", ""], False, None),
         ("detect_entities", ["kbid", "sentence"], False, []),
         ("summarize", ["kbid", Mock(resources={})], True, None),
     ],
@@ -235,62 +223,6 @@ async def test_rephrase_onprem():
     pe.session.post.assert_awaited_once_with(
         url="public-europe1/api/v1/predict/rephrase/kbid",
         json=item.model_dump(),
-        headers={"X-STF-NUAKEY": "Bearer nuakey"},
-    )
-
-
-async def test_feedback():
-    pe = PredictEngine(
-        "cluster",
-        "public-{zone}",
-        zone="europe1",
-        onprem=False,
-    )
-    pe.session = get_mocked_session("POST", 204, json="", context_manager=False)
-
-    x_nucliadb_user = "user"
-    x_ndb_client = "client"
-    x_forwarded_for = "fwfor"
-    item = FeedbackRequest(ident="foo", good=True, task=FeedbackTasks.CHAT)
-    await pe.send_feedback("kbid", item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
-
-    json_data = item.model_dump()
-    json_data["user_id"] = x_nucliadb_user
-    json_data["client"] = x_ndb_client
-    json_data["forwarded"] = x_forwarded_for
-
-    pe.session.post.assert_awaited_once_with(
-        url="cluster/api/v1/internal/predict/feedback",
-        json=json_data,
-        headers={"X-STF-KBID": "kbid"},
-    )
-
-
-async def test_feedback_onprem():
-    pe = PredictEngine(
-        "cluster",
-        "public-{zone}",
-        zone="europe1",
-        onprem=True,
-        nuclia_service_account="nuakey",
-    )
-
-    pe.session = get_mocked_session("POST", 204, json="", context_manager=False)
-
-    x_nucliadb_user = "user"
-    x_ndb_client = "client"
-    x_forwarded_for = "fwfor"
-    item = FeedbackRequest(ident="foo", good=True, task=FeedbackTasks.CHAT)
-    await pe.send_feedback("kbid", item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
-
-    json_data = item.model_dump()
-    json_data["user_id"] = x_nucliadb_user
-    json_data["client"] = x_ndb_client
-    json_data["forwarded"] = x_forwarded_for
-
-    pe.session.post.assert_awaited_once_with(
-        url="public-europe1/api/v1/predict/feedback/kbid",
-        json=json_data,
         headers={"X-STF-NUAKEY": "Bearer nuakey"},
     )
 
