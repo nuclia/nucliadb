@@ -1,4 +1,3 @@
-use crate::upload::pack_and_upload;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -18,6 +17,7 @@ use crate::upload::pack_and_upload;
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::segment_store::pack_and_upload;
 use crate::{metadata::*, Settings};
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
@@ -101,7 +101,7 @@ pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -
     Ok(resource)
 }
 
-async fn index_resource(
+pub async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
     shard_id: &str,
@@ -128,6 +128,7 @@ async fn index_resource(
         let mut tx = meta.transaction().await?;
         segment.mark_ready(&mut *tx, records, size as i64).await?;
         Deletion::create(&mut *tx, index.id, seq, &deletions).await?;
+        index.updated(&mut *tx).await?;
         tx.commit().await?;
     }
     Ok(())
@@ -155,14 +156,14 @@ mod tests {
 
     use super::*;
     use crate::metadata::{IndexKind, NidxMetadata};
-    use crate::test::*;
+    use nidx_tests::*;
 
     #[sqlx::test]
     async fn test_index_resource(pool: sqlx::PgPool) {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
-        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
         index_resource(

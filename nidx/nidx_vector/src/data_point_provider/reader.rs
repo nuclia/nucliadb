@@ -36,14 +36,13 @@ use nidx_types::SegmentMetadata;
 use nidx_types::Seq;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 use tracing::*;
 
 #[derive(Clone, Copy)]
 pub struct TimeSensitiveDLog<'a> {
     pub dlog: &'a DTrie,
-    pub time: SystemTime,
+    pub time: Seq,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {
@@ -244,9 +243,8 @@ impl Reader {
             if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
                 continue;
             }
-            let secs: i64 = seq.into();
             let delete_log = TimeSensitiveDLog {
-                time: SystemTime::UNIX_EPOCH + Duration::from_secs(secs as u64),
+                time: *seq,
                 dlog: &self.delete_log,
             };
             let partial_solution = open_data_point.search(

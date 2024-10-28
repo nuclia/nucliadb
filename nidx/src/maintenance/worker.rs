@@ -18,21 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{collections::HashSet, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
-use futures::TryStreamExt;
 use nidx_types::SegmentMetadata;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tokio_util::io::SyncIoBridge;
 use tracing::*;
 
 use crate::{
-    metadata::{Deletion, Index, IndexKind, MergeJob, Segment, SegmentId},
-    upload::pack_and_upload,
+    metadata::{Deletion, Index, IndexKind, MergeJob, Segment},
+    segment_store::{download_segment, pack_and_upload},
     NidxMetadata, Settings,
 };
 
@@ -68,21 +65,6 @@ pub async fn run() -> anyhow::Result<()> {
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
     }
-}
-
-pub async fn download_segment(
-    storage: Arc<DynObjectStore>,
-    segment_id: SegmentId,
-    output_dir: PathBuf,
-) -> anyhow::Result<()> {
-    let response = storage.get(&segment_id.storage_key()).await?.into_stream();
-    let reader = response.map_err(|_| std::io::Error::last_os_error()).into_async_read(); // HACK: Mapping errors randomly
-    let reader = SyncIoBridge::new(reader.compat());
-
-    let mut tar = tar::Archive::new(reader);
-    tokio::task::spawn_blocking(move || tar.unpack(output_dir).unwrap()).await?;
-
-    Ok(())
 }
 
 pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObjectStore>) -> anyhow::Result<()> {
@@ -142,6 +124,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let mut tx = meta.transaction().await?;
     segment.mark_ready(&mut *tx, merged_records as i64, size as i64).await?;
     Segment::delete_many(&mut *tx, &segments.iter().map(|s| s.id).collect::<Vec<_>>()).await?;
+    index.updated(&mut *tx).await?;
     // Delete task if successful. Mark as failed otherwise?
     job.finish(&mut *tx).await?;
     tx.commit().await?;

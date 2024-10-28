@@ -9,8 +9,9 @@ CREATE TABLE indexes (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     shard_id UUID NOT NULL REFERENCES shards(id),
     kind index_kind NOT NULL,
-    name TEXT,
+    name TEXT NOT NULL,
     configuration JSON,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (shard_id, kind, name)
 );
 

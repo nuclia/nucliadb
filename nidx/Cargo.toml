@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["nidx_vector", "nidx_types", "nidx_protos"]
+members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests"]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -26,3 +26,9 @@ nidx_types = { version = "0.1.0", path = "nidx_types" }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 nidx_protos = { version = "0.1.0", path = "nidx_protos" }
+tonic = "0.12.3"
+lru = "0.12.5"
+
+[dev-dependencies]
+nidx_tests = { path = "nidx_tests" }
+rand = "0.8.5"

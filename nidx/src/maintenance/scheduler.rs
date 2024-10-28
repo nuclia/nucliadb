@@ -68,8 +68,17 @@ pub async fn run() -> anyhow::Result<()> {
     let mut consumer2 = consumer.clone();
     tasks.spawn(async move {
         loop {
-            if let Err(e) = purge_deletions(&meta2, &mut consumer2).await {
-                warn!(?e, "Error in purge_deletions task");
+            match consumer2.info().await {
+                Ok(consumer_info) => {
+                    let oldest_confirmed_seq = consumer_info.ack_floor.stream_sequence;
+                    let oldest_pending_seq = oldest_confirmed_seq + 1;
+                    if let Err(e) = purge_deletions(&meta2, oldest_pending_seq).await {
+                        warn!(?e, "Error in purge_deletions task");
+                    }
+                }
+                Err(e) => {
+                    warn!(?e, "Error while getting consumer information");
+                }
             }
             sleep(Duration::from_secs(15)).await;
         }
@@ -145,10 +154,7 @@ pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) 
     Ok(())
 }
 
-pub async fn purge_deletions(meta: &NidxMetadata, consumer: &mut PullConsumer) -> anyhow::Result<()> {
-    let oldest_confirmed_seq = consumer.info().await?.ack_floor.stream_sequence;
-    let oldest_pending_seq = oldest_confirmed_seq + 1;
-
+pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> anyhow::Result<()> {
     // Purge deletions that don't apply to any segment and won't apply to any segment pending to process
     sqlx::query!(
         "WITH oldest_segments AS (
@@ -219,7 +225,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await?;
+            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
             let mut seq: i64 = 0;
 
             for _ in 0..10 {
@@ -236,7 +242,7 @@ mod tests {
             // one job has been scheduled for the index
             let jobs = get_all_merge_jobs(&meta).await?;
             assert_eq!(jobs.len(), 1);
-            assert_eq!(IndexId::from(jobs[0].index_id), index.id);
+            assert_eq!(jobs[0].index_id, index.id);
             assert_eq!(jobs[0].seq, Seq::from(seq));
 
             for segment in index.segments(&meta.pool).await? {
@@ -254,11 +260,11 @@ mod tests {
             let shard = Shard::create(&meta.pool, kbid).await?;
 
             let indexes = vec![
-                Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("english")).await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Text, Some("fulltext")).await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Paragraph, Some("keyword")).await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Relation, Some("relation")).await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Vector, "english").await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Text, "fulltext").await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Paragraph, "keyword").await?,
+                Index::create(&meta.pool, shard.id, IndexKind::Relation, "relation").await?,
             ];
             let mut seq: i64 = 0;
 
@@ -305,7 +311,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await?;
+            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
 
             for seq in [95, 98, 99, 100, 102i64] {
                 let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await?;
@@ -352,7 +358,7 @@ mod tests {
                     assert!(segment.merge_job_id.is_none());
                 }
             }
-            let expected = [95, 98, 99, 100i64].into_iter().map(|s| Seq::from(s)).collect();
+            let expected = [95, 98, 99, 100i64].into_iter().map(Seq::from).collect();
             assert_eq!(segment_sequences, expected);
 
             Ok(())

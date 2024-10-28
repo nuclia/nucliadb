@@ -20,12 +20,12 @@
 
 use config::VectorConfig;
 use data_point::open;
-use data_point_provider::reader::TimeSensitiveDLog;
+use data_point_provider::reader::{Reader, TimeSensitiveDLog, VectorsContext};
+use data_point_provider::DTrie;
 use indexer::index_resource;
-use nidx_protos::Resource;
+use nidx_protos::{Resource, VectorSearchRequest, VectorSearchResponse};
 use nidx_types::{SegmentMetadata, Seq};
 use std::path::Path;
-use std::time::{Duration, SystemTime};
 
 pub struct VectorIndexer;
 
@@ -51,13 +51,12 @@ impl VectorIndexer {
         // Wait and see how the Tantivy indexes turn out
         let mut delete_log = data_point_provider::DTrie::new();
         for d in deletions {
-            let time = SystemTime::UNIX_EPOCH + Duration::from_secs(i64::from(&d.0) as u64);
+            let time = d.0;
             for k in d.1 {
                 delete_log.insert(k.as_bytes(), time);
             }
         }
 
-        // Rename (nidx_vector wants uuid, we use i64 as segment ids) and open the segments
         let segment_ids: Vec<_> = segments
             .into_iter()
             .map(|(meta, seq)| {
@@ -65,7 +64,7 @@ impl VectorIndexer {
                 (
                     TimeSensitiveDLog {
                         dlog: &delete_log,
-                        time: SystemTime::UNIX_EPOCH + Duration::from_secs(i64::from(&seq) as u64),
+                        time: seq,
                     },
                     open_dp,
                 )
@@ -80,6 +79,42 @@ impl VectorIndexer {
         )?;
 
         Ok(open_destination.no_nodes())
+    }
+}
+
+pub struct VectorSearcher {
+    reader: Reader,
+}
+
+impl VectorSearcher {
+    pub fn open(
+        config: VectorConfig,
+        operations: Vec<(Seq, Vec<SegmentMetadata>, Vec<String>)>,
+    ) -> anyhow::Result<Self> {
+        let mut delete_log = DTrie::new();
+        let mut segments = Vec::new();
+
+        for (seq, segment_metas, deleted_keys) in operations {
+            for meta in segment_metas {
+                segments.push((meta, seq));
+            }
+
+            for key in deleted_keys {
+                delete_log.insert(key.as_bytes(), seq);
+            }
+        }
+
+        Ok(VectorSearcher {
+            reader: Reader::open(segments, config, delete_log)?,
+        })
+    }
+
+    pub fn search(
+        &self,
+        request: &VectorSearchRequest,
+        context: &VectorsContext,
+    ) -> anyhow::Result<VectorSearchResponse> {
+        self.reader.search(request, context)
     }
 }
 

@@ -45,7 +45,7 @@ impl NidxMetadata {
         Self::new_with_pool(pool).await
     }
 
-    pub(crate) async fn new_with_pool(pool: sqlx::PgPool) -> Result<Self, sqlx::Error> {
+    pub async fn new_with_pool(pool: sqlx::PgPool) -> Result<Self, sqlx::Error> {
         // Run migrations inside a transaction that holds a global lock, avoids races
         let mut tx = pool.begin().await?;
         sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID).execute(&mut *tx).await?;
@@ -76,15 +76,15 @@ mod tests {
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
         assert_eq!(shard.kbid, kbid);
 
-        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await.unwrap();
         assert_eq!(index.shard_id, shard.id);
         assert_eq!(index.kind, IndexKind::Vector);
-        assert_eq!(index.name, Some("multilingual".into()));
+        assert_eq!(index.name, "multilingual");
 
-        let found = Index::find(&meta.pool, shard.id, IndexKind::Vector, Some("multilingual")).await.unwrap();
+        let found = Index::find(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await.unwrap();
         assert_eq!(found.id, index.id);
         assert_eq!(found.shard_id, shard.id);
         assert_eq!(found.kind, IndexKind::Vector);
-        assert_eq!(found.name, Some("multilingual".into()));
+        assert_eq!(found.name, "multilingual");
     }
 }
