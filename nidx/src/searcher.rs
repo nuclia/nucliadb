@@ -77,7 +77,7 @@ impl SyncedSearcher {
     }
 
     pub fn index_cache(&self) -> Arc<IndexCache> {
-        self.index_cache.clone()
+        Arc::clone(&self.index_cache)
     }
 }
 
