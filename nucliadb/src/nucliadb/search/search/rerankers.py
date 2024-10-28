@@ -23,6 +23,7 @@ import math
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 
+from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import search as search_models
 from nucliadb_models.internal.predict import RerankModel
@@ -135,16 +136,27 @@ class PredictReranker(Reranker):
             user_id="",  # TODO
             context=context,
         )
-        response = await predict.rerank(options.kbid, request)
-
-        reranked = [
-            RankedItem(
-                id=id,
-                score=score,
-                score_type=SCORE_TYPE.RERANKER,
-            )
-            for id, score in response.context_scores.items()
-        ]
+        try:
+            response = await predict.rerank(options.kbid, request)
+        except SendToPredictError:
+            # predict failed, we can't rerank
+            reranked = [
+                RankedItem(
+                    id=item.id,
+                    score=item.score,
+                    score_type=item.score_type,
+                )
+                for item in items
+            ]
+        else:
+            reranked = [
+                RankedItem(
+                    id=id,
+                    score=score,
+                    score_type=SCORE_TYPE.RERANKER,
+                )
+                for id, score in response.context_scores.items()
+            ]
         sort_by_score(reranked)
         best = reranked[: options.top_k]
         return best
