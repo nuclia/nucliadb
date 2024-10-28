@@ -217,8 +217,6 @@ pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> an
 ///                              |    to split)    |
 /// ```
 ///
-/// TODO: merge segments with too many deletions
-///
 struct MergeScheduler {
     /// Minimum number of segments needed to perform a merge for an index
     min_number_of_segments: usize,
@@ -312,6 +310,7 @@ impl MergeScheduler {
             buckets.push(current_bucket);
 
             for segments in buckets {
+                // TODO: merge segments with too many deletions
                 if segments.len() >= self.min_number_of_segments {
                     debug!(?segments, "Scheduling merge job for bucket");
                     MergeJob::create(meta, m.index_id.into(), &segments, last_indexed_seq).await?;
