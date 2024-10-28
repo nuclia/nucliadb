@@ -1168,7 +1168,7 @@ class FieldMetadata(google.protobuf.message.Message):
     def thumbnail(self) -> global___CloudFile: ...
     @property
     def positions(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Positions]:
-        """Map of key f"{entity_text}/{entity_type}" with `entity_text` present in `ner` map and value positions to reflect the entity positions in the text"""
+        """Map with keys f"{entity_text}/{entity_type}" for every `entity_text` present in `ner` field, and positions as values to reflect the entity positions in the text"""
 
     @property
     def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Relations]: ...

@@ -290,7 +290,7 @@ message FieldMetadata {
     CloudFile thumbnail = 9;
     string language = 10;
     string summary = 11;
-    // Map of key f"{entity_text}/{entity_type}" with `entity_text` present in `ner` map and value positions to reflect the entity positions in the text
+    // Map with keys f"{entity_text}/{entity_type}" for every `entity_text` present in `ner` field, and positions as values to reflect the entity positions in the text
     map<string, Positions> positions = 12; 
     repeated Relations relations = 13;
     string mime_type = 14;

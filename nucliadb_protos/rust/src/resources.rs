@@ -720,7 +720,7 @@ pub struct FieldMetadata {
     pub language: ::prost::alloc::string::String,
     #[prost(string, tag = "11")]
     pub summary: ::prost::alloc::string::String,
-    /// Map of key f"{entity_text}/{entity_type}" with `entity_text` present in `ner` map and value positions to reflect the entity positions in the text
+    /// Map with keys f"{entity_text}/{entity_type}" for every `entity_text` present in `ner` field, and positions as values to reflect the entity positions in the text
     #[prost(map = "string, message", tag = "12")]
     pub positions: ::std::collections::HashMap<
         ::prost::alloc::string::String,
