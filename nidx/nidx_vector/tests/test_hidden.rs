@@ -22,8 +22,10 @@ use std::collections::{HashMap, HashSet};
 
 use nidx_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSearchRequest, VectorSentence};
 use nidx_vector::config::VectorConfig;
+use nidx_vector::data_point_provider::reader::{Reader, VectorsContext};
+use nidx_vector::data_point_provider::DTrie;
+use nidx_vector::indexer::{index_resource, ResourceWrapper};
 use nidx_vector::query_language::BooleanExpression;
-use nidx_vector::service::{ResourceWrapper, VectorReaderService, VectorWriterService, VectorsContext};
 use tempfile::tempdir;
 use uuid::Uuid;
 
@@ -61,20 +63,24 @@ fn resource(labels: Vec<String>) -> Resource {
 
 #[test]
 fn test_hidden_search() -> anyhow::Result<()> {
-    let workdir = tempdir()?;
-    let index_path = workdir.path().join("vectors");
-    let mut writer = VectorWriterService::create(&index_path, VectorConfig::default())?;
+    let config = VectorConfig::default();
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];
     let hidden_resource = resource(labels);
-    writer.set_resource(ResourceWrapper::from(&hidden_resource))?;
+    let hidden_dir = tempdir()?;
+    let (hidden_segment, _) = index_resource(ResourceWrapper::from(&hidden_resource), hidden_dir.path(), &config)?;
 
     let visible_resource = resource(vec![]);
-    writer.set_resource(ResourceWrapper::from(&visible_resource))?;
+    let visible_dir = tempdir()?;
+    let (visible_segment, _) = index_resource(ResourceWrapper::from(&visible_resource), visible_dir.path(), &config)?;
 
     // Find all resources
-    let reader = VectorReaderService::open(&index_path)?;
+    let reader = Reader::open(
+        vec![(hidden_segment.unwrap(), 0i64.into()), (visible_segment.unwrap(), 0i64.into())],
+        config,
+        DTrie::new(),
+    )?;
     let request = VectorSearchRequest {
         vector: vec![0.5, 0.5, 0.5, 0.5],
         min_score: -1.0,

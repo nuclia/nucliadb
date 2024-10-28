@@ -10,26 +10,31 @@
       },
       {
         "ordinal": 1,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
         "name": "retries",
         "type_info": "Int2"
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "seq",
         "type_info": "Int8"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "enqueued_at",
         "type_info": "Timestamp"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "started_at",
         "type_info": "Timestamp"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "running_at",
         "type_info": "Timestamp"
       }
@@ -38,6 +43,7 @@
       "Left": []
     },
     "nullable": [
+      false,
       false,
       false,
       false,

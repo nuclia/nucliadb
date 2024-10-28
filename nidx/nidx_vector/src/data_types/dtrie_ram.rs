@@ -19,17 +19,16 @@
 //
 
 use std::collections::HashMap;
-use std::time::SystemTime;
 
-use serde::{Deserialize, Serialize};
+use nidx_types::Seq;
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone)]
 pub struct DTrie {
-    value: Option<SystemTime>,
+    value: Option<Seq>,
     go_table: HashMap<u8, Box<DTrie>>,
 }
 impl DTrie {
-    fn inner_get(&self, key: &[u8], current: Option<SystemTime>) -> Option<SystemTime> {
+    fn inner_get(&self, key: &[u8], current: Option<Seq>) -> Option<Seq> {
         let current = std::cmp::max(current, self.value);
         let [head, tail @ ..] = key else {
             return current;
@@ -39,7 +38,7 @@ impl DTrie {
         };
         node.inner_get(tail, current)
     }
-    fn inner_prune(&mut self, time: SystemTime) -> bool {
+    fn inner_prune(&mut self, time: Seq) -> bool {
         self.value = self.value.filter(|v| *v > time);
         self.go_table = std::mem::take(&mut self.go_table)
             .into_iter()
@@ -52,7 +51,7 @@ impl DTrie {
     pub fn new() -> DTrie {
         DTrie::default()
     }
-    pub fn insert(&mut self, key: &[u8], value: SystemTime) {
+    pub fn insert(&mut self, key: &[u8], value: Seq) {
         match key {
             [] => {
                 self.value = Some(value);
@@ -63,10 +62,10 @@ impl DTrie {
             }
         }
     }
-    pub fn get(&self, key: &[u8]) -> Option<SystemTime> {
+    pub fn get(&self, key: &[u8]) -> Option<Seq> {
         self.inner_get(key, None)
     }
-    pub fn prune(&mut self, time: SystemTime) {
+    pub fn prune(&mut self, time: Seq) {
         self.inner_prune(time);
     }
     pub fn size(&self) -> usize {
@@ -84,8 +83,6 @@ impl DTrie {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use super::*;
 
     const KEY: &str = "key";
@@ -95,10 +92,10 @@ mod tests {
 
     #[test]
     fn insert_search() {
-        let tplus0 = SystemTime::now();
-        let tplus1 = tplus0 + Duration::from_secs(1);
-        let tplus2 = tplus0 + Duration::from_secs(2);
-        let tplus3 = tplus0 + Duration::from_secs(3);
+        let tplus0 = 100i64.into();
+        let tplus1 = 101i64.into();
+        let tplus2 = 102i64.into();
+        let tplus3 = 103i64.into();
 
         // Time matches the prefix order
         let mut trie = DTrie::new();
@@ -144,10 +141,10 @@ mod tests {
     }
     #[test]
     fn prune() {
-        let tplus0 = SystemTime::now();
-        let tplus1 = tplus0 + Duration::from_secs(1);
-        let tplus2 = tplus0 + Duration::from_secs(2);
-        let tplus3 = tplus0 + Duration::from_secs(3);
+        let tplus0 = 100i64.into();
+        let tplus1 = 101i64.into();
+        let tplus2 = 102i64.into();
+        let tplus3 = 103i64.into();
 
         let mut trie = DTrie::new();
         trie.insert(KEY.as_bytes(), tplus0);

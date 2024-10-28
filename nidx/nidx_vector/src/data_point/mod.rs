@@ -35,17 +35,14 @@ use crate::VectorR;
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
 use fs::{File, OpenOptions};
-use fs2::FileExt;
-use io::{BufWriter, ErrorKind, Write};
+use io::{BufWriter, Write};
 use memmap2::Mmap;
+use nidx_types::SegmentMetadata;
 use node::Node;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::io::BufReader;
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::path::Path;
 use std::{fs, io};
 
 pub use ops_hnsw::DataRetriever;
@@ -54,110 +51,15 @@ pub use uuid::Uuid as DpId;
 mod file_names {
     pub const NODES: &str = "nodes.kv";
     pub const HNSW: &str = "index.hnsw";
-    pub const JOURNAL: &str = "journal.json";
-    pub const DATA_POINT_PIN: &str = ".pin";
 }
 
-pub struct DataPointPin {
-    data_point_id: DpId,
-    data_point_path: PathBuf,
-    journal_path: PathBuf,
-    #[allow(unused)]
-    pin: File,
-}
-impl DataPointPin {
-    pub fn id(&self) -> DpId {
-        self.data_point_id
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.data_point_path
-    }
-
-    pub fn is_pinned(path: &Path, id: DpId) -> io::Result<bool> {
-        let data_point_path = path.join(id.to_string());
-        let pin_path = data_point_path.join(file_names::DATA_POINT_PIN);
-
-        if !pin_path.is_file() {
-            return Ok(false);
-        }
-
-        let pin_file = File::open(pin_path)?;
-
-        let Err(error) = pin_file.try_lock_exclusive() else {
-            return Ok(false);
-        };
-
-        if let ErrorKind::WouldBlock = error.kind() {
-            Ok(true)
-        } else {
-            Err(error)
-        }
-    }
-
-    pub fn read_journal(&self) -> io::Result<Journal> {
-        let journal = File::open(&self.journal_path)?;
-        let journal: Journal = serde_json::from_reader(BufReader::new(journal))?;
-        Ok(journal)
-    }
-
-    pub fn create_pin(dir: &Path) -> io::Result<DataPointPin> {
-        let id = DpId::new_v4();
-        let folder_name = id.to_string();
-        let temp_dir = format!("{folder_name}.tmp");
-        let data_point_path = dir.join(folder_name);
-        let temp_data_point_path = dir.join(temp_dir);
-        let journal_path = data_point_path.join(file_names::JOURNAL);
-
-        std::fs::create_dir(&temp_data_point_path)?;
-
-        let temp_pin_path = temp_data_point_path.join(file_names::DATA_POINT_PIN);
-        let pin_file = File::create(temp_pin_path)?;
-        pin_file.lock_shared()?;
-
-        std::fs::rename(&temp_data_point_path, &data_point_path)?;
-
-        Ok(DataPointPin {
-            journal_path,
-            data_point_path,
-            pin: pin_file,
-            data_point_id: id,
-        })
-    }
-
-    pub fn open_pin(dir: &Path, id: DpId) -> io::Result<DataPointPin> {
-        let data_point_path = dir.join(id.to_string());
-        let pin_path = data_point_path.join(file_names::DATA_POINT_PIN);
-        let journal_path = data_point_path.join(file_names::JOURNAL);
-        let pin_file = File::create(pin_path)?;
-
-        pin_file.lock_shared()?;
-
-        Ok(DataPointPin {
-            journal_path,
-            data_point_path,
-            pin: pin_file,
-            data_point_id: id,
-        })
-    }
-}
-
-pub fn delete(dir: &Path, uid: DpId) -> VectorR<()> {
-    let uid = uid.to_string();
-    let id = dir.join(uid);
-    fs::remove_dir_all(id)?;
-    Ok(())
-}
-
-pub fn open(pin: &DataPointPin) -> VectorR<OpenDataPoint> {
-    let data_point_path = &pin.data_point_path;
-    let nodes_file = File::open(data_point_path.join(file_names::NODES))?;
-    let journal_file = File::open(data_point_path.join(file_names::JOURNAL))?;
-    let hnsw_file = File::open(data_point_path.join(file_names::HNSW))?;
+pub fn open(metadata: SegmentMetadata) -> VectorR<OpenDataPoint> {
+    let path = &metadata.path;
+    let nodes_file = File::open(path.join(file_names::NODES))?;
+    let hnsw_file = File::open(path.join(file_names::HNSW))?;
 
     let nodes = unsafe { Mmap::map(&nodes_file)? };
     let index = unsafe { Mmap::map(&hnsw_file)? };
-    let journal: Journal = serde_json::from_reader(BufReader::new(journal_file))?;
 
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
@@ -167,37 +69,26 @@ pub fn open(pin: &DataPointPin) -> VectorR<OpenDataPoint> {
     }
 
     Ok(OpenDataPoint {
-        journal,
+        metadata,
         nodes,
         index,
     })
 }
 
 pub fn merge<Dlog>(
-    pin: &DataPointPin,
+    data_point_path: &Path,
     operants: &[(Dlog, &OpenDataPoint)],
     config: &VectorConfig,
-    merge_time: SystemTime,
 ) -> VectorR<OpenDataPoint>
 where
     Dlog: DeleteLog,
 {
-    let data_point_id = pin.data_point_id;
-    let data_point_path = &pin.data_point_path;
-
     let nodes_path = data_point_path.join(file_names::NODES);
     let mut nodes_file_options = OpenOptions::new();
     nodes_file_options.read(true);
     nodes_file_options.write(true);
     nodes_file_options.create(true);
     let mut nodes_file = nodes_file_options.open(nodes_path)?;
-
-    let journal_path = data_point_path.join(file_names::JOURNAL);
-    let mut journal_file_options = OpenOptions::new();
-    journal_file_options.read(true);
-    journal_file_options.write(true);
-    journal_file_options.create(true);
-    let mut journal_file = journal_file_options.open(journal_path)?;
 
     let hnsw_path = data_point_path.join(file_names::HNSW);
     let mut hnsw_file_options = OpenOptions::new();
@@ -208,12 +99,12 @@ where
 
     // Sort largest operant first so we reuse as much of the HNSW as possible
     let mut operants = operants.iter().collect::<Vec<_>>();
-    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.1.journal().no_nodes()));
+    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.1.metadata.records));
 
     // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
-    let tags = operants[0].1.journal().tags().clone();
+    let tags = operants[0].1.metadata.tags.clone();
     for (_, dp) in &operants {
-        if dp.journal().tags() != &tags {
+        if dp.metadata.tags != tags {
             return Err(crate::VectorErr::InconsistentMergeSegmentTags);
         }
     }
@@ -251,19 +142,6 @@ where
 
     let index = unsafe { Mmap::map(&hnsw_file)? };
 
-    let journal = Journal {
-        nodes: no_nodes,
-        uid: data_point_id,
-        ctime: merge_time,
-        tags,
-    };
-
-    {
-        let mut journalf_buffer = BufWriter::new(&mut journal_file);
-        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
-        journalf_buffer.flush()?;
-    }
-
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
@@ -271,20 +149,20 @@ where
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    let metadata = SegmentMetadata {
+        path: data_point_path.to_path_buf(),
+        records: no_nodes,
+        tags,
+    };
+
     Ok(OpenDataPoint {
-        journal,
+        metadata,
         nodes,
         index,
     })
 }
 
-pub fn create(
-    pin: &DataPointPin,
-    elems: Vec<Elem>,
-    time: Option<SystemTime>,
-    config: &VectorConfig,
-    tags: HashSet<String>,
-) -> VectorR<OpenDataPoint> {
+pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSet<String>) -> VectorR<OpenDataPoint> {
     // Check dimensions
     if let Some(dim) = config.vector_type.dimension() {
         if elems.iter().any(|elem| elem.vector.len() != dim) {
@@ -292,25 +170,17 @@ pub fn create(
         }
     }
 
-    let data_point_id = pin.data_point_id;
-    let data_point_path = &pin.data_point_path;
     let mut nodes_file_options = OpenOptions::new();
     nodes_file_options.read(true);
     nodes_file_options.write(true);
     nodes_file_options.create(true);
-    let mut nodesf = nodes_file_options.open(data_point_path.join(file_names::NODES))?;
-
-    let mut journal_file_options = OpenOptions::new();
-    journal_file_options.read(true);
-    journal_file_options.write(true);
-    journal_file_options.create(true);
-    let mut journalf = journal_file_options.open(data_point_path.join(file_names::JOURNAL))?;
+    let mut nodesf = nodes_file_options.open(path.join(file_names::NODES))?;
 
     let mut hnsw_file_options = OpenOptions::new();
     hnsw_file_options.read(true);
     hnsw_file_options.write(true);
     hnsw_file_options.create(true);
-    let mut hnswf = hnsw_file_options.open(data_point_path.join(file_names::HNSW))?;
+    let mut hnswf = hnsw_file_options.open(path.join(file_names::HNSW))?;
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
@@ -335,19 +205,6 @@ pub fn create(
     }
     let index = unsafe { Mmap::map(&hnswf)? };
 
-    let journal = Journal {
-        nodes: no_nodes,
-        uid: data_point_id,
-        ctime: time.unwrap_or_else(SystemTime::now),
-        tags,
-    };
-    {
-        // Saving the journal
-        let mut journalf_buffer = BufWriter::new(&mut journalf);
-        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
-        journalf_buffer.flush()?;
-    }
-
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
     {
@@ -355,8 +212,14 @@ pub fn create(
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    let metadata = SegmentMetadata {
+        path: path.to_path_buf(),
+        records: no_nodes,
+        tags,
+    };
+
     Ok(OpenDataPoint {
-        journal,
+        metadata,
         nodes,
         index,
     })
@@ -369,33 +232,7 @@ impl DeleteLog for NoDLog {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Journal {
-    uid: DpId,
-    nodes: usize,
-    ctime: SystemTime,
-    #[serde(default)]
-    tags: HashSet<String>,
-}
-impl Journal {
-    pub fn id(&self) -> DpId {
-        self.uid
-    }
-    pub fn no_nodes(&self) -> usize {
-        self.nodes
-    }
-    pub fn time(&self) -> SystemTime {
-        self.ctime
-    }
-    pub fn update_time(&mut self, time: SystemTime) {
-        self.ctime = time;
-    }
-    pub fn tags(&self) -> &HashSet<String> {
-        &self.tags
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Address(usize);
 impl Address {
     #[cfg(test)]
@@ -635,7 +472,7 @@ impl Neighbour {
 }
 
 pub struct OpenDataPoint {
-    journal: Journal,
+    metadata: SegmentMetadata,
     nodes: Mmap,
     index: Mmap,
 }
@@ -647,32 +484,24 @@ impl AsRef<OpenDataPoint> for OpenDataPoint {
 }
 
 impl OpenDataPoint {
+    pub fn into_metadata(self) -> SegmentMetadata {
+        self.metadata
+    }
+
+    pub fn no_nodes(&self) -> usize {
+        self.metadata.records
+    }
+
+    pub fn tags(&self) -> &HashSet<String> {
+        &self.metadata.tags
+    }
+
     pub fn stored_len(&self) -> Option<usize> {
         if data_store::stored_elements(&self.nodes) == 0 {
             return None;
         }
         let node = data_store::get_value(Node, &self.nodes, 0);
         Some(dense_f32_unaligned::vector_len(Node::vector(node)) as usize)
-    }
-    pub fn get_id(&self) -> DpId {
-        self.journal.uid
-    }
-    pub fn journal(&self) -> &Journal {
-        &self.journal
-    }
-    pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
-        let node_storage = &self.nodes;
-        let length = data_store::stored_elements(node_storage);
-        let data_iterator = (0..length).map(|i| data_store::get_value(Node, node_storage, i));
-        let mut keys = Vec::new();
-        for data in data_iterator {
-            let raw_key = Node.get_key(data);
-            if !delete_log.is_deleted(raw_key) {
-                let string_key = String::from_utf8_lossy(raw_key).to_string();
-                keys.push(string_key);
-            }
-        }
-        keys
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -690,7 +519,8 @@ impl OpenDataPoint {
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
         let filter = FormulaFilter::new(filter);
         let ops = HnswOps::new(&tracker);
-        let neighbours = ops.search(Address(self.journal.nodes), self.index.as_ref(), results, filter, with_duplicates);
+        let neighbours =
+            ops.search(Address(self.metadata.records), self.index.as_ref(), results, filter, with_duplicates);
 
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
     }
@@ -698,10 +528,7 @@ impl OpenDataPoint {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        collections::{BTreeMap, HashSet},
-        time::SystemTime,
-    };
+    use std::collections::{BTreeMap, HashSet};
 
     use nidx_protos::{Position, Representation, SentenceMetadata};
     use rand::{rngs::SmallRng, Rng, SeedableRng};
@@ -713,7 +540,7 @@ mod test {
         vector_types::dense_f32_unaligned::{dot_similarity, encode_vector},
     };
 
-    use super::{create, merge, node::Node, DataPointPin, Elem, LabelDictionary, NoDLog};
+    use super::{create, merge, node::Node, Elem, LabelDictionary, NoDLog};
     use nidx_protos::prost::*;
 
     const DIMENSION: usize = 128;
@@ -794,9 +621,9 @@ mod test {
         let temp_dir = tempdir()?;
 
         // Create a data point with random data of different length
-        let pin = DataPointPin::create_pin(temp_dir.path())?;
+        let path = temp_dir.path();
         let elems = (0..100).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp = create(&pin, elems.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
+        let dp = create(path, elems.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
         let nodes = dp.nodes;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
@@ -831,19 +658,18 @@ mod test {
             normalize_vectors: false,
         };
         let mut rng = SmallRng::seed_from_u64(1234567890);
-        let temp_dir = tempdir()?;
 
         // Create two data points with random data of different length
-        let pin1 = DataPointPin::create_pin(temp_dir.path())?;
+        let path1 = tempdir()?;
         let elems1 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp1 = create(&pin1, elems1.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
+        let dp1 = create(path1.path(), elems1.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
 
-        let pin2 = DataPointPin::create_pin(temp_dir.path())?;
+        let path2 = tempdir()?;
         let elems2 = (0..10).map(|_| random_elem(&mut rng)).collect::<Vec<_>>();
-        let dp2 = create(&pin2, elems2.iter().cloned().map(|x| x.0).collect(), None, &config, HashSet::new())?;
+        let dp2 = create(path2.path(), elems2.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
 
-        let pin_merged = DataPointPin::create_pin(temp_dir.path())?;
-        let merged_dp = merge(&pin_merged, &[(NoDLog, &dp1), (NoDLog, &dp2)], &config, SystemTime::now())?;
+        let path_merged = tempdir()?;
+        let merged_dp = merge(path_merged.path(), &[(NoDLog, &dp1), (NoDLog, &dp2)], &config)?;
         let nodes = merged_dp.nodes;
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
@@ -901,11 +727,9 @@ mod test {
 
         // Create a data point
         let temp_dir = tempdir()?;
-        let pin = DataPointPin::create_pin(temp_dir.path())?;
         let dp = create(
-            &pin,
+            temp_dir.path(),
             elems.iter().map(|(k, v)| Elem::new(k.clone(), v.clone(), Default::default(), None)).collect(),
-            None,
             &config,
             HashSet::new(),
         )?;

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, shard_id, kind as \"kind: IndexKind\", name, configuration FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3",
+  "query": "SELECT id, shard_id, kind as \"kind: IndexKind\", name, configuration, updated_at FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3",
   "describe": {
     "columns": [
       {
@@ -39,6 +39,11 @@
         "ordinal": 4,
         "name": "configuration",
         "type_info": "Json"
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamp"
       }
     ],
     "parameters": {
@@ -64,9 +69,10 @@
       false,
       false,
       false,
+      false,
       true,
-      true
+      false
     ]
   },
-  "hash": "391694cc5a131902fff5145681c6375e6c00a4e2fb2c049e14dd7d41e980183f"
+  "hash": "0592d80a004cb975976e21de68ca2c9c8bf1ade90950e7a846a4387634f2d1c2"
 }
