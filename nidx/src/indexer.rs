@@ -17,8 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::segment_store::pack_and_upload;
-use crate::{metadata::*, Settings};
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
 use futures::stream::StreamExt;
@@ -31,6 +29,9 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::*;
 use uuid::Uuid;
+
+use crate::segment_store::pack_and_upload;
+use crate::{metadata::*, Settings};
 
 pub async fn run() -> anyhow::Result<()> {
     let settings = Settings::from_env();

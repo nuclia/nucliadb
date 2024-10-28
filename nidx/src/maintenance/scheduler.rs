@@ -29,12 +29,14 @@ use tracing::*;
 
 use crate::{
     metadata::{MergeJob, Segment, SegmentId},
+    settings::MergeSettings,
     NidxMetadata, Settings,
 };
 
 pub async fn run() -> anyhow::Result<()> {
     let settings = Settings::from_env();
     let indexer_settings = settings.indexer.unwrap();
+    let merger_settings = settings.merge.unwrap_or_default();
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
 
     let client = async_nats::connect(indexer_settings.nats_server).await?;
@@ -85,11 +87,12 @@ pub async fn run() -> anyhow::Result<()> {
     });
 
     tasks.spawn(async move {
+        let merge_scheduler = MergeScheduler::from_settings(&merger_settings);
         loop {
             match consumer.info().await {
                 Ok(consumer_info) => {
                     let oldest_confirmed_seq = consumer_info.ack_floor.stream_sequence;
-                    if let Err(e) = schedule_merges(&meta, Seq::from(oldest_confirmed_seq)).await {
+                    if let Err(e) = merge_scheduler.schedule_merges(&meta, Seq::from(oldest_confirmed_seq)).await {
                         warn!(?e, "Error in schedule_merges task");
                     }
                 }
@@ -173,37 +176,150 @@ pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> an
     Ok(())
 }
 
-/// Enqueue merge jobs for segments older than `last_indexed_seq` that aren't
-/// already scheduled for merge or marked to delete.
+/// [`MergeScheduler`] implements a logarithmic merge strategy inspired from
+/// tantivy's log merge policy. The algorithm tries to merge segments with
+/// similar number of records.
 ///
-/// Merging involves creation of a single segment from multiple ones, combining
-/// their data and applying deletions. Merge jobs are executed in parallel (in
-/// multiple workers) and while other segments are being indexed. This restricts
-/// us to only merge segments whose sequences are less than the smaller sequence
-/// being indexed.
+/// It works by splitting up segments in different buckets depending on the
+/// amount of records they contain. Segments within a bucket are then scheduled
+/// to be merged together (if there are more than `min_number_of_segments`).
 ///
-/// As an example, if sequences 100 and 102 are indexed but 101 is still being
-/// indexed, we can only merge segments with sequence <= 100. Otherwise, if we
-/// merge 100 and 102 (generating a new 102 segment) and segment 101 included
-/// deletions for 100, we'll never apply them and we'll end in an inconsistent
-/// state.
+/// Buckets are dynamically computed depending on the segments. The biggest one
+/// marks the top bucket, and a configured bucket size marks the next ones.
 ///
-/// Right now, we schedule merges with everything we can
-async fn schedule_merges(meta: &NidxMetadata, last_indexed_seq: Seq) -> anyhow::Result<()> {
-    // TODO: better merge algorithm
-    let merges = sqlx::query!(
-        r#"SELECT index_id, array_agg(id) AS "segment_ids!: Vec<SegmentId>" FROM segments WHERE delete_at IS NULL AND merge_job_id IS NULL AND seq <= $1 GROUP BY index_id"#,
-        i64::from(last_indexed_seq),
-    )
-    .fetch_all(&meta.pool)
-    .await?;
-    for m in merges {
-        if m.segment_ids.len() > 3 {
-            MergeJob::create(meta, m.index_id.into(), &m.segment_ids, last_indexed_seq).await?;
+/// To avoid merging segments too large or dividing in too many buckets for
+/// small segments, one can configure the top and bottom bucket ceilings.
+///
+/// Here's a graphical representation:
+///
+/// ```ignore
+///                              |   (too big to   |
+///                              |    be merged)   |
+///  `top_bucket_max_records` -> +-----------------+
+///                              |  (no segments)  |
+///                              +-----------------+ <- log2(biggest_segment.records)
+///                              |   top bucket    |
+///                              +-----------------+ <- log2(biggest_segment.records) - bucket_size_log
+///                              |                 |
+///                              +-----------------+ <- log2(biggest_segment.records) - 2 * bucket_size_log
+///                              |                 |
+///                              |       ...       |
+///                              |                 |
+///                          +-- +-----------------+
+///       `bucket_size_log` -+   |                 |
+///                          +-- +-----------------+
+///                              |                 |
+///                              +-----------------+ <- log2(biggest_segment.records) - n * bucket_size_log
+/// `bottom_bucket_threshold` -> +  -   -   -  -  -|
+///                              |  bottom bucket  |
+///                              |                 |
+///                              |   (too small    |
+///                              |    to split)    |
+/// ```
+///
+struct MergeScheduler {
+    /// Minimum number of segments needed to perform a merge for an index
+    min_number_of_segments: usize,
+
+    /// Max number of records for a segment to be in the top bucket, i.e.,
+    /// elegible for merge. Once a segment becomes bigger, it won't be merged
+    /// anymore
+    top_bucket_max_records: usize,
+
+    /// Max number of records for a segment to be considered in the bottom
+    /// bucket. Segments with fewer records won't be further splitted in buckets
+    bottom_bucket_threshold: usize,
+
+    /// Log value between buckets. Increasing this number implies more segment
+    /// sizes to be grouped in the same merge job.
+    bucket_size_log: f64,
+}
+
+impl Default for MergeScheduler {
+    fn default() -> Self {
+        Self {
+            min_number_of_segments: 4,
+            top_bucket_max_records: 100_000,
+            bottom_bucket_threshold: 1000,
+            bucket_size_log: 0.75,
+        }
+    }
+}
+
+impl MergeScheduler {
+    pub fn from_settings(settings: &MergeSettings) -> Self {
+        Self {
+            min_number_of_segments: settings.min_number_of_segments,
+            top_bucket_max_records: settings.max_segment_size,
+            ..Default::default()
         }
     }
 
-    Ok(())
+    /// Enqueue merge jobs for segments older than `last_indexed_seq` that aren't
+    /// already scheduled for merge or marked to delete.
+    ///
+    /// Merging involves creation of a single segment from multiple ones, combining
+    /// their data and applying deletions. Merge jobs are executed in parallel (in
+    /// multiple workers) and while other segments are being indexed. This restricts
+    /// us to only merge segments whose sequences are less than the smaller sequence
+    /// being indexed.
+    ///
+    /// As an example, if sequences 100 and 102 are indexed but 101 is still being
+    /// indexed, we can only merge segments with sequence <= 100. Otherwise, if we
+    /// merge 100 and 102 (generating a new 102 segment) and segment 101 included
+    /// deletions for 100, we'll never apply them and we'll end in an inconsistent
+    /// state.
+    pub async fn schedule_merges(&self, meta: &NidxMetadata, last_indexed_seq: Seq) -> anyhow::Result<()> {
+        let merges = sqlx::query!(
+            r#"
+            SELECT
+                index_id,
+                array_agg(
+                    (id, records)
+                    ORDER BY records DESC
+                ) AS "segments!: Vec<(SegmentId, i64)>"
+            FROM segments
+            WHERE
+                delete_at IS NULL AND merge_job_id IS NULL
+                AND seq <= $1
+                AND records <= $2
+            GROUP BY index_id"#,
+            i64::from(last_indexed_seq),
+            self.top_bucket_max_records as i64,
+        )
+        .fetch_all(&meta.pool)
+        .await?;
+
+        for m in merges {
+            let mut buckets = vec![];
+            let mut current_bucket = vec![];
+            let mut current_max_size_log = f64::MAX;
+
+            for (segment_id, records) in m.segments {
+                let segment_size_log =
+                    f64::from(std::cmp::max(records as u32, self.bottom_bucket_threshold as u32)).log2();
+                if segment_size_log <= (current_max_size_log - self.bucket_size_log) {
+                    // traversed to next bucket, store current and continue
+                    buckets.push(current_bucket);
+                    current_bucket = vec![];
+                    current_max_size_log = segment_size_log;
+                }
+
+                current_bucket.push(segment_id);
+            }
+            buckets.push(current_bucket);
+
+            for segments in buckets {
+                // TODO: merge segments with too many deletions
+                if segments.len() >= self.min_number_of_segments {
+                    debug!(?segments, "Scheduling merge job for bucket");
+                    MergeJob::create(meta, m.index_id.into(), &segments, last_indexed_seq).await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -220,6 +336,152 @@ mod tests {
 
         use crate::metadata::{Index, IndexId, IndexKind, NidxMetadata, Shard};
 
+        fn merge_scheduler() -> MergeScheduler {
+            MergeScheduler::from_settings(&MergeSettings {
+                min_number_of_segments: 3,
+                ..Default::default()
+            })
+        }
+
+        async fn create_segments_with_num_records(
+            pool: &sqlx::PgPool,
+            index: &Index,
+            segment_records: &[i64],
+        ) -> anyhow::Result<Seq> {
+            let last_seq = sqlx::query_scalar!(r#"SELECT MAX(seq) from segments"#).fetch_one(pool).await?.unwrap_or(1);
+            let mut seq: i64 = last_seq;
+            for records in segment_records {
+                let segment = Segment::create(pool, index.id, Seq::from(seq)).await?;
+                segment.mark_ready(pool, *records, 512 * records).await?;
+                seq += 1;
+            }
+
+            Ok(Seq::from(seq - 1))
+        }
+
+        #[sqlx::test]
+        async fn test_log_merge_scheduling_not_enough_segments_merge(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let last_seq = create_segments_with_num_records(&meta.pool, &index, &vec![50; 3]).await?;
+
+            let scheduler = MergeScheduler::from_settings(&MergeSettings {
+                min_number_of_segments: 4,
+                ..Default::default()
+            });
+            scheduler.schedule_merges(&meta, last_seq).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert!(jobs.is_empty());
+
+            Ok(())
+        }
+
+        #[sqlx::test]
+        async fn test_log_merge_scheduling_same_size_segments(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let last_seq = create_segments_with_num_records(&meta.pool, &index, &vec![50; 3]).await?;
+
+            let scheduler = MergeScheduler::from_settings(&MergeSettings {
+                min_number_of_segments: 3,
+                ..Default::default()
+            });
+            scheduler.schedule_merges(&meta, last_seq).await?;
+
+            // all segments have been scheduled for merge in a single job
+
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), 1);
+
+            let job = &jobs[0];
+            for segment in index.segments(&meta.pool).await? {
+                assert!(segment.merge_job_id.is_some_and(|id| id == job.id))
+            }
+
+            Ok(())
+        }
+
+        #[sqlx::test]
+        async fn test_log_merge_scheduling_all_buckets(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+
+            let scheduler = MergeScheduler {
+                min_number_of_segments: 2,
+                top_bucket_max_records: 1000,
+                bottom_bucket_threshold: 50,
+                bucket_size_log: 1.0,
+            };
+
+            let last_seq = create_segments_with_num_records(
+                &meta.pool,
+                &index,
+                &vec![
+                    50,   // bottom bucket
+                    10,   // bottom bucket
+                    1000, // log2(1000) = ~9.97 -- will mark the top bucket
+                    63,   // bottom + 1
+                    124,  // bottom + 1
+                    62,   // first in bottom bucket
+                    1001, // exceeds the max segment size, won't appear
+                    20,   // bottom bucket
+                    125,  // top - 2
+                    51,   // just above bottom_bucket_threshold
+                    249,  // top - 2
+                    501,  // last element in top bucket
+                    500,  // just below top bucket
+                ],
+            )
+            .await?;
+            scheduler.schedule_merges(&meta, last_seq).await?;
+
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), 4);
+
+            // For test simplicity, we rely on jobs being created in
+            // top-to-bottom order. Feel free to change this is the algorithm
+            // changes
+            for segment in index.segments(&meta.pool).await? {
+                match segment.records.unwrap() {
+                    // > top_bucket_max_records
+                    1001 => {
+                        assert!(segment.merge_job_id.is_none());
+                    }
+                    // top bucket
+                    501 | 1000 => {
+                        assert!(segment.merge_job_id.is_some_and(|id| id == jobs[0].id))
+                    }
+                    // < min_number_of_segments
+                    500 => {
+                        assert!(segment.merge_job_id.is_none());
+                    }
+                    125 | 249 => {
+                        assert!(segment.merge_job_id.is_some_and(|id| id == jobs[1].id))
+                    }
+                    63 | 124 => {
+                        assert!(segment.merge_job_id.is_some_and(|id| id == jobs[2].id))
+                    }
+                    // bottom bucket
+                    10 | 20 | 50 | 51 | 62 => {
+                        assert!(segment.merge_job_id.is_some_and(|id| id == jobs[3].id))
+                    }
+                    r => {
+                        unreachable!(
+                            "All segment sizes should be handled in the match expression. Did you forgot about {r}?"
+                        )
+                    }
+                }
+            }
+
+            Ok(())
+        }
+
         #[sqlx::test]
         async fn test_schedule_merges_for_shard_with_single_index(pool: sqlx::PgPool) -> anyhow::Result<()> {
             let meta = NidxMetadata::new_with_pool(pool).await?;
@@ -234,16 +496,18 @@ mod tests {
                 seq += 1;
             }
 
+            let last_seq = Seq::from(seq - 1);
+
             // creation of shards/indexes/segments don't trigger any merge job
             assert!(MergeJob::take(&meta.pool).await?.is_none());
 
-            schedule_merges(&meta, Seq::from(seq)).await?;
+            merge_scheduler().schedule_merges(&meta, last_seq).await?;
 
             // one job has been scheduled for the index
             let jobs = get_all_merge_jobs(&meta).await?;
             assert_eq!(jobs.len(), 1);
             assert_eq!(jobs[0].index_id, index.id);
-            assert_eq!(jobs[0].seq, Seq::from(seq));
+            assert_eq!(jobs[0].seq, last_seq);
 
             for segment in index.segments(&meta.pool).await? {
                 assert!(segment.merge_job_id.is_some());
@@ -276,7 +540,7 @@ mod tests {
                 }
             }
 
-            schedule_merges(&meta, Seq::from(seq)).await?;
+            merge_scheduler().schedule_merges(&meta, Seq::from(seq)).await?;
 
             // scheduled a job per index
             let jobs = get_all_merge_jobs(&meta).await?;
@@ -328,7 +592,7 @@ mod tests {
         async fn scheduling_with_smaller_than_existing_sequences(pool: sqlx::PgPool) -> anyhow::Result<()> {
             let meta = ongoing_indexing_scenario(pool).await?;
 
-            schedule_merges(&meta, Seq::from(50i64)).await?;
+            merge_scheduler().schedule_merges(&meta, Seq::from(50i64)).await?;
             let jobs = get_all_merge_jobs(&meta).await?;
             assert!(jobs.is_empty());
 
@@ -340,7 +604,7 @@ mod tests {
             let meta = ongoing_indexing_scenario(pool).await?;
             let ack_floor = Seq::from(100i64);
 
-            schedule_merges(&meta, ack_floor).await?;
+            merge_scheduler().schedule_merges(&meta, ack_floor).await?;
             let jobs = get_all_merge_jobs(&meta).await?;
             assert_eq!(jobs.len(), 1);
 
