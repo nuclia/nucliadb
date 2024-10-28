@@ -230,7 +230,7 @@ struct MergeScheduler {
 
     /// Max number of records for a segment to be considered in the bottom
     /// bucket. Segments with fewer records won't be further splitted in buckets
-    bottom_bucket_threshold: u32,
+    bottom_bucket_threshold: usize,
 
     /// Log value between buckets. Increasing this number implies more segment
     /// sizes to be grouped in the same merge job.
@@ -298,7 +298,8 @@ impl MergeScheduler {
             let mut current_max_size_log = f64::MAX;
 
             for (segment_id, records) in m.segments {
-                let segment_size_log = f64::from(std::cmp::max(records as u32, self.bottom_bucket_threshold)).log2();
+                let segment_size_log =
+                    f64::from(std::cmp::max(records as u32, self.bottom_bucket_threshold as u32)).log2();
                 if segment_size_log <= (current_max_size_log - self.bucket_size_log) {
                     // traversed to next bucket, store current and continue
                     buckets.push(current_bucket);
