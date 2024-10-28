@@ -312,7 +312,7 @@ impl MergeScheduler {
 
             for segments in buckets {
                 if segments.len() >= self.min_number_of_segments {
-                    println!("Merge job for bucket: {segments:?}");
+                    debug!(?segments, "Scheduling merge job for bucket");
                     MergeJob::create(meta, m.index_id.into(), &segments, last_indexed_seq).await?;
                 }
             }
