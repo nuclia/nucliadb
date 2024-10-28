@@ -19,7 +19,7 @@
 #
 import asyncio
 from unittest import mock
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import pytest
@@ -43,8 +43,6 @@ from nucliadb.search.predict import (
 )
 from nucliadb_models.search import (
     ChatModel,
-    FeedbackRequest,
-    FeedbackTasks,
     RephraseModel,
     SummarizedResource,
     SummarizedResponse,

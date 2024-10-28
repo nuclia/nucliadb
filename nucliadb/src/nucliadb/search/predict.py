@@ -41,7 +41,6 @@ from nucliadb_models.internal.predict import (
 )
 from nucliadb_models.search import (
     ChatModel,
-    FeedbackRequest,
     RephraseModel,
     SummarizedResource,
     SummarizedResponse,

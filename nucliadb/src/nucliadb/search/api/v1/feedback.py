@@ -23,7 +23,7 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search import logger, predict
+from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import FeedbackRequest, NucliaDBClientType
