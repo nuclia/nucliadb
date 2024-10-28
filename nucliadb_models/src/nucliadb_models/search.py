@@ -426,7 +426,10 @@ class SearchParamDefaults:
     fields = ParamDefault(
         default=[],
         title="Fields",
-        description="The list of fields to search in. For instance: `a/title` to search only on title field. For more details on filtering by field, see: https://docs.nuclia.dev/docs/rag/advanced/search/#search-in-a-specific-field",  # noqa: E501
+        description=(
+            "The list of fields to search in. For instance: `a/title` to search only on title field. "
+            "For more details on filtering by field, see: https://docs.nuclia.dev/docs/rag/advanced/search/#search-in-a-specific-field. "
+        ),
     )
     filters = ParamDefault(
         default=[],
@@ -560,7 +563,7 @@ class SearchParamDefaults:
     field_type_filter = ParamDefault(
         default=list(FieldTypeName),
         title="Field type filter",
-        description="Filter search results to match paragraphs of a specific field type. E.g: `['conversation', 'text']`",  # noqa
+        description="Define which field types are serialized on resources of search results",
     )
     range_creation_start = ParamDefault(
         default=None,

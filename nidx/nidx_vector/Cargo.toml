@@ -10,11 +10,8 @@ tempfile = "3.13.0"
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
 rand = { version = "0.8.4", features = ["small_rng"] }
 memmap2 = "0.5.3"
-fs2 = "0.4.3"
 thiserror = "1.0.31"
-bincode = "1.3.3"
 bit-set = "0.5.3"
-fxhash = "0.2.1"
 libc = "0.2.153"
 lazy_static = "1.4.0"
 nidx_protos = { version = "0.1.0", path = "../nidx_protos" }

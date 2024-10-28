@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                index_id,\n                array_agg(\n                    (id, records)\n                    ORDER BY records DESC\n                ) AS \"segments!: Vec<(SegmentId, i64)>\"\n            FROM segments\n            WHERE\n                delete_at IS NULL AND merge_job_id IS NULL\n                AND seq <= $1\n                AND records <= $2\n            GROUP BY index_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "segments!: Vec<(SegmentId, i64)>",
+        "type_info": "RecordArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "cfa8466a8f00f1e3df1115e83e50567674de6b10ba1d154f450f1b66ae4352ed"
+}

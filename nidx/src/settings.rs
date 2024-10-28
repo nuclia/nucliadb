@@ -120,9 +120,26 @@ pub struct StorageSettings {
     pub object_store: ObjectStoreConfig,
 }
 
+// Take a look to the merge scheduler for more details about these settings
+#[derive(Deserialize, Debug)]
+pub struct MergeSettings {
+    pub min_number_of_segments: usize,
+    pub max_segment_size: usize,
+}
+
+impl Default for MergeSettings {
+    fn default() -> Self {
+        Self {
+            min_number_of_segments: 4,
+            max_segment_size: 100_000,
+        }
+    }
+}
+
 with_prefix!(metadata "metadata_");
 with_prefix!(indexer "indexer_");
 with_prefix!(storage "storage_");
+with_prefix!(merge "merge_");
 
 #[derive(Deserialize, Debug)]
 pub struct Settings {
@@ -140,6 +157,11 @@ pub struct Settings {
     /// Required by indexer, worker, searcher
     #[serde(flatten, with = "storage")]
     pub storage: Option<StorageSettings>,
+
+    /// Merge scheduling algorithm configuration
+    /// Required by scheduler
+    #[serde(flatten, with = "merge")]
+    pub merge: Option<MergeSettings>,
 }
 
 impl Settings {

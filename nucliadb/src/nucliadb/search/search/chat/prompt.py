@@ -70,6 +70,10 @@ CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 TextBlockId = Union[ParagraphId, FieldId]
 
 
+class ParagraphIdNotFoundInExtractedMetadata(Exception):
+    pass
+
+
 class CappedPromptContext:
     """
     Class to keep track of the size (in number of characters) of the prompt context
@@ -533,18 +537,38 @@ async def get_paragraph_text_with_neighbours(
         )
 
     ops = []
-    for paragraph_index in get_neighbouring_paragraph_indexes(
-        field_paragraphs=field_paragraphs,
-        matching_paragraph=pid,
-        before=before,
-        after=after,
-    ):
-        neighbour_pid = field_paragraphs[paragraph_index]
+    try:
+        for paragraph_index in get_neighbouring_paragraph_indexes(
+            field_paragraphs=field_paragraphs,
+            matching_paragraph=pid,
+            before=before,
+            after=after,
+        ):
+            neighbour_pid = field_paragraphs[paragraph_index]
+            ops.append(
+                asyncio.create_task(
+                    _get_paragraph_text(
+                        kbid=kbid,
+                        pid=neighbour_pid,
+                    )
+                )
+            )
+    except ParagraphIdNotFoundInExtractedMetadata:
+        logger.warning(
+            "Could not find matching paragraph in extracted metadata. This is odd and needs to be investigated.",
+            extra={
+                "kbid": kbid,
+                "matching_paragraph": pid.full(),
+                "field_paragraphs": [p.full() for p in field_paragraphs],
+            },
+        )
+        # If we could not find the matching paragraph in the extracted metadata, we can't retrieve
+        # the neighbouring paragraphs and we simply fetch the text of the matching paragraph.
         ops.append(
             asyncio.create_task(
                 _get_paragraph_text(
                     kbid=kbid,
-                    pid=neighbour_pid,
+                    pid=pid,
                 )
             )
         )
@@ -947,7 +971,12 @@ def get_neighbouring_paragraph_indexes(
     """
     assert before >= 0
     assert after >= 0
-    matching_index = field_paragraphs.index(matching_paragraph)
+    try:
+        matching_index = field_paragraphs.index(matching_paragraph)
+    except ValueError:
+        raise ParagraphIdNotFoundInExtractedMetadata(
+            f"Matching paragraph {matching_paragraph.full()} not found in extracted metadata"
+        )
     start_index = max(0, matching_index - before)
     end_index = min(len(field_paragraphs), matching_index + after + 1)
     return list(range(start_index, end_index))
