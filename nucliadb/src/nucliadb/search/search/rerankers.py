@@ -23,7 +23,7 @@ import math
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 
-from nucliadb.search.predict import SendToPredictError
+from nucliadb.search.predict import ProxiedPredictAPIError, SendToPredictError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import search as search_models
 from nucliadb_models.internal.predict import RerankModel
@@ -138,7 +138,7 @@ class PredictReranker(Reranker):
         )
         try:
             response = await predict.rerank(options.kbid, request)
-        except SendToPredictError:
+        except (SendToPredictError, ProxiedPredictAPIError):
             # predict failed, we can't rerank
             reranked = [
                 RankedItem(

@@ -20,7 +20,9 @@
 
 from unittest.mock import AsyncMock, Mock, patch
 
-from nucliadb.search.predict import SendToPredictError
+import pytest
+
+from nucliadb.search.predict import ProxiedPredictAPIError, SendToPredictError
 from nucliadb.search.search.rerankers import (
     PredictReranker,
     RankedItem,
@@ -153,9 +155,12 @@ async def test_predict_reranker_dont_call_predict_with_empty_results():
         assert reranked[0].score_type == SCORE_TYPE.RERANKER
 
 
-async def test_predict_reranker_handles_predict_failures():
+@pytest.mark.parametrize("error", [SendToPredictError(), ProxiedPredictAPIError(status=500)])
+async def test_predict_reranker_handles_predict_failures(
+    error: Exception,
+):
     predict = AsyncMock()
-    predict.rerank.side_effect = SendToPredictError
+    predict.rerank.side_effect = error
 
     with patch(
         "nucliadb.search.search.rerankers.get_predict", new=Mock(return_value=predict)
