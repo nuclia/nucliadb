@@ -273,12 +273,15 @@ message Position {
 message Positions {
     repeated Position position = 1;
     string entity = 2;
+    // Data augmentation task id where this entity was found in the text
+    optional string data_augmentation_task_id = 6; 
 }
 
 message FieldMetadata {
     repeated string links = 1;
     repeated Paragraph paragraphs = 2;
-    map<string, string> ner = 3;  // Document
+    // Map of entity_text to entity_type (label) found in the text
+    map<string, string> ner = 3;  
     repeated Classification classifications = 4;
     google.protobuf.Timestamp last_index = 5;
     google.protobuf.Timestamp last_understanding = 6;
@@ -287,7 +290,8 @@ message FieldMetadata {
     CloudFile thumbnail = 9;
     string language = 10;
     string summary = 11;
-    map<string, Positions> positions = 12;  // Document
+    // Map of key f"{entity_text}/{entity_type}" with `entity_text` present in `ner` map and value positions to reflect the entity positions in the text
+    map<string, Positions> positions = 12; 
     repeated Relations relations = 13;
     string mime_type = 14;
 }
