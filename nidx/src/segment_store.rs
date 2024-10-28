@@ -18,10 +18,15 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::path::PathBuf;
 use std::{path::Path, sync::Arc};
 
+use futures::TryStreamExt;
 use object_store::DynObjectStore;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::SyncIoBridge;
+
+use crate::metadata::SegmentId;
 
 /// Adapter that implements a sync Writer trait and writes to an AsyncWrite while counting bytes
 struct WriteCounter<T> {
@@ -79,4 +84,19 @@ pub async fn pack_and_upload(
     .await??;
 
     Ok(size)
+}
+
+pub async fn download_segment(
+    storage: Arc<DynObjectStore>,
+    segment_id: SegmentId,
+    output_dir: PathBuf,
+) -> anyhow::Result<()> {
+    let response = storage.get(&segment_id.storage_key()).await?.into_stream();
+    let reader = response.map_err(std::io::Error::from).into_async_read();
+    let reader = SyncIoBridge::new(reader.compat());
+
+    let mut tar = tar::Archive::new(reader);
+    tokio::task::spawn_blocking(move || tar.unpack(output_dir).unwrap()).await?;
+
+    Ok(())
 }

@@ -18,20 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
-use futures::TryStreamExt;
+use nidx_types::SegmentMetadata;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tokio_util::io::SyncIoBridge;
 use tracing::*;
 
 use crate::{
-    metadata::{Deletion, Index, IndexKind, MergeJob, Segment, SegmentId},
-    upload::pack_and_upload,
+    metadata::{Deletion, Index, IndexKind, MergeJob, Segment},
+    segment_store::{download_segment, pack_and_upload},
     NidxMetadata, Settings,
 };
 
@@ -69,27 +67,15 @@ pub async fn run() -> anyhow::Result<()> {
     }
 }
 
-pub async fn download_segment(
-    storage: Arc<DynObjectStore>,
-    segment_id: SegmentId,
-    output_dir: PathBuf,
-) -> anyhow::Result<()> {
-    let response = storage.get(&segment_id.storage_key()).await?.into_stream();
-    let reader = response.map_err(|_| std::io::Error::last_os_error()).into_async_read(); // HACK: Mapping errors randomly
-    let reader = SyncIoBridge::new(reader.compat());
-
-    let mut tar = tar::Archive::new(reader);
-    tokio::task::spawn_blocking(move || tar.unpack(output_dir).unwrap()).await?;
-
-    Ok(())
-}
-
 pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObjectStore>) -> anyhow::Result<()> {
-    // TODO: It's weird that we take the index_id from the first segment. Maybe add a job param and check here? Should jobs be generic or keep the merge_job idea?
+    // TODO: Should jobs be generic or keep the merge_job idea?
     let segments = job.segments(&meta.pool).await?;
-    let index = Index::get(&meta.pool, segments[0].index_id).await?;
+    let index = Index::get(&meta.pool, job.index_id).await?;
     for s in &segments {
-        assert!(s.index_id == index.id);
+        assert!(
+            s.index_id == index.id,
+            "Jobs must only use segments from a single index or we could end with a multi-index merge!"
+        );
     }
     let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, job.seq).await?;
     let work_dir: tempfile::TempDir = tempdir()?;
@@ -108,27 +94,37 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     };
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
-    let ssegments = &segments
+    let ssegments = segments
         .iter()
         .enumerate()
-        .map(|(i, s)| (work_dir.path().join(i.to_string()), s.seq, s.records.unwrap()))
+        .map(|(i, s)| {
+            (
+                SegmentMetadata {
+                    path: work_dir.path().join(i.to_string()),
+                    records: s.records.unwrap() as usize,
+                    tags: HashSet::new(), // TODO: Record tags in database
+                },
+                s.seq,
+            )
+        })
         .collect::<Vec<_>>();
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 
     let index = Index::get(&meta.pool, segments[0].index_id).await?;
-    let (merged, merged_records) = match index.kind {
+    let merged_records = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?,
         _ => unimplemented!(),
     };
 
     // Upload
     let segment = Segment::create(&meta.pool, segments[0].index_id, job.seq).await?;
-    let size = pack_and_upload(storage, &work_dir.path().join(merged), segment.id.storage_key()).await?;
+    let size = pack_and_upload(storage, work_dir.path(), segment.id.storage_key()).await?;
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at
     let mut tx = meta.transaction().await?;
     segment.mark_ready(&mut *tx, merged_records as i64, size as i64).await?;
     Segment::delete_many(&mut *tx, &segments.iter().map(|s| s.id).collect::<Vec<_>>()).await?;
+    index.updated(&mut *tx).await?;
     // Delete task if successful. Mark as failed otherwise?
     job.finish(&mut *tx).await?;
     tx.commit().await?;

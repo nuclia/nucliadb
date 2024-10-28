@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx::{indexer, maintenance};
+use nidx::{indexer, maintenance, searcher};
 use std::collections::HashSet;
 use tokio::{main, task::JoinSet};
 
@@ -34,6 +34,7 @@ async fn main() -> anyhow::Result<()> {
             "indexer" => tasks.spawn(indexer::run()),
             "worker" => tasks.spawn(maintenance::worker::run()),
             "scheduler" => tasks.spawn(maintenance::scheduler::run()),
+            "searcher" => tasks.spawn(searcher::run()),
             other => panic!("Unknown component: {other}"),
         };
     });

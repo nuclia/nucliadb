@@ -21,12 +21,12 @@
 use std::collections::HashSet;
 
 use nidx_vector::config::VectorType;
-use nidx_vector::data_point_provider::SearchRequest;
+use nidx_vector::data_point_provider::{DTrie, SearchRequest};
 use nidx_vector::formula::Formula;
 use nidx_vector::{
     config::{Similarity, VectorConfig},
-    data_point::{self, DataPointPin, Elem, LabelDictionary},
-    data_point_provider::{reader::Reader, writer::Writer},
+    data_point::{self, Elem, LabelDictionary},
+    data_point_provider::reader::Reader,
 };
 use rstest::rstest;
 use tempfile::tempdir;
@@ -38,7 +38,7 @@ fn elem(index: usize) -> Elem {
     Elem::new(format!("key_{index}"), vector, LabelDictionary::default(), None)
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct Request {
     vector: Vec<f32>,
     formula: Formula,
@@ -72,7 +72,7 @@ fn test_basic_search(
     #[values(VectorType::DenseF32Unaligned, VectorType::DenseF32 { dimension: DIMENSION })] vector_type: VectorType,
 ) -> anyhow::Result<()> {
     let workdir = tempdir()?;
-    let index_path = workdir.path().join("vectors");
+    let segment_path = workdir.path();
     let config = VectorConfig {
         similarity,
         vector_type,
@@ -80,16 +80,12 @@ fn test_basic_search(
     };
 
     // Write some data
-    let mut writer = Writer::new(&index_path, config.clone())?;
-    let data_point_pin = DataPointPin::create_pin(&index_path)?;
-    data_point::create(&data_point_pin, (0..DIMENSION).map(elem).collect(), None, &config, HashSet::new())?;
-    writer.add_data_point(data_point_pin)?;
-    writer.commit()?;
+    let segment = data_point::create(segment_path, (0..DIMENSION).map(elem).collect(), &config, HashSet::new())?;
 
     // Search for a specific element
-    let reader = Reader::open(&index_path)?;
+    let reader = Reader::open(vec![(segment.into_metadata(), 0i64.into())], config, DTrie::new())?;
     let search_for = elem(5);
-    let results = reader.search(
+    let results = reader._search(
         &Request {
             vector: search_for.vector,
             formula: Formula::new(),
@@ -107,8 +103,7 @@ fn test_basic_search(
     vector[43] = 0.6;
     vector[44] = 0.5;
     vector[45] = 0.4;
-    let reader = Reader::open(&index_path)?;
-    let results = reader.search(
+    let results = reader._search(
         &Request {
             vector,
             formula: Formula::new(),

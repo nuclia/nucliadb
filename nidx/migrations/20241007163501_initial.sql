@@ -9,13 +9,15 @@ CREATE TABLE indexes (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     shard_id UUID NOT NULL REFERENCES shards(id),
     kind index_kind NOT NULL,
-    name TEXT,
+    name TEXT NOT NULL,
     configuration JSON,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (shard_id, kind, name)
 );
 
 CREATE TABLE merge_jobs (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    index_id BIGINT NOT NULL REFERENCES indexes(id),
     retries SMALLINT NOT NULL DEFAULT 0,
     seq BIGINT NOT NULL,
     enqueued_at TIMESTAMP NOT NULL DEFAULT NOW(),

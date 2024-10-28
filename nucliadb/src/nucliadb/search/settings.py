@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Optional
+
 from pydantic import Field
 
 from nucliadb.ingest.settings import DriverSettings
@@ -41,6 +43,7 @@ class Settings(DriverSettings):
         title="Prequeries max parallel",
         description="The maximum number of prequeries to run in parallel per /ask request",
     )
+    nidx_address: Optional[str] = Field(default=None)
 
 
 settings = Settings()
