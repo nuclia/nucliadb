@@ -115,29 +115,21 @@ impl NodeReader for SearchServer {
         todo!()
     }
 
-    #[doc = " Server streaming response type for the Paragraphs method."]
     type ParagraphsStream = Pin<Box<dyn Stream<Item = Result<ParagraphItem, Status>> + Send>>;
-
-    #[doc = " Streams"]
     async fn paragraphs(&self, _request: Request<StreamRequest>) -> Result<Response<Self::ParagraphsStream>> {
         todo!()
     }
 
-    #[doc = " Server streaming response type for the Documents method."]
     type DocumentsStream = Pin<Box<dyn Stream<Item = Result<DocumentItem, Status>> + Send>>;
-
     async fn documents(&self, _request: Request<StreamRequest>) -> Result<Response<Self::DocumentsStream>> {
         todo!()
     }
 
-    #[doc = " Shard Download"]
     async fn get_shard_files(&self, _request: Request<GetShardFilesRequest>) -> Result<Response<ShardFileList>> {
         todo!()
     }
 
-    #[doc = " Server streaming response type for the DownloadShardFile method."]
     type DownloadShardFileStream = Pin<Box<dyn Stream<Item = Result<ShardFileChunk, Status>> + Send>>;
-
     async fn download_shard_file(
         &self,
         _request: Request<DownloadShardFileRequest>,
