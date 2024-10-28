@@ -25,7 +25,6 @@ from typing import AsyncIterable, Optional
 import pytest
 from httpx import AsyncClient
 
-from nucliadb_protos import writer_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
@@ -62,19 +61,6 @@ async def kb_with_vectorset(
         vectorset_id=vectorset_id,
         vectorset_dimension=vectorset_dimension,
     )
-
-
-async def create_vectorset(
-    nucliadb_grpc: WriterStub, kbid: str, vectorset_id: str, *, vectorset_dimension: int
-):
-    response = await nucliadb_grpc.NewVectorSet(
-        writer_pb2.NewVectorSetRequest(
-            kbid=kbid,
-            vectorset_id=vectorset_id,
-            vector_dimension=vectorset_dimension,
-        )
-    )  # type: ignore
-    assert response.status == response.Status.OK
 
 
 async def inject_broker_message_with_vectorset_data(
