@@ -126,11 +126,14 @@ class RelationMetadata(google.protobuf.message.Message):
     SOURCE_END_FIELD_NUMBER: builtins.int
     TO_START_FIELD_NUMBER: builtins.int
     TO_END_FIELD_NUMBER: builtins.int
+    DATA_AUGMENTATION_TASK_ID_FIELD_NUMBER: builtins.int
     paragraph_id: builtins.str
     source_start: builtins.int
     source_end: builtins.int
     to_start: builtins.int
     to_end: builtins.int
+    data_augmentation_task_id: builtins.str
+    """Data augmentation task id where this relation was computed"""
     def __init__(
         self,
         *,
@@ -139,9 +142,12 @@ class RelationMetadata(google.protobuf.message.Message):
         source_end: builtins.int | None = ...,
         to_start: builtins.int | None = ...,
         to_end: builtins.int | None = ...,
+        data_augmentation_task_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "paragraph_id", b"paragraph_id", "source_end", b"source_end", "source_start", b"source_start", "to_end", b"to_end", "to_start", b"to_start"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "paragraph_id", b"paragraph_id", "source_end", b"source_end", "source_start", b"source_start", "to_end", b"to_end", "to_start", b"to_start"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_data_augmentation_task_id", b"_data_augmentation_task_id", "_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "data_augmentation_task_id", b"data_augmentation_task_id", "paragraph_id", b"paragraph_id", "source_end", b"source_end", "source_start", b"source_start", "to_end", b"to_end", "to_start", b"to_start"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_data_augmentation_task_id", b"_data_augmentation_task_id", "_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "data_augmentation_task_id", b"data_augmentation_task_id", "paragraph_id", b"paragraph_id", "source_end", b"source_end", "source_start", b"source_start", "to_end", b"to_end", "to_start", b"to_start"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_data_augmentation_task_id", b"_data_augmentation_task_id"]) -> typing.Literal["data_augmentation_task_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_paragraph_id", b"_paragraph_id"]) -> typing.Literal["paragraph_id"] | None: ...
     @typing.overload

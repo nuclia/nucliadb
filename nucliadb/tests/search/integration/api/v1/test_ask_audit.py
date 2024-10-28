@@ -67,7 +67,6 @@ async def test_ask_sends_only_one_audit(
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/ask",
             json={"query": "title"},
-            headers={"X-Synchronous": "True"},
         )
         assert resp.status_code == 200
 
