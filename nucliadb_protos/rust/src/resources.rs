@@ -685,11 +685,26 @@ pub struct Positions {
     pub position: ::prost::alloc::vec::Vec<Position>,
     #[prost(string, tag = "2")]
     pub entity: ::prost::alloc::string::String,
-    /// Data augmentation task id where this entity was found in the text
-    #[prost(string, optional, tag = "6")]
-    pub data_augmentation_task_id: ::core::option::Option<
-        ::prost::alloc::string::String,
-    >,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldEntity {
+    /// The entity text
+    #[prost(string, tag = "1")]
+    pub text: ::prost::alloc::string::String,
+    /// The entity type
+    #[prost(string, tag = "2")]
+    pub label: ::prost::alloc::string::String,
+    /// The positions of the entity in the text
+    #[prost(message, repeated, tag = "3")]
+    pub positions: ::prost::alloc::vec::Vec<Position>,
+}
+/// Wrapper for a list of entities
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldEntities {
+    #[prost(message, repeated, tag = "1")]
+    pub entities: ::prost::alloc::vec::Vec<Entity>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -703,6 +718,12 @@ pub struct FieldMetadata {
     pub ner: ::std::collections::HashMap<
         ::prost::alloc::string::String,
         ::prost::alloc::string::String,
+    >,
+    /// Map of data_augmentation_task_id to list of entities found in the text
+    #[prost(map = "string, message", tag = "15")]
+    pub entities: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        FieldEntities,
     >,
     #[prost(message, repeated, tag = "4")]
     pub classifications: ::prost::alloc::vec::Vec<Classification>,
