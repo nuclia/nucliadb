@@ -20,6 +20,9 @@
 
 from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
+from nucliadb.search.predict import ProxiedPredictAPIError, SendToPredictError
 from nucliadb.search.search.rerankers import (
     PredictReranker,
     RankedItem,
@@ -150,3 +153,34 @@ async def test_predict_reranker_dont_call_predict_with_empty_results():
         assert reranked[0].id == "id"
         assert reranked[0].score == 10
         assert reranked[0].score_type == SCORE_TYPE.RERANKER
+
+
+@pytest.mark.parametrize("error", [SendToPredictError(), ProxiedPredictAPIError(status=500)])
+async def test_predict_reranker_handles_predict_failures(
+    error: Exception,
+):
+    predict = AsyncMock()
+    predict.rerank.side_effect = error
+
+    with patch(
+        "nucliadb.search.search.rerankers.get_predict", new=Mock(return_value=predict)
+    ) as get_predict:
+        reranker = PredictReranker()
+
+        await reranker.rerank(items=[], options=Mock())
+        assert get_predict.call_count == 0
+
+        reranked = await reranker.rerank(
+            items=[
+                RerankableItem(id="1", score=1, score_type=SCORE_TYPE.BM25, content="bla bla"),
+                RerankableItem(id="2", score=0.6, score_type=SCORE_TYPE.VECTOR, content="bla bla"),
+                RerankableItem(id="3", score=1.5, score_type=SCORE_TYPE.BOTH, content="bla bla"),
+            ],
+            options=RerankingOptions(kbid="kbid", query="my query", top_k=20),
+        )
+        assert get_predict.call_count == 1
+
+        assert len(reranked) == 3
+        assert reranked[0] == RankedItem(id="3", score=1.5, score_type=SCORE_TYPE.BOTH)
+        assert reranked[1] == RankedItem(id="1", score=1, score_type=SCORE_TYPE.BM25)
+        assert reranked[2] == RankedItem(id="2", score=0.6, score_type=SCORE_TYPE.VECTOR)
