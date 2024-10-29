@@ -1669,6 +1669,7 @@ class FeedbackRequest(BaseModel):
         description="The task the feedback is for. For now, only `CHAT` task is available",
     )
     feedback: Optional[str] = Field(None, title="Feedback", description="Feedback text")
+    text_block_id: Optional[str] = Field(None, title="Text block", description="Text block id")
 
 
 def validate_facets(facets):

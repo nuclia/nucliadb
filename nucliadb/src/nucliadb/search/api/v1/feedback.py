@@ -23,9 +23,8 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search import logger, predict
+from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import FeedbackRequest, NucliaDBClientType
 from nucliadb_telemetry import errors
@@ -52,36 +51,20 @@ async def send_feedback_endpoint(
     x_forwarded_for: str = Header(""),
 ):
     try:
-        return await send_feedback(kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
-    except predict.ProxiedPredictAPIError as err:
-        return HTTPClientError(
-            status_code=err.status,
-            detail=err.detail,
-        )
+        audit = get_audit()
+        if audit is not None:
+            audit.feedback(
+                kbid=kbid,
+                user=x_nucliadb_user,
+                client_type=x_ndb_client.to_proto(),
+                origin=x_forwarded_for,
+                learning_id=item.ident,
+                good=item.good,
+                task=item.task.to_proto(),
+                feedback=item.feedback,
+                text_block_id=item.text_block_id,
+            )
     except Exception as ex:
         errors.capture_exception(ex)
         logger.exception("Unexpected error sending feedback", extra={"kbid": kbid})
         return HTTPClientError(status_code=500, detail=f"Internal server error")
-
-
-async def send_feedback(
-    kbid: str,
-    item: FeedbackRequest,
-    x_nucliadb_user: str,
-    x_ndb_client: NucliaDBClientType,
-    x_forwarded_for: str,
-):
-    predict = get_predict()
-    await predict.send_feedback(kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for)
-    audit = get_audit()
-    if audit is not None:
-        audit.feedback(
-            kbid=kbid,
-            user=x_nucliadb_user,
-            client_type=x_ndb_client.to_proto(),
-            origin=x_forwarded_for,
-            learning_id=item.ident,
-            good=item.good,
-            task=item.task.to_proto(),
-            feedback=item.feedback,
-        )

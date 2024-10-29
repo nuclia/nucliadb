@@ -117,5 +117,6 @@ class AuditStorage:
         good: bool,
         task: int,
         feedback: Optional[str],
+        text_block_id: Optional[str],
     ):
         raise NotImplementedError

@@ -217,10 +217,12 @@ class FeedbackAudit(google.protobuf.message.Message):
     GOOD_FIELD_NUMBER: builtins.int
     TASK_FIELD_NUMBER: builtins.int
     FEEDBACK_FIELD_NUMBER: builtins.int
+    TEXT_BLOCK_ID_FIELD_NUMBER: builtins.int
     learning_id: builtins.str
     good: builtins.bool
     task: global___TaskType.ValueType
     feedback: builtins.str
+    text_block_id: builtins.str
     def __init__(
         self,
         *,
@@ -228,10 +230,14 @@ class FeedbackAudit(google.protobuf.message.Message):
         good: builtins.bool = ...,
         task: global___TaskType.ValueType = ...,
         feedback: builtins.str | None = ...,
+        text_block_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_feedback", b"_feedback", "feedback", b"feedback"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_feedback", b"_feedback", "feedback", b"feedback", "good", b"good", "learning_id", b"learning_id", "task", b"task"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_feedback", b"_feedback", "_text_block_id", b"_text_block_id", "feedback", b"feedback", "text_block_id", b"text_block_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_feedback", b"_feedback", "_text_block_id", b"_text_block_id", "feedback", b"feedback", "good", b"good", "learning_id", b"learning_id", "task", b"task", "text_block_id", b"text_block_id"]) -> None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_feedback", b"_feedback"]) -> typing.Literal["feedback"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_text_block_id", b"_text_block_id"]) -> typing.Literal["text_block_id"] | None: ...
 
 global___FeedbackAudit = FeedbackAudit
 

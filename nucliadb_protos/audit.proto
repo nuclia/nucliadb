@@ -68,6 +68,7 @@ message FeedbackAudit {
   bool good = 2;
   TaskType task = 3;
   optional string feedback = 4;
+  optional string text_block_id = 5;
 }
 
 
