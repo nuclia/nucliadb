@@ -30,7 +30,7 @@ use tempfile::TempDir;
 pub fn test_reader() -> TextReaderService {
     let dir = TempDir::new().unwrap();
     let resource = create_resource("shard".to_string());
-    let segment_meta = TextIndexer.index_resource(dir.path(), &resource).unwrap();
+    let segment_meta = TextIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
 
     TextSearcher::open(vec![(1i64.into(), vec![segment_meta], vec![])]).unwrap().reader
 }
@@ -48,7 +48,7 @@ pub fn create_resource(shard_id: String) -> Resource {
     };
 
     let metadata = nidx_protos::IndexMetadata {
-        created: Some(timestamp.clone()),
+        created: Some(timestamp),
         modified: Some(timestamp),
     };
 

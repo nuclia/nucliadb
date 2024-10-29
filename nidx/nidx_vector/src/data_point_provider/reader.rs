@@ -33,7 +33,6 @@ use nidx_protos::prost::*;
 use nidx_protos::{
     DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
 };
-use nidx_types::SegmentMetadata;
 use nidx_types::Seq;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -438,7 +437,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
         let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let mut request = VectorSearchRequest {
@@ -529,7 +528,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
         let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let request = VectorSearchRequest {
@@ -651,7 +650,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
         let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let request = VectorSearchRequest {

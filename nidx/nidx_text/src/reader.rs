@@ -24,7 +24,6 @@ use std::time::*;
 
 use super::schema::TextSchema;
 use super::search_query;
-use crate::query_io;
 use anyhow::anyhow;
 use itertools::Itertools;
 use nidx_protos::order_by::{OrderField, OrderType};

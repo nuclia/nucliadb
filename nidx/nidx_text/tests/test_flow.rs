@@ -27,11 +27,11 @@ use tempfile::tempdir;
 fn test_index_merge_search() -> anyhow::Result<()> {
     let resource = little_prince("shard");
     let segment_dir = tempdir()?;
-    let meta1 = TextIndexer.index_resource(segment_dir.path(), &resource)?;
+    let meta1 = TextIndexer.index_resource(segment_dir.path(), &resource)?.unwrap();
     let records = meta1.records;
 
     let segment_dir2 = tempdir()?;
-    let meta2 = TextIndexer.index_resource(segment_dir2.path(), &resource)?;
+    let meta2 = TextIndexer.index_resource(segment_dir2.path(), &resource)?.unwrap();
 
     let merge_dir = tempdir()?;
     let merged_meta = TextIndexer.merge(

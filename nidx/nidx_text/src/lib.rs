@@ -60,7 +60,7 @@ impl TextIndexer {
         &self,
         output_dir: &Path,
         resource: &nidx_protos::Resource,
-    ) -> anyhow::Result<TantivySegmentMetadata> {
+    ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
         let field_schema = TextSchema::new();
         let mut indexer = TantivyIndexer::new(output_dir, field_schema.schema.clone())?;
 
@@ -69,7 +69,11 @@ impl TextIndexer {
         }
 
         index_document(&mut indexer, resource, field_schema)?;
-        indexer.finalize()
+        Ok(Some(indexer.finalize()?))
+    }
+
+    pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
+        vec![resource.resource.as_ref().unwrap().uuid.clone()]
     }
 
     pub fn merge(

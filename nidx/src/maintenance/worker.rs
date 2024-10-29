@@ -18,17 +18,16 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
-use nidx_types::SegmentMetadata;
 use object_store::DynObjectStore;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
 use tracing::*;
 
 use crate::{
-    metadata::{Deletion, Index, IndexKind, MergeJob, Segment},
+    metadata::{Deletion, Index, IndexKind, MergeJob, NewSegment, Segment},
     segment_store::{download_segment, pack_and_upload},
     NidxMetadata, Settings,
 };
@@ -94,18 +93,17 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     };
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
-
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 
     let index = Index::get(&meta.pool, segments[0].index_id).await?;
-    let merged_records = match index.kind {
+    let merged_segment: NewSegment = match index.kind {
         IndexKind::Vector => {
             let ssegments = segments
                 .iter()
                 .enumerate()
                 .map(|(i, s)| (s.metadata(work_dir.path().join(i.to_string())), s.seq))
                 .collect::<Vec<_>>();
-            nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?
+            nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?.into()
         }
         IndexKind::Text => {
             let ssegments = segments
@@ -113,7 +111,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
                 .enumerate()
                 .map(|(i, s)| (s.metadata(work_dir.path().join(i.to_string())), s.seq))
                 .collect::<Vec<_>>();
-            nidx_text::TextIndexer.merge(work_dir.path(), ssegments, ddeletions)?
+            nidx_text::TextIndexer.merge(work_dir.path(), ssegments, ddeletions)?.into()
         }
         _ => unimplemented!(),
     };
@@ -124,7 +122,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at
     let mut tx = meta.transaction().await?;
-    segment.mark_ready(&mut *tx, merged_records as i64, size as i64).await?;
+    segment.mark_ready(&mut *tx, &merged_segment, size as i64).await?;
     Segment::delete_many(&mut *tx, &segments.iter().map(|s| s.id).collect::<Vec<_>>()).await?;
     index.updated(&mut *tx).await?;
     // Delete task if successful. Mark as failed otherwise?

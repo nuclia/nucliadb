@@ -116,10 +116,10 @@ pub async fn index_resource(
 
     for index in indexes {
         let output_dir = tempfile::tempdir()?;
-        let (records, deletions) = index_resource_to_index(&index, resource, output_dir.path()).await?;
-        if records == 0 {
+        let (new_segment, deletions) = index_resource_to_index(&index, resource, output_dir.path()).await?;
+        let Some(new_segment) = new_segment else {
             continue;
-        }
+        };
 
         // Create the segment first so we can track it if the upload gets interrupted
         let segment = Segment::create(&meta.pool, index.id, seq).await?;
@@ -127,7 +127,7 @@ pub async fn index_resource(
 
         // Mark the segment as visible and write the deletions at the same time
         let mut tx = meta.transaction().await?;
-        segment.mark_ready(&mut *tx, records, size as i64).await?;
+        segment.mark_ready(&mut *tx, &new_segment, size as i64).await?;
         Deletion::create(&mut *tx, index.id, seq, &deletions).await?;
         index.updated(&mut *tx).await?;
         tx.commit().await?;
@@ -139,14 +139,20 @@ async fn index_resource_to_index(
     index: &Index,
     resource: &Resource,
     output_dir: &Path,
-) -> anyhow::Result<(i64, Vec<String>)> {
-    let (records, deletions) = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer.index_resource(output_dir, resource)?,
-        IndexKind::Text => nidx_text::TextIndexer.index_resource(output_dir, resource)?,
+) -> anyhow::Result<(Option<NewSegment>, Vec<String>)> {
+    let segment = match index.kind {
+        IndexKind::Vector => nidx_vector::VectorIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
+        IndexKind::Text => nidx_text::TextIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
         _ => unimplemented!(),
     };
 
-    Ok((records, deletions))
+    let deletions = match index.kind {
+        IndexKind::Vector => nidx_vector::VectorIndexer.deletions_for_resource(resource),
+        IndexKind::Text => nidx_text::TextIndexer.deletions_for_resource(resource),
+        _ => unimplemented!(),
+    };
+
+    Ok((segment, deletions))
 }
 
 #[cfg(test)]

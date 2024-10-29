@@ -22,7 +22,6 @@ use crate::data_point::{self, Elem, LabelDictionary};
 use crate::{utils, VectorSegmentMetadata};
 use anyhow::anyhow;
 use nidx_protos::{noderesources, prost::*};
-use nidx_types::SegmentMetadata;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
@@ -107,7 +106,7 @@ pub fn index_resource(
     resource: ResourceWrapper,
     output_path: &Path,
     config: &VectorConfig,
-) -> anyhow::Result<(Option<VectorSegmentMetadata>, Vec<String>)> {
+) -> anyhow::Result<Option<VectorSegmentMetadata>> {
     let time = Instant::now();
 
     let id = resource.id();
@@ -150,9 +149,8 @@ pub fn index_resource(
         return Err(anyhow!("Inconsistent dimensions on insert"));
     }
 
-    let deletions = resource.sentences_to_delete().map(|d| d.to_owned()).collect();
     if elems.is_empty() {
-        return Ok((None, deletions));
+        return Ok(None);
     }
 
     let tags = resource.labels().iter().filter(|t| SEGMENT_TAGS.contains(&t.as_str())).cloned().collect();
@@ -161,5 +159,5 @@ pub fn index_resource(
     let v = time.elapsed().as_millis();
     debug!("{id:?} - Main index set resource: ends {v} ms");
 
-    Ok((Some(data_point.into_metadata()), deletions))
+    Ok(Some(data_point.into_metadata()))
 }

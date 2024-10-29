@@ -43,7 +43,6 @@ pub fn produce_date_range_query(
     let right_date_time = to.map(schema::timestamp_to_datetime_utc);
     let left_bound = left_date_time.map(Bound::Included).unwrap_or(Bound::Unbounded);
     let right_bound = right_date_time.map(Bound::Included).unwrap_or(Bound::Unbounded);
-    let xtype = tantivy::schema::Type::Date;
     let query = RangeQuery::new_date_bounds(field.to_string(), left_bound, right_bound);
     Some(query)
 }
@@ -110,21 +109,20 @@ pub fn create_query(
     };
 
     // Timestamp filters
-    // TODO
-    // if let Some(time_ranges) = search.timestamps.as_ref() {
-    //     let modified =
-    //         produce_date_range_query("modified", time_ranges.from_modified.as_ref(), time_ranges.to_modified.as_ref());
-    //     let created =
-    //         produce_date_range_query("created", time_ranges.from_created.as_ref(), time_ranges.to_created.as_ref());
+    if let Some(time_ranges) = search.timestamps.as_ref() {
+        let modified =
+            produce_date_range_query("modified", time_ranges.from_modified.as_ref(), time_ranges.to_modified.as_ref());
+        let created =
+            produce_date_range_query("created", time_ranges.from_created.as_ref(), time_ranges.to_created.as_ref());
 
-    //     if let Some(modified) = modified {
-    //         queries.push((Occur::Must, Box::new(modified)));
-    //     }
+        if let Some(modified) = modified {
+            queries.push((Occur::Must, Box::new(modified)));
+        }
 
-    //     if let Some(created) = created {
-    //         queries.push((Occur::Must, Box::new(created)));
-    //     }
-    // }
+        if let Some(created) = created {
+            queries.push((Occur::Must, Box::new(created)));
+        }
+    }
 
     // Advance query
     if let Some(query) = with_advance {

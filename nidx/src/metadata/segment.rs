@@ -21,7 +21,7 @@ use std::{collections::HashSet, path::PathBuf};
 //
 use super::IndexId;
 use nidx_types::{SegmentMetadata, Seq};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{
     types::{time::PrimitiveDateTime, JsonValue},
     Executor, Postgres,
@@ -56,6 +56,20 @@ pub struct Segment {
     pub delete_at: Option<PrimitiveDateTime>,
 }
 
+pub struct NewSegment {
+    pub(crate) records: i64,
+    pub(crate) index_metadata: JsonValue,
+}
+
+impl<M: Serialize> From<SegmentMetadata<M>> for NewSegment {
+    fn from(value: SegmentMetadata<M>) -> Self {
+        Self {
+            records: value.records as i64,
+            index_metadata: serde_json::to_value(&value.index_metadata).unwrap(),
+        }
+    }
+}
+
 impl Segment {
     pub async fn create(
         meta: impl Executor<'_, Database = Postgres>,
@@ -75,12 +89,13 @@ impl Segment {
     pub async fn mark_ready(
         &self,
         meta: impl Executor<'_, Database = Postgres>,
-        records: i64,
+        new_segment: &NewSegment,
         size_bytes: i64,
     ) -> sqlx::Result<()> {
         sqlx::query!(
-            "UPDATE segments SET delete_at = NULL, records = $1, size_bytes = $2 WHERE id = $3",
-            records,
+            "UPDATE segments SET delete_at = NULL, records = $1, index_metadata = $2, size_bytes = $3 WHERE id = $4",
+            new_segment.records,
+            new_segment.index_metadata,
             size_bytes,
             self.id as SegmentId,
         )
