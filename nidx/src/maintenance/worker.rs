@@ -94,25 +94,27 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     };
 
     // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
-    let ssegments = segments
-        .iter()
-        .enumerate()
-        .map(|(i, s)| {
-            (
-                SegmentMetadata {
-                    path: work_dir.path().join(i.to_string()),
-                    records: s.records.unwrap() as usize,
-                    tags: HashSet::new(), // TODO: Record tags in database
-                },
-                s.seq,
-            )
-        })
-        .collect::<Vec<_>>();
+
     let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
 
     let index = Index::get(&meta.pool, segments[0].index_id).await?;
     let merged_records = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?,
+        IndexKind::Vector => {
+            let ssegments = segments
+                .iter()
+                .enumerate()
+                .map(|(i, s)| (s.metadata(work_dir.path().join(i.to_string())), s.seq))
+                .collect::<Vec<_>>();
+            nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?
+        }
+        IndexKind::Text => {
+            let ssegments = segments
+                .iter()
+                .enumerate()
+                .map(|(i, s)| (s.metadata(work_dir.path().join(i.to_string())), s.seq))
+                .collect::<Vec<_>>();
+            nidx_text::TextIndexer.merge(work_dir.path(), ssegments, ddeletions)?
+        }
         _ => unimplemented!(),
     };
 

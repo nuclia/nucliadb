@@ -19,7 +19,7 @@
 
 use crate::config::VectorConfig;
 use crate::data_point::{self, Elem, LabelDictionary};
-use crate::utils;
+use crate::{utils, VectorSegmentMetadata};
 use anyhow::anyhow;
 use nidx_protos::{noderesources, prost::*};
 use nidx_types::SegmentMetadata;
@@ -107,7 +107,7 @@ pub fn index_resource(
     resource: ResourceWrapper,
     output_path: &Path,
     config: &VectorConfig,
-) -> anyhow::Result<(Option<SegmentMetadata>, Vec<String>)> {
+) -> anyhow::Result<(Option<VectorSegmentMetadata>, Vec<String>)> {
     let time = Instant::now();
 
     let id = resource.id();

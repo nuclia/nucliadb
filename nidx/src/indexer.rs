@@ -142,6 +142,7 @@ async fn index_resource_to_index(
 ) -> anyhow::Result<(i64, Vec<String>)> {
     let (records, deletions) = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer.index_resource(output_dir, resource)?,
+        IndexKind::Text => nidx_text::TextIndexer.index_resource(output_dir, resource)?,
         _ => unimplemented!(),
     };
 

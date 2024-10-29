@@ -17,43 +17,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::{collections::HashSet, path::PathBuf};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Seq(i64);
-impl From<i64> for Seq {
-    fn from(value: i64) -> Self {
-        Self(value)
-    }
-}
-impl From<u64> for Seq {
-    fn from(value: u64) -> Self {
-        Self(value as i64)
-    }
-}
-impl From<Seq> for i64 {
-    fn from(value: Seq) -> Self {
-        value.0
-    }
-}
-impl From<&Seq> for i64 {
-    fn from(value: &Seq) -> Self {
-        value.0
-    }
-}
+mod common;
 
-#[derive(Clone, Debug)]
-pub struct SegmentMetadata<T> {
-    pub path: PathBuf,
-    pub records: usize,
-    pub tags: HashSet<String>,
-    pub index_metadata: T,
-}
+use nucliadb_core::protos::StreamRequest;
+use nucliadb_core::texts::*;
 
-/// Represents a field that has met all of the
-/// pre-filtering requirements.
-#[derive(Debug, Clone)]
-pub struct ValidField {
-    pub resource_id: String,
-    pub field_id: String,
+#[test]
+fn test_stream_request_iterator() {
+    let reader = common::test_reader();
+    let request = StreamRequest {
+        shard_id: None,
+        filter: None,
+        ..Default::default()
+    };
+    let iter = reader.iterator(&request).unwrap();
+    let count = iter.count();
+    assert_eq!(count, 2);
 }

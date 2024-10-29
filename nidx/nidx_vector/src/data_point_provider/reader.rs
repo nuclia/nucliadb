@@ -26,6 +26,7 @@ use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::query_language::{BooleanExpression, BooleanOperation, Operator};
 use crate::utils;
+use crate::VectorSegmentMetadata;
 use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
 use nidx_protos::prost::*;
@@ -177,7 +178,11 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl Reader {
-    pub fn open(segments: Vec<(SegmentMetadata, Seq)>, config: VectorConfig, delete_log: DTrie) -> VectorR<Reader> {
+    pub fn open(
+        segments: Vec<(VectorSegmentMetadata, Seq)>,
+        config: VectorConfig,
+        delete_log: DTrie,
+    ) -> VectorR<Reader> {
         let mut dimension = None;
         let mut open_data_points = Vec::new();
         let mut number_of_embeddings = 0;

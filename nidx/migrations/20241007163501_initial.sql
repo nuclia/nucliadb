@@ -32,6 +32,7 @@ CREATE TABLE segments (
     records BIGINT,
     size_bytes BIGINT,
     merge_job_id BIGINT REFERENCES merge_jobs(id) ON DELETE SET NULL,
+    index_metadata JSON,
     delete_at TIMESTAMP DEFAULT NOW() + INTERVAL '5 minutes'
 );
 

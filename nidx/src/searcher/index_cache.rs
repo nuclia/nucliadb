@@ -81,16 +81,11 @@ impl IndexCache {
         // TODO: Cleaner mapping from sync metadata to IndexSeacher metadata
         // We might also want to make this granular, so diff updates can be applied, e.g:
         // list of new segments to open + list of new deletions to apply
-        let segments = sqlx::query_as!(
-            Segment,
-            "SELECT * FROM segments WHERE id = ANY($1)",
-            meta.operations.segments().collect::<Vec<_>>() as Vec<SegmentId>
-        )
-        .fetch_all(&self.metadb.pool)
-        .await?
-        .into_iter()
-        .map(|s| (s.id, s))
-        .collect::<HashMap<SegmentId, Segment>>();
+        let segments = Segment::select_many(&self.metadb.pool, &meta.operations.segments().collect::<Vec<_>>())
+            .await?
+            .into_iter()
+            .map(|s| (s.id, s))
+            .collect::<HashMap<SegmentId, Segment>>();
 
         let operations = meta
             .operations
@@ -101,11 +96,7 @@ impl IndexCache {
                     op.seq,
                     op.segment_ids
                         .iter()
-                        .map(|sid| nidx_types::SegmentMetadata {
-                            path: self.sync_metadata.segment_location(id, sid),
-                            records: segments[sid].records.unwrap() as usize,
-                            tags: HashSet::new(),
-                        })
+                        .map(|sid| segments[sid].metadata(self.sync_metadata.segment_location(id, sid)))
                         .collect::<Vec<_>>(),
                     op.deleted_keys.clone(),
                 )

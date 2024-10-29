@@ -27,6 +27,8 @@ use nidx_protos::{Resource, VectorSearchRequest, VectorSearchResponse};
 use nidx_types::{SegmentMetadata, Seq};
 use std::path::Path;
 
+type VectorSegmentMetadata = SegmentMetadata<()>;
+
 pub struct VectorIndexer;
 
 impl VectorIndexer {
@@ -44,8 +46,8 @@ impl VectorIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: Vec<(SegmentMetadata, Seq)>,
-        deletions: &Vec<(Seq, &Vec<String>)>,
+        segments: Vec<(VectorSegmentMetadata, Seq)>,
+        deletions: &[(Seq, &Vec<String>)],
     ) -> VectorR<usize> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
         // Wait and see how the Tantivy indexes turn out
@@ -89,7 +91,7 @@ pub struct VectorSearcher {
 impl VectorSearcher {
     pub fn open(
         config: VectorConfig,
-        operations: Vec<(Seq, Vec<SegmentMetadata>, Vec<String>)>,
+        operations: Vec<(Seq, Vec<VectorSegmentMetadata>, Vec<String>)>,
     ) -> anyhow::Result<Self> {
         let mut delete_log = DTrie::new();
         let mut segments = Vec::new();
