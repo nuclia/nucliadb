@@ -40,7 +40,6 @@ from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.processor.auditing import collect_audit_fields
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import (
-    knowledgebox_pb2,
     noderesources_pb2,
     nodewriter_pb2,
     resources_pb2,
@@ -51,7 +50,7 @@ from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage, has_feature
+from nucliadb_utils.utilities import has_feature
 
 from .pgcatalog import pgcatalog_delete, pgcatalog_update
 
@@ -140,17 +139,8 @@ class Processor:
             await self.delete_resource(message, seqid, partition, transaction_check)
         elif message.type == writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT:
             await self.txn([message], seqid, partition, transaction_check)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.MULTI:
-            # XXX Not supported right now
-            # MULTI, COMMIT and ROLLBACK are all not supported in transactional mode right now
-            # This concept is probably not tenable with current architecture because
-            # of how nats works and how we would need to manage rollbacks.
-            # XXX Should this be removed?
-            await self.multi(message, seqid)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.COMMIT:
-            await self.commit(message, seqid, partition)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.ROLLBACK:
-            await self.rollback(message, seqid, partition)
+        else:
+            logger.error(f"Unknown message type {message.type}")
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage) -> str:
         if message.uuid is None:
@@ -463,30 +453,6 @@ class Processor:
                 resource_uuid=resource_uuid, resource_data=index_message
             )
 
-    async def multi(self, message: writer_pb2.BrokerMessage, seqid: int) -> None:
-        self.messages.setdefault(message.multiid, []).append(message)
-
-    async def commit(self, message: writer_pb2.BrokerMessage, seqid: int, partition: str) -> None:
-        if message.multiid not in self.messages:
-            # Error
-            logger.error(f"Closed multi {message.multiid}")
-            await self.deadletter([message], partition, seqid)
-        else:
-            await self.txn(self.messages[message.multiid], seqid, partition)
-
-    async def rollback(self, message: writer_pb2.BrokerMessage, seqid: int, partition: str) -> None:
-        # Error
-        logger.error(f"Closed multi {message.multiid}")
-        del self.messages[message.multiid]
-        await self.notify_abort(
-            partition=partition,
-            seqid=seqid,
-            multi=message.multiid,
-            kbid=message.kbid,
-            rid=message.uuid,
-            source=message.source,
-        )
-
     async def deadletter(
         self, messages: list[writer_pb2.BrokerMessage], partition: str, seqid: int
     ) -> None:
@@ -663,25 +629,6 @@ class Processor:
             )
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)
-
-    # KB tools
-    # XXX: Why are these utility functions here?
-    async def get_kb_obj(
-        self, txn: Transaction, kbid: knowledgebox_pb2.KnowledgeBoxID
-    ) -> Optional[KnowledgeBox]:
-        uuid: Optional[str] = kbid.uuid
-        if uuid == "":
-            uuid = await datamanagers.kb.get_kb_uuid(txn, slug=kbid.slug)
-
-        if uuid is None:
-            return None
-
-        if not (await datamanagers.kb.exists_kb(txn, kbid=uuid)):
-            return None
-
-        storage = await get_storage()
-        kbobj = KnowledgeBox(txn, storage, uuid)
-        return kbobj
 
 
 def messages_source(messages: list[writer_pb2.BrokerMessage]):

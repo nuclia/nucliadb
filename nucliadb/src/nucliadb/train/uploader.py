@@ -22,12 +22,15 @@ from typing import Optional
 import aiohttp
 
 from nucliadb.common import datamanagers
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest.orm.entities import EntitiesManager
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.train import SERVICE_NAME
 from nucliadb.train.models import RequestData
 from nucliadb.train.settings import settings
+from nucliadb_protos import knowledgebox_pb2
 from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
     EnabledMetadata,
@@ -76,7 +79,7 @@ class UploadServicer:
         kbid = request.kb.uuid
         response = GetEntitiesResponse()
         async with self.proc.driver.transaction(read_only=True) as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            kbobj = await get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
                 return response
@@ -176,3 +179,19 @@ async def start_upload(request: str, kb: str):
             await sess.post(f"{url}/ontology", data=payload)
 
     await us.finalize()
+
+
+async def get_kb_obj(txn: Transaction, kbid: knowledgebox_pb2.KnowledgeBoxID) -> Optional[KnowledgeBox]:
+    uuid: Optional[str] = kbid.uuid
+    if uuid == "":
+        uuid = await datamanagers.kb.get_kb_uuid(txn, slug=kbid.slug)
+
+    if uuid is None:
+        return None
+
+    if not (await datamanagers.kb.exists_kb(txn, kbid=uuid)):
+        return None
+
+    storage = await get_storage()
+    kbobj = KnowledgeBox(txn, storage, uuid)
+    return kbobj

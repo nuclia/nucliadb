@@ -26,6 +26,7 @@ from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.broker_message import generate_broker_message
@@ -35,7 +36,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_protos import nodewriter_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, nodewriter_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
@@ -226,7 +227,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> NewEntitiesGroupResponse:
         response = NewEntitiesGroupResponse()
         async with self.driver.transaction(read_only=True) as ro_txn:
-            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
+            kbobj = await get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = NewEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
@@ -249,7 +250,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
         async with self.driver.transaction(read_only=True) as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            kbobj = await get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
                 return response
@@ -271,7 +272,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
         async with self.driver.transaction(read_only=True) as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            kbobj = await get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
                 return response
@@ -295,7 +296,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
         async with self.driver.transaction(read_only=True) as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            kbobj = await get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
@@ -320,7 +321,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def SetEntities(self, request: SetEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         response = OpStatusWriter()
         async with self.driver.transaction(read_only=True) as ro_txn:
-            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
+            kbobj = await get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
                 return response
@@ -344,7 +345,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> UpdateEntitiesGroupResponse:
         response = UpdateEntitiesGroupResponse()
         async with self.driver.transaction(read_only=True) as ro_txn:
-            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
+            kbobj = await get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
@@ -373,7 +374,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = OpStatusWriter()
 
         async with self.driver.transaction(read_only=True) as ro_txn:
-            kbobj = await self.proc.get_kb_obj(ro_txn, request.kb)
+            kbobj = await get_kb_obj(ro_txn, request.kb)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
                 return response
@@ -536,3 +537,21 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         else:
             response.status = DelVectorSetResponse.Status.OK
         return response
+
+
+async def get_kb_obj(
+    txn: Transaction, kbid: knowledgebox_pb2.KnowledgeBoxID
+) -> Optional[KnowledgeBoxORM]:
+    uuid: Optional[str] = kbid.uuid
+    if uuid == "":
+        uuid = await datamanagers.kb.get_kb_uuid(txn, slug=kbid.slug)
+
+    if uuid is None:
+        return None
+
+    if not (await datamanagers.kb.exists_kb(txn, kbid=uuid)):
+        return None
+
+    storage = await get_storage()
+    kbobj = KnowledgeBoxORM(txn, storage, uuid)
+    return kbobj
