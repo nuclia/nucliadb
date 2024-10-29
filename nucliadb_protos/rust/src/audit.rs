@@ -119,6 +119,8 @@ pub struct FeedbackAudit {
     pub task: i32,
     #[prost(string, optional, tag = "4")]
     pub feedback: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "5")]
+    pub text_block_id: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
