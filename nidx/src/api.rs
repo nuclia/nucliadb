@@ -17,13 +17,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub mod api;
-pub mod indexer;
-pub mod maintenance;
-pub mod metadata;
-pub mod searcher;
-mod segment_store;
-mod settings;
 
-pub use metadata::NidxMetadata;
-pub use settings::Settings;
+mod shards;
+
+use crate::{NidxMetadata, Settings};
+
+pub async fn run() -> anyhow::Result<()> {
+    let settings = Settings::from_env();
+    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
+    let _storage = settings.storage.expect("Storage settings needed").object_store.client();
+
+    println!("Running API");
+
+    let shards_api = shards::ShardsServer::new(meta.clone());
+    shards_api.serve().await;
+
+    Ok(())
+}
