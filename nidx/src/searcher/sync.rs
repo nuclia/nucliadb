@@ -209,6 +209,7 @@ impl GuardedIndexMetadata {
 mod tests {
     use std::{io::BufWriter, path::Path, sync::Arc};
 
+    use nidx_vector::config::VectorConfig;
     use object_store::{ObjectStore, PutPayload};
     use tempfile::tempdir;
 
@@ -224,8 +225,8 @@ mod tests {
         let index = Index::create(
             &pool,
             Shard::create(&pool, uuid::Uuid::new_v4()).await?.id,
-            crate::metadata::IndexKind::Vector,
             "english",
+            VectorConfig::default().into(),
         )
         .await?;
 
@@ -294,8 +295,8 @@ mod tests {
         let index = Index::create(
             &meta.pool,
             Shard::create(&meta.pool, uuid::Uuid::new_v4()).await?.id,
-            crate::metadata::IndexKind::Vector,
             "english",
+            VectorConfig::default().into(),
         )
         .await?;
         // Assumes we get index_id=1

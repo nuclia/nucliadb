@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use super::segment::Segment;
+use nidx_vector::config::VectorConfig;
+use serde::Serialize;
 use sqlx::{
     self,
     types::{time::PrimitiveDateTime, JsonValue},
@@ -52,18 +54,28 @@ pub struct Index {
     pub updated_at: PrimitiveDateTime,
 }
 
+pub enum IndexConfig {
+    Text(JsonValue),
+    Paragraph(JsonValue),
+    Vector(VectorConfig),
+    Relation(JsonValue),
+}
+
 impl Index {
     pub async fn create(
         meta: impl Executor<'_, Database = Postgres>,
         shard_id: Uuid,
-        kind: IndexKind,
         name: &str,
-    ) -> Result<Index, sqlx::Error> {
+        config: IndexConfig,
+    ) -> Result<Index, anyhow::Error> {
+        let kind = config.kind();
+        let json_config = serde_json::to_value(&config)?;
         let inserted = sqlx::query!(
-            r#"INSERT INTO indexes (shard_id, kind, name) VALUES ($1, $2, $3) RETURNING id AS "id: IndexId", updated_at"#,
+            r#"INSERT INTO indexes (shard_id, kind, name, configuration) VALUES ($1, $2, $3, $4) RETURNING id AS "id: IndexId", updated_at"#,
             shard_id,
             kind as IndexKind,
-            name
+            name,
+            json_config,
         )
         .fetch_one(meta)
         .await?;
@@ -72,7 +84,7 @@ impl Index {
             shard_id,
             kind,
             name: name.to_owned(),
-            configuration: JsonValue::Null,
+            configuration: json_config,
             updated_at: inserted.updated_at,
         })
     }
@@ -136,5 +148,69 @@ impl Index {
         sqlx::query_as!(Segment, r#"SELECT * FROM segments WHERE index_id = $1"#, self.id as IndexId)
             .fetch_all(meta)
             .await
+    }
+
+    pub fn config(&self) -> anyhow::Result<IndexConfig> {
+        Ok(match self.kind {
+            IndexKind::Text => {
+                todo!()
+            }
+            IndexKind::Paragraph => {
+                todo!()
+            }
+            IndexKind::Vector => {
+                let vector_config = serde_json::from_value::<VectorConfig>(self.configuration.clone())?;
+                IndexConfig::from(vector_config)
+            }
+            IndexKind::Relation => {
+                todo!()
+            }
+        })
+    }
+}
+
+impl IndexConfig {
+    pub fn kind(&self) -> IndexKind {
+        match self {
+            Self::Text(_) => IndexKind::Text,
+            Self::Paragraph(_) => IndexKind::Paragraph,
+            Self::Vector(_) => IndexKind::Vector,
+            Self::Relation(_) => IndexKind::Relation,
+        }
+    }
+}
+
+impl Serialize for IndexConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Text(config) => config.serialize(serializer),
+            Self::Paragraph(config) => config.serialize(serializer),
+            Self::Vector(config) => config.serialize(serializer),
+            Self::Relation(config) => config.serialize(serializer),
+        }
+    }
+}
+
+impl From<VectorConfig> for IndexConfig {
+    fn from(value: VectorConfig) -> Self {
+        Self::Vector(value)
+    }
+}
+
+// TODO: replace new_ methods for impl From like the one above
+impl IndexConfig {
+    pub fn new_fulltext() -> Self {
+        Self::Text(JsonValue::Null)
+    }
+
+    pub fn new_keyword() -> Self {
+        Self::Paragraph(JsonValue::Null)
+    }
+
+    pub fn new_relation() -> Self {
+        Self::Relation(JsonValue::Null)
     }
 }

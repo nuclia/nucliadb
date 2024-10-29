@@ -330,11 +330,12 @@ mod tests {
         use std::collections::{HashMap, HashSet};
 
         use nidx_types::Seq;
+        use nidx_vector::config::VectorConfig;
         use uuid::Uuid;
 
         use super::*;
 
-        use crate::metadata::{Index, IndexId, IndexKind, NidxMetadata, Shard};
+        use crate::metadata::{Index, IndexConfig, IndexId, NidxMetadata, Shard};
 
         fn merge_scheduler() -> MergeScheduler {
             MergeScheduler::from_settings(&MergeSettings {
@@ -364,7 +365,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
             let last_seq = create_segments_with_num_records(&meta.pool, &index, &vec![50; 3]).await?;
 
             let scheduler = MergeScheduler::from_settings(&MergeSettings {
@@ -383,7 +384,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
             let last_seq = create_segments_with_num_records(&meta.pool, &index, &vec![50; 3]).await?;
 
             let scheduler = MergeScheduler::from_settings(&MergeSettings {
@@ -410,7 +411,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
 
             let scheduler = MergeScheduler {
                 min_number_of_segments: 2,
@@ -487,7 +488,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
             let mut seq: i64 = 0;
 
             for _ in 0..10 {
@@ -524,11 +525,11 @@ mod tests {
             let shard = Shard::create(&meta.pool, kbid).await?;
 
             let indexes = vec![
-                Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Vector, "english").await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Text, "fulltext").await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Paragraph, "keyword").await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Relation, "relation").await?,
+                Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?,
+                Index::create(&meta.pool, shard.id, "english", VectorConfig::default().into()).await?,
+                Index::create(&meta.pool, shard.id, "fulltext", IndexConfig::new_fulltext()).await?,
+                Index::create(&meta.pool, shard.id, "keyword", IndexConfig::new_keyword()).await?,
+                Index::create(&meta.pool, shard.id, "relation", IndexConfig::new_relation()).await?,
             ];
             let mut seq: i64 = 0;
 
@@ -575,7 +576,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
 
             for seq in [95, 98, 99, 100, 102i64] {
                 let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await?;

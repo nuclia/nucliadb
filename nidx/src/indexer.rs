@@ -152,11 +152,12 @@ async fn index_resource_to_index(
 mod tests {
     use std::io::{Seek, Write};
 
+    use nidx_vector::config::VectorConfig;
     use tempfile::tempfile;
     use uuid::Uuid;
 
     use super::*;
-    use crate::metadata::{IndexKind, NidxMetadata};
+    use crate::metadata::NidxMetadata;
     use nidx_tests::*;
 
     #[sqlx::test]
@@ -164,7 +165,7 @@ mod tests {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
-        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
         index_resource(

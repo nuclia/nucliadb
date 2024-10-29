@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO indexes (shard_id, kind, name) VALUES ($1, $2, $3) RETURNING id AS \"id: IndexId\", updated_at",
+  "query": "INSERT INTO indexes (shard_id, kind, name, configuration) VALUES ($1, $2, $3, $4) RETURNING id AS \"id: IndexId\", updated_at",
   "describe": {
     "columns": [
       {
@@ -30,7 +30,8 @@
             }
           }
         },
-        "Text"
+        "Text",
+        "Json"
       ]
     },
     "nullable": [
@@ -38,5 +39,5 @@
       false
     ]
   },
-  "hash": "4fc9b1dc170aea3e5ac0f83b3199728fc96ee42f24c4270cc228904ad085be32"
+  "hash": "2a43bc5131650ae6080751bfb0f4615d4b9135fbe002c1c7ff1896a7925f8269"
 }

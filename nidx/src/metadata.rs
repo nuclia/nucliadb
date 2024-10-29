@@ -25,7 +25,7 @@ mod segment;
 mod shard;
 
 pub use deletion::Deletion;
-pub use index::{Index, IndexId, IndexKind};
+pub use index::{Index, IndexConfig, IndexId, IndexKind};
 pub use merge_job::MergeJob;
 pub use segment::{Segment, SegmentId};
 pub use shard::Shard;
@@ -64,6 +64,7 @@ impl NidxMetadata {
 
 #[cfg(test)]
 mod tests {
+    use nidx_vector::config::VectorConfig;
     use shard::Shard;
     use uuid::Uuid;
 
@@ -76,7 +77,7 @@ mod tests {
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
         assert_eq!(shard.kbid, kbid);
 
-        let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await.unwrap();
         assert_eq!(index.shard_id, shard.id);
         assert_eq!(index.kind, IndexKind::Vector);
         assert_eq!(index.name, "multilingual");
