@@ -1119,11 +1119,11 @@ class FieldEntities(google.protobuf.message.Message):
 
     ENTITIES_FIELD_NUMBER: builtins.int
     @property
-    def entities(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Entity]: ...
+    def entities(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldEntity]: ...
     def __init__(
         self,
         *,
-        entities: collections.abc.Iterable[global___Entity] | None = ...,
+        entities: collections.abc.Iterable[global___FieldEntity] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["entities", b"entities"]) -> None: ...
 
