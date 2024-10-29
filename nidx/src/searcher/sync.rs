@@ -214,7 +214,7 @@ mod tests {
 
     use crate::{
         maintenance::scheduler::purge_deletions,
-        metadata::{Deletion, Index, NewSegment, Segment, SegmentId, Shard},
+        metadata::{Deletion, Index, Segment, SegmentId, Shard},
         searcher::sync::{sync_index, Operations, SyncMetadata},
         NidxMetadata,
     };
@@ -229,29 +229,24 @@ mod tests {
         )
         .await?;
 
-        let new_segment = NewSegment {
-            records: 4,
-            index_metadata: serde_json::Value::Null,
-        };
-
         // Seq 1: A segment was created and unmerged
-        let s1 = Segment::create(&pool, index.id, 1i64.into()).await?;
-        s1.mark_ready(&pool, &new_segment, 122).await?;
+        let s1 = Segment::create(&pool, index.id, 1i64.into(), 4, serde_json::Value::Null).await?;
+        s1.mark_ready(&pool, 122).await?;
         Deletion::create(&pool, index.id, 1i64.into(), &["k1".to_string()]).await?;
 
         // Seq 2: A segment was created and later merged (deletions remain)
         Deletion::create(&pool, index.id, 2i64.into(), &["k2a".to_string(), "k2b".to_string()]).await?;
 
         // Seq 3: A segment was created and also the result of a merge
-        let s2 = Segment::create(&pool, index.id, 3i64.into()).await?;
-        s2.mark_ready(&pool, &new_segment, 122).await?;
+        let s2 = Segment::create(&pool, index.id, 3i64.into(), 4, serde_json::Value::Null).await?;
+        s2.mark_ready(&pool, 122).await?;
         Deletion::create(&pool, index.id, 3i64.into(), &["k3".to_string()]).await?;
-        let s3 = Segment::create(&pool, index.id, 3i64.into()).await?;
-        s3.mark_ready(&pool, &new_segment, 1220).await?;
+        let s3 = Segment::create(&pool, index.id, 3i64.into(), 4, serde_json::Value::Null).await?;
+        s3.mark_ready(&pool, 1220).await?;
 
         // Seq 4: A segment was created without deletions
-        let s4 = Segment::create(&pool, index.id, 4i64.into()).await?;
-        s4.mark_ready(&pool, &new_segment, 122).await?;
+        let s4 = Segment::create(&pool, index.id, 4i64.into(), 4, serde_json::Value::Null).await?;
+        s4.mark_ready(&pool, 122).await?;
 
         let op = Operations::load_for_index(&pool, &index.id).await?;
         let sm = &op.0[0];
@@ -306,11 +301,6 @@ mod tests {
         // Assumes we get index_id=1
         let index_path = work_dir.path().join("1");
 
-        let new_segment = NewSegment {
-            records: 4,
-            index_metadata: serde_json::Value::Null,
-        };
-
         // Initial sync with empty data
         sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
         // No notification sent for empty index
@@ -319,9 +309,9 @@ mod tests {
         assert!(downloaded_segments(&index_path).is_err());
 
         // Adds a first segment
-        let s1 = Segment::create(&meta.pool, index.id, 1i64.into()).await?;
+        let s1 = Segment::create(&meta.pool, index.id, 1i64.into(), 4, serde_json::Value::Null).await?;
         storage.put(&s1.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned())).await?;
-        s1.mark_ready(&meta.pool, &new_segment, 122).await?;
+        s1.mark_ready(&meta.pool, 122).await?;
         Deletion::create(&meta.pool, index.id, 1i64.into(), &["k1".to_string()]).await?;
 
         sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
@@ -334,9 +324,9 @@ mod tests {
         }
 
         // Adds another segment
-        let s2 = Segment::create(&meta.pool, index.id, 2i64.into()).await?;
+        let s2 = Segment::create(&meta.pool, index.id, 2i64.into(), 4, serde_json::Value::Null).await?;
         storage.put(&s2.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned())).await?;
-        s2.mark_ready(&meta.pool, &new_segment, 122).await?;
+        s2.mark_ready(&meta.pool, 122).await?;
         Deletion::create(&meta.pool, index.id, 2i64.into(), &["k2".to_string()]).await?;
 
         sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
@@ -353,9 +343,9 @@ mod tests {
         Segment::delete_many(&meta.pool, &[s1.id, s2.id]).await?;
         storage.delete(&s1.id.storage_key()).await?;
         storage.delete(&s2.id.storage_key()).await?;
-        let s3 = Segment::create(&meta.pool, index.id, 3i64.into()).await?;
+        let s3 = Segment::create(&meta.pool, index.id, 3i64.into(), 4, serde_json::Value::Null).await?;
         storage.put(&s3.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned())).await?;
-        s3.mark_ready(&meta.pool, &new_segment, 122).await?;
+        s3.mark_ready(&meta.pool, 122).await?;
 
         sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
         assert_eq!(rx.try_recv()?, index.id);

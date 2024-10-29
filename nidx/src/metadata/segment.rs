@@ -49,10 +49,10 @@ pub struct Segment {
     pub id: SegmentId,
     pub index_id: IndexId,
     pub seq: Seq,
-    pub records: Option<i64>,
+    pub records: i64,
     pub size_bytes: Option<i64>,
     pub merge_job_id: Option<i64>,
-    index_metadata: Option<JsonValue>,
+    index_metadata: JsonValue,
     pub delete_at: Option<PrimitiveDateTime>,
 }
 
@@ -75,27 +75,24 @@ impl Segment {
         meta: impl Executor<'_, Database = Postgres>,
         index_id: IndexId,
         seq: Seq,
+        records: i64,
+        index_metadata: JsonValue,
     ) -> sqlx::Result<Segment> {
         sqlx::query_as!(
             Segment,
-            r#"INSERT INTO segments (index_id, seq) VALUES ($1, $2) RETURNING *"#,
+            r#"INSERT INTO segments (index_id, seq, records, index_metadata) VALUES ($1, $2, $3, $4) RETURNING *"#,
             index_id as IndexId,
-            i64::from(&seq)
+            i64::from(&seq),
+            records,
+            index_metadata
         )
         .fetch_one(meta)
         .await
     }
 
-    pub async fn mark_ready(
-        &self,
-        meta: impl Executor<'_, Database = Postgres>,
-        new_segment: &NewSegment,
-        size_bytes: i64,
-    ) -> sqlx::Result<()> {
+    pub async fn mark_ready(&self, meta: impl Executor<'_, Database = Postgres>, size_bytes: i64) -> sqlx::Result<()> {
         sqlx::query!(
-            "UPDATE segments SET delete_at = NULL, records = $1, index_metadata = $2, size_bytes = $3 WHERE id = $4",
-            new_segment.records,
-            new_segment.index_metadata,
+            "UPDATE segments SET delete_at = NULL, size_bytes = $1 WHERE id = $2",
             size_bytes,
             self.id as SegmentId,
         )
@@ -145,10 +142,10 @@ impl Segment {
     }
 
     pub fn metadata<T: for<'de> Deserialize<'de>>(&self, path: PathBuf) -> SegmentMetadata<T> {
-        let metadata = serde_json::from_value(self.index_metadata.clone().unwrap()).unwrap();
+        let metadata = serde_json::from_value(self.index_metadata.clone()).unwrap();
         SegmentMetadata {
             path,
-            records: self.records.unwrap() as usize,
+            records: self.records as usize,
             tags: HashSet::new(),
             index_metadata: metadata,
         }

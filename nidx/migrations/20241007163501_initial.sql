@@ -29,11 +29,13 @@ CREATE TABLE segments (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     index_id BIGINT NOT NULL REFERENCES indexes(id),
     seq BIGINT NOT NULL,
-    records BIGINT,
+    records BIGINT NOT NULL,
     size_bytes BIGINT,
     merge_job_id BIGINT REFERENCES merge_jobs(id) ON DELETE SET NULL,
-    index_metadata JSON,
-    delete_at TIMESTAMP DEFAULT NOW() + INTERVAL '5 minutes'
+    index_metadata JSON NOT NULL,
+    delete_at TIMESTAMP DEFAULT NOW() + INTERVAL '5 minutes',
+    -- Metadata fields must be set if the segment is active (i.e: delete_at is NULL)
+    CHECK (delete_at IS NOT NULL OR size_bytes IS NOT NULL)
 );
 
 CREATE TABLE deletions (
