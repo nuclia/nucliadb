@@ -688,16 +688,42 @@ pub struct Positions {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldEntity {
+    /// The entity text
+    #[prost(string, tag = "1")]
+    pub text: ::prost::alloc::string::String,
+    /// The entity type
+    #[prost(string, tag = "2")]
+    pub label: ::prost::alloc::string::String,
+    /// The positions of the entity in the text
+    #[prost(message, repeated, tag = "3")]
+    pub positions: ::prost::alloc::vec::Vec<Position>,
+}
+/// Wrapper for a list of entities
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldEntities {
+    #[prost(message, repeated, tag = "1")]
+    pub entities: ::prost::alloc::vec::Vec<Entity>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldMetadata {
     #[prost(string, repeated, tag = "1")]
     pub links: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(message, repeated, tag = "2")]
     pub paragraphs: ::prost::alloc::vec::Vec<Paragraph>,
-    /// Document
+    /// Map of entity_text to entity_type (label) found in the text
     #[prost(map = "string, string", tag = "3")]
     pub ner: ::std::collections::HashMap<
         ::prost::alloc::string::String,
         ::prost::alloc::string::String,
+    >,
+    /// Map of data_augmentation_task_id to list of entities found in the field
+    #[prost(map = "string, message", tag = "15")]
+    pub entities: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        FieldEntities,
     >,
     #[prost(message, repeated, tag = "4")]
     pub classifications: ::prost::alloc::vec::Vec<Classification>,
@@ -715,7 +741,7 @@ pub struct FieldMetadata {
     pub language: ::prost::alloc::string::String,
     #[prost(string, tag = "11")]
     pub summary: ::prost::alloc::string::String,
-    /// Document
+    /// Map with keys f"{entity_text}/{entity_type}" for every `entity_text` present in `ner` field, and positions as values to reflect the entity positions in the text
     #[prost(map = "string, message", tag = "12")]
     pub positions: ::std::collections::HashMap<
         ::prost::alloc::string::String,

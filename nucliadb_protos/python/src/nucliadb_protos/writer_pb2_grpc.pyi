@@ -116,6 +116,8 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadata as FieldComputedMetadata,
     FieldComputedMetadataWrapper as FieldComputedMetadataWrapper,
     FieldConversation as FieldConversation,
+    FieldEntities as FieldEntities,
+    FieldEntity as FieldEntity,
     FieldFile as FieldFile,
     FieldID as FieldID,
     FieldLargeMetadata as FieldLargeMetadata,
