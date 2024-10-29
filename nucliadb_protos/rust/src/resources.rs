@@ -719,7 +719,7 @@ pub struct FieldMetadata {
         ::prost::alloc::string::String,
         ::prost::alloc::string::String,
     >,
-    /// Map of data_augmentation_task_id to list of entities found in the text
+    /// Map of data_augmentation_task_id to list of entities found in the field
     #[prost(map = "string, message", tag = "15")]
     pub entities: ::std::collections::HashMap<
         ::prost::alloc::string::String,

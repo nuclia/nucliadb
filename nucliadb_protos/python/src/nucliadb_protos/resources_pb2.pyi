@@ -1213,7 +1213,7 @@ class FieldMetadata(google.protobuf.message.Message):
 
     @property
     def entities(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___FieldEntities]:
-        """Map of data_augmentation_task_id to list of entities found in the text"""
+        """Map of data_augmentation_task_id to list of entities found in the field"""
 
     @property
     def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
