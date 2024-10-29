@@ -283,7 +283,7 @@ message FieldEntity {
 
 // Wrapper for a list of entities
 message FieldEntities {
-    repeated Entity entities = 1;
+    repeated FieldEntity entities = 1;
 }
 
 message FieldMetadata {

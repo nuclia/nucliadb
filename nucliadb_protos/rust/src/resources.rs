@@ -704,7 +704,7 @@ pub struct FieldEntity {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldEntities {
     #[prost(message, repeated, tag = "1")]
-    pub entities: ::prost::alloc::vec::Vec<Entity>,
+    pub entities: ::prost::alloc::vec::Vec<FieldEntity>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
