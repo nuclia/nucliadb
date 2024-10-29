@@ -28,17 +28,13 @@
 
 pub mod index_reader;
 
-use nidx_types::{SegmentMetadata, Seq};
+use nidx_types::SegmentMetadata;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
 };
-use tantivy::{
-    directory::{MmapDirectory, RamDirectory},
-    schema::Schema,
-    Index, IndexSettings, SingleSegmentIndexWriter, TantivyDocument,
-};
+use tantivy::{directory::MmapDirectory, schema::Schema, Index, SingleSegmentIndexWriter, TantivyDocument};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TantivyMeta {

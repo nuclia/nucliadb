@@ -17,18 +17,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-// use std::convert::TryFrom;
-// use std::time::SystemTime;
 
 use crate::query_io;
+use crate::query_language::{self, QueryContext};
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
-use nucliadb_core::protos::stream_filter::Conjunction;
-use nucliadb_core::protos::{DocumentSearchRequest, StreamFilter, StreamRequest};
-use nucliadb_core::query_language::{self, QueryContext};
-use nucliadb_core::NodeResult;
+use nidx_protos::stream_filter::Conjunction;
+use nidx_protos::{DocumentSearchRequest, StreamFilter, StreamRequest};
 use std::ops::Bound;
 use tantivy::query::*;
-use tantivy::schema::{Facet, Field, IndexRecordOption};
+use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
 
 use crate::schema::{self, TextSchema};
@@ -68,7 +65,7 @@ pub fn create_query(
     schema: &TextSchema,
     text: &str,
     with_advance: Option<Box<dyn Query>>,
-) -> NodeResult<Box<dyn Query>> {
+) -> anyhow::Result<Box<dyn Query>> {
     let mut queries = vec![];
     let main_q = if text.is_empty() {
         Box::new(AllQuery)

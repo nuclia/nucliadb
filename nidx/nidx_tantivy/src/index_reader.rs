@@ -157,7 +157,10 @@ impl Directory for NidxDirectory {
         }
     }
 
-    fn delete(&self, _path: &std::path::Path) -> Result<(), tantivy::directory::error::DeleteError> {
+    fn delete(&self, path: &std::path::Path) -> Result<(), tantivy::directory::error::DeleteError> {
+        if path.ends_with(".tantivy-meta.lock") {
+            return Ok(());
+        }
         unimplemented!()
     }
 

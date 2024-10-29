@@ -18,10 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
+use nidx_protos::StreamRequest;
 
-use nucliadb_core::protos::StreamRequest;
-use nucliadb_core::texts::*;
+mod common;
 
 #[test]
 fn test_stream_request_iterator() {

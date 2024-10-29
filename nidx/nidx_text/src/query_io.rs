@@ -17,8 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::query_language::{BooleanExpression, BooleanOperation, Operator};
 use crate::schema::TextSchema;
-use nucliadb_core::query_language::{BooleanExpression, BooleanOperation, Operator};
 use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, TermQuery};
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::tokenizer::TokenizerManager;

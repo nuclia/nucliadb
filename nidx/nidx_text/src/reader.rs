@@ -25,26 +25,38 @@ use std::time::*;
 use super::schema::TextSchema;
 use super::search_query;
 use crate::query_io;
+use anyhow::anyhow;
 use itertools::Itertools;
-use nucliadb_core::prelude::*;
-use nucliadb_core::protos::order_by::{OrderField, OrderType};
-use nucliadb_core::protos::{
+use nidx_protos::order_by::{OrderField, OrderType};
+use nidx_protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults, OrderBy,
     ResultScore, StreamRequest,
 };
-use nucliadb_core::query_planner::{
-    FieldDateType, PreFilterRequest, PreFilterResponse, ValidField, ValidFieldCollector,
-};
-use nucliadb_core::texts::*;
-use nucliadb_core::tracing::{self, *};
-use nucliadb_procs::measure;
+use nidx_types::ValidField;
 use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::BytesColumn;
 use tantivy::fastfield::FacetReader;
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::Value;
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, ReloadPolicy, Searcher};
+use tracing::*;
+
+pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
+impl DocumentIterator {
+    pub fn new<I>(inner: I) -> DocumentIterator
+    where
+        I: Iterator<Item = DocumentItem> + Send + 'static,
+    {
+        DocumentIterator(Box::new(inner))
+    }
+}
+impl Iterator for DocumentIterator {
+    type Item = DocumentItem;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -167,107 +179,104 @@ impl Collector for FieldUuidCollector {
     }
 }
 
-impl FieldReader for TextReaderService {
-    #[measure(actor = "texts", metric = "prefilter")]
-    #[tracing::instrument(skip_all)]
-    fn prefilter(&self, request: &PreFilterRequest) -> NodeResult<PreFilterResponse> {
-        let schema = &self.schema;
-        let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
-        let mut created_queries = Vec::new();
-        let mut modified_queries = Vec::new();
+impl TextReaderService {
+    // fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
+    //     let schema = &self.schema;
+    //     let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
+    //     let mut created_queries = Vec::new();
+    //     let mut modified_queries = Vec::new();
 
-        if let Some(security) = request.security.as_ref() {
-            for group_id in security.access_groups.iter() {
-                let mut group_id_key = group_id.clone();
-                if !group_id.starts_with('/') {
-                    // Slash needs to be added to be compatible with tantivy facet fields
-                    group_id_key = "/".to_string() + group_id;
-                }
-                let facet = Facet::from_text(&group_id_key).unwrap();
-                let term = Term::from_facet(self.schema.groups_with_access, &facet);
-                let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-                access_groups_queries.push(Box::new(term_query));
-            }
-        }
+    //     if let Some(security) = request.security.as_ref() {
+    //         for group_id in security.access_groups.iter() {
+    //             let mut group_id_key = group_id.clone();
+    //             if !group_id.starts_with('/') {
+    //                 // Slash needs to be added to be compatible with tantivy facet fields
+    //                 group_id_key = "/".to_string() + group_id;
+    //             }
+    //             let facet = Facet::from_text(&group_id_key).unwrap();
+    //             let term = Term::from_facet(self.schema.groups_with_access, &facet);
+    //             let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+    //             access_groups_queries.push(Box::new(term_query));
+    //         }
+    //     }
 
-        for timestamp_query in request.timestamp_filters.iter() {
-            let from = timestamp_query.from.as_ref();
-            let to = timestamp_query.to.as_ref();
-            let (field, add_to) = match timestamp_query.applies_to {
-                FieldDateType::Created => ("created", &mut created_queries),
-                FieldDateType::Modified => ("modified", &mut modified_queries),
-            };
-            // TODO
-            // if let Some(query) = search_query::produce_date_range_query(field, from, to) {
-            //     let query: Box<dyn Query> = Box::new(query);
-            //     add_to.push((Occur::Should, query));
-            // }
-        }
+    //     for timestamp_query in request.timestamp_filters.iter() {
+    //         let from = timestamp_query.from.as_ref();
+    //         let to = timestamp_query.to.as_ref();
+    //         let (field, add_to) = match timestamp_query.applies_to {
+    //             FieldDateType::Created => ("created", &mut created_queries),
+    //             FieldDateType::Modified => ("modified", &mut modified_queries),
+    //         };
+    //         // TODO
+    //         // if let Some(query) = search_query::produce_date_range_query(field, from, to) {
+    //         //     let query: Box<dyn Query> = Box::new(query);
+    //         //     add_to.push((Occur::Should, query));
+    //         // }
+    //     }
 
-        let mut subqueries = vec![];
-        if !access_groups_queries.is_empty() {
-            let public_fields_query = Box::new(TermQuery::new(
-                Term::from_field_u64(self.schema.groups_public, 1_u64),
-                IndexRecordOption::Basic,
-            ));
-            access_groups_queries.push(public_fields_query);
-            let access_groups_query: Box<dyn Query> = Box::new(BooleanQuery::union(access_groups_queries));
-            subqueries.push(access_groups_query);
-        }
-        if !created_queries.is_empty() {
-            let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
-            subqueries.push(created_query);
-        }
-        if !modified_queries.is_empty() {
-            let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
-            subqueries.push(modified_query);
-        }
-        if let Some(labels_formula) = request.labels_formula.as_ref() {
-            let labels_formula_query = query_io::translate_labels_expression(labels_formula, schema);
-            subqueries.push(labels_formula_query);
-        }
+    //     let mut subqueries = vec![];
+    //     if !access_groups_queries.is_empty() {
+    //         let public_fields_query = Box::new(TermQuery::new(
+    //             Term::from_field_u64(self.schema.groups_public, 1_u64),
+    //             IndexRecordOption::Basic,
+    //         ));
+    //         access_groups_queries.push(public_fields_query);
+    //         let access_groups_query: Box<dyn Query> = Box::new(BooleanQuery::union(access_groups_queries));
+    //         subqueries.push(access_groups_query);
+    //     }
+    //     if !created_queries.is_empty() {
+    //         let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+    //         subqueries.push(created_query);
+    //     }
+    //     if !modified_queries.is_empty() {
+    //         let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
+    //         subqueries.push(modified_query);
+    //     }
+    //     if let Some(labels_formula) = request.labels_formula.as_ref() {
+    //         let labels_formula_query = query_io::translate_labels_expression(labels_formula, schema);
+    //         subqueries.push(labels_formula_query);
+    //     }
 
-        if let Some(keywords_formula) = request.keywords_formula.as_ref() {
-            let keywords_formula_query = query_io::translate_keywords_expression(keywords_formula, schema);
-            subqueries.push(keywords_formula_query);
-        }
+    //     if let Some(keywords_formula) = request.keywords_formula.as_ref() {
+    //         let keywords_formula_query = query_io::translate_keywords_expression(keywords_formula, schema);
+    //         subqueries.push(keywords_formula_query);
+    //     }
 
-        if subqueries.is_empty() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::All,
-            });
-        }
+    //     if subqueries.is_empty() {
+    //         return Ok(PreFilterResponse {
+    //             valid_fields: ValidFieldCollector::All,
+    //         });
+    //     }
 
-        let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
-        let searcher = self.reader.searcher();
-        let collector = FieldUuidCollector {
-            uuid: self.schema.uuid,
-            field: self.schema.field,
-        };
-        let docs_fulfilled = searcher.search(&prefilter_query, &collector)?;
+    //     let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
+    //     let searcher = self.reader.searcher();
+    //     let collector = FieldUuidCollector {
+    //         uuid: self.schema.uuid,
+    //         field: self.schema.field,
+    //     };
+    //     let docs_fulfilled = searcher.search(&prefilter_query, &collector)?;
 
-        // If none of the fields match the pre-filter, thats all the query planner needs to know.
-        if docs_fulfilled.is_empty() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::None,
-            });
-        }
+    //     // If none of the fields match the pre-filter, thats all the query planner needs to know.
+    //     if docs_fulfilled.is_empty() {
+    //         return Ok(PreFilterResponse {
+    //             valid_fields: ValidFieldCollector::None,
+    //         });
+    //     }
 
-        // If all the fields match the pre-filter, thats all the query planner needs to know
-        if docs_fulfilled.len() as u64 == searcher.num_docs() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::All,
-            });
-        }
+    //     // If all the fields match the pre-filter, thats all the query planner needs to know
+    //     if docs_fulfilled.len() as u64 == searcher.num_docs() {
+    //         return Ok(PreFilterResponse {
+    //             valid_fields: ValidFieldCollector::All,
+    //         });
+    //     }
 
-        // The fields matching the pre-filter are a non-empty subset of all the fields
-        Ok(PreFilterResponse {
-            valid_fields: ValidFieldCollector::Some(docs_fulfilled),
-        })
-    }
+    //     // The fields matching the pre-filter are a non-empty subset of all the fields
+    //     Ok(PreFilterResponse {
+    //         valid_fields: ValidFieldCollector::Some(docs_fulfilled),
+    //     })
+    // }
 
-    #[tracing::instrument(skip_all)]
-    fn iterator(&self, request: &StreamRequest) -> NodeResult<DocumentIterator> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<DocumentIterator> {
         let producer = BatchProducer {
             offset: 0,
             total: self.count()?,
@@ -280,8 +289,7 @@ impl FieldReader for TextReaderService {
         Ok(DocumentIterator::new(producer.flatten()))
     }
 
-    #[tracing::instrument(skip_all)]
-    fn count(&self) -> NodeResult<usize> {
+    fn count(&self) -> anyhow::Result<usize> {
         let id: Option<String> = None;
         let time = Instant::now();
         let searcher = self.reader.searcher();
@@ -292,15 +300,11 @@ impl FieldReader for TextReaderService {
         Ok(count)
     }
 
-    #[measure(actor = "texts", metric = "search")]
-    #[tracing::instrument(skip_all)]
-    fn search(&self, request: &ProtosRequest) -> NodeResult<ProtosResponse> {
+    pub fn search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
         self.do_search(request)
     }
 
-    #[measure(actor = "texts", metric = "stored_ids")]
-    #[tracing::instrument(skip_all)]
-    fn stored_ids(&self) -> NodeResult<Vec<String>> {
+    fn stored_ids(&self) -> anyhow::Result<Vec<String>> {
         let mut keys = vec![];
         let searcher = self.reader.searcher();
         for addr in searcher.search(&AllQuery, &DocSetCollector)? {
@@ -342,10 +346,9 @@ impl TextReaderService {
         })
     }
 
-    #[tracing::instrument(skip_all)]
-    pub fn open(path: &Path) -> NodeResult<Self> {
+    pub fn open(path: &Path) -> anyhow::Result<Self> {
         if !path.exists() {
-            return Err(node_error!("Invalid path {:?}", path));
+            return Err(anyhow!("Invalid path {:?}", path));
         }
         let field_schema = TextSchema::new();
         let index = Index::open_in_dir(path)?;
@@ -502,8 +505,7 @@ impl TextReaderService {
         }
     }
 
-    #[tracing::instrument(skip_all)]
-    fn do_search(&self, request: &DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
+    fn do_search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
         use crate::search_query::create_query;
         let id = Some(&request.id);
         let time = Instant::now();

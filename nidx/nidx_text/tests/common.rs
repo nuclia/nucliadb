@@ -18,31 +18,21 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-// clippy doesn't detect functions are being used in our intergration tests
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::time::SystemTime;
 
+use nidx_protos::prost_types::Timestamp;
+use nidx_protos::{Resource, ResourceId};
 use nidx_text::reader::TextReaderService;
-use nucliadb_core::protos;
-use nucliadb_core::protos::prost_types::Timestamp;
-use nucliadb_core::protos::{Resource, ResourceId};
-use nucliadb_core::texts::*;
+use nidx_text::{TextIndexer, TextSearcher};
 use tempfile::TempDir;
 
 pub fn test_reader() -> TextReaderService {
     let dir = TempDir::new().unwrap();
-    let shard_path = dir.path().join("texts");
-    let config = TextConfig {
-        path: shard_path.clone(),
-    };
-
-    let mut writer = TextWriterService::create(config).unwrap();
     let resource = create_resource("shard".to_string());
-    writer.set_resource(&resource).unwrap();
+    let segment_meta = TextIndexer.index_resource(dir.path(), &resource).unwrap();
 
-    TextReaderService::open(&shard_path).unwrap()
+    TextSearcher::open(vec![(1i64.into(), vec![segment_meta], vec![])]).unwrap().reader
 }
 
 pub fn create_resource(shard_id: String) -> Resource {
@@ -57,7 +47,7 @@ pub fn create_resource(shard_id: String) -> Resource {
         nanos: 0,
     };
 
-    let metadata = protos::IndexMetadata {
+    let metadata = nidx_protos::IndexMetadata {
         created: Some(timestamp.clone()),
         modified: Some(timestamp),
     };
@@ -67,12 +57,12 @@ pub fn create_resource(shard_id: String) -> Resource {
     const DOC1_P2: &str = "This should be enough to test the tantivy.";
     const DOC1_P3: &str = "But I wanted to make it three anyway.";
 
-    let ti_title = protos::TextInformation {
+    let ti_title = nidx_protos::TextInformation {
         text: DOC1_TI.to_string(),
         labels: vec!["/l/mylabel".to_string(), "/e/myentity".to_string()],
     };
 
-    let ti_body = protos::TextInformation {
+    let ti_body = nidx_protos::TextInformation {
         text: DOC1_P1.to_string() + DOC1_P2 + DOC1_P3,
         labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
     };
@@ -85,7 +75,7 @@ pub fn create_resource(shard_id: String) -> Resource {
         resource: Some(resource_id),
         metadata: Some(metadata),
         texts,
-        status: protos::resource::ResourceStatus::Processed as i32,
+        status: nidx_protos::resource::ResourceStatus::Processed as i32,
         labels: vec![],
         paragraphs: HashMap::new(),
         paragraphs_to_delete: vec![],

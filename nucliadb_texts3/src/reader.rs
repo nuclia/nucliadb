@@ -163,6 +163,12 @@ impl Collector for FieldUuidCollector {
     }
 }
 
+impl TextReaderService {
+    pub fn reload(&self) {
+        self.reader.reload().unwrap();
+    }
+}
+
 impl FieldReader for TextReaderService {
     #[measure(actor = "texts", metric = "prefilter")]
     #[tracing::instrument(skip_all)]

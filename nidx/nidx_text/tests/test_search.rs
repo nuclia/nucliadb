@@ -19,12 +19,9 @@
 //
 
 mod common;
+use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
+use nidx_protos::{DocumentSearchRequest, Faceted, Filter};
 use nidx_text::reader::TextReaderService;
-use nucliadb_core::protos::{order_by::OrderField, order_by::OrderType, OrderBy};
-use nucliadb_core::protos::{DocumentSearchRequest, Faceted, Filter};
-use nucliadb_core::query_planner::{PreFilterRequest, ValidFieldCollector};
-use nucliadb_core::texts::*;
-use std::collections::HashSet;
 
 #[test]
 fn test_search_queries() {
@@ -76,101 +73,103 @@ fn test_search_queries() {
     // query(&reader, "shou", 1);
 }
 
-#[test]
-fn test_prefilter_all_search() {
-    let reader = common::test_reader();
-    let request = PreFilterRequest {
-        security: None,
-        labels_formula: None,
-        timestamp_filters: vec![],
-        keywords_formula: None,
-    };
-    let response = reader.prefilter(&request).unwrap();
-    assert!(matches!(response.valid_fields, ValidFieldCollector::All));
-}
+// TODO: Prefilter & tests
 
-#[test]
-fn test_prefilter_not_search() {
-    let reader = common::test_reader();
+// #[test]
+// fn test_prefilter_all_search() {
+//     let reader = common::test_reader();
+//     let request = PreFilterRequest {
+//         security: None,
+//         labels_formula: None,
+//         timestamp_filters: vec![],
+//         keywords_formula: None,
+//     };
+//     let response = reader.prefilter(&request).unwrap();
+//     assert!(matches!(response.valid_fields, ValidFieldCollector::All));
+// }
 
-    let context = nucliadb_core::query_language::QueryContext {
-        field_labels: HashSet::from(["/l/mylabel".to_string()]),
-        paragraph_labels: HashSet::with_capacity(0),
-    };
-    let query = "{ \"not\": { \"literal\": \"/l/mylabel\" } }";
-    let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
-    let request = PreFilterRequest {
-        security: None,
-        timestamp_filters: vec![],
-        labels_formula: expression.labels_prefilter_query,
-        keywords_formula: expression.keywords_prefilter_query,
-    };
-    println!("expression: {:?}", request.labels_formula);
-    let response = reader.prefilter(&request).unwrap();
-    let valid_fields = &response.valid_fields;
-    let ValidFieldCollector::Some(fields) = valid_fields else {
-        panic!("Response is not on the right variant {valid_fields:?}");
-    };
-    assert_eq!(fields.len(), 1);
-}
+// #[test]
+// fn test_prefilter_not_search() {
+//     let reader = common::test_reader();
 
-#[test]
-fn test_labels_prefilter_search() {
-    let reader = common::test_reader();
+//     let context = nucliadb_core::query_language::QueryContext {
+//         field_labels: HashSet::from(["/l/mylabel".to_string()]),
+//         paragraph_labels: HashSet::with_capacity(0),
+//     };
+//     let query = "{ \"not\": { \"literal\": \"/l/mylabel\" } }";
+//     let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
+//     let request = PreFilterRequest {
+//         security: None,
+//         timestamp_filters: vec![],
+//         labels_formula: expression.labels_prefilter_query,
+//         keywords_formula: expression.keywords_prefilter_query,
+//     };
+//     println!("expression: {:?}", request.labels_formula);
+//     let response = reader.prefilter(&request).unwrap();
+//     let valid_fields = &response.valid_fields;
+//     let ValidFieldCollector::Some(fields) = valid_fields else {
+//         panic!("Response is not on the right variant {valid_fields:?}");
+//     };
+//     assert_eq!(fields.len(), 1);
+// }
 
-    let context = nucliadb_core::query_language::QueryContext {
-        field_labels: HashSet::from(["/l/mylabel".to_string()]),
-        paragraph_labels: HashSet::with_capacity(0),
-    };
-    let query = "{ \"literal\": \"/l/mylabel\" }";
-    let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
-    let request = PreFilterRequest {
-        security: None,
-        labels_formula: expression.labels_prefilter_query,
-        timestamp_filters: vec![],
-        keywords_formula: expression.keywords_prefilter_query,
-    };
-    let response = reader.prefilter(&request).unwrap();
-    let ValidFieldCollector::Some(fields) = response.valid_fields else {
-        panic!("Response is not on the right variant");
-    };
-    assert_eq!(fields.len(), 1);
-}
+// #[test]
+// fn test_labels_prefilter_search() {
+//     let reader = common::test_reader();
 
-#[test]
-fn test_keywords_prefilter_search() {
-    let reader = common::test_reader();
-    let context = nucliadb_core::query_language::QueryContext {
-        field_labels: HashSet::from(["/l/mylabel".to_string()]),
-        paragraph_labels: HashSet::with_capacity(0),
-    };
-    let labels = "{ \"literal\": \"/l/mylabel\" }";
-    let keywords = "{ \"literal\": \"foobar\" }";
-    let expression = nucliadb_core::query_language::translate(Some(labels), Some(keywords), &context).unwrap();
-    let request = PreFilterRequest {
-        security: None,
-        labels_formula: expression.labels_prefilter_query,
-        timestamp_filters: vec![],
-        keywords_formula: expression.keywords_prefilter_query,
-    };
-    let response = reader.prefilter(&request).unwrap();
-    let ValidFieldCollector::None = response.valid_fields else {
-        panic!("Response is not on the right variant");
-    };
+//     let context = nucliadb_core::query_language::QueryContext {
+//         field_labels: HashSet::from(["/l/mylabel".to_string()]),
+//         paragraph_labels: HashSet::with_capacity(0),
+//     };
+//     let query = "{ \"literal\": \"/l/mylabel\" }";
+//     let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
+//     let request = PreFilterRequest {
+//         security: None,
+//         labels_formula: expression.labels_prefilter_query,
+//         timestamp_filters: vec![],
+//         keywords_formula: expression.keywords_prefilter_query,
+//     };
+//     let response = reader.prefilter(&request).unwrap();
+//     let ValidFieldCollector::Some(fields) = response.valid_fields else {
+//         panic!("Response is not on the right variant");
+//     };
+//     assert_eq!(fields.len(), 1);
+// }
 
-    let expression = nucliadb_core::query_language::translate(Some(labels), None, &context).unwrap();
-    let request = PreFilterRequest {
-        security: None,
-        labels_formula: expression.labels_prefilter_query,
-        timestamp_filters: vec![],
-        keywords_formula: expression.keywords_prefilter_query,
-    };
-    let response = reader.prefilter(&request).unwrap();
-    let ValidFieldCollector::Some(fields) = response.valid_fields else {
-        panic!("Response is not on the right variant");
-    };
-    assert_eq!(fields.len(), 1);
-}
+// #[test]
+// fn test_keywords_prefilter_search() {
+//     let reader = common::test_reader();
+//     let context = nucliadb_core::query_language::QueryContext {
+//         field_labels: HashSet::from(["/l/mylabel".to_string()]),
+//         paragraph_labels: HashSet::with_capacity(0),
+//     };
+//     let labels = "{ \"literal\": \"/l/mylabel\" }";
+//     let keywords = "{ \"literal\": \"foobar\" }";
+//     let expression = nucliadb_core::query_language::translate(Some(labels), Some(keywords), &context).unwrap();
+//     let request = PreFilterRequest {
+//         security: None,
+//         labels_formula: expression.labels_prefilter_query,
+//         timestamp_filters: vec![],
+//         keywords_formula: expression.keywords_prefilter_query,
+//     };
+//     let response = reader.prefilter(&request).unwrap();
+//     let ValidFieldCollector::None = response.valid_fields else {
+//         panic!("Response is not on the right variant");
+//     };
+
+//     let expression = nucliadb_core::query_language::translate(Some(labels), None, &context).unwrap();
+//     let request = PreFilterRequest {
+//         security: None,
+//         labels_formula: expression.labels_prefilter_query,
+//         timestamp_filters: vec![],
+//         keywords_formula: expression.keywords_prefilter_query,
+//     };
+//     let response = reader.prefilter(&request).unwrap();
+//     let ValidFieldCollector::Some(fields) = response.valid_fields else {
+//         panic!("Response is not on the right variant");
+//     };
+//     assert_eq!(fields.len(), 1);
+// }
 
 #[test]
 fn test_filtered_search() {
