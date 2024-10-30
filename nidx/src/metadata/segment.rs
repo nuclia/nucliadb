@@ -129,7 +129,7 @@ impl Segment {
         meta: impl Executor<'_, Database = Postgres>,
         index_id: IndexId,
     ) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE merge_job_id = $1", index_id as IndexId)
+        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE index_id = $1", index_id as IndexId)
             .fetch_all(meta)
             .await
     }
