@@ -72,13 +72,6 @@ async def test_create_resource_orm_metadata(
             )
         ]
     )
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
-    ex1.metadata.metadata.positions["document"].entity = "Ramon"
-    ex1.metadata.metadata.positions["document"].position.extend(
-        [Position(start=0, end=5), Position(start=23, end=28)]
-    )
 
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_field_metadata(ex1)
@@ -110,14 +103,9 @@ async def test_create_resource_orm_metadata_split(
     p1.classifications.append(cl1)
     ex1.metadata.split_metadata["ff1"].paragraphs.append(p1)
     ex1.metadata.split_metadata["ff1"].classifications.append(cl1)
-    # Data Augmentation + Processor entities
     ex1.metadata.split_metadata["ff1"].entities["processor"].entities.extend(
         [FieldEntity(text="Ramon", label="PERSON")]
     )
-
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    ex1.metadata.split_metadata["ff1"].ner["Ramon"] = "PEOPLE"
 
     ex1.metadata.split_metadata["ff1"].last_index.FromDatetime(datetime.now())
     ex1.metadata.split_metadata["ff1"].last_understanding.FromDatetime(datetime.now())
@@ -138,7 +126,9 @@ async def test_create_resource_orm_metadata_split(
     p1.classifications.append(cl1)
     ex2.metadata.split_metadata["ff2"].paragraphs.append(p1)
     ex2.metadata.split_metadata["ff2"].classifications.append(cl1)
-    ex2.metadata.split_metadata["ff2"].ner["Ramon"] = "PEOPLE"
+    ex1.metadata.split_metadata["ff1"].entities["processor"].entities.extend(
+        [FieldEntity(text="Ramon", label="PEOPLE")]
+    )
     ex2.metadata.split_metadata["ff2"].last_index.FromDatetime(datetime.now())
     ex2.metadata.split_metadata["ff2"].last_understanding.FromDatetime(datetime.now())
     ex2.metadata.split_metadata["ff2"].last_extract.FromDatetime(datetime.now())

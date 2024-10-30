@@ -499,7 +499,13 @@ class ResourceBrain:
                     )
                 )
         # Data Augmentation + Processor entities
+        use_legacy_entities = True
         for data_augmentation_task_id, entities in metadata.entities.items():
+            # If we recieved the entities from the processor here, we don't want to use the legacy entities
+            # TODO: Remove this when processor doesn't use this anymore
+            if data_augmentation_task_id == "processor":
+                use_legacy_entities = False
+
             for ent in entities.entities:
                 entity_text = ent.text
                 entity_label = ent.label
@@ -522,23 +528,24 @@ class ResourceBrain:
 
         # Legacy processor entities
         # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-        for klass_entity, _ in metadata.positions.items():
-            labels["e"].add(klass_entity)
-            entity_array = klass_entity.split("/")
-            if len(entity_array) == 1:
-                raise AttributeError(f"Entity should be with type {klass_entity}")
-            elif len(entity_array) > 1:
-                klass = entity_array[0]
-                entity = "/".join(entity_array[1:])
-            relation_node_entity = RelationNode(
-                value=entity, ntype=RelationNode.NodeType.ENTITY, subtype=klass
-            )
-            rel = Relation(
-                relation=Relation.ENTITY,
-                source=relation_node_document,
-                to=relation_node_entity,
-            )
-            self.brain.relations.append(rel)
+        if use_legacy_entities:
+            for klass_entity, _ in metadata.positions.items():
+                labels["e"].add(klass_entity)
+                entity_array = klass_entity.split("/")
+                if len(entity_array) == 1:
+                    raise AttributeError(f"Entity should be with type {klass_entity}")
+                elif len(entity_array) > 1:
+                    klass = entity_array[0]
+                    entity = "/".join(entity_array[1:])
+                relation_node_entity = RelationNode(
+                    value=entity, ntype=RelationNode.NodeType.ENTITY, subtype=klass
+                )
+                rel = Relation(
+                    relation=Relation.ENTITY,
+                    source=relation_node_document,
+                    to=relation_node_entity,
+                )
+                self.brain.relations.append(rel)
 
     def apply_field_labels(
         self,

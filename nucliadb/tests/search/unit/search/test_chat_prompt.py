@@ -419,14 +419,9 @@ async def test_extend_prompt_context_with_metadata():
     resource.get_basic = AsyncMock(return_value=basic)
     field = mock.Mock()
     fcm = rpb2.FieldComputedMetadata()
-    # Data Augmentation + Processor entities
     fcm.metadata.entities["processor"].entities.extend(
         [rpb2.FieldEntity(text="Barcelona", label="LOCATION")]
     )
-
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    fcm.metadata.ner.update({"Barcelona": "LOCATION"})
 
     field.get_field_metadata = AsyncMock(return_value=fcm)
     resource.get_field = AsyncMock(return_value=field)

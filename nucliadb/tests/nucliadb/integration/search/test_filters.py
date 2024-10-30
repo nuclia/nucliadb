@@ -123,10 +123,6 @@ def broker_message_with_entities(kbid):
             FieldEntity(text=entity, label=family, positions=[pos]),
         ]
     )
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    fmw.metadata.metadata.positions[EntityLabels.DETECTED].position.append(pos)
-    fmw.metadata.metadata.ner[entity] = family
 
     par1 = Paragraph()
     par1.start = 0

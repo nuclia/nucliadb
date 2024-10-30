@@ -117,14 +117,9 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
-    # Data Augmentation + Processor entities
     fcm.metadata.metadata.entities["processor"].entities.extend(
         [rpb.FieldEntity(text="Ramon", label="PERSON")]
     )
-
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
 
     fcm.metadata.metadata.classifications.append(c1)
 

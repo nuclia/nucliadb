@@ -104,10 +104,25 @@ class Positions(BaseModel):
     entity: str
 
 
+class FieldEntity(BaseModel):
+    text: str
+    label: str
+    positions: List[Position]
+
+
+class FieldEntities(BaseModel):
+    """
+    Wrapper for the entities extracted from a field (required because protobuf doesn't support lists of lists)
+    """
+
+    entities: List[FieldEntity]
+
+
 class FieldMetadata(BaseModel):
     links: List[str]
     paragraphs: List[Paragraph]
-    ner: Dict[str, str]
+    ner: Dict[str, str]  # TODO: Remove once processor doesn't use this anymore
+    entities: Dict[str, FieldEntities]
     classifications: List[Classification]
     last_index: Optional[datetime] = None
     last_understanding: Optional[datetime] = None
@@ -116,7 +131,7 @@ class FieldMetadata(BaseModel):
     thumbnail: Optional[CloudLink] = None
     language: Optional[str] = None
     summary: Optional[str] = None
-    positions: Dict[str, Positions]
+    positions: Dict[str, Positions]  # TODO: Remove once processor doesn't use this anymore
     relations: Optional[List[Relation]] = None
 
 
@@ -322,6 +337,25 @@ class FieldQuestionAnswers(BaseModel):
 def convert_fieldmetadata_pb_to_dict(
     message: resources_pb2.FieldMetadata,
 ) -> Dict[str, Any]:
+    # Backwards compatibility with old entities format
+    # TODO: Remove once deprecated fields are removed
+    # If we recieved processor entities in the new field and the old field is empty, we copy them to the old field
+    if "processor" in message.entities and len(message.positions) == 0 and len(message.ner) == 0:
+        message.ner.update(
+            {entity.text: entity.label for entity in message.entities["processor"].entities}
+        )
+        for entity in message.entities["processor"].entities:
+            message.positions[entity.label + "/" + entity.text].entity = entity.text
+            message.positions[entity.label + "/" + entity.text].position.extend(
+                [
+                    resources_pb2.Position(
+                        start=position.start,
+                        end=position.end,
+                    )
+                    for position in entity.positions
+                ]
+            )
+
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
