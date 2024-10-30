@@ -327,15 +327,8 @@ class KnowledgeBox:
             await txn.set(storage_to_delete, b"")
 
             # Delete KB Shards
-            shards_match = datamanagers.cluster.KB_SHARDS.format(kbid=kbid)
-            payload = await txn.get(shards_match, for_update=False)
-
-            if payload is None:
-                logger.warning(f"Shards not found for kbid={kbid}")
-            else:
-                shards_obj = writer_pb2.Shards()
-                shards_obj.ParseFromString(payload)
-
+            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            if shards_obj is not None:
                 for shard in shards_obj.shards:
                     # Delete the shard on nodes
                     for replica in shard.replicas:
