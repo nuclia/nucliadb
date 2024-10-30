@@ -101,7 +101,8 @@ impl NodeWriter for ShardsServer {
     }
 
     async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>, Status> {
-        todo!()
+        // TODO
+        Ok(Response::new(NodeMetadata::default()))
     }
 
     async fn gc(&self, _request: Request<ShardId>) -> Result<Response<GarbageCollectorResponse>, Status> {
