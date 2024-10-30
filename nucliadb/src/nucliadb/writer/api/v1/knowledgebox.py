@@ -260,8 +260,8 @@ def to_pinecone_serverless_cloud_pb(
 async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
     try:
         await vectorsets.add(kbid, vectorset_id)
-    except vectorsets.LearningConfigurationNotFound:
-        raise HTTPException(status_code=412, detail="Learning configuration not found for KB")
+    except learning_proxy.ProxiedLearningConfigError as err:
+        return Response(status_code=err.status_code, content=err.content, media_type=err.content_type)
     return Response(status_code=200)
 
 
@@ -276,5 +276,8 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Respo
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
-    await vectorsets.delete(kbid, vectorset_id)
+    try:
+        await vectorsets.delete(kbid, vectorset_id)
+    except learning_proxy.ProxiedLearningConfigError as err:
+        return Response(status_code=err.status_code, content=err.content, media_type=err.content_type)
     return Response(status_code=200)
