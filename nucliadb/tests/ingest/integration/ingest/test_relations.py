@@ -28,6 +28,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldID,
     FieldText,
     FieldType,
+    FieldEntity,
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -140,6 +141,15 @@ async def test_ingest_field_metadata_relation_extraction(
             field="title",
         )
     )
+    # Data Augmentation + Processor entities
+    fcmw.metadata.metadata.entities["my-task-id"].entities.extend(
+        [
+            FieldEntity(text="value-3", label="subtype-3"),
+            FieldEntity(text="value-4", label="subtype-4"),
+        ]
+    )
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
     fcmw.metadata.metadata.positions["subtype-1/value-1"].entity = "value-1"
     fcmw.metadata.metadata.positions["subtype-1/value-2"].entity = "value-2"
 
@@ -159,7 +169,18 @@ async def test_ingest_field_metadata_relation_extraction(
     pb = await storage.get_indexing(index._calls[0][1])
 
     generated_relations = [
-        # From ner metadata
+        # From data augmentation + processor metadata
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
+            to=RelationNode(value="value-3", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-3"),
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
+            to=RelationNode(value="value-4", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-4"),
+        ),
+        # From legacy ner metadata
         Relation(
             relation=Relation.RelationType.ENTITY,
             source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),

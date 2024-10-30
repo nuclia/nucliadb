@@ -42,6 +42,7 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
     Position,
     Sentence,
+    FieldEntity,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -189,6 +190,15 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
     fcmw.metadata.metadata.paragraphs.append(p1)
     fcmw.metadata.metadata.paragraphs.append(p2)
 
+    # Data Augmentation + Processor entities
+    fcmw.metadata.metadata.entities["my-task-id"].entities.extend(
+        [
+            FieldEntity(text="Barcelona", label="CITY", positions=[Position(start=43, end=52)]),
+            FieldEntity(text="Manresa", label="CITY"),
+        ]
+    )
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
     # Add a ner with positions
     fcmw.metadata.metadata.ner.update(
         {
@@ -198,6 +208,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
     )
     fcmw.metadata.metadata.positions["CITY/Barcelona"].entity = "Barcelona"
     fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(Position(start=43, end=52))
+
     message2.field_metadata.append(fcmw)
 
     etw = ExtractedTextWrapper()

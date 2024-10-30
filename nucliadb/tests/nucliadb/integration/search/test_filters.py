@@ -37,6 +37,7 @@ from nucliadb_protos.resources_pb2 import (
     Position,
     TokenSplit,
     UserFieldMetadata,
+    FieldEntity,
 )
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -115,9 +116,17 @@ def broker_message_with_entities(kbid):
     fmw = FieldComputedMetadataWrapper()
     fmw.field.CopyFrom(field)
     family, entity = EntityLabels.DETECTED.split("/")
-    fmw.metadata.metadata.ner[entity] = family
     pos = Position(start=60, end=64)
+    # Data Augmentation + Processor entities
+    fmw.metadata.metadata.entities["my-task-id"].entities.extend(
+        [
+            FieldEntity(text=entity, label=family, positions=[pos]),
+        ]
+    )
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
     fmw.metadata.metadata.positions[EntityLabels.DETECTED].position.append(pos)
+    fmw.metadata.metadata.ner[entity] = family
 
     par1 = Paragraph()
     par1.start = 0

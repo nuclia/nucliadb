@@ -369,7 +369,11 @@ async def test_generate_broker_message(
     lfcm = [fcm for fcm in bm.field_metadata if fcm.field.field == "link1"][0]
     assert lfcm.metadata.metadata.links[0] == "https://nuclia.com"
     assert len(lfcm.metadata.metadata.paragraphs) == 1
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
     assert len(lfcm.metadata.metadata.positions) == 1
+    # Add this check when processor sends the entities in the new format
+    # assert len(lfcm.metadata.metadata.entities) == 1
     assert lfcm.metadata.metadata.HasField("last_index")
     assert lfcm.metadata.metadata.HasField("last_understanding")
     assert lfcm.metadata.metadata.HasField("last_extract")

@@ -34,6 +34,7 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
     Position,
     Sentence,
+    FieldEntity,
 )
 from nucliadb_utils.storages.storage import Storage
 
@@ -58,10 +59,22 @@ async def test_create_resource_orm_metadata(
     p1.classifications.append(cl1)
     ex1.metadata.metadata.paragraphs.append(p1)
     ex1.metadata.metadata.classifications.append(cl1)
-    ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
     ex1.metadata.metadata.last_index.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_extract.FromDatetime(datetime.now())
+    # Data Augmentation + Processor entities
+    ex1.metadata.metadata.entities["my-task-id"].entities.extend(
+        [
+            FieldEntity(
+                text="Ramon",
+                label="PEOPLE",
+                positions=[Position(start=0, end=5), Position(start=23, end=28)],
+            )
+        ]
+    )
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
+    ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
     ex1.metadata.metadata.positions["document"].entity = "Ramon"
     ex1.metadata.metadata.positions["document"].position.extend(
         [Position(start=0, end=5), Position(start=23, end=28)]
@@ -97,7 +110,15 @@ async def test_create_resource_orm_metadata_split(
     p1.classifications.append(cl1)
     ex1.metadata.split_metadata["ff1"].paragraphs.append(p1)
     ex1.metadata.split_metadata["ff1"].classifications.append(cl1)
+    # Data Augmentation + Processor entities
+    ex1.metadata.split_metadata["ff1"].entities["processor"].entities.extend(
+        [FieldEntity(text="Ramon", label="PERSON")]
+    )
+
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
     ex1.metadata.split_metadata["ff1"].ner["Ramon"] = "PEOPLE"
+
     ex1.metadata.split_metadata["ff1"].last_index.FromDatetime(datetime.now())
     ex1.metadata.split_metadata["ff1"].last_understanding.FromDatetime(datetime.now())
     ex1.metadata.split_metadata["ff1"].last_extract.FromDatetime(datetime.now())
