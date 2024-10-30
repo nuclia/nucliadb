@@ -447,7 +447,7 @@ async def test_generate_index_message_contains_all_metadata(
         assert field in fields_to_be_found
         fields_to_be_found.remove(field)
         assert text.text == "MyText"
-        assert {"/l/labelset1/label1", "/e/ENTITY/document", "e/NOUN/document"}.issubset(
+        assert {"/l/labelset1/label1", "/e/ENTITY/document", "/e/NOUN/document"}.issubset(
             set(text.labels)
         )
         if field in ("u/link", "t/text1"):

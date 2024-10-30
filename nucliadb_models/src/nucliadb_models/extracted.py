@@ -167,7 +167,7 @@ class FieldComputedMetadata(BaseModel):
         cls,
         message: resources_pb2.FieldComputedMetadata,
     ) -> None:
-        large_fields = ["ner", "relations", "positions", "classifications"]
+        large_fields = ["ner", "relations", "positions", "classifications", "entities"]
         for field in large_fields:
             message.metadata.ClearField(field)  # type: ignore
         for metadata in message.split_metadata.values():
