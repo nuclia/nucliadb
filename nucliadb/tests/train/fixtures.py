@@ -37,12 +37,12 @@ from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
+    FieldEntity,
     FieldID,
     FieldType,
     Paragraph,
     Position,
     Sentence,
-    FieldEntity,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub

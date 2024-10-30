@@ -29,12 +29,12 @@ from nucliadb_protos.resources_pb2 import (
     Classification,
     FieldComputedMetadata,
     FieldComputedMetadataWrapper,
+    FieldEntity,
     FieldID,
     FieldType,
     Paragraph,
     Position,
     Sentence,
-    FieldEntity,
 )
 from nucliadb_utils.storages.storage import Storage
 

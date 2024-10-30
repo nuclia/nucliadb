@@ -500,9 +500,9 @@ class ResourceBrain:
                 )
         # Data Augmentation + Processor entities
         for data_augmentation_task_id, entities in metadata.entities.items():
-            for entity in entities.entities:
-                entity_text = entity.text
-                entity_label = entity.label
+            for ent in entities.entities:
+                entity_text = ent.text
+                entity_label = ent.label
                 # Seems like we don't care about where the entity is in the text
                 # entity_positions = entity.positions
                 labels["e"].add(

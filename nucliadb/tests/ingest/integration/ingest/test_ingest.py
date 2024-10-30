@@ -50,6 +50,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedVectorsWrapper,
     FieldComputedMetadata,
     FieldComputedMetadataWrapper,
+    FieldEntity,
     FieldID,
     FieldMetadata,
     FieldQuestionAnswerWrapper,
@@ -59,7 +60,6 @@ from nucliadb_protos.resources_pb2 import (
     Origin,
     Paragraph,
     QuestionAnswer,
-    FieldEntity,
 )
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors

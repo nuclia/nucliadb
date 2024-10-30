@@ -25,10 +25,10 @@ from nucliadb.ingest import SERVICE_NAME
 from nucliadb_protos.resources_pb2 import (
     Classification,
     FieldComputedMetadataWrapper,
+    FieldEntity,
     FieldID,
     FieldText,
     FieldType,
-    FieldEntity,
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage

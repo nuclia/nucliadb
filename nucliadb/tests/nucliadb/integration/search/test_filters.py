@@ -30,6 +30,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
+    FieldEntity,
     FieldID,
     FieldType,
     Paragraph,
@@ -37,7 +38,6 @@ from nucliadb_protos.resources_pb2 import (
     Position,
     TokenSplit,
     UserFieldMetadata,
-    FieldEntity,
 )
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
