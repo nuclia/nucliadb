@@ -37,8 +37,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import httpx
-
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.exceptions import VectorSetConflict
@@ -49,14 +47,6 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_storage
 
 
-class LearningConfigError(Exception):
-    pass
-
-
-class LearningConfigurationNotFound(Exception):
-    pass
-
-
 class EmbeddingNotFound(Exception):
     pass
 
@@ -64,15 +54,13 @@ class EmbeddingNotFound(Exception):
 async def add(kbid: str, vectorset_id: str) -> None:
     # First off, add the vectorset to the learning configuration if it's not already there
     lconfig = await learning_proxy.get_configuration(kbid)
-    if lconfig is None:
-        raise LearningConfigurationNotFound()
-    if vectorset_id not in lconfig.semantic_models:
-        lconfig.semantic_models.append(vectorset_id)
-        try:
-            lconfig = await learning_proxy.set_configuration(kbid, lconfig.model_dump())
-        except httpx.HTTPStatusError:
-            # TODO: handle errors better here
-            pass
+    assert lconfig is not None
+    semantic_models = lconfig.model_dump()["semantic_models"]
+    if vectorset_id not in semantic_models:
+        semantic_models.append(vectorset_id)
+        await learning_proxy.update_configuration(kbid, {"semantic_models": semantic_models})
+        lconfig = await learning_proxy.get_configuration(kbid)
+        assert lconfig is not None
 
     # Then, add the vectorset to the index if it's not already there
     async with datamanagers.with_rw_transaction() as txn:
@@ -88,10 +76,11 @@ async def add(kbid: str, vectorset_id: str) -> None:
 
 async def delete(kbid: str, vectorset_id: str) -> None:
     lconfig = await learning_proxy.get_configuration(kbid)
-    if lconfig is not None and vectorset_id in lconfig.semantic_models:
-        lconfig.semantic_models.remove(vectorset_id)
-        await learning_proxy.set_configuration(kbid, lconfig.model_dump())
-
+    if lconfig is not None:
+        semantic_models = lconfig.model_dump()["semantic_models"]
+        if vectorset_id in semantic_models:
+            semantic_models.remove(vectorset_id)
+            await learning_proxy.update_configuration(kbid, {"semantic_models": semantic_models})
     try:
         async with datamanagers.with_rw_transaction() as txn:
             kbobj = KnowledgeBox(txn, await get_storage(), kbid)

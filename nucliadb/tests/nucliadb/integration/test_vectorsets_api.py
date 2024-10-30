@@ -23,7 +23,12 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
-from nucliadb.learning_proxy import LearningConfiguration, SemanticConfig, SimilarityFunction
+from nucliadb.learning_proxy import (
+    LearningConfiguration,
+    ProxiedLearningConfigError,
+    SemanticConfig,
+    SimilarityFunction,
+)
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodewriter_pb2 import VectorType
 
@@ -71,9 +76,14 @@ async def test_add_delete_vectorsets(
     )
 
     with patch(
-        f"{MODULE}.learning_proxy.get_configuration", return_value=existing_lconfig
+        f"{MODULE}.learning_proxy.get_configuration",
+        side_effect=[
+            existing_lconfig,  # Initial configuration
+            updated_lconfig,  # Configuration after adding the vectorset
+            updated_lconfig,  # Configuration right before deleting the vectorset
+        ],
     ) as get_configuration:
-        with patch(f"{MODULE}.learning_proxy.set_configuration", return_value=updated_lconfig):
+        with patch(f"{MODULE}.learning_proxy.update_configuration", return_value=None):
             # Add the vectorset
             resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 200, resp.text
@@ -99,3 +109,24 @@ async def test_add_delete_vectorsets(
             async with datamanagers.with_ro_transaction() as txn:
                 vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset_id)
                 assert vs is None
+
+
+@pytest.mark.asyncio
+async def test_learning_config_errors_are_proxied_correctly(
+    nucliadb_manager: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    with patch(
+        f"{MODULE}.learning_proxy.get_configuration",
+        side_effect=ProxiedLearningConfigError(
+            status_code=500, content=b"Learning Internal Server Error", content_type="text/plain"
+        ),
+    ):
+        resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/foo")
+        assert resp.status_code == 500
+        assert resp.text == "Learning Internal Server Error"
+
+        resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/foo")
+        assert resp.status_code == 500
+        assert resp.text == "Learning Internal Server Error"
