@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM segments WHERE merge_job_id = $1",
+  "query": "SELECT * FROM segments WHERE index_id = $1",
   "describe": {
     "columns": [
       {
@@ -60,5 +60,5 @@
       true
     ]
   },
-  "hash": "7a7e59e47b30b12237511fd3d7da2d17b0471ad2b006af48d6a6f587c779692b"
+  "hash": "f39970929b426bf50f68a51999092522453358903d24af3c8a1fceee11133d2c"
 }

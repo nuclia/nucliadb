@@ -45,7 +45,7 @@ pub fn open_index_with_deletions(
     open_index: impl OpenIndexMetadata<TantivyMeta>,
     query_builder: impl DeletionQueryBuilder,
 ) -> anyhow::Result<Index> {
-    let index = Index::open(NidxDirectory::new(schema.clone(), open_index.segments())?)?;
+    let index = Index::open(UnionDirectory::new(schema.clone(), open_index.segments())?)?;
 
     // Apply deletions
     for segment in index.searchable_segments()? {
@@ -92,13 +92,13 @@ pub fn open_index_with_deletions(
 ///
 /// In order to alleviate this, this Directory is kept private and only meant to be used from `TantivyIndexWithDeletions`
 #[derive(Debug, Clone)]
-struct NidxDirectory {
+struct UnionDirectory {
     index_meta: Arc<Mutex<IndexMeta>>,
     segment_dirs: HashMap<String, MmapDirectory>,
     ram: RamDirectory,
 }
 
-impl NidxDirectory {
+impl UnionDirectory {
     fn new(schema: Schema, segments: impl Iterator<Item = (TantivySegmentMetadata, Seq)>) -> anyhow::Result<Self> {
         let mut index_meta = IndexMeta::with_schema(schema.clone());
 
@@ -130,7 +130,7 @@ impl NidxDirectory {
     }
 }
 
-impl Directory for NidxDirectory {
+impl Directory for UnionDirectory {
     fn get_file_handle(
         &self,
         path: &std::path::Path,
@@ -139,8 +139,12 @@ impl Directory for NidxDirectory {
             self.ram.get_file_handle(path)
         } else {
             let prefix = path.file_stem().unwrap().to_str().unwrap();
-            let subdir = &self.segment_dirs[prefix];
-            subdir.get_file_handle(path)
+            let subdir = &self.segment_dirs.get(prefix);
+            if let Some(subdir) = subdir {
+                subdir.get_file_handle(path)
+            } else {
+                Err(OpenReadError::FileDoesNotExist(path.to_path_buf()))
+            }
         }
     }
 
@@ -203,5 +207,149 @@ impl Directory for NidxDirectory {
         _watch_callback: tantivy::directory::WatchCallback,
     ) -> tantivy::Result<tantivy::directory::WatchHandle> {
         unimplemented!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashSet, io::Write, path::Path};
+
+    use crate::TantivySegmentMetadata;
+    use serde_json::Value;
+    use tantivy::{
+        schema::{NumericOptions, Schema},
+        Directory, SegmentId,
+    };
+    use tantivy_common::TerminatingWrite;
+    use tempfile::tempdir;
+
+    use super::UnionDirectory;
+
+    #[test]
+    fn test_read_union_directory() -> anyhow::Result<()> {
+        let dir1 = tempdir()?;
+        let dir2 = tempdir()?;
+
+        let uuid1 = SegmentId::generate_random().uuid_string();
+        let uuid2 = SegmentId::generate_random().uuid_string();
+        let uuid3 = SegmentId::generate_random().uuid_string();
+
+        std::fs::write(dir1.path().join(format!("{uuid1}.store")), "dir1")?;
+        std::fs::write(dir2.path().join(format!("{uuid2}.store")), "dir2")?;
+
+        let segments = vec![
+            (
+                TantivySegmentMetadata {
+                    path: dir1.path().to_path_buf(),
+                    records: 1,
+                    tags: HashSet::new(),
+                    index_metadata: crate::TantivyMeta {
+                        segment_id: uuid1.clone(),
+                    },
+                },
+                1i64.into(),
+            ),
+            (
+                TantivySegmentMetadata {
+                    path: dir2.path().to_path_buf(),
+                    records: 1,
+                    tags: HashSet::new(),
+                    index_metadata: crate::TantivyMeta {
+                        segment_id: uuid2.clone(),
+                    },
+                },
+                1i64.into(),
+            ),
+        ];
+
+        let directory = UnionDirectory::new(Schema::builder().build(), segments.into_iter())?;
+
+        // Can read existing files
+        assert_eq!(directory.open_read(Path::new(&format!("{uuid1}.store")))?.read_bytes()?, "dir1");
+        assert_eq!(directory.open_read(Path::new(&format!("{uuid2}.store")))?.read_bytes()?, "dir2");
+
+        // Can not read unknown files of existing segments
+        assert!(directory.open_read(Path::new(&format!("{uuid1}.fake"))).is_err());
+
+        // Can not read unknown segments
+        assert!(directory.open_read(Path::new(&format!("{uuid3}.store"))).is_err());
+
+        // Can not read malformed filenames
+        assert!(directory.open_read(Path::new("wadus")).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_union_directory_metadata() -> anyhow::Result<()> {
+        let dir1 = tempdir()?;
+        let dir2 = tempdir()?;
+
+        let uuid1 = SegmentId::generate_random().uuid_string();
+        let uuid2 = SegmentId::generate_random().uuid_string();
+
+        std::fs::write(dir1.path().join(format!("{uuid1}.store")), "dir1")?;
+        std::fs::write(dir2.path().join(format!("{uuid2}.store")), "dir2")?;
+
+        let segments = vec![
+            (
+                TantivySegmentMetadata {
+                    path: dir1.path().to_path_buf(),
+                    records: 12,
+                    tags: HashSet::new(),
+                    index_metadata: crate::TantivyMeta {
+                        segment_id: uuid1.clone(),
+                    },
+                },
+                12i64.into(),
+            ),
+            (
+                TantivySegmentMetadata {
+                    path: dir2.path().to_path_buf(),
+                    records: 1,
+                    tags: HashSet::new(),
+                    index_metadata: crate::TantivyMeta {
+                        segment_id: uuid2.clone(),
+                    },
+                },
+                13i64.into(),
+            ),
+        ];
+
+        let mut schema = Schema::builder();
+        schema.add_bool_field("mirror", NumericOptions::default());
+        let directory = UnionDirectory::new(schema.build(), segments.into_iter())?;
+
+        // Can read metadata
+        let meta: Value = serde_json::from_slice(&directory.atomic_read(Path::new("meta.json"))?)?;
+        let root = meta.as_object().unwrap();
+
+        // Has schema
+        let schema = root["schema"].as_array().unwrap();
+        assert_eq!(schema[0].as_object().unwrap()["name"], Value::String("mirror".to_string()));
+
+        // Has list of segments
+        let segments = root["segments"].as_array().unwrap();
+        let segment = segments[0].as_object().unwrap();
+        assert_eq!(segment["deletes"].as_object().unwrap()["num_deleted_docs"].as_i64().unwrap(), 0);
+        assert_eq!(segment["deletes"].as_object().unwrap()["opstamp"].as_i64().unwrap(), 12);
+        assert_eq!(segment["segment_id"].as_str().unwrap().replace('-', ""), uuid1);
+
+        // Adding deletions
+        let mut writer = directory.open_write(Path::new(&format!("{uuid1}.7.del")))?;
+        writer.write_all(b"garbage")?;
+        writer.terminate()?;
+
+        // Metadata was updated
+        let meta: Value = serde_json::from_slice(&directory.atomic_read(Path::new("meta.json"))?)?;
+        let root = meta.as_object().unwrap();
+        let segments = root["segments"].as_array().unwrap();
+        let segment = segments
+            .iter()
+            .find(|s| s.as_object().unwrap()["segment_id"].as_str().unwrap().replace('-', "") == uuid1)
+            .unwrap();
+        assert_eq!(segment["deletes"].as_object().unwrap()["num_deleted_docs"].as_i64().unwrap(), 7);
+
+        Ok(())
     }
 }
