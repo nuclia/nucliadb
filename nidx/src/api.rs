@@ -20,6 +20,8 @@
 
 pub mod shards;
 
+use tracing::debug;
+
 use crate::{NidxMetadata, Settings};
 
 pub async fn run() -> anyhow::Result<()> {
@@ -27,8 +29,7 @@ pub async fn run() -> anyhow::Result<()> {
     let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
     let _storage = settings.storage.expect("Storage settings needed").object_store.client();
 
-    println!("Running API");
-
+    debug!("Running Shards API");
     let shards_api = shards::ShardsServer::new(meta.clone());
     shards_api.serve().await;
 
