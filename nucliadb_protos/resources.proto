@@ -315,8 +315,9 @@ message Question {
 
 message Answers {
     string text = 1;
-    string language = 2;
+    string language = 2 [deprecated = true];
     repeated string ids_paragraphs = 3;
+    string reason = 4;
 }
 
 message QuestionAnswer {
