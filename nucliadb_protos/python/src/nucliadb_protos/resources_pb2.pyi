@@ -1286,8 +1286,10 @@ class Answers(google.protobuf.message.Message):
     TEXT_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
     IDS_PARAGRAPHS_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
     text: builtins.str
     language: builtins.str
+    reason: builtins.str
     @property
     def ids_paragraphs(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
@@ -1296,8 +1298,9 @@ class Answers(google.protobuf.message.Message):
         text: builtins.str = ...,
         language: builtins.str = ...,
         ids_paragraphs: collections.abc.Iterable[builtins.str] | None = ...,
+        reason: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["ids_paragraphs", b"ids_paragraphs", "language", b"language", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ids_paragraphs", b"ids_paragraphs", "language", b"language", "reason", b"reason", "text", b"text"]) -> None: ...
 
 global___Answers = Answers
 
