@@ -690,9 +690,6 @@ class Resource:
                 break
 
     async def _apply_field_computed_metadata(self, field_metadata: FieldComputedMetadataWrapper):
-        import pdb
-
-        pdb.set_trace()
         assert self.basic is not None
         maybe_update_basic_summary(self.basic, field_metadata.metadata.metadata.summary)
 
