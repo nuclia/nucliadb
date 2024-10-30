@@ -12,6 +12,11 @@
         "ordinal": 1,
         "name": "kbid",
         "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "deleted_at",
+        "type_info": "Timestamp"
       }
     ],
     "parameters": {
@@ -21,7 +26,8 @@
     },
     "nullable": [
       false,
-      false
+      false,
+      true
     ]
   },
   "hash": "d1db2d4b7de69471692f5f76f931e16de56ea704d4b1c8784dafcce996983342"

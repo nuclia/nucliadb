@@ -17,7 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use super::segment::Segment;
+
+use std::collections::HashSet;
+
 use nidx_vector::config::VectorConfig;
 use serde::Serialize;
 use sqlx::{
@@ -26,6 +28,8 @@ use sqlx::{
     Executor, Postgres,
 };
 use uuid::Uuid;
+
+use super::segment::Segment;
 
 #[derive(sqlx::Type, Copy, Clone, PartialEq, Debug)]
 #[sqlx(type_name = "index_kind", rename_all = "lowercase")]
@@ -52,6 +56,7 @@ pub struct Index {
     pub name: String,
     pub configuration: JsonValue,
     pub updated_at: PrimitiveDateTime,
+    pub deleted_at: Option<PrimitiveDateTime>,
 }
 
 pub enum IndexConfig {
@@ -71,7 +76,9 @@ impl Index {
         let kind = config.kind();
         let json_config = serde_json::to_value(&config)?;
         let inserted = sqlx::query!(
-            r#"INSERT INTO indexes (shard_id, kind, name, configuration) VALUES ($1, $2, $3, $4) RETURNING id AS "id: IndexId", updated_at"#,
+            r#"INSERT INTO indexes (shard_id, kind, name, configuration)
+               VALUES ($1, $2, $3, $4)
+               RETURNING id AS "id: IndexId", updated_at"#,
             shard_id,
             kind as IndexKind,
             name,
@@ -86,7 +93,20 @@ impl Index {
             name: name.to_owned(),
             configuration: json_config,
             updated_at: inserted.updated_at,
+            deleted_at: None,
         })
+    }
+
+    pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: IndexId) -> sqlx::Result<Index> {
+        sqlx::query_as!(
+            Index,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
+               FROM indexes
+               WHERE id = $1 AND deleted_at IS NULL"#,
+            id as IndexId
+        )
+        .fetch_one(meta)
+        .await
     }
 
     pub async fn find(
@@ -97,7 +117,9 @@ impl Index {
     ) -> sqlx::Result<Index> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
+               FROM indexes
+               WHERE shard_id = $1 AND kind = $2 AND name = $3 AND deleted_at IS NULL"#,
             shard_id,
             kind as IndexKind,
             name
@@ -109,20 +131,12 @@ impl Index {
     pub async fn for_shard(meta: impl Executor<'_, Database = Postgres>, shard_id: Uuid) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE shard_id = $1"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
+               FROM indexes
+               WHERE shard_id = $1 AND deleted_at IS NULL"#,
             shard_id
         )
         .fetch_all(meta)
-        .await
-    }
-
-    pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: IndexId) -> sqlx::Result<Index> {
-        sqlx::query_as!(
-            Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE id = $1"#,
-            id as IndexId
-        )
-        .fetch_one(meta)
         .await
     }
 
@@ -137,11 +151,34 @@ impl Index {
     ) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes WHERE updated_at > $1"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
+               FROM indexes
+               WHERE updated_at > $1 AND deleted_at IS NULL"#,
             newer_than
         )
         .fetch_all(meta)
         .await
+    }
+
+    pub async fn mark_delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
+        sqlx::query!("UPDATE indexes SET deleted_at = NOW() WHERE id = $1", self.id as IndexId).execute(meta).await?;
+        Ok(())
+    }
+
+    pub async fn delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
+        sqlx::query!("DELETE FROM indexes WHERE id = $1", self.id as IndexId).execute(meta).await?;
+        Ok(())
+    }
+
+    pub async fn marked_to_delete(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<HashSet<IndexId>> {
+        let ids = sqlx::query!(
+            r#"SELECT id as "id: IndexId"
+               FROM indexes
+               WHERE deleted_at IS NOT NULL"#,
+        )
+        .fetch_all(meta)
+        .await?;
+        Ok(ids.into_iter().map(|record| record.id).collect())
     }
 
     pub async fn segments(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Segment>> {

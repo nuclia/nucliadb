@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) AS \"count!: i64\"\n           FROM segments\n           JOIN indexes ON segments.index_id = indexes.id\n           JOIN shards ON shards.id = indexes.shard_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3e807036087f9764f0f6cb3fb2085c3fa51c6c31ede416d0242cd471c2e610d6"
+}

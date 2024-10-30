@@ -18,27 +18,43 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use super::index::*;
-use sqlx::{Executor, Postgres};
+use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 use uuid::Uuid;
 
 pub struct Shard {
     pub id: Uuid,
     pub kbid: Uuid,
+    pub deleted_at: Option<PrimitiveDateTime>,
 }
 
 impl Shard {
-    pub async fn create(meta: impl Executor<'_, Database = Postgres>, kbid: Uuid) -> Result<Shard, sqlx::Error> {
+    pub async fn create(meta: impl Executor<'_, Database = Postgres>, kbid: Uuid) -> sqlx::Result<Shard> {
         sqlx::query_as!(Shard, "INSERT INTO shards (kbid) VALUES ($1) RETURNING *", kbid).fetch_one(meta).await
     }
 
-    pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> Result<Shard, sqlx::Error> {
+    pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> sqlx::Result<Shard> {
         sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_one(meta).await
+    }
+
+    pub async fn try_get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> sqlx::Result<Option<Shard>> {
+        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_optional(meta).await
+    }
+
+    pub async fn mark_delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
+        sqlx::query!("UPDATE shards SET deleted_at = NOW() WHERE id = $1", self.id).execute(meta).await?;
+        Ok(())
+    }
+
+    pub async fn delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
+        sqlx::query!("DELETE FROM shards WHERE id = $1", self.id).execute(meta).await?;
+        Ok(())
     }
 
     pub async fn indexes(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at FROM indexes where shard_id = $1"#,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
+               FROM indexes where shard_id = $1"#,
             self.id
         )
         .fetch_all(meta)

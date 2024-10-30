@@ -52,7 +52,6 @@ impl NodeWriter for ShardsServer {
         }
 
         let shard = self.create_shard(kbid, vector_configs).await.map_err(|e| Status::internal(e.to_string()))?;
-        println!("Shard: {shard:?}");
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),
@@ -61,12 +60,19 @@ impl NodeWriter for ShardsServer {
         }))
     }
 
-    async fn delete_shard(&self, _request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
+    async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
         // TODO? analytics event
-        todo!()
+        let request = request.into_inner();
+        let shard_id = Uuid::from_str(&request.id).map_err(|e| Status::internal(e.to_string()))?;
+
+        self.delete_shard(shard_id).await.map_err(|e| Status::internal(e.to_string()))?;
+
+        Ok(Response::new(ShardId {
+            id: shard_id.to_string(),
+        }))
     }
 
-    async fn list_shards(&self, __request: Request<EmptyQuery>) -> Result<Response<ShardIds>, Status> {
+    async fn list_shards(&self, _request: Request<EmptyQuery>) -> Result<Response<ShardIds>, Status> {
         todo!()
     }
 

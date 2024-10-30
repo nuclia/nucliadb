@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM merge_jobs WHERE running_at < NOW() - INTERVAL '1 minute' AND retries >= 4 RETURNING *",
+  "query": "UPDATE merge_jobs\n         SET started_at = NULL, running_at = NULL, retries = retries + 1\n         WHERE running_at < NOW() - INTERVAL '1 minute' AND retries < 4 RETURNING *",
   "describe": {
     "columns": [
       {
@@ -52,5 +52,5 @@
       true
     ]
   },
-  "hash": "5e1f1e5904356fa8b462a0fe3424ea9f612b6c4b338af9b431a2b121b4799f0c"
+  "hash": "4d7a76fa413c9ef0ce2a47ac7bb7e01d3e6a2aabded9487d21010a53efee8852"
 }

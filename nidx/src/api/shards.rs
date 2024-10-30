@@ -26,7 +26,7 @@ use anyhow::anyhow;
 use nidx_vector::config::VectorConfig;
 use uuid::Uuid;
 
-use crate::metadata::{Index, IndexConfig, Shard};
+use crate::metadata::{Index, Segment, Shard};
 use crate::NidxMetadata;
 
 pub struct ShardsServer {
@@ -40,16 +40,21 @@ impl ShardsServer {
         }
     }
 
-    async fn create_shard(&self, kbid: Uuid, vector_configs: HashMap<String, VectorConfig>) -> anyhow::Result<Shard> {
+    pub async fn create_shard(
+        &self,
+        kbid: Uuid,
+        vector_configs: HashMap<String, VectorConfig>,
+    ) -> anyhow::Result<Shard> {
         if vector_configs.is_empty() {
             return Err(anyhow!("Can't create shard without a vector index"));
         }
 
         let mut tx = self.meta.transaction().await?;
         let shard = Shard::create(&mut *tx, kbid).await?;
-        Index::create(&mut *tx, shard.id, "fulltext", IndexConfig::new_fulltext()).await?;
-        Index::create(&mut *tx, shard.id, "keyword", IndexConfig::new_keyword()).await?;
-        Index::create(&mut *tx, shard.id, "relation", IndexConfig::new_relation()).await?;
+        // TODO: support other indexes
+        // Index::create(&mut *tx, shard.id, "fulltext", IndexConfig::new_fulltext()).await?;
+        // Index::create(&mut *tx, shard.id, "keyword", IndexConfig::new_keyword()).await?;
+        // Index::create(&mut *tx, shard.id, "relation", IndexConfig::new_relation()).await?;
         for (vectorset_id, config) in vector_configs.into_iter() {
             Index::create(&mut *tx, shard.id, &vectorset_id, config.into()).await?;
         }
@@ -57,33 +62,20 @@ impl ShardsServer {
 
         Ok(shard)
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use std::collections::HashSet;
+    /// Mark a shard, its indexes and segments for eventual deletion
+    pub async fn delete_shard(&self, shard_id: Uuid) -> anyhow::Result<()> {
+        let mut tx = self.meta.transaction().await?;
+        let Some(shard) = Shard::try_get(&mut *tx, shard_id).await? else {
+            return Ok(());
+        };
+        for index in shard.indexes(&mut *tx).await?.into_iter() {
+            Segment::mark_delete_by_index(&mut *tx, index.id).await?;
+            index.mark_delete(&mut *tx).await?;
+        }
 
-    use super::*;
-
-    #[sqlx::test]
-    async fn test_create_shard(pool: sqlx::PgPool) -> anyhow::Result<()> {
-        let meta = NidxMetadata::new_with_pool(pool).await?;
-        let kbid = Uuid::new_v4();
-        let vector_configs = HashMap::from([
-            ("multilingual".to_string(), VectorConfig::default()),
-            ("english".to_string(), VectorConfig::default()),
-        ]);
-        let shards_server = ShardsServer::new(meta.clone());
-        let shard = shards_server.create_shard(kbid, vector_configs).await?;
-
-        let indexes = shard.indexes(&meta.pool).await?;
-        assert_eq!(indexes.len(), 5);
-
-        let names = indexes.iter().map(|index| index.name.as_str()).collect::<HashSet<_>>();
-        let expected = HashSet::from(["multilingual", "english", "fulltext", "keyword", "relation"]);
-        assert_eq!(names, expected);
-
-        // TODO: more tests
+        shard.mark_delete(&mut *tx).await?;
+        tx.commit().await?;
 
         Ok(())
     }

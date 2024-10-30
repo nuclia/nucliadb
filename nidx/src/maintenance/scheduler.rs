@@ -67,6 +67,16 @@ pub async fn run() -> anyhow::Result<()> {
     });
 
     let meta2 = meta.clone();
+    tasks.spawn(async move {
+        loop {
+            if let Err(e) = purge_deleted_shards_and_indexes(&meta2).await {
+                warn!(?e, "Error purging deleted shards and indexes");
+            }
+            sleep(Duration::from_secs(60)).await;
+        }
+    });
+
+    let meta2 = meta.clone();
     let mut consumer2 = consumer.clone();
     tasks.spawn(async move {
         loop {
@@ -113,7 +123,14 @@ pub async fn run() -> anyhow::Result<()> {
 /// Re-enqueues jobs that have been stuck for a while without ack'ing
 pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
     // Requeue failed jobs (with retries left)
-    let retry_jobs = sqlx::query_as!(MergeJob, "UPDATE merge_jobs SET started_at = NULL, running_at = NULL, retries = retries + 1 WHERE running_at < NOW() - INTERVAL '1 minute' AND retries < 4 RETURNING *").fetch_all(&meta.pool).await?;
+    let retry_jobs = sqlx::query_as!(
+        MergeJob,
+        "UPDATE merge_jobs
+         SET started_at = NULL, running_at = NULL, retries = retries + 1
+         WHERE running_at < NOW() - INTERVAL '1 minute' AND retries < 4 RETURNING *"
+    )
+    .fetch_all(&meta.pool)
+    .await?;
     for j in retry_jobs {
         debug!(j.id, j.retries, "Retrying job");
     }
@@ -121,7 +138,8 @@ pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
     // Delete failed jobs (no retries left)
     let failed_jobs = sqlx::query_as!(
         MergeJob,
-        "DELETE FROM merge_jobs WHERE running_at < NOW() - INTERVAL '1 minute' AND retries >= 4 RETURNING *"
+        "DELETE FROM merge_jobs
+         WHERE running_at < NOW() - INTERVAL '1 minute' AND retries >= 4 RETURNING *"
     )
     .fetch_all(&meta.pool)
     .await?;
@@ -169,6 +187,32 @@ pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> an
         AND deletions.seq <= oldest_segments.seq
         AND deletions.seq <= $1",
         oldest_pending_seq as i64
+    )
+    .execute(&meta.pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Purge shards and indexes marked to delete when it's safe to do so, i.e.,
+/// after all segments have been removed
+pub async fn purge_deleted_shards_and_indexes(meta: &NidxMetadata) -> anyhow::Result<()> {
+    sqlx::query!(
+        "DELETE FROM indexes
+         WHERE (
+             deleted_at IS NOT NULL
+             AND NOT EXISTS(SELECT 1 FROM segments WHERE index_id = indexes.id)
+         )"
+    )
+    .execute(&meta.pool)
+    .await?;
+
+    sqlx::query!(
+        "DELETE FROM shards
+         WHERE (
+             deleted_at IS NOT NULL
+             AND NOT EXISTS(SELECT 1 FROM indexes WHERE shard_id = shards.id)
+         )"
     )
     .execute(&meta.pool)
     .await?;

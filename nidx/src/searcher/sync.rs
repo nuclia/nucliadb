@@ -39,11 +39,18 @@ pub async fn run_sync(
 ) -> anyhow::Result<()> {
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
     loop {
+        let deleted = Index::marked_to_delete(&meta.pool).await?;
         let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
         for index in indexes {
             // TODO: Handle errors
+
+            if deleted.contains(&index.id) {
+                delete_index(index.id, Arc::clone(&index_metadata), &notifier).await?;
+                continue;
+            }
+
             last_updated_at = max(last_updated_at, index.updated_at);
-            sync_index(&meta, storage.clone(), index_metadata.clone(), index, &notifier).await?;
+            sync_index(&meta, storage.clone(), Arc::clone(&index_metadata), index, &notifier).await?;
         }
 
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -80,6 +87,16 @@ async fn sync_index(
         std::fs::remove_dir_all(sync_metadata.segment_location(&index_id, &segment_id))?;
     }
 
+    Ok(())
+}
+
+async fn delete_index(
+    index_id: IndexId,
+    sync_metadata: Arc<SyncMetadata>,
+    notifier: &Sender<IndexId>,
+) -> anyhow::Result<()> {
+    sync_metadata.delete(&index_id).await;
+    notifier.send(index_id).await?;
     Ok(())
 }
 
@@ -181,6 +198,10 @@ impl SyncMetadata {
 
     pub async fn get<'a>(&self, index_id: &IndexId) -> GuardedIndexMetadata {
         GuardedIndexMetadata::new(self.synced_metadata.clone().read_owned().await, *index_id)
+    }
+
+    pub async fn delete(&self, index_id: &IndexId) {
+        self.synced_metadata.write().await.remove(&index_id);
     }
 }
 

@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod shards;
+pub mod shards;
 
 use crate::{NidxMetadata, Settings};
 

@@ -84,6 +84,21 @@ impl Segment {
         Ok(())
     }
 
+    pub async fn mark_delete_by_index(
+        meta: impl Executor<'_, Database = Postgres>,
+        index_id: IndexId,
+    ) -> sqlx::Result<()> {
+        sqlx::query!(
+            "UPDATE segments
+             SET delete_at = NOW() + INTERVAL '5 minutes'
+             WHERE index_id = $1",
+            index_id as IndexId,
+        )
+        .execute(meta)
+        .await?;
+        Ok(())
+    }
+
     pub async fn delete_many(
         meta: impl Executor<'_, Database = Postgres>,
         segment_ids: &[SegmentId],
