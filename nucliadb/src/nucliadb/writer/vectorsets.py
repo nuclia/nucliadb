@@ -47,10 +47,6 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_storage
 
 
-class EmbeddingNotFound(Exception):
-    pass
-
-
 async def add(kbid: str, vectorset_id: str) -> None:
     # First off, add the vectorset to the learning configuration if it's not already there
     lconfig = await learning_proxy.get_configuration(kbid)
