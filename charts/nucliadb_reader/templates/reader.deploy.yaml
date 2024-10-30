@@ -45,7 +45,7 @@ spec:
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
-      serviceAccount: {{ .Values.serviceAccount | default "default" }}
+      serviceAccountName: {{ .Values.serviceAccount | default "default" }}
       containers:
       - name: reader
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

@@ -46,7 +46,7 @@ spec:
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
-      serviceAccount: {{ ((.Values.ingest_orm_grpc).serviceAccount) | default "default" }}
+      serviceAccountName: {{ ((.Values.ingest_orm_grpc).serviceAccount) | default "default" }}
       containers:
       - name: ingest-orm-grpc
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
