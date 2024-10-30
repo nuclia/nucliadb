@@ -328,7 +328,9 @@ class KnowledgeBox:
 
             # Delete KB Shards
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-            if shards_obj is not None:
+            if shards_obj is None:
+                logger.warning(f"Shards not found for KB while purging it", extra={"kbid": kbid})
+            else:
                 for shard in shards_obj.shards:
                     # Delete the shard on nodes
                     for replica in shard.replicas:
