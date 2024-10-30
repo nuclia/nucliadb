@@ -77,15 +77,15 @@ impl NodeWriter for ShardsServer {
     }
 
     async fn set_resource(&self, _request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
-        todo!()
+        unimplemented!("Use indexer service instead")
     }
 
     async fn set_resource_from_storage(&self, _request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
-        todo!()
+        unimplemented!("Use indexer service instead")
     }
 
     async fn remove_resource(&self, _request: Request<ResourceId>) -> Result<Response<OpStatus>, Status> {
-        todo!()
+        unimplemented!("Use indexer service instead")
     }
 
     async fn add_vector_set(&self, _request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {
@@ -105,10 +105,10 @@ impl NodeWriter for ShardsServer {
     }
 
     async fn gc(&self, _request: Request<ShardId>) -> Result<Response<GarbageCollectorResponse>, Status> {
-        todo!()
+        unimplemented!("Garbage collection is done by the scheduler service")
     }
 
     async fn merge(&self, _request: Request<ShardId>) -> Result<Response<MergeResponse>, Status> {
-        todo!()
+        unimplemented!("Merging is done by scheduler and worker services")
     }
 }
