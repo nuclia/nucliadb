@@ -207,11 +207,25 @@ class KBShardManager:
             ignore_nodes=settings.drain_nodes,
         )
 
-        shard_uuid = uuid.uuid4().hex
         vectorsets = {
             vectorset_id: vectorset_config.vectorset_index_config
             async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
         }
+
+        if settings.nidx_shards_api:
+            shards_api = IndexNode(
+                id="nidx-shards-api",
+                address=settings.nidx_shards_api,
+                shard_count=0,
+                available_disk=1000,
+            )
+            shard_created = await shards_api.new_shard_with_vectorsets(
+                kbid,
+                vectorsets_configs=vectorsets,
+            )
+            shard_uuid = uuid.UUID(shard_created.id).hex
+        else:
+            shard_uuid = uuid.uuid4().hex
 
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
         try:
