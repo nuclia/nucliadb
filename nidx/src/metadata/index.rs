@@ -20,6 +20,7 @@
 
 use std::collections::HashSet;
 
+use anyhow::anyhow;
 use nidx_vector::config::VectorConfig;
 use serde::Serialize;
 use sqlx::{
@@ -234,6 +235,19 @@ impl Serialize for IndexConfig {
 impl From<VectorConfig> for IndexConfig {
     fn from(value: VectorConfig) -> Self {
         Self::Vector(value)
+    }
+}
+
+impl TryInto<VectorConfig> for IndexConfig {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<VectorConfig, Self::Error> {
+        if let Self::Vector(config) = self {
+            Ok(config)
+        } else {
+            let kind = self.kind();
+            Err(anyhow!("Can't convert to vector config from {kind:?}"))
+        }
     }
 }
 
