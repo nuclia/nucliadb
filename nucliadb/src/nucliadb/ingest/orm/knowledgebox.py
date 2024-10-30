@@ -38,6 +38,7 @@ from nucliadb.common.datamanagers.resources import (
 from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.common.nidx import get_nidx_shards_api_client
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
@@ -287,11 +288,24 @@ class KnowledgeBox:
             await datamanagers.kb.delete_config(txn, kbid=kbid)
 
             # Mark KB to purge. This will eventually delete all KB keys, storage
-            # and index data
+            # and index data (for the old index nodes)
             when = datetime.now().isoformat()
             await txn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
 
+            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+
             await txn.commit()
+
+        if shards_obj is None:
+            logger.warning(f"Shards not found for KB while deleting it", extra={"kbid": kbid})
+        else:
+            shards_api = get_nidx_shards_api_client()
+            # Delete shards from nidx. They'll be marked for eventual deletion,
+            # so this call shouldn't be costly
+            if shards_api is not None:
+                for shard in shards_obj.shards:
+                    shard_id = shard.shard
+                    await shards_api.delete_shard(kbid, shard_id)
 
         if kb_config is not None:
             await cls._maybe_delete_external_indexes(kbid, kb_config.external_index_provider)
