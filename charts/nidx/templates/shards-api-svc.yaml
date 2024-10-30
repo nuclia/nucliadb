@@ -1,0 +1,20 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nidx-shards-api
+  labels:
+    app: nidx-shards-api
+    metrics: "enabled"
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: nidx-shards-api
+  ports:
+    - name: nidx-shards-api
+      port: 10000
+      protocol: TCP
+      appProtocol: grpc

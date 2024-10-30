@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nidx-shards-api
+  labels:
+    app: nidx-shards-api
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nidx-shards-api
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      name: nidx-shards-api
+      annotations:
+        {{- with .Values.excludeOutboundPorts }}
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ . }}"
+        {{- end }}
+        {{- with .Values.excludeInboundPorts }}
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ . }}"
+        {{- end }}
+      labels:
+        app: nidx-shards-api
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      {{- with .Values.searcher.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.searcher.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.searcher.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.searcher.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      dnsPolicy: ClusterFirst
+      serviceAccount: {{ .Values.searcher.serviceAccount | default "default" }}
+      containers:
+      - name: nidx-shards-api
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        command: ["nidx", "shards-api"]
+        env:
+          {{- include "toEnv" .Values.env | nindent 10 }}
+        ports:
+        {{- with .Values.searcher.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
