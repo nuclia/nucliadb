@@ -88,12 +88,14 @@ pub struct SegmentDiff {
     pub removed_segments: HashSet<SegmentId>,
 }
 
+#[derive(Clone)]
 pub struct SeqMetadata {
     pub seq: Seq,
     pub segment_ids: Vec<SegmentId>,
     pub deleted_keys: Vec<String>,
 }
 
+#[derive(Clone)]
 pub struct Operations(pub Vec<SeqMetadata>);
 
 impl Operations {

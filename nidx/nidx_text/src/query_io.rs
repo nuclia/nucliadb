@@ -92,6 +92,6 @@ pub fn translate_labels_expression(expression: &BooleanExpression, schema: &Text
     translate_expression(expression, schema, false)
 }
 
-pub fn translate_keywords_expression(expression: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
-    translate_expression(expression, schema, true)
-}
+// pub fn translate_keywords_expression(expression: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
+//     translate_expression(expression, schema, true)
+// }

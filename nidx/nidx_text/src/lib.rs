@@ -32,7 +32,7 @@ use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse};
 use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
 use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
-use nidx_types::Seq;
+use nidx_types::OpenIndexMetadata;
 use reader::TextReaderService;
 use schema::{timestamp_to_datetime_utc, TextSchema};
 
@@ -49,8 +49,8 @@ use tantivy::{
 pub struct TextIndexer;
 
 pub struct TextDeletionQueryBuilder(Field);
-impl<'a> DeletionQueryBuilder<'a> for TextDeletionQueryBuilder {
-    fn query(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
+impl DeletionQueryBuilder for TextDeletionQueryBuilder {
+    fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
         Box::new(TermSetQuery::new(keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes()))))
     }
 }
@@ -79,12 +79,11 @@ impl TextIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: Vec<(TantivySegmentMetadata, Seq)>,
-        deletions: &[(Seq, &Vec<String>)],
+        open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
         let schema = TextSchema::new().schema;
         let query_builder = TextDeletionQueryBuilder(schema.get_field("uuid").unwrap());
-        let index = open_index_with_deletions(schema, segments, deletions, query_builder)?;
+        let index = open_index_with_deletions(schema, open_index, query_builder)?;
 
         let output_index = merge_indices(&[index], MmapDirectory::open(work_dir)?)?;
         let segment = &output_index.searchable_segment_metas()?[0];
@@ -169,22 +168,11 @@ pub struct TextSearcher {
 }
 
 impl TextSearcher {
-    pub fn open(operations: Vec<(Seq, Vec<TantivySegmentMetadata>, Vec<String>)>) -> anyhow::Result<Self> {
+    pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
         let schema = TextSchema::new().schema;
-        // TODO: Review the parameters of `open_index_with_deletions`
-        let mut segments: Vec<(nidx_types::SegmentMetadata<nidx_tantivy::TantivyMeta>, Seq)> = Vec::new();
-        let mut deletions = Vec::new();
-        for (seq, segment_list, deleted_keys) in operations {
-            for segment in segment_list {
-                segments.push((segment, seq));
-            }
-            deletions.push((seq, deleted_keys));
-        }
-        let ddeletions = deletions.iter().map(|(s, d)| (*s, d)).collect::<Vec<_>>();
         let index = open_index_with_deletions(
             schema.clone(),
-            segments,
-            &ddeletions,
+            open_index,
             TextDeletionQueryBuilder(schema.get_field("uuid").unwrap()),
         )?;
 

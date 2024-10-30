@@ -24,7 +24,7 @@ use data_point_provider::reader::{Reader, TimeSensitiveDLog, VectorsContext};
 use data_point_provider::DTrie;
 use indexer::index_resource;
 use nidx_protos::{Resource, VectorSearchRequest, VectorSearchResponse};
-use nidx_types::{SegmentMetadata, Seq};
+use nidx_types::{OpenIndexMetadata, SegmentMetadata};
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -48,21 +48,17 @@ impl VectorIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: Vec<(VectorSegmentMetadata, Seq)>,
-        deletions: &[(Seq, &Vec<String>)],
+        open_index: impl OpenIndexMetadata<()>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
         // Wait and see how the Tantivy indexes turn out
         let mut delete_log = data_point_provider::DTrie::new();
-        for d in deletions {
-            let time = d.0;
-            for k in d.1 {
-                delete_log.insert(k.as_bytes(), time);
-            }
+        for (key, seq) in open_index.deletions() {
+            delete_log.insert(key.as_bytes(), seq);
         }
 
-        let segment_ids: Vec<_> = segments
-            .into_iter()
+        let segment_ids: Vec<_> = open_index
+            .segments()
             .map(|(meta, seq)| {
                 let open_dp = open(meta).unwrap();
                 (
@@ -96,25 +92,15 @@ pub struct VectorSearcher {
 }
 
 impl VectorSearcher {
-    pub fn open(
-        config: VectorConfig,
-        operations: Vec<(Seq, Vec<VectorSegmentMetadata>, Vec<String>)>,
-    ) -> anyhow::Result<Self> {
+    pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<()>) -> anyhow::Result<Self> {
         let mut delete_log = DTrie::new();
-        let mut segments = Vec::new();
 
-        for (seq, segment_metas, deleted_keys) in operations {
-            for meta in segment_metas {
-                segments.push((meta, seq));
-            }
-
-            for key in deleted_keys {
-                delete_log.insert(key.as_bytes(), seq);
-            }
+        for (key, seq) in open_index.deletions() {
+            delete_log.insert(key.as_bytes(), seq);
         }
 
         Ok(VectorSearcher {
-            reader: Reader::open(segments, config, delete_log)?,
+            reader: Reader::open(open_index.segments().collect(), config, delete_log)?,
         })
     }
 

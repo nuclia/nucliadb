@@ -24,7 +24,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use nidx_types::Seq;
+use nidx_types::{OpenIndexMetadata, Seq};
 use tantivy::{
     directory::{error::OpenReadError, MmapDirectory, RamDirectory},
     fastfield::write_alive_bitset,
@@ -34,50 +34,37 @@ use tantivy::{
 };
 use tantivy_common::{BitSet, TerminatingWrite as _};
 
-use crate::TantivySegmentMetadata;
+use crate::{TantivyMeta, TantivySegmentMetadata};
 
-pub trait DeletionQueryBuilder<'a> {
-    fn query(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query>;
+pub trait DeletionQueryBuilder {
+    fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query>;
 }
 
-pub fn open_index_with_deletions<'a>(
+pub fn open_index_with_deletions(
     schema: Schema,
-    segments: Vec<(TantivySegmentMetadata, Seq)>,
-    deletions: &'a [(Seq, &Vec<String>)],
-    query_builder: impl DeletionQueryBuilder<'a>,
+    open_index: impl OpenIndexMetadata<TantivyMeta>,
+    query_builder: impl DeletionQueryBuilder,
 ) -> anyhow::Result<Index> {
-    let index = Index::open(NidxDirectory::new(schema.clone(), &segments)?)?;
+    let index = Index::open(NidxDirectory::new(schema.clone(), open_index.segments())?)?;
 
     // Apply deletions
     for segment in index.searchable_segments()? {
-        let segment_deletions = deletions
-            .iter()
-            .filter_map(|(deletion_seq, keys)| {
-                let del: i64 = deletion_seq.into();
-                if segment.meta().delete_opstamp().unwrap() < del as u64 {
-                    Some(keys.iter())
-                } else {
-                    None
-                }
-            })
-            .flatten();
-        let segment_reader = SegmentReader::open(&segment).unwrap();
+        let segment_deletions = open_index
+            .deletions()
+            .filter(|&(_, del_seq)| (Seq::from(segment.meta().delete_opstamp().unwrap() as i64) < del_seq))
+            .map(|(key, _)| key);
+        let segment_reader = SegmentReader::open(&segment)?;
         let mut bitset = BitSet::with_max_value_and_full(segment.meta().max_doc());
-        let mut deleted = Vec::new();
 
         let query = query_builder.query(segment_deletions);
-        query
-            .weight(tantivy::query::EnableScoring::Disabled {
-                schema: &index.schema(),
-                searcher_opt: None,
-            })?
-            .for_each_no_score(&segment_reader, &mut |doc_set| {
+        query.weight(tantivy::query::EnableScoring::disabled_from_schema(&index.schema()))?.for_each_no_score(
+            &segment_reader,
+            &mut |doc_set| {
                 for doc in doc_set {
                     bitset.remove(*doc);
-                    deleted.push(*doc);
                 }
-            })
-            .unwrap();
+            },
+        )?;
 
         let mut writer = index.directory().open_write(Path::new(&format!(
             "{}.{}.del",
@@ -112,7 +99,7 @@ struct NidxDirectory {
 }
 
 impl NidxDirectory {
-    fn new(schema: Schema, segments: &Vec<(TantivySegmentMetadata, Seq)>) -> anyhow::Result<Self> {
+    fn new(schema: Schema, segments: impl Iterator<Item = (TantivySegmentMetadata, Seq)>) -> anyhow::Result<Self> {
         let mut index_meta = IndexMeta::with_schema(schema.clone());
 
         // Temporary index, just to create SegmentMetas

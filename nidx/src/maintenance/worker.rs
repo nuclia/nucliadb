@@ -18,10 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
+use nidx_types::{OpenIndexMetadata, SegmentMetadata, Seq};
 use object_store::DynObjectStore;
+use serde::Deserialize;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
 use tracing::*;
@@ -66,6 +68,33 @@ pub async fn run() -> anyhow::Result<()> {
     }
 }
 
+/// This structure (its trait) is passed to the indexes in order to open a searcher.
+struct MergeInputs {
+    work_dir: PathBuf,
+    segments: Vec<Segment>,
+    deletions: Vec<Deletion>,
+}
+
+impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for MergeInputs {
+    fn segments_and_deletions(&self) -> impl Iterator<Item = (SegmentMetadata<T>, impl Iterator<Item = &String>)> {
+        self.segments.iter().enumerate().map(|(idx, s)| {
+            let deletions = self.deletions.iter().filter(|&d| (s.seq < d.seq)).flat_map(|d| d.keys.iter());
+            (s.metadata(self.work_dir.join(idx.to_string())), deletions)
+        })
+    }
+
+    fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)> {
+        self.segments
+            .iter()
+            .enumerate()
+            .map(|(idx, segment)| (segment.metadata(self.work_dir.join(idx.to_string())), segment.seq))
+    }
+
+    fn deletions(&self) -> impl Iterator<Item = (&String, Seq)> {
+        self.deletions.iter().flat_map(|del| del.keys.iter().map(|key| (key, del.seq)))
+    }
+}
+
 pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObjectStore>) -> anyhow::Result<()> {
     // TODO: Should jobs be generic or keep the merge_job idea?
     let segments = job.segments(&meta.pool).await?;
@@ -76,14 +105,15 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
             "Jobs must only use segments from a single index or we could end with a multi-index merge!"
         );
     }
+    let segment_ids = segments.iter().map(|s| s.id).collect::<Vec<_>>();
     let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, job.seq).await?;
-    let work_dir: tempfile::TempDir = tempdir()?;
+    let download_dir = tempdir()?;
 
     // Download segments
     let mut download_tasks = JoinSet::new();
     segments.iter().enumerate().for_each(|(i, s)| {
         let storage = storage.clone();
-        let work_dir = work_dir.path().join(i.to_string());
+        let work_dir = download_dir.path().join(i.to_string());
         download_tasks.spawn(download_segment(storage, s.id, work_dir));
     });
     match download_tasks.join_all().await.into_iter().reduce(Result::and) {
@@ -92,45 +122,28 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
         Some(Ok(())) => {}
     };
 
-    // TODO: Define a structure that gets passed to indices with all the needed information, better than random tuples :)
-    let ddeletions = &deletions.iter().map(|d| (d.seq, &d.keys)).collect::<Vec<_>>();
-
     let index = Index::get(&meta.pool, segments[0].index_id).await?;
-    let merged_segment: NewSegment = match index.kind {
-        IndexKind::Vector => {
-            let ssegments = segments
-                .iter()
-                .enumerate()
-                .map(|(i, s)| (s.metadata(work_dir.path().join(i.to_string())), s.seq))
-                .collect::<Vec<_>>();
-            nidx_vector::VectorIndexer.merge(work_dir.path(), ssegments, ddeletions)?.into()
-        }
-        IndexKind::Text => {
-            let ssegments = segments
-                .iter()
-                .enumerate()
-                .map(|(i, s)| (s.metadata(work_dir.path().join(i.to_string())), s.seq))
-                .collect::<Vec<_>>();
-            nidx_text::TextIndexer.merge(work_dir.path(), ssegments, ddeletions)?.into()
-        }
+    let merge_inputs = MergeInputs {
+        work_dir: download_dir.path().to_path_buf(),
+        segments,
+        deletions,
+    };
+
+    let work_dir = tempdir()?;
+    let merged: NewSegment = match index.kind {
+        IndexKind::Vector => nidx_vector::VectorIndexer.merge(work_dir.path(), merge_inputs)?.into(),
+        IndexKind::Text => nidx_text::TextIndexer.merge(work_dir.path(), merge_inputs)?.into(),
         _ => unimplemented!(),
     };
 
     // Upload
-    let segment = Segment::create(
-        &meta.pool,
-        segments[0].index_id,
-        job.seq,
-        merged_segment.records,
-        merged_segment.index_metadata,
-    )
-    .await?;
+    let segment = Segment::create(&meta.pool, job.index_id, job.seq, merged.records, merged.index_metadata).await?;
     let size = pack_and_upload(storage, work_dir.path(), segment.id.storage_key()).await?;
 
     // Record new segment and delete old ones. TODO: Mark as deleted_at
     let mut tx = meta.transaction().await?;
     segment.mark_ready(&mut *tx, size as i64).await?;
-    Segment::delete_many(&mut *tx, &segments.iter().map(|s| s.id).collect::<Vec<_>>()).await?;
+    Segment::delete_many(&mut *tx, &segment_ids).await?;
     index.updated(&mut *tx).await?;
     // Delete task if successful. Mark as failed otherwise?
     job.finish(&mut *tx).await?;

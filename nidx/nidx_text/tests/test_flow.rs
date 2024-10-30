@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+mod common;
+use common::TestOpener;
 use nidx_protos::DocumentSearchRequest;
 use nidx_tests::little_prince;
 use nidx_text::{TextIndexer, TextSearcher};
@@ -36,15 +38,17 @@ fn test_index_merge_search() -> anyhow::Result<()> {
     let merge_dir = tempdir()?;
     let merged_meta = TextIndexer.merge(
         merge_dir.path(),
-        vec![(meta1.clone(), 1i64.into()), (meta2.clone(), 2i64.into())],
-        &[(2i64.into(), &vec![resource.resource.unwrap().uuid])],
+        TestOpener::new(
+            vec![(meta1.clone(), 1i64.into()), (meta2.clone(), 2i64.into())],
+            vec![(resource.resource.unwrap().uuid, 2i64.into())],
+        ),
     )?;
 
     // Only the second resource is retained
     assert_eq!(merged_meta.records, records);
 
     // Search on first resource
-    let searcher = TextSearcher::open(vec![(1i64.into(), vec![meta1.clone()], vec![])])?;
+    let searcher = TextSearcher::open(TestOpener::new(vec![(meta1.clone(), 1i64.into())], vec![]))?;
     let result = searcher.search(&DocumentSearchRequest {
         result_per_page: 20,
         ..Default::default()
@@ -52,7 +56,7 @@ fn test_index_merge_search() -> anyhow::Result<()> {
     assert_eq!(result.results.len(), 2);
 
     // Search on both resources
-    let searcher = TextSearcher::open(vec![(1i64.into(), vec![meta1, meta2], vec![])])?;
+    let searcher = TextSearcher::open(TestOpener::new(vec![(meta1, 1i64.into()), (meta2, 2i64.into())], vec![]))?;
     let result = searcher.search(&DocumentSearchRequest {
         result_per_page: 20,
         ..Default::default()
@@ -60,7 +64,7 @@ fn test_index_merge_search() -> anyhow::Result<()> {
     assert_eq!(result.results.len(), 4);
 
     // Search on merged resources
-    let searcher = TextSearcher::open(vec![(1i64.into(), vec![merged_meta], vec![])])?;
+    let searcher = TextSearcher::open(TestOpener::new(vec![(merged_meta, 1i64.into())], vec![]))?;
     let result = searcher.search(&DocumentSearchRequest {
         result_per_page: 20,
         ..Default::default()

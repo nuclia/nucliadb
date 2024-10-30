@@ -57,3 +57,18 @@ pub struct ValidField {
     pub resource_id: String,
     pub field_id: String,
 }
+
+pub trait OpenIndexMetadata<T> {
+    // Tantivy indexes build a set of deletions for each segment
+
+    /// List of segments and its deletions
+    fn segments_and_deletions(&self) -> impl Iterator<Item = (SegmentMetadata<T>, impl Iterator<Item = &String>)>;
+
+    // Vector indexes builds an structure with all deletions and uses the Seq
+    // number to apply part of this to each segment.
+
+    /// List of segments and Seq
+    fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)>;
+    /// List of deletions and Seq
+    fn deletions(&self) -> impl Iterator<Item = (&String, Seq)>;
+}

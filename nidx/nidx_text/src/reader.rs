@@ -32,10 +32,10 @@ use nidx_protos::{
     ResultScore, StreamRequest,
 };
 use nidx_types::ValidField;
-use tantivy::collector::{Collector, Count, DocSetCollector, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
+use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::BytesColumn;
 use tantivy::fastfield::FacetReader;
-use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, Query, QueryParser};
 use tantivy::schema::Value;
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, ReloadPolicy, Searcher};
@@ -136,47 +136,47 @@ impl SegmentCollector for FieldUuidSegmentCollector {
     }
 }
 
-struct FieldUuidCollector {
-    uuid: Field,
-    field: Field,
-}
+// struct FieldUuidCollector {
+//     uuid: Field,
+//     field: Field,
+// }
 
-impl Collector for FieldUuidCollector {
-    type Fruit = Vec<ValidField>;
+// impl Collector for FieldUuidCollector {
+//     type Fruit = Vec<ValidField>;
 
-    type Child = FieldUuidSegmentCollector;
+//     type Child = FieldUuidSegmentCollector;
 
-    fn for_segment(
-        &self,
-        _segment_local_id: tantivy::SegmentOrdinal,
-        segment: &tantivy::SegmentReader,
-    ) -> tantivy::Result<Self::Child> {
-        let uuid_reader = segment.fast_fields().bytes("uuid")?.unwrap();
-        let field_reader = segment.facet_reader("field")?;
-        Ok(FieldUuidSegmentCollector {
-            uuid_reader,
-            field_reader,
-            results: vec![],
-        })
-    }
+//     fn for_segment(
+//         &self,
+//         _segment_local_id: tantivy::SegmentOrdinal,
+//         segment: &tantivy::SegmentReader,
+//     ) -> tantivy::Result<Self::Child> {
+//         let uuid_reader = segment.fast_fields().bytes("uuid")?.unwrap();
+//         let field_reader = segment.facet_reader("field")?;
+//         Ok(FieldUuidSegmentCollector {
+//             uuid_reader,
+//             field_reader,
+//             results: vec![],
+//         })
+//     }
 
-    fn requires_scoring(&self) -> bool {
-        false
-    }
+//     fn requires_scoring(&self) -> bool {
+//         false
+//     }
 
-    fn merge_fruits(
-        &self,
-        segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
-    ) -> tantivy::Result<Self::Fruit> {
-        Ok(segment_fruits
-            .into_iter()
-            .reduce(|mut a, mut b| {
-                a.append(&mut b);
-                a
-            })
-            .unwrap_or_default())
-    }
-}
+//     fn merge_fruits(
+//         &self,
+//         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
+//     ) -> tantivy::Result<Self::Fruit> {
+//         Ok(segment_fruits
+//             .into_iter()
+//             .reduce(|mut a, mut b| {
+//                 a.append(&mut b);
+//                 a
+//             })
+//             .unwrap_or_default())
+//     }
+// }
 
 impl TextReaderService {
     // fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
@@ -303,25 +303,25 @@ impl TextReaderService {
         self.do_search(request)
     }
 
-    fn stored_ids(&self) -> anyhow::Result<Vec<String>> {
-        let mut keys = vec![];
-        let searcher = self.reader.searcher();
-        for addr in searcher.search(&AllQuery, &DocSetCollector)? {
-            let key = String::from_utf8(
-                searcher
-                    .doc::<TantivyDocument>(addr)?
-                    .get_first(self.schema.uuid)
-                    .expect("documents must have a uuid.")
-                    .as_bytes()
-                    .expect("uuid field must be bytes")
-                    .to_vec(),
-            )
-            .unwrap();
-            keys.push(key);
-        }
+    // fn stored_ids(&self) -> anyhow::Result<Vec<String>> {
+    //     let mut keys = vec![];
+    //     let searcher = self.reader.searcher();
+    //     for addr in searcher.search(&AllQuery, &DocSetCollector)? {
+    //         let key = String::from_utf8(
+    //             searcher
+    //                 .doc::<TantivyDocument>(addr)?
+    //                 .get_first(self.schema.uuid)
+    //                 .expect("documents must have a uuid.")
+    //                 .as_bytes()
+    //                 .expect("uuid field must be bytes")
+    //                 .to_vec(),
+    //         )
+    //         .unwrap();
+    //         keys.push(key);
+    //     }
 
-        Ok(keys)
-    }
+    //     Ok(keys)
+    // }
 }
 
 impl TextReaderService {

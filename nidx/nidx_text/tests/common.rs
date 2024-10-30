@@ -18,21 +18,57 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+#![allow(dead_code)] // clippy doesn't check for usage in other tests modules
+
 use std::collections::HashMap;
 use std::time::SystemTime;
 
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::{Resource, ResourceId};
+use nidx_tantivy::{TantivyMeta, TantivySegmentMetadata};
 use nidx_text::reader::TextReaderService;
 use nidx_text::{TextIndexer, TextSearcher};
+use nidx_types::{OpenIndexMetadata, Seq};
 use tempfile::TempDir;
+
+pub struct TestOpener {
+    segments: Vec<(TantivySegmentMetadata, Seq)>,
+    deletions: Vec<(String, Seq)>,
+}
+
+impl TestOpener {
+    pub fn new(segments: Vec<(TantivySegmentMetadata, Seq)>, deletions: Vec<(String, Seq)>) -> Self {
+        Self {
+            segments,
+            deletions,
+        }
+    }
+}
+
+impl OpenIndexMetadata<TantivyMeta> for TestOpener {
+    fn segments_and_deletions(
+        &self,
+    ) -> impl Iterator<Item = (nidx_types::SegmentMetadata<TantivyMeta>, impl Iterator<Item = &String>)> {
+        self.segments.iter().map(|(meta, seq)| {
+            (meta.clone(), self.deletions.iter().filter(move |(_, del_seq)| seq < del_seq).map(|(k, _)| k))
+        })
+    }
+
+    fn segments(&self) -> impl Iterator<Item = (nidx_types::SegmentMetadata<TantivyMeta>, nidx_types::Seq)> {
+        self.segments.iter().cloned()
+    }
+
+    fn deletions(&self) -> impl Iterator<Item = (&String, nidx_types::Seq)> {
+        self.deletions.iter().map(|(key, seq)| (key, *seq))
+    }
+}
 
 pub fn test_reader() -> TextReaderService {
     let dir = TempDir::new().unwrap();
     let resource = create_resource("shard".to_string());
     let segment_meta = TextIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
 
-    TextSearcher::open(vec![(1i64.into(), vec![segment_meta], vec![])]).unwrap().reader
+    TextSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![])).unwrap().reader
 }
 
 pub fn create_resource(shard_id: String) -> Resource {
