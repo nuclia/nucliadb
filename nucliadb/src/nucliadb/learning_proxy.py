@@ -164,7 +164,7 @@ def raise_for_status(response: httpx.Response) -> None:
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as err:
-        content_type = err.response.headers.get("content-type", "application/json")
+        content_type = err.response.headers.get("Content-Type", "application/json")
         raise ProxiedLearningConfigError(
             status_code=err.response.status_code,
             content=err.response.content,
