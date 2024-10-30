@@ -208,6 +208,11 @@ class KBShardManager:
         )
 
         shard_uuid = uuid.uuid4().hex
+        vectorsets = {
+            vectorset_id: vectorset_config.vectorset_index_config
+            async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
+        }
+
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
         try:
             # Attempt to create configured number of replicas
@@ -224,13 +229,6 @@ class KBShardManager:
                 if node is None:
                     logger.error(f"Node {node_id} is not found or not available")
                     continue
-
-                vectorsets = {
-                    vectorset_id: vectorset_config.vectorset_index_config
-                    async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
-                        txn, kbid=kbid
-                    )
-                }
 
                 try:
                     if not vectorsets:
