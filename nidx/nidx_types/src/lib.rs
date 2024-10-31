@@ -58,7 +58,7 @@ pub struct ValidField {
     pub field_id: String,
 }
 
-/// The metadata needed top open an index: a list of segments and deletions.
+/// The metadata needed to open an index: a list of segments and deletions.
 pub trait OpenIndexMetadata<T> {
     /// List of segments and Seq
     fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)>;
