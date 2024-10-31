@@ -243,7 +243,7 @@ mod tests {
         let s2 = Segment::create(&pool, index.id, 3i64.into(), 4, serde_json::Value::Null).await?;
         s2.mark_ready(&pool, 122).await?;
         Deletion::create(&pool, index.id, 3i64.into(), &["k3".to_string()]).await?;
-        let s3 = Segment::create(&pool, index.id, 3i64.into(), 4, serde_json::Value::Null).await?;
+        let s3 = Segment::create(&pool, index.id, 3i64.into(), 40, serde_json::Value::Null).await?;
         s3.mark_ready(&pool, 1220).await?;
 
         // Seq 4: A segment was created without deletions

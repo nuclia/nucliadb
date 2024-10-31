@@ -62,7 +62,7 @@ impl TextIndexer {
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
         let field_schema = TextSchema::new();
-        let mut indexer = TantivyIndexer::new(output_dir, field_schema.schema.clone())?;
+        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
         if resource.status == ResourceStatus::Delete as i32 {
             return Err(anyhow::anyhow!("This is a deletion, not a set resource"));

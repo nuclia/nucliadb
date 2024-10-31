@@ -40,6 +40,9 @@ pub enum IndexSearcher {
 }
 
 /// This structure (its trait) is passed to the indexes in order to open a searcher.
+/// This implementation takes the data in the format available to a searcher node,
+/// that is, what is stored in SyncMetadata, a list of `Operations` and a map of
+/// extended segment metadata.
 struct IndexOperations {
     sync_metadata: Arc<SyncMetadata>,
     segments: HashMap<SegmentId, Segment>,
@@ -48,15 +51,6 @@ struct IndexOperations {
 }
 
 impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for IndexOperations {
-    fn segments_and_deletions(&self) -> impl Iterator<Item = (SegmentMetadata<T>, impl Iterator<Item = &String>)> {
-        self.operations.0.iter().flat_map(|op| {
-            op.segment_ids.iter().map(|segment_id| {
-                let location = self.sync_metadata.segment_location(&self.index_id, segment_id);
-                (self.segments[segment_id].metadata(location), op.deleted_keys.iter())
-            })
-        })
-    }
-
     fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)> {
         self.operations.0.iter().flat_map(|op| {
             op.segment_ids.iter().map(|segment_id| {

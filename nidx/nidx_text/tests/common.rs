@@ -46,14 +46,6 @@ impl TestOpener {
 }
 
 impl OpenIndexMetadata<TantivyMeta> for TestOpener {
-    fn segments_and_deletions(
-        &self,
-    ) -> impl Iterator<Item = (nidx_types::SegmentMetadata<TantivyMeta>, impl Iterator<Item = &String>)> {
-        self.segments.iter().map(|(meta, seq)| {
-            (meta.clone(), self.deletions.iter().filter(move |(_, del_seq)| seq < del_seq).map(|(k, _)| k))
-        })
-    }
-
     fn segments(&self) -> impl Iterator<Item = (nidx_types::SegmentMetadata<TantivyMeta>, nidx_types::Seq)> {
         self.segments.iter().cloned()
     }

@@ -80,7 +80,7 @@ pub fn open_index_with_deletions(
 
 /// A Tantivy directory implementation that reads data from a set of directories (one per segment)
 ///
-/// We need to be able to apply deletions, but we cannot calculate them until after the index and directory is opened
+/// We need to be able to apply deletions, but we cannot calculate them until the index and directory are opened
 /// since we need to search in the segments to know the deleted documents. So we open it with a metadata that indicates
 /// no deletions, calculate deletions, and then write the deletions through this directory. The code that handles
 /// writes detects a deletion file being writter and adjusts the index metadata in order to reflect it.

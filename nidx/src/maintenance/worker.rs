@@ -69,6 +69,8 @@ pub async fn run() -> anyhow::Result<()> {
 }
 
 /// This structure (its trait) is passed to the indexes in order to open a searcher.
+/// This implementation of the trait takes the data in the format available to a worker
+/// that is merging segments for an index: a list of DB models for Segments and Deletions.
 struct MergeInputs {
     work_dir: PathBuf,
     segments: Vec<Segment>,
@@ -76,13 +78,6 @@ struct MergeInputs {
 }
 
 impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for MergeInputs {
-    fn segments_and_deletions(&self) -> impl Iterator<Item = (SegmentMetadata<T>, impl Iterator<Item = &String>)> {
-        self.segments.iter().enumerate().map(|(idx, s)| {
-            let deletions = self.deletions.iter().filter(|&d| (s.seq < d.seq)).flat_map(|d| d.keys.iter());
-            (s.metadata(self.work_dir.join(idx.to_string())), deletions)
-        })
-    }
-
     fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)> {
         self.segments
             .iter()

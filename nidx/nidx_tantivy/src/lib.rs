@@ -30,10 +30,7 @@ pub mod index_reader;
 
 use nidx_types::SegmentMetadata;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, path::PathBuf};
 use tantivy::{directory::MmapDirectory, schema::Schema, Index, SingleSegmentIndexWriter, TantivyDocument};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -49,12 +46,12 @@ pub struct TantivyIndexer {
 }
 
 impl TantivyIndexer {
-    pub fn new(output_dir: &Path, schema: Schema) -> anyhow::Result<Self> {
+    pub fn new(output_dir: PathBuf, schema: Schema) -> anyhow::Result<Self> {
         let index_builder = Index::builder().schema(schema);
-        let writer = index_builder.single_segment_index_writer(MmapDirectory::open(output_dir)?, 15_000_000)?;
+        let writer = index_builder.single_segment_index_writer(MmapDirectory::open(&output_dir)?, 15_000_000)?;
         Ok(Self {
             writer,
-            output_path: output_dir.to_path_buf(),
+            output_path: output_dir,
         })
     }
 
