@@ -1,6 +1,7 @@
 CREATE TABLE shards (
     id UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
-    kbid UUID NOT NULL
+    kbid UUID NOT NULL,
+    deleted_at TIMESTAMP DEFAULT NULL
 );
 
 CREATE TYPE index_kind AS ENUM ('text', 'paragraph', 'vector', 'relation');
@@ -12,6 +13,7 @@ CREATE TABLE indexes (
     name TEXT NOT NULL,
     configuration JSON,
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMP DEFAULT NULL,
     UNIQUE (shard_id, kind, name)
 );
 

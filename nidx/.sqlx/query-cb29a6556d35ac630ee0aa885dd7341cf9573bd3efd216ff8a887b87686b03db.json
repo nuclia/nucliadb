@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM merge_jobs WHERE index_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cb29a6556d35ac630ee0aa885dd7341cf9573bd3efd216ff8a887b87686b03db"
+}

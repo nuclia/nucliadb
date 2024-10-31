@@ -39,11 +39,17 @@ pub async fn run_sync(
 ) -> anyhow::Result<()> {
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
     loop {
+        let deleted = Index::marked_to_delete(&meta.pool).await?;
+        for index_id in deleted.into_iter() {
+            // TODO: Handle errors
+            delete_index(index_id, Arc::clone(&index_metadata), &notifier).await?;
+        }
+
         let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
         for index in indexes {
             // TODO: Handle errors
             last_updated_at = max(last_updated_at, index.updated_at);
-            sync_index(&meta, storage.clone(), index_metadata.clone(), index, &notifier).await?;
+            sync_index(&meta, storage.clone(), Arc::clone(&index_metadata), index, &notifier).await?;
         }
 
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -80,6 +86,21 @@ async fn sync_index(
         std::fs::remove_dir_all(sync_metadata.segment_location(&index_id, &segment_id))?;
     }
 
+    Ok(())
+}
+
+async fn delete_index(
+    index_id: IndexId,
+    sync_metadata: Arc<SyncMetadata>,
+    notifier: &Sender<IndexId>,
+) -> anyhow::Result<()> {
+    if sync_metadata.delete(&index_id).await {
+        // remove directory for the index, effectively deleting all segment data
+        // stored locally
+        let index_location = sync_metadata.index_location(&index_id);
+        tokio::fs::remove_dir_all(index_location).await?;
+        notifier.send(index_id).await?;
+    }
     Ok(())
 }
 
@@ -147,6 +168,10 @@ impl SyncMetadata {
         }
     }
 
+    pub fn index_location(&self, index_id: &IndexId) -> PathBuf {
+        self.work_dir.join(index_id.local_path())
+    }
+
     pub fn segment_location(&self, index_id: &IndexId, segment_id: &SegmentId) -> PathBuf {
         self.work_dir.join(segment_id.local_path(index_id))
     }
@@ -184,6 +209,10 @@ impl SyncMetadata {
     pub async fn get<'a>(&self, index_id: &IndexId) -> GuardedIndexMetadata {
         GuardedIndexMetadata::new(self.synced_metadata.clone().read_owned().await, *index_id)
     }
+
+    pub async fn delete(&self, index_id: &IndexId) -> bool {
+        self.synced_metadata.write().await.remove(index_id).is_some()
+    }
 }
 
 pub struct GuardedIndexMetadata {
@@ -211,6 +240,7 @@ impl GuardedIndexMetadata {
 mod tests {
     use std::{io::BufWriter, path::Path, sync::Arc};
 
+    use nidx_vector::config::VectorConfig;
     use object_store::{ObjectStore, PutPayload};
     use tempfile::tempdir;
 
@@ -226,8 +256,8 @@ mod tests {
         let index = Index::create(
             &pool,
             Shard::create(&pool, uuid::Uuid::new_v4()).await?.id,
-            crate::metadata::IndexKind::Vector,
             "english",
+            VectorConfig::default().into(),
         )
         .await?;
 
@@ -296,8 +326,8 @@ mod tests {
         let index = Index::create(
             &meta.pool,
             Shard::create(&meta.pool, uuid::Uuid::new_v4()).await?.id,
-            crate::metadata::IndexKind::Vector,
             "english",
+            VectorConfig::default().into(),
         )
         .await?;
         // Assumes we get index_id=1

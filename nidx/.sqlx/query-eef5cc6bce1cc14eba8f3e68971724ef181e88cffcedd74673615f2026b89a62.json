@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH indexes_to_delete AS (\n             SELECT indexes.id\n             FROM indexes\n             WHERE indexes.deleted_at IS NOT NULL\n         )\n         DELETE FROM deletions USING indexes_to_delete\n         WHERE deletions.index_id = indexes_to_delete.id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "eef5cc6bce1cc14eba8f3e68971724ef181e88cffcedd74673615f2026b89a62"
+}
