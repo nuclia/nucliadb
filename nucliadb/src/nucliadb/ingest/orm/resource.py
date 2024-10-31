@@ -23,9 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Type, Union
-
-from google.protobuf.internal.containers import ScalarMap
+from typing import TYPE_CHECKING, Any, AsyncIterator, MutableMapping, Optional, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -1258,9 +1256,7 @@ def extract_field_metadata_languages(
     return list(languages)
 
 
-def _update_entities_dict(
-    target_entites_dict: Union[dict[str, str], ScalarMap[str, str]], field_metadata: FieldMetadata
-):
+def _update_entities_dict(target_entites_dict: MutableMapping[str, str], field_metadata: FieldMetadata):
     """
     Update the entities dict with the entities from the field metadata.
     Method created to ease the transition from legacy ner field to new entities field.
@@ -1268,12 +1264,12 @@ def _update_entities_dict(
     # Data Augmentation + Processor entities
     # This will overwrite entities detected from more than one data augmentation task
     # TODO: Change TrainMetadata proto to accept multiple entities with the same text
-    ents = {
+    entity_map = {
         entity.text: entity.label
         for data_augmentation_task_id, entities_wrapper in field_metadata.entities.items()
         for entity in entities_wrapper.entities
     }
-    target_entites_dict.update(ents)
+    target_entites_dict.update(entity_map)
 
     # Legacy processor entities
     # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
