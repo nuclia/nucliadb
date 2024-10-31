@@ -85,7 +85,7 @@ def get_nidx() -> NidxIndexer:
     return get_utility(Utility.NIDX)
 
 
-def get_nidx_api_client() -> Optional[AbstractIndexNode]:
+def get_nidx_api_client() -> Optional["AbstractIndexNode"]:
     if settings.nidx_api:
         from nucliadb.common.cluster.manager import IndexNode
 
