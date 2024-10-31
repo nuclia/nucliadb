@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
             "worker" => tasks.spawn(maintenance::worker::run()),
             "scheduler" => tasks.spawn(maintenance::scheduler::run()),
             "searcher" => tasks.spawn(searcher::run()),
-            "shards-api" => tasks.spawn(api::run()),
+            "api" => tasks.spawn(api::run()),
             other => panic!("Unknown component: {other}"),
         };
     });

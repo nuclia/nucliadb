@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nidx-shards-api
+  name: nidx-api
   labels:
-    app: nidx-shards-api
+    app: nidx-api
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
@@ -12,12 +12,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nidx-shards-api
+      app: nidx-api
       release: "{{ .Release.Name }}"
       heritage: "{{ .Release.Service }}"
   template:
     metadata:
-      name: nidx-shards-api
+      name: nidx-api
       annotations:
         {{- with .Values.excludeOutboundPorts }}
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{ . }}"
@@ -26,7 +26,7 @@ spec:
         traffic.sidecar.istio.io/excludeInboundPorts: "{{ . }}"
         {{- end }}
       labels:
-        app: nidx-shards-api
+        app: nidx-api
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
@@ -51,9 +51,9 @@ spec:
       dnsPolicy: ClusterFirst
       serviceAccount: {{ .Values.searcher.serviceAccount | default "default" }}
       containers:
-      - name: nidx-shards-api
+      - name: nidx-api
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
-        command: ["nidx", "shards-api"]
+        command: ["nidx", "api"]
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
         ports:

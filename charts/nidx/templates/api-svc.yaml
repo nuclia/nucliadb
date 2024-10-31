@@ -1,9 +1,9 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: nidx-shards-api
+  name: nidx-api
   labels:
-    app: nidx-shards-api
+    app: nidx-api
     metrics: "enabled"
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
@@ -12,9 +12,9 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    app: nidx-shards-api
+    app: nidx-api
   ports:
-    - name: nidx-shards-api
+    - name: nidx-api
       port: 10000
       protocol: TCP
       appProtocol: grpc
