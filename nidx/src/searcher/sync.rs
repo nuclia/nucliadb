@@ -40,15 +40,14 @@ pub async fn run_sync(
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
     loop {
         let deleted = Index::marked_to_delete(&meta.pool).await?;
+        for index_id in deleted.into_iter() {
+            // TODO: Handle errors
+            delete_index(index.id, Arc::clone(&index_metadata), &notifier).await?;
+        }
+
         let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
         for index in indexes {
             // TODO: Handle errors
-
-            if deleted.contains(&index.id) {
-                delete_index(index.id, Arc::clone(&index_metadata), &notifier).await?;
-                continue;
-            }
-
             last_updated_at = max(last_updated_at, index.updated_at);
             sync_index(&meta, storage.clone(), Arc::clone(&index_metadata), index, &notifier).await?;
         }
