@@ -30,18 +30,12 @@ use uuid::Uuid;
 use nidx::api::shards;
 use nidx::indexer::index_resource;
 use nidx::maintenance::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
-use nidx::metadata::{IndexId};
+use nidx::metadata::IndexId;
 use nidx::{metadata::Shard, NidxMetadata};
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;
 
-use common::metadata::{
-    get_all_shards,
-    get_all_deletions,
-    get_all_indexes,
-    get_all_merge_jobs,
-    get_all_segments,
-};
+use common::metadata::{count_deletions, count_indexes, count_merge_jobs, count_segments, count_shards};
 
 #[sqlx::test]
 async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()> {
@@ -103,11 +97,11 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     purge_segments(&meta, &storage).await?;
     purge_deleted_shards_and_indexes(&meta).await?;
 
-    assert_eq!(get_all_shards(&meta.pool).await?.into_iter().count(), 0);
-    assert_eq!(get_all_indexes(&meta.pool).await?.into_iter().count(), 0);
-    assert_eq!(get_all_segments(&meta.pool).await?.into_iter().count(), 0);
-    assert_eq!(get_all_merge_jobs(&meta.pool).await?.into_iter().count(), 0);
-    assert_eq!(get_all_deletions(&meta.pool).await?.into_iter().count(), 0);
+    assert_eq!(count_shards(&meta.pool).await?, 0);
+    assert_eq!(count_indexes(&meta.pool).await?, 0);
+    assert_eq!(count_segments(&meta.pool).await?, 0);
+    assert_eq!(count_merge_jobs(&meta.pool).await?, 0);
+    assert_eq!(count_deletions(&meta.pool).await?, 0);
 
     Ok(())
 }

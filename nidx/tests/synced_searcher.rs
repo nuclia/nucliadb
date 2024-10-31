@@ -18,8 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod common;
-
 use std::sync::Arc;
 use std::time::Duration;
 

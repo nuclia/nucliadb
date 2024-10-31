@@ -18,35 +18,34 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#![allow(dead_code)] // rust doesn't detect all is used in our integration tests...
+// rust doesn't detect usage of `common` in our integration tests
+#![allow(dead_code)]
 
 pub mod metadata {
-    use nidx::metadata::{Index, MergeJob, Segment, Deletion, Shard, IndexKind};
     use sqlx::{Executor, Postgres};
 
-    pub async fn get_all_shards(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Shard>> {
-        sqlx::query_as!(Shard, r#"SELECT * FROM shards"#).fetch_all(meta).await
+    pub async fn count_shards(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM shards"#).fetch_one(meta).await?;
+        Ok(count as usize)
     }
 
-    pub async fn get_all_indexes(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Index>> {
-        sqlx::query_as!(
-            Index,
-            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
-               FROM indexes"#,
-        )
-            .fetch_all(meta)
-            .await
+    pub async fn count_indexes(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM indexes"#).fetch_one(meta).await?;
+        Ok(count as usize)
     }
 
-    pub async fn get_all_segments(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, r#"SELECT * FROM segments"#).fetch_all(meta).await
+    pub async fn count_segments(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM segments"#).fetch_one(meta).await?;
+        Ok(count as usize)
     }
 
-    pub async fn get_all_merge_jobs(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<MergeJob>> {
-        sqlx::query_as!(MergeJob, r#"SELECT * FROM merge_jobs"#).fetch_all(meta).await
+    pub async fn count_merge_jobs(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM merge_jobs"#).fetch_one(meta).await?;
+        Ok(count as usize)
     }
 
-    pub async fn get_all_deletions(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Deletion>> {
-        sqlx::query_as!(Deletion, r#"SELECT * FROM deletions"#).fetch_all(meta).await
+    pub async fn count_deletions(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<usize> {
+        let count = sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM deletions"#).fetch_one(meta).await?;
+        Ok(count as usize)
     }
 }
