@@ -152,6 +152,25 @@ class LearningConfiguration(BaseModel):
         return semantic_model
 
 
+class ProxiedLearningConfigError(Exception):
+    def __init__(self, status_code: int, content: bytes, content_type: str):
+        self.status_code = status_code
+        self.content = content
+        self.content_type = content_type
+
+
+def raise_for_status(response: httpx.Response) -> None:
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as err:
+        content_type = err.response.headers.get("Content-Type", "application/json")
+        raise ProxiedLearningConfigError(
+            status_code=err.response.status_code,
+            content=err.response.content,
+            content_type=content_type,
+        )
+
+
 async def get_configuration(
     kbid: str,
 ) -> Optional[LearningConfiguration]:
@@ -163,6 +182,13 @@ async def set_configuration(
     config: dict[str, Any],
 ) -> LearningConfiguration:
     return await learning_config_service().set_configuration(kbid, config)
+
+
+async def update_configuration(
+    kbid: str,
+    config: dict[str, Any],
+) -> None:
+    return await learning_config_service().update_configuration(kbid, config)
 
 
 async def delete_configuration(
@@ -379,6 +405,10 @@ class DummyClient(httpx.AsyncClient):
         # simulate post that returns the created config
         return self.get_config(*args, **kwargs)
 
+    def patch_config(self, *args: Any, **kwargs: Any):
+        # simulate patch that returns the updated config
+        return self.get_config(*args, **kwargs)
+
     async def request(  # type: ignore
         self,
         method: str,
@@ -411,6 +441,9 @@ class LearningConfigService(ABC):
     async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration: ...
 
     @abstractmethod
+    async def update_configuration(self, kbid: str, config: dict[str, Any]) -> None: ...
+
+    @abstractmethod
     async def delete_configuration(self, kbid: str) -> None: ...
 
 
@@ -419,9 +452,9 @@ class ProxiedLearningConfig(LearningConfigService):
         async with self._client() as client:
             resp = await client.get(f"config/{kbid}")
             try:
-                resp.raise_for_status()
-            except httpx.HTTPStatusError as err:
-                if err.response.status_code == 404:
+                raise_for_status(resp)
+            except ProxiedLearningConfigError as err:
+                if err.status_code == 404:
                     return None
                 raise
             return LearningConfiguration.model_validate(resp.json())
@@ -429,13 +462,19 @@ class ProxiedLearningConfig(LearningConfigService):
     async def set_configuration(self, kbid: str, config: dict[str, Any]) -> LearningConfiguration:
         async with self._client() as client:
             resp = await client.post(f"config/{kbid}", json=config)
-            resp.raise_for_status()
+            raise_for_status(resp)
             return LearningConfiguration.model_validate(resp.json())
+
+    async def update_configuration(self, kbid: str, config: dict[str, Any]) -> None:
+        async with self._client() as client:
+            resp = await client.patch(f"config/{kbid}", json=config)
+            raise_for_status(resp)
+            return
 
     async def delete_configuration(self, kbid: str) -> None:
         async with self._client() as client:
             resp = await client.delete(f"config/{kbid}")
-            resp.raise_for_status()
+            raise_for_status(resp)
 
     @contextlib.asynccontextmanager
     async def _client(self) -> AsyncIterator[httpx.AsyncClient]:
@@ -486,6 +525,13 @@ class InMemoryLearningConfig(LearningConfigService):
 
         _IN_MEMORY_CONFIGS[kbid] = learning_config
         return learning_config
+
+    async def update_configuration(self, kbid: str, config: dict[str, Any]) -> None:
+        if kbid not in _IN_MEMORY_CONFIGS:
+            raise ValueError(f"Configuration for kbid {kbid} not found")
+        learning_config = _IN_MEMORY_CONFIGS[kbid]
+        learning_config = learning_config.model_copy(update=config)
+        _IN_MEMORY_CONFIGS[kbid] = learning_config
 
     async def delete_configuration(self, kbid: str) -> None:
         _IN_MEMORY_CONFIGS.pop(kbid, None)

@@ -767,10 +767,13 @@ pub struct Question {
 pub struct Answers {
     #[prost(string, tag = "1")]
     pub text: ::prost::alloc::string::String,
+    #[deprecated]
     #[prost(string, tag = "2")]
     pub language: ::prost::alloc::string::String,
     #[prost(string, repeated, tag = "3")]
     pub ids_paragraphs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, tag = "4")]
+    pub reason: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
