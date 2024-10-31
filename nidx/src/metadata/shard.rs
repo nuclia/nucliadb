@@ -41,11 +41,6 @@ impl Shard {
         Ok(())
     }
 
-    pub async fn delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
-        sqlx::query!("DELETE FROM shards WHERE id = $1", self.id).execute(meta).await?;
-        Ok(())
-    }
-
     pub async fn indexes(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
