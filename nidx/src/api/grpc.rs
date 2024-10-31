@@ -18,8 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use super::ShardsServer;
-
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -29,7 +27,20 @@ use nidx_vector::config::VectorConfig;
 use tonic::{transport::Server, Request, Response, Status};
 use uuid::Uuid;
 
-impl ShardsServer {
+use crate::NidxMetadata;
+use crate::api::shards;
+
+pub struct GrpcServer {
+    meta: NidxMetadata,
+}
+
+impl GrpcServer {
+    pub fn new(meta: NidxMetadata) -> Self {
+        Self {
+            meta,
+        }
+    }
+
     pub async fn serve(self) {
         Server::builder()
             .add_service(NodeWriterServer::new(self))
@@ -40,7 +51,7 @@ impl ShardsServer {
 }
 
 #[tonic::async_trait]
-impl NodeWriter for ShardsServer {
+impl NodeWriter for GrpcServer {
     async fn new_shard(&self, request: Request<NewShardRequest>) -> Result<Response<ShardCreated>, Status> {
         // TODO? analytics event
         let request = request.into_inner();
@@ -51,7 +62,7 @@ impl NodeWriter for ShardsServer {
                 .insert(vectorset_id, VectorConfig::try_from(config).map_err(|e| Status::internal(e.to_string()))?);
         }
 
-        let shard = self.create_shard(kbid, vector_configs).await.map_err(|e| Status::internal(e.to_string()))?;
+        let shard = shards::create_shard(&self.meta, kbid, vector_configs).await.map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),
@@ -65,7 +76,7 @@ impl NodeWriter for ShardsServer {
         let request = request.into_inner();
         let shard_id = Uuid::from_str(&request.id).map_err(|e| Status::internal(e.to_string()))?;
 
-        self.delete_shard(shard_id).await.map_err(|e| Status::internal(e.to_string()))?;
+        shards::delete_shard(&self.meta, shard_id).await.map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(ShardId {
             id: shard_id.to_string(),

@@ -25,20 +25,19 @@ use object_store::memory::InMemory;
 use object_store::ObjectStore;
 use uuid::Uuid;
 
-use nidx::api::shards::ShardsServer;
 use nidx::indexer::index_resource;
 use nidx::maintenance::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
 use nidx::metadata::IndexId;
 use nidx::{metadata::Shard, NidxMetadata};
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;
+use nidx::api::shards;
+
 
 #[sqlx::test]
 async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let meta = NidxMetadata::new_with_pool(pool).await?;
     let storage: Arc<dyn ObjectStore> = Arc::new(InMemory::new());
-
-    let shards_server = ShardsServer::new(meta.clone());
 
     // Create a new shard for a KB with 2 vectorsets
     let kbid = Uuid::new_v4();
@@ -46,7 +45,7 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
         ("multilingual".to_string(), VectorConfig::default()),
         ("english".to_string(), VectorConfig::default()),
     ]);
-    let shard = shards_server.create_shard(kbid, vector_configs).await?;
+    let shard = shards::create_shard(&meta, kbid, vector_configs).await?;
 
     let indexes = shard.indexes(&meta.pool).await?;
     // TODO: update when more indexes are created
@@ -72,7 +71,7 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     }
 
     // Mark shard and indexes to delete
-    shards_server.delete_shard(shard.id).await?;
+    shards::delete_shard(&meta, shard.id).await?;
 
     let shard = Shard::get(&meta.pool, shard.id).await?;
     assert!(shard.deleted_at.is_some());

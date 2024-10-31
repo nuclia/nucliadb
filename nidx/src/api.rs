@@ -19,6 +19,7 @@
 //
 
 pub mod shards;
+mod grpc;
 
 use tracing::debug;
 
@@ -30,7 +31,7 @@ pub async fn run() -> anyhow::Result<()> {
     let _storage = settings.storage.expect("Storage settings needed").object_store.client();
 
     debug!("Running Shards API");
-    let shards_api = shards::ShardsServer::new(meta.clone());
+    let shards_api = grpc::GrpcServer::new(meta.clone());
     shards_api.serve().await;
 
     Ok(())
