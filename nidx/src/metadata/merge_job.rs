@@ -73,8 +73,15 @@ impl MergeJob {
     pub async fn take(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Option<MergeJob>> {
         sqlx::query_as!(
             MergeJob,
-            "WITH job AS (SELECT id FROM merge_jobs WHERE started_at IS NULL ORDER BY id LIMIT 1)
-            UPDATE merge_jobs SET started_at = NOW(), running_at = NOW() FROM job WHERE merge_jobs.id = job.id RETURNING merge_jobs.*"
+            "WITH job AS (
+                 SELECT id FROM merge_jobs
+                 WHERE started_at IS NULL ORDER BY id LIMIT 1
+             )
+             UPDATE merge_jobs
+             SET started_at = NOW(), running_at = NOW()
+             FROM job
+             WHERE merge_jobs.id = job.id
+             RETURNING merge_jobs.*"
         )
         .fetch_optional(meta)
         .await
@@ -87,6 +94,14 @@ impl MergeJob {
 
     pub async fn finish(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
         sqlx::query!("DELETE FROM merge_jobs WHERE id = $1", self.id,).execute(meta).await?;
+        Ok(())
+    }
+
+    pub async fn delete_many_by_index(
+        meta: impl Executor<'_, Database = Postgres>,
+        index_id: IndexId,
+    ) -> sqlx::Result<()> {
+        sqlx::query!("DELETE FROM merge_jobs WHERE index_id = $1", index_id as IndexId).execute(meta).await?;
         Ok(())
     }
 }

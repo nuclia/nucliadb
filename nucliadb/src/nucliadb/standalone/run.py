@@ -98,7 +98,7 @@ def run():
         "API": f"http://{settings.http_host}:{settings.http_port}/api",
         "Admin UI": f"http://{settings.http_host}:{settings.http_port}/admin",
         "Key-value backend": ingest_settings.driver.value,
-        "Blog storage backend": storage_settings.file_backend.value,
+        "Blob storage backend": storage_settings.file_backend.value,
         "Cluster discovery mode": cluster_settings.cluster_discovery_mode.value,
         "Node replicas": cluster_settings.node_replicas,
         "Index data path": os.path.realpath(cluster_settings.data_path),

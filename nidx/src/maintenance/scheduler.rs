@@ -67,6 +67,16 @@ pub async fn run() -> anyhow::Result<()> {
     });
 
     let meta2 = meta.clone();
+    tasks.spawn(async move {
+        loop {
+            if let Err(e) = purge_deleted_shards_and_indexes(&meta2).await {
+                warn!(?e, "Error purging deleted shards and indexes");
+            }
+            sleep(Duration::from_secs(60)).await;
+        }
+    });
+
+    let meta2 = meta.clone();
     let mut consumer2 = consumer.clone();
     tasks.spawn(async move {
         loop {
@@ -113,7 +123,14 @@ pub async fn run() -> anyhow::Result<()> {
 /// Re-enqueues jobs that have been stuck for a while without ack'ing
 pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
     // Requeue failed jobs (with retries left)
-    let retry_jobs = sqlx::query_as!(MergeJob, "UPDATE merge_jobs SET started_at = NULL, running_at = NULL, retries = retries + 1 WHERE running_at < NOW() - INTERVAL '1 minute' AND retries < 4 RETURNING *").fetch_all(&meta.pool).await?;
+    let retry_jobs = sqlx::query_as!(
+        MergeJob,
+        "UPDATE merge_jobs
+         SET started_at = NULL, running_at = NULL, retries = retries + 1
+         WHERE running_at < NOW() - INTERVAL '1 minute' AND retries < 4 RETURNING *"
+    )
+    .fetch_all(&meta.pool)
+    .await?;
     for j in retry_jobs {
         debug!(j.id, j.retries, "Retrying job");
     }
@@ -121,7 +138,8 @@ pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
     // Delete failed jobs (no retries left)
     let failed_jobs = sqlx::query_as!(
         MergeJob,
-        "DELETE FROM merge_jobs WHERE running_at < NOW() - INTERVAL '1 minute' AND retries >= 4 RETURNING *"
+        "DELETE FROM merge_jobs
+         WHERE running_at < NOW() - INTERVAL '1 minute' AND retries >= 4 RETURNING *"
     )
     .fetch_all(&meta.pool)
     .await?;
@@ -136,9 +154,7 @@ pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
 /// - Uploads that failed
 /// - Recent deletions
 pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) -> anyhow::Result<()> {
-    let deleted_segments = sqlx::query_scalar!(r#"SELECT id AS "id: SegmentId" FROM segments WHERE delete_at < NOW()"#)
-        .fetch_all(&meta.pool)
-        .await?;
+    let deleted_segments = Segment::marked_as_deleted(&meta.pool).await?;
     let paths = deleted_segments.iter().map(|sid| Ok(sid.storage_key()));
     let results = storage.delete_stream(futures::stream::iter(paths).boxed()).collect::<Vec<_>>().await;
 
@@ -158,7 +174,8 @@ pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) 
 }
 
 pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> anyhow::Result<()> {
-    // Purge deletions that don't apply to any segment and won't apply to any segment pending to process
+    // Purge deletions that don't apply to any segment and won't apply to any
+    // segment pending to process
     sqlx::query!(
         "WITH oldest_segments AS (
             SELECT index_id, MIN(seq) AS seq FROM segments
@@ -169,6 +186,46 @@ pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> an
         AND deletions.seq <= oldest_segments.seq
         AND deletions.seq <= $1",
         oldest_pending_seq as i64
+    )
+    .execute(&meta.pool)
+    .await?;
+
+    // Purge deletions for indexes marked to delete
+    sqlx::query!(
+        "WITH indexes_to_delete AS (
+             SELECT indexes.id
+             FROM indexes
+             WHERE indexes.deleted_at IS NOT NULL
+         )
+         DELETE FROM deletions USING indexes_to_delete
+         WHERE deletions.index_id = indexes_to_delete.id"
+    )
+    .execute(&meta.pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Purge shards and indexes marked to delete when it's safe to do so, i.e.,
+/// after all segments and deletions have been removed
+pub async fn purge_deleted_shards_and_indexes(meta: &NidxMetadata) -> anyhow::Result<()> {
+    sqlx::query!(
+        "DELETE FROM indexes
+         WHERE (
+             deleted_at IS NOT NULL
+             AND NOT EXISTS(SELECT 1 FROM segments WHERE index_id = indexes.id)
+             AND NOT EXISTS(SELECT 1 FROM deletions where index_id = deletions.index_id)
+         )"
+    )
+    .execute(&meta.pool)
+    .await?;
+
+    sqlx::query!(
+        "DELETE FROM shards
+         WHERE (
+             deleted_at IS NOT NULL
+             AND NOT EXISTS(SELECT 1 FROM indexes WHERE shard_id = shards.id)
+         )"
     )
     .execute(&meta.pool)
     .await?;
@@ -330,11 +387,12 @@ mod tests {
         use std::collections::{HashMap, HashSet};
 
         use nidx_types::Seq;
+        use nidx_vector::config::VectorConfig;
         use uuid::Uuid;
 
         use super::*;
 
-        use crate::metadata::{Index, IndexId, IndexKind, NidxMetadata, Shard};
+        use crate::metadata::{Index, IndexConfig, IndexId, NidxMetadata, Shard};
 
         fn merge_scheduler() -> MergeScheduler {
             MergeScheduler::from_settings(&MergeSettings {
@@ -365,7 +423,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
             let last_seq = create_segments_with_num_records(&meta.pool, &index, &[50; 3]).await?;
 
             let scheduler = MergeScheduler::from_settings(&MergeSettings {
@@ -384,7 +442,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
             let last_seq = create_segments_with_num_records(&meta.pool, &index, &[50; 3]).await?;
 
             let scheduler = MergeScheduler::from_settings(&MergeSettings {
@@ -411,7 +469,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
 
             let scheduler = MergeScheduler {
                 min_number_of_segments: 2,
@@ -488,7 +546,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
             let mut seq: i64 = 0;
 
             for _ in 0..10 {
@@ -526,11 +584,11 @@ mod tests {
             let shard = Shard::create(&meta.pool, kbid).await?;
 
             let indexes = vec![
-                Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Vector, "english").await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Text, "fulltext").await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Paragraph, "keyword").await?,
-                Index::create(&meta.pool, shard.id, IndexKind::Relation, "relation").await?,
+                Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?,
+                Index::create(&meta.pool, shard.id, "english", VectorConfig::default().into()).await?,
+                Index::create(&meta.pool, shard.id, "fulltext", IndexConfig::new_fulltext()).await?,
+                Index::create(&meta.pool, shard.id, "keyword", IndexConfig::new_keyword()).await?,
+                Index::create(&meta.pool, shard.id, "relation", IndexConfig::new_relation()).await?,
             ];
             let mut seq: i64 = 0;
 
@@ -578,7 +636,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
 
             for seq in [95, 98, 99, 100, 102i64] {
                 let segment =

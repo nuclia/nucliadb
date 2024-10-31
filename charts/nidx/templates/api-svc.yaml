@@ -1,0 +1,20 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nidx-api
+  labels:
+    app: nidx-api
+    metrics: "enabled"
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: nidx-api
+  ports:
+    - name: nidx-api
+      port: 10000
+      protocol: TCP
+      appProtocol: grpc

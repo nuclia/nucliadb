@@ -25,12 +25,11 @@ use std::sync::{Arc, Weak};
 use anyhow::anyhow;
 use lru::LruCache;
 use nidx_types::{OpenIndexMetadata, SegmentMetadata, Seq};
-use nidx_vector::config::VectorConfig;
 use nidx_vector::VectorSearcher;
 use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore};
 
-use crate::metadata::{IndexId, Segment, SegmentId};
+use crate::metadata::{IndexId, IndexKind, Segment, SegmentId};
 use crate::NidxMetadata;
 
 use super::sync::{Operations, SyncMetadata};
@@ -119,7 +118,23 @@ impl IndexCache {
             index_id: *id,
         };
 
-        Ok(Arc::new(IndexSearcher::Vector(VectorSearcher::open(VectorConfig::default(), open_index)?)))
+        let index_config = meta.index.config()?;
+        let searcher = match index_config.kind() {
+            IndexKind::Text => {
+                todo!()
+            }
+            IndexKind::Paragraph => {
+                todo!()
+            }
+            IndexKind::Vector => {
+                IndexSearcher::Vector(VectorSearcher::open(index_config.try_into().unwrap(), open_index)?)
+            }
+            IndexKind::Relation => {
+                todo!()
+            }
+        };
+
+        Ok(Arc::new(searcher))
     }
 }
 
