@@ -69,11 +69,11 @@ fn test_hidden_search() -> anyhow::Result<()> {
     let labels = vec!["/q/h".to_string()];
     let hidden_resource = resource(labels);
     let hidden_dir = tempdir()?;
-    let (hidden_segment, _) = index_resource(ResourceWrapper::from(&hidden_resource), hidden_dir.path(), &config)?;
+    let hidden_segment = index_resource(ResourceWrapper::from(&hidden_resource), hidden_dir.path(), &config)?;
 
     let visible_resource = resource(vec![]);
     let visible_dir = tempdir()?;
-    let (visible_segment, _) = index_resource(ResourceWrapper::from(&visible_resource), visible_dir.path(), &config)?;
+    let visible_segment = index_resource(ResourceWrapper::from(&visible_resource), visible_dir.path(), &config)?;
 
     // Find all resources
     let reader = Reader::open(

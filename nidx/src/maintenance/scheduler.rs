@@ -351,8 +351,9 @@ mod tests {
             let last_seq = sqlx::query_scalar!(r#"SELECT MAX(seq) from segments"#).fetch_one(pool).await?.unwrap_or(1);
             let mut seq: i64 = last_seq;
             for records in segment_records {
-                let segment = Segment::create(pool, index.id, Seq::from(seq)).await?;
-                segment.mark_ready(pool, *records, 512 * records).await?;
+                let segment =
+                    Segment::create(pool, index.id, Seq::from(seq), *records, serde_json::Value::Null).await?;
+                segment.mark_ready(pool, 512 * records).await?;
                 seq += 1;
             }
 
@@ -365,7 +366,7 @@ mod tests {
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
             let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
-            let last_seq = create_segments_with_num_records(&meta.pool, &index, &vec![50; 3]).await?;
+            let last_seq = create_segments_with_num_records(&meta.pool, &index, &[50; 3]).await?;
 
             let scheduler = MergeScheduler::from_settings(&MergeSettings {
                 min_number_of_segments: 4,
@@ -384,7 +385,7 @@ mod tests {
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
             let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
-            let last_seq = create_segments_with_num_records(&meta.pool, &index, &vec![50; 3]).await?;
+            let last_seq = create_segments_with_num_records(&meta.pool, &index, &[50; 3]).await?;
 
             let scheduler = MergeScheduler::from_settings(&MergeSettings {
                 min_number_of_segments: 3,
@@ -422,7 +423,7 @@ mod tests {
             let last_seq = create_segments_with_num_records(
                 &meta.pool,
                 &index,
-                &vec![
+                &[
                     50,   // bottom bucket
                     10,   // bottom bucket
                     1000, // log2(1000) = ~9.97 -- will mark the top bucket
@@ -448,7 +449,7 @@ mod tests {
             // top-to-bottom order. Feel free to change this is the algorithm
             // changes
             for segment in index.segments(&meta.pool).await? {
-                match segment.records.unwrap() {
+                match segment.records {
                     // > top_bucket_max_records
                     1001 => {
                         assert!(segment.merge_job_id.is_none());
@@ -491,8 +492,9 @@ mod tests {
             let mut seq: i64 = 0;
 
             for _ in 0..10 {
-                let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await?;
-                segment.mark_ready(&meta.pool, 50, 1000).await?;
+                let segment =
+                    Segment::create(&meta.pool, index.id, Seq::from(seq), 50, serde_json::Value::Null).await?;
+                segment.mark_ready(&meta.pool, 1000).await?;
                 seq += 1;
             }
 
@@ -534,8 +536,9 @@ mod tests {
 
             for _ in 0..10 {
                 for index in &indexes {
-                    let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await?;
-                    segment.mark_ready(&meta.pool, 50, 1000).await?;
+                    let segment =
+                        Segment::create(&meta.pool, index.id, Seq::from(seq), 50, serde_json::Value::Null).await?;
+                    segment.mark_ready(&meta.pool, 1000).await?;
                     seq += 1;
                 }
             }
@@ -578,12 +581,13 @@ mod tests {
             let index = Index::create(&meta.pool, shard.id, IndexKind::Vector, "multilingual").await?;
 
             for seq in [95, 98, 99, 100, 102i64] {
-                let segment = Segment::create(&meta.pool, index.id, Seq::from(seq)).await?;
-                segment.mark_ready(&meta.pool, 50, 1000).await?;
+                let segment =
+                    Segment::create(&meta.pool, index.id, Seq::from(seq), 50, serde_json::Value::Null).await?;
+                segment.mark_ready(&meta.pool, 1000).await?;
             }
 
             // 101 is still indexing
-            Segment::create(&meta.pool, index.id, Seq::from(101i64)).await?;
+            Segment::create(&meta.pool, index.id, Seq::from(101i64), 50, serde_json::Value::Null).await?;
 
             Ok(meta)
         }

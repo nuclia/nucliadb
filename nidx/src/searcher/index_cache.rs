@@ -17,24 +17,52 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Weak};
 
 use anyhow::anyhow;
 use lru::LruCache;
+use nidx_types::{OpenIndexMetadata, SegmentMetadata, Seq};
 use nidx_vector::config::VectorConfig;
 use nidx_vector::VectorSearcher;
+use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore};
 
 use crate::metadata::{IndexId, Segment, SegmentId};
 use crate::NidxMetadata;
 
-use super::sync::SyncMetadata;
+use super::sync::{Operations, SyncMetadata};
 
 pub enum IndexSearcher {
     Vector(VectorSearcher),
+}
+
+/// This structure (its trait) is passed to the indexes in order to open a searcher.
+/// This implementation takes the data in the format available to a searcher node,
+/// that is, what is stored in SyncMetadata, a list of `Operations` and a map of
+/// extended segment metadata.
+struct IndexOperations {
+    sync_metadata: Arc<SyncMetadata>,
+    segments: HashMap<SegmentId, Segment>,
+    operations: Operations,
+    index_id: IndexId,
+}
+
+impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for IndexOperations {
+    fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)> {
+        self.operations.0.iter().flat_map(|op| {
+            op.segment_ids.iter().map(|segment_id| {
+                let location = self.sync_metadata.segment_location(&self.index_id, segment_id);
+                (self.segments[segment_id].metadata(location), op.seq)
+            })
+        })
+    }
+
+    fn deletions(&self) -> impl Iterator<Item = (&String, Seq)> {
+        self.operations.0.iter().flat_map(|op| op.deleted_keys.iter().map(|key| (key, op.seq)))
+    }
 }
 
 pub struct IndexCache {
@@ -78,41 +106,20 @@ impl IndexCache {
             return Err(anyhow!("Index not found"));
         };
 
-        // TODO: Cleaner mapping from sync metadata to IndexSeacher metadata
-        // We might also want to make this granular, so diff updates can be applied, e.g:
-        // list of new segments to open + list of new deletions to apply
-        let segments = sqlx::query_as!(
-            Segment,
-            "SELECT * FROM segments WHERE id = ANY($1)",
-            meta.operations.segments().collect::<Vec<_>>() as Vec<SegmentId>
-        )
-        .fetch_all(&self.metadb.pool)
-        .await?
-        .into_iter()
-        .map(|s| (s.id, s))
-        .collect::<HashMap<SegmentId, Segment>>();
+        let segments = Segment::select_many(&self.metadb.pool, &meta.operations.segments().collect::<Vec<_>>())
+            .await?
+            .into_iter()
+            .map(|s| (s.id, s))
+            .collect::<HashMap<SegmentId, Segment>>();
 
-        let operations = meta
-            .operations
-            .0
-            .iter()
-            .map(|op| {
-                (
-                    op.seq,
-                    op.segment_ids
-                        .iter()
-                        .map(|sid| nidx_types::SegmentMetadata {
-                            path: self.sync_metadata.segment_location(id, sid),
-                            records: segments[sid].records.unwrap() as usize,
-                            tags: HashSet::new(),
-                        })
-                        .collect::<Vec<_>>(),
-                    op.deleted_keys.clone(),
-                )
-            })
-            .collect();
+        let open_index = IndexOperations {
+            segments,
+            operations: meta.operations.clone(),
+            sync_metadata: self.sync_metadata.clone(),
+            index_id: *id,
+        };
 
-        Ok(Arc::new(IndexSearcher::Vector(VectorSearcher::open(VectorConfig::default(), operations)?)))
+        Ok(Arc::new(IndexSearcher::Vector(VectorSearcher::open(VectorConfig::default(), open_index)?)))
     }
 }
 
