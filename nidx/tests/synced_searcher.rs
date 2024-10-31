@@ -25,11 +25,12 @@ use nidx::indexer::index_resource;
 use nidx::metadata::Deletion;
 use nidx::searcher::{IndexSearcher, SyncedSearcher};
 use nidx::{
-    metadata::{Index, IndexKind, Shard},
+    metadata::{Index, Shard},
     NidxMetadata,
 };
 use nidx_protos::VectorSearchRequest;
 use nidx_tests::*;
+use nidx_vector::config::VectorConfig;
 use tempfile::tempdir;
 
 #[sqlx::test]
@@ -46,8 +47,8 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let index = Index::create(
         &meta.pool,
         Shard::create(&meta.pool, uuid::Uuid::new_v4()).await?.id,
-        IndexKind::Vector,
         "english",
+        VectorConfig::default().into(),
     )
     .await?;
 

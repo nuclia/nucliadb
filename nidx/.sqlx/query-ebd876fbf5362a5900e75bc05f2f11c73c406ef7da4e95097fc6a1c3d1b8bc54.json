@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM shards\n         WHERE (\n             deleted_at IS NOT NULL\n             AND NOT EXISTS(SELECT 1 FROM indexes WHERE shard_id = shards.id)\n         )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "ebd876fbf5362a5900e75bc05f2f11c73c406ef7da4e95097fc6a1c3d1b8bc54"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, shard_id, kind as \"kind: IndexKind\", name, configuration, updated_at FROM indexes WHERE shard_id = $1 AND kind = $2 AND name = $3",
+  "query": "SELECT id, shard_id, kind as \"kind: IndexKind\", name, configuration, updated_at, deleted_at\n               FROM indexes\n               WHERE updated_at > $1 AND deleted_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -44,25 +44,16 @@
         "ordinal": 5,
         "name": "updated_at",
         "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 6,
+        "name": "deleted_at",
+        "type_info": "Timestamp"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        {
-          "Custom": {
-            "name": "index_kind",
-            "kind": {
-              "Enum": [
-                "text",
-                "paragraph",
-                "vector",
-                "relation"
-              ]
-            }
-          }
-        },
-        "Text"
+        "Timestamp"
       ]
     },
     "nullable": [
@@ -71,8 +62,9 @@
       false,
       false,
       true,
-      false
+      false,
+      true
     ]
   },
-  "hash": "0592d80a004cb975976e21de68ca2c9c8bf1ade90950e7a846a4387634f2d1c2"
+  "hash": "1eab17fdaf452cfa2e71a050b43b8d8d421ce345d99c1ba4158f2e5788a4e35e"
 }
