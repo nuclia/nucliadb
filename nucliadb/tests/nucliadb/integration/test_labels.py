@@ -117,7 +117,10 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
-    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
+    fcm.metadata.metadata.entities["processor"].entities.extend(
+        [rpb.FieldEntity(text="Ramon", label="PERSON")]
+    )
+
     fcm.metadata.metadata.classifications.append(c1)
 
     bm.field_metadata.append(fcm)

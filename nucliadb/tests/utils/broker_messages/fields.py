@@ -146,10 +146,17 @@ class FieldBuilder:
         )
         self._user_metadata.token.append(entity)
 
-    def with_extracted_entity(self, klass: str, name: str, *, positions: list[rpb.Position]):
-        entity = self._extracted_metadata.metadata.metadata.positions[f"{klass}/{name}"]
-        entity.entity = name
-        entity.position.extend(positions)
+    def with_extracted_entity(
+        self,
+        klass: str,
+        name: str,
+        *,
+        positions: list[rpb.Position],
+        data_augmentation_task_id: str = "processor",
+    ):
+        self._extracted_metadata.metadata.metadata.entities[data_augmentation_task_id].entities.append(
+            rpb.FieldEntity(text=name, label=klass, positions=positions)
+        )
 
     def with_user_paragraph_labels(self, key: str, labelset: str, labels: list[str]):
         classifications = labels_to_classifications(labelset, labels)

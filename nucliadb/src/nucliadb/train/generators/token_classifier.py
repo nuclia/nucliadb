@@ -139,6 +139,36 @@ async def get_field_text(
     field_metadata = await field_obj.get_field_metadata()
     # Check computed definition of entities
     if field_metadata is not None:
+        # Data Augmentation + Processor entities
+        for data_augmentation_task_id, entities in field_metadata.metadata.entities.items():
+            for entity in entities.entities:
+                entity_text = entity.text
+                entity_label = entity.label
+                entity_positions = entity.positions
+                if entity_label in valid_entity_groups:
+                    split_ners[MAIN].setdefault(entity_label, {}).setdefault(entity_text, [])
+                    for position in entity_positions:
+                        split_ners[MAIN][entity_label][entity_text].append(
+                            (position.start, position.end)
+                        )
+
+        for split, split_metadata in field_metadata.split_metadata.items():
+            for data_augmentation_task_id, entities in split_metadata.entities.items():
+                for entity in entities.entities:
+                    entity_text = entity.text
+                    entity_label = entity.label
+                    entity_positions = entity.positions
+                    if entity_label in valid_entity_groups:
+                        split_ners.setdefault(split, {}).setdefault(entity_label, {}).setdefault(
+                            entity_text, []
+                        )
+                        for position in entity_positions:
+                            split_ners[split][entity_label][entity_text].append(
+                                (position.start, position.end)
+                            )
+
+        # Legacy processor entities
+        # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
         for entity_key, positions in field_metadata.metadata.positions.items():
             entities = entity_key.split("/")
             entity_group = entities[0]

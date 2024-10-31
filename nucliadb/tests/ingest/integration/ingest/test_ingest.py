@@ -50,6 +50,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedVectorsWrapper,
     FieldComputedMetadata,
     FieldComputedMetadataWrapper,
+    FieldEntity,
     FieldID,
     FieldMetadata,
     FieldQuestionAnswerWrapper,
@@ -166,6 +167,13 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
+    # Data Augmentation + Processor entities
+    fcm.metadata.metadata.entities["processor"].entities.extend(
+        [FieldEntity(text="Ramon", label="PERSON")]
+    )
+
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
     fcm.metadata.metadata.ner["Ramon"] = "PERSON"
 
     c1 = Classification()

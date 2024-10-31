@@ -30,6 +30,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
+    FieldEntity,
     FieldID,
     FieldType,
     Paragraph,
@@ -115,9 +116,13 @@ def broker_message_with_entities(kbid):
     fmw = FieldComputedMetadataWrapper()
     fmw.field.CopyFrom(field)
     family, entity = EntityLabels.DETECTED.split("/")
-    fmw.metadata.metadata.ner[entity] = family
     pos = Position(start=60, end=64)
-    fmw.metadata.metadata.positions[EntityLabels.DETECTED].position.append(pos)
+    # Data Augmentation + Processor entities
+    fmw.metadata.metadata.entities["my-task-id"].entities.extend(
+        [
+            FieldEntity(text=entity, label=family, positions=[pos]),
+        ]
+    )
 
     par1 = Paragraph()
     par1.start = 0
