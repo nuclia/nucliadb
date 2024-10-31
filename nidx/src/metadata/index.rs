@@ -66,10 +66,10 @@ pub struct Index {
 }
 
 pub enum IndexConfig {
-    Text(JsonValue),
-    Paragraph(JsonValue),
+    Text(()),
+    Paragraph(()),
     Vector(VectorConfig),
-    Relation(JsonValue),
+    Relation(()),
 }
 
 impl Index {
@@ -193,19 +193,13 @@ impl Index {
 
     pub fn config(&self) -> anyhow::Result<IndexConfig> {
         Ok(match self.kind {
-            IndexKind::Text => {
-                todo!()
-            }
-            IndexKind::Paragraph => {
-                todo!()
-            }
+            IndexKind::Text => IndexConfig::Text(()),
+            IndexKind::Paragraph => IndexConfig::Paragraph(()),
             IndexKind::Vector => {
                 let vector_config = serde_json::from_value::<VectorConfig>(self.configuration.clone())?;
                 IndexConfig::from(vector_config)
             }
-            IndexKind::Relation => {
-                todo!()
-            }
+            IndexKind::Relation => IndexConfig::Relation(()),
         })
     }
 }
@@ -254,17 +248,16 @@ impl TryInto<VectorConfig> for IndexConfig {
     }
 }
 
-// TODO: replace new_ methods for impl From like the one above
 impl IndexConfig {
     pub fn new_fulltext() -> Self {
-        Self::Text(JsonValue::Null)
+        Self::Text(())
     }
 
     pub fn new_keyword() -> Self {
-        Self::Paragraph(JsonValue::Null)
+        Self::Paragraph(())
     }
 
     pub fn new_relation() -> Self {
-        Self::Relation(JsonValue::Null)
+        Self::Relation(())
     }
 }

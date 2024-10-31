@@ -19,33 +19,10 @@
 
 #![allow(unused)]
 
-use anyhow::anyhow;
 use serde_json::Value as Json;
 use std::collections::HashSet;
 
-pub struct QueryContext {
-    pub paragraph_labels: HashSet<String>,
-    pub field_labels: HashSet<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Operator {
-    And,
-    Or,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BooleanOperation {
-    pub operator: Operator,
-    pub operands: Vec<BooleanExpression>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BooleanExpression {
-    Literal(String),
-    Not(Box<BooleanExpression>),
-    Operation(BooleanOperation),
-}
+use nidx_types::query_language::*;
 
 #[derive(Debug, Clone)]
 struct Translated {
@@ -104,12 +81,12 @@ fn translate_operation(operator: Operator, operands: Vec<Json>, context: &QueryC
 
 fn translate_expression(query: Json, context: &QueryContext) -> anyhow::Result<Translated> {
     let Json::Object(json_object) = query else {
-        #[rustfmt::skip] return Err(anyhow!(
+        #[rustfmt::skip] return Err(anyhow::anyhow!(
             "Only json objects are valid roots for expressions: {query}"
         ));
     };
     let Some((root_id, inner_expression)) = json_object.into_iter().next() else {
-        #[rustfmt::skip] return Err(anyhow!(
+        #[rustfmt::skip] return Err(anyhow::anyhow!(
             "Empty objects are not supported by the schema"
         ));
     };
@@ -118,7 +95,7 @@ fn translate_expression(query: Json, context: &QueryContext) -> anyhow::Result<T
         ("and", Json::Array(operands)) => translate_operation(Operator::And, operands, context),
         ("or", Json::Array(operands)) => translate_operation(Operator::Or, operands, context),
         ("not", operand) => translate_not(operand, context),
-        (root_id, _) => Err(anyhow!("{root_id} is not a valid expression")),
+        (root_id, _) => Err(anyhow::anyhow!("{root_id} is not a valid expression")),
     }
 }
 
@@ -129,12 +106,12 @@ struct ExpressionSplit {
 
 fn split_mixed(expression: BooleanExpression, context: &QueryContext) -> anyhow::Result<ExpressionSplit> {
     let BooleanExpression::Operation(expression) = expression else {
-        #[rustfmt::skip] return Err(anyhow!(
+        #[rustfmt::skip] return Err(anyhow::anyhow!(
             "This function can not operate with literals"
         ));
     };
     if !matches!(expression.operator, Operator::And) {
-        #[rustfmt::skip] return Err(anyhow!(
+        #[rustfmt::skip] return Err(anyhow::anyhow!(
             "Only mixed ANDs can be splitted"
         ));
     }
@@ -148,11 +125,11 @@ fn split_mixed(expression: BooleanExpression, context: &QueryContext) -> anyhow:
             BooleanExpression::Literal(literal) => literal,
             BooleanExpression::Not(subexpression) => match subexpression.as_ref() {
                 BooleanExpression::Literal(literal) => literal,
-                #[rustfmt::skip] _ => return Err(anyhow!(
+                #[rustfmt::skip] _ => return Err(anyhow::anyhow!(
                     "Nested expressions can not be splitted"
                 )),
             },
-            #[rustfmt::skip] _ => return Err(anyhow!(
+            #[rustfmt::skip] _ => return Err(anyhow::anyhow!(
                 "Nested expressions can not be splitted"
             )),
         };
@@ -203,7 +180,7 @@ pub fn translate(
     if let Some(labels_query) = labels_query {
         if !labels_query.is_empty() {
             let Json::Object(labels_subexpressions) = serde_json::from_str(labels_query)? else {
-                #[rustfmt::skip] return Err(anyhow!(
+                #[rustfmt::skip] return Err(anyhow::anyhow!(
                     "Unexpected labels query format {labels_query}"
                 ));
             };
@@ -228,7 +205,7 @@ pub fn translate(
     if let Some(keywords_query) = keywords_query {
         if !keywords_query.is_empty() {
             let Json::Object(keywords_subexpressions) = serde_json::from_str(keywords_query)? else {
-                #[rustfmt::skip] return Err(anyhow!(
+                #[rustfmt::skip] return Err(anyhow::anyhow!(
                     "Unexpected keywords query format {keywords_query}"
                 ));
             };

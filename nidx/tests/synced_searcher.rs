@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use nidx::indexer::index_resource;
 use nidx::metadata::Deletion;
-use nidx::searcher::{IndexSearcher, SyncedSearcher};
+use nidx::searcher::SyncedSearcher;
 use nidx::{
     metadata::{Index, Shard},
     NidxMetadata,
@@ -31,6 +31,7 @@ use nidx::{
 use nidx_protos::VectorSearchRequest;
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;
+use nidx_vector::VectorSearcher;
 use tempfile::tempdir;
 
 #[sqlx::test]
@@ -69,7 +70,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
 
     // TODO: Test with shard_search once we have more indexes. We can make IndexSearch enum private again
     let searcher = index_cache.get(&index.id).await?;
-    let IndexSearcher::Vector(vector_searcher) = searcher.as_ref();
+    let vector_searcher: &VectorSearcher = searcher.as_ref().into();
     let result = vector_searcher.search(&search_request, &Default::default())?;
     assert_eq!(result.documents.len(), 1);
 
@@ -81,7 +82,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     let searcher = index_cache.get(&index.id).await?;
-    let IndexSearcher::Vector(vector_searcher) = searcher.as_ref();
+    let vector_searcher: &VectorSearcher = searcher.as_ref().into();
     let result = vector_searcher.search(&search_request, &Default::default())?;
     assert_eq!(result.documents.len(), 0);
 

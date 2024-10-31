@@ -24,7 +24,6 @@ use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
-use crate::query_language::{BooleanExpression, BooleanOperation, Operator};
 use crate::utils;
 use crate::VectorSegmentMetadata;
 use crate::{formula::*, query_io};
@@ -33,6 +32,7 @@ use nidx_protos::prost::*;
 use nidx_protos::{
     DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
 };
+use nidx_types::query_language::*;
 use nidx_types::Seq;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -126,7 +126,7 @@ fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> 
     }
 }
 
-// In an ideal world this should be part of the actual request, but since
+// TODO: In an ideal world this should be part of the actual request, but since
 // we use protos all the way down the stack here we are. Once the protos use
 // is restricted to only the upper layer, this type won't be needed anymore.
 #[derive(Clone, Default)]

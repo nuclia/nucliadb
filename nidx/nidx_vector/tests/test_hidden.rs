@@ -21,11 +21,11 @@
 use std::collections::{HashMap, HashSet};
 
 use nidx_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSearchRequest, VectorSentence};
+use nidx_types::query_language::BooleanExpression;
 use nidx_vector::config::VectorConfig;
 use nidx_vector::data_point_provider::reader::{Reader, VectorsContext};
 use nidx_vector::data_point_provider::DTrie;
 use nidx_vector::indexer::{index_resource, ResourceWrapper};
-use nidx_vector::query_language::BooleanExpression;
 use tempfile::tempdir;
 use uuid::Uuid;
 

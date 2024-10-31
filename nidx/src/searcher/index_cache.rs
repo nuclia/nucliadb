@@ -24,6 +24,7 @@ use std::sync::{Arc, Weak};
 
 use anyhow::anyhow;
 use lru::LruCache;
+use nidx_text::TextSearcher;
 use nidx_types::{OpenIndexMetadata, SegmentMetadata, Seq};
 use nidx_vector::VectorSearcher;
 use serde::Deserialize;
@@ -36,6 +37,25 @@ use super::sync::{Operations, SyncMetadata};
 
 pub enum IndexSearcher {
     Vector(VectorSearcher),
+    Text(TextSearcher),
+}
+
+impl<'a> From<&'a IndexSearcher> for &'a VectorSearcher {
+    fn from(value: &'a IndexSearcher) -> Self {
+        match value {
+            IndexSearcher::Vector(v) => v,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> From<&'a IndexSearcher> for &'a TextSearcher {
+    fn from(value: &'a IndexSearcher) -> Self {
+        match value {
+            IndexSearcher::Text(v) => v,
+            _ => unreachable!(),
+        }
+    }
 }
 
 /// This structure (its trait) is passed to the indexes in order to open a searcher.
@@ -120,9 +140,7 @@ impl IndexCache {
 
         let index_config = meta.index.config()?;
         let searcher = match index_config.kind() {
-            IndexKind::Text => {
-                todo!()
-            }
+            IndexKind::Text => IndexSearcher::Text(TextSearcher::open(open_index)?),
             IndexKind::Paragraph => {
                 todo!()
             }

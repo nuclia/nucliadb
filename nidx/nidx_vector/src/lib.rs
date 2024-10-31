@@ -36,9 +36,10 @@ impl VectorIndexer {
     pub fn index_resource(
         &self,
         output_dir: &Path,
+        config: VectorConfig,
         resource: &Resource,
     ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-        index_resource(resource.into(), output_dir, &VectorConfig::default())
+        index_resource(resource.into(), output_dir, &config)
     }
 
     pub fn deletions_for_resource(&self, resource: &Resource) -> Vec<String> {
@@ -48,6 +49,7 @@ impl VectorIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
+        config: VectorConfig,
         open_index: impl OpenIndexMetadata<()>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
@@ -72,11 +74,8 @@ impl VectorIndexer {
             .collect();
 
         // Do the merge
-        let open_destination = data_point::merge(
-            work_dir,
-            &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(),
-            &VectorConfig::default(),
-        )?;
+        let open_destination =
+            data_point::merge(work_dir, &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(), &config)?;
 
         Ok(VectorSegmentMetadata {
             path: work_dir.to_path_buf(),
@@ -123,7 +122,6 @@ mod data_types;
 pub mod formula;
 pub mod indexer;
 mod query_io;
-pub mod query_language;
 mod utils;
 mod vector_types;
 

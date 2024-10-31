@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod prefilter;
 mod query_io;
-mod query_language;
 pub mod reader;
 mod schema;
 mod search_query;
@@ -33,9 +33,11 @@ use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse};
 use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
 use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
 use nidx_types::OpenIndexMetadata;
+use prefilter::{PreFilterRequest, PreFilterResponse};
 use reader::TextReaderService;
 use schema::{timestamp_to_datetime_utc, TextSchema};
 
+pub use search_query::TextContext;
 use tantivy::indexer::merge_indices;
 use tantivy::schema::Field;
 use tantivy::{
@@ -185,7 +187,15 @@ impl TextSearcher {
         })
     }
 
-    pub fn search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
-        self.reader.search(request)
+    pub fn search(
+        &self,
+        request: &DocumentSearchRequest,
+        context: &TextContext,
+    ) -> anyhow::Result<DocumentSearchResponse> {
+        self.reader.search(request, context)
+    }
+
+    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
+        self.reader.prefilter(request)
     }
 }

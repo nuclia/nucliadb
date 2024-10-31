@@ -20,6 +20,8 @@
 
 mod grpc;
 mod index_cache;
+mod query_language;
+mod query_planner;
 mod shard_search;
 mod sync;
 
