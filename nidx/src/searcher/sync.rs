@@ -94,14 +94,13 @@ async fn delete_index(
     sync_metadata: Arc<SyncMetadata>,
     notifier: &Sender<IndexId>,
 ) -> anyhow::Result<()> {
-    sync_metadata.delete(&index_id).await;
-
-    // remove directory for the index, effectively deleting all segment data
-    // stored locally
-    let index_location = sync_metadata.index_location(&index_id);
-    tokio::fs::remove_dir_all(index_location).await?;
-
-    notifier.send(index_id).await?;
+    if sync_metadata.delete(&index_id).await {
+        // remove directory for the index, effectively deleting all segment data
+        // stored locally
+        let index_location = sync_metadata.index_location(&index_id);
+        tokio::fs::remove_dir_all(index_location).await?;
+        notifier.send(index_id).await?;
+    }
     Ok(())
 }
 
@@ -211,8 +210,8 @@ impl SyncMetadata {
         GuardedIndexMetadata::new(self.synced_metadata.clone().read_owned().await, *index_id)
     }
 
-    pub async fn delete(&self, index_id: &IndexId) {
-        self.synced_metadata.write().await.remove(index_id);
+    pub async fn delete(&self, index_id: &IndexId) -> bool {
+        self.synced_metadata.write().await.remove(index_id).is_some()
     }
 }
 
