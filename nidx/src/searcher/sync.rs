@@ -95,6 +95,12 @@ async fn delete_index(
     notifier: &Sender<IndexId>,
 ) -> anyhow::Result<()> {
     sync_metadata.delete(&index_id).await;
+
+    // remove directory for the index, effectively deleting all segment data
+    // stored locally
+    let index_location = sync_metadata.index_location(&index_id);
+    tokio::fs::remove_dir_all(index_location).await?;
+
     notifier.send(index_id).await?;
     Ok(())
 }
@@ -161,6 +167,10 @@ impl SyncMetadata {
             work_dir,
             synced_metadata: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    pub fn index_location(&self, index_id: &IndexId) -> PathBuf {
+        self.work_dir.join(index_id)
     }
 
     pub fn segment_location(&self, index_id: &IndexId, segment_id: &SegmentId) -> PathBuf {
