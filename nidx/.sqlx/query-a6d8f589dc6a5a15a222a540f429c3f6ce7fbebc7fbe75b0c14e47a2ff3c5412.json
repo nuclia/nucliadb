@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS \"id: SegmentId\" FROM segments WHERE delete_at < NOW()",
+  "query": "SELECT id AS \"id: SegmentId\"\n               FROM segments\n               WHERE delete_at < NOW()",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "b6f4ee214d534d8721aec720222370af7ef30ef7cb5dde8d2d8fb0871a4b483e"
+  "hash": "a6d8f589dc6a5a15a222a540f429c3f6ce7fbebc7fbe75b0c14e47a2ff3c5412"
 }

@@ -27,8 +27,8 @@ use nidx_vector::config::VectorConfig;
 use tonic::{transport::Server, Request, Response, Status};
 use uuid::Uuid;
 
-use crate::NidxMetadata;
 use crate::api::shards;
+use crate::NidxMetadata;
 
 pub struct GrpcServer {
     meta: NidxMetadata,
@@ -62,7 +62,9 @@ impl NodeWriter for GrpcServer {
                 .insert(vectorset_id, VectorConfig::try_from(config).map_err(|e| Status::internal(e.to_string()))?);
         }
 
-        let shard = shards::create_shard(&self.meta, kbid, vector_configs).await.map_err(|e| Status::internal(e.to_string()))?;
+        let shard = shards::create_shard(&self.meta, kbid, vector_configs)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),

@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod shards;
 mod grpc;
+pub mod shards;
 
 use tracing::debug;
 

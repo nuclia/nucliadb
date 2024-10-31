@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+mod common;
+
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -25,14 +27,21 @@ use object_store::memory::InMemory;
 use object_store::ObjectStore;
 use uuid::Uuid;
 
+use nidx::api::shards;
 use nidx::indexer::index_resource;
 use nidx::maintenance::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
-use nidx::metadata::IndexId;
+use nidx::metadata::{IndexId};
 use nidx::{metadata::Shard, NidxMetadata};
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;
-use nidx::api::shards;
 
+use common::metadata::{
+    get_all_shards,
+    get_all_deletions,
+    get_all_indexes,
+    get_all_merge_jobs,
+    get_all_segments,
+};
 
 #[sqlx::test]
 async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()> {
@@ -64,6 +73,7 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     // Index a resource
     let resource = little_prince(shard.id.to_string());
     index_resource(&meta, storage.clone(), &shard.id.to_string(), &resource, 1i64.into()).await?;
+    index_resource(&meta, storage.clone(), &shard.id.to_string(), &resource, 2i64.into()).await?;
 
     for index in shard.indexes(&meta.pool).await? {
         let segments = index.segments(&meta.pool).await?;
@@ -88,20 +98,16 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     }
 
     // Purge everything
+    // TODO: show better when we remove everything
     purge_deletions(&meta, 100).await?;
     purge_segments(&meta, &storage).await?;
     purge_deleted_shards_and_indexes(&meta).await?;
 
-    let count = sqlx::query_scalar!(
-        r#"SELECT COUNT(*) AS "count!: i64"
-           FROM segments
-           JOIN indexes ON segments.index_id = indexes.id
-           JOIN shards ON shards.id = indexes.shard_id"#
-    )
-    .fetch_one(&meta.pool)
-    .await?;
-
-    assert_eq!(count, 0);
+    assert_eq!(get_all_shards(&meta.pool).await?.into_iter().count(), 0);
+    assert_eq!(get_all_indexes(&meta.pool).await?.into_iter().count(), 0);
+    assert_eq!(get_all_segments(&meta.pool).await?.into_iter().count(), 0);
+    assert_eq!(get_all_merge_jobs(&meta.pool).await?.into_iter().count(), 0);
+    assert_eq!(get_all_deletions(&meta.pool).await?.into_iter().count(), 0);
 
     Ok(())
 }

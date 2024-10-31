@@ -154,9 +154,7 @@ pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
 /// - Uploads that failed
 /// - Recent deletions
 pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) -> anyhow::Result<()> {
-    let deleted_segments = sqlx::query_scalar!(r#"SELECT id AS "id: SegmentId" FROM segments WHERE delete_at < NOW()"#)
-        .fetch_all(&meta.pool)
-        .await?;
+    let deleted_segments = Segment::marked_as_deleted(&meta.pool).await?;
     let paths = deleted_segments.iter().map(|sid| Ok(sid.storage_key()));
     let results = storage.delete_stream(futures::stream::iter(paths).boxed()).collect::<Vec<_>>().await;
 
@@ -176,7 +174,8 @@ pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) 
 }
 
 pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> anyhow::Result<()> {
-    // Purge deletions that don't apply to any segment and won't apply to any segment pending to process
+    // Purge deletions that don't apply to any segment and won't apply to any
+    // segment pending to process
     sqlx::query!(
         "WITH oldest_segments AS (
             SELECT index_id, MIN(seq) AS seq FROM segments
@@ -191,17 +190,31 @@ pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> an
     .execute(&meta.pool)
     .await?;
 
+    // Purge deletions for indexes marked to delete
+    sqlx::query!(
+        "WITH indexes_to_delete AS (
+             SELECT indexes.id
+             FROM indexes
+             WHERE indexes.deleted_at IS NOT NULL
+         )
+         DELETE FROM deletions USING indexes_to_delete
+         WHERE deletions.index_id = indexes_to_delete.id"
+    )
+    .execute(&meta.pool)
+    .await?;
+
     Ok(())
 }
 
 /// Purge shards and indexes marked to delete when it's safe to do so, i.e.,
-/// after all segments have been removed
+/// after all segments and deletions have been removed
 pub async fn purge_deleted_shards_and_indexes(meta: &NidxMetadata) -> anyhow::Result<()> {
     sqlx::query!(
         "DELETE FROM indexes
          WHERE (
              deleted_at IS NOT NULL
              AND NOT EXISTS(SELECT 1 FROM segments WHERE index_id = indexes.id)
+             AND NOT EXISTS(SELECT 1 FROM deletions where index_id = deletions.index_id)
          )"
     )
     .execute(&meta.pool)

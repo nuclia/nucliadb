@@ -24,7 +24,7 @@ use anyhow::anyhow;
 use nidx_vector::config::VectorConfig;
 use uuid::Uuid;
 
-use crate::metadata::{Index, Segment, Shard};
+use crate::metadata::{Index, MergeJob, Segment, Shard};
 use crate::NidxMetadata;
 
 pub async fn create_shard(
@@ -50,7 +50,9 @@ pub async fn create_shard(
     Ok(shard)
 }
 
-/// Mark a shard, its indexes and segments for eventual deletion. Delete merge jobs
+/// Mark a shard, its indexes and segments for eventual deletion. Delete merge
+/// jobs scheduled for its indexes, as we don't want to keep working on it.
+/// Segment deletions will be purged eventually by the worker.
 pub async fn delete_shard(meta: &NidxMetadata, shard_id: Uuid) -> anyhow::Result<()> {
     let mut tx = meta.transaction().await?;
     let shard = match Shard::get(&mut *tx, shard_id).await {
@@ -60,6 +62,7 @@ pub async fn delete_shard(meta: &NidxMetadata, shard_id: Uuid) -> anyhow::Result
     };
 
     for index in shard.indexes(&mut *tx).await?.into_iter() {
+        MergeJob::delete_many_by_index(&mut *tx, index.id).await?;
         Segment::mark_delete_by_index(&mut *tx, index.id).await?;
         index.mark_delete(&mut *tx).await?;
     }

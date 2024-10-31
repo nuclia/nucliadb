@@ -96,4 +96,12 @@ impl MergeJob {
         sqlx::query!("DELETE FROM merge_jobs WHERE id = $1", self.id,).execute(meta).await?;
         Ok(())
     }
+
+    pub async fn delete_many_by_index(
+        meta: impl Executor<'_, Database = Postgres>,
+        index_id: IndexId,
+    ) -> sqlx::Result<()> {
+        sqlx::query!("DELETE FROM merge_jobs WHERE index_id = $1", index_id as IndexId).execute(meta).await?;
+        Ok(())
+    }
 }
