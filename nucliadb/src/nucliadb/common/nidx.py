@@ -18,18 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import uuid
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from nucliadb.common.cluster.settings import settings
 from nucliadb_protos.nodewriter_pb2 import (
     IndexMessage,
-    VectorIndexConfig,
 )
 from nucliadb_utils import logger
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+
+if TYPE_CHECKING:
+    from nucliadb.common.cluster.manager import AbstractIndexNode
 
 
 class NidxIndexer:
@@ -60,31 +61,6 @@ class NidxIndexer:
         return res.seq
 
 
-class NidxShardsApiClient:
-    def __init__(self, nidx_shards_api_address: str):
-        from nucliadb.common.cluster.manager import IndexNode
-
-        self.shards_api = IndexNode(
-            id="nidx-shards-api",
-            address=nidx_shards_api_address,
-            shard_count=0,
-            available_disk=0,
-        )
-
-    async def create_shard(
-        self, kbid: str, vectorsets_configs: dict[str, VectorIndexConfig]
-    ) -> uuid.UUID:
-        shard_created = await self.shards_api.new_shard_with_vectorsets(
-            kbid,
-            vectorsets_configs,
-        )
-        shard_id = uuid.UUID(shard_created.id)
-        return shard_id
-
-    async def delete_shard(self, kbid: str, shard_id: str):
-        await self.shards_api.delete_shard(shard_id)
-
-
 async def start_nidx_utility() -> NidxIndexer:
     if indexing_settings.index_nidx_subject is None:
         raise ValueError("nidx subject needed for nidx utility")
@@ -109,8 +85,16 @@ def get_nidx() -> NidxIndexer:
     return get_utility(Utility.NIDX)
 
 
-def get_nidx_shards_api_client() -> Optional[NidxShardsApiClient]:
-    if settings.nidx_shards_api:
-        return NidxShardsApiClient(settings.nidx_shards_api)
+def get_nidx_api_client() -> Optional[AbstractIndexNode]:
+    if settings.nidx_api:
+        from nucliadb.common.cluster.manager import IndexNode
+
+        nidx_api = IndexNode(
+            id="nidx-api",
+            address=settings.nidx_api,
+            shard_count=0,
+            available_disk=0,
+        )
+        return nidx_api
     else:
         return None

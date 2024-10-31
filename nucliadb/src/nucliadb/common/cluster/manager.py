@@ -36,7 +36,7 @@ from nucliadb.common.cluster.exceptions import (
     ShardsNotFound,
 )
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.nidx import get_nidx, get_nidx_shards_api_client
+from nucliadb.common.nidx import get_nidx, get_nidx_api_client
 from nucliadb_protos import (
     knowledgebox_pb2,
     nodereader_pb2,
@@ -212,9 +212,10 @@ class KBShardManager:
             async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
         }
 
-        shards_api = get_nidx_shards_api_client()
-        if shards_api:
-            shard_uuid = (await shards_api.create_shard(kbid, vectorsets)).hex
+        nidx_api = get_nidx_api_client()
+        if nidx_api:
+            shard_created = await nidx_api.new_shard_with_vectorsets(kbid, vectorsets)
+            shard_uuid = uuid.UUID(shard_created.id).hex
         else:
             shard_uuid = uuid.uuid4().hex
 

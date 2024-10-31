@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     cluster_discovery_kubernetes_selector: str = "appType=node"
     cluster_discovery_manual_addresses: list[str] = []
 
-    nidx_shards_api: Optional[str] = Field(default=None)
+    nidx_api: Optional[str] = Field(default=None, description="NIDX gRPC API address")
 
 
 settings = Settings()
