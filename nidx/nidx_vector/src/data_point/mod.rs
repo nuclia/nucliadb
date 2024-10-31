@@ -31,13 +31,12 @@ use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
 use crate::vector_types::dense_f32_unaligned;
-use crate::VectorR;
+use crate::{VectorR, VectorSegmentMetadata};
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
 use fs::{File, OpenOptions};
 use io::{BufWriter, Write};
 use memmap2::Mmap;
-use nidx_types::SegmentMetadata;
 use node::Node;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
@@ -53,7 +52,7 @@ mod file_names {
     pub const HNSW: &str = "index.hnsw";
 }
 
-pub fn open(metadata: SegmentMetadata) -> VectorR<OpenDataPoint> {
+pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
     let path = &metadata.path;
     let nodes_file = File::open(path.join(file_names::NODES))?;
     let hnsw_file = File::open(path.join(file_names::HNSW))?;
@@ -149,10 +148,11 @@ where
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    let metadata = SegmentMetadata {
+    let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
         records: no_nodes,
         tags,
+        index_metadata: (),
     };
 
     Ok(OpenDataPoint {
@@ -212,10 +212,11 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    let metadata = SegmentMetadata {
+    let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
         records: no_nodes,
         tags,
+        index_metadata: (),
     };
 
     Ok(OpenDataPoint {
@@ -472,7 +473,7 @@ impl Neighbour {
 }
 
 pub struct OpenDataPoint {
-    metadata: SegmentMetadata,
+    metadata: VectorSegmentMetadata,
     nodes: Mmap,
     index: Mmap,
 }
@@ -484,7 +485,7 @@ impl AsRef<OpenDataPoint> for OpenDataPoint {
 }
 
 impl OpenDataPoint {
-    pub fn into_metadata(self) -> SegmentMetadata {
+    pub fn into_metadata(self) -> VectorSegmentMetadata {
         self.metadata
     }
 

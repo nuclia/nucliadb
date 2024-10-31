@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE segments SET delete_at = NULL, size_bytes = $1 WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aca588cca57a85e4d7fcc40c23cd87e57d53d11ca550d78e7e3d5e39e524fcd3"
+}

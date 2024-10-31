@@ -26,13 +26,13 @@ use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::query_language::{BooleanExpression, BooleanOperation, Operator};
 use crate::utils;
+use crate::VectorSegmentMetadata;
 use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
 use nidx_protos::prost::*;
 use nidx_protos::{
     DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
 };
-use nidx_types::SegmentMetadata;
 use nidx_types::Seq;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -177,7 +177,11 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl Reader {
-    pub fn open(segments: Vec<(SegmentMetadata, Seq)>, config: VectorConfig, delete_log: DTrie) -> VectorR<Reader> {
+    pub fn open(
+        segments: Vec<(VectorSegmentMetadata, Seq)>,
+        config: VectorConfig,
+        delete_log: DTrie,
+    ) -> VectorR<Reader> {
         let mut dimension = None;
         let mut open_data_points = Vec::new();
         let mut number_of_embeddings = 0;
@@ -433,7 +437,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
         let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let mut request = VectorSearchRequest {
@@ -524,7 +528,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
         let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let request = VectorSearchRequest {
@@ -646,7 +650,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (segment, _) = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
         let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
         let request = VectorSearchRequest {
