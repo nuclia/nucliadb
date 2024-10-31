@@ -67,7 +67,7 @@ impl MergeJob {
     }
 
     pub async fn segments(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE merge_job_id = $1", self.id).fetch_all(meta).await
+        Segment::in_merge_job(meta, self.id).await
     }
 
     pub async fn take(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Option<MergeJob>> {

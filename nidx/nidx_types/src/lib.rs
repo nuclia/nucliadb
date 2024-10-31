@@ -42,9 +42,26 @@ impl From<&Seq> for i64 {
     }
 }
 
-#[derive(Clone)]
-pub struct SegmentMetadata {
+#[derive(Clone, Debug)]
+pub struct SegmentMetadata<T> {
     pub path: PathBuf,
     pub records: usize,
     pub tags: HashSet<String>,
+    pub index_metadata: T,
+}
+
+/// Represents a field that has met all of the
+/// pre-filtering requirements.
+#[derive(Debug, Clone)]
+pub struct ValidField {
+    pub resource_id: String,
+    pub field_id: String,
+}
+
+/// The metadata needed to open an index: a list of segments and deletions.
+pub trait OpenIndexMetadata<T> {
+    /// List of segments and Seq
+    fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)>;
+    /// List of deletions and Seq
+    fn deletions(&self) -> impl Iterator<Item = (&String, Seq)>;
 }

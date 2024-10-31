@@ -183,9 +183,7 @@ impl Index {
     }
 
     pub async fn segments(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, r#"SELECT * FROM segments WHERE index_id = $1"#, self.id as IndexId)
-            .fetch_all(meta)
-            .await
+        Segment::in_index(meta, self.id).await
     }
 
     pub fn config(&self) -> anyhow::Result<IndexConfig> {

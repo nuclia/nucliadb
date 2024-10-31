@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
@@ -20,8 +20,12 @@ use std::path::PathBuf;
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use super::IndexId;
-use nidx_types::Seq;
-use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
+use nidx_types::{SegmentMetadata, Seq};
+use serde::{Deserialize, Serialize};
+use sqlx::{
+    types::{time::PrimitiveDateTime, JsonValue},
+    Executor, Postgres,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(transparent)]
@@ -45,10 +49,25 @@ pub struct Segment {
     pub id: SegmentId,
     pub index_id: IndexId,
     pub seq: Seq,
-    pub records: Option<i64>,
+    pub records: i64,
     pub size_bytes: Option<i64>,
     pub merge_job_id: Option<i64>,
+    index_metadata: JsonValue,
     pub delete_at: Option<PrimitiveDateTime>,
+}
+
+pub struct NewSegment {
+    pub(crate) records: i64,
+    pub(crate) index_metadata: JsonValue,
+}
+
+impl<M: Serialize> From<SegmentMetadata<M>> for NewSegment {
+    fn from(value: SegmentMetadata<M>) -> Self {
+        Self {
+            records: value.records as i64,
+            index_metadata: serde_json::to_value(&value.index_metadata).unwrap(),
+        }
+    }
 }
 
 impl Segment {
@@ -56,26 +75,24 @@ impl Segment {
         meta: impl Executor<'_, Database = Postgres>,
         index_id: IndexId,
         seq: Seq,
+        records: i64,
+        index_metadata: JsonValue,
     ) -> sqlx::Result<Segment> {
         sqlx::query_as!(
             Segment,
-            r#"INSERT INTO segments (index_id, seq) VALUES ($1, $2) RETURNING *"#,
+            r#"INSERT INTO segments (index_id, seq, records, index_metadata) VALUES ($1, $2, $3, $4) RETURNING *"#,
             index_id as IndexId,
-            i64::from(&seq)
+            i64::from(&seq),
+            records,
+            index_metadata
         )
         .fetch_one(meta)
         .await
     }
 
-    pub async fn mark_ready(
-        &self,
-        meta: impl Executor<'_, Database = Postgres>,
-        records: i64,
-        size_bytes: i64,
-    ) -> sqlx::Result<()> {
+    pub async fn mark_ready(&self, meta: impl Executor<'_, Database = Postgres>, size_bytes: i64) -> sqlx::Result<()> {
         sqlx::query!(
-            "UPDATE segments SET delete_at = NULL, records = $1, size_bytes = $2 WHERE id = $3",
-            records,
+            "UPDATE segments SET delete_at = NULL, size_bytes = $1 WHERE id = $2",
             size_bytes,
             self.id as SegmentId,
         )
@@ -111,6 +128,41 @@ impl Segment {
             Err(sqlx::Error::RowNotFound)
         } else {
             Ok(())
+        }
+    }
+
+    pub async fn select_many(
+        meta: impl Executor<'_, Database = Postgres>,
+        segment_ids: &[SegmentId],
+    ) -> sqlx::Result<Vec<Segment>> {
+        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE id = ANY($1)", segment_ids as &[SegmentId])
+            .fetch_all(meta)
+            .await
+    }
+
+    pub async fn in_index(
+        meta: impl Executor<'_, Database = Postgres>,
+        index_id: IndexId,
+    ) -> sqlx::Result<Vec<Segment>> {
+        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE index_id = $1", index_id as IndexId)
+            .fetch_all(meta)
+            .await
+    }
+
+    pub async fn in_merge_job(
+        meta: impl Executor<'_, Database = Postgres>,
+        merge_job_id: i64,
+    ) -> sqlx::Result<Vec<Segment>> {
+        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE merge_job_id = $1", merge_job_id).fetch_all(meta).await
+    }
+
+    pub fn metadata<T: for<'de> Deserialize<'de>>(&self, path: PathBuf) -> SegmentMetadata<T> {
+        let metadata = serde_json::from_value(self.index_metadata.clone()).unwrap();
+        SegmentMetadata {
+            path,
+            records: self.records as usize,
+            tags: HashSet::new(),
+            index_metadata: metadata,
         }
     }
 }

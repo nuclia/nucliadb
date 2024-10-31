@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO segments (index_id, seq) VALUES ($1, $2) RETURNING *",
+  "query": "INSERT INTO segments (index_id, seq, records, index_metadata) VALUES ($1, $2, $3, $4) RETURNING *",
   "describe": {
     "columns": [
       {
@@ -35,6 +35,11 @@
       },
       {
         "ordinal": 6,
+        "name": "index_metadata",
+        "type_info": "Json"
+      },
+      {
+        "ordinal": 7,
         "name": "delete_at",
         "type_info": "Timestamp"
       }
@@ -42,18 +47,21 @@
     "parameters": {
       "Left": [
         "Int8",
-        "Int8"
+        "Int8",
+        "Int8",
+        "Json"
       ]
     },
     "nullable": [
       false,
       false,
       false,
+      false,
       true,
       true,
-      true,
+      false,
       true
     ]
   },
-  "hash": "94fe73b6bf3faab08db00df079bfce545c4089d1611dab13f7f8dedde7c77b4a"
+  "hash": "733c3ebacc86f444bf5e2dd79ade660c291e88a00fc09b722f6e2e191545874c"
 }
