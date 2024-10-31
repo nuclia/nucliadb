@@ -24,11 +24,11 @@ mod merge_job;
 mod segment;
 mod shard;
 
-pub use deletion::Deletion;
-pub use index::{Index, IndexId, IndexKind};
-pub use merge_job::MergeJob;
-pub use segment::{Segment, SegmentId};
-pub use shard::Shard;
+pub use deletion::*;
+pub use index::*;
+pub use merge_job::*;
+pub use segment::*;
+pub use shard::*;
 
 /// A random ID to identify the lock we use during migration
 const MIGRATION_LOCK_ID: i64 = 5324678839066546102;

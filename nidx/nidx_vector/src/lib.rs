@@ -24,41 +24,41 @@ use data_point_provider::reader::{Reader, TimeSensitiveDLog, VectorsContext};
 use data_point_provider::DTrie;
 use indexer::index_resource;
 use nidx_protos::{Resource, VectorSearchRequest, VectorSearchResponse};
-use nidx_types::{SegmentMetadata, Seq};
+use nidx_types::{OpenIndexMetadata, SegmentMetadata};
+use std::collections::HashSet;
 use std::path::Path;
+
+type VectorSegmentMetadata = SegmentMetadata<()>;
 
 pub struct VectorIndexer;
 
 impl VectorIndexer {
-    pub fn index_resource(&self, output_dir: &Path, resource: &Resource) -> VectorR<(i64, Vec<String>)> {
-        // Index resource
-        let (segment, deletions) = index_resource(resource.into(), output_dir, &VectorConfig::default()).unwrap();
+    pub fn index_resource(
+        &self,
+        output_dir: &Path,
+        resource: &Resource,
+    ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
+        index_resource(resource.into(), output_dir, &VectorConfig::default())
+    }
 
-        if let Some(segment) = segment {
-            Ok((segment.records as i64, deletions))
-        } else {
-            Ok((0, deletions))
-        }
+    pub fn deletions_for_resource(&self, resource: &Resource) -> Vec<String> {
+        resource.sentences_to_delete.clone()
     }
 
     pub fn merge(
         &self,
         work_dir: &Path,
-        segments: Vec<(SegmentMetadata, Seq)>,
-        deletions: &Vec<(Seq, &Vec<String>)>,
-    ) -> VectorR<usize> {
+        open_index: impl OpenIndexMetadata<()>,
+    ) -> anyhow::Result<VectorSegmentMetadata> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
         // Wait and see how the Tantivy indexes turn out
         let mut delete_log = data_point_provider::DTrie::new();
-        for d in deletions {
-            let time = d.0;
-            for k in d.1 {
-                delete_log.insert(k.as_bytes(), time);
-            }
+        for (key, seq) in open_index.deletions() {
+            delete_log.insert(key.as_bytes(), seq);
         }
 
-        let segment_ids: Vec<_> = segments
-            .into_iter()
+        let segment_ids: Vec<_> = open_index
+            .segments()
             .map(|(meta, seq)| {
                 let open_dp = open(meta).unwrap();
                 (
@@ -78,7 +78,12 @@ impl VectorIndexer {
             &VectorConfig::default(),
         )?;
 
-        Ok(open_destination.no_nodes())
+        Ok(VectorSegmentMetadata {
+            path: work_dir.to_path_buf(),
+            records: open_destination.no_nodes(),
+            tags: HashSet::new(),
+            index_metadata: (),
+        })
     }
 }
 
@@ -87,25 +92,15 @@ pub struct VectorSearcher {
 }
 
 impl VectorSearcher {
-    pub fn open(
-        config: VectorConfig,
-        operations: Vec<(Seq, Vec<SegmentMetadata>, Vec<String>)>,
-    ) -> anyhow::Result<Self> {
+    pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<()>) -> anyhow::Result<Self> {
         let mut delete_log = DTrie::new();
-        let mut segments = Vec::new();
 
-        for (seq, segment_metas, deleted_keys) in operations {
-            for meta in segment_metas {
-                segments.push((meta, seq));
-            }
-
-            for key in deleted_keys {
-                delete_log.insert(key.as_bytes(), seq);
-            }
+        for (key, seq) in open_index.deletions() {
+            delete_log.insert(key.as_bytes(), seq);
         }
 
         Ok(VectorSearcher {
-            reader: Reader::open(segments, config, delete_log)?,
+            reader: Reader::open(open_index.segments().collect(), config, delete_log)?,
         })
     }
 
