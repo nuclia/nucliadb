@@ -36,10 +36,6 @@ impl Shard {
         sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_one(meta).await
     }
 
-    pub async fn try_get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> sqlx::Result<Option<Shard>> {
-        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_optional(meta).await
-    }
-
     pub async fn mark_delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
         sqlx::query!("UPDATE shards SET deleted_at = NOW() WHERE id = $1", self.id).execute(meta).await?;
         Ok(())

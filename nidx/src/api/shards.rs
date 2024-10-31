@@ -66,9 +66,12 @@ impl ShardsServer {
     /// Mark a shard, its indexes and segments for eventual deletion
     pub async fn delete_shard(&self, shard_id: Uuid) -> anyhow::Result<()> {
         let mut tx = self.meta.transaction().await?;
-        let Some(shard) = Shard::try_get(&mut *tx, shard_id).await? else {
-            return Ok(());
+        let shard = match Shard::get(&mut *tx, shard_id).await {
+            Ok(shard) => shard,
+            Err(sqlx::error::Error::RowNotFound) => return Ok(()),
+            Err(e) => return Err(e.into()),
         };
+
         for index in shard.indexes(&mut *tx).await?.into_iter() {
             Segment::mark_delete_by_index(&mut *tx, index.id).await?;
             index.mark_delete(&mut *tx).await?;
