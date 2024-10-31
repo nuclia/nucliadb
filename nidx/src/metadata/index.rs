@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf};
 
 use anyhow::anyhow;
 use nidx_vector::config::VectorConfig;
@@ -47,6 +47,11 @@ pub struct IndexId(pub(super) i64);
 impl From<i64> for IndexId {
     fn from(value: i64) -> Self {
         Self(value)
+    }
+}
+impl IndexId {
+    pub fn local_path(&self) -> PathBuf {
+        PathBuf::from(format!("{}", self.0))
     }
 }
 

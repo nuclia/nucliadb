@@ -424,7 +424,7 @@ mod tests {
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
             let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
-            let last_seq = create_segments_with_num_records(&meta.pool, &index, &vec![50; 3]).await?;
+            let last_seq = create_segments_with_num_records(&meta.pool, &index, &[50; 3]).await?;
 
             let scheduler = MergeScheduler::from_settings(&MergeSettings {
                 min_number_of_segments: 4,
@@ -443,7 +443,7 @@ mod tests {
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
             let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
-            let last_seq = create_segments_with_num_records(&meta.pool, &index, &vec![50; 3]).await?;
+            let last_seq = create_segments_with_num_records(&meta.pool, &index, &[50; 3]).await?;
 
             let scheduler = MergeScheduler::from_settings(&MergeSettings {
                 min_number_of_segments: 3,

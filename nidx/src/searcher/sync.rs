@@ -42,7 +42,7 @@ pub async fn run_sync(
         let deleted = Index::marked_to_delete(&meta.pool).await?;
         for index_id in deleted.into_iter() {
             // TODO: Handle errors
-            delete_index(index.id, Arc::clone(&index_metadata), &notifier).await?;
+            delete_index(index_id, Arc::clone(&index_metadata), &notifier).await?;
         }
 
         let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
@@ -170,7 +170,7 @@ impl SyncMetadata {
     }
 
     pub fn index_location(&self, index_id: &IndexId) -> PathBuf {
-        self.work_dir.join(index_id)
+        self.work_dir.join(index_id.local_path())
     }
 
     pub fn segment_location(&self, index_id: &IndexId, segment_id: &SegmentId) -> PathBuf {
@@ -212,7 +212,7 @@ impl SyncMetadata {
     }
 
     pub async fn delete(&self, index_id: &IndexId) {
-        self.synced_metadata.write().await.remove(&index_id);
+        self.synced_metadata.write().await.remove(index_id);
     }
 }
 
