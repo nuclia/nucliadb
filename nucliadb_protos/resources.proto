@@ -379,6 +379,7 @@ message FieldText {
         MARKDOWN = 3;
         JSON = 4;
         KEEP_MARKDOWN = 5;  // Markdown to be kept
+        JSONL = 6;
     }
     string body = 1;
     Format format = 2;

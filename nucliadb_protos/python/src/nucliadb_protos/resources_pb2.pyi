@@ -1557,6 +1557,7 @@ class FieldText(google.protobuf.message.Message):
         JSON: FieldText._Format.ValueType  # 4
         KEEP_MARKDOWN: FieldText._Format.ValueType  # 5
         """Markdown to be kept"""
+        JSONL: FieldText._Format.ValueType  # 6
 
     class Format(_Format, metaclass=_FormatEnumTypeWrapper): ...
     PLAIN: FieldText.Format.ValueType  # 0
@@ -1566,6 +1567,7 @@ class FieldText(google.protobuf.message.Message):
     JSON: FieldText.Format.ValueType  # 4
     KEEP_MARKDOWN: FieldText.Format.ValueType  # 5
     """Markdown to be kept"""
+    JSONL: FieldText.Format.ValueType  # 6
 
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
