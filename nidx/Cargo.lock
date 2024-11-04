@@ -1443,6 +1443,7 @@ dependencies = [
  "lazy_static",
  "levenshtein_automata",
  "nidx_protos",
+ "nidx_tantivy",
  "nidx_types",
  "once_cell",
  "regex",

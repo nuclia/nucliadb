@@ -110,9 +110,6 @@ impl SharedTermC {
     pub fn from(termc: TermCollector) -> SharedTermC {
         SharedTermC(Arc::new(Mutex::new(termc)))
     }
-    pub fn new() -> SharedTermC {
-        SharedTermC::default()
-    }
     pub fn get_termc(&self) -> TermCollector {
         std::mem::take(&mut self.0.lock().unwrap())
     }
@@ -535,7 +532,7 @@ mod tests {
         let boolean0: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries0));
         let boolean1: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries1));
         let nested = BooleanQuery::new(vec![(Occur::Should, boolean0), (Occur::Should, boolean1)]);
-        let adapted = flat_and_adapt(Box::new(nested), true, 2, SharedTermC::new());
+        let adapted = flat_and_adapt(Box::new(nested), true, 2, SharedTermC::default());
         assert_eq!(adapted.len(), 24);
         assert!(adapted.iter().all(|(occur, _)| *occur == Occur::Must));
         assert!(adapted.iter().all(|(_, query)| query.is::<FuzzyTermQuery>()));

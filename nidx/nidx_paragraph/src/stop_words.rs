@@ -21,7 +21,6 @@ use std::collections::HashSet;
 use std::env;
 
 use lazy_static::lazy_static;
-use serde_json;
 
 lazy_static! {
     static ref STOP_WORDS: StopWords = build_stop_words();
