@@ -46,17 +46,36 @@ use tantivy::{
     directory::MmapDirectory,
     indexer::merge_indices,
     query::{Query, TermSetQuery},
-    schema::Field,
+    schema::{Field, Schema},
     Term,
 };
 
 pub struct ParagraphIndexer;
 
-pub struct TextDeletionQueryBuilder(Field);
-impl DeletionQueryBuilder for TextDeletionQueryBuilder {
+pub struct ParagraphDeletionQueryBuilder {
+    field: Field,
+    resource: Field,
+}
+impl DeletionQueryBuilder for ParagraphDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        // TODO: Support deleting by resource id and paragraph id
-        Box::new(TermSetQuery::new(keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes()))))
+        Box::new(TermSetQuery::new(keys.map(|k| {
+            // Our keys can be resource or field ids, match the corresponding tantivy field
+            let is_field = k.len() > 32;
+            let tantivy_field = if is_field {
+                self.field
+            } else {
+                self.resource
+            };
+            Term::from_field_bytes(tantivy_field, k.as_bytes())
+        })))
+    }
+}
+impl ParagraphDeletionQueryBuilder {
+    fn new(schema: &Schema) -> Self {
+        ParagraphDeletionQueryBuilder {
+            resource: schema.get_field("uuid").unwrap(),
+            field: schema.get_field("field_uuid").unwrap(),
+        }
     }
 }
 
@@ -77,9 +96,8 @@ impl ParagraphIndexer {
         Ok(Some(indexer.finalize()?))
     }
 
-    pub fn deletions_for_resource(&self, _resource: &nidx_protos::Resource) -> Vec<String> {
-        // TODO!
-        vec![]
+    pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
+        resource.paragraphs_to_delete.clone()
     }
 
     pub fn merge(
@@ -88,8 +106,8 @@ impl ParagraphIndexer {
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
         let schema = ParagraphSchema::new().schema;
-        let query_builder = TextDeletionQueryBuilder(schema.get_field("uuid").unwrap());
-        let index = open_index_with_deletions(schema, open_index, query_builder)?;
+        let deletions_query = ParagraphDeletionQueryBuilder::new(&schema);
+        let index = open_index_with_deletions(schema, open_index, deletions_query)?;
 
         let output_index = merge_indices(&[index], MmapDirectory::open(work_dir)?)?;
         let segment = &output_index.searchable_segment_metas()?[0];
@@ -112,11 +130,7 @@ pub struct ParagraphSearcher {
 impl ParagraphSearcher {
     pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
         let schema = ParagraphSchema::new().schema;
-        let index = open_index_with_deletions(
-            schema.clone(),
-            open_index,
-            TextDeletionQueryBuilder(schema.get_field("uuid").unwrap()),
-        )?;
+        let index = open_index_with_deletions(schema.clone(), open_index, ParagraphDeletionQueryBuilder::new(&schema))?;
 
         Ok(Self {
             reader: ParagraphReaderService {
