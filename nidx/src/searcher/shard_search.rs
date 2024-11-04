@@ -20,6 +20,7 @@
 
 use std::sync::Arc;
 
+use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{SearchRequest, SearchResponse};
 use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
@@ -39,6 +40,9 @@ pub async fn search(
     let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
 
     // TODO: Avoid querying here, the information can be take from synced metadata
+    let paragraph_index = Index::find(&meta.pool, shard_id, IndexKind::Paragraph, "paragraph").await?;
+    let paragraph_searcher_arc = index_cache.get(&paragraph_index.id).await?;
+
     let text_index = Index::find(&meta.pool, shard_id, IndexKind::Text, "text").await?;
     let text_searcher_arc = index_cache.get(&text_index.id).await?;
 
@@ -46,13 +50,19 @@ pub async fn search(
     let vector_seacher_arc = index_cache.get(&vector_index.id).await?;
 
     tokio::task::spawn_blocking(move || {
-        blocking_search(search_request, text_searcher_arc.as_ref().into(), vector_seacher_arc.as_ref().into())
+        blocking_search(
+            search_request,
+            paragraph_searcher_arc.as_ref().into(),
+            text_searcher_arc.as_ref().into(),
+            vector_seacher_arc.as_ref().into(),
+        )
     })
     .await?
 }
 
 fn blocking_search(
     search_request: SearchRequest,
+    paragraph_searcher: &ParagraphSearcher,
     text_searcher: &TextSearcher,
     vector_searcher: &VectorSearcher,
 ) -> anyhow::Result<SearchResponse> {
@@ -72,14 +82,10 @@ fn blocking_search(
         move || text_searcher.search(&request, &index_queries.texts_context)
     });
 
-    // TODO
-    // let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
-    //     request.id = search_id.clone();
-    //     let paragraphs_context = &index_queries.paragraphs_context;
-    //     let info = info_span!(parent: &span, "paragraph search");
-    //     let task = move || read_rw_lock(&self.paragraph_reader).search(&request, paragraphs_context);
-    //     || run_with_telemetry(info, task)
-    // });
+    let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
+        request.id = search_id.clone();
+        move || paragraph_searcher.search(&request, &index_queries.paragraphs_context)
+    });
 
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();
@@ -94,11 +100,16 @@ fn blocking_search(
     // });
 
     let mut rtext = None;
-    // let mut rparagraph = None;
+    let mut rparagraph = None;
     let mut rvector = None;
     // let mut rrelation = None;
 
     std::thread::scope(|scope| {
+        if let Some(task) = paragraph_task {
+            let rparagraph = &mut rparagraph;
+            scope.spawn(move || *rparagraph = Some(task()));
+        }
+
         if let Some(task) = text_task {
             let rtext = &mut rtext;
             scope.spawn(move || *rtext = Some(task()));
@@ -112,7 +123,7 @@ fn blocking_search(
 
     Ok(SearchResponse {
         document: rtext.transpose()?,
-        paragraph: None,
+        paragraph: rparagraph.transpose()?,
         vector: rvector.transpose()?,
         relation: None,
     })
