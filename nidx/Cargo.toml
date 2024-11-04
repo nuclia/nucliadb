@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy"]
+members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy", "nidx_paragraph"]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -30,6 +30,7 @@ nidx_protos = { version = "0.1.0", path = "nidx_protos" }
 tonic = "0.12.3"
 lru = "0.12.5"
 nidx_text = { version = "0.1.0", path = "nidx_text" }
+nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
 
 [dev-dependencies]
 nidx_tests = { path = "nidx_tests" }
