@@ -70,10 +70,6 @@ fn test_search_queries() {
 
     // additional (non existent) symbols
     query(&reader, "enough - test", 0);
-
-    // partial words
-    // TODO: uncomment after fixing sc-5626
-    // query(&reader, "shou", 1);
 }
 
 #[test]

@@ -137,12 +137,12 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let segment = Segment::create(&meta.pool, job.index_id, job.seq, merged.records, merged.index_metadata).await?;
     let size = pack_and_upload(storage, work_dir.path(), segment.id.storage_key()).await?;
 
-    // Record new segment and delete old ones. TODO: Mark as deleted_at
+    // Record new segment and delete old ones
     let mut tx = meta.transaction().await?;
     segment.mark_ready(&mut *tx, size as i64).await?;
-    Segment::delete_many(&mut *tx, &segment_ids).await?;
+    Segment::mark_many_for_deletion(&mut *tx, &segment_ids).await?;
     index.updated(&mut *tx).await?;
-    // Delete task if successful. Mark as failed otherwise?
+    // Delete task if successful. TODO: Mark as failed otherwise?
     job.finish(&mut *tx).await?;
     tx.commit().await?;
 

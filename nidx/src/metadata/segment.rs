@@ -127,6 +127,24 @@ impl Segment {
         .await
     }
 
+    pub async fn mark_many_for_deletion(
+        meta: impl Executor<'_, Database = Postgres>,
+        segment_ids: &[SegmentId],
+    ) -> sqlx::Result<()> {
+        let affected = sqlx::query!(
+            "UPDATE segments SET delete_at = NOW() + INTERVAL '5 minutes' WHERE id = ANY($1)",
+            segment_ids as &[SegmentId]
+        )
+        .execute(meta)
+        .await?
+        .rows_affected();
+        if affected != segment_ids.len() as u64 {
+            Err(sqlx::Error::RowNotFound)
+        } else {
+            Ok(())
+        }
+    }
+
     pub async fn delete_many(
         meta: impl Executor<'_, Database = Postgres>,
         segment_ids: &[SegmentId],
