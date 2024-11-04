@@ -20,7 +20,7 @@
 
 pub mod prefilter;
 mod query_io;
-pub mod reader;
+mod reader;
 mod schema;
 mod search_query;
 
@@ -29,12 +29,12 @@ use std::path::Path;
 
 use anyhow::anyhow;
 use nidx_protos::resource::ResourceStatus;
-use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse};
+use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse, StreamRequest};
 use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
 use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
 use nidx_types::OpenIndexMetadata;
 use prefilter::{PreFilterRequest, PreFilterResponse};
-use reader::TextReaderService;
+use reader::{DocumentIterator, TextReaderService};
 use schema::{timestamp_to_datetime_utc, TextSchema};
 
 pub use search_query::TextContext;
@@ -197,5 +197,9 @@ impl TextSearcher {
 
     pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
         self.reader.prefilter(request)
+    }
+
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<DocumentIterator> {
+        self.reader.iterator(request)
     }
 }

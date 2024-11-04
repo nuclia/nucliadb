@@ -21,7 +21,8 @@
 use nidx_protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
-use nidx_text::{prefilter::*, TextContext};
+use nidx_text::prefilter::*;
+use nidx_text::TextContext;
 use nidx_types::query_language::*;
 use nidx_vector::data_point_provider::reader::VectorsContext;
 use nidx_vector::indexer::SEGMENT_TAGS;

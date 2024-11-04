@@ -26,7 +26,6 @@ use std::time::SystemTime;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::{Resource, ResourceId};
 use nidx_tantivy::{TantivyMeta, TantivySegmentMetadata};
-use nidx_text::reader::TextReaderService;
 use nidx_text::{TextIndexer, TextSearcher};
 use nidx_types::{OpenIndexMetadata, Seq};
 use tempfile::TempDir;
@@ -55,12 +54,12 @@ impl OpenIndexMetadata<TantivyMeta> for TestOpener {
     }
 }
 
-pub fn test_reader() -> TextReaderService {
+pub fn test_reader() -> TextSearcher {
     let dir = TempDir::new().unwrap();
     let resource = create_resource("shard".to_string());
     let segment_meta = TextIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
 
-    TextSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![])).unwrap().reader
+    TextSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![])).unwrap()
 }
 
 pub fn create_resource(shard_id: String) -> Resource {
