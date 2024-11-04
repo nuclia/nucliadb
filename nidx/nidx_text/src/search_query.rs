@@ -163,7 +163,6 @@ impl IntoOccur for Conjunction {
 }
 
 #[cfg(test)]
-#[allow(non_snake_case)]
 mod tests {
     use super::*;
 
@@ -199,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn test_AND_stream_filter_queries_creation() {
+    fn test_and_stream_filter_queries_creation() {
         let schema = TextSchema::new();
         let filter = StreamFilter {
             labels: vec!["/A".to_string(), "/B".to_string()],
@@ -214,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn test_OR_stream_filter_queries_creation() {
+    fn test_or_stream_filter_queries_creation() {
         let schema = TextSchema::new();
         let filter = StreamFilter {
             labels: vec!["/A".to_string(), "/B".to_string()],
@@ -229,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn test_NOT_stream_filter_queries_creation() {
+    fn test_not_stream_filter_queries_creation() {
         let schema = TextSchema::new();
         let filter = StreamFilter {
             labels: vec!["/A".to_string(), "/B".to_string()],

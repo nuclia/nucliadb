@@ -66,11 +66,6 @@ impl RAMLayer {
     pub fn is_empty(&self) -> bool {
         self.out.len() == 0
     }
-    #[cfg(test)]
-    #[allow(unused)]
-    pub fn no_nodes(&self) -> usize {
-        self.out.len()
-    }
 }
 
 #[derive(Default, Clone)]

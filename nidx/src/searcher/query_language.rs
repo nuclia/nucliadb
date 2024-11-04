@@ -17,16 +17,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-#![allow(unused)]
-
 use serde_json::Value as Json;
-use std::collections::HashSet;
 
 use nidx_types::query_language::*;
 
 #[derive(Debug, Clone)]
 struct Translated {
-    is_nested: bool,
     has_field_labels: bool,
     has_paragraph_labels: bool,
     expression: BooleanExpression,
@@ -34,7 +30,6 @@ struct Translated {
 
 fn translate_literal(literal: String, context: &QueryContext) -> Translated {
     Translated {
-        is_nested: false,
         has_field_labels: context.field_labels.contains(&literal),
         has_paragraph_labels: context.paragraph_labels.contains(&literal),
         expression: BooleanExpression::Literal(literal),
@@ -48,14 +43,12 @@ fn translate_not(inner: Json, context: &QueryContext) -> anyhow::Result<Translat
     }
 
     Ok(Translated {
-        is_nested: matches!(&inner.expression, BooleanExpression::Not(_)),
         expression: BooleanExpression::Not(Box::new(inner.expression)),
         ..inner
     })
 }
 
 fn translate_operation(operator: Operator, operands: Vec<Json>, context: &QueryContext) -> anyhow::Result<Translated> {
-    let mut is_nested = false;
     let mut has_field_labels = false;
     let mut has_paragraph_labels = false;
     let mut boolean_operation = BooleanOperation {
@@ -64,15 +57,11 @@ fn translate_operation(operator: Operator, operands: Vec<Json>, context: &QueryC
     };
     for json_operand in operands {
         let operand = translate_expression(json_operand, context)?;
-        if let BooleanExpression::Operation(_) = &operand.expression {
-            is_nested = true;
-        }
         has_field_labels = has_field_labels || operand.has_field_labels;
         has_paragraph_labels = has_paragraph_labels || operand.has_paragraph_labels;
         boolean_operation.operands.push(operand.expression);
     }
     Ok(Translated {
-        is_nested,
         has_field_labels,
         has_paragraph_labels,
         expression: BooleanExpression::Operation(boolean_operation),
@@ -274,6 +263,8 @@ pub fn extract_label_filters(expression: &BooleanExpression, labels: &[&str]) ->
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
 
     #[test]
@@ -308,8 +299,8 @@ mod tests {
         let Some(search_query) = analysis.search_query else {
             panic!("The json used should produce a search query")
         };
-        assert!(matches!(labels_prefilter_query, expected_prefilter));
-        assert!(matches!(expected_search, expected_search));
+        assert_eq!(labels_prefilter_query, expected_prefilter);
+        assert_eq!(search_query, expected_search);
         assert!(analysis.keywords_prefilter_query.is_none());
     }
 
@@ -349,7 +340,6 @@ mod tests {
         });
 
         let translation = translate_expression(query, &context).unwrap();
-        assert!(translation.is_nested);
         assert!(translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
         assert_eq!(translation.expression, expected);
@@ -380,7 +370,6 @@ mod tests {
         });
 
         let translation = translate_expression(query, &context).unwrap();
-        assert!(!translation.is_nested);
         assert!(translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
         assert_eq!(translation.expression, expected);
@@ -410,7 +399,6 @@ mod tests {
         });
 
         let translation = translate_expression(query, &context).unwrap();
-        assert!(!translation.is_nested);
         assert!(!translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
         assert_eq!(translation.expression, expected);
@@ -432,7 +420,6 @@ mod tests {
         let expected = BooleanExpression::Not(Box::new(BooleanExpression::Literal("var".to_string())));
 
         let translation = translate_expression(query, &context).unwrap();
-        assert!(!translation.is_nested);
         assert!(!translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
         assert_eq!(translation.expression, expected);
@@ -453,7 +440,6 @@ mod tests {
         });
 
         let translation = translate_expression(query, &context).unwrap();
-        assert!(!translation.is_nested);
         assert!(!translation.has_paragraph_labels);
         assert!(translation.has_field_labels);
         assert_eq!(translation.expression, expected);
@@ -468,7 +454,6 @@ mod tests {
             "literal": "var",
         });
         let translation = translate_expression(query, &context).unwrap();
-        assert!(!translation.is_nested);
         assert!(!translation.has_field_labels);
         assert!(translation.has_paragraph_labels);
         assert_eq!(translation.expression, expected);
@@ -529,7 +514,6 @@ mod tests {
         const LABELS: &[&str] = &["/v", "/w"];
 
         let a: BooleanExpression = BooleanExpression::Literal("/a".to_string());
-        let b: BooleanExpression = BooleanExpression::Literal("/b".to_string());
         let v: BooleanExpression = BooleanExpression::Literal("/v".to_string());
         let w: BooleanExpression = BooleanExpression::Literal("/w".to_string());
 
