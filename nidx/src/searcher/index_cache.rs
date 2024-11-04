@@ -138,15 +138,12 @@ impl IndexCache {
             index_id: *id,
         };
 
-        let index_config = meta.index.config()?;
-        let searcher = match index_config.kind() {
+        let searcher = match meta.index.kind {
             IndexKind::Text => IndexSearcher::Text(TextSearcher::open(open_index)?),
             IndexKind::Paragraph => {
                 todo!()
             }
-            IndexKind::Vector => {
-                IndexSearcher::Vector(VectorSearcher::open(index_config.try_into().unwrap(), open_index)?)
-            }
+            IndexKind::Vector => IndexSearcher::Vector(VectorSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Relation => {
                 todo!()
             }

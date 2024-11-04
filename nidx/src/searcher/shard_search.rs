@@ -38,6 +38,7 @@ pub async fn search(
 ) -> anyhow::Result<SearchResponse> {
     let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
 
+    // TODO: Avoid querying here, the information can be take from synced metadata
     let text_index = Index::find(&meta.pool, shard_id, IndexKind::Text, "text").await?;
     let text_searcher_arc = index_cache.get(&text_index.id).await?;
 
