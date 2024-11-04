@@ -191,7 +191,7 @@ jobs:
           helm lint charts/nucliadb
           helm package charts/nucliadb
           curl --data-binary "@nucliadb-${{ steps.version_step.outputs.helm_version }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
-          helm push nucliadb-${{ matrix.component }}-${{ steps.version_step.outputs.version_number }}.tgz ${{ env.ARTIFACT_REGISTRY_URL }}
+          helm push nucliadb-${{ steps.version_step.outputs.version_number }}.tgz ${{ env.ARTIFACT_REGISTRY_URL }}
 
       - name: Send to promotion queue
         id: send-to-promo
