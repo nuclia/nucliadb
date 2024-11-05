@@ -88,10 +88,6 @@ impl ParagraphIndexer {
         let field_schema = ParagraphSchema::new();
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
-        if resource.status == ResourceStatus::Delete as i32 {
-            return Err(anyhow::anyhow!("This is a deletion, not a set resource"));
-        }
-
         index_paragraphs(&mut indexer, resource, field_schema)?;
         Ok(Some(indexer.finalize()?))
     }
