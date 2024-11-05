@@ -19,42 +19,33 @@
 //
 
 use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddrV4};
 use std::str::FromStr;
 
-use anyhow::anyhow;
-use nidx_protos::node_writer_server::{NodeWriter, NodeWriterServer};
+use nidx_protos::node_writer_server::NodeWriter;
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
-use tonic::{transport::Server, Request, Response, Status};
+use node_writer_server::NodeWriterServer;
+use tonic::transport::server::Router;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 use crate::api::shards;
-use crate::grpc_server::GrpcServer;
 use crate::NidxMetadata;
 
 pub struct ApiServer {
     meta: NidxMetadata,
-    server: Option<GrpcServer>,
 }
 
 impl ApiServer {
-    pub async fn new(meta: NidxMetadata, listen_port: Option<u16>) -> anyhow::Result<Self> {
-        let server = Some(GrpcServer::new(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, listen_port.unwrap_or(0))).await?);
-        Ok(Self {
+    pub fn new(meta: NidxMetadata) -> Self {
+        Self {
             meta,
-            server,
-        })
+        }
     }
 
-    pub async fn serve(mut self) -> anyhow::Result<()> {
-        let listener = self.server.take().expect("Server already running");
-        let router = Server::builder().add_service(NodeWriterServer::new(self));
-        Ok(listener.serve(router).await?)
-    }
-
-    pub fn port(&self) -> anyhow::Result<u16> {
-        self.server.as_ref().ok_or(anyhow!("Server already running"))?.port()
+    pub fn into_service(self) -> Router {
+        Server::builder().add_service(NodeWriterServer::new(self))
     }
 }
 

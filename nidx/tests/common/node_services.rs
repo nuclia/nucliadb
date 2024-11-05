@@ -20,8 +20,10 @@
 
 use std::time::Duration;
 
+use nidx::api::grpc::ApiServer;
+use nidx::grpc_server::GrpcServer;
 use nidx::settings::{ObjectStoreConfig, StorageSettings};
-use nidx::{api, searcher, NidxMetadata, Settings};
+use nidx::{searcher, NidxMetadata, Settings};
 use nidx_protos::node_reader_client::NodeReaderClient;
 use nidx_protos::node_writer_client::NodeWriterClient;
 use sqlx::PgPool;
@@ -49,9 +51,10 @@ impl NidxFixture {
         };
         let searcher_task = Some(tokio::task::spawn(searcher::run(settings.clone())));
 
-        let shards_api = api::grpc::ApiServer::new(settings.metadata, None).await?;
-        let port = shards_api.port()?;
-        let api_task = Some(tokio::task::spawn(shards_api.serve()));
+        let api_service = ApiServer::new(settings.metadata.clone()).into_service();
+        let api_server = GrpcServer::new("localhost:0").await?;
+        let port = api_server.port()?;
+        let api_task = Some(tokio::task::spawn(api_server.serve(api_service)));
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 

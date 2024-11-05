@@ -33,7 +33,7 @@ impl GrpcServer {
         Ok(self.0.local_addr()?.port())
     }
 
-    pub async fn serve(self, server: Router) -> Result<(), tonic::transport::Error> {
-        server.serve_with_incoming(TcpIncoming::from_listener(self.0, true, None).unwrap()).await
+    pub async fn serve(self, server: Router) -> anyhow::Result<()> {
+        Ok(server.serve_with_incoming(TcpIncoming::from_listener(self.0, true, None).unwrap()).await?)
     }
 }
