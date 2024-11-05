@@ -51,7 +51,6 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     let shard = shards::create_shard(&meta, kbid, vector_configs).await?;
 
     let indexes = shard.indexes(&meta.pool).await?;
-    // TODO: update when more indexes are created
     assert_eq!(indexes.len(), 4);
 
     let names = indexes.iter().map(|index| index.name.as_str()).collect::<HashSet<_>>();

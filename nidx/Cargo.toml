@@ -31,6 +31,7 @@ tonic = "0.12.3"
 lru = "0.12.5"
 nidx_text = { version = "0.1.0", path = "nidx_text" }
 nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
+nidx_relation = { version = "0.1.0", path = "nidx_relation" }
 
 [dev-dependencies]
 nidx_tests = { path = "nidx_tests" }

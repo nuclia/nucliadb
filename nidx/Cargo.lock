@@ -1420,6 +1420,7 @@ dependencies = [
  "lru",
  "nidx_paragraph",
  "nidx_protos",
+ "nidx_relation",
  "nidx_tests",
  "nidx_text",
  "nidx_types",
