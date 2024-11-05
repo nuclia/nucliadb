@@ -18,9 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod prefilter;
 mod query_io;
-mod query_language;
-pub mod reader;
+mod reader;
 mod schema;
 mod search_query;
 
@@ -29,13 +29,15 @@ use std::path::Path;
 
 use anyhow::anyhow;
 use nidx_protos::resource::ResourceStatus;
-use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse};
+use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse, StreamRequest};
 use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
 use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
 use nidx_types::OpenIndexMetadata;
-use reader::TextReaderService;
+use prefilter::{PreFilterRequest, PreFilterResponse};
+use reader::{DocumentIterator, TextReaderService};
 use schema::{timestamp_to_datetime_utc, TextSchema};
 
+pub use search_query::TextContext;
 use tantivy::indexer::merge_indices;
 use tantivy::schema::Field;
 use tantivy::{
@@ -65,7 +67,7 @@ impl TextIndexer {
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
         if resource.status == ResourceStatus::Delete as i32 {
-            return Err(anyhow::anyhow!("This is a deletion, not a set resource"));
+            return Err(anyhow!("This is a deletion, not a set resource"));
         }
 
         index_document(&mut indexer, resource, field_schema)?;
@@ -185,7 +187,19 @@ impl TextSearcher {
         })
     }
 
-    pub fn search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
-        self.reader.search(request)
+    pub fn search(
+        &self,
+        request: &DocumentSearchRequest,
+        context: &TextContext,
+    ) -> anyhow::Result<DocumentSearchResponse> {
+        self.reader.search(request, context)
+    }
+
+    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
+        self.reader.prefilter(request)
+    }
+
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<DocumentIterator> {
+        self.reader.iterator(request)
     }
 }

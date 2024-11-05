@@ -179,6 +179,7 @@ pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> an
     sqlx::query!(
         "WITH oldest_segments AS (
             SELECT index_id, MIN(seq) AS seq FROM segments
+            WHERE delete_at IS NULL
             GROUP BY index_id
         )
         DELETE FROM deletions USING oldest_segments

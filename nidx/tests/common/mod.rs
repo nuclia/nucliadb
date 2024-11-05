@@ -18,9 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-// rust doesn't detect usage of `common` in our integration tests
-#![allow(dead_code)]
-
 pub mod metadata {
     use sqlx::{Executor, Postgres};
 
