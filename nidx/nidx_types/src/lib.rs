@@ -19,6 +19,8 @@
 //
 use std::{collections::HashSet, path::PathBuf};
 
+pub mod query_language;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Seq(i64);
 impl From<i64> for Seq {
@@ -48,14 +50,6 @@ pub struct SegmentMetadata<T> {
     pub records: usize,
     pub tags: HashSet<String>,
     pub index_metadata: T,
-}
-
-/// Represents a field that has met all of the
-/// pre-filtering requirements.
-#[derive(Debug, Clone)]
-pub struct ValidField {
-    pub resource_id: String,
-    pub field_id: String,
 }
 
 /// The metadata needed to open an index: a list of segments and deletions.

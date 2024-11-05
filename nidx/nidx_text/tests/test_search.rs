@@ -19,13 +19,16 @@
 //
 
 mod common;
+
 use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
-use nidx_protos::{DocumentSearchRequest, Faceted, Filter};
-use nidx_text::reader::TextReaderService;
+use nidx_protos::{DocumentSearchRequest, Faceted};
+use nidx_text::prefilter::*;
+use nidx_text::{TextContext, TextSearcher};
+use nidx_types::query_language::BooleanExpression;
 
 #[test]
 fn test_search_queries() {
-    fn query(reader: &TextReaderService, query: impl Into<String>, expected: i32) {
+    fn query(reader: &TextSearcher, query: impl Into<String>, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
@@ -35,7 +38,7 @@ fn test_search_queries() {
             ..Default::default()
         };
 
-        let response = reader.search(&request).unwrap();
+        let response = reader.search(&request, &TextContext::default()).unwrap();
         assert_eq!(response.total, expected, "Failed query: '{}'", query);
 
         assert_eq!(response.total, response.results.len() as i32);
@@ -67,124 +70,104 @@ fn test_search_queries() {
 
     // additional (non existent) symbols
     query(&reader, "enough - test", 0);
-
-    // partial words
-    // TODO: uncomment after fixing sc-5626
-    // query(&reader, "shou", 1);
 }
 
-// TODO: Prefilter & tests
+#[test]
+fn test_prefilter_all_search() {
+    let reader = common::test_reader();
+    let request = PreFilterRequest {
+        security: None,
+        labels_formula: None,
+        timestamp_filters: vec![],
+        keywords_formula: None,
+    };
+    let response = reader.prefilter(&request).unwrap();
+    assert!(matches!(response.valid_fields, ValidFieldCollector::All));
+}
 
-// #[test]
-// fn test_prefilter_all_search() {
-//     let reader = common::test_reader();
-//     let request = PreFilterRequest {
-//         security: None,
-//         labels_formula: None,
-//         timestamp_filters: vec![],
-//         keywords_formula: None,
-//     };
-//     let response = reader.prefilter(&request).unwrap();
-//     assert!(matches!(response.valid_fields, ValidFieldCollector::All));
-// }
+#[test]
+fn test_prefilter_not_search() {
+    let reader = common::test_reader();
 
-// #[test]
-// fn test_prefilter_not_search() {
-//     let reader = common::test_reader();
+    let request = PreFilterRequest {
+        security: None,
+        timestamp_filters: vec![],
+        labels_formula: Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/l/mylabel".to_string())))),
+        keywords_formula: None,
+    };
+    println!("expression: {:?}", request.labels_formula);
+    let response = reader.prefilter(&request).unwrap();
+    let valid_fields = &response.valid_fields;
+    let ValidFieldCollector::Some(fields) = valid_fields else {
+        panic!("Response is not on the right variant {valid_fields:?}");
+    };
+    assert_eq!(fields.len(), 1);
+}
 
-//     let context = nucliadb_core::query_language::QueryContext {
-//         field_labels: HashSet::from(["/l/mylabel".to_string()]),
-//         paragraph_labels: HashSet::with_capacity(0),
-//     };
-//     let query = "{ \"not\": { \"literal\": \"/l/mylabel\" } }";
-//     let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
-//     let request = PreFilterRequest {
-//         security: None,
-//         timestamp_filters: vec![],
-//         labels_formula: expression.labels_prefilter_query,
-//         keywords_formula: expression.keywords_prefilter_query,
-//     };
-//     println!("expression: {:?}", request.labels_formula);
-//     let response = reader.prefilter(&request).unwrap();
-//     let valid_fields = &response.valid_fields;
-//     let ValidFieldCollector::Some(fields) = valid_fields else {
-//         panic!("Response is not on the right variant {valid_fields:?}");
-//     };
-//     assert_eq!(fields.len(), 1);
-// }
+#[test]
+fn test_labels_prefilter_search() {
+    let reader = common::test_reader();
 
-// #[test]
-// fn test_labels_prefilter_search() {
-//     let reader = common::test_reader();
+    let request = PreFilterRequest {
+        security: None,
+        timestamp_filters: vec![],
+        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
+        keywords_formula: None,
+    };
+    let response = reader.prefilter(&request).unwrap();
+    let ValidFieldCollector::Some(fields) = response.valid_fields else {
+        panic!("Response is not on the right variant");
+    };
+    assert_eq!(fields.len(), 1);
+}
 
-//     let context = nucliadb_core::query_language::QueryContext {
-//         field_labels: HashSet::from(["/l/mylabel".to_string()]),
-//         paragraph_labels: HashSet::with_capacity(0),
-//     };
-//     let query = "{ \"literal\": \"/l/mylabel\" }";
-//     let expression = nucliadb_core::query_language::translate(Some(query), None, &context).unwrap();
-//     let request = PreFilterRequest {
-//         security: None,
-//         labels_formula: expression.labels_prefilter_query,
-//         timestamp_filters: vec![],
-//         keywords_formula: expression.keywords_prefilter_query,
-//     };
-//     let response = reader.prefilter(&request).unwrap();
-//     let ValidFieldCollector::Some(fields) = response.valid_fields else {
-//         panic!("Response is not on the right variant");
-//     };
-//     assert_eq!(fields.len(), 1);
-// }
+#[test]
+fn test_keywords_prefilter_search() {
+    let reader = common::test_reader();
+    let request = PreFilterRequest {
+        security: None,
+        timestamp_filters: vec![],
+        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
+        keywords_formula: Some(BooleanExpression::Literal("foobar".to_string())),
+    };
+    let response = reader.prefilter(&request).unwrap();
+    let ValidFieldCollector::None = response.valid_fields else {
+        panic!("Response is not on the right variant");
+    };
 
-// #[test]
-// fn test_keywords_prefilter_search() {
-//     let reader = common::test_reader();
-//     let context = nucliadb_core::query_language::QueryContext {
-//         field_labels: HashSet::from(["/l/mylabel".to_string()]),
-//         paragraph_labels: HashSet::with_capacity(0),
-//     };
-//     let labels = "{ \"literal\": \"/l/mylabel\" }";
-//     let keywords = "{ \"literal\": \"foobar\" }";
-//     let expression = nucliadb_core::query_language::translate(Some(labels), Some(keywords), &context).unwrap();
-//     let request = PreFilterRequest {
-//         security: None,
-//         labels_formula: expression.labels_prefilter_query,
-//         timestamp_filters: vec![],
-//         keywords_formula: expression.keywords_prefilter_query,
-//     };
-//     let response = reader.prefilter(&request).unwrap();
-//     let ValidFieldCollector::None = response.valid_fields else {
-//         panic!("Response is not on the right variant");
-//     };
-
-//     let expression = nucliadb_core::query_language::translate(Some(labels), None, &context).unwrap();
-//     let request = PreFilterRequest {
-//         security: None,
-//         labels_formula: expression.labels_prefilter_query,
-//         timestamp_filters: vec![],
-//         keywords_formula: expression.keywords_prefilter_query,
-//     };
-//     let response = reader.prefilter(&request).unwrap();
-//     let ValidFieldCollector::Some(fields) = response.valid_fields else {
-//         panic!("Response is not on the right variant");
-//     };
-//     assert_eq!(fields.len(), 1);
-// }
+    let request = PreFilterRequest {
+        security: None,
+        timestamp_filters: vec![],
+        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
+        keywords_formula: None,
+    };
+    let response = reader.prefilter(&request).unwrap();
+    let ValidFieldCollector::Some(fields) = response.valid_fields else {
+        panic!("Response is not on the right variant");
+    };
+    assert_eq!(fields.len(), 1);
+}
 
 #[test]
 fn test_filtered_search() {
-    fn query(reader: &TextReaderService, query: impl Into<String>, filter: Filter, expected: i32) {
+    fn query(reader: &TextSearcher, query: impl Into<String>, label_filter: Option<BooleanExpression>, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: query.clone(),
-            filter: Some(filter),
             page_number: 0,
             result_per_page: 20,
             ..Default::default()
         };
 
-        let response = reader.search(&request).unwrap();
+        let response = reader
+            .search(
+                &request,
+                &TextContext {
+                    label_filtering_formula: label_filter,
+                },
+            )
+            .unwrap();
         assert_eq!(response.total, expected, "Failed query: '{}'", query);
 
         assert_eq!(response.total, response.results.len() as i32);
@@ -193,39 +176,9 @@ fn test_filtered_search() {
 
     let reader = common::test_reader();
 
-    query(
-        &reader,
-        "",
-        Filter {
-            paragraph_labels: vec![],
-            field_labels: vec!["/l/mylabel".to_string()],
-            labels_expression: "{ \"literal\": \"/l/mylabel\" }".to_string(),
-            ..Default::default()
-        },
-        1,
-    );
-    query(
-        &reader,
-        "",
-        Filter {
-            paragraph_labels: vec![],
-            field_labels: vec!["/e/myentity".to_string()],
-            labels_expression: "{ \"literal\": \"/e/myentity\" }".to_string(),
-            ..Default::default()
-        },
-        1,
-    );
-    query(
-        &reader,
-        "",
-        Filter {
-            paragraph_labels: vec![],
-            field_labels: vec!["/l/fakelabel".to_string()],
-            labels_expression: "{ \"literal\": \"/l/fakelabel\" }".to_string(),
-            ..Default::default()
-        },
-        0,
-    );
+    query(&reader, "", Some(BooleanExpression::Literal("/l/mylabel".to_string())), 1);
+    query(&reader, "", Some(BooleanExpression::Literal("/e/myentity".to_string())), 1);
+    query(&reader, "", Some(BooleanExpression::Literal("/l/fakelabel".to_string())), 0);
 }
 
 #[test]
@@ -241,7 +194,7 @@ fn test_search_by_field() {
         ..Default::default()
     };
 
-    let response = reader.search(&request).unwrap();
+    let response = reader.search(&request, &TextContext::default()).unwrap();
     assert_eq!(response.total, response.results.len() as i32);
     assert_eq!(response.total, 1);
     assert!(!response.next_page);
@@ -249,7 +202,7 @@ fn test_search_by_field() {
 
 #[test]
 fn test_faceted_search() {
-    fn query(reader: &TextReaderService, query: impl Into<String>, facets: Faceted, expected: i32) {
+    fn query(reader: &TextSearcher, query: impl Into<String>, facets: Faceted, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
@@ -259,7 +212,7 @@ fn test_faceted_search() {
             faceted: Some(facets.clone()),
             ..Default::default()
         };
-        let response = reader.search(&request).unwrap();
+        let response = reader.search(&request, &TextContext::default()).unwrap();
         println!("Response: {response:#?}");
         assert_eq!(response.total, expected, "Failed faceted query: '{}'. With facets: {:?}", query, facets);
 
@@ -281,7 +234,7 @@ fn test_faceted_search() {
 
 #[test]
 fn test_quote_fixing() {
-    fn query(reader: &TextReaderService, query: impl Into<String>) {
+    fn query(reader: &TextSearcher, query: impl Into<String>) {
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: query.into(),
@@ -290,7 +243,7 @@ fn test_quote_fixing() {
             ..Default::default()
         };
 
-        let response = reader.search(&request).unwrap();
+        let response = reader.search(&request, &TextContext::default()).unwrap();
         assert_eq!(response.query, "\"enough test\"");
     }
 
@@ -303,7 +256,7 @@ fn test_quote_fixing() {
 
 #[test]
 fn test_search_with_min_score() {
-    fn query(reader: &TextReaderService, query: impl Into<String>, min_score: f32, expected: i32) {
+    fn query(reader: &TextSearcher, query: impl Into<String>, min_score: f32, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
@@ -314,7 +267,7 @@ fn test_search_with_min_score() {
             ..Default::default()
         };
 
-        let response = reader.search(&request).unwrap();
+        let response = reader.search(&request, &TextContext::default()).unwrap();
         assert_eq!(response.results.len() as i32, expected, "Failed query: '{}'", query);
         assert!(!response.next_page);
     }
@@ -344,7 +297,7 @@ fn test_int_order_pagination() {
         ..Default::default()
     };
 
-    let response = reader.search(&request).unwrap();
+    let response = reader.search(&request, &TextContext::default()).unwrap();
     assert_eq!(response.results.len(), 1);
     assert!(response.next_page);
 }

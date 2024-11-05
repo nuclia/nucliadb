@@ -111,17 +111,6 @@ pub struct HnswOps<'a, DR> {
 }
 
 impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
-    #[allow(unused)]
-    fn select_neighbours_simple(
-        &self,
-        k_neighbours: usize,
-        mut candidates: Vec<(Address, Edge)>,
-    ) -> Vec<(Address, Edge)> {
-        candidates.sort_unstable_by_key(|(n, d)| std::cmp::Reverse(Cnx(*n, *d)));
-        candidates.dedup_by_key(|(addr, _)| *addr);
-        candidates.truncate(k_neighbours);
-        candidates
-    }
     fn select_neighbours_heuristic(
         &self,
         k_neighbours: usize,

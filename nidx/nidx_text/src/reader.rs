@@ -22,6 +22,9 @@ use std::fmt::Debug;
 use std::path::Path;
 use std::time::*;
 
+use crate::search_query::TextContext;
+use crate::{prefilter::*, query_io};
+
 use super::schema::TextSchema;
 use super::search_query;
 use anyhow::anyhow;
@@ -31,11 +34,10 @@ use nidx_protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults, OrderBy,
     ResultScore, StreamRequest,
 };
-use nidx_types::ValidField;
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::BytesColumn;
 use tantivy::fastfield::FacetReader;
-use tantivy::query::{AllQuery, Query, QueryParser};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::schema::Value;
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, ReloadPolicy, Searcher};
@@ -136,144 +138,136 @@ impl SegmentCollector for FieldUuidSegmentCollector {
     }
 }
 
-// struct FieldUuidCollector {
-//     uuid: Field,
-//     field: Field,
-// }
+struct FieldUuidCollector;
 
-// impl Collector for FieldUuidCollector {
-//     type Fruit = Vec<ValidField>;
+impl Collector for FieldUuidCollector {
+    type Fruit = Vec<ValidField>;
 
-//     type Child = FieldUuidSegmentCollector;
+    type Child = FieldUuidSegmentCollector;
 
-//     fn for_segment(
-//         &self,
-//         _segment_local_id: tantivy::SegmentOrdinal,
-//         segment: &tantivy::SegmentReader,
-//     ) -> tantivy::Result<Self::Child> {
-//         let uuid_reader = segment.fast_fields().bytes("uuid")?.unwrap();
-//         let field_reader = segment.facet_reader("field")?;
-//         Ok(FieldUuidSegmentCollector {
-//             uuid_reader,
-//             field_reader,
-//             results: vec![],
-//         })
-//     }
+    fn for_segment(
+        &self,
+        _segment_local_id: tantivy::SegmentOrdinal,
+        segment: &tantivy::SegmentReader,
+    ) -> tantivy::Result<Self::Child> {
+        let uuid_reader = segment.fast_fields().bytes("uuid")?.unwrap();
+        let field_reader = segment.facet_reader("field")?;
+        Ok(FieldUuidSegmentCollector {
+            uuid_reader,
+            field_reader,
+            results: vec![],
+        })
+    }
 
-//     fn requires_scoring(&self) -> bool {
-//         false
-//     }
+    fn requires_scoring(&self) -> bool {
+        false
+    }
 
-//     fn merge_fruits(
-//         &self,
-//         segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
-//     ) -> tantivy::Result<Self::Fruit> {
-//         Ok(segment_fruits
-//             .into_iter()
-//             .reduce(|mut a, mut b| {
-//                 a.append(&mut b);
-//                 a
-//             })
-//             .unwrap_or_default())
-//     }
-// }
+    fn merge_fruits(
+        &self,
+        segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
+    ) -> tantivy::Result<Self::Fruit> {
+        Ok(segment_fruits
+            .into_iter()
+            .reduce(|mut a, mut b| {
+                a.append(&mut b);
+                a
+            })
+            .unwrap_or_default())
+    }
+}
 
 impl TextReaderService {
-    // fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
-    //     let schema = &self.schema;
-    //     let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
-    //     let mut created_queries = Vec::new();
-    //     let mut modified_queries = Vec::new();
+    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
+        let schema = &self.schema;
+        let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
+        let mut created_queries = Vec::new();
+        let mut modified_queries = Vec::new();
 
-    //     if let Some(security) = request.security.as_ref() {
-    //         for group_id in security.access_groups.iter() {
-    //             let mut group_id_key = group_id.clone();
-    //             if !group_id.starts_with('/') {
-    //                 // Slash needs to be added to be compatible with tantivy facet fields
-    //                 group_id_key = "/".to_string() + group_id;
-    //             }
-    //             let facet = Facet::from_text(&group_id_key).unwrap();
-    //             let term = Term::from_facet(self.schema.groups_with_access, &facet);
-    //             let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-    //             access_groups_queries.push(Box::new(term_query));
-    //         }
-    //     }
+        if let Some(security) = request.security.as_ref() {
+            for group_id in security.access_groups.iter() {
+                let mut group_id_key = group_id.clone();
+                if !group_id.starts_with('/') {
+                    // Slash needs to be added to be compatible with tantivy facet fields
+                    group_id_key = "/".to_string() + group_id;
+                }
+                let facet = Facet::from_text(&group_id_key).unwrap();
+                let term = Term::from_facet(self.schema.groups_with_access, &facet);
+                let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+                access_groups_queries.push(Box::new(term_query));
+            }
+        }
 
-    //     for timestamp_query in request.timestamp_filters.iter() {
-    //         let from = timestamp_query.from.as_ref();
-    //         let to = timestamp_query.to.as_ref();
-    //         let (field, add_to) = match timestamp_query.applies_to {
-    //             FieldDateType::Created => ("created", &mut created_queries),
-    //             FieldDateType::Modified => ("modified", &mut modified_queries),
-    //         };
-    //         // TODO
-    //         // if let Some(query) = search_query::produce_date_range_query(field, from, to) {
-    //         //     let query: Box<dyn Query> = Box::new(query);
-    //         //     add_to.push((Occur::Should, query));
-    //         // }
-    //     }
+        for timestamp_query in request.timestamp_filters.iter() {
+            let from = timestamp_query.from.as_ref();
+            let to = timestamp_query.to.as_ref();
+            let (field, add_to) = match timestamp_query.applies_to {
+                FieldDateType::Created => ("created", &mut created_queries),
+                FieldDateType::Modified => ("modified", &mut modified_queries),
+            };
+            if let Some(query) = search_query::produce_date_range_query(field, from, to) {
+                let query: Box<dyn Query> = Box::new(query);
+                add_to.push((Occur::Should, query));
+            }
+        }
 
-    //     let mut subqueries = vec![];
-    //     if !access_groups_queries.is_empty() {
-    //         let public_fields_query = Box::new(TermQuery::new(
-    //             Term::from_field_u64(self.schema.groups_public, 1_u64),
-    //             IndexRecordOption::Basic,
-    //         ));
-    //         access_groups_queries.push(public_fields_query);
-    //         let access_groups_query: Box<dyn Query> = Box::new(BooleanQuery::union(access_groups_queries));
-    //         subqueries.push(access_groups_query);
-    //     }
-    //     if !created_queries.is_empty() {
-    //         let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
-    //         subqueries.push(created_query);
-    //     }
-    //     if !modified_queries.is_empty() {
-    //         let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
-    //         subqueries.push(modified_query);
-    //     }
-    //     if let Some(labels_formula) = request.labels_formula.as_ref() {
-    //         let labels_formula_query = query_io::translate_labels_expression(labels_formula, schema);
-    //         subqueries.push(labels_formula_query);
-    //     }
+        let mut subqueries = vec![];
+        if !access_groups_queries.is_empty() {
+            let public_fields_query = Box::new(TermQuery::new(
+                Term::from_field_u64(self.schema.groups_public, 1_u64),
+                IndexRecordOption::Basic,
+            ));
+            access_groups_queries.push(public_fields_query);
+            let access_groups_query: Box<dyn Query> = Box::new(BooleanQuery::union(access_groups_queries));
+            subqueries.push(access_groups_query);
+        }
+        if !created_queries.is_empty() {
+            let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
+            subqueries.push(created_query);
+        }
+        if !modified_queries.is_empty() {
+            let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
+            subqueries.push(modified_query);
+        }
+        if let Some(labels_formula) = request.labels_formula.as_ref() {
+            let labels_formula_query = query_io::translate_labels_expression(labels_formula, schema);
+            subqueries.push(labels_formula_query);
+        }
 
-    //     if let Some(keywords_formula) = request.keywords_formula.as_ref() {
-    //         let keywords_formula_query = query_io::translate_keywords_expression(keywords_formula, schema);
-    //         subqueries.push(keywords_formula_query);
-    //     }
+        if let Some(keywords_formula) = request.keywords_formula.as_ref() {
+            let keywords_formula_query = query_io::translate_keywords_expression(keywords_formula, schema);
+            subqueries.push(keywords_formula_query);
+        }
 
-    //     if subqueries.is_empty() {
-    //         return Ok(PreFilterResponse {
-    //             valid_fields: ValidFieldCollector::All,
-    //         });
-    //     }
+        if subqueries.is_empty() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::All,
+            });
+        }
 
-    //     let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
-    //     let searcher = self.reader.searcher();
-    //     let collector = FieldUuidCollector {
-    //         uuid: self.schema.uuid,
-    //         field: self.schema.field,
-    //     };
-    //     let docs_fulfilled = searcher.search(&prefilter_query, &collector)?;
+        let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
+        let searcher = self.reader.searcher();
+        let docs_fulfilled = searcher.search(&prefilter_query, &FieldUuidCollector)?;
 
-    //     // If none of the fields match the pre-filter, thats all the query planner needs to know.
-    //     if docs_fulfilled.is_empty() {
-    //         return Ok(PreFilterResponse {
-    //             valid_fields: ValidFieldCollector::None,
-    //         });
-    //     }
+        // If none of the fields match the pre-filter, thats all the query planner needs to know.
+        if docs_fulfilled.is_empty() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::None,
+            });
+        }
 
-    //     // If all the fields match the pre-filter, thats all the query planner needs to know
-    //     if docs_fulfilled.len() as u64 == searcher.num_docs() {
-    //         return Ok(PreFilterResponse {
-    //             valid_fields: ValidFieldCollector::All,
-    //         });
-    //     }
+        // If all the fields match the pre-filter, thats all the query planner needs to know
+        if docs_fulfilled.len() as u64 == searcher.num_docs() {
+            return Ok(PreFilterResponse {
+                valid_fields: ValidFieldCollector::All,
+            });
+        }
 
-    //     // The fields matching the pre-filter are a non-empty subset of all the fields
-    //     Ok(PreFilterResponse {
-    //         valid_fields: ValidFieldCollector::Some(docs_fulfilled),
-    //     })
-    // }
+        // The fields matching the pre-filter are a non-empty subset of all the fields
+        Ok(PreFilterResponse {
+            valid_fields: ValidFieldCollector::Some(docs_fulfilled),
+        })
+    }
 
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<DocumentIterator> {
         let producer = BatchProducer {
@@ -299,8 +293,12 @@ impl TextReaderService {
         Ok(count)
     }
 
-    pub fn search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
-        self.do_search(request)
+    pub fn search(
+        &self,
+        request: &DocumentSearchRequest,
+        context: &TextContext,
+    ) -> anyhow::Result<DocumentSearchResponse> {
+        self.do_search(request, context)
     }
 
     // fn stored_ids(&self) -> anyhow::Result<Vec<String>> {
@@ -504,7 +502,11 @@ impl TextReaderService {
         }
     }
 
-    fn do_search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
+    fn do_search(
+        &self,
+        request: &DocumentSearchRequest,
+        context: &TextContext,
+    ) -> anyhow::Result<DocumentSearchResponse> {
         use crate::search_query::create_query;
         let id = Some(&request.id);
         let time = Instant::now();
@@ -520,7 +522,7 @@ impl TextReaderService {
         let text = TextReaderService::adapt_text(&query_parser, &request.body);
         let advanced_query =
             request.advanced_query.as_ref().map(|query| query_parser.parse_query(query)).transpose()?;
-        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query)?;
+        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query, context)?;
 
         // Offset to search from
         let results = request.result_per_page as usize;
