@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 pub mod api;
+mod grpc_server;
 pub mod indexer;
 pub mod maintenance;
 pub mod metadata;

@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use futures::executor::block_on;
 use nidx::settings::{ObjectStoreConfig, StorageSettings};
-use nidx::{api, searcher, Settings};
+use nidx::{api, searcher, NidxMetadata, Settings};
 use nidx_protos::node_reader_client::NodeReaderClient;
 use nidx_protos::node_writer_client::NodeWriterClient;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
@@ -51,12 +51,18 @@ impl NidxFixture {
             merge: Default::default(),
         };
         let searcher_task = Some(tokio::task::spawn(searcher::run(settings.clone())));
-        let api_task = Some(tokio::task::spawn(api::run(settings.clone())));
+
+        let meta = NidxMetadata::new(settings.metadata.database_url).await?;
+        let _storage = settings.storage.expect("Storage settings needed").object_store.client();
+
+        let shards_api = api::grpc::ApiServer::new(meta.clone(), None).await?;
+        let port = shards_api.port()?;
+        let api_task = Some(tokio::task::spawn(shards_api.serve()));
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         let searcher_client = NodeReaderClient::connect("http://localhost:10001").await?;
-        let api_client = NodeWriterClient::connect("http://localhost:10000").await?;
+        let api_client = NodeWriterClient::connect(format!("http://localhost:{port}")).await?;
 
         Ok(NidxFixture {
             searcher_client,

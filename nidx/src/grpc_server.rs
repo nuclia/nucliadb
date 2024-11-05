@@ -18,20 +18,22 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod grpc;
-pub mod shards;
+use tokio::net::{TcpListener, ToSocketAddrs};
+use tonic::transport::server::{Router, TcpIncoming};
 
-use tracing::debug;
+/// A tonic server that allows binding to and returning a random port.
+pub struct GrpcServer(TcpListener);
 
-use crate::{NidxMetadata, Settings};
+impl GrpcServer {
+    pub async fn new(address: impl ToSocketAddrs) -> anyhow::Result<Self> {
+        Ok(GrpcServer(TcpListener::bind(address).await?))
+    }
 
-pub async fn run(settings: Settings) -> anyhow::Result<()> {
-    let meta = NidxMetadata::new(settings.metadata.database_url).await?;
-    let _storage = settings.storage.expect("Storage settings needed").object_store.client();
+    pub fn port(&self) -> anyhow::Result<u16> {
+        Ok(self.0.local_addr()?.port())
+    }
 
-    let shards_api = grpc::ApiServer::new(meta.clone(), Some(10000)).await?;
-    debug!("Running Shards API at port {}", shards_api.port()?);
-    shards_api.serve().await?;
-
-    Ok(())
+    pub async fn serve(self, server: Router) -> Result<(), tonic::transport::Error> {
+        server.serve_with_incoming(TcpIncoming::from_listener(self.0, true, None).unwrap()).await
+    }
 }
