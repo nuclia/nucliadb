@@ -18,22 +18,21 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::time::Duration;
-
 use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
+use nidx::searcher::grpc::SearchServer;
+use nidx::searcher::SyncedSearcher;
 use nidx::settings::{ObjectStoreConfig, StorageSettings};
-use nidx::{searcher, NidxMetadata, Settings};
+use nidx::{NidxMetadata, Settings};
 use nidx_protos::node_reader_client::NodeReaderClient;
 use nidx_protos::node_writer_client::NodeWriterClient;
 use sqlx::PgPool;
+use tempfile::tempdir;
 use tonic::transport::Channel;
 
 pub struct NidxFixture {
     pub searcher_client: NodeReaderClient<Channel>,
     pub api_client: NodeWriterClient<Channel>,
-    searcher_task: Option<tokio::task::JoinHandle<anyhow::Result<()>>>,
-    api_task: Option<tokio::task::JoinHandle<anyhow::Result<()>>>,
 }
 
 impl NidxFixture {
@@ -49,23 +48,28 @@ impl NidxFixture {
             }),
             merge: Default::default(),
         };
-        let searcher_task = Some(tokio::task::spawn(searcher::run(settings.clone())));
-
+        // API server
         let api_service = ApiServer::new(settings.metadata.clone()).into_service();
         let api_server = GrpcServer::new("localhost:0").await?;
-        let port = api_server.port()?;
-        let api_task = Some(tokio::task::spawn(api_server.serve(api_service)));
+        let api_port = api_server.port()?;
+        tokio::task::spawn(api_server.serve(api_service));
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Searcher API
+        let work_dir = tempdir()?;
+        let searcher = SyncedSearcher::new(settings.metadata.clone(), work_dir.path());
+        let searcher_api = SearchServer::new(settings.metadata.clone(), searcher.index_cache());
+        let searcher_server = GrpcServer::new("localhost:0").await?;
+        let searcher_port = searcher_server.port()?;
+        tokio::task::spawn(searcher_server.serve(searcher_api.into_service()));
+        tokio::task::spawn(async move { searcher.run(settings.storage.unwrap().object_store).await });
 
-        let searcher_client = NodeReaderClient::connect("http://localhost:10001").await?;
-        let api_client = NodeWriterClient::connect(format!("http://localhost:{port}")).await?;
+        // Clients
+        let searcher_client = NodeReaderClient::connect(format!("http://localhost:{searcher_port}")).await?;
+        let api_client = NodeWriterClient::connect(format!("http://localhost:{api_port}")).await?;
 
         Ok(NidxFixture {
             searcher_client,
             api_client,
-            searcher_task,
-            api_task,
         })
     }
 }

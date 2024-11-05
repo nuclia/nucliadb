@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod grpc;
+pub mod grpc;
 mod index_cache;
 mod query_language;
 mod query_planner;
@@ -35,6 +35,7 @@ use std::sync::Arc;
 
 use tempfile::tempdir;
 
+use crate::grpc_server::GrpcServer;
 use crate::{NidxMetadata, Settings};
 
 pub use index_cache::IndexSearcher;
@@ -91,7 +92,8 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
 
     let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
-    let api_task = tokio::task::spawn(api.serve());
+    let server = GrpcServer::new("localhost:10001").await?;
+    let api_task = tokio::task::spawn(server.serve(api.into_service()));
     let search_task = tokio::task::spawn(async move { searcher.run(storage).await });
 
     tokio::select! {
