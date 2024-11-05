@@ -18,108 +18,94 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashSet;
+mod common;
 
-use nidx_vector::config::VectorType;
-use nidx_vector::data_point_provider::{DTrie, SearchRequest};
-use nidx_vector::formula::Formula;
-use nidx_vector::{
-    config::{Similarity, VectorConfig},
-    data_point::{self, Elem, LabelDictionary},
-    data_point_provider::reader::Reader,
-};
+use nidx_protos::{VectorSearchRequest, VectorSentence};
+use nidx_vector::{config::*, VectorsContext};
 use rstest::rstest;
 use tempfile::tempdir;
 
-fn elem(index: usize) -> Elem {
+fn sentence(index: usize) -> VectorSentence {
     let mut vector: Vec<f32> = [0.0; DIMENSION].into();
     vector[index] = 1.0;
 
-    Elem::new(format!("key_{index}"), vector, LabelDictionary::default(), None)
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct Request {
-    vector: Vec<f32>,
-    formula: Formula,
-}
-
-impl SearchRequest for Request {
-    fn with_duplicates(&self) -> bool {
-        false
-    }
-    fn get_query(&self) -> &[f32] {
-        &self.vector
-    }
-
-    fn get_filter(&self) -> &Formula {
-        &self.formula
-    }
-
-    fn no_results(&self) -> usize {
-        10
-    }
-    fn min_score(&self) -> f32 {
-        -1.0
+    VectorSentence {
+        vector,
+        metadata: None,
     }
 }
 
-const DIMENSION: usize = 128;
+const DIMENSION: usize = 64;
 
 #[rstest]
 fn test_basic_search(
     #[values(Similarity::Dot, Similarity::Cosine)] similarity: Similarity,
     #[values(VectorType::DenseF32Unaligned, VectorType::DenseF32 { dimension: DIMENSION })] vector_type: VectorType,
 ) -> anyhow::Result<()> {
-    let workdir = tempdir()?;
-    let segment_path = workdir.path();
+    use common::{resource, TestOpener};
+    use nidx_vector::{VectorIndexer, VectorSearcher};
+
     let config = VectorConfig {
         similarity,
         vector_type,
         ..Default::default()
     };
 
-    // Write some data
-    let segment = data_point::create(segment_path, (0..DIMENSION).map(elem).collect(), &config, HashSet::new())?;
+    // Creates a resource with some orthogonal vectors, to test search
+    let mut resource = resource(vec![]);
+    let sentences =
+        &mut resource.paragraphs.values_mut().next().unwrap().paragraphs.values_mut().next().unwrap().sentences;
+    sentences.clear();
+    let id = &resource.resource.as_ref().unwrap().uuid;
+    for i in 0..DIMENSION {
+        sentences.insert(format!("{id}/a/title/0-{i}"), sentence(i));
+    }
 
-    // Search for a specific element
-    let reader = Reader::open(vec![(segment.into_metadata(), 0i64.into())], config, DTrie::new())?;
-    let search_for = elem(5);
-    let results = reader._search(
-        &Request {
+    let segment_dir = tempdir()?;
+    let segment_meta = VectorIndexer.index_resource(segment_dir.path(), &config, &resource)?.unwrap();
+
+    // Search near one specific vector
+    let reader = VectorSearcher::open(config.clone(), TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))?;
+    let search_for = sentence(5);
+    let results = reader.search(
+        &VectorSearchRequest {
             vector: search_for.vector,
-            formula: Formula::new(),
+            result_per_page: 10,
+            ..Default::default()
         },
-        &None,
+        &VectorsContext::default(),
     )?;
-    assert_eq!(results.len(), 10);
-    assert_eq!(results[0].id(), search_for.key);
-    assert_eq!(results[0].score(), 1.0);
-    assert_eq!(results[1].score(), 0.0);
+
+    assert_eq!(results.documents.len(), 10);
+    assert_eq!(results.documents[0].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-5"));
+    assert_eq!(results.documents[0].score, 1.0);
+    assert_eq!(results.documents[1].score, 0.0);
 
     // Search near a few elements
     let mut vector: Vec<f32> = [0.0; DIMENSION].into();
-    vector[42] = 0.7;
-    vector[43] = 0.6;
+    vector[42] = 0.9;
+    vector[43] = 0.7;
     vector[44] = 0.5;
-    vector[45] = 0.4;
-    let results = reader._search(
-        &Request {
+    vector[45] = 0.3;
+    let results = reader.search(
+        &VectorSearchRequest {
             vector,
-            formula: Formula::new(),
+            result_per_page: 10,
+            ..Default::default()
         },
-        &None,
+        &VectorsContext::default(),
     )?;
-    assert_eq!(results.len(), 10);
-    assert_eq!(results[0].id(), elem(42).key);
-    assert!(results[0].score() > 0.2);
-    assert_eq!(results[1].id(), elem(43).key);
-    assert!(results[1].score() > 0.2);
-    assert_eq!(results[2].id(), elem(44).key);
-    assert!(results[2].score() > 0.2);
-    assert_eq!(results[3].id(), elem(45).key);
-    assert!(results[3].score() > 0.2);
-    assert_eq!(results[5].score(), 0.0);
+
+    assert_eq!(results.documents.len(), 10);
+    assert_eq!(results.documents[0].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-42"));
+    assert!(results.documents[0].score > 0.2);
+    assert_eq!(results.documents[1].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-43"));
+    assert!(results.documents[1].score > 0.2);
+    assert_eq!(results.documents[2].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-44"));
+    assert!(results.documents[2].score > 0.2);
+    assert_eq!(results.documents[3].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-45"));
+    assert!(results.documents[3].score > 0.2);
+    assert_eq!(results.documents[5].score, 0.0);
 
     Ok(())
 }

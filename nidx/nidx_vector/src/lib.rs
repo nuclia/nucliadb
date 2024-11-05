@@ -18,17 +18,37 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod config;
+mod data_point;
+mod data_point_provider;
+mod data_types;
+mod formula;
+mod indexer;
+mod query_io;
+mod utils;
+mod vector_types;
+
 use config::VectorConfig;
 use data_point::open;
-use data_point_provider::reader::{Reader, TimeSensitiveDLog, VectorsContext};
+use data_point_provider::reader::{Reader, TimeSensitiveDLog};
 use data_point_provider::DTrie;
 use indexer::index_resource;
 use nidx_protos::{Resource, VectorSearchRequest, VectorSearchResponse};
 use nidx_types::{OpenIndexMetadata, SegmentMetadata};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
+use thiserror::Error;
 
-type VectorSegmentMetadata = SegmentMetadata<()>;
+pub use data_point_provider::reader::VectorsContext;
+pub use indexer::SEGMENT_TAGS;
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct VectorSegmentMeta {
+    tags: HashSet<String>,
+}
+
+type VectorSegmentMetadata = SegmentMetadata<VectorSegmentMeta>;
 
 pub struct VectorIndexer;
 
@@ -36,10 +56,10 @@ impl VectorIndexer {
     pub fn index_resource(
         &self,
         output_dir: &Path,
-        config: VectorConfig,
+        config: &VectorConfig,
         resource: &Resource,
     ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-        index_resource(resource.into(), output_dir, &config)
+        index_resource(resource.into(), output_dir, config)
     }
 
     pub fn deletions_for_resource(&self, resource: &Resource) -> Vec<String> {
@@ -50,7 +70,7 @@ impl VectorIndexer {
         &self,
         work_dir: &Path,
         config: VectorConfig,
-        open_index: impl OpenIndexMetadata<()>,
+        open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
         // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
         // Wait and see how the Tantivy indexes turn out
@@ -80,8 +100,9 @@ impl VectorIndexer {
         Ok(VectorSegmentMetadata {
             path: work_dir.to_path_buf(),
             records: open_destination.no_nodes(),
-            tags: HashSet::new(),
-            index_metadata: (),
+            index_metadata: VectorSegmentMeta {
+                tags: open_destination.tags().clone(),
+            },
         })
     }
 }
@@ -91,7 +112,7 @@ pub struct VectorSearcher {
 }
 
 impl VectorSearcher {
-    pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<()>) -> anyhow::Result<Self> {
+    pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> anyhow::Result<Self> {
         let mut delete_log = DTrie::new();
 
         for (key, seq) in open_index.deletions() {
@@ -112,20 +133,6 @@ impl VectorSearcher {
     }
 }
 
-//
-// nidx_vector code
-//
-pub mod config;
-pub mod data_point;
-pub mod data_point_provider;
-mod data_types;
-pub mod formula;
-pub mod indexer;
-mod query_io;
-mod utils;
-mod vector_types;
-
-use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum VectorErr {
     #[error("IO error: {0}")]

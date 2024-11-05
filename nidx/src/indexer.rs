@@ -143,7 +143,7 @@ async fn index_resource_to_index(
 ) -> anyhow::Result<(Option<NewSegment>, Vec<String>)> {
     let segment = match index.kind {
         IndexKind::Vector => {
-            nidx_vector::VectorIndexer.index_resource(output_dir, index.config()?, resource)?.map(|x| x.into())
+            nidx_vector::VectorIndexer.index_resource(output_dir, &index.config()?, resource)?.map(|x| x.into())
         }
         IndexKind::Text => nidx_text::TextIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
         IndexKind::Paragraph => {

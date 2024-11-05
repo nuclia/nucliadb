@@ -52,33 +52,6 @@ const HEADER_LEN: usize = 4 * USIZE_LEN;
 #[derive(Clone, Copy)]
 pub struct Node;
 impl Node {
-    pub fn serialized_len<S, V, T, M>(key: S, vector: V, trie: T, metadata: Option<M>) -> usize
-    where
-        S: AsRef<[u8]>,
-        V: AsRef<[u8]>,
-        T: AsRef<[u8]>,
-        M: AsRef<[u8]>,
-    {
-        let skey = key.as_ref();
-        let svector = vector.as_ref();
-        let strie = trie.as_ref();
-        let svector_len = svector.len() + USIZE_LEN;
-        let skey_len = skey.len() + USIZE_LEN;
-        let slabels_len = strie.len();
-        let metadata_len = metadata.map(|m| m.as_ref().len()).unwrap_or_default();
-        HEADER_LEN + svector_len + skey_len + slabels_len + metadata_len
-    }
-    pub fn serialize<S, V, T, M>(key: S, vector: V, alignment: usize, labels: T, metadata: Option<M>) -> Vec<u8>
-    where
-        S: AsRef<[u8]>,
-        V: AsRef<[u8]>,
-        T: AsRef<[u8]>,
-        M: AsRef<[u8]>,
-    {
-        let mut buf = vec![];
-        Node::serialize_into(&mut buf, key, vector, alignment, labels, metadata).unwrap();
-        buf
-    }
     // labels must be sorted.
     pub fn serialize_into<W, S, V, T, M>(
         mut w: W,
