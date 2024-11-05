@@ -146,15 +146,17 @@ async fn index_resource_to_index(
             nidx_vector::VectorIndexer.index_resource(output_dir, index.config()?, resource)?.map(|x| x.into())
         }
         IndexKind::Text => nidx_text::TextIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
-        IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
-        _ => unimplemented!(),
+        IndexKind::Paragraph => {
+            nidx_paragraph::ParagraphIndexer.index_resource(output_dir, resource)?.map(|x| x.into())
+        }
+        IndexKind::Relation => nidx_relation::RelationIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
     };
 
     let deletions = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer.deletions_for_resource(resource),
         IndexKind::Text => nidx_text::TextIndexer.deletions_for_resource(resource),
         IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.deletions_for_resource(resource),
-        _ => unimplemented!(),
+        IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(resource),
     };
 
     Ok((segment, deletions))
