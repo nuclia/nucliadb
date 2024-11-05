@@ -22,6 +22,7 @@ use std::sync::Arc;
 
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{SearchRequest, SearchResponse};
+use nidx_relation::RelationSearcher;
 use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
 
@@ -43,6 +44,9 @@ pub async fn search(
     let paragraph_index = Index::find(&meta.pool, shard_id, IndexKind::Paragraph, "paragraph").await?;
     let paragraph_searcher_arc = index_cache.get(&paragraph_index.id).await?;
 
+    let relation_index = Index::find(&meta.pool, shard_id, IndexKind::Relation, "relation").await?;
+    let relation_searcher_arc = index_cache.get(&relation_index.id).await?;
+
     let text_index = Index::find(&meta.pool, shard_id, IndexKind::Text, "text").await?;
     let text_searcher_arc = index_cache.get(&text_index.id).await?;
 
@@ -53,6 +57,7 @@ pub async fn search(
         blocking_search(
             search_request,
             paragraph_searcher_arc.as_ref().into(),
+            relation_searcher_arc.as_ref().into(),
             text_searcher_arc.as_ref().into(),
             vector_seacher_arc.as_ref().into(),
         )
@@ -63,6 +68,7 @@ pub async fn search(
 fn blocking_search(
     search_request: SearchRequest,
     paragraph_searcher: &ParagraphSearcher,
+    relation_searcher: &RelationSearcher,
     text_searcher: &TextSearcher,
     vector_searcher: &VectorSearcher,
 ) -> anyhow::Result<SearchResponse> {
@@ -87,27 +93,27 @@ fn blocking_search(
         move || paragraph_searcher.search(&request, &index_queries.paragraphs_context)
     });
 
+    let relation_task = index_queries.relations_request.map(|request| move || relation_searcher.search(&request));
+
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();
         move || vector_searcher.search(&request, &index_queries.vectors_context)
     });
 
-    // TODO
-    // let relation_task = index_queries.relations_request.map(|request| {
-    //     let info = info_span!(parent: &span, "relations search");
-    //     let task = move || read_rw_lock(&self.relation_reader).search(&request);
-    //     || run_with_telemetry(info, task)
-    // });
-
     let mut rtext = None;
     let mut rparagraph = None;
     let mut rvector = None;
-    // let mut rrelation = None;
+    let mut rrelation = None;
 
     std::thread::scope(|scope| {
         if let Some(task) = paragraph_task {
             let rparagraph = &mut rparagraph;
             scope.spawn(move || *rparagraph = Some(task()));
+        }
+
+        if let Some(task) = relation_task {
+            let rrelation = &mut rrelation;
+            scope.spawn(move || *rrelation = Some(task()));
         }
 
         if let Some(task) = text_task {
@@ -125,6 +131,6 @@ fn blocking_search(
         document: rtext.transpose()?,
         paragraph: rparagraph.transpose()?,
         vector: rvector.transpose()?,
-        relation: None,
+        relation: rrelation.transpose()?,
     })
 }
