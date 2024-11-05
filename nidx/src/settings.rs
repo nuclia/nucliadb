@@ -1,3 +1,4 @@
+use std::str::FromStr;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -25,10 +26,11 @@ use object_store::aws::AmazonS3Builder;
 use object_store::local::LocalFileSystem;
 use object_store::memory::InMemory;
 use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use serde_with::with_prefix;
+use sqlx::postgres::PgConnectOptions;
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "object_store", rename_all = "lowercase")]
 pub enum ObjectStoreConfig {
     Memory,
@@ -102,26 +104,32 @@ impl ObjectStoreConfig {
     }
 }
 
-#[derive(Deserialize, Debug)]
-pub struct MetadataSettings {
-    pub database_url: String,
+fn deserialize_database_url<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PgConnectOptions, D::Error> {
+    let url = String::deserialize(deserializer)?;
+    Ok(PgConnectOptions::from_str(&url).unwrap())
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
+pub struct MetadataSettings {
+    #[serde(deserialize_with = "deserialize_database_url")]
+    pub database_url: PgConnectOptions,
+}
+
+#[derive(Clone, Deserialize, Debug)]
 pub struct IndexerSettings {
     #[serde(flatten)]
     pub object_store: ObjectStoreConfig,
     pub nats_server: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct StorageSettings {
     #[serde(flatten)]
     pub object_store: ObjectStoreConfig,
 }
 
 // Take a look to the merge scheduler for more details about these settings
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct MergeSettings {
     pub min_number_of_segments: usize,
     pub max_segment_size: usize,
@@ -141,7 +149,7 @@ with_prefix!(indexer "indexer_");
 with_prefix!(storage "storage_");
 with_prefix!(merge "merge_");
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct Settings {
     /// Connection to the metadata database
     /// Mandatory for all components
@@ -161,7 +169,7 @@ pub struct Settings {
     /// Merge scheduling algorithm configuration
     /// Required by scheduler
     #[serde(flatten, with = "merge")]
-    pub merge: Option<MergeSettings>,
+    pub merge: MergeSettings,
 }
 
 impl Settings {
@@ -183,6 +191,6 @@ mod tests {
             ("INDEXER_NATS_SERVER", "a"),
         ];
         let settings: Settings = envy::from_iter(env.iter().map(|(a, b)| (a.to_string(), b.to_string()))).unwrap();
-        assert_eq!(settings.metadata.database_url, "postgresql://localhost");
+        assert_eq!(settings.metadata.database_url.get_host(), "localhost");
     }
 }

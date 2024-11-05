@@ -25,9 +25,8 @@ use tracing::debug;
 
 use crate::{NidxMetadata, Settings};
 
-pub async fn run() -> anyhow::Result<()> {
-    let settings = Settings::from_env();
-    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
+pub async fn run(settings: Settings) -> anyhow::Result<()> {
+    let meta = NidxMetadata::new(settings.metadata.database_url).await?;
     let _storage = settings.storage.expect("Storage settings needed").object_store.client();
 
     debug!("Running Shards API");

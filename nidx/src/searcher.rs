@@ -83,10 +83,9 @@ impl SyncedSearcher {
     }
 }
 
-pub async fn run() -> anyhow::Result<()> {
+pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let work_dir = tempdir()?;
-    let settings = Settings::from_env();
-    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
+    let meta = NidxMetadata::new(settings.metadata.database_url).await?;
     let storage = settings.storage.expect("Storage settings needed").object_store.client();
 
     let searcher = SyncedSearcher::new(meta.clone(), work_dir.path());

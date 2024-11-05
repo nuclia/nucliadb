@@ -23,7 +23,7 @@ pub mod maintenance;
 pub mod metadata;
 pub mod searcher;
 mod segment_store;
-mod settings;
+pub mod settings;
 
 pub use metadata::NidxMetadata;
 pub use settings::Settings;

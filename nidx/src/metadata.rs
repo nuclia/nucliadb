@@ -29,6 +29,7 @@ pub use index::*;
 pub use merge_job::*;
 pub use segment::*;
 pub use shard::*;
+use sqlx::postgres::PgConnectOptions;
 
 /// A random ID to identify the lock we use during migration
 const MIGRATION_LOCK_ID: i64 = 5324678839066546102;
@@ -39,8 +40,8 @@ pub struct NidxMetadata {
 }
 
 impl NidxMetadata {
-    pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
-        let pool = sqlx::postgres::PgPoolOptions::new().connect(database_url).await?;
+    pub async fn new(connect_options: PgConnectOptions) -> Result<Self, sqlx::Error> {
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_with(connect_options).await?;
 
         Self::new_with_pool(pool).await
     }

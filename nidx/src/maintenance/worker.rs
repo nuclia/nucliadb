@@ -34,10 +34,9 @@ use crate::{
     NidxMetadata, Settings,
 };
 
-pub async fn run() -> anyhow::Result<()> {
-    let settings = Settings::from_env();
+pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let storage = settings.storage.as_ref().unwrap().object_store.client();
-    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
+    let meta = NidxMetadata::new(settings.metadata.database_url).await?;
 
     loop {
         let job = MergeJob::take(&meta.pool).await?;

@@ -33,13 +33,12 @@ use crate::{
     NidxMetadata, Settings,
 };
 
-pub async fn run() -> anyhow::Result<()> {
-    let settings = Settings::from_env();
+pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let indexer_settings = settings.indexer.unwrap();
-    let merger_settings = settings.merge.unwrap_or_default();
-    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
+    let merger_settings = settings.merge;
+    let meta = NidxMetadata::new(settings.metadata.database_url).await?;
 
-    let client = async_nats::connect(indexer_settings.nats_server).await?;
+    let client = async_nats::connect(&indexer_settings.nats_server).await?;
     let jetstream = async_nats::jetstream::new(client);
     let mut consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
 
