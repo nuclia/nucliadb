@@ -52,10 +52,10 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 
     let indexes = shard.indexes(&meta.pool).await?;
     // TODO: update when more indexes are created
-    assert_eq!(indexes.len(), 3);
+    assert_eq!(indexes.len(), 4);
 
     let names = indexes.iter().map(|index| index.name.as_str()).collect::<HashSet<_>>();
-    let expected = HashSet::from(["multilingual", "english", "fulltext"]);
+    let expected = HashSet::from(["multilingual", "english", "text", "paragraph"]);
     assert_eq!(names, expected);
 
     let shard = Shard::get(&meta.pool, shard.id).await?;

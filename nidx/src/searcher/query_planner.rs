@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nidx_paragraph::ParagraphsContext;
 use nidx_protos::{
     DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
 };
@@ -28,9 +29,6 @@ use nidx_vector::data_point_provider::reader::VectorsContext;
 use nidx_vector::indexer::SEGMENT_TAGS;
 
 use super::query_language;
-
-// TODO: Use the real stuff
-type ParagraphsContext = ();
 
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
@@ -132,10 +130,9 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
             .as_ref()
             .and_then(|e| query_language::extract_label_filters(e, SEGMENT_TAGS)),
     };
-    // TODO
-    // let paragraphs_context = ParagraphsContext {
-    //     filtering_formula: search_query,
-    // };
+    let paragraphs_context = ParagraphsContext {
+        filtering_formula: search_query,
+    };
 
     let prefilter = compute_prefilters(
         &search_request,
@@ -151,7 +148,7 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
         prefilter,
         index_queries: IndexQueries {
             vectors_context,
-            paragraphs_context: (),
+            paragraphs_context,
             texts_context,
             vectors_request,
             paragraphs_request,
@@ -343,26 +340,25 @@ mod tests {
         };
         assert_eq!(literal, "this");
 
-        // TODO: depends on paragraph index
-        // let index_queries = query_plan.index_queries;
-        // let vectors_context = index_queries.vectors_context;
-        // let paragraphs_context = index_queries.paragraphs_context;
-        // assert_eq!(vectors_context.filtering_formula, paragraphs_context.filtering_formula);
+        let index_queries = query_plan.index_queries;
+        let vectors_context = index_queries.vectors_context;
+        let paragraphs_context = index_queries.paragraphs_context;
+        assert_eq!(vectors_context.filtering_formula, paragraphs_context.filtering_formula);
 
-        // let Some(formula) = paragraphs_context.filtering_formula else {
-        //     panic!("there should be a paragraphs formula")
-        // };
-        // let BooleanExpression::Operation(inner_formula) = formula else {
-        //     panic!("the inner formula should be an operation");
-        // };
-        // assert!(matches!(inner_formula.operator, Operator::And));
-        // let BooleanExpression::Literal(literal) = &inner_formula.operands[0] else {
-        //     panic!("first operand should be a literal");
-        // };
-        // assert_eq!(literal, "and");
-        // let BooleanExpression::Literal(literal) = &inner_formula.operands[1] else {
-        //     panic!("second operand should be a literal");
-        // };
-        // assert_eq!(literal, "that");
+        let Some(formula) = paragraphs_context.filtering_formula else {
+            panic!("there should be a paragraphs formula")
+        };
+        let BooleanExpression::Operation(inner_formula) = formula else {
+            panic!("the inner formula should be an operation");
+        };
+        assert!(matches!(inner_formula.operator, Operator::And));
+        let BooleanExpression::Literal(literal) = &inner_formula.operands[0] else {
+            panic!("first operand should be a literal");
+        };
+        assert_eq!(literal, "and");
+        let BooleanExpression::Literal(literal) = &inner_formula.operands[1] else {
+            panic!("second operand should be a literal");
+        };
+        assert_eq!(literal, "that");
     }
 }
