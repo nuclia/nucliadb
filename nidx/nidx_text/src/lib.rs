@@ -28,7 +28,6 @@ mod search_query;
 use std::collections::HashSet;
 use std::path::Path;
 
-use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse, StreamRequest};
 use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
 use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};

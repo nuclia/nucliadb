@@ -28,9 +28,7 @@ mod search_response;
 mod set_query;
 mod stop_words;
 
-use nidx_protos::{
-    resource::ResourceStatus, ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest,
-};
+use nidx_protos::{ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest};
 use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
