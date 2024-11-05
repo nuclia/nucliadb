@@ -250,7 +250,7 @@ pub async fn purge_deleted_shards_and_indexes(meta: &NidxMetadata) -> anyhow::Re
 ///
 /// Here's a graphical representation:
 ///
-/// ```ignore
+/// ```text
 ///                              |   (too big to   |
 ///                              |    be merged)   |
 ///  `top_bucket_max_records` -> +-----------------+
@@ -328,20 +328,25 @@ impl MergeScheduler {
     /// deletions for 100, we'll never apply them and we'll end in an inconsistent
     /// state.
     pub async fn schedule_merges(&self, meta: &NidxMetadata, last_indexed_seq: Seq) -> anyhow::Result<()> {
+        // TODO: Remove vector index split by metadata when removing tags
         let merges = sqlx::query!(
             r#"
             SELECT
                 index_id,
                 array_agg(
-                    (id, records)
+                    (segments.id, records)
                     ORDER BY records DESC
                 ) AS "segments!: Vec<(SegmentId, i64)>"
             FROM segments
+            JOIN indexes ON segments.index_id = indexes.id
             WHERE
                 delete_at IS NULL AND merge_job_id IS NULL
                 AND seq <= $1
                 AND records <= $2
-            GROUP BY index_id"#,
+            GROUP BY
+                index_id,
+                -- Only merge vector segments with same tags
+                CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END"#,
             i64::from(last_indexed_seq),
             self.top_bucket_max_records as i64,
         )
@@ -389,6 +394,7 @@ mod tests {
 
         use nidx_types::Seq;
         use nidx_vector::config::VectorConfig;
+        use serde_json::json;
         use uuid::Uuid;
 
         use super::*;
@@ -687,6 +693,58 @@ mod tests {
             }
             let expected = [95, 98, 99, 100i64].into_iter().map(Seq::from).collect();
             assert_eq!(segment_sequences, expected);
+
+            Ok(())
+        }
+
+        #[sqlx::test]
+        async fn test_schedule_merges_with_segment_tags(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let merge_scheduler = MergeScheduler::from_settings(&MergeSettings {
+                min_number_of_segments: 2,
+                ..Default::default()
+            });
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+
+            let hidden_count = 1;
+            let visible_count = 2;
+
+            let segment_hidden =
+                Segment::create(&meta.pool, index.id, 1i64.into(), hidden_count, json!({"tags": ["/q/h"]})).await?;
+            segment_hidden.mark_ready(&meta.pool, 1000).await?;
+
+            let segment_visible =
+                Segment::create(&meta.pool, index.id, 2i64.into(), visible_count, json!({"tags": []})).await?;
+            segment_visible.mark_ready(&meta.pool, 1000).await?;
+
+            // Cannot merge (two segments with different tags)
+            merge_scheduler.schedule_merges(&meta, 6i64.into()).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert!(jobs.is_empty());
+
+            let segment_hidden2 =
+                Segment::create(&meta.pool, index.id, 3i64.into(), hidden_count, json!({"tags": ["/q/h"]})).await?;
+            segment_hidden2.mark_ready(&meta.pool, 1000).await?;
+
+            let segment_visible2 =
+                Segment::create(&meta.pool, index.id, 4i64.into(), visible_count, json!({"tags": []})).await?;
+            segment_visible2.mark_ready(&meta.pool, 1000).await?;
+
+            // Can merge hidden and visible segments pair-wise
+            merge_scheduler.schedule_merges(&meta, 6i64.into()).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), 2);
+
+            for j in jobs {
+                let merged_segments = j.segments(&meta.pool).await?;
+                assert_eq!(merged_segments.len(), 2);
+                // We use different number of records to differentiante hidden/visible segments
+                // because the tags field is private outside the vectors index
+                assert_eq!(merged_segments[0].records, merged_segments[1].records);
+            }
 
             Ok(())
         }
