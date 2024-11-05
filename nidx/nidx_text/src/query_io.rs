@@ -17,8 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::query_language::{BooleanExpression, BooleanOperation, Operator};
 use crate::schema::TextSchema;
+use nidx_types::query_language::*;
 use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, TermQuery};
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::tokenizer::TokenizerManager;
@@ -92,6 +92,6 @@ pub fn translate_labels_expression(expression: &BooleanExpression, schema: &Text
     translate_expression(expression, schema, false)
 }
 
-// pub fn translate_keywords_expression(expression: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
-//     translate_expression(expression, schema, true)
-// }
+pub fn translate_keywords_expression(expression: &BooleanExpression, schema: &TextSchema) -> Box<dyn Query> {
+    translate_expression(expression, schema, true)
+}

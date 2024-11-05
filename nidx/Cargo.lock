@@ -1474,22 +1474,14 @@ dependencies = [
  "nidx_tantivy",
  "nidx_tests",
  "nidx_types",
- "serde",
- "serde_json",
  "tantivy",
- "tantivy-common",
  "tempfile",
  "tracing",
- "uuid",
 ]
 
 [[package]]
 name = "nidx_types"
 version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde_json",
-]
 
 [[package]]
 name = "nidx_vector"
@@ -1505,7 +1497,6 @@ dependencies = [
  "rand",
  "rstest",
  "serde",
- "serde_json",
  "simsimd",
  "tempfile",
  "thiserror",

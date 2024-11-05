@@ -19,7 +19,7 @@
 //
 
 use crate::formula::*;
-use crate::query_language::*;
+use nidx_types::query_language::*;
 
 fn map_literal(literal: &str) -> Clause {
     Clause::Atom(AtomClause::label(literal.to_string()))

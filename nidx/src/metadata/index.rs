@@ -18,11 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{collections::HashSet, path::PathBuf};
+use std::{any::TypeId, collections::HashSet, path::PathBuf};
 
 use anyhow::anyhow;
 use nidx_vector::config::VectorConfig;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{
     self,
     types::{time::PrimitiveDateTime, JsonValue},
@@ -66,10 +66,10 @@ pub struct Index {
 }
 
 pub enum IndexConfig {
-    Text(JsonValue),
-    Paragraph(JsonValue),
+    Text(()),
+    Paragraph(()),
     Vector(VectorConfig),
-    Relation(JsonValue),
+    Relation(()),
 }
 
 impl Index {
@@ -191,22 +191,16 @@ impl Index {
         Segment::in_index(meta, self.id).await
     }
 
-    pub fn config(&self) -> anyhow::Result<IndexConfig> {
-        Ok(match self.kind {
-            IndexKind::Text => {
-                todo!()
-            }
-            IndexKind::Paragraph => {
-                todo!()
-            }
-            IndexKind::Vector => {
-                let vector_config = serde_json::from_value::<VectorConfig>(self.configuration.clone())?;
-                IndexConfig::from(vector_config)
-            }
-            IndexKind::Relation => {
-                todo!()
-            }
-        })
+    pub fn config<T: for<'de> Deserialize<'de> + 'static>(&self) -> anyhow::Result<T> {
+        let config_type = match self.kind {
+            IndexKind::Vector => TypeId::of::<VectorConfig>(),
+            _ => TypeId::of::<()>(),
+        };
+
+        if TypeId::of::<T>() != config_type {
+            return Err(anyhow!("Invalid index type while getting configuration"));
+        }
+        Ok(serde_json::from_value::<T>(self.configuration.clone())?)
     }
 }
 
@@ -254,17 +248,16 @@ impl TryInto<VectorConfig> for IndexConfig {
     }
 }
 
-// TODO: replace new_ methods for impl From like the one above
 impl IndexConfig {
     pub fn new_fulltext() -> Self {
-        Self::Text(JsonValue::Null)
+        Self::Text(())
     }
 
     pub fn new_keyword() -> Self {
-        Self::Paragraph(JsonValue::Null)
+        Self::Paragraph(())
     }
 
     pub fn new_relation() -> Self {
-        Self::Relation(JsonValue::Null)
+        Self::Relation(())
     }
 }

@@ -20,50 +20,100 @@
 
 use std::sync::Arc;
 
-use nidx_protos::{SearchRequest, SearchResponse, VectorSearchRequest};
-use nidx_vector::data_point_provider::reader::VectorsContext;
+use nidx_protos::{SearchRequest, SearchResponse};
+use nidx_text::TextSearcher;
+use nidx_vector::VectorSearcher;
 
-use crate::{metadata::Index, NidxMetadata};
+use crate::{
+    metadata::{Index, IndexKind},
+    NidxMetadata,
+};
 
-use super::index_cache::{IndexCache, IndexSearcher};
+use super::{index_cache::IndexCache, query_planner};
 
 pub async fn search(
     meta: &NidxMetadata,
     index_cache: Arc<IndexCache>,
     search_request: SearchRequest,
 ) -> anyhow::Result<SearchResponse> {
-    // TODO: Bring all query parsing code from nucliadb_vectors and use all indexes
+    let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
 
-    let index = Index::find(
-        &meta.pool,
-        uuid::Uuid::parse_str(&search_request.shard)?,
-        crate::metadata::IndexKind::Vector,
-        &search_request.vectorset,
-    )
-    .await?;
-    let index_seacher = index_cache.get(&index.id).await?;
-    let IndexSearcher::Vector(vector_searcher) = index_seacher.as_ref();
+    // TODO: Avoid querying here, the information can be take from synced metadata
+    let text_index = Index::find(&meta.pool, shard_id, IndexKind::Text, "text").await?;
+    let text_searcher_arc = index_cache.get(&text_index.id).await?;
 
-    let results = vector_searcher.search(
-        &VectorSearchRequest {
-            id: search_request.shard.clone(),
-            vector_set: search_request.vectorset.clone(),
-            vector: search_request.vector.clone(),
-            page_number: search_request.page_number,
-            result_per_page: search_request.result_per_page,
-            with_duplicates: search_request.with_duplicates,
-            key_filters: search_request.key_filters.clone(),
-            min_score: search_request.min_score_semantic,
-            field_filters: search_request.fields.clone(),
-            ..Default::default()
-        },
-        &VectorsContext::default(),
-    )?;
+    let vector_index = Index::find(&meta.pool, shard_id, IndexKind::Vector, &search_request.vectorset).await?;
+    let vector_seacher_arc = index_cache.get(&vector_index.id).await?;
+
+    tokio::task::spawn_blocking(move || {
+        blocking_search(search_request, text_searcher_arc.as_ref().into(), vector_seacher_arc.as_ref().into())
+    })
+    .await?
+}
+
+fn blocking_search(
+    search_request: SearchRequest,
+    text_searcher: &TextSearcher,
+    vector_searcher: &VectorSearcher,
+) -> anyhow::Result<SearchResponse> {
+    let query_plan = query_planner::build_query_plan(search_request)?;
+    let search_id = uuid::Uuid::new_v4().to_string();
+    let mut index_queries = query_plan.index_queries;
+
+    // Apply pre-filtering to the query plan
+    if let Some(prefilter) = query_plan.prefilter {
+        let prefiltered = text_searcher.prefilter(&prefilter)?;
+        index_queries.apply_prefilter(prefiltered);
+    }
+
+    // Run the rest of the plan
+    let text_task = index_queries.texts_request.map(|mut request| {
+        request.id = search_id.clone();
+        move || text_searcher.search(&request, &index_queries.texts_context)
+    });
+
+    // TODO
+    // let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
+    //     request.id = search_id.clone();
+    //     let paragraphs_context = &index_queries.paragraphs_context;
+    //     let info = info_span!(parent: &span, "paragraph search");
+    //     let task = move || read_rw_lock(&self.paragraph_reader).search(&request, paragraphs_context);
+    //     || run_with_telemetry(info, task)
+    // });
+
+    let vector_task = index_queries.vectors_request.map(|mut request| {
+        request.id = search_id.clone();
+        move || vector_searcher.search(&request, &index_queries.vectors_context)
+    });
+
+    // TODO
+    // let relation_task = index_queries.relations_request.map(|request| {
+    //     let info = info_span!(parent: &span, "relations search");
+    //     let task = move || read_rw_lock(&self.relation_reader).search(&request);
+    //     || run_with_telemetry(info, task)
+    // });
+
+    let mut rtext = None;
+    // let mut rparagraph = None;
+    let mut rvector = None;
+    // let mut rrelation = None;
+
+    std::thread::scope(|scope| {
+        if let Some(task) = text_task {
+            let rtext = &mut rtext;
+            scope.spawn(move || *rtext = Some(task()));
+        }
+
+        if let Some(task) = vector_task {
+            let rvector = &mut rvector;
+            scope.spawn(move || *rvector = Some(task()));
+        }
+    });
 
     Ok(SearchResponse {
-        document: None,
+        document: rtext.transpose()?,
         paragraph: None,
-        vector: Some(results),
+        vector: rvector.transpose()?,
         relation: None,
     })
 }

@@ -52,10 +52,10 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 
     let indexes = shard.indexes(&meta.pool).await?;
     // TODO: update when more indexes are created
-    assert_eq!(indexes.len(), 2);
+    assert_eq!(indexes.len(), 3);
 
     let names = indexes.iter().map(|index| index.name.as_str()).collect::<HashSet<_>>();
-    let expected = HashSet::from(["multilingual", "english"]);
+    let expected = HashSet::from(["multilingual", "english", "fulltext"]);
     assert_eq!(names, expected);
 
     let shard = Shard::get(&meta.pool, shard.id).await?;
@@ -93,8 +93,8 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 
     // Purge everything
     // TODO: show better when we remove everything
-    purge_deletions(&meta, 100).await?;
     purge_segments(&meta, &storage).await?;
+    purge_deletions(&meta, 100).await?;
     purge_deleted_shards_and_indexes(&meta).await?;
 
     assert_eq!(count_shards(&meta.pool).await?, 0);
