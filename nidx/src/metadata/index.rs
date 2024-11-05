@@ -249,11 +249,11 @@ impl TryInto<VectorConfig> for IndexConfig {
 }
 
 impl IndexConfig {
-    pub fn new_fulltext() -> Self {
+    pub fn nex_text() -> Self {
         Self::Text(())
     }
 
-    pub fn new_keyword() -> Self {
+    pub fn new_paragraph() -> Self {
         Self::Paragraph(())
     }
 

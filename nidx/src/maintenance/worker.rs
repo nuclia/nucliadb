@@ -128,6 +128,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let merged: NewSegment = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer.merge(work_dir.path(), index.config()?, merge_inputs)?.into(),
         IndexKind::Text => nidx_text::TextIndexer.merge(work_dir.path(), merge_inputs)?.into(),
+        IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.merge(work_dir.path(), merge_inputs)?.into(),
         _ => unimplemented!(),
     };
 
