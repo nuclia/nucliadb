@@ -1,4 +1,3 @@
-use std::str::FromStr;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -22,13 +21,15 @@ use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as base64;
 use base64::Engine;
+use futures::executor::block_on;
 use object_store::aws::AmazonS3Builder;
 use object_store::local::LocalFileSystem;
 use object_store::memory::InMemory;
 use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
 use serde::{Deserialize, Deserializer};
 use serde_with::with_prefix;
-use sqlx::postgres::PgConnectOptions;
+
+use crate::NidxMetadata;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "object_store", rename_all = "lowercase")]
@@ -104,28 +105,27 @@ impl ObjectStoreConfig {
     }
 }
 
-fn deserialize_database_url<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PgConnectOptions, D::Error> {
-    let url = String::deserialize(deserializer)?;
-    Ok(PgConnectOptions::from_str(&url).unwrap())
+fn deserialize_object_store<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Arc<DynObjectStore>, D::Error> {
+    let config = ObjectStoreConfig::deserialize(deserializer)?;
+    Ok(config.client())
 }
 
-#[derive(Clone, Deserialize, Debug)]
-pub struct MetadataSettings {
-    #[serde(deserialize_with = "deserialize_database_url")]
-    pub database_url: PgConnectOptions,
+fn deserialize_database_url<'de, D: Deserializer<'de>>(deserializer: D) -> Result<NidxMetadata, D::Error> {
+    let url = String::deserialize(deserializer)?;
+    Ok(block_on(NidxMetadata::new(&url)).unwrap())
 }
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct IndexerSettings {
-    #[serde(flatten)]
-    pub object_store: ObjectStoreConfig,
+    #[serde(flatten, deserialize_with = "deserialize_object_store")]
+    pub object_store: Arc<DynObjectStore>,
     pub nats_server: String,
 }
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct StorageSettings {
-    #[serde(flatten)]
-    pub object_store: ObjectStoreConfig,
+    #[serde(flatten, deserialize_with = "deserialize_object_store")]
+    pub object_store: Arc<DynObjectStore>,
 }
 
 // Take a look to the merge scheduler for more details about these settings
@@ -144,17 +144,16 @@ impl Default for MergeSettings {
     }
 }
 
-with_prefix!(metadata "metadata_");
 with_prefix!(indexer "indexer_");
 with_prefix!(storage "storage_");
 with_prefix!(merge "merge_");
 
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Settings {
     /// Connection to the metadata database
     /// Mandatory for all components
-    #[serde(flatten, with = "metadata")]
-    pub metadata: MetadataSettings,
+    #[serde(flatten, deserialize_with = "deserialize_database_url")]
+    pub metadata: NidxMetadata,
 
     /// Indexing configuration, should match nucliadb
     /// Required by indexer and scheduler
@@ -190,7 +189,6 @@ mod tests {
             ("INDEXER_FILE_PATH", "a"),
             ("INDEXER_NATS_SERVER", "a"),
         ];
-        let settings: Settings = envy::from_iter(env.iter().map(|(a, b)| (a.to_string(), b.to_string()))).unwrap();
-        assert_eq!(settings.metadata.database_url.get_host(), "localhost");
+        let _settings: Settings = envy::from_iter(env.iter().map(|(a, b)| (a.to_string(), b.to_string()))).unwrap();
     }
 }

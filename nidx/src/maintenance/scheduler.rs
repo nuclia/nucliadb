@@ -36,7 +36,7 @@ use crate::{
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let indexer_settings = settings.indexer.unwrap();
     let merger_settings = settings.merge;
-    let meta = NidxMetadata::new(settings.metadata.database_url).await?;
+    let meta = settings.metadata;
 
     let client = async_nats::connect(&indexer_settings.nats_server).await?;
     let jetstream = async_nats::jetstream::new(client);
@@ -55,7 +55,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     });
 
     let meta2 = meta.clone();
-    let storage = indexer_settings.object_store.client();
+    let storage = indexer_settings.object_store;
     tasks.spawn(async move {
         loop {
             if let Err(e) = purge_segments(&meta2, &storage).await {

@@ -23,11 +23,11 @@ pub mod shards;
 
 use tracing::debug;
 
-use crate::{NidxMetadata, Settings};
+use crate::Settings;
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
-    let meta = NidxMetadata::new(settings.metadata.database_url).await?;
-    let _storage = settings.storage.expect("Storage settings needed").object_store.client();
+    let meta = settings.metadata;
+    let _storage = settings.storage.expect("Storage settings needed").object_store;
 
     let shards_api = grpc::ApiServer::new(meta.clone(), Some(10000)).await?;
     debug!("Running Shards API at port {}", shards_api.port()?);

@@ -24,15 +24,12 @@ use std::collections::HashMap;
 
 use common::node_services::NidxFixture;
 use nidx_protos::{NewShardRequest, VectorIndexConfig};
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::PgPool;
 use tonic::Request;
 
 #[sqlx::test]
-async fn test_create_shard(
-    _pool_opts: PgPoolOptions,
-    connect_options: PgConnectOptions,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut fixture = NidxFixture::new(connect_options).await?;
+async fn test_create_shard(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
+    let mut fixture = NidxFixture::new(pool).await?;
 
     let new_shard_response = fixture
         .api_client

@@ -34,13 +34,13 @@ use crate::segment_store::pack_and_upload;
 use crate::{metadata::*, Settings};
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
-    let meta = NidxMetadata::new(settings.metadata.database_url).await?;
+    let meta = settings.metadata;
 
     let indexer_settings = settings.indexer.ok_or(anyhow!("Indexer settings required"))?;
-    let indexer_storage = indexer_settings.object_store.client();
+    let indexer_storage = indexer_settings.object_store;
 
     let storage_settings = settings.storage.ok_or(anyhow!("Storage settings required"))?;
-    let segment_storage = storage_settings.object_store.client();
+    let segment_storage = storage_settings.object_store;
 
     let nats_client = async_nats::connect(&indexer_settings.nats_server).await?;
     let jetstream = async_nats::jetstream::new(nats_client);

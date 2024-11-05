@@ -20,12 +20,11 @@
 
 use std::time::Duration;
 
-use futures::executor::block_on;
 use nidx::settings::{ObjectStoreConfig, StorageSettings};
 use nidx::{api, searcher, NidxMetadata, Settings};
 use nidx_protos::node_reader_client::NodeReaderClient;
 use nidx_protos::node_writer_client::NodeWriterClient;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::PgPool;
 use tonic::transport::Channel;
 
 pub struct NidxFixture {
@@ -36,26 +35,21 @@ pub struct NidxFixture {
 }
 
 impl NidxFixture {
-    pub async fn new(db_options: PgConnectOptions) -> anyhow::Result<Self> {
+    pub async fn new(pool: PgPool) -> anyhow::Result<Self> {
         let settings = Settings {
-            metadata: nidx::settings::MetadataSettings {
-                database_url: db_options,
-            },
+            metadata: NidxMetadata::new_with_pool(pool).await?,
             indexer: Some(nidx::settings::IndexerSettings {
-                object_store: ObjectStoreConfig::Memory,
+                object_store: ObjectStoreConfig::Memory.client(),
                 nats_server: String::new(),
             }),
             storage: Some(StorageSettings {
-                object_store: ObjectStoreConfig::Memory,
+                object_store: ObjectStoreConfig::Memory.client(),
             }),
             merge: Default::default(),
         };
         let searcher_task = Some(tokio::task::spawn(searcher::run(settings.clone())));
 
-        let meta = NidxMetadata::new(settings.metadata.database_url).await?;
-        let _storage = settings.storage.expect("Storage settings needed").object_store.client();
-
-        let shards_api = api::grpc::ApiServer::new(meta.clone(), None).await?;
+        let shards_api = api::grpc::ApiServer::new(settings.metadata, None).await?;
         let port = shards_api.port()?;
         let api_task = Some(tokio::task::spawn(shards_api.serve()));
 
