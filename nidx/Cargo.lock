@@ -61,9 +61,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.91"
+version = "1.0.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c042108f3ed77fd83760a5fd79b53be043192bb3b9dba91d8c574c0ada7850c8"
+checksum = "74f37166d7d48a0284b99dd824694c26119c700b53bf0d1540cdb147dbdaaf13"
 
 [[package]]
 name = "arc-swap"
@@ -1412,6 +1412,7 @@ dependencies = [
  "envy",
  "futures",
  "lru",
+ "nidx_paragraph",
  "nidx_protos",
  "nidx_tests",
  "nidx_text",
@@ -1431,6 +1432,27 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "nidx_paragraph"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "itertools 0.13.0",
+ "lazy_static",
+ "levenshtein_automata",
+ "nidx_protos",
+ "nidx_tantivy",
+ "nidx_types",
+ "once_cell",
+ "regex",
+ "serde_json",
+ "tantivy",
+ "tantivy-common",
+ "tantivy-fst",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]
@@ -2034,9 +2056,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38200e5ee88914975b69f657f0801b6f6dccafd44fd9326302a4aaeecfacb1d8"
+checksum = "b544ef1b4eac5dc2db33ea63606ae9ffcfac26c1416a2806ae0bf5f56b201191"
 dependencies = [
  "aho-corasick",
  "memchr",

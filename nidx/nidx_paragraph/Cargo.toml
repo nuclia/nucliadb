@@ -1,0 +1,25 @@
+[package]
+name = "nidx_paragraph"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.92"
+itertools = "0.13.0"
+lazy_static = "1.5.0"
+levenshtein_automata = "0.2.1"
+nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
+nidx_tantivy = { version = "0.1.0", path = "../nidx_tantivy" }
+nidx_types = { version = "0.1.0", path = "../nidx_types" }
+once_cell = "1.20.2"
+regex = "1.11.1"
+serde_json = "1.0.132"
+tantivy = "0.22.0"
+tantivy-common = "0.7.0"
+tantivy-fst = "0.5.0"
+tracing = "0.1.40"
+
+[build-dependencies]
+
+[dev-dependencies]
+tempfile = "3.13.0"

@@ -18,58 +18,80 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod prefilter;
+mod fuzzy_query;
 mod query_io;
 mod reader;
 mod resource_indexer;
 mod schema;
 mod search_query;
+mod search_response;
+mod set_query;
+mod stop_words;
 
-use std::collections::HashSet;
-use std::path::Path;
-
-use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse, StreamRequest};
-use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
-use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
+use nidx_protos::{ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest};
+use nidx_tantivy::{
+    index_reader::{open_index_with_deletions, DeletionQueryBuilder},
+    TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
+};
 use nidx_types::OpenIndexMetadata;
-use prefilter::{PreFilterRequest, PreFilterResponse};
-use reader::{DocumentIterator, TextReaderService};
-use resource_indexer::index_document;
-use schema::TextSchema;
-
-pub use search_query::TextContext;
-use tantivy::indexer::merge_indices;
-use tantivy::schema::Field;
+use reader::ParagraphReaderService;
+use resource_indexer::index_paragraphs;
+use schema::ParagraphSchema;
+use search_query::ParagraphIterator;
+pub use search_query::ParagraphsContext;
+use std::{collections::HashSet, path::Path};
 use tantivy::{
     directory::MmapDirectory,
+    indexer::merge_indices,
     query::{Query, TermSetQuery},
+    schema::{Field, Schema},
     Term,
 };
 
-pub struct TextIndexer;
+pub struct ParagraphIndexer;
 
-pub struct TextDeletionQueryBuilder(Field);
-impl DeletionQueryBuilder for TextDeletionQueryBuilder {
+pub struct ParagraphDeletionQueryBuilder {
+    field: Field,
+    resource: Field,
+}
+impl DeletionQueryBuilder for ParagraphDeletionQueryBuilder {
     fn query<'a>(&self, keys: impl Iterator<Item = &'a String>) -> Box<dyn Query> {
-        Box::new(TermSetQuery::new(keys.map(|k| Term::from_field_bytes(self.0, k.as_bytes()))))
+        Box::new(TermSetQuery::new(keys.map(|k| {
+            // Our keys can be resource or field ids, match the corresponding tantivy field
+            let is_field = k.len() > 32;
+            let tantivy_field = if is_field {
+                self.field
+            } else {
+                self.resource
+            };
+            Term::from_field_bytes(tantivy_field, k.as_bytes())
+        })))
+    }
+}
+impl ParagraphDeletionQueryBuilder {
+    fn new(schema: &Schema) -> Self {
+        ParagraphDeletionQueryBuilder {
+            resource: schema.get_field("uuid").unwrap(),
+            field: schema.get_field("field_uuid").unwrap(),
+        }
     }
 }
 
-impl TextIndexer {
+impl ParagraphIndexer {
     pub fn index_resource(
         &self,
         output_dir: &Path,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
-        let field_schema = TextSchema::new();
+        let field_schema = ParagraphSchema::new();
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
-        index_document(&mut indexer, resource, field_schema)?;
+        index_paragraphs(&mut indexer, resource, field_schema)?;
         Ok(Some(indexer.finalize()?))
     }
 
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
-        vec![resource.resource.as_ref().unwrap().uuid.clone()]
+        resource.paragraphs_to_delete.clone()
     }
 
     pub fn merge(
@@ -77,9 +99,9 @@ impl TextIndexer {
         work_dir: &Path,
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
-        let schema = TextSchema::new().schema;
-        let query_builder = TextDeletionQueryBuilder(schema.get_field("uuid").unwrap());
-        let index = open_index_with_deletions(schema, open_index, query_builder)?;
+        let schema = ParagraphSchema::new().schema;
+        let deletions_query = ParagraphDeletionQueryBuilder::new(&schema);
+        let index = open_index_with_deletions(schema, open_index, deletions_query)?;
 
         let output_index = merge_indices(&[index], MmapDirectory::open(work_dir)?)?;
         let segment = &output_index.searchable_segment_metas()?[0];
@@ -95,23 +117,19 @@ impl TextIndexer {
     }
 }
 
-pub struct TextSearcher {
-    pub reader: TextReaderService,
+pub struct ParagraphSearcher {
+    pub reader: ParagraphReaderService,
 }
 
-impl TextSearcher {
+impl ParagraphSearcher {
     pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
-        let schema = TextSchema::new().schema;
-        let index = open_index_with_deletions(
-            schema.clone(),
-            open_index,
-            TextDeletionQueryBuilder(schema.get_field("uuid").unwrap()),
-        )?;
+        let schema = ParagraphSchema::new().schema;
+        let index = open_index_with_deletions(schema.clone(), open_index, ParagraphDeletionQueryBuilder::new(&schema))?;
 
         Ok(Self {
-            reader: TextReaderService {
+            reader: ParagraphReaderService {
                 index: index.clone(),
-                schema: TextSchema::new(),
+                schema: ParagraphSchema::new(),
                 reader: index.reader_builder().reload_policy(tantivy::ReloadPolicy::Manual).try_into()?,
             },
         })
@@ -119,17 +137,17 @@ impl TextSearcher {
 
     pub fn search(
         &self,
-        request: &DocumentSearchRequest,
-        context: &TextContext,
-    ) -> anyhow::Result<DocumentSearchResponse> {
+        request: &ParagraphSearchRequest,
+        context: &ParagraphsContext,
+    ) -> anyhow::Result<ParagraphSearchResponse> {
         self.reader.search(request, context)
     }
 
-    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
-        self.reader.prefilter(request)
+    pub fn suggest(&self, request: &SuggestRequest) -> anyhow::Result<ParagraphSearchResponse> {
+        self.reader.suggest(request)
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<DocumentIterator> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<ParagraphIterator> {
         self.reader.iterator(request)
     }
 }
