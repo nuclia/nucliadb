@@ -62,7 +62,7 @@ fn test_basic_search(
     }
 
     let segment_dir = tempdir()?;
-    let segment_meta = VectorIndexer.index_resource(segment_dir.path(), &config, &resource)?.unwrap();
+    let segment_meta = VectorIndexer.index_resource(segment_dir.path(), &config, &resource, "default", true)?.unwrap();
 
     // Search near one specific vector
     let reader = VectorSearcher::open(config.clone(), TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))?;

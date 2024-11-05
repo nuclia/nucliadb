@@ -32,7 +32,7 @@ use config::VectorConfig;
 use data_point::open;
 use data_point_provider::reader::{Reader, TimeSensitiveDLog};
 use data_point_provider::DTrie;
-use indexer::index_resource;
+use indexer::{index_resource, ResourceWrapper};
 use nidx_protos::{Resource, VectorSearchRequest, VectorSearchResponse};
 use nidx_types::{OpenIndexMetadata, SegmentMetadata};
 use serde::{Deserialize, Serialize};
@@ -58,8 +58,11 @@ impl VectorIndexer {
         output_dir: &Path,
         config: &VectorConfig,
         resource: &Resource,
+        index_name: &str,
+        use_default_vectorset: bool,
     ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
-        index_resource(resource.into(), output_dir, config)
+        let vectorset_resource = ResourceWrapper::new_vectorset_resource(resource, index_name, use_default_vectorset);
+        index_resource(vectorset_resource, output_dir, config)
     }
 
     pub fn deletions_for_resource(&self, resource: &Resource) -> Vec<String> {
