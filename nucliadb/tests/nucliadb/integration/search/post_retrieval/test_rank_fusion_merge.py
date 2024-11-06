@@ -25,40 +25,60 @@ This test suite validates different combinations of inputs
 """
 
 import random
+from typing import Optional
 
 import pytest
 
-from nucliadb.common.ids import ParagraphId
-from nucliadb.search.search.find_merge import rank_fusion_merge
+from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import ParagraphId, VectorId
+from nucliadb.search.search.find_merge import (
+    keyword_result_to_text_block_match,
+    rank_fusion_merge,
+    semantic_result_to_text_block_match,
+)
+from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
 
-def gen_keyword_result(rid: str, score: float) -> ParagraphResult:
-    start = random.randint(0, 100)
-    end = random.randint(start, start + 100)
-    paragraph_id = ParagraphId.from_string(f"{rid}/f/my-file/{start}-{end}")
+def gen_keyword_result(
+    score: float, rid: Optional[str] = None, force_id: Optional[str] = None
+) -> TextBlockMatch:
+    assert (rid is None and force_id is not None) or (rid is not None and force_id is None)
+    if force_id is None:
+        start = random.randint(0, 100)
+        end = random.randint(start, start + 100)
+        paragraph_id = ParagraphId.from_string(f"{rid}/f/my-file/{start}-{end}")
+    else:
+        paragraph_id = ParagraphId.from_string(force_id)
 
     result = ParagraphResult()
-    result.uuid = rid
+    result.uuid = paragraph_id.rid
     result.score.bm25 = score
     result.paragraph = paragraph_id.full()
-    result.start = start
-    result.end = end
-    return result
+    result.start = paragraph_id.paragraph_start
+    result.end = paragraph_id.paragraph_end
+    return keyword_result_to_text_block_match(result)
 
 
-def gen_semantic_result(rid: str, score: float) -> DocumentScored:
-    start = random.randint(0, 100)
-    end = random.randint(start, start + 100)
-    index = random.randint(0, 100)
+def gen_semantic_result(
+    score: float, rid: Optional[str] = None, force_id: Optional[str] = None
+) -> TextBlockMatch:
+    assert (rid is None and force_id is not None) or (rid is not None and force_id is None)
+    if force_id is None:
+        start = random.randint(0, 100)
+        end = random.randint(start, start + 100)
+        index = random.randint(0, 100)
+        vector_id = VectorId.from_string(f"{rid}/f/my-file/{index}/{start}-{end}")
+    else:
+        vector_id = VectorId.from_string(force_id)
 
     result = DocumentScored()
-    result.doc_id.id = f"{rid}/f/my-file/{index}/{start}-{end}"
+    result.doc_id.id = vector_id.full()
     result.score = score
-    result.metadata.position.start = start
-    result.metadata.position.end = end
-    return result
+    result.metadata.position.start = vector_id.vector_start
+    result.metadata.position.end = vector_id.vector_end
+    return semantic_result_to_text_block_match(result)
 
 
 @pytest.mark.parametrize(
@@ -67,15 +87,15 @@ def gen_semantic_result(rid: str, score: float) -> DocumentScored:
         # mix of keyword and semantic results
         (
             [
-                gen_keyword_result("k-1", 0.1),
-                gen_keyword_result("k-2", 0.5),
-                gen_keyword_result("k-3", 0.3),
+                gen_keyword_result(0.1, rid="k-1"),
+                gen_keyword_result(0.5, rid="k-2"),
+                gen_keyword_result(0.3, rid="k-3"),
             ],
             [
-                gen_semantic_result("s-1", 0.2),
-                gen_semantic_result("s-2", 0.3),
-                gen_semantic_result("s-3", 0.6),
-                gen_semantic_result("s-4", 0.4),
+                gen_semantic_result(0.2, rid="s-1"),
+                gen_semantic_result(0.3, rid="s-2"),
+                gen_semantic_result(0.6, rid="s-3"),
+                gen_semantic_result(0.4, rid="s-4"),
             ],
             [
                 ("k-2", 0.5, SCORE_TYPE.BM25),
@@ -90,9 +110,9 @@ def gen_semantic_result(rid: str, score: float) -> DocumentScored:
         # only keyword results
         (
             [
-                gen_keyword_result("k-1", 1),
-                gen_keyword_result("k-2", 3),
-                gen_keyword_result("k-3", 4),
+                gen_keyword_result(1, rid="k-1"),
+                gen_keyword_result(3, rid="k-2"),
+                gen_keyword_result(4, rid="k-3"),
             ],
             [],
             [
@@ -105,10 +125,10 @@ def gen_semantic_result(rid: str, score: float) -> DocumentScored:
         (
             [],
             [
-                gen_semantic_result("s-1", 0.2),
-                gen_semantic_result("s-2", 0.3),
-                gen_semantic_result("s-3", 0.6),
-                gen_semantic_result("s-4", 0.4),
+                gen_semantic_result(0.2, rid="s-1"),
+                gen_semantic_result(0.3, rid="s-2"),
+                gen_semantic_result(0.6, rid="s-3"),
+                gen_semantic_result(0.4, rid="s-4"),
             ],
             [
                 ("s-3", 0.6, SCORE_TYPE.VECTOR),
@@ -120,16 +140,16 @@ def gen_semantic_result(rid: str, score: float) -> DocumentScored:
         # all keyword scores greater than semantic
         (
             [
-                gen_keyword_result("k-1", 1),
-                gen_keyword_result("k-2", 5),
-                gen_keyword_result("k-3", 3),
+                gen_keyword_result(1, rid="k-1"),
+                gen_keyword_result(5, rid="k-2"),
+                gen_keyword_result(3, rid="k-3"),
             ],
             [
-                gen_semantic_result("s-1", 0.2),
-                gen_semantic_result("s-2", 0.3),
-                gen_semantic_result("s-3", 0.6),
-                gen_semantic_result("s-4", 0.4),
-                gen_semantic_result("s-5", 0.1),
+                gen_semantic_result(0.2, rid="s-1"),
+                gen_semantic_result(0.3, rid="s-2"),
+                gen_semantic_result(0.6, rid="s-3"),
+                gen_semantic_result(0.4, rid="s-4"),
+                gen_semantic_result(0.1, rid="s-5"),
             ],
             [
                 ("k-2", 5, SCORE_TYPE.BM25),
@@ -145,16 +165,16 @@ def gen_semantic_result(rid: str, score: float) -> DocumentScored:
         # all keyword scores smaller than semantic
         (
             [
-                gen_keyword_result("k-1", 0.1),
-                gen_keyword_result("k-2", 0.5),
-                gen_keyword_result("k-3", 0.3),
-                gen_keyword_result("k-4", 0.6),
-                gen_keyword_result("k-5", 0.6),
+                gen_keyword_result(0.1, rid="k-1"),
+                gen_keyword_result(0.5, rid="k-2"),
+                gen_keyword_result(0.3, rid="k-3"),
+                gen_keyword_result(0.6, rid="k-4"),
+                gen_keyword_result(0.6, rid="k-5"),
             ],
             [
-                gen_semantic_result("s-1", 2),
-                gen_semantic_result("s-2", 3),
-                gen_semantic_result("s-3", 6),
+                gen_semantic_result(2, rid="s-1"),
+                gen_semantic_result(3, rid="s-2"),
+                gen_semantic_result(6, rid="s-3"),
             ],
             [
                 ("k-4", 0.6, SCORE_TYPE.BM25),
@@ -169,12 +189,162 @@ def gen_semantic_result(rid: str, score: float) -> DocumentScored:
         ),
     ],
 )
-def test_rank_fusion_algorithm(
-    keyword: list[ParagraphResult],
-    semantic: list[DocumentScored],
+def test_legacy_rank_fusion_algorithm(
+    keyword: list[TextBlockMatch],
+    semantic: list[TextBlockMatch],
     expected: list[tuple[str, float, SCORE_TYPE]],
 ):
-    """Basic test to validate how our rank fusion algorithm works"""
-    merged = rank_fusion_merge(keyword, semantic)
+    """Basic test to validate how our own rank fusion algorithm works"""
+    merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=LegacyRankFusion())
     results = [(item.paragraph_id.rid, round(item.score, 1), item.score_type) for item in merged]
+    assert results == expected
+
+
+RRF_TEST_K = 2
+
+
+def rrf_score(rank: int) -> float:
+    score = 1 / (RRF_TEST_K + rank)
+    return round(score, 6)
+
+
+@pytest.mark.parametrize(
+    "keyword,semantic,expected",
+    [
+        # mix of keyword and semantic results
+        (
+            [
+                gen_keyword_result(0.1, rid="k-1"),
+                gen_keyword_result(0.5, rid="k-2"),
+                gen_keyword_result(0.3, rid="k-3"),
+            ],
+            [
+                gen_semantic_result(0.2, rid="s-1"),
+                gen_semantic_result(0.3, rid="s-2"),
+                gen_semantic_result(0.6, rid="s-3"),
+                gen_semantic_result(0.4, rid="s-4"),
+            ],
+            [
+                ("k-2", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-3", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+            ],
+        ),
+        # only keyword results
+        (
+            [
+                gen_keyword_result(1, rid="k-1"),
+                gen_keyword_result(3, rid="k-2"),
+                gen_keyword_result(4, rid="k-3"),
+            ],
+            [],
+            [
+                ("k-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("k-2", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("k-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+            ],
+        ),
+        # only semantic results
+        (
+            [],
+            [
+                gen_semantic_result(0.2, rid="s-1"),
+                gen_semantic_result(0.3, rid="s-2"),
+                gen_semantic_result(0.6, rid="s-3"),
+                gen_semantic_result(0.4, rid="s-4"),
+            ],
+            [
+                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+            ],
+        ),
+        # all keyword scores greater than semantic
+        (
+            [
+                gen_keyword_result(1, rid="k-1"),
+                gen_keyword_result(5, rid="k-2"),
+                gen_keyword_result(3, rid="k-3"),
+            ],
+            [
+                gen_semantic_result(0.2, rid="s-1"),
+                gen_semantic_result(0.3, rid="s-2"),
+                gen_semantic_result(0.6, rid="s-3"),
+                gen_semantic_result(0.4, rid="s-4"),
+                gen_semantic_result(0.1, rid="s-5"),
+            ],
+            [
+                ("k-2", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-3", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("s-5", round(1 / (4 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+            ],
+        ),
+        # all keyword scores smaller than semantic
+        (
+            [
+                gen_keyword_result(0.1, rid="k-1"),
+                gen_keyword_result(0.5, rid="k-2"),
+                gen_keyword_result(0.3, rid="k-3"),
+                gen_keyword_result(0.6, rid="k-4"),
+                gen_keyword_result(0.6, rid="k-5"),
+            ],
+            [
+                gen_semantic_result(2, rid="s-1"),
+                gen_semantic_result(3, rid="s-2"),
+                gen_semantic_result(6, rid="s-3"),
+            ],
+            [
+                ("k-4", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-5", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-2", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("s-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-3", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("k-1", round(1 / (4 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+            ],
+        ),
+        # multi-match
+        (
+            [
+                gen_keyword_result(0.1, force_id="r-1/f/my/0-10"),
+                gen_keyword_result(0.5, force_id="r-2/f/my/0-10"),
+                gen_keyword_result(0.3, force_id="r-4/f/my/0-10"),
+            ],
+            [
+                gen_semantic_result(2, force_id="r-1/f/my/0/0-10"),
+                gen_semantic_result(3, force_id="r-3/f/my/0/0-10"),
+                gen_semantic_result(6, force_id="r-4/f/my/0/0-10"),
+                gen_semantic_result(6, force_id="r-5/f/my/0/0-10"),
+            ],
+            [
+                ("r-4", round(1 / (0 + RRF_TEST_K) + 1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("r-4", round(1 / (0 + RRF_TEST_K) + 1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("r-2", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("r-5", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("r-3", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+            ],
+        ),
+    ],
+)
+def test_reciprocal_rank_fusion_algorithm(
+    keyword: list[TextBlockMatch],
+    semantic: list[TextBlockMatch],
+    expected: list[tuple[str, float, SCORE_TYPE]],
+):
+    rrf = ReciprocalRankFusion(k=RRF_TEST_K)
+    merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=rrf)
+    results = [(item.paragraph_id.rid, round(item.score, 6), item.score_type) for item in merged]
     assert results == expected

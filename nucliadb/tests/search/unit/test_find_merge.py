@@ -20,7 +20,12 @@
 
 import random
 
-from nucliadb.search.search.find_merge import cut_page, rank_fusion_merge
+from nucliadb.search.search.find_merge import (
+    cut_page,
+    keyword_result_to_text_block_match,
+    rank_fusion_merge,
+    semantic_result_to_text_block_match,
+)
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
@@ -36,7 +41,7 @@ def get_paragraph_result(score):
     pr.start = start
     pr.end = end
     pr.field = "/a/title"
-    return pr
+    return keyword_result_to_text_block_match(pr)
 
 
 def get_vector_result(score):
@@ -48,7 +53,7 @@ def get_vector_result(score):
     vr.score = score
     vr.metadata.position.start = start
     vr.metadata.position.end = end
-    return vr
+    return semantic_result_to_text_block_match(vr)
 
 
 def test_merge_paragraphs_vectors():
