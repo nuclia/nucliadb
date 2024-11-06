@@ -26,7 +26,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self
 
-from nucliadb_models import logger
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
@@ -1472,18 +1471,6 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
     def normalize_features(cls, features: list[ChatOptions]):
         return [feature.normalized() for feature in features]
 
-    @field_validator("rank_fusion", mode="after")
-    @classmethod
-    def convert_rank_fusion_name_to_object(cls, value):
-        if isinstance(value, RankFusionName):
-            if value == RankFusionName.LEGACY:
-                value = LegacyRankFusion()
-            elif value == RankFusionName.RECIPROCAL_RANK_FUSION:
-                value = ReciprocalRankFusion()
-            else:
-                logger.error(f"Rank fusion algorithm not converted from name to object: {value}")
-        return value
-
 
 # Alias (for backwards compatiblity with testbed)
 class ChatRequest(AskRequest):
@@ -1593,18 +1580,6 @@ class FindRequest(BaseSearchRequest):
         if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
             raise ValueError("fulltext search not supported")
         return v
-
-    @field_validator("rank_fusion", mode="after")
-    @classmethod
-    def convert_rank_fusion_name_to_object(cls, value):
-        if isinstance(value, RankFusionName):
-            if value == RankFusionName.LEGACY:
-                value = LegacyRankFusion()
-            elif value == RankFusionName.RECIPROCAL_RANK_FUSION:
-                value = ReciprocalRankFusion()
-            else:
-                logger.error(f"Rank fusion algorithm not converted from name to object: {value}")
-        return value
 
 
 class SCORE_TYPE(str, Enum):

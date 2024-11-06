@@ -17,11 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
 from abc import ABC, abstractmethod
-from typing import Iterable
+from typing import Iterable, Union
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
+from nucliadb_models import search as search_models
+
+logger = logging.getLogger(__name__)
 
 
 class RankFusionAlgorithm(ABC):
@@ -116,3 +120,31 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
 
         merged.sort(key=lambda x: x.score, reverse=True)
         return merged
+
+
+def get_rank_fusion(
+    rf: Union[search_models.RankFusionName, search_models.RankFusion],
+) -> RankFusionAlgorithm:
+    """Given a rank fusion API type, return the appropiate rank fusion algorithm
+    class.
+
+    """
+    algorithm: RankFusionAlgorithm = ReciprocalRankFusion()
+
+    if isinstance(rf, search_models.RankFusionName):
+        if rf == search_models.RankFusionName.LEGACY:
+            algorithm = LegacyRankFusion()
+        elif rf == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
+            algorithm = ReciprocalRankFusion()
+        else:
+            logger.error(
+                f"Rank fusion algorithm not converted from name to object: {rf}. Using RRF as default instead"
+            )
+    elif isinstance(rf, search_models.LegacyRankFusion):
+        algorithm = LegacyRankFusion()
+    elif isinstance(rf, search_models.ReciprocalRankFusion):
+        algorithm = ReciprocalRankFusion()
+    else:
+        logger.error(f"Unknown rank fusion algorithm: {rf}")
+
+    return algorithm

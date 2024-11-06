@@ -144,19 +144,21 @@ def test_chat_request_features_normalization():
 
 
 @pytest.mark.parametrize(
-    "rank_fusion",
+    "rank_fusion,expected",
     [
-        "legacy",
-        "rrf",
-        search.RankFusionName.LEGACY,
-        search.RankFusionName.RECIPROCAL_RANK_FUSION,
-        search.LegacyRankFusion(),
-        search.ReciprocalRankFusion(),
+        ("legacy", search.RankFusionName.LEGACY),
+        ("rrf", search.RankFusionName.RECIPROCAL_RANK_FUSION),
+        (search.RankFusionName.LEGACY, search.RankFusionName.LEGACY),
+        (search.RankFusionName.RECIPROCAL_RANK_FUSION, search.RankFusionName.RECIPROCAL_RANK_FUSION),
+        (search.LegacyRankFusion(), search.LegacyRankFusion()),
+        (search.ReciprocalRankFusion(), search.ReciprocalRankFusion()),
     ],
 )
-def test_rank_fusion(rank_fusion):
-    search.FindRequest(rank_fusion=rank_fusion)
-    search.AskRequest(query="q", rank_fusion=rank_fusion)
+def test_rank_fusion(rank_fusion, expected):
+    req = search.FindRequest(rank_fusion=rank_fusion)
+    assert req.rank_fusion == expected
+    req = search.AskRequest(query="q", rank_fusion=rank_fusion)
+    assert req.rank_fusion == expected
 
 
 def test_rank_fusion_errors():
