@@ -108,6 +108,7 @@ class RelationMetadata(BaseModel):
     source_end: Optional[int] = None
     to_start: Optional[int] = None
     to_end: Optional[int] = None
+    data_augmentation_task_id: Optional[str] = None
 
     @classmethod
     def from_message(cls: Type[_T], message: utils_pb2.RelationMetadata) -> _T:
