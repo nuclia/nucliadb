@@ -24,6 +24,7 @@ from typing import Iterable, Union
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
 from nucliadb_models import search as search_models
+from nucliadb_models.search import SCORE_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -112,39 +113,36 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
                 score = scores[paragraph_id]
                 result = rankings[r][i]
                 result.score = score
-                # TODO: should we change the score type?
-                # result.score_type = SCORE_TYPE.RRF
-
-                # We are appending multi-matches. Should we merge them?
+                result.score_type = SCORE_TYPE.RANK_FUSION
+                # NOTE we are appending multi-matches. Should we merge them?
                 merged.append(result)
 
         merged.sort(key=lambda x: x.score, reverse=True)
         return merged
 
 
+def get_default_rank_fusion() -> RankFusionAlgorithm:
+    return LegacyRankFusion()
+
+
 def get_rank_fusion(
     rf: Union[search_models.RankFusionName, search_models.RankFusion],
 ) -> RankFusionAlgorithm:
-    """Given a rank fusion API type, return the appropiate rank fusion algorithm
-    class.
+    """Given a rank fusion API type, return the appropiate rank fusion algorithm instance"""
+    algorithm: RankFusionAlgorithm
 
-    """
-    algorithm: RankFusionAlgorithm = ReciprocalRankFusion()
-
-    if isinstance(rf, search_models.RankFusionName):
-        if rf == search_models.RankFusionName.LEGACY:
-            algorithm = LegacyRankFusion()
-        elif rf == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
-            algorithm = ReciprocalRankFusion()
-        else:
-            logger.error(
-                f"Rank fusion algorithm not converted from name to object: {rf}. Using RRF as default instead"
-            )
+    if rf is None:
+        algorithm = get_default_rank_fusion()
     elif isinstance(rf, search_models.LegacyRankFusion):
         algorithm = LegacyRankFusion()
     elif isinstance(rf, search_models.ReciprocalRankFusion):
         algorithm = ReciprocalRankFusion()
+    elif rf == search_models.RankFusionName.LEGACY:
+        algorithm = LegacyRankFusion()
+    elif rf == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
+        algorithm = ReciprocalRankFusion()
     else:
-        logger.error(f"Unknown rank fusion algorithm: {rf}")
+        logger.error(f"Unknown rank fusion algorithm {type(rf)} {rf}. Using default")
+        algorithm = get_default_rank_fusion()
 
     return algorithm

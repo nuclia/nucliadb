@@ -31,7 +31,7 @@ from nucliadb.search.search.hydrator import (
     text_block_to_find_paragraph,
 )
 from nucliadb.search.search.merge import merge_relations_results
-from nucliadb.search.search.rank_fusion import LegacyRankFusion, RankFusionAlgorithm
+from nucliadb.search.search.rank_fusion import RankFusionAlgorithm
 from nucliadb.search.search.rerankers import (
     RerankableItem,
     Reranker,
@@ -78,12 +78,12 @@ async def build_find_response(
     page_number: int,
     min_score_bm25: float,
     min_score_semantic: float,
+    rank_fusion_algorithm: RankFusionAlgorithm,
     reranker: Reranker,
     show: list[ResourceProperties] = [],
     extracted: list[ExtractedDataTypeName] = [],
     field_type_filter: list[FieldTypeName] = [],
     highlight: bool = False,
-    rank_fusion_algorithm: RankFusionAlgorithm = LegacyRankFusion(),
 ) -> KnowledgeboxFindResults:
     # merge
     search_response = merge_shard_responses(search_responses)

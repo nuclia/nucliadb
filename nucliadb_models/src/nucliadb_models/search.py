@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from abc import ABC
 from enum import Enum
 from typing import Any, Literal, Optional, TypeVar, Union
 
@@ -395,16 +394,19 @@ class RankFusionName(str, Enum):
     RECIPROCAL_RANK_FUSION = "rrf"
 
 
-class RankFusion(ABC, BaseModel):
+class _BaseRankFusion(BaseModel):
     name: str
 
 
-class LegacyRankFusion(RankFusion):
+class LegacyRankFusion(_BaseRankFusion):
     name: Literal[RankFusionName.LEGACY] = RankFusionName.LEGACY
 
 
-class ReciprocalRankFusion(RankFusion):
+class ReciprocalRankFusion(_BaseRankFusion):
     name: Literal[RankFusionName.RECIPROCAL_RANK_FUSION] = RankFusionName.RECIPROCAL_RANK_FUSION
+
+
+RankFusion = Union[LegacyRankFusion, ReciprocalRankFusion]
 
 
 class Reranker(str, Enum):
@@ -1586,6 +1588,7 @@ class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
     BOTH = "BOTH"
+    RANK_FUSION = "RANK_FUSION"
     RERANKER = "RERANKER"
 
 

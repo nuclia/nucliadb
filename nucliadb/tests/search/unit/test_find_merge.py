@@ -26,6 +26,7 @@ from nucliadb.search.search.find_merge import (
     rank_fusion_merge,
     semantic_result_to_text_block_match,
 )
+from nucliadb.search.search.rank_fusion import get_default_rank_fusion
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
@@ -81,6 +82,7 @@ def test_merge_paragraphs_vectors():
         rank_fusion_merge(
             [*shard1_paragraphs, *shard2_paragraphs],
             filter(lambda x: x.score >= min_score_semantic, [*shard1_vectors, *shard2_vectors]),
+            get_default_rank_fusion(),
         ),
         20,
         0,

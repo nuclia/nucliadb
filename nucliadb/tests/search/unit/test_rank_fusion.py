@@ -25,10 +25,11 @@ This test suite validates different combinations of inputs
 """
 
 import random
-from typing import Optional
+from typing import Optional, Type
 
 import pytest
 
+import nucliadb_models.search as search_models
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search.search.find_merge import (
@@ -36,9 +37,23 @@ from nucliadb.search.search.find_merge import (
     rank_fusion_merge,
     semantic_result_to_text_block_match,
 )
-from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion
+from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion, get_rank_fusion
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
+
+
+@pytest.mark.parametrize(
+    "rank_fusion,expected_type",
+    [
+        (search_models.RankFusionName.LEGACY, LegacyRankFusion),
+        (search_models.RankFusionName.RECIPROCAL_RANK_FUSION, ReciprocalRankFusion),
+        (search_models.LegacyRankFusion(), LegacyRankFusion),
+        (search_models.ReciprocalRankFusion(), ReciprocalRankFusion),
+    ],
+)
+def test_get_rank_fusion(rank_fusion, expected_type: Type):
+    algorithm = get_rank_fusion(rank_fusion)
+    assert isinstance(algorithm, expected_type)
 
 
 def gen_keyword_result(
@@ -225,13 +240,13 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(0.4, rid="s-4"),
             ],
             [
-                ("k-2", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("k-3", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("k-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-2", round(1 / (0 + RRF_TEST_K), 6)),
+                ("s-3", round(1 / (0 + RRF_TEST_K), 6)),
+                ("k-3", round(1 / (1 + RRF_TEST_K), 6)),
+                ("s-4", round(1 / (1 + RRF_TEST_K), 6)),
+                ("k-1", round(1 / (2 + RRF_TEST_K), 6)),
+                ("s-2", round(1 / (2 + RRF_TEST_K), 6)),
+                ("s-1", round(1 / (3 + RRF_TEST_K), 6)),
             ],
         ),
         # only keyword results
@@ -243,9 +258,9 @@ def rrf_score(rank: int) -> float:
             ],
             [],
             [
-                ("k-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("k-2", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("k-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("k-3", round(1 / (0 + RRF_TEST_K), 6)),
+                ("k-2", round(1 / (1 + RRF_TEST_K), 6)),
+                ("k-1", round(1 / (2 + RRF_TEST_K), 6)),
             ],
         ),
         # only semantic results
@@ -258,10 +273,10 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(0.4, rid="s-4"),
             ],
             [
-                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("s-3", round(1 / (0 + RRF_TEST_K), 6)),
+                ("s-4", round(1 / (1 + RRF_TEST_K), 6)),
+                ("s-2", round(1 / (2 + RRF_TEST_K), 6)),
+                ("s-1", round(1 / (3 + RRF_TEST_K), 6)),
             ],
         ),
         # all keyword scores greater than semantic
@@ -279,14 +294,14 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(0.1, rid="s-5"),
             ],
             [
-                ("k-2", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("k-3", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-4", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("k-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-1", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("s-5", round(1 / (4 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("k-2", round(1 / (0 + RRF_TEST_K), 6)),
+                ("s-3", round(1 / (0 + RRF_TEST_K), 6)),
+                ("k-3", round(1 / (1 + RRF_TEST_K), 6)),
+                ("s-4", round(1 / (1 + RRF_TEST_K), 6)),
+                ("k-1", round(1 / (2 + RRF_TEST_K), 6)),
+                ("s-2", round(1 / (2 + RRF_TEST_K), 6)),
+                ("s-1", round(1 / (3 + RRF_TEST_K), 6)),
+                ("s-5", round(1 / (4 + RRF_TEST_K), 6)),
             ],
         ),
         # all keyword scores smaller than semantic
@@ -304,14 +319,14 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(6, rid="s-3"),
             ],
             [
-                ("k-4", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-3", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("k-5", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-2", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("k-2", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("s-1", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("k-3", round(1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("k-1", round(1 / (4 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
+                ("k-4", round(1 / (0 + RRF_TEST_K), 6)),
+                ("s-3", round(1 / (0 + RRF_TEST_K), 6)),
+                ("k-5", round(1 / (1 + RRF_TEST_K), 6)),
+                ("s-2", round(1 / (1 + RRF_TEST_K), 6)),
+                ("k-2", round(1 / (2 + RRF_TEST_K), 6)),
+                ("s-1", round(1 / (2 + RRF_TEST_K), 6)),
+                ("k-3", round(1 / (3 + RRF_TEST_K), 6)),
+                ("k-1", round(1 / (4 + RRF_TEST_K), 6)),
             ],
         ),
         # multi-match
@@ -328,13 +343,13 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(6, force_id="r-5/f/my/0/0-10"),
             ],
             [
-                ("r-4", round(1 / (0 + RRF_TEST_K) + 1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("r-4", round(1 / (0 + RRF_TEST_K) + 1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("r-2", round(1 / (0 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.BM25),
-                ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("r-5", round(1 / (1 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
-                ("r-3", round(1 / (2 + RRF_TEST_K), 6), SCORE_TYPE.VECTOR),
+                ("r-4", round(1 / (0 + RRF_TEST_K) + 1 / (1 + RRF_TEST_K), 6)),
+                ("r-4", round(1 / (0 + RRF_TEST_K) + 1 / (1 + RRF_TEST_K), 6)),
+                ("r-2", round(1 / (0 + RRF_TEST_K), 6)),
+                ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6)),
+                ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6)),
+                ("r-5", round(1 / (1 + RRF_TEST_K), 6)),
+                ("r-3", round(1 / (2 + RRF_TEST_K), 6)),
             ],
         ),
     ],
@@ -342,9 +357,12 @@ def rrf_score(rank: int) -> float:
 def test_reciprocal_rank_fusion_algorithm(
     keyword: list[TextBlockMatch],
     semantic: list[TextBlockMatch],
-    expected: list[tuple[str, float, SCORE_TYPE]],
+    expected: list[tuple[str, float]],
 ):
     rrf = ReciprocalRankFusion(k=RRF_TEST_K)
     merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=rrf)
-    results = [(item.paragraph_id.rid, round(item.score, 6), item.score_type) for item in merged]
+    results = [(item.paragraph_id.rid, round(item.score, 6)) for item in merged]
     assert results == expected
+
+    score_type = set({item.score_type for item in merged})
+    assert score_type == {SCORE_TYPE.RANK_FUSION}
