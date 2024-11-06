@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
+from abc import ABC
 from enum import Enum
 from typing import Any, Literal, Optional, TypeVar, Union
 
@@ -25,6 +26,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self
 
+from nucliadb_models import logger
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
@@ -389,6 +391,23 @@ class SortOptions(BaseModel):
     order: SortOrder = SortOrder.DESC
 
 
+class RankFusionName(str, Enum):
+    LEGACY = "legacy"
+    RECIPROCAL_RANK_FUSION = "rrf"
+
+
+class RankFusion(ABC, BaseModel):
+    name: str
+
+
+class LegacyRankFusion(RankFusion):
+    name: Literal[RankFusionName.LEGACY] = RankFusionName.LEGACY
+
+
+class ReciprocalRankFusion(RankFusion):
+    name: Literal[RankFusionName.RECIPROCAL_RANK_FUSION] = RankFusionName.RECIPROCAL_RANK_FUSION
+
+
 class Reranker(str, Enum):
     """Rerankers
 
@@ -538,6 +557,11 @@ class SearchParamDefaults:
         default=None,
         title="Search features",
         description="List of search features to use. Each value corresponds to a lookup into on of the different indexes. `document`, `paragraph` and `vector` are deprecated, please use `fulltext`, `keyword` and `semantic` instead",  # noqa
+    )
+    rank_fusion = ParamDefault(
+        default=RankFusionName.LEGACY,
+        title="Rank fusion",
+        description="Rank fusion algorithm to use to merge results from multiple retrievers (keyword, semantic)",
     )
     reranker = ParamDefault(
         default=Reranker.MULTI_MATCH_BOOSTER,
@@ -1303,6 +1327,7 @@ class AskRequest(AuditMetadataBase):
         title="Prompts",
         description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa
     )
+    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
     reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
     citations: bool = Field(
         default=False,
@@ -1447,6 +1472,18 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
     def normalize_features(cls, features: list[ChatOptions]):
         return [feature.normalized() for feature in features]
 
+    @field_validator("rank_fusion", mode="after")
+    @classmethod
+    def convert_rank_fusion_name_to_object(cls, value):
+        if isinstance(value, RankFusionName):
+            if value == RankFusionName.LEGACY:
+                value = LegacyRankFusion()
+            elif value == RankFusionName.RECIPROCAL_RANK_FUSION:
+                value = ReciprocalRankFusion()
+            else:
+                logger.error(f"Rank fusion algorithm not converted from name to object: {value}")
+        return value
+
 
 # Alias (for backwards compatiblity with testbed)
 class ChatRequest(AskRequest):
@@ -1530,15 +1567,8 @@ class FindRequest(BaseSearchRequest):
             SearchOptions.SEMANTIC,
         ]
     )
+    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
     reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
-
-    @field_validator("features", mode="after")
-    @classmethod
-    def fulltext_not_supported(cls, v):
-        # features are already normalized in the BaseSearchRequest model
-        if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
-            raise ValueError("fulltext search not supported")
-        return v
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
@@ -1555,6 +1585,26 @@ class FindRequest(BaseSearchRequest):
             ["Friedrich Nietzsche", "Immanuel Kant"],
         ],
     )
+
+    @field_validator("features", mode="after")
+    @classmethod
+    def fulltext_not_supported(cls, v):
+        # features are already normalized in the BaseSearchRequest model
+        if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
+            raise ValueError("fulltext search not supported")
+        return v
+
+    @field_validator("rank_fusion", mode="after")
+    @classmethod
+    def convert_rank_fusion_name_to_object(cls, value):
+        if isinstance(value, RankFusionName):
+            if value == RankFusionName.LEGACY:
+                value = LegacyRankFusion()
+            elif value == RankFusionName.RECIPROCAL_RANK_FUSION:
+                value = ReciprocalRankFusion()
+            else:
+                logger.error(f"Rank fusion algorithm not converted from name to object: {value}")
+        return value
 
 
 class SCORE_TYPE(str, Enum):

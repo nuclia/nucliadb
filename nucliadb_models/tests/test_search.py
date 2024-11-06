@@ -138,3 +138,29 @@ def test_chat_request_features_normalization():
         search.ChatOptions.KEYWORD,
         search.ChatOptions.RELATIONS,
     ]
+
+
+# Rank fusion
+
+
+@pytest.mark.parametrize(
+    "rank_fusion",
+    [
+        "legacy",
+        "rrf",
+        search.RankFusionName.LEGACY,
+        search.RankFusionName.RECIPROCAL_RANK_FUSION,
+        search.LegacyRankFusion(),
+        search.ReciprocalRankFusion(),
+    ],
+)
+def test_rank_fusion(rank_fusion):
+    search.FindRequest(rank_fusion=rank_fusion)
+    search.AskRequest(query="q", rank_fusion=rank_fusion)
+
+
+def test_rank_fusion_errors():
+    with pytest.raises(ValueError):
+        search.FindRequest(rank_fusion="unknown")
+    with pytest.raises(ValueError):
+        search.AskRequest(query="q", rank_fusion="unknown")
