@@ -547,7 +547,8 @@ class QueryParser:
         - Query: "What is Foo?"
         - Advanced Query: "What is (Foo OR Bar OR Baz)?"
         """
-        if not self.with_synonyms:
+        if not self.with_synonyms or not self.query:
+            # Nothing to do
             return
 
         if self.has_vector_search or self.has_relations_search:
@@ -555,10 +556,6 @@ class QueryParser:
                 "synonyms",
                 "Search with custom synonyms is only supported on paragraph and document search",
             )
-
-        if not self.query:
-            # Nothing to do
-            return
 
         synonyms = await self._get_synomyns()
         if synonyms is None:
