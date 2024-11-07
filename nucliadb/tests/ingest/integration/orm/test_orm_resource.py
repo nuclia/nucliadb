@@ -369,7 +369,9 @@ async def test_generate_broker_message(
     lfcm = [fcm for fcm in bm.field_metadata if fcm.field.field == "link1"][0]
     assert lfcm.metadata.metadata.links[0] == "https://nuclia.com"
     assert len(lfcm.metadata.metadata.paragraphs) == 1
-    assert len(lfcm.metadata.metadata.positions) == 1
+    assert len(lfcm.metadata.metadata.entities["processor"].entities) == 1
+    assert len(lfcm.metadata.metadata.entities["my-task-id"].entities) == 1
+
     assert lfcm.metadata.metadata.HasField("last_index")
     assert lfcm.metadata.metadata.HasField("last_understanding")
     assert lfcm.metadata.metadata.HasField("last_extract")
@@ -445,7 +447,9 @@ async def test_generate_index_message_contains_all_metadata(
         assert field in fields_to_be_found
         fields_to_be_found.remove(field)
         assert text.text == "MyText"
-        assert {"/l/labelset1/label1", "/e/ENTITY/document"}.issubset(set(text.labels))
+        assert {"/l/labelset1/label1", "/e/ENTITY/document", "/e/NOUN/document"}.issubset(
+            set(text.labels)
+        )
         if field in ("u/link", "t/text1"):
             assert "/e/Location/My home" in text.labels
 

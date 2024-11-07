@@ -387,9 +387,24 @@ def make_field_metadata(field_id):
     ex1.metadata.metadata.last_extract.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_summary.FromDatetime(datetime.now())
     ex1.metadata.metadata.thumbnail.CopyFrom(THUMBNAIL)
-    ex1.metadata.metadata.positions["ENTITY/document"].entity = "document"
-    ex1.metadata.metadata.positions["ENTITY/document"].position.extend(
-        [rpb.Position(start=0, end=5), rpb.Position(start=13, end=18)]
+    # Data Augmentation + Processor entities
+    ex1.metadata.metadata.entities["processor"].entities.extend(
+        [
+            rpb.FieldEntity(
+                text="document",
+                label="ENTITY",
+                positions=[rpb.Position(start=0, end=5), rpb.Position(start=13, end=18)],
+            ),
+        ]
+    )
+    ex1.metadata.metadata.entities["my-task-id"].entities.extend(
+        [
+            rpb.FieldEntity(
+                text="document",
+                label="NOUN",
+                positions=[rpb.Position(start=0, end=5), rpb.Position(start=13, end=18)],
+            ),
+        ]
     )
     return ex1
 
@@ -511,7 +526,12 @@ def broker_resource(
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
-    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
+    fcm.metadata.metadata.entities["processor"].entities.extend(
+        [rpb.FieldEntity(text="Ramon", label="PERSON")]
+    )
+    fcm.metadata.metadata.entities["my-data-augmentation"].entities.extend(
+        [rpb.FieldEntity(text="Ramon", label="CTO")]
+    )
 
     c1 = rpb.Classification()
     c1.label = "label1"

@@ -413,6 +413,12 @@ async def extend_prompt_context_with_ner(context, kbid, text_block_ids: list[Tex
             field = await resource.get_field(fid.key, fid.pb_type, load=False)
             fcm = await field.get_field_metadata()
             if fcm is not None:
+                # Data Augmentation + Processor entities
+                for data_aumgentation_task_id, entities_wrapper in fcm.metadata.entities.items():
+                    for entity in entities_wrapper.entities:
+                        ners.setdefault(entity.label, set()).add(entity.text)
+                # Legacy processor entities
+                # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
                 for token, family in fcm.metadata.ner.items():
                     ners.setdefault(family, set()).add(token)
         return _id, ners

@@ -343,15 +343,17 @@ async def test_extracted_shortened_metadata(
     fcmw.metadata.metadata.relations.append(relations)
     fcmw.metadata.split_metadata["split"].relations.append(relations)
 
-    # Add some ners
-    ner = {"Barcelona": "CITY/Barcelona"}
-    fcmw.metadata.metadata.ner.update(ner)
-    fcmw.metadata.split_metadata["split"].ner.update(ner)
-
-    # Add some positions
-    position = rpb.Position(start=1, end=2)
-    fcmw.metadata.metadata.positions["foo"].position.append(position)
-    fcmw.metadata.split_metadata["split"].positions["foo"].position.append(position)
+    # Add some ners with position
+    fcmw.metadata.metadata.entities["processor"].entities.extend(
+        [
+            rpb.FieldEntity(text="Barcelona", label="CITY", positions=[rpb.Position(start=1, end=2)]),
+        ]
+    )
+    fcmw.metadata.split_metadata["split"].entities["processor"].entities.extend(
+        [
+            rpb.FieldEntity(text="Barcelona", label="CITY", positions=[rpb.Position(start=1, end=2)]),
+        ]
+    )
 
     # Add some classification
     classification = rpb.Classification(label="foo", labelset="bar")
@@ -362,6 +364,7 @@ async def test_extracted_shortened_metadata(
 
     await inject_message(nucliadb_grpc, br)
 
+    # TODO: Remove ner and positions once fields are removed
     cropped_fields = ["ner", "positions", "relations", "classifications"]
 
     # Check that when 'shortened_metadata' in extracted param fields are cropped
