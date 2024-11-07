@@ -64,7 +64,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
 
     // Index a resource and search for it
     let resource = little_prince(index.shard_id.to_string(), None);
-    index_resource(&meta, storage.clone(), &index.shard_id.to_string(), &resource, 1i64.into()).await?;
+    index_resource(&meta, storage.clone(), &index.shard_id.to_string(), resource.clone(), 1i64.into()).await?;
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
