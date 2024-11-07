@@ -19,7 +19,7 @@
 #
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable, Union
+from typing import Iterable, Literal, Optional, Union
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
@@ -67,25 +67,33 @@ class LegacyRankFusion(RankFusionAlgorithm):
 
 class ReciprocalRankFusion(RankFusionAlgorithm):
     """Rank-based rank fusion algorithm. Discounts the weight of documents
-    occurring deep in retrieved lists using a reciprocal distribution
+    occurring deep in retrieved lists using a reciprocal distribution. It can be
+    parametrized with weights to boost retrievers.
 
-    RRF = Σ(r ∈ R) 1 / (k + r(d))
+    RRF = Σ(r ∈ R) (1 / (k + r(d)) · w(r))
 
     where:
     - d is a document
     - R is the set of retrievers
     - k (constant)
     - r(d) rank of document d in reranker r
+    - w(r) weight (boost) for retriever r
 
     """
 
-    # TODO: implement rank window
-    def __init__(self, k: float = 60.0):
+    def __init__(
+        self,
+        k: float = 60.0,
+        weights: Optional[dict[Union[Literal["keyword"], Literal["semantic"]], float]] = None,
+    ):
         # Constant used in RRF, studies agree on 60 as a good default value
         # giving good results across many datasets. k allow bigger score
         # difference among the best results and a smaller score difference among
         # bad results
         self.k = k
+        weights = weights or {"keyword": 1.0, "semantic": 1.0}
+        self.keyword_boost = weights["keyword"]
+        self.semantic_boost = weights["semantic"]
 
     def fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
@@ -97,12 +105,15 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         keyword = [k for k in sorted(keyword, key=lambda r: r.score, reverse=True)]
         semantic = [s for s in sorted(semantic, key=lambda r: r.score, reverse=True)]
 
-        rankings = [keyword, semantic]
-        for r, ranking in enumerate(rankings):
+        rankings = [
+            (keyword, self.keyword_boost),
+            (semantic, self.semantic_boost),
+        ]
+        for r, (ranking, boost) in enumerate(rankings):
             for i, result in enumerate(ranking):
                 id = result.paragraph_id
                 scores.setdefault(id, 0)
-                scores[id] += 1 / (self.k + i)
+                scores[id] += 1 / (self.k + i) * boost
 
                 position = (r, i)
                 match_positions.setdefault(result.paragraph_id, []).append(position)
@@ -111,7 +122,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         for paragraph_id, positions in match_positions.items():
             for r, i in positions:
                 score = scores[paragraph_id]
-                result = rankings[r][i]
+                result = rankings[r][0][i]
                 result.score = score
                 result.score_type = SCORE_TYPE.RANK_FUSION
                 # NOTE we are appending multi-matches. Should we merge them?
@@ -131,12 +142,13 @@ def get_rank_fusion(
     """Given a rank fusion API type, return the appropiate rank fusion algorithm instance"""
     algorithm: RankFusionAlgorithm
 
-    if rf is None:
-        algorithm = get_default_rank_fusion()
-    elif isinstance(rf, search_models.LegacyRankFusion):
+    if isinstance(rf, search_models.LegacyRankFusion):
         algorithm = LegacyRankFusion()
     elif isinstance(rf, search_models.ReciprocalRankFusion):
-        algorithm = ReciprocalRankFusion()
+        algorithm = ReciprocalRankFusion(
+            k=rf.k,
+            weights=rf.boosting,
+        )
     elif rf == search_models.RankFusionName.LEGACY:
         algorithm = LegacyRankFusion()
     elif rf == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:

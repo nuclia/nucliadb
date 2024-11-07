@@ -404,6 +404,17 @@ class LegacyRankFusion(_BaseRankFusion):
 
 class ReciprocalRankFusion(_BaseRankFusion):
     name: Literal[RankFusionName.RECIPROCAL_RANK_FUSION] = RankFusionName.RECIPROCAL_RANK_FUSION
+    k: float = Field(
+        default=60.0,
+        title="RRF k parameter",
+        description="k parameter changes the influence top-ranked and lower-ranked elements have. Research has shown that 60 is a performant value across datasets",  # noqa: E501
+    )
+    boosting: dict[Union[Literal["keyword"], Literal["semantic"]], float] = Field(
+        default_factory=dict,
+        title="Retriever boosting",
+        description="Define weights for each retriever. This allows to give different priorities to different retrieval methods. Scores will be multiplied by this value, so a boost of 1.0 is the same as no boost. As an example, multilingual search may benefit from semantic boosting",  # noqa: E501
+        min_length=2,
+    )
 
 
 RankFusion = Annotated[

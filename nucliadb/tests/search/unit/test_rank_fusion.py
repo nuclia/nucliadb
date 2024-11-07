@@ -343,13 +343,13 @@ def rrf_score(rank: int) -> float:
                 gen_semantic_result(6, force_id="r-5/f/my/0/0-10"),
             ],
             [
-                ("r-4", round(1 / (0 + RRF_TEST_K) + 1 / (1 + RRF_TEST_K), 6)),
-                ("r-4", round(1 / (0 + RRF_TEST_K) + 1 / (1 + RRF_TEST_K), 6)),
-                ("r-2", round(1 / (0 + RRF_TEST_K), 6)),
+                ("r-4", round(1 / (1 + RRF_TEST_K) + 1 / (0 + RRF_TEST_K), 6)),
+                ("r-4", round(1 / (1 + RRF_TEST_K) + 1 / (0 + RRF_TEST_K), 6)),
+                ("r-2", round(1 / (0 + RRF_TEST_K) + 0, 6)),
                 ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6)),
                 ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6)),
-                ("r-5", round(1 / (1 + RRF_TEST_K), 6)),
-                ("r-3", round(1 / (2 + RRF_TEST_K), 6)),
+                ("r-5", round(0 + 1 / (1 + RRF_TEST_K), 6)),
+                ("r-3", round(0 + 1 / (2 + RRF_TEST_K), 6)),
             ],
         ),
     ],
@@ -360,6 +360,76 @@ def test_reciprocal_rank_fusion_algorithm(
     expected: list[tuple[str, float]],
 ):
     rrf = ReciprocalRankFusion(k=RRF_TEST_K)
+    merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=rrf)
+    results = [(item.paragraph_id.rid, round(item.score, 6)) for item in merged]
+    assert results == expected
+
+    score_type = set({item.score_type for item in merged})
+    assert score_type == {SCORE_TYPE.RANK_FUSION}
+
+
+@pytest.mark.parametrize(
+    "keyword,semantic,expected",
+    [
+        # only keyword results
+        (
+            [
+                gen_keyword_result(1, rid="k-1"),
+                gen_keyword_result(3, rid="k-2"),
+                gen_keyword_result(4, rid="k-3"),
+            ],
+            [],
+            [
+                ("k-3", round(1 / (0 + RRF_TEST_K) * 2, 6)),
+                ("k-2", round(1 / (1 + RRF_TEST_K) * 2, 6)),
+                ("k-1", round(1 / (2 + RRF_TEST_K) * 2, 6)),
+            ],
+        ),
+        # only semantic results
+        (
+            [],
+            [
+                gen_semantic_result(0.2, rid="s-1"),
+                gen_semantic_result(0.3, rid="s-2"),
+                gen_semantic_result(0.6, rid="s-3"),
+            ],
+            [
+                ("s-3", round(1 / (0 + RRF_TEST_K) * 0.5, 6)),
+                ("s-2", round(1 / (1 + RRF_TEST_K) * 0.5, 6)),
+                ("s-1", round(1 / (2 + RRF_TEST_K) * 0.5, 6)),
+            ],
+        ),
+        # multi-match
+        (
+            [
+                gen_keyword_result(0.1, force_id="r-1/f/my/0-10"),
+                gen_keyword_result(0.5, force_id="r-2/f/my/0-10"),
+                gen_keyword_result(0.3, force_id="r-4/f/my/0-10"),
+            ],
+            [
+                gen_semantic_result(2, force_id="r-1/f/my/0/0-10"),
+                gen_semantic_result(3, force_id="r-3/f/my/0/0-10"),
+                gen_semantic_result(6, force_id="r-4/f/my/0/0-10"),
+                gen_semantic_result(6, force_id="r-5/f/my/0/0-10"),
+            ],
+            [
+                ("r-2", round((1 / (0 + RRF_TEST_K) * 2) + 0, 6)),
+                ("r-4", round((1 / (1 + RRF_TEST_K) * 2) + (1 / (0 + RRF_TEST_K) * 0.5), 6)),
+                ("r-4", round((1 / (1 + RRF_TEST_K) * 2) + (1 / (0 + RRF_TEST_K) * 0.5), 6)),
+                ("r-1", round((1 / (2 + RRF_TEST_K) * 2) + (1 / (3 + RRF_TEST_K) * 0.5), 6)),
+                ("r-1", round((1 / (2 + RRF_TEST_K) * 2) + (1 / (3 + RRF_TEST_K) * 0.5), 6)),
+                ("r-5", round(0 + (1 / (1 + RRF_TEST_K) * 0.5), 6)),
+                ("r-3", round(0 + (1 / (2 + RRF_TEST_K) * 0.5), 6)),
+            ],
+        ),
+    ],
+)
+def test_reciprocal_rank_fusion_boosting(
+    keyword: list[TextBlockMatch],
+    semantic: list[TextBlockMatch],
+    expected: list[tuple[str, float]],
+):
+    rrf = ReciprocalRankFusion(k=RRF_TEST_K, weights={"keyword": 2, "semantic": 0.5})
     merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=rrf)
     results = [(item.paragraph_id.rid, round(item.score, 6)) for item in merged]
     assert results == expected
