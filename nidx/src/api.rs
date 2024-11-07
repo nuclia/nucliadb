@@ -30,7 +30,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
 
     let service = grpc::ApiServer::new(meta).into_service();
     let server = GrpcServer::new("localhost:10000").await?;
-    debug!("Running Shards API at port {}", server.port()?);
+    debug!("Running API at port {}", server.port()?);
     server.serve(service).await?;
 
     Ok(())
