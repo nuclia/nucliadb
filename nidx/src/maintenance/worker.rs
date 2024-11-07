@@ -124,12 +124,15 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     };
 
     let work_dir = tempdir()?;
-    let merged: NewSegment = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer.merge(work_dir.path(), index.config()?, merge_inputs)?.into(),
-        IndexKind::Text => nidx_text::TextIndexer.merge(work_dir.path(), merge_inputs)?.into(),
-        IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.merge(work_dir.path(), merge_inputs)?.into(),
-        IndexKind::Relation => nidx_relation::RelationIndexer.merge(work_dir.path(), merge_inputs)?.into(),
-    };
+    let work_path = work_dir.path().to_path_buf();
+    let index_config = index.config().unwrap();
+    let merged: NewSegment = tokio::task::spawn_blocking(move || match index.kind {
+        IndexKind::Vector => nidx_vector::VectorIndexer.merge(&work_path, index_config, merge_inputs).map(|x| x.into()),
+        IndexKind::Text => nidx_text::TextIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+        IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+        IndexKind::Relation => nidx_relation::RelationIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+    })
+    .await??;
 
     // Upload
     let segment = Segment::create(&meta.pool, job.index_id, job.seq, merged.records, merged.index_metadata).await?;

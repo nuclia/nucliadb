@@ -45,7 +45,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let nats_client = async_nats::connect(&indexer_settings.nats_server).await?;
     let jetstream = async_nats::jetstream::new(nats_client);
     let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
-    let mut subscription = consumer.messages().await?;
+    let mut subscription = consumer.stream().max_messages_per_batch(1).messages().await?;
 
     while let Some(Ok(msg)) = subscription.next().await {
         let info = match msg.info() {
@@ -78,7 +78,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             }
         };
 
-        match index_resource(&meta, segment_storage.clone(), &index_message.shard, &resource, seq).await {
+        match index_resource(&meta, segment_storage.clone(), &index_message.shard, resource, seq).await {
             Ok(()) => {
                 if let Err(e) = acker.ack().await {
                     warn!("Error ack'ing NATS message {e:?}")
@@ -105,11 +105,12 @@ pub async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
     shard_id: &str,
-    resource: &Resource,
+    resource: Resource,
     seq: Seq,
 ) -> anyhow::Result<()> {
     let shard_id = Uuid::parse_str(shard_id)?;
     let indexes = Index::for_shard(&meta.pool, shard_id).await?;
+    let resource = Arc::new(resource);
 
     info!(?seq, ?shard_id, "Indexing message to shard");
 
@@ -118,8 +119,16 @@ pub async fn index_resource(
 
     for index in indexes {
         let output_dir = tempfile::tempdir()?;
-        let (new_segment, deletions) =
-            index_resource_to_index(&index, resource, output_dir.path(), single_vector_index).await?;
+
+        // Index the resource
+        let index = Arc::new(index);
+        let resource = Arc::clone(&resource);
+        let path = output_dir.path().to_path_buf();
+        let index_2 = Arc::clone(&index);
+        let (new_segment, deletions) = tokio::task::spawn_blocking(move || {
+            index_resource_to_index(&index_2, &resource, &path, single_vector_index)
+        })
+        .await??;
         let Some(new_segment) = new_segment else {
             continue;
         };
@@ -139,7 +148,7 @@ pub async fn index_resource(
     Ok(())
 }
 
-async fn index_resource_to_index(
+fn index_resource_to_index(
     index: &Index,
     resource: &Resource,
     output_dir: &Path,
@@ -190,7 +199,7 @@ mod tests {
             &meta,
             storage.clone(),
             &shard.id.to_string(),
-            &little_prince(shard.id.to_string(), None),
+            little_prince(shard.id.to_string(), None),
             123i64.into(),
         )
         .await
