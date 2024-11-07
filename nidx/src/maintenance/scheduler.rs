@@ -367,15 +367,32 @@ impl MergeScheduler {
                     current_max_size_log = segment_size_log;
                 }
 
-                current_bucket.push(segment_id);
+                current_bucket.push((segment_id, records));
             }
             buckets.push(current_bucket);
 
             for segments in buckets {
                 // TODO: merge segments with too many deletions
                 if segments.len() >= self.min_number_of_segments {
-                    debug!(?segments, "Scheduling merge job for bucket");
-                    MergeJob::create(meta, m.index_id.into(), &segments, last_indexed_seq).await?;
+                    let mut sum_segments = 0;
+                    let mut to_merge = Vec::new();
+                    for (sid, records) in &segments {
+                        sum_segments += *records as usize;
+                        to_merge.push(*sid);
+                        if sum_segments > self.top_bucket_max_records {
+                            if to_merge.len() >= self.min_number_of_segments {
+                                debug!(?to_merge, "Scheduling merge job for bucket");
+                                MergeJob::create(meta, m.index_id.into(), &to_merge, last_indexed_seq).await?;
+                            }
+                            sum_segments = 0;
+                            to_merge.clear();
+                        }
+                    }
+
+                    if to_merge.len() >= self.min_number_of_segments {
+                        debug!(?to_merge, "Scheduling merge job for bucket");
+                        MergeJob::create(meta, m.index_id.into(), &to_merge, last_indexed_seq).await?;
+                    }
                 }
             }
         }
