@@ -539,6 +539,14 @@ class QueryParser:
         return autofilters
 
     async def parse_synonyms(self, request: nodereader_pb2.SearchRequest) -> None:
+        """
+        Replace the query terms with the expression that includes the synonyms:
+
+        Example:
+        - Synonyms: Foo -> Bar, Baz
+        - Query: "What is Foo?"
+        - Advanced Query: "What is (Foo OR Bar OR Baz)?"
+        """
         if not self.with_synonyms:
             return
 
@@ -557,18 +565,17 @@ class QueryParser:
             # No synonyms found
             return
 
-        synonyms_found: list[str] = []
-        advanced_query = []
-        for term in self.query.split(" "):
-            advanced_query.append(term)
-            term_synonyms = synonyms.terms.get(term)
-            if term_synonyms is None or len(term_synonyms.synonyms) == 0:
-                # No synonyms found for this term
-                continue
-            synonyms_found.extend(term_synonyms.synonyms)
+        variants = {}
+        for term, term_synonyms in synonyms.terms.items():
+            if len(term_synonyms.synonyms) > 0:
+                variants[term] = f"({" OR ".join([term] + list(term_synonyms.synonyms))})"
 
-        if len(synonyms_found):
-            request.advanced_query = " OR ".join(advanced_query + synonyms_found)
+        advanced_query = self.query
+        for term, variant in variants.items():
+            advanced_query = advanced_query.replace(term, variant)
+
+        if advanced_query != self.query:
+            request.advanced_query = advanced_query
             request.ClearField("body")
 
     async def get_visual_llm_enabled(self) -> bool:
