@@ -212,7 +212,7 @@ impl Directory for UnionDirectory {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, io::Write, path::Path};
+    use std::{io::Write, path::Path};
 
     use crate::TantivySegmentMetadata;
     use serde_json::Value;
@@ -242,7 +242,6 @@ mod tests {
                 TantivySegmentMetadata {
                     path: dir1.path().to_path_buf(),
                     records: 1,
-                    tags: HashSet::new(),
                     index_metadata: crate::TantivyMeta {
                         segment_id: uuid1.clone(),
                     },
@@ -253,7 +252,6 @@ mod tests {
                 TantivySegmentMetadata {
                     path: dir2.path().to_path_buf(),
                     records: 1,
-                    tags: HashSet::new(),
                     index_metadata: crate::TantivyMeta {
                         segment_id: uuid2.clone(),
                     },
@@ -296,7 +294,6 @@ mod tests {
                 TantivySegmentMetadata {
                     path: dir1.path().to_path_buf(),
                     records: 12,
-                    tags: HashSet::new(),
                     index_metadata: crate::TantivyMeta {
                         segment_id: uuid1.clone(),
                     },
@@ -307,7 +304,6 @@ mod tests {
                 TantivySegmentMetadata {
                     path: dir2.path().to_path_buf(),
                     records: 1,
-                    tags: HashSet::new(),
                     index_metadata: crate::TantivyMeta {
                         segment_id: uuid2.clone(),
                     },

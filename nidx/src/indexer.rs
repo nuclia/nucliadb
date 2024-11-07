@@ -114,9 +114,13 @@ pub async fn index_resource(
 
     info!(?seq, ?shard_id, "Indexing message to shard");
 
+    let num_vector_indexes = indexes.iter().filter(|i| matches!(i.kind, IndexKind::Vector)).count();
+    let single_vector_index = num_vector_indexes == 1;
+
     for index in indexes {
         let output_dir = tempfile::tempdir()?;
-        let (new_segment, deletions) = index_resource_to_index(&index, resource, output_dir.path()).await?;
+        let (new_segment, deletions) =
+            index_resource_to_index(&index, resource, output_dir.path(), single_vector_index).await?;
         let Some(new_segment) = new_segment else {
             continue;
         };
@@ -140,11 +144,12 @@ async fn index_resource_to_index(
     index: &Index,
     resource: &Resource,
     output_dir: &Path,
+    single_vector_index: bool,
 ) -> anyhow::Result<(Option<NewSegment>, Vec<String>)> {
     let segment = match index.kind {
-        IndexKind::Vector => {
-            nidx_vector::VectorIndexer.index_resource(output_dir, index.config()?, resource)?.map(|x| x.into())
-        }
+        IndexKind::Vector => nidx_vector::VectorIndexer
+            .index_resource(output_dir, &index.config()?, resource, &index.name, single_vector_index)?
+            .map(|x| x.into()),
         IndexKind::Text => nidx_text::TextIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
         IndexKind::Paragraph => {
             nidx_paragraph::ParagraphIndexer.index_resource(output_dir, resource)?.map(|x| x.into())
@@ -186,7 +191,7 @@ mod tests {
             &meta,
             storage.clone(),
             &shard.id.to_string(),
-            &little_prince(shard.id.to_string()),
+            &little_prince(shard.id.to_string(), None),
             123i64.into(),
         )
         .await

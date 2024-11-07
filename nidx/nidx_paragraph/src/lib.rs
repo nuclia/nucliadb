@@ -39,7 +39,7 @@ use resource_indexer::index_paragraphs;
 use schema::ParagraphSchema;
 use search_query::ParagraphIterator;
 pub use search_query::ParagraphsContext;
-use std::{collections::HashSet, path::Path};
+use std::path::Path;
 use tantivy::{
     directory::MmapDirectory,
     indexer::merge_indices,
@@ -109,7 +109,6 @@ impl ParagraphIndexer {
         Ok(TantivySegmentMetadata {
             path: work_dir.to_path_buf(),
             records: segment.num_docs() as usize,
-            tags: HashSet::new(),
             index_metadata: TantivyMeta {
                 segment_id: segment.id().uuid_string(),
             },

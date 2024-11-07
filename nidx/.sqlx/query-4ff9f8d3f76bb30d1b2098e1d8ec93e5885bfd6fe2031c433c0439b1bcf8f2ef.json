@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                index_id,\n                array_agg(\n                    (segments.id, records)\n                    ORDER BY records DESC\n                ) AS \"segments!: Vec<(SegmentId, i64)>\"\n            FROM segments\n            JOIN indexes ON segments.index_id = indexes.id\n            WHERE\n                delete_at IS NULL AND merge_job_id IS NULL\n                AND seq <= $1\n                AND records <= $2\n            GROUP BY\n                index_id,\n                -- Only merge vector segments with same tags\n                CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "segments!: Vec<(SegmentId, i64)>",
+        "type_info": "RecordArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "4ff9f8d3f76bb30d1b2098e1d8ec93e5885bfd6fe2031c433c0439b1bcf8f2ef"
+}

@@ -27,7 +27,7 @@ use tempfile::tempdir;
 
 #[test]
 fn test_index_merge_search() -> anyhow::Result<()> {
-    let resource = little_prince("shard");
+    let resource = little_prince("shard", None);
     let segment_dir = tempdir()?;
     let meta1 = TextIndexer.index_resource(segment_dir.path(), &resource)?.unwrap();
     let records = meta1.records;

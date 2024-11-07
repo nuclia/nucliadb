@@ -49,7 +49,7 @@ pub fn minimal_resource(shard_id: String) -> Resource {
     }
 }
 
-pub fn little_prince(shard_id: impl Into<String>) -> Resource {
+pub fn little_prince(shard_id: impl Into<String>, vectorsets: Option<&[&str]>) -> Resource {
     let shard_id = shard_id.into();
     let mut resource = minimal_resource(shard_id);
     let rid = &resource.resource.as_ref().unwrap().uuid;
@@ -91,22 +91,37 @@ pub fn little_prince(shard_id: impl Into<String>) -> Resource {
         },
     );
     let mut summary_paragraphs = HashMap::new();
-    summary_paragraphs.insert(
-        format!("{rid}/a/summary/0-150"),
-        IndexParagraph {
-            start: 0,
-            end: 150,
-            field: "a/summary".to_string(),
-            sentences: HashMap::from([(
-                format!("{rid}/a/summary/0-150"),
-                VectorSentence {
-                    vector: vec![0.5, 0.5, 0.5],
-                    metadata: None,
+    let mut index_paragraph = IndexParagraph {
+        start: 0,
+        end: 150,
+        field: "a/summary".to_string(),
+        ..Default::default()
+    };
+    if let Some(vectorsets) = vectorsets {
+        for vs in vectorsets {
+            index_paragraph.vectorsets_sentences.insert(
+                vs.to_string(),
+                VectorsetSentences {
+                    sentences: HashMap::from([(
+                        format!("{rid}/a/summary/0-150"),
+                        VectorSentence {
+                            vector: vec![0.5, 0.5, 0.5],
+                            metadata: None,
+                        },
+                    )]),
                 },
-            )]),
-            ..Default::default()
-        },
-    );
+            );
+        }
+    } else {
+        index_paragraph.sentences = HashMap::from([(
+            format!("{rid}/a/summary/0-150"),
+            VectorSentence {
+                vector: vec![0.5, 0.5, 0.5],
+                metadata: None,
+            },
+        )]);
+    }
+    summary_paragraphs.insert(format!("{rid}/a/summary/0-150"), index_paragraph);
     resource.paragraphs.insert(
         "a/summary".to_string(),
         IndexParagraphs {

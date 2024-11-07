@@ -30,7 +30,7 @@ pub mod index_reader;
 
 use nidx_types::SegmentMetadata;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 use tantivy::{directory::MmapDirectory, schema::Schema, Index, SingleSegmentIndexWriter, TantivyDocument};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -68,7 +68,6 @@ impl TantivyIndexer {
         Ok(SegmentMetadata {
             path: self.output_path,
             records: segment.max_doc() as usize,
-            tags: HashSet::new(),
             index_metadata: TantivyMeta {
                 segment_id: segment.id().uuid_string(),
             },

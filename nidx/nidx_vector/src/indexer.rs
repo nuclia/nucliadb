@@ -46,17 +46,17 @@ impl<'a> From<&'a noderesources::Resource> for ResourceWrapper<'a> {
 }
 
 impl<'a> ResourceWrapper<'a> {
-    // pub fn new_vectorset_resource(
-    //     resource: &'a noderesources::Resource,
-    //     vectorset: &str,
-    //     fallback_to_default_vectorset: bool,
-    // ) -> Self {
-    //     Self {
-    //         resource,
-    //         vectorset: Some(vectorset.to_string()),
-    //         fallback_to_default_vectorset,
-    //     }
-    // }
+    pub fn new_vectorset_resource(
+        resource: &'a noderesources::Resource,
+        vectorset: &str,
+        fallback_to_default_vectorset: bool,
+    ) -> Self {
+        Self {
+            resource,
+            vectorset: Some(vectorset.to_string()),
+            fallback_to_default_vectorset,
+        }
+    }
 
     pub fn id(&self) -> &String {
         &self.resource.shard_id
@@ -90,10 +90,6 @@ impl<'a> ResourceWrapper<'a> {
             });
             (field_id, sentences_iterator)
         })
-    }
-
-    pub fn sentences_to_delete(&self) -> impl Iterator<Item = &str> {
-        self.resource.sentences_to_delete.iter().map(String::as_str)
     }
 }
 
