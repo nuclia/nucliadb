@@ -131,8 +131,11 @@ class FieldMetadata(BaseModel):
     thumbnail: Optional[CloudLink] = None
     language: Optional[str] = None
     summary: Optional[str] = None
-    positions: Dict[str, Positions]  # TODO: Remove once processor doesn't use this anymore
+    positions: Dict[
+        str, Positions
+    ]  # TODO: Remove once processor doesn't use this anymore
     relations: Optional[List[Relation]] = None
+    mime_type: Optional[str] = None
 
 
 class FieldComputedMetadata(BaseModel):
@@ -340,9 +343,16 @@ def convert_fieldmetadata_pb_to_dict(
     # Backwards compatibility with old entities format
     # TODO: Remove once deprecated fields are removed
     # If we recieved processor entities in the new field and the old field is empty, we copy them to the old field
-    if "processor" in message.entities and len(message.positions) == 0 and len(message.ner) == 0:
+    if (
+        "processor" in message.entities
+        and len(message.positions) == 0
+        and len(message.ner) == 0
+    ):
         message.ner.update(
-            {entity.text: entity.label for entity in message.entities["processor"].entities}
+            {
+                entity.text: entity.label
+                for entity in message.entities["processor"].entities
+            }
         )
         for entity in message.entities["processor"].entities:
             message.positions[entity.label + "/" + entity.text].entity = entity.text
