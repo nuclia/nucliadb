@@ -406,7 +406,10 @@ class ReciprocalRankFusion(_BaseRankFusion):
     name: Literal[RankFusionName.RECIPROCAL_RANK_FUSION] = RankFusionName.RECIPROCAL_RANK_FUSION
 
 
-RankFusion = Union[LegacyRankFusion, ReciprocalRankFusion]
+RankFusion = Annotated[
+    Union[LegacyRankFusion, ReciprocalRankFusion],
+    Field(discriminator="name"),
+]
 
 
 class Reranker(str, Enum):
