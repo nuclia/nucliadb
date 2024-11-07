@@ -18,21 +18,20 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod grpc;
+pub mod grpc;
 pub mod shards;
 
 use tracing::debug;
 
-use crate::{NidxMetadata, Settings};
+use crate::{grpc_server::GrpcServer, Settings};
 
-pub async fn run() -> anyhow::Result<()> {
-    let settings = Settings::from_env();
-    let meta = NidxMetadata::new(&settings.metadata.database_url).await?;
-    let _storage = settings.storage.expect("Storage settings needed").object_store.client();
+pub async fn run(settings: Settings) -> anyhow::Result<()> {
+    let meta = settings.metadata.clone();
 
-    debug!("Running Shards API");
-    let shards_api = grpc::GrpcServer::new(meta.clone());
-    shards_api.serve().await;
+    let service = grpc::ApiServer::new(meta).into_service();
+    let server = GrpcServer::new("localhost:10000").await?;
+    debug!("Running API at port {}", server.port()?);
+    server.serve(service).await?;
 
     Ok(())
 }
