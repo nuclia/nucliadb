@@ -161,6 +161,7 @@ pub struct EnvSettings {
 
     /// Merge scheduling algorithm configuration
     /// Required by scheduler
+    #[serde(default)]
     pub merge: MergeSettings,
 }
 
