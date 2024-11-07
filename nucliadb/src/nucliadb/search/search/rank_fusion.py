@@ -79,6 +79,8 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
     - r(d) rank of document d in reranker r
     - w(r) weight (boost) for retriever r
 
+    RRF boosts matches from multiple retrievers and deduplicate them
+
     """
 
     def __init__(
@@ -120,13 +122,14 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
 
         merged = []
         for paragraph_id, positions in match_positions.items():
-            for r, i in positions:
-                score = scores[paragraph_id]
-                result = rankings[r][0][i]
-                result.score = score
-                result.score_type = SCORE_TYPE.RANK_FUSION
-                # NOTE we are appending multi-matches. Should we merge them?
-                merged.append(result)
+            # we are getting only one position, effectively deduplicating
+            # multiple matches for the same text block
+            r, i = match_positions[paragraph_id][0]
+            score = scores[paragraph_id]
+            result = rankings[r][0][i]
+            result.score = score
+            result.score_type = SCORE_TYPE.RANK_FUSION
+            merged.append(result)
 
         merged.sort(key=lambda x: x.score, reverse=True)
         return merged

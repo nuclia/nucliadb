@@ -344,9 +344,7 @@ def rrf_score(rank: int) -> float:
             ],
             [
                 ("r-4", round(1 / (1 + RRF_TEST_K) + 1 / (0 + RRF_TEST_K), 6)),
-                ("r-4", round(1 / (1 + RRF_TEST_K) + 1 / (0 + RRF_TEST_K), 6)),
                 ("r-2", round(1 / (0 + RRF_TEST_K) + 0, 6)),
-                ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6)),
                 ("r-1", round(1 / (2 + RRF_TEST_K) + 1 / (3 + RRF_TEST_K), 6)),
                 ("r-5", round(0 + 1 / (1 + RRF_TEST_K), 6)),
                 ("r-3", round(0 + 1 / (2 + RRF_TEST_K), 6)),
@@ -415,8 +413,6 @@ def test_reciprocal_rank_fusion_algorithm(
             [
                 ("r-2", round((1 / (0 + RRF_TEST_K) * 2) + 0, 6)),
                 ("r-4", round((1 / (1 + RRF_TEST_K) * 2) + (1 / (0 + RRF_TEST_K) * 0.5), 6)),
-                ("r-4", round((1 / (1 + RRF_TEST_K) * 2) + (1 / (0 + RRF_TEST_K) * 0.5), 6)),
-                ("r-1", round((1 / (2 + RRF_TEST_K) * 2) + (1 / (3 + RRF_TEST_K) * 0.5), 6)),
                 ("r-1", round((1 / (2 + RRF_TEST_K) * 2) + (1 / (3 + RRF_TEST_K) * 0.5), 6)),
                 ("r-5", round(0 + (1 / (1 + RRF_TEST_K) * 0.5), 6)),
                 ("r-3", round(0 + (1 / (2 + RRF_TEST_K) * 0.5), 6)),
