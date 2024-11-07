@@ -27,8 +27,6 @@ pub use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 use crate::formula::Formula;
 
-pub use crate::data_point::Neighbour;
-
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
     fn get_filter(&self) -> &Formula;

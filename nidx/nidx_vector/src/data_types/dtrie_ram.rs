@@ -38,6 +38,7 @@ impl DTrie {
         };
         node.inner_get(tail, current)
     }
+    #[cfg(test)]
     fn inner_prune(&mut self, time: Seq) -> bool {
         self.value = self.value.filter(|v| *v > time);
         self.go_table = std::mem::take(&mut self.go_table)
@@ -65,19 +66,9 @@ impl DTrie {
     pub fn get(&self, key: &[u8]) -> Option<Seq> {
         self.inner_get(key, None)
     }
+    #[cfg(test)]
     pub fn prune(&mut self, time: Seq) {
         self.inner_prune(time);
-    }
-    pub fn size(&self) -> usize {
-        if self.go_table.is_empty() {
-            if self.value.is_some() {
-                1
-            } else {
-                0
-            }
-        } else {
-            self.go_table.values().map(|v| v.size()).sum()
-        }
     }
 }
 

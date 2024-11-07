@@ -32,7 +32,7 @@ use nidx_types::OpenIndexMetadata;
 use reader::RelationsReaderService;
 use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
-use std::{collections::HashSet, path::Path};
+use std::path::Path;
 use tantivy::{
     directory::MmapDirectory,
     indexer::merge_indices,
@@ -91,7 +91,6 @@ impl RelationIndexer {
         Ok(TantivySegmentMetadata {
             path: work_dir.to_path_buf(),
             records: segment.num_docs() as usize,
-            tags: HashSet::new(),
             index_metadata: TantivyMeta {
                 segment_id: segment.id().uuid_string(),
             },

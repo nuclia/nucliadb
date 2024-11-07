@@ -25,7 +25,6 @@ mod resource_indexer;
 mod schema;
 mod search_query;
 
-use std::collections::HashSet;
 use std::path::Path;
 
 use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse, StreamRequest};
@@ -87,7 +86,6 @@ impl TextIndexer {
         Ok(TantivySegmentMetadata {
             path: work_dir.to_path_buf(),
             records: segment.num_docs() as usize,
-            tags: HashSet::new(),
             index_metadata: TantivyMeta {
                 segment_id: segment.id().uuid_string(),
             },
