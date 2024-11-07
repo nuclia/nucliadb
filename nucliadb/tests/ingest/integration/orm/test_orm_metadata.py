@@ -57,6 +57,7 @@ async def test_create_resource_orm_metadata(
     p1.sentences.append(Sentence(start=11, end=20, key="test"))
     cl1 = Classification(labelset="labelset1", label="label1")
     p1.classifications.append(cl1)
+    ex1.metadata.metadata.mime_type = "text/plain"
     ex1.metadata.metadata.paragraphs.append(p1)
     ex1.metadata.metadata.classifications.append(cl1)
     ex1.metadata.metadata.last_index.FromDatetime(datetime.now())
@@ -73,12 +74,15 @@ async def test_create_resource_orm_metadata(
         ]
     )
 
-    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text = await r.get_field(
+        ex1.field.field, ex1.field.field_type, load=False
+    )
     await field_obj.set_field_metadata(ex1)
 
     ex2: Optional[FieldComputedMetadata] = await field_obj.get_field_metadata()
     assert ex2 is not None
     assert ex2.metadata.links[0] == ex1.metadata.metadata.links[0]
+    assert ex2.metadata.mime_type == ex1.metadata.metadata.mime_type
 
 
 @pytest.mark.asyncio
@@ -110,7 +114,9 @@ async def test_create_resource_orm_metadata_split(
     ex1.metadata.split_metadata["ff1"].last_index.FromDatetime(datetime.now())
     ex1.metadata.split_metadata["ff1"].last_understanding.FromDatetime(datetime.now())
     ex1.metadata.split_metadata["ff1"].last_extract.FromDatetime(datetime.now())
-    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text = await r.get_field(
+        ex1.field.field, ex1.field.field_type, load=False
+    )
     await field_obj.set_field_metadata(ex1)
 
     ex2 = FieldComputedMetadataWrapper()
@@ -137,5 +143,8 @@ async def test_create_resource_orm_metadata_split(
 
     ex3: Optional[FieldComputedMetadata] = await field_obj.get_field_metadata()
     assert ex3 is not None
-    assert ex1.metadata.split_metadata["ff1"].links[0] == ex3.split_metadata["ff1"].links[0]
+    assert (
+        ex1.metadata.split_metadata["ff1"].links[0]
+        == ex3.split_metadata["ff1"].links[0]
+    )
     assert len(ex3.split_metadata) == 2

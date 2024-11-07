@@ -29,7 +29,11 @@ from nucliadb_models.labels import BASE_LABELS, LABEL_HIDDEN, flatten_resource_l
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
-from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, Representation, ResourceID
+from nucliadb_protos.noderesources_pb2 import (
+    ParagraphMetadata,
+    Representation,
+    ResourceID,
+)
 from nucliadb_protos.noderesources_pb2 import Position as TextPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.resources_pb2 import (
@@ -107,13 +111,17 @@ class ResourceBrain:
         # We should set paragraphs and labels
         paragraph_pages = ParagraphPages(page_positions) if page_positions else None
         for subfield, metadata_split in metadata.split_metadata.items():
-            extracted_text_str = extracted_text.split_text[subfield] if extracted_text else None
+            extracted_text_str = (
+                extracted_text.split_text[subfield] if extracted_text else None
+            )
 
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
 
-                denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
+                denied_classifications = set(
+                    user_paragraph_classifications.denied.get(key, [])
+                )
                 position = TextPosition(
                     index=index,
                     start=paragraph.start,
@@ -154,13 +162,17 @@ class ResourceBrain:
                         representation=representation,
                     ),
                 )
-                paragraph_kind_label = f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+                paragraph_kind_label = (
+                    f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+                )
                 paragraph_labels = {paragraph_kind_label}
                 paragraph_labels.update(
                     f"/l/{classification.labelset}/{classification.label}"
                     for classification in paragraph.classifications
                 )
-                paragraph_labels.update(set(user_paragraph_classifications.valid.get(key, [])))
+                paragraph_labels.update(
+                    set(user_paragraph_classifications.valid.get(key, []))
+                )
                 paragraph_labels.difference_update(denied_classifications)
                 p.labels.extend(list(paragraph_labels))
 
@@ -169,7 +181,9 @@ class ResourceBrain:
         extracted_text_str = extracted_text.text if extracted_text else None
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
-            denied_classifications = set(user_paragraph_classifications.denied.get(key, []))
+            denied_classifications = set(
+                user_paragraph_classifications.denied.get(key, [])
+            )
             position = TextPosition(
                 index=index,
                 start=paragraph.start,
@@ -207,13 +221,17 @@ class ResourceBrain:
                     representation=representation,
                 ),
             )
-            paragraph_kind_label = f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+            paragraph_kind_label = (
+                f"/k/{Paragraph.TypeParagraph.Name(paragraph.kind).lower()}"
+            )
             paragraph_labels = {paragraph_kind_label}
             paragraph_labels.update(
                 f"/l/{classification.labelset}/{classification.label}"
                 for classification in paragraph.classifications
             )
-            paragraph_labels.update(set(user_paragraph_classifications.valid.get(key, [])))
+            paragraph_labels.update(
+                set(user_paragraph_classifications.valid.get(key, []))
+            )
             paragraph_labels.difference_update(denied_classifications)
             p.labels.extend(list(paragraph_labels))
 
@@ -311,7 +329,9 @@ class ResourceBrain:
     ):
         paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key.full()]
         if vectorset:
-            sentence_pb = paragraph_pb.vectorsets_sentences[vectorset].sentences[sentence_key.full()]
+            sentence_pb = paragraph_pb.vectorsets_sentences[vectorset].sentences[
+                sentence_key.full()
+            ]
         else:
             sentence_pb = paragraph_pb.sentences[sentence_key.full()]
 
@@ -329,18 +349,26 @@ class ResourceBrain:
         sentence_pb.metadata.position.end = vector.end_paragraph
 
         # does it make sense to copy forward paragraph values here?
-        sentence_pb.metadata.position.page_number = paragraph_pb.metadata.position.page_number
+        sentence_pb.metadata.position.page_number = (
+            paragraph_pb.metadata.position.page_number
+        )
         sentence_pb.metadata.position.in_page = paragraph_pb.metadata.position.in_page
 
         sentence_pb.metadata.page_with_visual = paragraph_pb.metadata.page_with_visual
 
-        sentence_pb.metadata.representation.file = paragraph_pb.metadata.representation.file
+        sentence_pb.metadata.representation.file = (
+            paragraph_pb.metadata.representation.file
+        )
 
-        sentence_pb.metadata.representation.is_a_table = paragraph_pb.metadata.representation.is_a_table
+        sentence_pb.metadata.representation.is_a_table = (
+            paragraph_pb.metadata.representation.is_a_table
+        )
 
         sentence_pb.metadata.position.index = paragraph_pb.metadata.position.index
 
-    def set_processing_status(self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]):
+    def set_processing_status(
+        self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]
+    ):
         """
         We purposefully overwrite what we index as a status and DO NOT reflect
         actual status with what we index.
@@ -397,11 +425,15 @@ class ResourceBrain:
                 self.brain.metadata.modified.CopyFrom(origin.modified)
 
     def _set_resource_relations(self, basic: Basic, origin: Optional[Origin]):
-        relationnodedocument = RelationNode(value=self.rid, ntype=RelationNode.NodeType.RESOURCE)
+        relationnodedocument = RelationNode(
+            value=self.rid, ntype=RelationNode.NodeType.RESOURCE
+        )
         if origin is not None:
             # origin contributors
             for contrib in origin.colaborators:
-                relationnodeuser = RelationNode(value=contrib, ntype=RelationNode.NodeType.USER)
+                relationnodeuser = RelationNode(
+                    value=contrib, ntype=RelationNode.NodeType.USER
+                )
                 self.brain.relations.append(
                     Relation(
                         relation=Relation.COLAB,
@@ -483,6 +515,8 @@ class ResourceBrain:
         relation_node_document: RelationNode,
         user_canceled_labels: set[str],
     ):
+        if metadata.mime_type != "":
+            labels["mt"].add(metadata.mime_type)
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
@@ -562,7 +596,9 @@ class ResourceBrain:
                 for classification in basic_user_metadata.classifications
                 if classification.cancelled_by_user
             )
-        relation_node_resource = RelationNode(value=uuid, ntype=RelationNode.NodeType.RESOURCE)
+        relation_node_resource = RelationNode(
+            value=uuid, ntype=RelationNode.NodeType.RESOURCE
+        )
         labels: dict[str, set[str]] = {"l": set(), "e": set()}
         if metadata is not None:
             for meta in metadata.split_metadata.values():
