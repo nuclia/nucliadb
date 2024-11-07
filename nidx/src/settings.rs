@@ -110,9 +110,14 @@ fn deserialize_object_store<'de, D: Deserializer<'de>>(deserializer: D) -> Resul
     Ok(config.client())
 }
 
+#[derive(Deserialize)]
+struct DatabaseSettings {
+    metadata_database_url: String,
+}
+
 fn deserialize_database_url<'de, D: Deserializer<'de>>(deserializer: D) -> Result<NidxMetadata, D::Error> {
-    let url = String::deserialize(deserializer)?;
-    Ok(block_on(NidxMetadata::new(&url)).unwrap())
+    let db_settings = DatabaseSettings::deserialize(deserializer)?;
+    Ok(block_on(NidxMetadata::new(&db_settings.metadata_database_url)).unwrap())
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -130,6 +135,7 @@ pub struct StorageSettings {
 
 // Take a look to the merge scheduler for more details about these settings
 #[derive(Clone, Deserialize, Debug)]
+#[serde(default)]
 pub struct MergeSettings {
     pub min_number_of_segments: usize,
     pub max_segment_size: usize,
