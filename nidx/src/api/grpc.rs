@@ -21,37 +21,36 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use nidx_protos::node_writer_server::{NodeWriter, NodeWriterServer};
+use nidx_protos::node_writer_server::NodeWriter;
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
-use tonic::{transport::Server, Request, Response, Status};
+use node_writer_server::NodeWriterServer;
+use tonic::transport::server::Router;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 use crate::api::shards;
 use crate::NidxMetadata;
 
-pub struct GrpcServer {
+pub struct ApiServer {
     meta: NidxMetadata,
 }
 
-impl GrpcServer {
+impl ApiServer {
     pub fn new(meta: NidxMetadata) -> Self {
         Self {
             meta,
         }
     }
 
-    pub async fn serve(self) {
-        Server::builder()
-            .add_service(NodeWriterServer::new(self))
-            .serve("0.0.0.0:10000".parse().unwrap())
-            .await
-            .unwrap();
+    pub fn into_service(self) -> Router {
+        Server::builder().add_service(NodeWriterServer::new(self))
     }
 }
 
 #[tonic::async_trait]
-impl NodeWriter for GrpcServer {
+impl NodeWriter for ApiServer {
     async fn new_shard(&self, request: Request<NewShardRequest>) -> Result<Response<ShardCreated>, Status> {
         // TODO? analytics event
         let request = request.into_inner();

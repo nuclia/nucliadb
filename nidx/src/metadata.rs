@@ -24,6 +24,8 @@ mod merge_job;
 mod segment;
 mod shard;
 
+use std::time::Duration;
+
 pub use deletion::*;
 pub use index::*;
 pub use merge_job::*;
@@ -33,14 +35,15 @@ pub use shard::*;
 /// A random ID to identify the lock we use during migration
 const MIGRATION_LOCK_ID: i64 = 5324678839066546102;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NidxMetadata {
     pub pool: sqlx::PgPool,
 }
 
 impl NidxMetadata {
     pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
-        let pool = sqlx::postgres::PgPoolOptions::new().connect(database_url).await?;
+        let pool =
+            sqlx::postgres::PgPoolOptions::new().acquire_timeout(Duration::from_secs(2)).connect(database_url).await?;
 
         Self::new_with_pool(pool).await
     }
