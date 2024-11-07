@@ -22,7 +22,7 @@ mod common;
 
 use std::collections::HashMap;
 
-use common::node_services::NidxFixture;
+use common::services::NidxFixture;
 use nidx_protos::{NewShardRequest, VectorIndexConfig};
 use sqlx::PgPool;
 use tonic::Request;

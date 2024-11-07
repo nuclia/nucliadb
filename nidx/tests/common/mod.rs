@@ -20,7 +20,7 @@
 
 #![allow(dead_code)] // clippy doesn't check for usage in other tests modules
 
-pub mod node_services;
+pub mod services;
 
 pub mod metadata {
     use sqlx::{Executor, Postgres};
