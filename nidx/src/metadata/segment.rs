@@ -1,5 +1,3 @@
-use std::{collections::HashSet, path::PathBuf};
-
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -19,6 +17,7 @@ use std::{collections::HashSet, path::PathBuf};
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+
 use super::IndexId;
 use nidx_types::{SegmentMetadata, Seq};
 use serde::{Deserialize, Serialize};
@@ -26,6 +25,7 @@ use sqlx::{
     types::{time::PrimitiveDateTime, JsonValue},
     Executor, Postgres,
 };
+use std::path::PathBuf;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(transparent)]
@@ -190,7 +190,6 @@ impl Segment {
         SegmentMetadata {
             path,
             records: self.records as usize,
-            tags: HashSet::new(),
             index_metadata: metadata,
         }
     }

@@ -31,7 +31,7 @@ use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
 use crate::vector_types::dense_f32_unaligned;
-use crate::{VectorR, VectorSegmentMetadata};
+use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
 use fs::{File, OpenOptions};
@@ -45,7 +45,6 @@ use std::path::Path;
 use std::{fs, io};
 
 pub use ops_hnsw::DataRetriever;
-pub use uuid::Uuid as DpId;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
@@ -101,9 +100,9 @@ where
     operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.1.metadata.records));
 
     // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
-    let tags = operants[0].1.metadata.tags.clone();
+    let tags = &operants[0].1.metadata.index_metadata.tags;
     for (_, dp) in &operants {
-        if dp.metadata.tags != tags {
+        if &dp.metadata.index_metadata.tags != tags {
             return Err(crate::VectorErr::InconsistentMergeSegmentTags);
         }
     }
@@ -151,8 +150,9 @@ where
     let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
         records: no_nodes,
-        tags,
-        index_metadata: (),
+        index_metadata: VectorSegmentMeta {
+            tags: tags.clone(),
+        },
     };
 
     Ok(OpenDataPoint {
@@ -215,8 +215,9 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
         records: no_nodes,
-        tags,
-        index_metadata: (),
+        index_metadata: VectorSegmentMeta {
+            tags,
+        },
     };
 
     Ok(OpenDataPoint {
@@ -439,13 +440,6 @@ impl PartialEq for Neighbour {
 }
 
 impl Neighbour {
-    #[cfg(test)]
-    pub fn dummy_neighbour(key: &[u8], score: f32) -> Neighbour {
-        Neighbour {
-            score,
-            node: Node::serialize(key, [1, 2, 3, 4], 1, [], None as Option<&[u8]>),
-        }
-    }
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
         let node = data_store::get_value(Node, data, addr);
         let (exact, _) = Node.read_exact(node);
@@ -494,7 +488,7 @@ impl OpenDataPoint {
     }
 
     pub fn tags(&self) -> &HashSet<String> {
-        &self.metadata.tags
+        &self.metadata.index_metadata.tags
     }
 
     pub fn stored_len(&self) -> Option<usize> {

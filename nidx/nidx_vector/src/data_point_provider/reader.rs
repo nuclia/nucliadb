@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub use crate::data_point::Neighbour;
 use crate::data_point::{self, OpenDataPoint};
-pub use crate::data_point::{DpId, Neighbour};
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::data_types::dtrie_ram::DTrie;
@@ -107,7 +107,6 @@ pub struct Reader {
     config: VectorConfig,
     open_data_points: Vec<(OpenDataPoint, Seq)>,
     delete_log: DTrie,
-    number_of_embeddings: usize,
     dimension: Option<usize>,
 }
 
@@ -184,12 +183,10 @@ impl Reader {
     ) -> VectorR<Reader> {
         let mut dimension = None;
         let mut open_data_points = Vec::new();
-        let mut number_of_embeddings = 0;
 
         for (metadata, seq) in segments {
             let open_data_point = data_point::open(metadata)?;
 
-            number_of_embeddings += open_data_point.no_nodes();
             open_data_points.push((open_data_point, seq));
         }
 
@@ -201,7 +198,6 @@ impl Reader {
             config,
             open_data_points,
             delete_log,
-            number_of_embeddings,
             dimension,
         })
     }
@@ -344,18 +340,6 @@ impl Reader {
             page_number: request.page_number,
             result_per_page: request.result_per_page,
         })
-    }
-
-    pub fn size(&self) -> usize {
-        self.number_of_embeddings
-    }
-
-    pub fn config(&self) -> &VectorConfig {
-        &self.config
-    }
-
-    pub fn embedding_dimension(&self) -> Option<usize> {
-        self.dimension
     }
 }
 
