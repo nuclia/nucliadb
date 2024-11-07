@@ -18,6 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+#![allow(dead_code)] // clippy doesn't check for usage in other tests modules
+
+pub mod services;
+
 pub mod metadata {
     use sqlx::{Executor, Postgres};
 

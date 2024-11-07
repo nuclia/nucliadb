@@ -24,7 +24,10 @@ use futures::Stream;
 use nidx_protos::node_reader_server::NodeReader;
 use nidx_protos::*;
 use node_reader_server::NodeReaderServer;
-use tonic::{transport::Server, Request, Response, Result, Status};
+use tonic::{
+    transport::{server::Router, Server},
+    Request, Response, Result, Status,
+};
 
 use crate::NidxMetadata;
 
@@ -44,12 +47,8 @@ impl SearchServer {
         }
     }
 
-    pub async fn serve(self) {
-        Server::builder()
-            .add_service(NodeReaderServer::new(self))
-            .serve("0.0.0.0:10001".parse().unwrap())
-            .await
-            .unwrap();
+    pub fn into_service(self) -> Router {
+        Server::builder().add_service(NodeReaderServer::new(self))
     }
 }
 

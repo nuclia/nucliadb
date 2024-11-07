@@ -17,14 +17,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub mod api;
-pub mod grpc_server;
-pub mod indexer;
-pub mod maintenance;
-pub mod metadata;
-pub mod searcher;
-mod segment_store;
-pub mod settings;
 
-pub use metadata::NidxMetadata;
-pub use settings::Settings;
+use tokio::net::{TcpListener, ToSocketAddrs};
+use tonic::transport::server::{Router, TcpIncoming};
+
+/// A tonic server that allows binding to and returning a random port.
+pub struct GrpcServer(TcpListener);
+
+impl GrpcServer {
+    pub async fn new(address: impl ToSocketAddrs) -> anyhow::Result<Self> {
+        Ok(GrpcServer(TcpListener::bind(address).await?))
+    }
+
+    pub fn port(&self) -> anyhow::Result<u16> {
+        Ok(self.0.local_addr()?.port())
+    }
+
+    pub async fn serve(self, server: Router) -> anyhow::Result<()> {
+        Ok(server.serve_with_incoming(TcpIncoming::from_listener(self.0, true, None).unwrap()).await?)
+    }
+}
