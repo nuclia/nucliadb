@@ -26,10 +26,9 @@ use tracing::debug;
 use crate::{grpc_server::GrpcServer, Settings};
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
-    let meta = settings.metadata;
-    let _storage = settings.storage.expect("Storage settings needed").object_store;
+    let meta = settings.metadata.clone();
 
-    let service = grpc::ApiServer::new(meta.clone()).into_service();
+    let service = grpc::ApiServer::new(meta).into_service();
     let server = GrpcServer::new("localhost:10000").await?;
     debug!("Running Shards API at port {}", server.port()?);
     server.serve(service).await?;

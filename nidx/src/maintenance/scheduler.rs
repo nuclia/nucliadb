@@ -34,9 +34,9 @@ use crate::{
 };
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
-    let indexer_settings = settings.indexer.unwrap();
-    let merger_settings = settings.merge;
-    let meta = settings.metadata;
+    let indexer_settings = settings.indexer.as_ref().unwrap();
+    let merger_settings = settings.merge.clone();
+    let meta = settings.metadata.clone();
 
     let client = async_nats::connect(&indexer_settings.nats_server).await?;
     let jetstream = async_nats::jetstream::new(client);
@@ -55,7 +55,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     });
 
     let meta2 = meta.clone();
-    let storage = indexer_settings.object_store;
+    let storage = indexer_settings.object_store.clone();
     tasks.spawn(async move {
         loop {
             if let Err(e) = purge_segments(&meta2, &storage).await {
@@ -306,7 +306,7 @@ impl Default for MergeScheduler {
 impl MergeScheduler {
     pub fn from_settings(settings: &MergeSettings) -> Self {
         Self {
-            min_number_of_segments: settings.min_number_of_segments,
+            min_number_of_segments: settings.min_number_of_segments as usize,
             top_bucket_max_records: settings.max_segment_size,
             ..Default::default()
         }

@@ -22,7 +22,7 @@ use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::SyncedSearcher;
-use nidx::settings::{ObjectStoreConfig, StorageSettings};
+use nidx::settings::{EnvSettings, MetadataSettings, ObjectStoreConfig, StorageSettings};
 use nidx::{NidxMetadata, Settings};
 use nidx_protos::node_reader_client::NodeReaderClient;
 use nidx_protos::node_writer_client::NodeWriterClient;
@@ -39,14 +39,19 @@ impl NidxFixture {
     pub async fn new(pool: PgPool) -> anyhow::Result<Self> {
         let settings = Settings {
             metadata: NidxMetadata::new_with_pool(pool).await?,
-            indexer: Some(nidx::settings::IndexerSettings {
-                object_store: ObjectStoreConfig::Memory.client(),
-                nats_server: String::new(),
-            }),
-            storage: Some(StorageSettings {
-                object_store: ObjectStoreConfig::Memory.client(),
-            }),
-            merge: Default::default(),
+            settings: EnvSettings {
+                indexer: Some(nidx::settings::IndexerSettings {
+                    object_store: ObjectStoreConfig::Memory.client(),
+                    nats_server: String::new(),
+                }),
+                storage: Some(StorageSettings {
+                    object_store: ObjectStoreConfig::Memory.client(),
+                }),
+                merge: Default::default(),
+                metadata: MetadataSettings {
+                    database_url: "ignored".to_string(),
+                },
+            },
         };
         // API server
         let api_service = ApiServer::new(settings.metadata.clone()).into_service();
@@ -61,7 +66,7 @@ impl NidxFixture {
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
         tokio::task::spawn(searcher_server.serve(searcher_api.into_service()));
-        tokio::task::spawn(async move { searcher.run(settings.storage.unwrap().object_store).await });
+        tokio::task::spawn(async move { searcher.run(settings.storage.as_ref().unwrap().object_store.clone()).await });
 
         // Clients
         let searcher_client = NodeReaderClient::connect(format!("http://localhost:{searcher_port}")).await?;

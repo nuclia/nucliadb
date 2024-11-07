@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
     tracing_subscriber::fmt::init();
 
-    let settings = Settings::from_env();
+    let settings = Settings::from_env().await?;
     let mut tasks = JoinSet::new();
     args.iter().for_each(|arg| {
         match arg.as_str() {

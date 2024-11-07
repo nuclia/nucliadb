@@ -35,8 +35,8 @@ use crate::{
 };
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
-    let storage = settings.storage.unwrap().object_store;
-    let meta = settings.metadata;
+    let storage = settings.storage.as_ref().unwrap().object_store.clone();
+    let meta = settings.metadata.clone();
 
     loop {
         let job = MergeJob::take(&meta.pool).await?;

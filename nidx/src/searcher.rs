@@ -86,8 +86,8 @@ impl SyncedSearcher {
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let work_dir = tempdir()?;
-    let meta = settings.metadata;
-    let storage = settings.storage.expect("Storage settings needed").object_store;
+    let meta = settings.metadata.clone();
+    let storage = settings.storage.as_ref().expect("Storage settings needed").object_store.clone();
 
     let searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
 
