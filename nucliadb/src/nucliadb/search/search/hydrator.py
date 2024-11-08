@@ -91,7 +91,7 @@ async def hydrate_text_block(
     return text_block
 
 
-@hydrator_observer.wrap({"type": "resource_metadata_simple"})
+@hydrator_observer.wrap({"type": "resource_metadata"})
 async def hydrate_resource_metadata(
     kbid: str,
     resource_id: str,
