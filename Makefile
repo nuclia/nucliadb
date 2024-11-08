@@ -78,6 +78,9 @@ venv:  ## Initializes an environment
 	pyenv virtualenv nucliadb
 	pyenv local nucliadb
 
+install:
+	pdm sync -d -G :all
+
 install__deprecated: ## Install dependencies (on the active environment)
 	pip install --upgrade pip wheel
 	pip install "Cython==0.29.24" "grpcio-tools>=1.44.0,<1.63.0"
