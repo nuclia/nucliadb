@@ -24,7 +24,7 @@ use std::str::FromStr;
 use crate::errors::NidxError;
 use crate::grpc_server::RemappedGrpcService;
 use crate::metadata::{IndexKind, Shard};
-use nidx::nidx_api_server::{NidxApi, NidxApiServer};
+use nidx_protos::nidx::nidx_api_server::*;
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
 use tonic::service::Routes;

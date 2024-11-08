@@ -21,7 +21,7 @@
 use std::{pin::Pin, sync::Arc};
 
 use futures::Stream;
-use nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
+use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
 use tonic::{service::Routes, Request, Response, Result, Status};
 
