@@ -132,9 +132,9 @@ async def test_search_with_synonyms(
     tomatoe_rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
+        f"/kb/{kbid}/find",
         json=dict(
-            features=["paragraph", "document"],
+            features=["keyword"],
             query="planet",
             with_synonyms=True,
             highlight=True,
@@ -145,21 +145,19 @@ async def test_search_with_synonyms(
 
     # Paragraph and fulltext search should match on summary (term)
     # and title (synonym) for the two resources
-    assert len(body["paragraphs"]["results"]) == 4
-    assert len(body["fulltext"]["results"]) == 4
+    assert len(get_pararagraphs(body)) == 4
     assert body["resources"][planet_rid]
     assert body["resources"][sphere_rid]
     assert tomatoe_rid not in body["resources"]
 
     # Check that searching without synonyms matches only query term
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
-        json=dict(features=["paragraph", "document"], query="planet"),
+        f"/kb/{kbid}/find",
+        json=dict(features=["keyword"], query="planet"),
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 1
-    assert len(body["fulltext"]["results"]) == 1
+    assert len(get_pararagraphs(body)) == 1
     assert body["resources"][planet_rid]
     assert sphere_rid not in body["resources"]
     assert tomatoe_rid not in body["resources"]
@@ -167,20 +165,27 @@ async def test_search_with_synonyms(
     # Check that searching with a term that has synonyms and
     # one that doesn't matches all of them
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
+        f"/kb/{kbid}/find",
         json=dict(
-            features=["paragraph", "document"],
+            features=["keyword"],
             query="planet tomatoe",
             with_synonyms=True,
         ),
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 5
-    assert len(body["fulltext"]["results"]) == 5
+    assert len(get_pararagraphs(body)) == 5
     assert body["resources"][planet_rid]
     assert body["resources"][sphere_rid]
     assert body["resources"][tomatoe_rid]
+
+
+def get_pararagraphs(body):
+    paragraphs = []
+    for resource in body.get("resources", {}).values():
+        for field in resource.get("fields", {}).values():
+            paragraphs.extend(field.get("paragraphs", []))
+    return paragraphs
 
 
 @pytest.mark.asyncio

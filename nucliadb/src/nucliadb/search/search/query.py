@@ -19,6 +19,7 @@
 #
 import asyncio
 import json
+import string
 from datetime import datetime
 from typing import Any, Awaitable, Optional, Union
 
@@ -539,7 +540,17 @@ class QueryParser:
         return autofilters
 
     async def parse_synonyms(self, request: nodereader_pb2.SearchRequest) -> None:
-        if not self.with_synonyms:
+        """
+        Replace the terms in the query with an expression that will make it match with the configured synonyms.
+        We're using the Tantivy's query language here: https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html
+
+        Example:
+        - Synonyms: Foo -> Bar, Baz
+        - Query: "What is Foo?"
+        - Advanced Query: "What is (Foo OR Bar OR Baz)?"
+        """
+        if not self.with_synonyms or not self.query:
+            # Nothing to do
             return
 
         if self.has_vector_search or self.has_relations_search:
@@ -548,27 +559,32 @@ class QueryParser:
                 "Search with custom synonyms is only supported on paragraph and document search",
             )
 
-        if not self.query:
-            # Nothing to do
-            return
-
         synonyms = await self._get_synomyns()
         if synonyms is None:
             # No synonyms found
             return
 
-        synonyms_found: list[str] = []
-        advanced_query = []
-        for term in self.query.split(" "):
-            advanced_query.append(term)
-            term_synonyms = synonyms.terms.get(term)
-            if term_synonyms is None or len(term_synonyms.synonyms) == 0:
-                # No synonyms found for this term
-                continue
-            synonyms_found.extend(term_synonyms.synonyms)
+        # Calculate term variants: 'term' -> '(term OR synonym1 OR synonym2)'
+        variants: dict[str, str] = {}
+        for term, term_synonyms in synonyms.terms.items():
+            if len(term_synonyms.synonyms) > 0:
+                variants[term] = f"({" OR ".join([term] + list(term_synonyms.synonyms))})"
 
-        if len(synonyms_found):
-            request.advanced_query = " OR ".join(advanced_query + synonyms_found)
+        # Split the query into terms
+        query_terms = self.query.split()
+
+        # Remove punctuation from the query terms
+        clean_query_terms = [term.strip(string.punctuation) for term in query_terms]
+
+        # Replace the original terms with the variants if the cleaned term is in the variants
+        term_with_synonyms_found = False
+        for index, clean_term in enumerate(clean_query_terms):
+            if clean_term in variants:
+                term_with_synonyms_found = True
+                query_terms[index] = query_terms[index].replace(clean_term, variants[clean_term])
+
+        if term_with_synonyms_found:
+            request.advanced_query = " ".join(query_terms)
             request.ClearField("body")
 
     async def get_visual_llm_enabled(self) -> bool:
