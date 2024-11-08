@@ -19,7 +19,7 @@
 #
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable, Literal, Optional, Union
+from typing import Iterable, Union, cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
@@ -86,16 +86,17 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
     def __init__(
         self,
         k: float = 60.0,
-        weights: Optional[dict[Union[Literal["keyword"], Literal["semantic"]], float]] = None,
+        *,
+        keyword_weight: float = 1.0,
+        semantic_weight: float = 1.0,
     ):
         # Constant used in RRF, studies agree on 60 as a good default value
         # giving good results across many datasets. k allow bigger score
         # difference among the best results and a smaller score difference among
         # bad results
         self.k = k
-        weights = weights or {"keyword": 1.0, "semantic": 1.0}
-        self.keyword_boost = weights["keyword"]
-        self.semantic_boost = weights["semantic"]
+        self.keyword_boost = keyword_weight
+        self.semantic_boost = semantic_weight
 
     def fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
@@ -146,16 +147,23 @@ def get_rank_fusion(
     algorithm: RankFusionAlgorithm
 
     if isinstance(rf, search_models.LegacyRankFusion):
+        rf = cast(search_models.LegacyRankFusion, rf)
         algorithm = LegacyRankFusion()
+
     elif isinstance(rf, search_models.ReciprocalRankFusion):
+        rf = cast(search_models.ReciprocalRankFusion, rf)
         algorithm = ReciprocalRankFusion(
             k=rf.k,
-            weights=rf.boosting,
+            keyword_weight=rf.boosting.keyword,
+            semantic_weight=rf.boosting.semantic,
         )
+
     elif rf == search_models.RankFusionName.LEGACY:
         algorithm = LegacyRankFusion()
+
     elif rf == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
         algorithm = ReciprocalRankFusion()
+
     else:
         logger.error(f"Unknown rank fusion algorithm {type(rf)} {rf}. Using default")
         algorithm = get_default_rank_fusion()

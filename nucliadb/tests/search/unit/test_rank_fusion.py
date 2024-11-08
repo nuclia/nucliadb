@@ -425,7 +425,7 @@ def test_reciprocal_rank_fusion_boosting(
     semantic: list[TextBlockMatch],
     expected: list[tuple[str, float]],
 ):
-    rrf = ReciprocalRankFusion(k=RRF_TEST_K, weights={"keyword": 2, "semantic": 0.5})
+    rrf = ReciprocalRankFusion(k=RRF_TEST_K, keyword_weight=2, semantic_weight=0.5)
     merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=rrf)
     results = [(item.paragraph_id.rid, round(item.score, 6)) for item in merged]
     assert results == expected
