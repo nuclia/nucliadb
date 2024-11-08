@@ -119,9 +119,10 @@ jobs:
           cache: true
       - name: Install venv
         run: pdm sync -d --clean --no-editable
+      - name: Clean build
+        run: find . -name build | xargs rm -r || true
       - name: Lint source code
         run: |
-          rm -r build
           source .venv/bin/activate
           for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models nucliadb_sidecar nucliadb_node_binding nucliadb_performance
           do
