@@ -23,7 +23,7 @@ from typing import Any, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
-from typing_extensions import Annotated, Self
+from typing_extensions import Annotated, Self, deprecated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
@@ -436,20 +436,25 @@ RankFusion = Annotated[
 class Reranker(str, Enum):
     """Rerankers
 
-    - Multi-match booster (default): given a set of results from different
+    - Multi-match booster (default, deprecated): given a set of results from different
       sources, e.g., keyword and semantic search boost results appearing in both
       sets
 
     - Predict reranker: after retrieval, send the results to Predict API to
       rerank it. This method uses a reranker model, so one can expect better
-      results at expenses of more latency
+      results at expenses of more latency.
+
+      This will be the new default
 
     - No-operation (noop) reranker: maintain order and do not rerank the results
       after retrieval
 
     """
 
-    MULTI_MATCH_BOOSTER = "multi_match_booster"
+    MULTI_MATCH_BOOSTER: Annotated[
+        str,
+        deprecated("We recommend do switch to the new default predict reranker for far better results"),
+    ] = "multi_match_booster"
     PREDICT_RERANKER = "predict"
     NOOP = "noop"
 
