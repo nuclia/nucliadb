@@ -21,6 +21,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use crate::errors::NidxError;
 use crate::metadata::{IndexKind, Shard};
 use nidx::nidx_api_server::{NidxApi, NidxApiServer};
 use nidx_protos::*;
@@ -54,11 +55,10 @@ impl NidxApi for ApiServer {
     async fn get_shard(&self, request: Request<GetShardRequest>) -> Result<Response<noderesources::Shard>> {
         let request = request.into_inner();
         let shard_id = request.shard_id.ok_or(Status::invalid_argument("Shard ID required"))?.id;
-        let shard_id = Uuid::parse_str(&shard_id).map_err(|_| Status::invalid_argument("Shard ID must be UUID"))?;
+        let shard_id = Uuid::parse_str(&shard_id).map_err(NidxError::from)?;
 
-        let shard = Shard::get(&self.meta.pool, shard_id).await.map_err(|_| Status::not_found("Shard not found"))?;
-
-        let index_stats = shard.stats(&self.meta.pool).await.map_err(|_| Status::not_found("Shard not found"))?;
+        let shard = Shard::get(&self.meta.pool, shard_id).await.map_err(NidxError::from)?;
+        let index_stats = shard.stats(&self.meta.pool).await.map_err(NidxError::from)?;
 
         Ok(Response::new(noderesources::Shard {
             metadata: Some(ShardMetadata {
@@ -74,16 +74,14 @@ impl NidxApi for ApiServer {
     async fn new_shard(&self, request: Request<NewShardRequest>) -> Result<Response<ShardCreated>> {
         // TODO? analytics event
         let request = request.into_inner();
-        let kbid = Uuid::from_str(&request.kbid).map_err(|e| Status::internal(e.to_string()))?;
+        let kbid = Uuid::from_str(&request.kbid).map_err(NidxError::from)?;
         let mut vector_configs = HashMap::with_capacity(request.vectorsets_configs.len());
         for (vectorset_id, config) in request.vectorsets_configs {
             vector_configs
                 .insert(vectorset_id, VectorConfig::try_from(config).map_err(|e| Status::internal(e.to_string()))?);
         }
 
-        let shard = shards::create_shard(&self.meta, kbid, vector_configs)
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let shard = shards::create_shard(&self.meta, kbid, vector_configs).await.map_err(NidxError::from)?;
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),
@@ -95,9 +93,9 @@ impl NidxApi for ApiServer {
     async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>> {
         // TODO? analytics event
         let request = request.into_inner();
-        let shard_id = Uuid::from_str(&request.id).map_err(|e| Status::internal(e.to_string()))?;
+        let shard_id = Uuid::from_str(&request.id).map_err(NidxError::from)?;
 
-        shards::delete_shard(&self.meta, shard_id).await.map_err(|e| Status::internal(e.to_string()))?;
+        shards::delete_shard(&self.meta, shard_id).await?;
 
         Ok(Response::new(ShardId {
             id: shard_id.to_string(),
@@ -105,7 +103,7 @@ impl NidxApi for ApiServer {
     }
 
     async fn list_shards(&self, _request: Request<EmptyQuery>) -> Result<Response<ShardIds>> {
-        let ids = Shard::list_ids(&self.meta.pool).await.map_err(|e| Status::internal(e.to_string()))?;
+        let ids = Shard::list_ids(&self.meta.pool).await.map_err(NidxError::from)?;
         Ok(Response::new(ShardIds {
             ids: ids
                 .iter()

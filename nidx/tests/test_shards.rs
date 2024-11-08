@@ -27,7 +27,8 @@ use nidx_protos::{
     nidx::nidx_api_client::NidxApiClient, EmptyQuery, GetShardRequest, NewShardRequest, ShardId, VectorIndexConfig,
 };
 use sqlx::PgPool;
-use tonic::{transport::Channel, Request};
+use tonic::{transport::Channel, Code, Request};
+use uuid::Uuid;
 
 #[sqlx::test]
 async fn test_create_shard(pool: PgPool) -> anyhow::Result<()> {
@@ -56,6 +57,29 @@ async fn test_create_shard(pool: PgPool) -> anyhow::Result<()> {
     let response = response.into_inner();
     assert_eq!(&response.shard_id, shard_id);
     assert_eq!(&response.metadata.unwrap().kbid, "aabbccdd-eeff-1122-3344-556677889900");
+
+    // get_shard error handling
+    let response = fixture
+        .api_client
+        .get_shard(Request::new(GetShardRequest {
+            shard_id: Some(ShardId {
+                id: Uuid::new_v4().to_string(),
+            }),
+            ..Default::default()
+        }))
+        .await;
+    let err = response.expect_err("Should have failed");
+    assert_eq!(err.code(), Code::NotFound);
+
+    let response = fixture
+        .api_client
+        .get_shard(Request::new(GetShardRequest {
+            shard_id: None,
+            ..Default::default()
+        }))
+        .await;
+    let err = response.expect_err("Should have failed");
+    assert_eq!(err.code(), Code::InvalidArgument);
 
     Ok(())
 }
