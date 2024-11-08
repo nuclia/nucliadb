@@ -31,8 +31,11 @@ from nucliadb_models.search import (
     SCORE_TYPE,
     KnowledgeboxFindResults,
 )
+from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
+
+reranker_observer = Observer("reranker_observer", labels={"type": ""})
 
 
 @dataclass
@@ -100,6 +103,7 @@ class NoopReranker(Reranker):
     def items_needed(self, requested: int, shards: int = 1) -> int:
         return requested
 
+    @reranker_observer.wrap({"type": "noop"})
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         return [
             RankedItem(
@@ -122,6 +126,7 @@ class PredictReranker(Reranker):
         actual_requested = requested * shards
         return math.ceil(max(reranker_requested, actual_requested) / shards)
 
+    @reranker_observer.wrap({"type": "predict"})
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         if len(items) == 0:
             return []
@@ -172,6 +177,7 @@ class MultiMatchBoosterReranker(Reranker):
     def items_needed(self, requested: int, shards: int = 1) -> int:
         return requested
 
+    @reranker_observer.wrap({"type": "multi_match_booster"})
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         """Given a list of rerankable items, boost matches that appear multiple
         times. The returned list can be smaller than the initial, as repeated
