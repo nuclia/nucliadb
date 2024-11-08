@@ -36,6 +36,7 @@ enum PredictType {
     DA_GRAPH = 11;
     DA_ASK = 12;
     DA_QA = 13;
+    DA_GUARD = 14;
 }
 
 enum ClientType {
