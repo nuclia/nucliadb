@@ -128,11 +128,11 @@ class TestApplySynonymsToRequest:
 
         request.ClearField.assert_not_called()
 
-        query_parser.query = "planet"
+        query_parser.query = "which is this planet?"
         await query_parser.parse_synonyms(request)
 
         request.ClearField.assert_called_once_with("body")
-        assert request.advanced_query == "planet OR earth OR globe"
+        assert request.advanced_query == "which is this (planet OR earth OR globe)?"
 
 
 def test_check_supported_filters():
