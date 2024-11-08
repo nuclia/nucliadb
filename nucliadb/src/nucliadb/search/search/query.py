@@ -541,7 +541,8 @@ class QueryParser:
 
     async def parse_synonyms(self, request: nodereader_pb2.SearchRequest) -> None:
         """
-        Replace the query terms with the expression that includes the synonyms:
+        Replace the terms in the query with an expression that will make it match with the configured synonyms.
+        We're using the Tantivy's query language here: https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html
 
         Example:
         - Synonyms: Foo -> Bar, Baz
