@@ -562,17 +562,27 @@ class QueryParser:
             # No synonyms found
             return
 
-        variants = {}
+        # Calculate term variants: 'term' -> '(term OR synonym1 OR synonym2)'
+        variants: dict[str, str] = {}
         for term, term_synonyms in synonyms.terms.items():
             if len(term_synonyms.synonyms) > 0:
                 variants[term] = f"({" OR ".join([term] + list(term_synonyms.synonyms))})"
 
-        advanced_query = self.query
-        for term, variant in variants.items():
-            advanced_query = advanced_query.replace(term, variant)
+        # Split the query into terms
+        query_terms = self.query.split()
 
-        if advanced_query != self.query:
-            request.advanced_query = advanced_query
+        # Remove punctuation from the query terms
+        clean_query_terms = [term.strip(".,;:!?¿") for term in query_terms]
+
+        # Replace the original terms with the variants if the cleaned term is in the variants
+        term_with_synonyms_found = False
+        for index, clean_term in enumerate(clean_query_terms):
+            if clean_term in variants:
+                term_with_synonyms_found = True
+                query_terms[index] = query_terms[index].replace(clean_term, variants[clean_term])
+
+        if term_with_synonyms_found:
+            request.advanced_query = " ".join(query_terms)
             request.ClearField("body")
 
     async def get_visual_llm_enabled(self) -> bool:

@@ -128,11 +128,12 @@ class TestApplySynonymsToRequest:
 
         request.ClearField.assert_not_called()
 
-        query_parser.query = "which is this planet?"
+        # Append planetary at the end of the query to test that partial terms are not replaced
+        query_parser.query = "which is this planet? planetary"
         await query_parser.parse_synonyms(request)
 
         request.ClearField.assert_called_once_with("body")
-        assert request.advanced_query == "which is this (planet OR earth OR globe)?"
+        assert request.advanced_query == "which is this (planet OR earth OR globe)? planetary"
 
 
 def test_check_supported_filters():
