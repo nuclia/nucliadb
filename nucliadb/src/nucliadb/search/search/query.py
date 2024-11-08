@@ -19,6 +19,7 @@
 #
 import asyncio
 import json
+import string
 from datetime import datetime
 from typing import Any, Awaitable, Optional, Union
 
@@ -572,7 +573,7 @@ class QueryParser:
         query_terms = self.query.split()
 
         # Remove punctuation from the query terms
-        clean_query_terms = [term.strip(".,;:!?¿") for term in query_terms]
+        clean_query_terms = [term.strip(string.punctuation) for term in query_terms]
 
         # Replace the original terms with the variants if the cleaned term is in the variants
         term_with_synonyms_found = False
