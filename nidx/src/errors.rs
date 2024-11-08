@@ -22,6 +22,8 @@ use thiserror::Error;
 
 pub type NidxResult<T> = Result<T, NidxError>;
 
+/// Error type for nidx. The idea is not to be exhaustive, but just include
+/// enough variants to be able to map application errors to API errors
 #[derive(Error, Debug)]
 pub enum NidxError {
     #[error("Not found")]
