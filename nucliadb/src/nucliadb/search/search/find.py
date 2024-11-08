@@ -36,6 +36,7 @@ from nucliadb.search.search.hydrator import (
 )
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.rank_fusion import get_rank_fusion
 from nucliadb.search.search.rerankers import RerankingOptions, get_reranker
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
@@ -120,6 +121,7 @@ async def _index_node_retrieval(
             extracted=item.extracted,
             field_type_filter=item.field_type_filter,
             highlight=item.highlight,
+            rank_fusion_algorithm=query_parser.rank_fusion,
             reranker=query_parser.reranker,
         )
 
@@ -247,6 +249,7 @@ async def query_parser_from_find_request(
     hidden = await filter_hidden_resources(kbid, item.show_hidden)
 
     reranker = get_reranker(item.reranker)
+    rank_fusion = get_rank_fusion(item.rank_fusion)
     query_parser = QueryParser(
         kbid=kbid,
         features=item.features,
@@ -274,6 +277,7 @@ async def query_parser_from_find_request(
         rephrase=item.rephrase,
         rephrase_prompt=item.rephrase_prompt,
         hidden=hidden,
+        rank_fusion=rank_fusion,
         reranker=reranker,
     )
     return query_parser

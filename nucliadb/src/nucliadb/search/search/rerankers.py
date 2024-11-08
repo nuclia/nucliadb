@@ -201,6 +201,10 @@ class MultiMatchBoosterReranker(Reranker):
         return reranked
 
 
+def get_default_reranker() -> Reranker:
+    return MultiMatchBoosterReranker()
+
+
 def get_reranker(kind: search_models.Reranker) -> Reranker:
     reranker: Reranker
     if kind == search_models.Reranker.PREDICT_RERANKER:
@@ -210,8 +214,8 @@ def get_reranker(kind: search_models.Reranker) -> Reranker:
     elif kind == search_models.Reranker.NOOP:
         reranker = NoopReranker()
     else:
-        logger.warning(f"Unknown reranker requested: {kind}. Using multi-match booster instead")
-        reranker = MultiMatchBoosterReranker()
+        logger.warning(f"Unknown reranker requested: {kind}. Using default instead")
+        reranker = get_default_reranker()
     return reranker
 
 

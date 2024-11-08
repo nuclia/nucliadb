@@ -40,6 +40,7 @@ from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
+    RankFusionName,
     Reranker,
     ResourceProperties,
     SearchOptions,
@@ -125,6 +126,9 @@ async def find_knowledgebox(
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
+    rank_fusion: RankFusionName = fastapi_query(
+        SearchParamDefaults.rank_fusion, include_in_schema=False
+    ),
     reranker: Reranker = fastapi_query(SearchParamDefaults.reranker),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
@@ -159,6 +163,7 @@ async def find_knowledgebox(
             autofilter=autofilter,
             security=security,
             show_hidden=show_hidden,
+            rank_fusion=rank_fusion,
             reranker=reranker,
         )
     except ValidationError as exc:

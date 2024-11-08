@@ -389,6 +389,50 @@ class SortOptions(BaseModel):
     order: SortOrder = SortOrder.DESC
 
 
+class RankFusionName(str, Enum):
+    LEGACY = "legacy"
+    RECIPROCAL_RANK_FUSION = "rrf"
+
+
+class _BaseRankFusion(BaseModel):
+    name: str
+
+
+class LegacyRankFusion(_BaseRankFusion):
+    name: Literal[RankFusionName.LEGACY] = RankFusionName.LEGACY
+
+
+class ReciprocalRankFusionWeights(BaseModel):
+    keyword: float = 1.0
+    semantic: float = 1.0
+
+
+class ReciprocalRankFusion(_BaseRankFusion):
+    name: Literal[RankFusionName.RECIPROCAL_RANK_FUSION] = RankFusionName.RECIPROCAL_RANK_FUSION
+    k: float = Field(
+        default=60.0,
+        title="RRF k parameter",
+        description="k parameter changes the influence top-ranked and lower-ranked elements have. Research has shown that 60 is a performant value across datasets",  # noqa: E501
+    )
+    boosting: ReciprocalRankFusionWeights = Field(
+        default_factory=ReciprocalRankFusionWeights,
+        title="Retrievers boosting",
+        description="""\
+Define different weights for each retriever. This allows to assign different priorities to different retrieval methods. RRF scores will be multiplied by this value.
+
+The default is 1 for each retriever, which means no extra boost for any of them. Weights below 0 can be used for negative boosting.
+
+This kind of boosting can be useful in multilingual search, for example, where keyword search may not give good results and can degrade the final search experience
+        """,  # noqa: E501
+    )
+
+
+RankFusion = Annotated[
+    Union[LegacyRankFusion, ReciprocalRankFusion],
+    Field(discriminator="name"),
+]
+
+
 class Reranker(str, Enum):
     """Rerankers
 
@@ -538,6 +582,11 @@ class SearchParamDefaults:
         default=None,
         title="Search features",
         description="List of search features to use. Each value corresponds to a lookup into on of the different indexes. `document`, `paragraph` and `vector` are deprecated, please use `fulltext`, `keyword` and `semantic` instead",  # noqa
+    )
+    rank_fusion = ParamDefault(
+        default=RankFusionName.LEGACY,
+        title="Rank fusion",
+        description="Rank fusion algorithm to use to merge results from multiple retrievers (keyword, semantic)",
     )
     reranker = ParamDefault(
         default=Reranker.MULTI_MATCH_BOOSTER,
@@ -1303,6 +1352,9 @@ class AskRequest(AuditMetadataBase):
         title="Prompts",
         description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa
     )
+    rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
+        SearchParamDefaults.rank_fusion.to_pydantic_field()
+    )
     reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
     citations: bool = Field(
         default=False,
@@ -1530,15 +1582,10 @@ class FindRequest(BaseSearchRequest):
             SearchOptions.SEMANTIC,
         ]
     )
+    rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
+        SearchParamDefaults.rank_fusion.to_pydantic_field()
+    )
     reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
-
-    @field_validator("features", mode="after")
-    @classmethod
-    def fulltext_not_supported(cls, v):
-        # features are already normalized in the BaseSearchRequest model
-        if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
-            raise ValueError("fulltext search not supported")
-        return v
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
@@ -1556,11 +1603,20 @@ class FindRequest(BaseSearchRequest):
         ],
     )
 
+    @field_validator("features", mode="after")
+    @classmethod
+    def fulltext_not_supported(cls, v):
+        # features are already normalized in the BaseSearchRequest model
+        if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
+            raise ValueError("fulltext search not supported")
+        return v
+
 
 class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
     BOTH = "BOTH"
+    RANK_FUSION = "RANK_FUSION"
     RERANKER = "RERANKER"
 
 

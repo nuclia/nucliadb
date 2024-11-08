@@ -181,6 +181,7 @@ async def run_main_query(
     find_request.debug = item.debug
     find_request.rephrase = item.rephrase
     find_request.rephrase_prompt = parse_rephrase_prompt(item)
+    find_request.rank_fusion = item.rank_fusion
     find_request.reranker = item.reranker
     # We don't support pagination, we always get the top_k results.
     find_request.top_k = item.top_k
