@@ -25,8 +25,10 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
 from nucliadb_models import search as search_models
 from nucliadb_models.search import SCORE_TYPE
+from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
+rank_fusion_observer = Observer("rank_fusion", labels={"type": ""})
 
 
 class RankFusionAlgorithm(ABC):
@@ -45,6 +47,7 @@ class LegacyRankFusion(RankFusionAlgorithm):
 
     """
 
+    @rank_fusion_observer.wrap({"type": "legacy"})
     def fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
     ) -> list[TextBlockMatch]:
@@ -98,6 +101,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         self.keyword_boost = keyword_weight
         self.semantic_boost = semantic_weight
 
+    @rank_fusion_observer.wrap({"type": "reciprocal-rank-fusion"})
     def fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
     ) -> list[TextBlockMatch]:
