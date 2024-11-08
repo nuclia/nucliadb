@@ -442,7 +442,7 @@ class Reranker(str, Enum):
 
     - Predict reranker: after retrieval, send the results to Predict API to
       rerank it. This method uses a reranker model, so one can expect better
-      results at expenses of more latency.
+      results at the expense of more latency.
 
       This will be the new default
 
