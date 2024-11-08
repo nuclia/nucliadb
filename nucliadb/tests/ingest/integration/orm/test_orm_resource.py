@@ -52,9 +52,7 @@ from tests.ingest.fixtures import create_resource
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_with_basic(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     basic = PBBasic(
         icon="text/plain",
         title="My title",
@@ -108,9 +106,7 @@ async def test_create_resource_orm_with_basic(
 
 
 @pytest.mark.asyncio
-async def test_iterate_paragraphs(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -155,9 +151,7 @@ async def test_iterate_paragraphs(
 
 
 @pytest.mark.asyncio
-async def test_paragraphs_with_page(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -216,9 +210,7 @@ async def test_paragraphs_with_page(
 
 
 @pytest.mark.asyncio
-async def test_vector_duplicate_fields(
-    storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
+async def test_vector_duplicate_fields(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     basic = PBBasic(title="My title", summary="My summary")
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
@@ -274,9 +266,7 @@ async def test_vector_duplicate_fields(
         for pkey2, para2 in para.paragraphs.items():
             for key, sent in para2.sentences.items():
                 count += 1
-                assert (
-                    len(sent.vector) == 768
-                ), f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
+                assert len(sent.vector) == 768, f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
 
     assert count == 1
 
@@ -471,10 +461,7 @@ async def test_generate_index_message_contains_all_metadata(
     # Metadata
     assert index_message.metadata.created.seconds > 0
     assert index_message.metadata.modified.seconds > 0
-    assert (
-        index_message.metadata.modified.seconds
-        >= index_message.metadata.created.seconds
-    )
+    assert index_message.metadata.modified.seconds >= index_message.metadata.created.seconds
 
     # Processing status
     assert index_message.status == Resource.ResourceStatus.PROCESSED
@@ -508,9 +495,7 @@ async def test_generate_index_message_vectorsets(
     storage, maindb_driver, cache, fake_node, knowledgebox_with_vectorsets: str
 ):
     # Create a resource with all possible metadata in it
-    resource = await create_resource(
-        storage, maindb_driver, knowledgebox_with_vectorsets
-    )
+    resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
     resource.disable_vectors = False
 
     async with maindb_driver.transaction() as txn:
@@ -523,9 +508,7 @@ async def test_generate_index_message_vectorsets(
     vectorsets = {}
     async with datamanagers.utils.with_ro_transaction() as txn:
         idx = 0.0
-        async for _, vs in datamanagers.vectorsets.iter(
-            txn, kbid=knowledgebox_with_vectorsets
-        ):
+        async for _, vs in datamanagers.vectorsets.iter(txn, kbid=knowledgebox_with_vectorsets):
             vectorsets[vs.vectorset_id] = (vs, idx)
             idx += 1
 
@@ -533,9 +516,7 @@ async def test_generate_index_message_vectorsets(
         for paragraph in field.paragraphs.values():
             # assert len(paragraph.vectorsets_sentences) == len(vectorsets)
             for vectorset_id, vs_sentences in paragraph.vectorsets_sentences.items():
-                config_dimension = vectorsets[vectorset_id][
-                    0
-                ].vectorset_index_config.vector_dimension
+                config_dimension = vectorsets[vectorset_id][0].vectorset_index_config.vector_dimension
                 vectorset_index = vectorsets[vectorset_id][1]
                 for sentence in vs_sentences.sentences.values():
                     assert len(sentence.vector) == config_dimension
