@@ -453,7 +453,7 @@ class Reranker(str, Enum):
 
     MULTI_MATCH_BOOSTER: Annotated[
         str,
-        deprecated("We recommend do switch to the new default predict reranker for far better results"),
+        deprecated("We recommend switching to the new default predict reranker for far better results"),
     ] = "multi_match_booster"
     PREDICT_RERANKER = "predict"
     NOOP = "noop"
