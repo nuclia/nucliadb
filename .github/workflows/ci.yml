@@ -97,7 +97,7 @@ jobs:
           path: .venv
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
-      - name: Run mypy
+      - name: Lint source code
         run: |
           source .venv/bin/activate
           for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models nucliadb_sidecar nucliadb_node_binding nucliadb_performance
