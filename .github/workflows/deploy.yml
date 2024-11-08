@@ -25,7 +25,7 @@ env:
 jobs:
   build-node-image:
     name: Build node image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -76,7 +76,7 @@ jobs:
 
   upload-chart-nucliadb-shared:
     name: Deploy nucliadb shared
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - name: Generate a token
       id: app-token
@@ -137,7 +137,7 @@ jobs:
 
   upload-chart-nucliadb-node:
     name: Upload Node chart
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-python-images
       - build-node-image
@@ -206,7 +206,7 @@ jobs:
 
   upload-charts-nucliadb-component:
     name: Upload NucliaDB component charts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version_number: ${{ steps.version_step.outputs.version_number }}
     needs:
@@ -283,7 +283,7 @@ jobs:
 
   upload-chart-nidx:
     name: Upload nidx chart
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: inputs.environment == 'dev'
     needs:
       - build-nidx-image
@@ -351,7 +351,7 @@ jobs:
 
   deploy-nucliadb-components:
     name: Deploy NucliaDB components
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: ${{ !failure() && !cancelled() }}
     needs:
       - upload-chart-nucliadb-shared

@@ -4,7 +4,7 @@
 # For a version that compiles the binaries inside docker, see `Dockerfile.node`
 #
 
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 
 ENV DATA_PATH=data
 ENV RUST_LOG=nucliadb_node=DEBUG

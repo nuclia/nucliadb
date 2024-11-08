@@ -15,7 +15,7 @@ permissions:
 jobs:
   build_wheels:
     name: Build wheels
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Generate a token
@@ -80,7 +80,7 @@ jobs:
 
   push-docker:
     name: Build and push nucliadb docker image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -123,7 +123,7 @@ jobs:
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: push-docker
 
     steps:
