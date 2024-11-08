@@ -1352,7 +1352,9 @@ class AskRequest(AuditMetadataBase):
         title="Prompts",
         description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa
     )
-    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
+    rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
+        SearchParamDefaults.rank_fusion.to_pydantic_field()
+    )
     reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
     citations: bool = Field(
         default=False,
@@ -1580,7 +1582,9 @@ class FindRequest(BaseSearchRequest):
             SearchOptions.SEMANTIC,
         ]
     )
-    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
+    rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
+        SearchParamDefaults.rank_fusion.to_pydantic_field()
+    )
     reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
