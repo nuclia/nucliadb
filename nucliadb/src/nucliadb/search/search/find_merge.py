@@ -96,8 +96,8 @@ async def build_find_response(
         )
     )
 
-    merged_text_blocks: list[TextBlockMatch] = rank_fusion_merge(
-        keyword_results, semantic_results, rank_fusion_algorithm
+    merged_text_blocks: list[TextBlockMatch] = rank_fusion_algorithm.fuse(
+        keyword_results, semantic_results
     )
 
     # cut
@@ -295,16 +295,6 @@ def semantic_results_to_text_block_matches(items: Iterable[DocumentScored]) -> l
             continue
         text_blocks.append(text_block)
     return text_blocks
-
-
-# we use a wrapper function to apply observability here
-@merge_observer.wrap({"type": "rank_fusion_merge"})
-def rank_fusion_merge(
-    keyword: Iterable[TextBlockMatch],
-    semantic: Iterable[TextBlockMatch],
-    rank_fusion_algorithm: RankFusionAlgorithm,
-) -> list[TextBlockMatch]:
-    return rank_fusion_algorithm.fuse(keyword, semantic)
 
 
 def cut_page(items: list[Any], page_size: int, page_number: int) -> tuple[list[Any], bool]:

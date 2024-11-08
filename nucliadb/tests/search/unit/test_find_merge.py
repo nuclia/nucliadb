@@ -23,7 +23,6 @@ import random
 from nucliadb.search.search.find_merge import (
     cut_page,
     keyword_result_to_text_block_match,
-    rank_fusion_merge,
     semantic_result_to_text_block_match,
 )
 from nucliadb.search.search.rank_fusion import get_default_rank_fusion
@@ -79,10 +78,9 @@ def test_merge_paragraphs_vectors():
 
     min_score_semantic = 1
     paragraphs, next_page = cut_page(
-        rank_fusion_merge(
-            [*shard1_paragraphs, *shard2_paragraphs],
-            filter(lambda x: x.score >= min_score_semantic, [*shard1_vectors, *shard2_vectors]),
-            get_default_rank_fusion(),
+        get_default_rank_fusion().fuse(
+            keyword=[*shard1_paragraphs, *shard2_paragraphs],
+            semantic=filter(lambda x: x.score >= min_score_semantic, [*shard1_vectors, *shard2_vectors]),
         ),
         20,
         0,

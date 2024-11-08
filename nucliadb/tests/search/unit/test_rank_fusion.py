@@ -34,7 +34,6 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search.search.find_merge import (
     keyword_result_to_text_block_match,
-    rank_fusion_merge,
     semantic_result_to_text_block_match,
 )
 from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion, get_rank_fusion
@@ -210,7 +209,8 @@ def test_legacy_rank_fusion_algorithm(
     expected: list[tuple[str, float, SCORE_TYPE]],
 ):
     """Basic test to validate how our own rank fusion algorithm works"""
-    merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=LegacyRankFusion())
+    rank_fusion = LegacyRankFusion()
+    merged = rank_fusion.fuse(keyword=keyword, semantic=semantic)
     results = [(item.paragraph_id.rid, round(item.score, 1), item.score_type) for item in merged]
     assert results == expected
 
@@ -358,7 +358,7 @@ def test_reciprocal_rank_fusion_algorithm(
     expected: list[tuple[str, float]],
 ):
     rrf = ReciprocalRankFusion(k=RRF_TEST_K)
-    merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=rrf)
+    merged = rrf.fuse(keyword, semantic)
     results = [(item.paragraph_id.rid, round(item.score, 6)) for item in merged]
     assert results == expected
 
@@ -426,7 +426,7 @@ def test_reciprocal_rank_fusion_boosting(
     expected: list[tuple[str, float]],
 ):
     rrf = ReciprocalRankFusion(k=RRF_TEST_K, keyword_weight=2, semantic_weight=0.5)
-    merged = rank_fusion_merge(keyword, semantic, rank_fusion_algorithm=rrf)
+    merged = rrf.fuse(keyword, semantic)
     results = [(item.paragraph_id.rid, round(item.score, 6)) for item in merged]
     assert results == expected
 
