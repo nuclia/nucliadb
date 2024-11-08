@@ -596,7 +596,7 @@ class SearchParamDefaults:
     reranker = ParamDefault(
         default=Reranker.MULTI_MATCH_BOOSTER,
         title="Reranker",
-        description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval",
+        description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval\nDEPRECATION! multi_match_booster will be deprecated and predict will be the new default",  # noqa: E501
     )
     debug = ParamDefault(
         default=False,
