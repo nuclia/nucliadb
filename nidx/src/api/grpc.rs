@@ -22,12 +22,12 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::errors::NidxError;
+use crate::grpc_server::RemappedGrpcService;
 use crate::metadata::{IndexKind, Shard};
 use nidx::nidx_api_server::{NidxApi, NidxApiServer};
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
-use tonic::transport::server::Router;
-use tonic::transport::Server;
+use tonic::service::Routes;
 use tonic::{Request, Response, Result, Status};
 use uuid::Uuid;
 
@@ -45,8 +45,11 @@ impl ApiServer {
         }
     }
 
-    pub fn into_service(self) -> Router {
-        Server::builder().add_service(NidxApiServer::new(self))
+    pub fn into_service(self) -> RemappedGrpcService {
+        RemappedGrpcService {
+            routes: Routes::new(NidxApiServer::new(self)),
+            package: "nidx.NidxApi".to_string(),
+        }
     }
 }
 

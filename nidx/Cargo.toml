@@ -32,6 +32,8 @@ nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
 nidx_relation = { version = "0.1.0", path = "nidx_relation" }
 config = { version = "0.14.1", default-features = false }
 thiserror = "2.0.0"
+tower = "0.5.1"
+http = "1.1.0"
 
 [dev-dependencies]
 nidx_tests = { path = "nidx_tests" }

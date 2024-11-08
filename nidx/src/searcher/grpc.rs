@@ -23,12 +23,9 @@ use std::{pin::Pin, sync::Arc};
 use futures::Stream;
 use nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
-use tonic::{
-    transport::{server::Router, Server},
-    Request, Response, Result, Status,
-};
+use tonic::{service::Routes, Request, Response, Result, Status};
 
-use crate::NidxMetadata;
+use crate::{grpc_server::RemappedGrpcService, NidxMetadata};
 
 use super::{index_cache::IndexCache, shard_search::search};
 use tracing::*;
@@ -46,8 +43,11 @@ impl SearchServer {
         }
     }
 
-    pub fn into_service(self) -> Router {
-        Server::builder().add_service(NidxSearcherServer::new(self))
+    pub fn into_service(self) -> RemappedGrpcService {
+        RemappedGrpcService {
+            routes: Routes::new(NidxSearcherServer::new(self)),
+            package: "nidx.NidxSearcher".to_string(),
+        }
     }
 }
 
