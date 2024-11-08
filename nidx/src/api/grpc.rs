@@ -21,13 +21,13 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use nidx_protos::node_writer_server::NodeWriter;
+use crate::metadata::{IndexKind, Shard};
+use nidx::nidx_api_server::{NidxApi, NidxApiServer};
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
-use node_writer_server::NodeWriterServer;
 use tonic::transport::server::Router;
 use tonic::transport::Server;
-use tonic::{Request, Response, Status};
+use tonic::{Request, Response, Result, Status};
 use uuid::Uuid;
 
 use crate::api::shards;
@@ -45,13 +45,33 @@ impl ApiServer {
     }
 
     pub fn into_service(self) -> Router {
-        Server::builder().add_service(NodeWriterServer::new(self))
+        Server::builder().add_service(NidxApiServer::new(self))
     }
 }
 
 #[tonic::async_trait]
-impl NodeWriter for ApiServer {
-    async fn new_shard(&self, request: Request<NewShardRequest>) -> Result<Response<ShardCreated>, Status> {
+impl NidxApi for ApiServer {
+    async fn get_shard(&self, request: Request<GetShardRequest>) -> Result<Response<noderesources::Shard>> {
+        let request = request.into_inner();
+        let shard_id = request.shard_id.ok_or(Status::invalid_argument("Shard ID required"))?.id;
+        let shard_id = Uuid::parse_str(&shard_id).map_err(|_| Status::invalid_argument("Shard ID must be UUID"))?;
+
+        let shard = Shard::get(&self.meta.pool, shard_id).await.map_err(|_| Status::not_found("Shard not found"))?;
+
+        let index_stats = shard.stats(&self.meta.pool).await.map_err(|_| Status::not_found("Shard not found"))?;
+
+        Ok(Response::new(noderesources::Shard {
+            metadata: Some(ShardMetadata {
+                kbid: shard.kbid.to_string(),
+                release_channel: 0,
+            }),
+            shard_id: shard_id.to_string(),
+            fields: *index_stats.get(&IndexKind::Text).unwrap_or(&0) as u64,
+            paragraphs: *index_stats.get(&IndexKind::Paragraph).unwrap_or(&0) as u64,
+            sentences: *index_stats.get(&IndexKind::Vector).unwrap_or(&0) as u64,
+        }))
+    }
+    async fn new_shard(&self, request: Request<NewShardRequest>) -> Result<Response<ShardCreated>> {
         // TODO? analytics event
         let request = request.into_inner();
         let kbid = Uuid::from_str(&request.kbid).map_err(|e| Status::internal(e.to_string()))?;
@@ -72,7 +92,7 @@ impl NodeWriter for ApiServer {
         }))
     }
 
-    async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
+    async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>> {
         // TODO? analytics event
         let request = request.into_inner();
         let shard_id = Uuid::from_str(&request.id).map_err(|e| Status::internal(e.to_string()))?;
@@ -84,44 +104,32 @@ impl NodeWriter for ApiServer {
         }))
     }
 
-    async fn list_shards(&self, _request: Request<EmptyQuery>) -> Result<Response<ShardIds>, Status> {
+    async fn list_shards(&self, _request: Request<EmptyQuery>) -> Result<Response<ShardIds>> {
+        let ids = Shard::list_ids(&self.meta.pool).await.map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(ShardIds {
+            ids: ids
+                .iter()
+                .map(|x| ShardId {
+                    id: x.to_string(),
+                })
+                .collect(),
+        }))
+    }
+
+    async fn add_vector_set(&self, _request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>> {
         todo!()
     }
 
-    async fn set_resource(&self, _request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
-        unimplemented!("Use indexer service instead")
-    }
-
-    async fn set_resource_from_storage(&self, _request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
-        unimplemented!("Use indexer service instead")
-    }
-
-    async fn remove_resource(&self, _request: Request<ResourceId>) -> Result<Response<OpStatus>, Status> {
-        unimplemented!("Use indexer service instead")
-    }
-
-    async fn add_vector_set(&self, _request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>, Status> {
+    async fn remove_vector_set(&self, _request: Request<VectorSetId>) -> Result<Response<OpStatus>> {
         todo!()
     }
 
-    async fn remove_vector_set(&self, _request: Request<VectorSetId>) -> Result<Response<OpStatus>, Status> {
+    async fn list_vector_sets(&self, _request: Request<ShardId>) -> Result<Response<VectorSetList>> {
         todo!()
     }
 
-    async fn list_vector_sets(&self, _request: Request<ShardId>) -> Result<Response<VectorSetList>, Status> {
-        todo!()
-    }
-
-    async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>, Status> {
+    async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>> {
         // TODO
         Ok(Response::new(NodeMetadata::default()))
-    }
-
-    async fn gc(&self, _request: Request<ShardId>) -> Result<Response<GarbageCollectorResponse>, Status> {
-        unimplemented!("Garbage collection is done by the scheduler service")
-    }
-
-    async fn merge(&self, _request: Request<ShardId>) -> Result<Response<MergeResponse>, Status> {
-        unimplemented!("Merging is done by scheduler and worker services")
     }
 }

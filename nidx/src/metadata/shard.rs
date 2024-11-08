@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -18,6 +20,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use super::index::*;
+use futures::StreamExt;
 use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
 use uuid::Uuid;
 
@@ -33,7 +36,7 @@ impl Shard {
     }
 
     pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> sqlx::Result<Shard> {
-        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1", id).fetch_one(meta).await
+        sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1 AND deleted_at IS NULL", id).fetch_one(meta).await
     }
 
     pub async fn mark_delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
@@ -50,5 +53,27 @@ impl Shard {
         )
         .fetch_all(meta)
         .await
+    }
+
+    pub async fn stats(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<HashMap<IndexKind, i64>> {
+        let mut stats = HashMap::new();
+        let mut results = sqlx::query!(
+            r#"SELECT kind as "kind: IndexKind", SUM(records)::bigint as "records!" FROM indexes
+              JOIN segments ON index_id = indexes.id
+              WHERE shard_id = $1
+              GROUP BY kind"#,
+            self.id
+        )
+        .fetch(meta);
+        while let Some(record) = results.next().await {
+            let record = record?;
+            stats.insert(record.kind, record.records);
+        }
+
+        Ok(stats)
+    }
+
+    pub async fn list_ids(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Uuid>> {
+        sqlx::query_scalar("SELECT id FROM shards WHERE deleted_at IS NULL").fetch_all(meta).await
     }
 }

@@ -23,164 +23,122 @@ mod common;
 use std::collections::HashMap;
 
 use common::services::NidxFixture;
-use nidx_protos::{NewShardRequest, VectorIndexConfig};
+use nidx_protos::{
+    nidx::nidx_api_client::NidxApiClient, EmptyQuery, GetShardRequest, NewShardRequest, ShardId, VectorIndexConfig,
+};
 use sqlx::PgPool;
-use tonic::Request;
+use tonic::{transport::Channel, Request};
 
 #[sqlx::test]
-async fn test_create_shard(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_create_shard(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool).await?;
 
     let new_shard_response = fixture
         .api_client
         .new_shard(Request::new(NewShardRequest {
-            kbid: "aabbccddeeff11223344556677889900".to_string(),
+            kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
             vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
             ..Default::default()
         }))
         .await?;
-    let _shard_id = &new_shard_response.get_ref().id;
+    let shard_id = &new_shard_response.get_ref().id;
 
-    // let response = fixture
-    //     .searcher_client
-    //     .get_shard(Request::new(GetShardRequest {
-    //         shard_id: Some(ShardId {
-    //             id: shard_id.to_owned(),
-    //         }),
-    //         ..Default::default()
-    //     }))
-    //     .await?;
+    let response = fixture
+        .api_client
+        .get_shard(Request::new(GetShardRequest {
+            shard_id: Some(ShardId {
+                id: shard_id.to_owned(),
+            }),
+            ..Default::default()
+        }))
+        .await?;
 
-    // assert_eq!(shard_id, &response.get_ref().shard_id);
+    let response = response.into_inner();
+    assert_eq!(&response.shard_id, shard_id);
+    assert_eq!(&response.metadata.unwrap().kbid, "aabbccdd-eeff-1122-3344-556677889900");
 
     Ok(())
 }
 
-// #[rstest]
-// #[tokio::test]
-// async fn test_shard_metadata() -> Result<(), Box<dyn std::error::Error>> {
-//     let mut fixture = NodeFixture::new();
-//     fixture.with_writer().await?.with_reader().await?;
-//     let mut writer = fixture.writer_client();
-//     let mut reader = fixture.reader_client();
+#[sqlx::test]
+async fn test_list_shards(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
 
-//     async fn create_shard_with_metadata(
-//         writer: &mut TestNodeWriter,
-//         kbid: String,
-//     ) -> Result<String, Box<dyn std::error::Error>> {
-//         let shard = writer
-//             .new_shard(Request::new(NewShardRequest {
-//                 kbid,
-//                 ..Default::default()
-//             }))
-//             .await?
-//             .into_inner();
-//         Ok(shard.id)
-//     }
+    let current = fixture
+        .api_client
+        .list_shards(Request::new(EmptyQuery {}))
+        .await?
+        .get_ref()
+        .ids
+        .iter()
+        .map(|s| s.id.clone())
+        .len();
 
-//     async fn validate_shard_metadata(
-//         reader: &mut TestNodeReader,
-//         shard_id: String,
-//         kbid: String,
-//     ) -> Result<(), Box<dyn std::error::Error>> {
-//         let shard = reader
-//             .get_shard(Request::new(GetShardRequest {
-//                 shard_id: Some(ShardId {
-//                     id: shard_id,
-//                 }),
-//                 ..Default::default()
-//             }))
-//             .await?
-//             .into_inner();
+    let request_ids = create_shards(&mut fixture.api_client, 5).await;
 
-//         assert!(shard.metadata.is_some());
+    let response =
+        fixture.api_client.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
 
-//         let shard_metadata = shard.metadata.unwrap();
-//         assert_eq!(shard_metadata.kbid, kbid);
+    let response_ids: Vec<String> = response.get_ref().ids.iter().map(|s| s.id.clone()).collect();
 
-//         Ok(())
-//     }
+    assert!(!request_ids.is_empty());
+    assert_eq!(request_ids.len() + current, response_ids.len());
+    assert!(request_ids.iter().all(|item| { response_ids.contains(item) }));
 
-//     const KB0: &str = "KB0";
-//     const KB1: &str = "KB1";
-//     const KB2: &str = "KB2";
+    Ok(())
+}
 
-//     // Used to validate correct creation
-//     let shard_0 = create_shard_with_metadata(&mut writer, KB0.to_string()).await?;
-//     // Used to check 1 is not overwritting 0
-//     let shard_1 = create_shard_with_metadata(&mut writer, KB1.to_string()).await?;
-//     // Used to validate correct creation when there are more shards
-//     let shard_2 = create_shard_with_metadata(&mut writer, KB2.to_string()).await?;
+#[sqlx::test]
+async fn test_delete_shards(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
 
-//     validate_shard_metadata(&mut reader, shard_0, KB0.to_string()).await?;
-//     validate_shard_metadata(&mut reader, shard_1, KB1.to_string()).await?;
-//     validate_shard_metadata(&mut reader, shard_2, KB2.to_string()).await?;
+    let current = fixture
+        .api_client
+        .list_shards(Request::new(EmptyQuery {}))
+        .await?
+        .get_ref()
+        .ids
+        .iter()
+        .map(|s| s.id.clone())
+        .len();
 
-//     Ok(())
-// }
+    let request_ids = create_shards(&mut fixture.api_client, 5).await;
 
-// #[rstest]
-// #[tokio::test]
-// async fn test_list_shards() -> Result<(), Box<dyn std::error::Error>> {
-//     let mut fixture = NodeFixture::new();
-//     fixture.with_writer().await?.with_reader().await?;
-//     let mut writer = fixture.writer_client();
+    for (id, expected) in request_ids.iter().map(|v| (v.clone(), v.clone())) {
+        let response = fixture
+            .api_client
+            .delete_shard(Request::new(ShardId {
+                id,
+            }))
+            .await
+            .expect("Error in delete_shard request");
+        let deleted_id = response.get_ref().id.clone();
+        assert_eq!(deleted_id, expected);
+    }
 
-//     let current =
-//         writer.list_shards(Request::new(EmptyQuery {})).await?.get_ref().ids.iter().map(|s| s.id.clone()).len();
+    let response =
+        fixture.api_client.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
 
-//     let request_ids = create_shards(&mut writer, 5).await;
+    assert_eq!(response.get_ref().ids.len(), current);
 
-//     let response = writer.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
+    Ok(())
+}
 
-//     let response_ids: Vec<String> = response.get_ref().ids.iter().map(|s| s.id.clone()).collect();
+async fn create_shards(writer: &mut NidxApiClient<Channel>, n: usize) -> Vec<String> {
+    let mut shard_ids = Vec::with_capacity(n);
 
-//     assert!(!request_ids.is_empty());
-//     assert_eq!(request_ids.len() + current, response_ids.len());
-//     assert!(request_ids.iter().all(|item| { response_ids.contains(item) }));
+    for _ in 0..n {
+        let response = writer
+            .new_shard(Request::new(NewShardRequest {
+                kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
+                vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+                ..Default::default()
+            }))
+            .await
+            .expect("Error in new_shard request");
 
-//     Ok(())
-// }
+        shard_ids.push(response.get_ref().id.clone());
+    }
 
-// #[rstest]
-// #[tokio::test]
-// async fn test_delete_shards() -> anyhow::Result<()> {
-//     let mut fixture = NodeFixture::new();
-//     fixture.with_writer().await?.with_reader().await?;
-//     let mut writer = fixture.writer_client();
-
-//     let current =
-//         writer.list_shards(Request::new(EmptyQuery {})).await?.get_ref().ids.iter().map(|s| s.id.clone()).len();
-
-//     let request_ids = create_shards(&mut writer, 5).await;
-
-//     for (id, expected) in request_ids.iter().map(|v| (v.clone(), v.clone())) {
-//         let response = writer
-//             .delete_shard(Request::new(ShardId {
-//                 id,
-//             }))
-//             .await
-//             .expect("Error in delete_shard request");
-//         let deleted_id = response.get_ref().id.clone();
-//         assert_eq!(deleted_id, expected);
-//     }
-
-//     let response = writer.list_shards(Request::new(EmptyQuery {})).await.expect("Error in list_shards request");
-
-//     assert_eq!(response.get_ref().ids.len(), current);
-
-//     Ok(())
-// }
-
-// async fn create_shards(writer: &mut TestNodeWriter, n: usize) -> Vec<String> {
-//     let mut shard_ids = Vec::with_capacity(n);
-
-//     for _ in 0..n {
-//         let response =
-//             writer.new_shard(Request::new(NewShardRequest::default())).await.expect("Error in new_shard request");
-
-//         shard_ids.push(response.get_ref().id.clone());
-//     }
-
-//     shard_ids
-// }
+    shard_ids
+}
