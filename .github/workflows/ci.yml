@@ -18,7 +18,7 @@ jobs:
   # Pre-checks
   format-rust:
     name: "Pre-checks: Rust code Format"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: rustfmt
@@ -26,7 +26,7 @@ jobs:
 
   clippy-rust:
     name: "Pre-checks: Clippy lint"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: rustup component add clippy
@@ -36,7 +36,7 @@ jobs:
 
   nidx-format-rust:
     name: "nidx: Rust code Format"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: rustfmt
@@ -44,7 +44,7 @@ jobs:
 
   nidx-clippy-rust:
     name: "nidx: Clippy lint"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: rustup component add clippy
@@ -58,7 +58,7 @@ jobs:
 
   updated-protos:
     name: "Pre-checks: Protos up-to-date"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions: write-all
     needs:
       - build-virtual-env
@@ -82,7 +82,7 @@ jobs:
 
   pre-checks-python:
     name: "Pre-checks: Python lint"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
     steps:
@@ -108,7 +108,7 @@ jobs:
 
   lint-helm:
     name: Lint all helm charts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -126,7 +126,7 @@ jobs:
 
   check-licenses:
     name: Check Licenses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Check License Header
@@ -140,7 +140,7 @@ jobs:
           command: check licenses
 
   check-migrations:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
     steps:
@@ -161,7 +161,7 @@ jobs:
   # Builds
   build-node-binaries:
     name: Build node binaries
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -175,7 +175,7 @@ jobs:
 
   build-virtual-env:
     name: Build virtual environment
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -195,7 +195,7 @@ jobs:
   # Tests
   sidecar-tests:
     name: Sidecar tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-node-binaries
       - build-virtual-env
@@ -234,7 +234,7 @@ jobs:
 
   nucliadb-search-tests:
     name: NucliaDB search tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-node-binaries
       - build-virtual-env
@@ -276,7 +276,7 @@ jobs:
 
   node-rust-tests:
     name: Node Rust tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
@@ -285,7 +285,7 @@ jobs:
 
   nidx-tests:
     name: nidx tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:15
@@ -313,7 +313,7 @@ jobs:
 
   nucliadb-tests:
     name: NucliaDB tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
     strategy:
@@ -359,7 +359,7 @@ jobs:
 
   nucliadb-components-tests:
     name: NucliaDB components tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
     strategy:
@@ -401,7 +401,7 @@ jobs:
 
   python-packages-tests:
     name: Python packages tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
     strategy:
@@ -445,7 +445,7 @@ jobs:
   # Depends on all tests to pass
   ci-passed:
     name: CI passed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - format-rust
       - clippy-rust
