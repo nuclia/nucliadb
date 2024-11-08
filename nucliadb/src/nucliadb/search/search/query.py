@@ -571,7 +571,7 @@ class QueryParser:
         variants: dict[str, str] = {}
         for term, term_synonyms in synonyms.terms.items():
             if len(term_synonyms.synonyms) > 0:
-                variants[term] = f"({" OR ".join([term] + list(term_synonyms.synonyms))})"
+                variants[term] = "({})".format(" OR ".join([term] + list(term_synonyms.synonyms)))
 
         # Split the query into terms
         query_terms = self.query.split()
