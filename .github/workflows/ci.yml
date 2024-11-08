@@ -106,6 +106,34 @@ jobs:
           done
           exit $ERROR
 
+  pre-checks-python-old:
+    name: "Pre-checks: Python lint 3.9"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: "3.9.20"
+          cache: true
+      - name: Install venv
+        run: pdm sync -d --clean --no-editable
+      - name: Upload virtualenv to cache
+        uses: actions/cache/save@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+
+      - name: Lint source code
+        run: |
+          source .venv/bin/activate
+          for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models nucliadb_sidecar nucliadb_node_binding nucliadb_performance
+          do
+              make -C $package lint || ERROR=1
+          done
+          exit $ERROR
+
   lint-helm:
     name: Lint all helm charts
     runs-on: ubuntu-24.04
@@ -460,6 +488,7 @@ jobs:
       - nucliadb-tests
       - nucliadb-components-tests
       - python-packages-tests
+      - pre-checks-python-old
     steps:
       - name: CI passed
         run: echo "CI passed"
