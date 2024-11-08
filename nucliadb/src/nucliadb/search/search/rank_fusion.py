@@ -28,6 +28,7 @@ from nucliadb_models.search import SCORE_TYPE
 from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
+
 rank_fusion_observer = Observer("rank_fusion", labels={"type": ""})
 
 
@@ -101,7 +102,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         self.keyword_boost = keyword_weight
         self.semantic_boost = semantic_weight
 
-    @rank_fusion_observer.wrap({"type": "reciprocal-rank-fusion"})
+    @rank_fusion_observer.wrap({"type": "reciprocal_rank_fusion"})
     def fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
     ) -> list[TextBlockMatch]:
