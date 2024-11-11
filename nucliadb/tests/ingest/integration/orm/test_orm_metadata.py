@@ -57,6 +57,7 @@ async def test_create_resource_orm_metadata(
     p1.sentences.append(Sentence(start=11, end=20, key="test"))
     cl1 = Classification(labelset="labelset1", label="label1")
     p1.classifications.append(cl1)
+    ex1.metadata.metadata.mime_type = "text/plain"
     ex1.metadata.metadata.paragraphs.append(p1)
     ex1.metadata.metadata.classifications.append(cl1)
     ex1.metadata.metadata.last_index.FromDatetime(datetime.now())
@@ -79,6 +80,7 @@ async def test_create_resource_orm_metadata(
     ex2: Optional[FieldComputedMetadata] = await field_obj.get_field_metadata()
     assert ex2 is not None
     assert ex2.metadata.links[0] == ex1.metadata.metadata.links[0]
+    assert ex2.metadata.mime_type == ex1.metadata.metadata.mime_type
 
 
 @pytest.mark.asyncio

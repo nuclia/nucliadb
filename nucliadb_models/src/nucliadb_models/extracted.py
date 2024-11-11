@@ -133,6 +133,7 @@ class FieldMetadata(BaseModel):
     summary: Optional[str] = None
     positions: Dict[str, Positions]  # TODO: Remove once processor doesn't use this anymore
     relations: Optional[List[Relation]] = None
+    mime_type: Optional[str] = None
 
 
 class FieldComputedMetadata(BaseModel):

@@ -29,7 +29,11 @@ from nucliadb_models.labels import BASE_LABELS, LABEL_HIDDEN, flatten_resource_l
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
-from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, Representation, ResourceID
+from nucliadb_protos.noderesources_pb2 import (
+    ParagraphMetadata,
+    Representation,
+    ResourceID,
+)
 from nucliadb_protos.noderesources_pb2 import Position as TextPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.resources_pb2 import (
@@ -483,6 +487,8 @@ class ResourceBrain:
         relation_node_document: RelationNode,
         user_canceled_labels: set[str],
     ):
+        if metadata.mime_type != "":
+            labels["mt"].add(metadata.mime_type)
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
@@ -563,7 +569,11 @@ class ResourceBrain:
                 if classification.cancelled_by_user
             )
         relation_node_resource = RelationNode(value=uuid, ntype=RelationNode.NodeType.RESOURCE)
-        labels: dict[str, set[str]] = {"l": set(), "e": set()}
+        labels: dict[str, set[str]] = {
+            "l": set(),  # classification labels
+            "e": set(),  # entities
+            "mt": set(),  # mime type
+        }
         if metadata is not None:
             for meta in metadata.split_metadata.values():
                 self.process_field_metadata(

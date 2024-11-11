@@ -393,7 +393,10 @@ def make_field_metadata(field_id):
             rpb.FieldEntity(
                 text="document",
                 label="ENTITY",
-                positions=[rpb.Position(start=0, end=5), rpb.Position(start=13, end=18)],
+                positions=[
+                    rpb.Position(start=0, end=5),
+                    rpb.Position(start=13, end=18),
+                ],
             ),
         ]
     )
@@ -402,10 +405,14 @@ def make_field_metadata(field_id):
             rpb.FieldEntity(
                 text="document",
                 label="NOUN",
-                positions=[rpb.Position(start=0, end=5), rpb.Position(start=13, end=18)],
+                positions=[
+                    rpb.Position(start=0, end=5),
+                    rpb.Position(start=13, end=18),
+                ],
             ),
         ]
     )
+    ex1.metadata.metadata.mime_type = "text/html"
     return ex1
 
 
