@@ -30,7 +30,7 @@ use uuid::Uuid;
 use nidx::api::shards;
 use nidx::indexer::index_resource;
 use nidx::maintenance::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
-use nidx::metadata::IndexId;
+use nidx::metadata::{Index, IndexId, Segment};
 use nidx::{metadata::Shard, NidxMetadata};
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;
@@ -76,16 +76,15 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     // Mark shard and indexes to delete
     shards::delete_shard(&meta, shard.id).await?;
 
-    let shard = Shard::get(&meta.pool, shard.id).await?;
-    assert!(shard.deleted_at.is_some());
-    for index in shard.indexes(&meta.pool).await? {
-        assert!(index.deleted_at.is_some());
-        for segment in index.segments(&meta.pool).await? {
+    let deleted = Shard::get(&meta.pool, shard.id).await;
+    assert!(matches!(deleted, Err(sqlx::Error::RowNotFound)));
+    for index_id in Index::marked_to_delete(&meta.pool).await? {
+        for segment in Segment::in_index(&meta.pool, index_id).await? {
             assert!(segment.delete_at.is_some());
         }
 
         // Update segment deletion time to validate purge
-        sqlx::query!("UPDATE segments SET delete_at = NOW() WHERE index_id = $1", index.id as IndexId,)
+        sqlx::query!("UPDATE segments SET delete_at = NOW() WHERE index_id = $1", index_id as IndexId,)
             .execute(&meta.pool)
             .await?;
     }
