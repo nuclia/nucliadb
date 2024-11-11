@@ -105,36 +105,11 @@ class SearchOptions(str, Enum):
     RELATIONS = "relations"
     SEMANTIC = "semantic"
 
-    # DEPRECATED: use keyword, fulltext and semantic instead
-    PARAGRAPH = "paragraph"
-    DOCUMENT = "document"
-    VECTOR = "vector"
-
-    def normalized(self):
-        if self.value == SearchOptions.PARAGRAPH:
-            return SearchOptions.KEYWORD
-        elif self.value == SearchOptions.DOCUMENT:
-            return SearchOptions.FULLTEXT
-        elif self.value == SearchOptions.VECTOR:
-            return SearchOptions.SEMANTIC
-        return self
-
 
 class ChatOptions(str, Enum):
     KEYWORD = "keyword"
     RELATIONS = "relations"
     SEMANTIC = "semantic"
-
-    # DEPRECATED: use keyword, and semantic instead
-    VECTORS = "vectors"
-    PARAGRAPHS = "paragraphs"
-
-    def normalized(self):
-        if self.value == ChatOptions.PARAGRAPHS:
-            return ChatOptions.KEYWORD
-        elif self.value == ChatOptions.VECTORS:
-            return ChatOptions.SEMANTIC
-        return self
 
 
 class SuggestOptions(str, Enum):
@@ -560,7 +535,7 @@ class SearchParamDefaults:
     with_synonyms = ParamDefault(
         default=False,
         title="With custom synonyms",
-        description="Whether to return matches for custom knowledge box synonyms of the query terms. Note: only supported for `paragraph` and `document` search options.",  # noqa: E501
+        description="Whether to return matches for custom knowledge box synonyms of the query terms. Note: only supported for `keyword` and `fulltext` search options.",  # noqa: E501
     )
     sort_order = ParamDefault(
         default=SortOrder.DESC,
@@ -586,7 +561,7 @@ class SearchParamDefaults:
     search_features = ParamDefault(
         default=None,
         title="Search features",
-        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes. `document`, `paragraph` and `vector` are deprecated, please use `fulltext`, `keyword` and `semantic` instead",  # noqa
+        description="List of search features to use. Each value corresponds to a lookup into on of the different indexes",
     )
     rank_fusion = ParamDefault(
         default=RankFusionName.LEGACY,
@@ -863,11 +838,6 @@ Please return ONLY the question without any explanation. Just the rephrased ques
             Please return ONLY the question without any explanation.""",
         ],
     )
-
-    @field_validator("features", mode="after")
-    @classmethod
-    def normalize_features(cls, features: list[SearchOptions]):
-        return [feature.normalized() for feature in features]
 
     @model_validator(mode="after")
     def top_k_overwrites_pagination(self):
@@ -1498,11 +1468,6 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
                     f"The following strategies cannot be combined in the same request: {', '.join(sorted(not_allowed_combination))}"
                 )
         return rag_strategies
-
-    @field_validator("features", mode="after")
-    @classmethod
-    def normalize_features(cls, features: list[ChatOptions]):
-        return [feature.normalized() for feature in features]
 
 
 # Alias (for backwards compatiblity with testbed)
