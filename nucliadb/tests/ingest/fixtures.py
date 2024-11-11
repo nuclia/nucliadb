@@ -96,9 +96,7 @@ class IngestFixture:
 
 
 @pytest.fixture(scope="function")
-async def ingest_consumers(
-    maindb_settings, transaction_utility, storage, fake_node, nats_manager
-):
+async def ingest_consumers(maindb_settings, transaction_utility, storage, fake_node, nats_manager):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
     yield
@@ -120,9 +118,7 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def grpc_servicer(
-    maindb_driver, ingest_consumers, ingest_processed_consumer, learning_config
-):
+async def grpc_servicer(maindb_driver, ingest_consumers, ingest_processed_consumer, learning_config):
     servicer = WriterServicer()
     await servicer.initialize()
 
@@ -190,9 +186,7 @@ def learning_config():
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(
-    storage, maindb_driver: Driver, shard_manager, learning_config
-):
+async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, learning_config):
     kbid = KnowledgeBox.new_unique_kbid()
     kbslug = "slug-" + str(uuid.uuid4())
     model = SemanticModelMetadata(
@@ -211,9 +205,7 @@ async def knowledgebox_ingest(
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_with_vectorsets(
-    storage, maindb_driver: Driver, shard_manager, learning_config
-):
+async def knowledgebox_with_vectorsets(storage, maindb_driver: Driver, shard_manager, learning_config):
     kbid = KnowledgeBox.new_unique_kbid()
     kbslug = "slug-" + str(uuid.uuid4())
     await KnowledgeBox.create(
@@ -343,9 +335,7 @@ TEST_CLOUDFILE = rpb.CloudFile(
     uri=TEST_CLOUDFILE_FILENAME,
     source=rpb.CloudFile.Source.LOCAL,
     bucket_name="/integration/orm/assets",
-    size=getsize(
-        f"{dirname(__file__)}/integration/orm/assets/{TEST_CLOUDFILE_FILENAME}"
-    ),
+    size=getsize(f"{dirname(__file__)}/integration/orm/assets/{TEST_CLOUDFILE_FILENAME}"),
     content_type="application/octet-stream",
     filename=TEST_CLOUDFILE_FILENAME,
     md5="01cca3f53edb934a445a3112c6caa652",
@@ -589,9 +579,7 @@ def broker_resource(
     return message1
 
 
-async def create_resource(
-    storage: Storage, driver: Driver, knowledgebox_ingest: str
-) -> Resource:
+async def create_resource(storage: Storage, driver: Driver, knowledgebox_ingest: str) -> Resource:
     async with driver.transaction() as txn:
         rid = str(uuid.uuid4())
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
@@ -619,12 +607,8 @@ async def create_resource(
 
         r1 = upb.Relation(
             relation=upb.Relation.CHILD,
-            source=upb.RelationNode(
-                value=rid, ntype=upb.RelationNode.NodeType.RESOURCE
-            ),
-            to=upb.RelationNode(
-                value="000001", ntype=upb.RelationNode.NodeType.RESOURCE
-            ),
+            source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
+            to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
         )
 
         basic.usermetadata.relations.append(r1)
@@ -645,12 +629,8 @@ async def create_resource(
         rels = []
         r1 = upb.Relation(
             relation=upb.Relation.CHILD,
-            source=upb.RelationNode(
-                value=rid, ntype=upb.RelationNode.NodeType.RESOURCE
-            ),
-            to=upb.RelationNode(
-                value="000001", ntype=upb.RelationNode.NodeType.RESOURCE
-            ),
+            source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
+            to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
         )
 
         rels.append(r1)
@@ -671,15 +651,11 @@ async def create_resource(
         # Add an example of each of the files, containing all possible metadata
 
         # Title
-        title_field = await test_resource.get_field(
-            "title", rpb.FieldType.GENERIC, load=False
-        )
+        title_field = await test_resource.get_field("title", rpb.FieldType.GENERIC, load=False)
         await make_field(title_field, "MyText")
 
         # Summary
-        summary_field = await test_resource.get_field(
-            "summary", rpb.FieldType.GENERIC, load=False
-        )
+        summary_field = await test_resource.get_field("summary", rpb.FieldType.GENERIC, load=False)
         await make_field(summary_field, "MyText")
 
         # 2.1 FILE FIELD
@@ -718,18 +694,14 @@ async def create_resource(
 
         # 2.3 TEXT FIELDS
 
-        t23 = rpb.FieldText(
-            body="This is my text field", format=rpb.FieldText.Format.PLAIN
-        )
+        t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
         textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
         await add_field_id(test_resource, textfield)
         await make_field(textfield, "MyText")
 
         # 2.4 CONVERSATION FIELD
 
-        def make_message(
-            text: str, files: Optional[list[rpb.CloudFile]] = None
-        ) -> rpb.Message:
+        def make_message(text: str, files: Optional[list[rpb.CloudFile]] = None) -> rpb.Message:
             msg = rpb.Message(
                 who="myself",
             )
@@ -747,14 +719,10 @@ async def create_resource(
         for i in range(300):
             new_message = make_message(f"{i} hello")
             if i == 33:
-                new_message = make_message(
-                    f"{i} hello", files=[TEST_CLOUDFILE, THUMBNAIL]
-                )
+                new_message = make_message(f"{i} hello", files=[TEST_CLOUDFILE, THUMBNAIL])
             c2.messages.append(new_message)
 
-        convfield = await test_resource.set_field(
-            rpb.FieldType.CONVERSATION, "conv1", c2
-        )
+        convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
         await add_field_id(test_resource, convfield)
         await make_field(convfield, extracted_text="MyText")
 
@@ -773,9 +741,7 @@ async def create_resource(
             answer.language = "catalan"
             answer.ids_paragraphs.extend([f"id1/{i}", f"id2/{i}"])
             qa.answers.append(answer)
-            question_answers.question_answers.question_answers.question_answer.append(
-                qa
-            )
+            question_answers.question_answers.question_answers.question_answer.append(qa)
 
         await field_obj.set_question_answers(question_answers)
 
