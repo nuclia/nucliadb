@@ -569,7 +569,11 @@ class ResourceBrain:
                 if classification.cancelled_by_user
             )
         relation_node_resource = RelationNode(value=uuid, ntype=RelationNode.NodeType.RESOURCE)
-        labels: dict[str, set[str]] = {"l": set(), "e": set()}
+        labels: dict[str, set[str]] = {
+            "l": set(),  # classification labels
+            "e": set(),  # entities
+            "mt": set(),  # mime type
+        }
         if metadata is not None:
             for meta in metadata.split_metadata.values():
                 self.process_field_metadata(
