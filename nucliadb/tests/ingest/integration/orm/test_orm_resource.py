@@ -423,7 +423,6 @@ async def test_generate_index_message_contains_all_metadata(
 
     # Global resource labels
     assert set(index_message.labels) == {
-        "/mt/plain/html",
         "/l/labelset1/label1",
         "/n/i/text/plain",
         "/s/p/ca",
@@ -433,6 +432,10 @@ async def test_generate_index_message_contains_all_metadata(
     }
     # Make sure there are no duplicates
     assert len(index_message.labels) == len(set(index_message.labels))
+
+    # Check that field labels contain the right set of labels
+    for field_id, field in index_message.texts.items():
+        assert "/mt/text/html" in field.labels
 
     # Check texts are populated with field extracted text and field computed labels
     expected_fields = {
