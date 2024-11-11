@@ -318,7 +318,9 @@ async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str,
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
-    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
+    fcm.metadata.metadata.entities["processor"].entities.extend(
+        [rpb.FieldEntity(text="Ramon", label="PERSON")]
+    )
 
     c1 = rpb.Classification()
     c1.label = "label1"

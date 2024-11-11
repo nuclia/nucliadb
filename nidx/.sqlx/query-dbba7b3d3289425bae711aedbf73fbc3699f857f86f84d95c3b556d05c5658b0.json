@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM segments WHERE id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "seq",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "records",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "merge_job_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "index_metadata",
+        "type_info": "Json"
+      },
+      {
+        "ordinal": 7,
+        "name": "delete_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "dbba7b3d3289425bae711aedbf73fbc3699f857f86f84d95c3b556d05c5658b0"
+}

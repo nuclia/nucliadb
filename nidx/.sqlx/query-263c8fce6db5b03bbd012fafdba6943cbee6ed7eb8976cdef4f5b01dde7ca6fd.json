@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE shards SET deleted_at = NOW() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "263c8fce6db5b03bbd012fafdba6943cbee6ed7eb8976cdef4f5b01dde7ca6fd"
+}

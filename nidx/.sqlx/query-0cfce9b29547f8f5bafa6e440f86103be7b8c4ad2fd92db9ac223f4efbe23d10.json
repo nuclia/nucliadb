@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH oldest_segments AS (\n            SELECT index_id, MIN(seq) AS seq FROM segments\n            WHERE delete_at IS NULL\n            GROUP BY index_id\n        )\n        DELETE FROM deletions USING oldest_segments\n        WHERE deletions.index_id = oldest_segments.index_id\n        AND deletions.seq <= oldest_segments.seq\n        AND deletions.seq <= $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0cfce9b29547f8f5bafa6e440f86103be7b8c4ad2fd92db9ac223f4efbe23d10"
+}

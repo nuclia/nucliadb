@@ -118,5 +118,6 @@ class BasicAuditStorage(AuditStorage):
         good: bool,
         task: int,
         feedback: Optional[str],
+        text_block_id: Optional[str],
     ):
         logger.debug(f"FEEDBACK {kbid} {user} {client_type} {origin}")

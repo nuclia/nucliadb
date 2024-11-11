@@ -1,3 +1,4 @@
+use std::ops::Deref;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -21,14 +22,16 @@ use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as base64;
 use base64::Engine;
+use config::{Config, Environment};
 use object_store::aws::AmazonS3Builder;
 use object_store::local::LocalFileSystem;
 use object_store::memory::InMemory;
 use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
-use serde::Deserialize;
-use serde_with::with_prefix;
+use serde::{Deserialize, Deserializer};
 
-#[derive(Deserialize, Debug)]
+use crate::NidxMetadata;
+
+#[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "object_store", rename_all = "lowercase")]
 pub enum ObjectStoreConfig {
     Memory,
@@ -102,65 +105,124 @@ impl ObjectStoreConfig {
     }
 }
 
-#[derive(Deserialize, Debug)]
+fn deserialize_object_store<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Arc<DynObjectStore>, D::Error> {
+    let config = ObjectStoreConfig::deserialize(deserializer)?;
+    Ok(config.client())
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct MetadataSettings {
     pub database_url: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct IndexerSettings {
-    #[serde(flatten)]
-    pub object_store: ObjectStoreConfig,
+    #[serde(flatten, deserialize_with = "deserialize_object_store")]
+    pub object_store: Arc<DynObjectStore>,
     pub nats_server: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct StorageSettings {
-    #[serde(flatten)]
-    pub object_store: ObjectStoreConfig,
+    #[serde(flatten, deserialize_with = "deserialize_object_store")]
+    pub object_store: Arc<DynObjectStore>,
 }
 
-with_prefix!(metadata "metadata_");
-with_prefix!(indexer "indexer_");
-with_prefix!(storage "storage_");
+// Take a look to the merge scheduler for more details about these settings
+#[derive(Clone, Deserialize, Debug)]
+#[serde(default)]
+pub struct MergeSettings {
+    pub min_number_of_segments: u64,
+    pub max_segment_size: usize,
+}
 
-#[derive(Deserialize, Debug)]
-pub struct Settings {
+impl Default for MergeSettings {
+    fn default() -> Self {
+        Self {
+            min_number_of_segments: 4,
+            max_segment_size: 100_000,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct EnvSettings {
     /// Connection to the metadata database
     /// Mandatory for all components
-    #[serde(flatten, with = "metadata")]
     pub metadata: MetadataSettings,
 
     /// Indexing configuration, should match nucliadb
     /// Required by indexer and scheduler
-    #[serde(flatten, with = "indexer")]
     pub indexer: Option<IndexerSettings>,
 
     /// Storage configuration for our segments
     /// Required by indexer, worker, searcher
-    #[serde(flatten, with = "storage")]
     pub storage: Option<StorageSettings>,
+
+    /// Merge scheduling algorithm configuration
+    /// Required by scheduler
+    #[serde(default)]
+    pub merge: MergeSettings,
+}
+
+impl EnvSettings {
+    pub fn from_env() -> Self {
+        Self::from_config_environment(Environment::default())
+    }
+
+    fn from_config_environment(env: Environment) -> Self {
+        let config = Config::builder().add_source(env.separator("__")).build().unwrap();
+        config.try_deserialize().unwrap()
+    }
+}
+
+/// Settings wrapper that holds opens a connection to the database
+/// Mainly to avoid blocking on the database while parsing settings
+#[derive(Clone)]
+pub struct Settings {
+    pub metadata: NidxMetadata,
+    pub settings: EnvSettings,
+}
+
+impl Deref for Settings {
+    type Target = EnvSettings;
+
+    fn deref(&self) -> &Self::Target {
+        &self.settings
+    }
 }
 
 impl Settings {
-    pub fn from_env() -> Self {
-        envy::from_env().expect("Failed to read configuration")
+    pub async fn from_env() -> anyhow::Result<Self> {
+        let settings = EnvSettings::from_env();
+        let metadata = NidxMetadata::new(&settings.metadata.database_url).await?;
+        Ok(Self {
+            metadata,
+            settings,
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[test]
     fn test_settings() {
         let env = [
-            ("METADATA_DATABASE_URL", "postgresql://localhost"),
-            ("INDEXER_OBJECT_STORE", "file"),
-            ("INDEXER_FILE_PATH", "a"),
-            ("INDEXER_NATS_SERVER", "a"),
+            ("METADATA__DATABASE_URL", "postgresql://localhost"),
+            ("INDEXER__OBJECT_STORE", "file"),
+            ("INDEXER__FILE_PATH", "/tmp"),
+            ("INDEXER__NATS_SERVER", "localhost"),
+            ("MERGE__MIN_NUMBER_OF_SEGMENTS", "1234"),
         ];
-        let settings: Settings = envy::from_iter(env.iter().map(|(a, b)| (a.to_string(), b.to_string()))).unwrap();
-        assert_eq!(settings.metadata.database_url, "postgresql://localhost");
+        let env = Environment::default().source(Some(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string())))));
+        let settings = EnvSettings::from_config_environment(env);
+        assert_eq!(&settings.metadata.database_url, "postgresql://localhost");
+        assert_eq!(&settings.indexer.unwrap().nats_server, "localhost");
+        assert_eq!(settings.merge.min_number_of_segments, 1234);
+        assert_eq!(settings.merge.max_segment_size, MergeSettings::default().max_segment_size);
     }
 }

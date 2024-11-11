@@ -41,7 +41,6 @@ from nucliadb_models.internal.predict import (
 )
 from nucliadb_models.search import (
     ChatModel,
-    FeedbackRequest,
     RephraseModel,
     SummarizedResource,
     SummarizedResponse,
@@ -292,34 +291,6 @@ class PredictEngine:
         func = getattr(self.session, method.lower())
         return await func(**request_args)
 
-    @predict_observer.wrap({"type": "feedback"})
-    async def send_feedback(
-        self,
-        kbid: str,
-        item: FeedbackRequest,
-        x_nucliadb_user: str,
-        x_ndb_client: str,
-        x_forwarded_for: str,
-    ):
-        try:
-            self.check_nua_key_is_configured_for_onprem()
-        except NUAKeyMissingError:
-            logger.warning("Nuclia Service account is not defined so could not send the feedback")
-            return
-
-        data = item.model_dump()
-        data["user_id"] = x_nucliadb_user
-        data["client"] = x_ndb_client
-        data["forwarded"] = x_forwarded_for
-
-        resp = await self.make_request(
-            "POST",
-            url=self.get_predict_url(FEEDBACK, kbid),
-            json=data,
-            headers=self.get_predict_headers(kbid),
-        )
-        await self.check_response(resp, expected_status=204)
-
     @predict_observer.wrap({"type": "rephrase"})
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
         try:
@@ -510,17 +481,6 @@ class DummyPredictEngine(PredictEngine):
         response.json = AsyncMock(return_value={"foo": "bar"})
         response.headers = {NUCLIA_LEARNING_ID_HEADER: DUMMY_LEARNING_ID}
         return response
-
-    async def send_feedback(
-        self,
-        kbid: str,
-        item: FeedbackRequest,
-        x_nucliadb_user: str,
-        x_ndb_client: str,
-        x_forwarded_for: str,
-    ):
-        self.calls.append(("send_feedback", item))
-        return
 
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> str:
         self.calls.append(("rephrase_query", item))

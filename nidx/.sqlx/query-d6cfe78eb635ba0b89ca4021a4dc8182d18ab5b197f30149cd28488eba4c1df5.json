@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE segments\n             SET delete_at = NOW() + INTERVAL '5 minutes'\n             WHERE index_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d6cfe78eb635ba0b89ca4021a4dc8182d18ab5b197f30149cd28488eba4c1df5"
+}

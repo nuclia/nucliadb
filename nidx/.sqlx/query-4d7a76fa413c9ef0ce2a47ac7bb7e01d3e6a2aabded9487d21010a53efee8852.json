@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE merge_jobs\n         SET started_at = NULL, running_at = NULL, retries = retries + 1\n         WHERE running_at < NOW() - INTERVAL '1 minute' AND retries < 4 RETURNING *",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "retries",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "seq",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "enqueued_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 5,
+        "name": "started_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 6,
+        "name": "running_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "4d7a76fa413c9ef0ce2a47ac7bb7e01d3e6a2aabded9487d21010a53efee8852"
+}

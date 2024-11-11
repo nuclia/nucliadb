@@ -17,14 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+pub mod api;
+pub mod grpc_server;
 pub mod indexer;
 pub mod maintenance;
 pub mod metadata;
-mod settings;
-mod upload;
+pub mod searcher;
+mod segment_store;
+pub mod settings;
 
 pub use metadata::NidxMetadata;
 pub use settings::Settings;
-
-#[cfg(test)]
-mod test;

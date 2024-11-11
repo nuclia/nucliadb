@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO segments (index_id, seq, records, index_metadata) VALUES ($1, $2, $3, $4) RETURNING *",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "index_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "seq",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "records",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "size_bytes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "merge_job_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "index_metadata",
+        "type_info": "Json"
+      },
+      {
+        "ordinal": 7,
+        "name": "delete_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8",
+        "Json"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "733c3ebacc86f444bf5e2dd79ade660c291e88a00fc09b722f6e2e191545874c"
+}

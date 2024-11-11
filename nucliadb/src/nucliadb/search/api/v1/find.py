@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-from typing import Optional, Union
+from typing import Annotated, Optional, Union
 
 from fastapi import Body, Header, Query, Request, Response
 from fastapi.openapi.models import Example
@@ -40,6 +40,7 @@ from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
+    RankFusionName,
     Reranker,
     ResourceProperties,
     SearchOptions,
@@ -125,10 +126,14 @@ async def find_knowledgebox(
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
     security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
+    rank_fusion: RankFusionName = fastapi_query(
+        SearchParamDefaults.rank_fusion, include_in_schema=False
+    ),
     reranker: Reranker = fastapi_query(SearchParamDefaults.reranker),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
+    x_nidx: Annotated[Optional[str], Header()] = None,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
         security = None
@@ -158,13 +163,16 @@ async def find_knowledgebox(
             autofilter=autofilter,
             security=security,
             show_hidden=show_hidden,
+            rank_fusion=rank_fusion,
             reranker=reranker,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
 
-    return await _find_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
+    return await _find_endpoint(
+        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, x_nidx
+    )
 
 
 @api.post(
@@ -186,8 +194,11 @@ async def find_post_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
+    x_nidx: Annotated[Optional[str], Header()] = None,
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
-    return await _find_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
+    return await _find_endpoint(
+        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, x_nidx
+    )
 
 
 async def _find_endpoint(
@@ -197,12 +208,13 @@ async def _find_endpoint(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
+    x_nidx: Optional[str],
 ) -> Union[KnowledgeboxFindResults, HTTPClientError]:
     try:
         maybe_log_request_payload(kbid, "/find", item)
         with cache.request_caches():
             results, incomplete, _ = await find(
-                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+                kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, nidx=(x_nidx is not None)
             )
             response.status_code = 206 if incomplete else 200
             return results

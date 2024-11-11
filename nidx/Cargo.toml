@@ -4,18 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["nidx_vector", "nidx_types", "nidx_protos"]
+members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy", "nidx_paragraph", "nidx_relation"]
 
 [dependencies]
 anyhow = "1.0.89"
 async-nats = "0.37.0"
 base64 = "0.22.1"
-envy = "0.4.2"
 futures = "0.3.31"
 nidx_vector = { version = "0.1.0", path = "nidx_vector" }
 object_store = { version = "0.11.0", features = ["gcp", "aws"] }
 serde = "1.0.210"
-serde_with = "3.11.0"
+serde_json = "1.0.132"
 sqlx = { version = "0.8.2", features = ["postgres", "uuid", "runtime-tokio", "time"] }
 tar = "0.4.42"
 tempfile = "3.13.0"
@@ -26,3 +25,13 @@ nidx_types = { version = "0.1.0", path = "nidx_types" }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 nidx_protos = { version = "0.1.0", path = "nidx_protos" }
+tonic = "0.12.3"
+lru = "0.12.5"
+nidx_text = { version = "0.1.0", path = "nidx_text" }
+nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
+nidx_relation = { version = "0.1.0", path = "nidx_relation" }
+config = { version = "0.14.1", default-features = false }
+
+[dev-dependencies]
+nidx_tests = { path = "nidx_tests" }
+rand = "0.8.5"

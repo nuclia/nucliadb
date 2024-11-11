@@ -24,7 +24,8 @@ from unittest.mock import patch
 import pytest
 
 from nucliadb.search.search.find_merge import build_find_response
-from nucliadb.search.search.rerankers import MultiMatchBoosterReranker
+from nucliadb.search.search.rank_fusion import get_default_rank_fusion
+from nucliadb.search.search.rerankers import get_default_reranker
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import SCORE_TYPE, ResourceProperties
 from nucliadb_protos import nodereader_pb2, noderesources_pb2
@@ -144,7 +145,8 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any]):
             field_type_filter=[],
             extracted=[],
             highlight=True,
-            reranker=MultiMatchBoosterReranker(),
+            rank_fusion_algorithm=get_default_rank_fusion(),
+            reranker=get_default_reranker(),
         )
         resp = find_response.model_dump()
         assert expected_find_response == resp

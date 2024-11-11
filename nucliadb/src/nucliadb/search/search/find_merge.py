@@ -31,6 +31,7 @@ from nucliadb.search.search.hydrator import (
     text_block_to_find_paragraph,
 )
 from nucliadb.search.search.merge import merge_relations_results
+from nucliadb.search.search.rank_fusion import RankFusionAlgorithm
 from nucliadb.search.search.rerankers import (
     RerankableItem,
     Reranker,
@@ -77,6 +78,7 @@ async def build_find_response(
     page_number: int,
     min_score_bm25: float,
     min_score_semantic: float,
+    rank_fusion_algorithm: RankFusionAlgorithm,
     reranker: Reranker,
     show: list[ResourceProperties] = [],
     extracted: list[ExtractedDataTypeName] = [],
@@ -85,12 +87,17 @@ async def build_find_response(
 ) -> KnowledgeboxFindResults:
     # merge
     search_response = merge_shard_responses(search_responses)
-    merged_text_blocks: list[TextBlockMatch] = rank_fusion_merge(
-        search_response.paragraph.results,
+
+    keyword_results = keyword_results_to_text_block_matches(search_response.paragraph.results)
+    semantic_results = semantic_results_to_text_block_matches(
         filter(
             lambda x: x.score >= min_score_semantic,
             search_response.vector.documents,
-        ),
+        )
+    )
+
+    merged_text_blocks: list[TextBlockMatch] = rank_fusion_algorithm.fuse(
+        keyword_results, semantic_results
     )
 
     # cut
@@ -212,86 +219,82 @@ def merge_shards_relation_responses(
     return merged
 
 
-@merge_observer.wrap({"type": "rank_fusion_merge"})
-def rank_fusion_merge(
-    paragraphs: Iterable[ParagraphResult],
-    vectors: Iterable[DocumentScored],
-) -> list[TextBlockMatch]:
-    """Merge results from different indexes using a rank fusion algorithm.
+def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
+    fuzzy_result = len(item.matches) > 0
+    return TextBlockMatch(
+        paragraph_id=ParagraphId.from_string(item.paragraph),
+        score=item.score.bm25,
+        score_type=SCORE_TYPE.BM25,
+        order=0,  # NOTE: this will be filled later
+        text="",  # NOTE: this will be filled later too
+        position=TextPosition(
+            page_number=item.metadata.position.page_number,
+            index=item.metadata.position.index,
+            start=item.start,
+            end=item.end,
+            start_seconds=[x for x in item.metadata.position.start_seconds],
+            end_seconds=[x for x in item.metadata.position.end_seconds],
+        ),
+        paragraph_labels=[x for x in item.labels],  # XXX could be list(paragraph.labels)?
+        fuzzy_search=fuzzy_result,
+        is_a_table=item.metadata.representation.is_a_table,
+        representation_file=item.metadata.representation.file,
+        page_with_visual=item.metadata.page_with_visual,
+    )
 
-    Given two list of sorted results from keyword and semantic search, this rank
-    fusion algorithm mixes them in the following way:
-    - 1st result from keyword search
-    - 2nd result from semantic search
-    - 2 keyword results and 1 semantic
 
-    """
-    merged_paragraphs: list[TextBlockMatch] = []
+def keyword_results_to_text_block_matches(items: Iterable[ParagraphResult]) -> list[TextBlockMatch]:
+    return [keyword_result_to_text_block_match(item) for item in items]
 
-    # sort results by it's score before merging them
-    paragraphs = [p for p in sorted(paragraphs, key=lambda r: r.score.bm25, reverse=True)]
-    vectors = [v for v in sorted(vectors, key=lambda r: r.score, reverse=True)]
 
-    for paragraph in paragraphs:
-        fuzzy_result = len(paragraph.matches) > 0
-        merged_paragraphs.append(
-            TextBlockMatch(
-                paragraph_id=ParagraphId.from_string(paragraph.paragraph),
-                score=paragraph.score.bm25,
-                score_type=SCORE_TYPE.BM25,
-                order=0,  # NOTE: this will be filled later
-                text="",  # NOTE: this will be filled later too
-                position=TextPosition(
-                    page_number=paragraph.metadata.position.page_number,
-                    index=paragraph.metadata.position.index,
-                    start=paragraph.start,
-                    end=paragraph.end,
-                    start_seconds=[x for x in paragraph.metadata.position.start_seconds],
-                    end_seconds=[x for x in paragraph.metadata.position.end_seconds],
-                ),
-                paragraph_labels=[x for x in paragraph.labels],  # XXX could be list(paragraph.labels)?
-                fuzzy_search=fuzzy_result,
-                is_a_table=paragraph.metadata.representation.is_a_table,
-                representation_file=paragraph.metadata.representation.file,
-                page_with_visual=paragraph.metadata.page_with_visual,
-            )
-        )
+class InvalidDocId(Exception):
+    """Raised while parsing an invalid id coming from semantic search"""
 
-    nextpos = 1
-    for vector in vectors:
+    def __init__(self, invalid_vector_id: str):
+        self.invalid_vector_id = invalid_vector_id
+        super().__init__(f"Invalid vector ID: {invalid_vector_id}")
+
+
+def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
+    try:
+        vector_id = VectorId.from_string(item.doc_id.id)
+    except (IndexError, ValueError):
+        raise InvalidDocId(item.doc_id.id)
+
+    return TextBlockMatch(
+        paragraph_id=ParagraphId.from_vector_id(vector_id),
+        score=item.score,
+        score_type=SCORE_TYPE.VECTOR,
+        order=0,  # NOTE: this will be filled later
+        text="",  # NOTE: this will be filled later too
+        position=TextPosition(
+            page_number=item.metadata.position.page_number,
+            index=item.metadata.position.index,
+            start=vector_id.vector_start,
+            end=vector_id.vector_end,
+            start_seconds=[x for x in item.metadata.position.start_seconds],
+            end_seconds=[x for x in item.metadata.position.end_seconds],
+        ),
+        # TODO: get labels from index
+        field_labels=[],
+        paragraph_labels=[],
+        fuzzy_search=False,  # semantic search doesn't have fuzziness
+        is_a_table=item.metadata.representation.is_a_table,
+        representation_file=item.metadata.representation.file,
+        page_with_visual=item.metadata.page_with_visual,
+    )
+
+
+def semantic_results_to_text_block_matches(items: Iterable[DocumentScored]) -> list[TextBlockMatch]:
+    text_blocks: list[TextBlockMatch] = []
+    for item in items:
         try:
-            vector_id = VectorId.from_string(vector.doc_id.id)
-        except (IndexError, ValueError):
-            logger.warning(f"Skipping invalid doc_id: {vector.doc_id.id}")
+            text_block = semantic_result_to_text_block_match(item)
+        except InvalidDocId as exc:
+            logger.warning(f"Skipping invalid doc_id: {exc.invalid_vector_id}")
             continue
-        merged_paragraphs.insert(
-            nextpos,
-            TextBlockMatch(
-                paragraph_id=ParagraphId.from_vector_id(vector_id),
-                score=vector.score,
-                score_type=SCORE_TYPE.VECTOR,
-                order=0,  # NOTE: this will be filled later
-                text="",  # NOTE: this will be filled later too
-                position=TextPosition(
-                    page_number=vector.metadata.position.page_number,
-                    index=vector.metadata.position.index,
-                    start=vector_id.vector_start,
-                    end=vector_id.vector_end,
-                    start_seconds=[x for x in vector.metadata.position.start_seconds],
-                    end_seconds=[x for x in vector.metadata.position.end_seconds],
-                ),
-                # TODO: get labels from index
-                field_labels=[],
-                paragraph_labels=[],
-                fuzzy_search=False,  # semantic search doesn't have fuzziness
-                is_a_table=vector.metadata.representation.is_a_table,
-                representation_file=vector.metadata.representation.file,
-                page_with_visual=vector.metadata.page_with_visual,
-            ),
-        )
-        nextpos += 3
-
-    return merged_paragraphs
+        text_blocks.append(text_block)
+    return text_blocks
 
 
 def cut_page(items: list[Any], page_size: int, page_number: int) -> tuple[list[Any], bool]:

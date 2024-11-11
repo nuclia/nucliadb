@@ -17,8 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::path::PathBuf;
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub mod query_language;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Seq(i64);
 impl From<i64> for Seq {
     fn from(value: i64) -> Self {
@@ -30,8 +33,28 @@ impl From<u64> for Seq {
         Self(value as i64)
     }
 }
+impl From<Seq> for i64 {
+    fn from(value: Seq) -> Self {
+        value.0
+    }
+}
 impl From<&Seq> for i64 {
     fn from(value: &Seq) -> Self {
         value.0
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct SegmentMetadata<T> {
+    pub path: PathBuf,
+    pub records: usize,
+    pub index_metadata: T,
+}
+
+/// The metadata needed to open an index: a list of segments and deletions.
+pub trait OpenIndexMetadata<T> {
+    /// List of segments and Seq
+    fn segments(&self) -> impl Iterator<Item = (SegmentMetadata<T>, Seq)>;
+    /// List of deletions and Seq
+    fn deletions(&self) -> impl Iterator<Item = (&String, Seq)>;
 }

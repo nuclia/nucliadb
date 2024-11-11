@@ -36,7 +36,7 @@ from nucliadb.common.cluster.exceptions import (
     ShardsNotFound,
 )
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.nidx import get_nidx
+from nucliadb.common.nidx import get_nidx, get_nidx_api_client
 from nucliadb_protos import (
     knowledgebox_pb2,
     nodereader_pb2,
@@ -207,7 +207,18 @@ class KBShardManager:
             ignore_nodes=settings.drain_nodes,
         )
 
-        shard_uuid = uuid.uuid4().hex
+        vectorsets = {
+            vectorset_id: vectorset_config.vectorset_index_config
+            async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
+        }
+
+        nidx_api = get_nidx_api_client()
+        if nidx_api:
+            shard_created = await nidx_api.new_shard_with_vectorsets(kbid, vectorsets)
+            shard_uuid = uuid.UUID(shard_created.id).hex
+        else:
+            shard_uuid = uuid.uuid4().hex
+
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
         try:
             # Attempt to create configured number of replicas
@@ -224,13 +235,6 @@ class KBShardManager:
                 if node is None:
                     logger.error(f"Node {node_id} is not found or not available")
                     continue
-
-                vectorsets = {
-                    vectorset_id: vectorset_config.vectorset_index_config
-                    async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
-                        txn, kbid=kbid
-                    )
-                }
 
                 try:
                     if not vectorsets:

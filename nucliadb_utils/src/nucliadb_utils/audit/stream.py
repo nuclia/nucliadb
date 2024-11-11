@@ -415,6 +415,7 @@ class StreamAuditStorage(AuditStorage):
         good: bool,
         task: int,
         feedback: Optional[str],
+        text_block_id: Optional[str],
     ):
         rcontext = get_request_context()
         if rcontext is None:
@@ -433,3 +434,5 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.feedback.task = task  # type: ignore
         if feedback is not None:
             auditrequest.feedback.feedback = feedback
+        if text_block_id is not None:
+            auditrequest.feedback.text_block_id = text_block_id

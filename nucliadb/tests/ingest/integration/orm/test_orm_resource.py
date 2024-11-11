@@ -23,6 +23,7 @@ from uuid import uuid4
 
 import pytest
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import resources_pb2 as rpb
@@ -368,7 +369,9 @@ async def test_generate_broker_message(
     lfcm = [fcm for fcm in bm.field_metadata if fcm.field.field == "link1"][0]
     assert lfcm.metadata.metadata.links[0] == "https://nuclia.com"
     assert len(lfcm.metadata.metadata.paragraphs) == 1
-    assert len(lfcm.metadata.metadata.positions) == 1
+    assert len(lfcm.metadata.metadata.entities["processor"].entities) == 1
+    assert len(lfcm.metadata.metadata.entities["my-task-id"].entities) == 1
+
     assert lfcm.metadata.metadata.HasField("last_index")
     assert lfcm.metadata.metadata.HasField("last_understanding")
     assert lfcm.metadata.metadata.HasField("last_extract")
@@ -444,7 +447,9 @@ async def test_generate_index_message_contains_all_metadata(
         assert field in fields_to_be_found
         fields_to_be_found.remove(field)
         assert text.text == "MyText"
-        assert {"/l/labelset1/label1", "/e/ENTITY/document"}.issubset(set(text.labels))
+        assert {"/l/labelset1/label1", "/e/ENTITY/document", "/e/NOUN/document"}.issubset(
+            set(text.labels)
+        )
         if field in ("u/link", "t/text1"):
             assert "/e/Location/My home" in text.labels
 
@@ -481,3 +486,35 @@ async def test_generate_index_message_contains_all_metadata(
     # assert len(index_message.vectors) == 1
     # vector = index_message.vectors["vectorset1"].vectors.popitem()[1].vector
     # assert len(vector) > 0
+
+
+async def test_generate_index_message_vectorsets(
+    storage, maindb_driver, cache, fake_node, knowledgebox_with_vectorsets: str
+):
+    # Create a resource with all possible metadata in it
+    resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
+    resource.disable_vectors = False
+
+    async with maindb_driver.transaction() as txn:
+        resource.txn = txn  # I don't like this but this is the API we have...
+        resource_brain = await resource.generate_index_message()
+    index_message = resource_brain.brain
+
+    # Check length of vectorsets of first sentence of first paragraph. In the fixture, we set the vector
+    # to be equal to the vectorset index, repeated to its length, to be able to differentiate
+    vectorsets = {}
+    async with datamanagers.utils.with_ro_transaction() as txn:
+        idx = 0.0
+        async for _, vs in datamanagers.vectorsets.iter(txn, kbid=knowledgebox_with_vectorsets):
+            vectorsets[vs.vectorset_id] = (vs, idx)
+            idx += 1
+
+    for field in index_message.paragraphs.values():
+        for paragraph in field.paragraphs.values():
+            # assert len(paragraph.vectorsets_sentences) == len(vectorsets)
+            for vectorset_id, vs_sentences in paragraph.vectorsets_sentences.items():
+                config_dimension = vectorsets[vectorset_id][0].vectorset_index_config.vector_dimension
+                vectorset_index = vectorsets[vectorset_id][1]
+                for sentence in vs_sentences.sentences.values():
+                    assert len(sentence.vector) == config_dimension
+                    assert sentence.vector == [vectorset_index] * config_dimension

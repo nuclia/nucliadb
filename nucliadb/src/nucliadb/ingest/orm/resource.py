@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, MutableMapping, Optional, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -890,7 +890,7 @@ class Resource:
 
                 entities: dict[str, str] = {}
                 if enabled_metadata.entities:
-                    entities.update(field_metadata.ner)
+                    _update_entities_dict(entities, field_metadata)
 
                 precomputed_vectors = {}
                 if vo is not None:
@@ -996,7 +996,7 @@ class Resource:
 
                 entities: dict[str, str] = {}
                 if enabled_metadata.entities:
-                    entities.update(field_metadata.ner)
+                    _update_entities_dict(entities, field_metadata)
 
                 if extracted_text is not None:
                     if subfield is not None:
@@ -1075,7 +1075,7 @@ class Resource:
 
                 if enabled_metadata.entities:
                     metadata.ClearField("entities")
-                    metadata.entities.update(splitted_metadata.ner)
+                    _update_entities_dict(metadata.entities, splitted_metadata)
 
                 pb_field = TrainField()
                 pb_field.uuid = self.uuid
@@ -1119,7 +1119,7 @@ class Resource:
                     metadata.labels.field.extend(splitted_metadata.classifications)
 
                 if enabled_metadata.entities:
-                    metadata.entities.update(splitted_metadata.ner)
+                    _update_entities_dict(metadata.entities, splitted_metadata)
 
         pb_resource = TrainResource()
         pb_resource.uuid = self.uuid
@@ -1254,3 +1254,23 @@ def extract_field_metadata_languages(
     for _, splitted_metadata in field_metadata.metadata.split_metadata.items():
         languages.add(splitted_metadata.language)
     return list(languages)
+
+
+def _update_entities_dict(target_entites_dict: MutableMapping[str, str], field_metadata: FieldMetadata):
+    """
+    Update the entities dict with the entities from the field metadata.
+    Method created to ease the transition from legacy ner field to new entities field.
+    """
+    # Data Augmentation + Processor entities
+    # This will overwrite entities detected from more than one data augmentation task
+    # TODO: Change TrainMetadata proto to accept multiple entities with the same text
+    entity_map = {
+        entity.text: entity.label
+        for data_augmentation_task_id, entities_wrapper in field_metadata.entities.items()
+        for entity in entities_wrapper.entities
+    }
+    target_entites_dict.update(entity_map)
+
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
+    target_entites_dict.update(field_metadata.ner)

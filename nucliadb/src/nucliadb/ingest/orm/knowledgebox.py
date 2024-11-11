@@ -38,6 +38,7 @@ from nucliadb.common.datamanagers.resources import (
 from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
@@ -287,11 +288,24 @@ class KnowledgeBox:
             await datamanagers.kb.delete_config(txn, kbid=kbid)
 
             # Mark KB to purge. This will eventually delete all KB keys, storage
-            # and index data
+            # and index data (for the old index nodes)
             when = datetime.now().isoformat()
             await txn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
 
+            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+
             await txn.commit()
+
+        if shards_obj is None:
+            logger.warning(f"Shards not found for KB while deleting it", extra={"kbid": kbid})
+        else:
+            nidx_api = get_nidx_api_client()
+            # Delete shards from nidx. They'll be marked for eventual deletion,
+            # so this call shouldn't be costly
+            if nidx_api is not None:
+                for shard in shards_obj.shards:
+                    shard_id = shard.shard
+                    await nidx_api.delete_shard(shard_id)
 
         if kb_config is not None:
             await cls._maybe_delete_external_indexes(kbid, kb_config.external_index_provider)
@@ -327,15 +341,10 @@ class KnowledgeBox:
             await txn.set(storage_to_delete, b"")
 
             # Delete KB Shards
-            shards_match = datamanagers.cluster.KB_SHARDS.format(kbid=kbid)
-            payload = await txn.get(shards_match, for_update=False)
-
-            if payload is None:
-                logger.warning(f"Shards not found for kbid={kbid}")
+            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            if shards_obj is None:
+                logger.warning(f"Shards not found for KB while purging it", extra={"kbid": kbid})
             else:
-                shards_obj = writer_pb2.Shards()
-                shards_obj.ParseFromString(payload)
-
                 for shard in shards_obj.shards:
                     # Delete the shard on nodes
                     for replica in shard.replicas:
@@ -477,13 +486,23 @@ class KnowledgeBox:
         ):
             raise VectorSetConflict(f"Vectorset {config.vectorset_id} already exists")
         await datamanagers.vectorsets.set(self.txn, kbid=self.kbid, config=config)
+
+        # Remove the async deletion mark if it exists, just in case there was a previous deletion
+        deletion_mark_key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=config.vectorset_id)
+        deletion_mark = await self.txn.get(deletion_mark_key, for_update=True)
+        if deletion_mark is not None:
+            await self.txn.delete(deletion_mark_key)
+
         shard_manager = get_shard_manager()
         await shard_manager.create_vectorset(self.kbid, config)
 
     async def delete_vectorset(self, vectorset_id: str):
         await datamanagers.vectorsets.delete(self.txn, kbid=self.kbid, vectorset_id=vectorset_id)
+
         # mark vectorset for async deletion
-        await self.txn.set(KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id), b"")
+        deletion_mark_key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
+        await self.txn.set(deletion_mark_key, b"")
+
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
 

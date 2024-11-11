@@ -18,63 +18,36 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::{HashMap, HashSet};
+mod common;
 
-use nidx_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSearchRequest, VectorSentence};
-use nidx_vector::config::VectorConfig;
-use nidx_vector::query_language::BooleanExpression;
-use nidx_vector::service::{ResourceWrapper, VectorReaderService, VectorWriterService, VectorsContext};
+use common::{resource, TestOpener};
+use nidx_protos::VectorSearchRequest;
+use nidx_types::query_language::BooleanExpression;
+use nidx_vector::{config::VectorConfig, VectorIndexer, VectorSearcher, VectorsContext};
+use std::collections::HashSet;
 use tempfile::tempdir;
-use uuid::Uuid;
-
-fn resource(labels: Vec<String>) -> Resource {
-    let id = Uuid::new_v4().to_string();
-    Resource {
-        resource: Some(ResourceId {
-            shard_id: String::new(),
-            uuid: id.clone(),
-        }),
-        labels,
-        paragraphs: HashMap::from([(
-            format!("{id}/a/title"),
-            IndexParagraphs {
-                paragraphs: HashMap::from([(
-                    format!("{id}/a/title/0-5"),
-                    IndexParagraph {
-                        start: 0,
-                        end: 5,
-                        sentences: HashMap::from([(
-                            format!("{id}/a/title/0-5"),
-                            VectorSentence {
-                                vector: vec![0.5, 0.5, 0.5, rand::random()],
-                                metadata: None,
-                            },
-                        )]),
-                        ..Default::default()
-                    },
-                )]),
-            },
-        )]),
-        ..Default::default()
-    }
-}
 
 #[test]
 fn test_hidden_search() -> anyhow::Result<()> {
-    let workdir = tempdir()?;
-    let index_path = workdir.path().join("vectors");
-    let mut writer = VectorWriterService::create(&index_path, VectorConfig::default())?;
+    let config = VectorConfig::default();
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];
     let hidden_resource = resource(labels);
-    writer.set_resource(ResourceWrapper::from(&hidden_resource))?;
+    let hidden_dir = tempdir()?;
+    let hidden_segment =
+        VectorIndexer.index_resource(hidden_dir.path(), &config, &hidden_resource, "default", true)?.unwrap();
 
     let visible_resource = resource(vec![]);
-    writer.set_resource(ResourceWrapper::from(&visible_resource))?;
+    let visible_dir = tempdir()?;
+    let visible_segment =
+        VectorIndexer.index_resource(visible_dir.path(), &config, &visible_resource, "default", true)?.unwrap();
 
     // Find all resources
-    let reader = VectorReaderService::open(&index_path)?;
+    let reader = VectorSearcher::open(
+        config,
+        TestOpener::new(vec![(hidden_segment, 1i64.into()), (visible_segment, 2i64.into())], vec![]),
+    )?;
     let request = VectorSearchRequest {
         vector: vec![0.5, 0.5, 0.5, 0.5],
         min_score: -1.0,

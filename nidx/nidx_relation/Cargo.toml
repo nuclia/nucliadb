@@ -1,0 +1,16 @@
+[package]
+name = "nidx_relation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.92"
+deunicode = "1.3.2"
+nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
+nidx_tantivy = { version = "0.1.0", path = "../nidx_tantivy" }
+nidx_types = { version = "0.1.0", path = "../nidx_types" }
+tantivy = "0.22"
+
+[dev-dependencies]
+tempfile = "3"
+lazy_static = "1.4.0"

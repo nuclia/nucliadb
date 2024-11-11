@@ -18,13 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
+from nucliadb.common.cluster.settings import settings
+from nucliadb_protos.nodewriter_pb2 import (
+    IndexMessage,
+)
 from nucliadb_utils import logger
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+
+if TYPE_CHECKING:
+    from nucliadb.common.cluster.manager import AbstractIndexNode
 
 
 class NidxIndexer:
@@ -77,3 +83,18 @@ async def stop_nidx_utility():
 
 def get_nidx() -> NidxIndexer:
     return get_utility(Utility.NIDX)
+
+
+def get_nidx_api_client() -> Optional["AbstractIndexNode"]:
+    if settings.nidx_api:
+        from nucliadb.common.cluster.manager import IndexNode
+
+        nidx_api = IndexNode(
+            id="nidx-api",
+            address=settings.nidx_api,
+            shard_count=0,
+            available_disk=0,
+        )
+        return nidx_api
+    else:
+        return None

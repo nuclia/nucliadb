@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO indexes (shard_id, kind, name, configuration)\n               VALUES ($1, $2, $3, $4)\n               RETURNING id AS \"id: IndexId\", updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: IndexId",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "index_kind",
+            "kind": {
+              "Enum": [
+                "text",
+                "paragraph",
+                "vector",
+                "relation"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Json"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "be60554eca98a5899efc6b49785cecd6444a6d39afed9e4a884ce2dbf162012c"
+}

@@ -23,9 +23,8 @@ use std::collections::HashSet;
 use crate::data_point::{Address, DataRetriever};
 
 /// Is a singleton clause.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AtomClause {
-    KeyPrefix(String),
     Label(String),
     KeyPrefixSet((HashSet<String>, HashSet<String>)),
     KeyField((String, String)),
@@ -33,9 +32,6 @@ pub enum AtomClause {
 impl AtomClause {
     pub fn label(value: String) -> AtomClause {
         Self::Label(value)
-    }
-    pub fn key_prefix(value: String) -> AtomClause {
-        Self::KeyPrefix(value)
     }
     pub fn key_set(resource_set: HashSet<String>, field_set: HashSet<String>) -> AtomClause {
         Self::KeyPrefixSet((resource_set, field_set))
@@ -45,7 +41,6 @@ impl AtomClause {
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         match self {
-            Self::KeyPrefix(value) => retriever.get_key(x).starts_with(value.as_bytes()),
             Self::Label(value) => retriever.has_label(x, value.as_bytes()),
             Self::KeyPrefixSet((resource_set, field_set)) => {
                 let key = retriever.get_key(x);
@@ -96,7 +91,7 @@ impl AtomClause {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BooleanOperator {
     Not,
     Or,
@@ -106,15 +101,12 @@ pub enum BooleanOperator {
 /// Is a clause formed by the conjuction of several LabelClauses. Additionally this
 /// clause has a threshold that specifies the minimum number of AtomClauses that have to
 /// succeed in order for the overall conjuction to be satisfied.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CompoundClause {
     operator: BooleanOperator,
     operands: Vec<Clause>,
 }
 impl CompoundClause {
-    pub fn len(&self) -> usize {
-        self.operands.len()
-    }
     pub fn is_empty(&self) -> bool {
         self.operands.is_empty()
     }
@@ -139,7 +131,7 @@ impl CompoundClause {
 }
 
 /// Wrapper that unifies the different types of clauses a formula may have.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Clause {
     Atom(AtomClause),
     Compound(CompoundClause),
@@ -168,7 +160,7 @@ impl From<CompoundClause> for Clause {
 
 /// Once applied to a given address, the formula becomes a boolean
 /// expression that evaluates to whether the address is valid or not.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Formula {
     clauses: Vec<Clause>,
 }
@@ -242,22 +234,12 @@ mod tests {
         assert!(!formula.run(ADDRESS, &retriever));
 
         #[rustfmt::skip] let inner = vec![
-            Clause::Atom(AtomClause::label(L1.to_string())), 
+            Clause::Atom(AtomClause::label(L1.to_string())),
             Clause::Atom(AtomClause::label(L2.to_string()))
         ];
         let mut formula = Formula::new();
         formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
         assert!(formula.run(ADDRESS, &retriever));
-
-        let mut formula = Formula::new();
-        let inner = vec![Clause::Atom(AtomClause::key_prefix("/This/is".to_string()))];
-        formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
-        assert!(formula.run(ADDRESS, &retriever));
-        let mut formula = Formula::new();
-
-        let inner = vec![Clause::Atom(AtomClause::key_prefix("/This/is/not".to_string()))];
-        formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
-        assert!(!formula.run(ADDRESS, &retriever));
     }
 
     #[test]
@@ -274,24 +256,6 @@ mod tests {
             key: FIELD_ID.as_bytes(),
             labels: HashSet::new(),
         };
-
-        // Find by resource_id
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::key_prefix(resource_id.clone()));
-        assert!(formula.run(ADDRESS, &retriever));
-
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::key_prefix(fake_resource_id.clone()));
-        assert!(!formula.run(ADDRESS, &retriever));
-
-        // Find by field_id
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::key_prefix(field_id.clone()));
-        assert!(formula.run(ADDRESS, &retriever));
-
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::key_prefix(fake_field_id.clone()));
-        assert!(!formula.run(ADDRESS, &retriever));
 
         // Find by set of resource_ids
         let mut formula = Formula::new();

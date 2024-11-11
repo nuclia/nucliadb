@@ -23,6 +23,7 @@ import math
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 
+from nucliadb.search.predict import ProxiedPredictAPIError, SendToPredictError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import search as search_models
 from nucliadb_models.internal.predict import RerankModel
@@ -30,8 +31,11 @@ from nucliadb_models.search import (
     SCORE_TYPE,
     KnowledgeboxFindResults,
 )
+from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
+
+reranker_observer = Observer("reranker", labels={"type": ""})
 
 
 @dataclass
@@ -99,6 +103,7 @@ class NoopReranker(Reranker):
     def items_needed(self, requested: int, shards: int = 1) -> int:
         return requested
 
+    @reranker_observer.wrap({"type": "noop"})
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         return [
             RankedItem(
@@ -121,6 +126,7 @@ class PredictReranker(Reranker):
         actual_requested = requested * shards
         return math.ceil(max(reranker_requested, actual_requested) / shards)
 
+    @reranker_observer.wrap({"type": "predict"})
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         if len(items) == 0:
             return []
@@ -135,16 +141,27 @@ class PredictReranker(Reranker):
             user_id="",  # TODO
             context=context,
         )
-        response = await predict.rerank(options.kbid, request)
-
-        reranked = [
-            RankedItem(
-                id=id,
-                score=score,
-                score_type=SCORE_TYPE.RERANKER,
-            )
-            for id, score in response.context_scores.items()
-        ]
+        try:
+            response = await predict.rerank(options.kbid, request)
+        except (SendToPredictError, ProxiedPredictAPIError):
+            # predict failed, we can't rerank
+            reranked = [
+                RankedItem(
+                    id=item.id,
+                    score=item.score,
+                    score_type=item.score_type,
+                )
+                for item in items
+            ]
+        else:
+            reranked = [
+                RankedItem(
+                    id=id,
+                    score=score,
+                    score_type=SCORE_TYPE.RERANKER,
+                )
+                for id, score in response.context_scores.items()
+            ]
         sort_by_score(reranked)
         best = reranked[: options.top_k]
         return best
@@ -160,6 +177,7 @@ class MultiMatchBoosterReranker(Reranker):
     def items_needed(self, requested: int, shards: int = 1) -> int:
         return requested
 
+    @reranker_observer.wrap({"type": "multi_match_booster"})
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         """Given a list of rerankable items, boost matches that appear multiple
         times. The returned list can be smaller than the initial, as repeated
@@ -189,6 +207,10 @@ class MultiMatchBoosterReranker(Reranker):
         return reranked
 
 
+def get_default_reranker() -> Reranker:
+    return MultiMatchBoosterReranker()
+
+
 def get_reranker(kind: search_models.Reranker) -> Reranker:
     reranker: Reranker
     if kind == search_models.Reranker.PREDICT_RERANKER:
@@ -198,8 +220,8 @@ def get_reranker(kind: search_models.Reranker) -> Reranker:
     elif kind == search_models.Reranker.NOOP:
         reranker = NoopReranker()
     else:
-        logger.warning(f"Unknown reranker requested: {kind}. Using multi-match booster instead")
-        reranker = MultiMatchBoosterReranker()
+        logger.warning(f"Unknown reranker requested: {kind}. Using default instead")
+        reranker = get_default_reranker()
     return reranker
 
 

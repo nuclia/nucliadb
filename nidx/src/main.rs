@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx::{indexer, maintenance};
+use nidx::{api, indexer, maintenance, searcher, Settings};
 use std::collections::HashSet;
 use tokio::{main, task::JoinSet};
 
@@ -28,12 +28,15 @@ async fn main() -> anyhow::Result<()> {
 
     tracing_subscriber::fmt::init();
 
+    let settings = Settings::from_env().await?;
     let mut tasks = JoinSet::new();
     args.iter().for_each(|arg| {
         match arg.as_str() {
-            "indexer" => tasks.spawn(indexer::run()),
-            "worker" => tasks.spawn(maintenance::worker::run()),
-            "scheduler" => tasks.spawn(maintenance::scheduler::run()),
+            "indexer" => tasks.spawn(indexer::run(settings.clone())),
+            "worker" => tasks.spawn(maintenance::worker::run(settings.clone())),
+            "scheduler" => tasks.spawn(maintenance::scheduler::run(settings.clone())),
+            "searcher" => tasks.spawn(searcher::run(settings.clone())),
+            "api" => tasks.spawn(api::run(settings.clone())),
             other => panic!("Unknown component: {other}"),
         };
     });

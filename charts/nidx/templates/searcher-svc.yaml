@@ -1,0 +1,20 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nidx-searcher
+  labels:
+    app: nidx-searcher
+    metrics: "enabled"
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: nidx-searcher
+  ports:
+    - name: nidx-searcher
+      port: 10001
+      protocol: TCP
+      appProtocol: grpc

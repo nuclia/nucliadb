@@ -1086,6 +1086,50 @@ class Positions(google.protobuf.message.Message):
 global___Positions = Positions
 
 @typing.final
+class FieldEntity(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TEXT_FIELD_NUMBER: builtins.int
+    LABEL_FIELD_NUMBER: builtins.int
+    POSITIONS_FIELD_NUMBER: builtins.int
+    text: builtins.str
+    """The entity text"""
+    label: builtins.str
+    """The entity type"""
+    @property
+    def positions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Position]:
+        """The positions of the entity in the text"""
+
+    def __init__(
+        self,
+        *,
+        text: builtins.str = ...,
+        label: builtins.str = ...,
+        positions: collections.abc.Iterable[global___Position] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["label", b"label", "positions", b"positions", "text", b"text"]) -> None: ...
+
+global___FieldEntity = FieldEntity
+
+@typing.final
+class FieldEntities(google.protobuf.message.Message):
+    """Wrapper for a list of entities"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTITIES_FIELD_NUMBER: builtins.int
+    @property
+    def entities(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldEntity]: ...
+    def __init__(
+        self,
+        *,
+        entities: collections.abc.Iterable[global___FieldEntity] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entities", b"entities"]) -> None: ...
+
+global___FieldEntities = FieldEntities
+
+@typing.final
 class FieldMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1103,6 +1147,24 @@ class FieldMetadata(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    @typing.final
+    class EntitiesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___FieldEntities: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___FieldEntities | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
 
     @typing.final
@@ -1126,6 +1188,7 @@ class FieldMetadata(google.protobuf.message.Message):
     LINKS_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     NER_FIELD_NUMBER: builtins.int
+    ENTITIES_FIELD_NUMBER: builtins.int
     CLASSIFICATIONS_FIELD_NUMBER: builtins.int
     LAST_INDEX_FIELD_NUMBER: builtins.int
     LAST_UNDERSTANDING_FIELD_NUMBER: builtins.int
@@ -1146,7 +1209,11 @@ class FieldMetadata(google.protobuf.message.Message):
     def paragraphs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Paragraph]: ...
     @property
     def ner(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
-        """Document"""
+        """Map of entity_text to entity_type (label) found in the text"""
+
+    @property
+    def entities(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___FieldEntities]:
+        """Map of data_augmentation_task_id to list of entities found in the field"""
 
     @property
     def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
@@ -1162,7 +1229,7 @@ class FieldMetadata(google.protobuf.message.Message):
     def thumbnail(self) -> global___CloudFile: ...
     @property
     def positions(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Positions]:
-        """Document"""
+        """Map with keys f"{entity_text}/{entity_type}" for every `entity_text` present in `ner` field, and positions as values to reflect the entity positions in the text"""
 
     @property
     def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Relations]: ...
@@ -1172,6 +1239,7 @@ class FieldMetadata(google.protobuf.message.Message):
         links: collections.abc.Iterable[builtins.str] | None = ...,
         paragraphs: collections.abc.Iterable[global___Paragraph] | None = ...,
         ner: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        entities: collections.abc.Mapping[builtins.str, global___FieldEntities] | None = ...,
         classifications: collections.abc.Iterable[global___Classification] | None = ...,
         last_index: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_understanding: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -1185,7 +1253,7 @@ class FieldMetadata(google.protobuf.message.Message):
         mime_type: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "thumbnail", b"thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["classifications", b"classifications", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "mime_type", b"mime_type", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "relations", b"relations", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["classifications", b"classifications", "entities", b"entities", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "mime_type", b"mime_type", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "relations", b"relations", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
 
 global___FieldMetadata = FieldMetadata
 
@@ -1218,8 +1286,10 @@ class Answers(google.protobuf.message.Message):
     TEXT_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
     IDS_PARAGRAPHS_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
     text: builtins.str
     language: builtins.str
+    reason: builtins.str
     @property
     def ids_paragraphs(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
@@ -1228,8 +1298,9 @@ class Answers(google.protobuf.message.Message):
         text: builtins.str = ...,
         language: builtins.str = ...,
         ids_paragraphs: collections.abc.Iterable[builtins.str] | None = ...,
+        reason: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["ids_paragraphs", b"ids_paragraphs", "language", b"language", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ids_paragraphs", b"ids_paragraphs", "language", b"language", "reason", b"reason", "text", b"text"]) -> None: ...
 
 global___Answers = Answers
 
@@ -1486,6 +1557,7 @@ class FieldText(google.protobuf.message.Message):
         JSON: FieldText._Format.ValueType  # 4
         KEEP_MARKDOWN: FieldText._Format.ValueType  # 5
         """Markdown to be kept"""
+        JSONL: FieldText._Format.ValueType  # 6
 
     class Format(_Format, metaclass=_FormatEnumTypeWrapper): ...
     PLAIN: FieldText.Format.ValueType  # 0
@@ -1495,6 +1567,7 @@ class FieldText(google.protobuf.message.Message):
     JSON: FieldText.Format.ValueType  # 4
     KEEP_MARKDOWN: FieldText.Format.ValueType  # 5
     """Markdown to be kept"""
+    JSONL: FieldText.Format.ValueType  # 6
 
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int

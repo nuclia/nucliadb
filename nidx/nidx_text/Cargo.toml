@@ -1,0 +1,18 @@
+[package]
+name = "nidx_text"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tempfile = "3"
+itertools = "0.12"
+
+tantivy = "0.22.0"
+nidx_types = { version = "0.1.0", path = "../nidx_types" }
+nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
+nidx_tantivy = { version = "0.1.0", path = "../nidx_tantivy" }
+anyhow = "1.0.91"
+tracing = "0.1.40"
+
+[dev-dependencies]
+nidx_tests = { path = "../nidx_tests" }

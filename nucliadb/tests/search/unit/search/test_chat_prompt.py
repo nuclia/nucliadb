@@ -419,7 +419,10 @@ async def test_extend_prompt_context_with_metadata():
     resource.get_basic = AsyncMock(return_value=basic)
     field = mock.Mock()
     fcm = rpb2.FieldComputedMetadata()
-    fcm.metadata.ner.update({"Barcelona": "LOCATION"})
+    fcm.metadata.entities["processor"].entities.extend(
+        [rpb2.FieldEntity(text="Barcelona", label="LOCATION")]
+    )
+
     field.get_field_metadata = AsyncMock(return_value=fcm)
     resource.get_field = AsyncMock(return_value=field)
     resource.get_extra = AsyncMock(return_value=extra)
