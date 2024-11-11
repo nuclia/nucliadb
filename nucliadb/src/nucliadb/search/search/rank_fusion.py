@@ -34,7 +34,7 @@ rank_fusion_observer = Observer(
     labels={"type": ""},
     buckets=[
         0.001,
-        0.025,
+        0.0025,
         0.005,
         0.01,
         0.025,
