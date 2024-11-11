@@ -21,7 +21,6 @@
 mod common;
 
 use std::collections::HashMap;
-use std::time::Duration;
 
 use common::services::NidxFixture;
 use nidx_protos::prost_types::Timestamp;
@@ -148,7 +147,7 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
         ..Default::default()
     };
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    fixture.wait_sync().await;
 
     // No time filter
     let no_time_range = request.clone();

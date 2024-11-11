@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::time::Duration;
+
 use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
 use nidx::indexer::index_resource;
@@ -98,5 +100,10 @@ impl NidxFixture {
         .await?;
         self.seq += 1;
         Ok(())
+    }
+
+    pub async fn wait_sync(&self) {
+        // TODO: Check the searcher has synced? For now, waiting twice the sync interval
+        tokio::time::sleep(Duration::from_secs(2)).await;
     }
 }
