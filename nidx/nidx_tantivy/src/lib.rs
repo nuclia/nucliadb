@@ -43,6 +43,7 @@ pub type TantivySegmentMetadata = SegmentMetadata<TantivyMeta>;
 pub struct TantivyIndexer {
     writer: SingleSegmentIndexWriter,
     output_path: PathBuf,
+    has_documents: bool,
 }
 
 impl TantivyIndexer {
@@ -52,25 +53,30 @@ impl TantivyIndexer {
         Ok(Self {
             writer,
             output_path: output_dir,
+            has_documents: false,
         })
     }
 
     pub fn add_document(&mut self, doc: TantivyDocument) -> tantivy::Result<()> {
+        self.has_documents = true;
         self.writer.add_document(doc)
     }
 
-    pub fn finalize(self) -> anyhow::Result<SegmentMetadata<TantivyMeta>> {
+    pub fn finalize(self) -> anyhow::Result<Option<SegmentMetadata<TantivyMeta>>> {
+        if !self.has_documents {
+            return Ok(None);
+        }
         let index = self.writer.finalize()?;
         let segments = index.searchable_segment_metas()?;
         assert_eq!(segments.len(), 1);
         let segment = &segments[0];
 
-        Ok(SegmentMetadata {
+        Ok(Some(SegmentMetadata {
             path: self.output_path,
             records: segment.max_doc() as usize,
             index_metadata: TantivyMeta {
                 segment_id: segment.id().uuid_string(),
             },
-        })
+        }))
     }
 }

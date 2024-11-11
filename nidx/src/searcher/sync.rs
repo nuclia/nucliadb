@@ -64,11 +64,6 @@ async fn sync_index(
     notifier: &Sender<IndexId>,
 ) -> anyhow::Result<()> {
     let operations = Operations::load_for_index(&meta.pool, &index.id).await?;
-    // Empty index, just created, no need to sync
-    if operations.0.is_empty() {
-        return Ok(());
-    }
-
     let diff = sync_metadata.diff(&index.id, &operations).await;
 
     // Download new segments
@@ -335,8 +330,8 @@ mod tests {
 
         // Initial sync with empty data
         sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
-        // No notification sent for empty index
-        assert!(rx.try_recv().is_err());
+        // We get a notification even for an empty index (so we don't return errors for empty indexes)
+        assert!(rx.try_recv().is_ok());
         // No data yet
         assert!(downloaded_segments(&index_path).is_err());
 

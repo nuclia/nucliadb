@@ -69,7 +69,7 @@ impl RelationIndexer {
         }
 
         index_relations(&mut indexer, resource, field_schema)?;
-        Ok(Some(indexer.finalize()?))
+        indexer.finalize()
     }
 
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
