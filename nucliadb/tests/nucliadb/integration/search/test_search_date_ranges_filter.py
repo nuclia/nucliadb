@@ -190,7 +190,7 @@ async def _test_find_date_ranges(
 ):
     payload = {"query": "Ramon", "features": features}
     if SearchOptions.SEMANTIC in features:
-        payload[SearchOptions.SEMANTIC] = V1
+        payload["vector"] = V1
     if creation_start is not None:
         payload["range_creation_start"] = creation_start.isoformat()
     if creation_end is not None:
