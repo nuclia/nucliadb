@@ -27,7 +27,7 @@ use tonic::{service::Routes, Request, Response, Result, Status};
 
 use crate::{grpc_server::RemappedGrpcService, NidxMetadata};
 
-use super::{index_cache::IndexCache, shard_search::search};
+use super::{index_cache::IndexCache, shard_search, shard_suggest};
 use tracing::*;
 
 pub struct SearchServer {
@@ -99,7 +99,7 @@ impl NidxSearcher for SearchServer {
     }
 
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        let response = search(&self.meta, self.index_cache.clone(), request.into_inner()).await;
+        let response = shard_search::search(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
         match response {
             Ok(response) => Ok(Response::new(response)),
             Err(e) => {
@@ -109,8 +109,15 @@ impl NidxSearcher for SearchServer {
         }
     }
 
-    async fn suggest(&self, _request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
-        todo!()
+    async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
+        let response = shard_suggest::suggest(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
+        match response {
+            Ok(response) => Ok(Response::new(response)),
+            Err(e) => {
+                error!(?e, "Error in suggest");
+                Err(Status::internal(e.to_string()))
+            }
+        }
     }
 
     type ParagraphsStream = Pin<Box<dyn Stream<Item = Result<ParagraphItem, Status>> + Send>>;
