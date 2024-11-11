@@ -973,7 +973,10 @@ async def test_search_pagination(
     total = 20  # 10 titles and 10 summaries
     page_size = 5
 
-    for feature in [SearchOptions.KEYWORD, SearchOptions.FULLTEXT]:
+    for feature, result_key in [
+        (SearchOptions.KEYWORD.value, "paragraphs"),
+        (SearchOptions.FULLTEXT.value, "fulltext"),
+    ]:
         total_pages = math.floor(total / page_size)
         for page_number in range(0, total_pages):
             resp = await nucliadb_reader.get(
@@ -985,7 +988,7 @@ async def test_search_pagination(
                 },
             )
             assert resp.status_code == 200
-            body = resp.json()[feature]
+            body = resp.json()[result_key]
             assert body["next_page"] == (page_number != total_pages - 1)
             assert len(body["results"]) == body["page_size"] == page_size
 
@@ -998,7 +1001,7 @@ async def test_search_pagination(
             },
         )
         assert resp.status_code == 200
-        body = resp.json()[feature]
+        body = resp.json()[result_key]
         assert body["next_page"] is False
         assert len(body["results"]) == 0
 

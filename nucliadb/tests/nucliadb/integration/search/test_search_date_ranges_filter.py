@@ -77,8 +77,8 @@ async def resource(nucliadb_grpc, knowledgebox):
 @pytest.mark.parametrize(
     "feature",
     [
-        "paragraph",
-        "vector",
+        SearchOptions.KEYWORD,
+        SearchOptions.SEMANTIC,
     ],
 )
 async def test_search_with_date_range_filters_nucliadb_dates(
@@ -134,8 +134,8 @@ async def test_search_with_date_range_filters_nucliadb_dates(
 @pytest.mark.parametrize(
     "feature",
     [
-        "paragraph",
-        "vector",
+        SearchOptions.KEYWORD,
+        SearchOptions.SEMANTIC,
     ],
 )
 async def test_search_with_date_range_filters_origin_dates(

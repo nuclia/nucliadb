@@ -128,7 +128,7 @@ async def test_matryoshka_embeddings(
             f"/kb/{kbid}/search",
             params={
                 "query": "matryoshka",
-                "features": [SearchOptions.SEMANTIC],
+                "features": [SearchOptions.SEMANTIC.value],
                 "min_score": 0.99999,
                 "with_duplicates": True,
             },

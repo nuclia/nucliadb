@@ -106,7 +106,7 @@ async def test_find_does_not_support_fulltext_search(
     knowledgebox,
 ):
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/find?query=title&features=document&features=paragraph",
+        f"/kb/{knowledgebox}/find?query=title&features=fulltext&features=keyword",
     )
     assert resp.status_code == 422
     assert "fulltext search not supported" in resp.json()["detail"][0]["msg"]
