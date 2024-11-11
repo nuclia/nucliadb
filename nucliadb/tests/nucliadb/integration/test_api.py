@@ -30,6 +30,7 @@ from nucliadb.learning_proxy import (
 )
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
+from nucliadb_models.search import SearchOptions
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -920,7 +921,7 @@ async def test_pagination_limits(
         f"/kb/kbid/find",
         json={
             "query": "foo",
-            "features": ["vector"],
+            "features": [SearchOptions.SEMANTIC],
             "page_size": 1000,
         },
     )
@@ -933,7 +934,7 @@ async def test_pagination_limits(
         f"/kb/kbid/find",
         json={
             "query": "foo",
-            "features": ["vector"],
+            "features": [SearchOptions.SEMANTIC],
             "page_number": 30,
             "page_size": 100,
         },

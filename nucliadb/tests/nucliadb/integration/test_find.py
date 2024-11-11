@@ -24,6 +24,7 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_models.search import SearchOptions
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
 
@@ -112,7 +113,7 @@ async def test_find_does_not_support_fulltext_search(
 
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",
-        json={"query": "title", "features": ["document", "paragraph"]},
+        json={"query": "title", "features": [SearchOptions.FULLTEXT, SearchOptions.KEYWORD]},
     )
     assert resp.status_code == 422
     assert "fulltext search not supported" in resp.json()["detail"][0]["msg"]
@@ -244,7 +245,7 @@ async def test_story_7286(
             f"/kb/{knowledgebox}/find",
             json={
                 "query": "title",
-                "features": ["paragraph", "vector", "relations"],
+                "features": [SearchOptions.KEYWORD, SearchOptions.SEMANTIC, SearchOptions.RELATIONS],
                 "shards": [],
                 "highlight": True,
                 "autofilter": False,

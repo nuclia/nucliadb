@@ -24,6 +24,7 @@ import dataclasses
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_models.search import SearchOptions
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -141,7 +142,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{knowledgebox}/find",
         json={
             "query": "Original",
-            "features": ["paragraph"],
+            "features": [SearchOptions.KEYWORD],
             "min_score": {"bm25": 0.0},
         },
         timeout=None,
@@ -155,7 +156,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{knowledgebox}/find",
         json={
             "query": "Extracted",
-            "features": ["paragraph"],
+            "features": [SearchOptions.KEYWORD],
         },
         timeout=None,
     )
@@ -233,7 +234,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{knowledgebox}/find",
         json={
             "query": "Extracted",
-            "features": ["paragraph"],
+            "features": [SearchOptions.KEYWORD],
             "min_score": {"bm25": 0.0},
         },
         timeout=None,
@@ -252,7 +253,7 @@ async def test_paragraph_index_deletions(
         f"/kb/{knowledgebox}/find",
         json={
             "query": "Modified",
-            "features": ["paragraph"],
+            "features": [SearchOptions.KEYWORD],
         },
         timeout=None,
     )

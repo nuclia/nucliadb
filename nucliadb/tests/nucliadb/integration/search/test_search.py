@@ -35,6 +35,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.tests.vectors import V1
+from nucliadb_models.search import SearchOptions
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
 from nucliadb_protos.utils_pb2 import RelationNode
@@ -972,10 +973,7 @@ async def test_search_pagination(
     total = 20  # 10 titles and 10 summaries
     page_size = 5
 
-    for feature, result_key in [
-        ("paragraph", "paragraphs"),
-        ("document", "fulltext"),
-    ]:
+    for feature in [SearchOptions.KEYWORD, SearchOptions.FULLTEXT]:
         total_pages = math.floor(total / page_size)
         for page_number in range(0, total_pages):
             resp = await nucliadb_reader.get(
@@ -987,7 +985,7 @@ async def test_search_pagination(
                 },
             )
             assert resp.status_code == 200
-            body = resp.json()[result_key]
+            body = resp.json()[feature]
             assert body["next_page"] == (page_number != total_pages - 1)
             assert len(body["results"]) == body["page_size"] == page_size
 
@@ -1000,7 +998,7 @@ async def test_search_pagination(
             },
         )
         assert resp.status_code == 200
-        body = resp.json()[result_key]
+        body = resp.json()[feature]
         assert body["next_page"] is False
         assert len(body["results"]) == 0
 
@@ -1069,7 +1067,7 @@ async def test_resource_search_pagination(
             f"/kb/{kbid}/resource/{rid}/search",
             params={
                 "query": query,
-                "features": ["paragraph"],
+                "features": [SearchOptions.KEYWORD],
                 "page_number": page_number,
                 "page_size": page_size,
             },
@@ -1083,7 +1081,7 @@ async def test_resource_search_pagination(
         f"/kb/{kbid}/resource/{rid}/search",
         params={
             "query": query,
-            "features": ["paragraph"],
+            "features": [SearchOptions.KEYWORD],
             "page_number": page_number + 1,
             "page_size": page_size,
         },
@@ -1109,7 +1107,7 @@ async def test_search_endpoints_handle_predict_errors(
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/{endpoint}",
             json={
-                "features": ["vector"],
+                "features": [SearchOptions.SEMANTIC],
                 "query": "something",
             },
         )

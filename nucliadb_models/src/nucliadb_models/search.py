@@ -632,7 +632,7 @@ class SearchParamDefaults:
     chat_features = ParamDefault(
         default=[ChatOptions.SEMANTIC, ChatOptions.KEYWORD],
         title="Chat features",
-        description="Features enabled for the chat endpoint. Semantic search is done if `semantic` (or `vectors`) is included. If `keyword` (or `paragraphs`) is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",  # noqa: E501
+        description="Features enabled for the chat endpoint. Semantic search is done if `semantic` is included. If `keyword` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",  # noqa: E501
     )
     suggest_features = ParamDefault(
         default=[

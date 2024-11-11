@@ -23,6 +23,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.tests.vectors import V1
+from nucliadb_models.search import SearchOptions
 from tests.nucliadb.integration.search.test_search import get_resource_with_a_sentence
 from tests.utils import inject_message
 
@@ -188,8 +189,8 @@ async def _test_find_date_ranges(
     found,
 ):
     payload = {"query": "Ramon", "features": features}
-    if "vector" in features:
-        payload["vector"] = V1
+    if SearchOptions.SEMANTIC in features:
+        payload[SearchOptions.SEMANTIC] = V1
     if creation_start is not None:
         payload["range_creation_start"] = creation_start.isoformat()
     if creation_end is not None:

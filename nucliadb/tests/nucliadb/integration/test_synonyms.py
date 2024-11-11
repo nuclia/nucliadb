@@ -19,6 +19,8 @@
 #
 import pytest
 
+from nucliadb_models.search import SearchOptions
+
 
 @pytest.mark.asyncio
 async def test_custom_synonyms_api(
@@ -197,7 +199,7 @@ async def test_search_errors_if_vectors_or_relations_requested(
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
         json=dict(
-            features=["paragraph", "vector", "relations"],
+            features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC, SearchOptions.RELATIONS],
             query="planet",
             with_synonyms=True,
         ),
