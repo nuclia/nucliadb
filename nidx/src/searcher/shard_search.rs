@@ -27,6 +27,7 @@ use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
 
 use crate::{
+    errors::NidxResult,
     metadata::{Index, IndexKind},
     NidxMetadata,
 };
@@ -37,7 +38,7 @@ pub async fn search(
     meta: &NidxMetadata,
     index_cache: Arc<IndexCache>,
     search_request: SearchRequest,
-) -> anyhow::Result<SearchResponse> {
+) -> NidxResult<SearchResponse> {
     let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
 
     // TODO: Avoid querying here, the information can be take from synced metadata
@@ -53,7 +54,7 @@ pub async fn search(
     let vector_index = Index::find(&meta.pool, shard_id, IndexKind::Vector, &search_request.vectorset).await?;
     let vector_seacher_arc = index_cache.get(&vector_index.id).await?;
 
-    tokio::task::spawn_blocking(move || {
+    let search_results = tokio::task::spawn_blocking(move || {
         blocking_search(
             search_request,
             paragraph_searcher_arc.as_ref().into(),
@@ -62,7 +63,8 @@ pub async fn search(
             vector_seacher_arc.as_ref().into(),
         )
     })
-    .await?
+    .await??;
+    Ok(search_results)
 }
 
 fn blocking_search(

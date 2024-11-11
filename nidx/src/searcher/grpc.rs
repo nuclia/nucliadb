@@ -21,15 +21,11 @@
 use std::{pin::Pin, sync::Arc};
 
 use futures::Stream;
-use nidx_protos::node_reader_server::NodeReader;
+use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
-use node_reader_server::NodeReaderServer;
-use tonic::{
-    transport::{server::Router, Server},
-    Request, Response, Result, Status,
-};
+use tonic::{service::Routes, Request, Response, Result, Status};
 
-use crate::NidxMetadata;
+use crate::{grpc_server::RemappedGrpcService, NidxMetadata};
 
 use super::{index_cache::IndexCache, shard_search::search};
 use tracing::*;
@@ -47,17 +43,16 @@ impl SearchServer {
         }
     }
 
-    pub fn into_service(self) -> Router {
-        Server::builder().add_service(NodeReaderServer::new(self))
+    pub fn into_service(self) -> RemappedGrpcService {
+        RemappedGrpcService {
+            routes: Routes::new(NidxSearcherServer::new(self)),
+            package: "nidx.NidxSearcher".to_string(),
+        }
     }
 }
 
 #[tonic::async_trait]
-impl NodeReader for SearchServer {
-    async fn get_shard(&self, _request: Request<GetShardRequest>) -> Result<Response<noderesources::Shard>> {
-        todo!()
-    }
-
+impl NidxSearcher for SearchServer {
     async fn document_search(
         &self,
         _request: Request<DocumentSearchRequest>,
@@ -119,24 +114,13 @@ impl NodeReader for SearchServer {
     }
 
     type ParagraphsStream = Pin<Box<dyn Stream<Item = Result<ParagraphItem, Status>> + Send>>;
+
     async fn paragraphs(&self, _request: Request<StreamRequest>) -> Result<Response<Self::ParagraphsStream>> {
         todo!()
     }
-
     type DocumentsStream = Pin<Box<dyn Stream<Item = Result<DocumentItem, Status>> + Send>>;
+
     async fn documents(&self, _request: Request<StreamRequest>) -> Result<Response<Self::DocumentsStream>> {
-        todo!()
-    }
-
-    async fn get_shard_files(&self, _request: Request<GetShardFilesRequest>) -> Result<Response<ShardFileList>> {
-        todo!()
-    }
-
-    type DownloadShardFileStream = Pin<Box<dyn Stream<Item = Result<ShardFileChunk, Status>> + Send>>;
-    async fn download_shard_file(
-        &self,
-        _request: Request<DownloadShardFileRequest>,
-    ) -> Result<Response<Self::DownloadShardFileStream>> {
         todo!()
     }
 }
