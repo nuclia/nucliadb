@@ -44,7 +44,7 @@ from nucliadb_protos import (
     nodewriter_pb2,
     writer_pb2,
 )
-from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, TypeMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, IndexMessageSource, NewShardRequest, TypeMessage
 from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_indexing, get_storage
 
@@ -214,8 +214,13 @@ class KBShardManager:
 
         nidx_api = get_nidx_api_client()
         if nidx_api:
-            shard_created = await nidx_api.new_shard_with_vectorsets(kbid, vectorsets)
-            shard_uuid = uuid.UUID(shard_created.id).hex
+            req = NewShardRequest(
+                kbid=kbid,
+                vectorsets_configs=vectorsets,
+            )
+
+            resp = await nidx_api.NewShard(req)  # type: ignore
+            shard_uuid = uuid.UUID(resp.id).hex
         else:
             shard_uuid = uuid.uuid4().hex
 

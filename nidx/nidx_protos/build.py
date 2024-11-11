@@ -11,6 +11,7 @@ def pdm_build_initialize(context):
     except FileExistsError:
         pass
 
+    # Compile protos
     for proto in [
         "src/nidx.proto",
     ]:
@@ -24,3 +25,6 @@ def pdm_build_initialize(context):
         ] + [proto]
         if protoc.main(command) != 0:
             raise Exception("error: {} failed".format(command))
+
+    # Create py.typed to enable type checking
+    open(f"{python_dir}/py.typed", "w")

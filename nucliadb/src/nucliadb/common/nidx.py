@@ -25,12 +25,21 @@ from nucliadb_protos.nodewriter_pb2 import (
     IndexMessage,
 )
 from nucliadb_utils import logger
+from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 if TYPE_CHECKING:
     from nucliadb.common.cluster.manager import AbstractIndexNode
+
+try:
+    import nidx_binding  # type: ignore
+    from nidx_protos import nidx_pb2_grpc
+
+    NIDX_BINDING = nidx_binding.NidxBinding()
+except ImportError as e:
+    logger.warning("Import error while loading nidx_binding", e)
 
 
 class NidxIndexer:
@@ -96,5 +105,8 @@ def get_nidx_api_client() -> Optional["AbstractIndexNode"]:
             available_disk=0,
         )
         return nidx_api
+    elif settings.standalone_mode and NIDX_BINDING is not None:
+        channel = get_traced_grpc_channel(f"localhost:{NIDX_BINDING.api_port}", "nidx_api")
+        return nidx_pb2_grpc.NidxApiStub(channel)
     else:
         return None

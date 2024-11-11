@@ -38,14 +38,14 @@ impl NidxBinding {
         let settings = Settings::from_env_settings(EnvSettings {
             indexer: Some(nidx::settings::IndexerSettings {
                 object_store: ObjectStoreConfig::File {
-                    file_path: "../../data/blob/fake/".to_string(),
+                    file_path: "data/blob/fake/".to_string(),
                 }
                 .client(),
                 nats_server: String::new(),
             }),
             storage: Some(StorageSettings {
                 object_store: ObjectStoreConfig::File {
-                    file_path: "../../data/blob/fake/".to_string(),
+                    file_path: "data/blob/fake/".to_string(),
                 }
                 .client(),
             }),
