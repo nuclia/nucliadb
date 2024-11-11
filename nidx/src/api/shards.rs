@@ -20,10 +20,10 @@
 
 use std::collections::HashMap;
 
-use anyhow::anyhow;
 use nidx_vector::config::VectorConfig;
 use uuid::Uuid;
 
+use crate::errors::{NidxError, NidxResult};
 use crate::metadata::{Index, IndexConfig, MergeJob, Segment, Shard};
 use crate::NidxMetadata;
 
@@ -31,9 +31,9 @@ pub async fn create_shard(
     meta: &NidxMetadata,
     kbid: Uuid,
     vector_configs: HashMap<String, VectorConfig>,
-) -> anyhow::Result<Shard> {
+) -> NidxResult<Shard> {
     if vector_configs.is_empty() {
-        return Err(anyhow!("Can't create shard without a vector index"));
+        return Err(NidxError::invalid("Can't create shard without a vector index"));
     }
 
     let mut tx = meta.transaction().await?;
@@ -53,7 +53,7 @@ pub async fn create_shard(
 /// Mark a shard, its indexes and segments for eventual deletion. Delete merge
 /// jobs scheduled for its indexes, as we don't want to keep working on it.
 /// Segment deletions will be purged eventually by the worker.
-pub async fn delete_shard(meta: &NidxMetadata, shard_id: Uuid) -> anyhow::Result<()> {
+pub async fn delete_shard(meta: &NidxMetadata, shard_id: Uuid) -> NidxResult<()> {
     let mut tx = meta.transaction().await?;
     let shard = match Shard::get(&mut *tx, shard_id).await {
         Ok(shard) => shard,
