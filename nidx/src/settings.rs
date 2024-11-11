@@ -194,7 +194,10 @@ impl Deref for Settings {
 
 impl Settings {
     pub async fn from_env() -> anyhow::Result<Self> {
-        let settings = EnvSettings::from_env();
+        Self::from_env_settings(EnvSettings::from_env()).await
+    }
+
+    pub async fn from_env_settings(settings: EnvSettings) -> anyhow::Result<Self> {
         let metadata = NidxMetadata::new(&settings.metadata.database_url).await?;
         Ok(Self {
             metadata,
