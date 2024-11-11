@@ -205,3 +205,61 @@ pub fn people_and_places(shard_id: impl Into<String>) -> Resource {
 
     resource
 }
+
+pub fn thus_spoke_zarathustra(shard_id: impl Into<String>) -> Resource {
+    let shard_id = shard_id.into();
+    let mut resource = minimal_resource(shard_id);
+    let rid = &resource.resource.as_ref().unwrap().uuid;
+
+    resource.labels.push("/s/p/de".to_string()); // language=de
+
+    resource.texts.insert(
+        "a/title".to_string(),
+        TextInformation {
+            text: "Thus Spoke Zarathustra".to_string(),
+            ..Default::default()
+        },
+    );
+    let mut title_paragraphs = HashMap::new();
+    title_paragraphs.insert(
+        format!("{rid}/a/title/0-22"),
+        IndexParagraph {
+            start: 0,
+            end: 22,
+            field: "a/title".to_string(),
+            ..Default::default()
+        },
+    );
+    resource.paragraphs.insert(
+        "a/title".to_string(),
+        IndexParagraphs {
+            paragraphs: title_paragraphs,
+        },
+    );
+
+    resource.texts.insert(
+        "a/summary".to_string(),
+        TextInformation {
+            text: "Philosophical book written by Frederich Nietzche".to_string(),
+            ..Default::default()
+        },
+    );
+    let mut summary_paragraphs = HashMap::new();
+    summary_paragraphs.insert(
+        format!("{rid}/a/summary/0-48"),
+        IndexParagraph {
+            start: 0,
+            end: 48,
+            field: "a/summary".to_string(),
+            ..Default::default()
+        },
+    );
+    resource.paragraphs.insert(
+        "a/summary".to_string(),
+        IndexParagraphs {
+            paragraphs: summary_paragraphs,
+        },
+    );
+
+    resource
+}

@@ -1377,6 +1377,7 @@ dependencies = [
  "config",
  "futures",
  "http",
+ "itertools 0.13.0",
  "lru",
  "nidx_paragraph",
  "nidx_protos",
