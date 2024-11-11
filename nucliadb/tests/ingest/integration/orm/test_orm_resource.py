@@ -434,8 +434,8 @@ async def test_generate_index_message_contains_all_metadata(
     assert len(index_message.labels) == len(set(index_message.labels))
 
     # Check that field labels contain the right set of labels
-    for field_id, field in index_message.texts.items():
-        assert "/mt/text/html" in field.labels
+    for text_info in index_message.texts.values():
+        assert "/mt/text/html" in text_info.labels
 
     # Check texts are populated with field extracted text and field computed labels
     expected_fields = {
@@ -447,17 +447,17 @@ async def test_generate_index_message_contains_all_metadata(
         "t/text1",
     }
     fields_to_be_found = expected_fields.copy()
-    for field, text in index_message.texts.items():
+    for field, text_info in index_message.texts.items():
         assert field in fields_to_be_found
         fields_to_be_found.remove(field)
-        assert text.text == "MyText"
+        assert text_info.text == "MyText"
         assert {
             "/l/labelset1/label1",
             "/e/ENTITY/document",
             "/e/NOUN/document",
-        }.issubset(set(text.labels))
+        }.issubset(set(text_info.labels))
         if field in ("u/link", "t/text1"):
-            assert "/e/Location/My home" in text.labels
+            assert "/e/Location/My home" in text_info.labels
 
     assert len(fields_to_be_found) == 0
 
