@@ -32,7 +32,7 @@ use uuid::Uuid;
 
 use super::segment::Segment;
 
-#[derive(sqlx::Type, Copy, Clone, PartialEq, Debug)]
+#[derive(sqlx::Type, Copy, Clone, PartialEq, Eq, Hash, Debug)]
 #[sqlx(type_name = "index_kind", rename_all = "lowercase")]
 pub enum IndexKind {
     Text,

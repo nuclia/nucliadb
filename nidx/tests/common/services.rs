@@ -24,15 +24,15 @@ use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::SyncedSearcher;
 use nidx::settings::{EnvSettings, MetadataSettings, ObjectStoreConfig, StorageSettings};
 use nidx::{NidxMetadata, Settings};
-use nidx_protos::node_reader_client::NodeReaderClient;
-use nidx_protos::node_writer_client::NodeWriterClient;
+use nidx_protos::nidx::nidx_api_client::NidxApiClient;
+use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use sqlx::PgPool;
 use tempfile::tempdir;
 use tonic::transport::Channel;
 
 pub struct NidxFixture {
-    pub searcher_client: NodeReaderClient<Channel>,
-    pub api_client: NodeWriterClient<Channel>,
+    pub searcher_client: NidxSearcherClient<Channel>,
+    pub api_client: NidxApiClient<Channel>,
 }
 
 impl NidxFixture {
@@ -69,8 +69,8 @@ impl NidxFixture {
         tokio::task::spawn(async move { searcher.run(settings.storage.as_ref().unwrap().object_store.clone()).await });
 
         // Clients
-        let searcher_client = NodeReaderClient::connect(format!("http://localhost:{searcher_port}")).await?;
-        let api_client = NodeWriterClient::connect(format!("http://localhost:{api_port}")).await?;
+        let searcher_client = NidxSearcherClient::connect(format!("http://localhost:{searcher_port}")).await?;
+        let api_client = NidxApiClient::connect(format!("http://localhost:{api_port}")).await?;
 
         Ok(NidxFixture {
             searcher_client,

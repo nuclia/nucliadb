@@ -34,6 +34,10 @@ pub mod nodewriter {
     tonic::include_proto!("nodewriter");
 }
 
+pub mod nidx {
+    tonic::include_proto!("nidx");
+}
+
 pub use nodereader::*;
 pub use noderesources::*;
 pub use nodewriter::*;
