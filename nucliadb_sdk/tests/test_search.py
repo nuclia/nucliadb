@@ -22,6 +22,7 @@ from typing import Any, Dict
 
 import nucliadb_sdk
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.search import SearchOptions
 
 TESTING_IN_CI = os.environ.get("CI") == "true"
 
@@ -252,7 +253,7 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
 
     results = sdk.search(
         kbid=kb.uuid,
-        features=["document"],
+        features=[SearchOptions.FULLTEXT],
         faceted=["/classification.labels"],
         page_size=0,
     )
@@ -266,7 +267,7 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
 
     resources = sdk.search(
         kbid=kb.uuid,
-        features=["document"],
+        features=[SearchOptions.FULLTEXT],
         faceted=["/classification.labels/emoji"],
         page_size=0,
     )

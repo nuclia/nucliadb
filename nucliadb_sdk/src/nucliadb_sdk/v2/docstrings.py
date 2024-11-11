@@ -200,7 +200,7 @@ SEARCH = Docstring(
             description="Search on the full text index",
             code=""">>> from nucliadb_sdk import *
 >>> sdk = NucliaDBSDK(api_key="api-key")
->>> resp = sdk.search(kbid="mykbid", query="Site Reliability", features=["document"])
+>>> resp = sdk.search(kbid="mykbid", query="Site Reliability", features=["fulltext"])
 >>> rid = resp.fulltext.results[0].rid
 >>> resp.resources[rid].title
 'The Site Reliability Workbook.pdf'

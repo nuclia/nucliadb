@@ -24,7 +24,7 @@ from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
 from nucliadb.tests.vectors import V1, V2, Q
 from nucliadb_models.labels import Label, LabelSetKind
-from nucliadb_models.search import MinScore
+from nucliadb_models.search import MinScore, SearchOptions
 from nucliadb_protos.resources_pb2 import (
     Classification,
     ExtractedTextWrapper,
@@ -351,7 +351,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         json=dict(
             query="",
             filters=filters,
-            features=["paragraph", "vector"],
+            features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
             vector=Q,
             min_score=MinScore(semantic=-1).model_dump(),
         ),

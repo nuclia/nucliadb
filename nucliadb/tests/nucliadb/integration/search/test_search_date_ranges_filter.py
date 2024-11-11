@@ -23,6 +23,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.tests.vectors import V1
+from nucliadb_models.search import SearchOptions
 from tests.nucliadb.integration.search.test_search import get_resource_with_a_sentence
 from tests.utils import inject_message
 
@@ -76,8 +77,8 @@ async def resource(nucliadb_grpc, knowledgebox):
 @pytest.mark.parametrize(
     "feature",
     [
-        "paragraph",
-        "vector",
+        SearchOptions.KEYWORD,
+        SearchOptions.SEMANTIC,
     ],
 )
 async def test_search_with_date_range_filters_nucliadb_dates(
@@ -133,8 +134,8 @@ async def test_search_with_date_range_filters_nucliadb_dates(
 @pytest.mark.parametrize(
     "feature",
     [
-        "paragraph",
-        "vector",
+        SearchOptions.KEYWORD,
+        SearchOptions.SEMANTIC,
     ],
 )
 async def test_search_with_date_range_filters_origin_dates(
@@ -188,7 +189,7 @@ async def _test_find_date_ranges(
     found,
 ):
     payload = {"query": "Ramon", "features": features}
-    if "vector" in features:
+    if SearchOptions.SEMANTIC in features:
         payload["vector"] = V1
     if creation_start is not None:
         payload["range_creation_start"] = creation_start.isoformat()

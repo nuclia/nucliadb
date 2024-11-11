@@ -25,6 +25,7 @@ from httpx import AsyncClient
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.learning_proxy import LearningConfiguration
+from nucliadb_models.search import SearchOptions
 from nucliadb_protos import knowledgebox_pb2, resources_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
@@ -127,7 +128,7 @@ async def test_matryoshka_embeddings(
             f"/kb/{kbid}/search",
             params={
                 "query": "matryoshka",
-                "features": ["vector"],
+                "features": [SearchOptions.SEMANTIC.value],
                 "min_score": 0.99999,
                 "with_duplicates": True,
             },

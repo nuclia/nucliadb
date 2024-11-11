@@ -22,6 +22,8 @@ from datetime import datetime
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_models.search import SearchOptions
+
 
 @pytest.mark.asyncio
 async def test_search_sort_by_score(
@@ -201,7 +203,7 @@ async def test_list_all_resources_by_creation_and_modification_dates_with_empty_
                 f"/kb/{kbid}/search",
                 params={
                     "query": "",
-                    "features": ["document"],
+                    "features": [SearchOptions.FULLTEXT.value],
                     "fields": ["a/title"],
                     "page_number": page_number,
                     "page_size": page_size,
