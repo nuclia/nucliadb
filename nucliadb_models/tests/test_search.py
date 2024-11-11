@@ -84,60 +84,9 @@ def test_base_search_request_top_k():
     assert request.page_size == 100
 
 
-def test_search_request_features_normalization():
-    request = search.SearchRequest(
-        features=[
-            search.SearchOptions.VECTOR,
-            search.SearchOptions.PARAGRAPH,
-            search.SearchOptions.DOCUMENT,
-            search.SearchOptions.RELATIONS,
-        ]
-    )
-    assert request.features == [
-        search.SearchOptions.SEMANTIC,
-        search.SearchOptions.KEYWORD,
-        search.SearchOptions.FULLTEXT,
-        search.SearchOptions.RELATIONS,
-    ]
-
-
-def test_find_request_features_normalization():
-    request = search.FindRequest(
-        features=[
-            search.SearchOptions.VECTOR,
-            search.SearchOptions.PARAGRAPH,
-            search.SearchOptions.RELATIONS,
-        ]
-    )
-    assert request.features == [
-        search.SearchOptions.SEMANTIC,
-        search.SearchOptions.KEYWORD,
-        search.SearchOptions.RELATIONS,
-    ]
-
-
 def test_find_request_fulltext_feature_not_allowed():
     with pytest.raises(ValidationError):
-        search.FindRequest(features=[search.SearchOptions.DOCUMENT])
-
-    with pytest.raises(ValidationError):
         search.FindRequest(features=[search.SearchOptions.FULLTEXT])
-
-
-def test_chat_request_features_normalization():
-    request = search.AskRequest(
-        query="my-query",
-        features=[
-            search.ChatOptions.VECTORS,
-            search.ChatOptions.PARAGRAPHS,
-            search.ChatOptions.RELATIONS,
-        ],
-    )
-    assert request.features == [
-        search.ChatOptions.SEMANTIC,
-        search.ChatOptions.KEYWORD,
-        search.ChatOptions.RELATIONS,
-    ]
 
 
 # Rank fusion
