@@ -35,7 +35,7 @@ from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
 
-reranker_observer = Observer("reranker_observer", labels={"type": ""})
+reranker_observer = Observer("reranker", labels={"type": ""})
 
 
 @dataclass
