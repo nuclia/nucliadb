@@ -47,6 +47,8 @@ class TextFormat(Enum):
     MARKDOWN = "MARKDOWN"
     JSON = "JSON"
     KEEP_MARKDOWN = "KEEP_MARKDOWN"
+    JSONL = "JSONL"
+    PLAIN_BLANKLINE_SPLIT = "PLAIN_BLANKLINE_SPLIT"
 
 
 TEXT_FORMAT_TO_MIMETYPE = {
@@ -56,6 +58,8 @@ TEXT_FORMAT_TO_MIMETYPE = {
     TextFormat.MARKDOWN: "text/markdown",
     TextFormat.JSON: "application/json",
     TextFormat.KEEP_MARKDOWN: "text/markdown",
+    TextFormat.JSONL: "application/x-ndjson",
+    TextFormat.PLAIN_BLANKLINE_SPLIT: "text/plain+blankline",
 }
 
 
@@ -111,6 +115,8 @@ class PushTextFormat(TextFormatValue, Enum):  # type: ignore
     RST = 3
     JSON = 4
     KEEP_MARKDOWN = 5
+    JSONL = 6
+    PLAIN_BLANKLINE_SPLIT = 7
 
 
 class Text(BaseModel):

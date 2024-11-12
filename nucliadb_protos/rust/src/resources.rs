@@ -940,6 +940,7 @@ pub mod field_text {
         /// Markdown to be kept
         KeepMarkdown = 5,
         Jsonl = 6,
+        PlainBlanklineSplit = 7,
     }
     impl Format {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -955,6 +956,7 @@ pub mod field_text {
                 Format::Json => "JSON",
                 Format::KeepMarkdown => "KEEP_MARKDOWN",
                 Format::Jsonl => "JSONL",
+                Format::PlainBlanklineSplit => "PLAIN_BLANKLINE_SPLIT",
             }
         }
         /// Creates an enum from field names used in the ProtoBuf definition.
@@ -967,6 +969,7 @@ pub mod field_text {
                 "JSON" => Some(Self::Json),
                 "KEEP_MARKDOWN" => Some(Self::KeepMarkdown),
                 "JSONL" => Some(Self::Jsonl),
+                "PLAIN_BLANKLINE_SPLIT" => Some(Self::PlainBlanklineSplit),
                 _ => None,
             }
         }

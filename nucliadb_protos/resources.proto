@@ -380,6 +380,7 @@ message FieldText {
         JSON = 4;
         KEEP_MARKDOWN = 5;  // Markdown to be kept
         JSONL = 6;
+        PLAIN_BLANKLINE_SPLIT = 7;
     }
     string body = 1;
     Format format = 2;
