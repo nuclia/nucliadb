@@ -80,7 +80,8 @@ async def query_paragraph_shard(
         security=query.security,
     )
     with node_observer({"type": "paragraph_search", "node_id": node.id}):
-        return await node.reader.Search(req)  # type: ignore
+        response = await node.reader.Search(req)  # type: ignore
+    return response.paragraph
 
 
 async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestRequest) -> SuggestResponse:
