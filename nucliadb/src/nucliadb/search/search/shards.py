@@ -95,8 +95,12 @@ async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestReque
 async def relations_shard(
     node: AbstractIndexNode, shard: str, query: RelationSearchRequest
 ) -> RelationSearchResponse:
-    req = RelationSearchRequest()
-    req.CopyFrom(query)
-    req.shard_id = shard
+    req = SearchRequest(
+        shard=shard,
+        relation_prefix=query.prefix,
+        relation_subgraph=query.subgraph,
+        reload=query.reload,
+    )
     with node_observer({"type": "relation_search", "node_id": node.id}):
-        return await node.reader.RelationSearch(req)  # type: ignore
+        response = await node.reader.Search(req)  # type: ignore
+    return response.relation
