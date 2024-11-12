@@ -951,31 +951,6 @@ pub mod node_reader_client {
                 .insert(GrpcMethod::new("nodereader.NodeReader", "VectorSearch"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn relation_search(
-            &mut self,
-            request: impl tonic::IntoRequest<super::RelationSearchRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::RelationSearchResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodereader.NodeReader/RelationSearch",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("nodereader.NodeReader", "RelationSearch"));
-            self.inner.unary(req, path, codec).await
-        }
         pub async fn document_ids(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
@@ -1267,13 +1242,6 @@ pub mod node_reader_server {
             request: tonic::Request<super::VectorSearchRequest>,
         ) -> std::result::Result<
             tonic::Response<super::VectorSearchResponse>,
-            tonic::Status,
-        >;
-        async fn relation_search(
-            &self,
-            request: tonic::Request<super::RelationSearchRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::RelationSearchResponse>,
             tonic::Status,
         >;
         async fn document_ids(
@@ -1592,52 +1560,6 @@ pub mod node_reader_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = VectorSearchSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodereader.NodeReader/RelationSearch" => {
-                    #[allow(non_camel_case_types)]
-                    struct RelationSearchSvc<T: NodeReader>(pub Arc<T>);
-                    impl<
-                        T: NodeReader,
-                    > tonic::server::UnaryService<super::RelationSearchRequest>
-                    for RelationSearchSvc<T> {
-                        type Response = super::RelationSearchResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::RelationSearchRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as NodeReader>::relation_search(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = RelationSearchSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

@@ -37,11 +37,6 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchResponse.FromString,
                 )
-        self.RelationSearch = channel.unary_unary(
-                '/nodereader.NodeReader/RelationSearch',
-                request_serializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.FromString,
-                )
         self.DocumentIds = channel.unary_unary(
                 '/nodereader.NodeReader/DocumentIds',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
@@ -123,12 +118,6 @@ class NodeReaderServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def VectorSearch(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def RelationSearch(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -224,11 +213,6 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.VectorSearch,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchRequest.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchResponse.SerializeToString,
-            ),
-            'RelationSearch': grpc.unary_unary_rpc_method_handler(
-                    servicer.RelationSearch,
-                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.SerializeToString,
             ),
             'DocumentIds': grpc.unary_unary_rpc_method_handler(
                     servicer.DocumentIds,
@@ -362,23 +346,6 @@ class NodeReader(object):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/VectorSearch',
             nucliadb__protos_dot_nodereader__pb2.VectorSearchRequest.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.VectorSearchResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def RelationSearch(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/RelationSearch',
-            nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.SerializeToString,
-            nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

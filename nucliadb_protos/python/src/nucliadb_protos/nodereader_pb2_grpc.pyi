@@ -86,11 +86,6 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.VectorSearchResponse,
     ]
 
-    RelationSearch: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodereader_pb2.RelationSearchRequest,
-        nucliadb_protos.nodereader_pb2.RelationSearchResponse,
-    ]
-
     DocumentIds: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.nodereader_pb2.IdCollection,
@@ -169,11 +164,6 @@ class NodeReaderAsyncStub:
     VectorSearch: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.VectorSearchRequest,
         nucliadb_protos.nodereader_pb2.VectorSearchResponse,
-    ]
-
-    RelationSearch: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodereader_pb2.RelationSearchRequest,
-        nucliadb_protos.nodereader_pb2.RelationSearchResponse,
     ]
 
     DocumentIds: grpc.aio.UnaryUnaryMultiCallable[
@@ -263,13 +253,6 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.VectorSearchRequest,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.nodereader_pb2.VectorSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.VectorSearchResponse]]: ...
-
-    @abc.abstractmethod
-    def RelationSearch(
-        self,
-        request: nucliadb_protos.nodereader_pb2.RelationSearchRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodereader_pb2.RelationSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.RelationSearchResponse]]: ...
 
     @abc.abstractmethod
     def DocumentIds(

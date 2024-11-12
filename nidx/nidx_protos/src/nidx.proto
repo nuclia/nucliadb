@@ -33,7 +33,6 @@ service NidxSearcher {
   rpc DocumentSearch(nodereader.DocumentSearchRequest) returns (nodereader.DocumentSearchResponse) {}
   rpc ParagraphSearch(nodereader.ParagraphSearchRequest) returns (nodereader.ParagraphSearchResponse) {}
   rpc VectorSearch(nodereader.VectorSearchRequest) returns (nodereader.VectorSearchResponse) {}
-  rpc RelationSearch(nodereader.RelationSearchRequest) returns (nodereader.RelationSearchResponse) {}
   rpc DocumentIds(noderesources.ShardId) returns (nodereader.IdCollection) {}
   rpc ParagraphIds(noderesources.ShardId) returns (nodereader.IdCollection) {}
   rpc VectorIds(noderesources.VectorSetID) returns (nodereader.IdCollection) {}

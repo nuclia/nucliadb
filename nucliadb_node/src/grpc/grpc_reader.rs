@@ -252,28 +252,6 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    async fn relation_search(
-        &self,
-        request: tonic::Request<RelationSearchRequest>,
-    ) -> Result<tonic::Response<RelationSearchResponse>, tonic::Status> {
-        let span = Span::current();
-        let relation_request = request.into_inner();
-        let shard_id = relation_request.shard_id.clone();
-        let info = info_span!(parent: &span, "relations search");
-        let shards = Arc::clone(&self.shards);
-        let task = move || {
-            let shard = obtain_shard(shards, shard_id)?;
-            run_with_telemetry(info, move || shard.relation_search(relation_request))
-        };
-        let response = tokio::task::spawn_blocking(task)
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match response {
-            Ok(response) => Ok(tonic::Response::new(response)),
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
-    }
-
     async fn document_search(
         &self,
         request: tonic::Request<DocumentSearchRequest>,

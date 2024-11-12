@@ -71,13 +71,6 @@ impl NidxSearcher for SearchServer {
         todo!()
     }
 
-    async fn relation_search(
-        &self,
-        _request: Request<RelationSearchRequest>,
-    ) -> Result<Response<RelationSearchResponse>> {
-        todo!()
-    }
-
     async fn document_ids(&self, _request: Request<noderesources::ShardId>) -> Result<Response<IdCollection>> {
         todo!()
     }
