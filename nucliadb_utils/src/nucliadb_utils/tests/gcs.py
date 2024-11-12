@@ -76,7 +76,7 @@ class GCS(BaseImage):
 def gcs():
     container = GCS()
     host, port = container.run()
-    public_api_url = f"http://{host}:{port}"
+    public_api_url = f"http://172.17.0.1:{port}"
     yield public_api_url
     container.stop()
 
@@ -120,5 +120,6 @@ async def gcs_storage(gcs, gcs_storage_settings: dict[str, Any]):
         anonymous=True,
     )
     await storage.initialize()
+    await storage.create_bucket("nidx")
     yield storage
     await storage.finalize()

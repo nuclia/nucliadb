@@ -114,7 +114,6 @@ async def node_query(
     use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
-    nidx: bool = False,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -138,7 +137,6 @@ async def node_query(
     use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
-    nidx: bool = False,
 ) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
     timeout = timeout or settings.search_timeout
     use_read_replica_nodes = use_read_replica_nodes and has_feature(
@@ -166,16 +164,10 @@ async def node_query(
                 target_shard_replicas=target_shard_replicas,
             )
 
-            # nidx testing
-            if nidx:
-                fake_node = get_nidx_fake_node()
-                if fake_node is None:
-                    raise HTTPException(
-                        status_code=500,
-                        detail="nidx not available",
-                    )
+            # Query with nidx if installed
+            fake_node = get_nidx_fake_node()
+            if fake_node:
                 node = fake_node
-
                 shard_id = shard_obj.shard
         except KeyError:
             incomplete_results = True
