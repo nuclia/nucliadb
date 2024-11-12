@@ -25,7 +25,7 @@ use nidx_protos::{
     op_status::Status, NewShardRequest, NewVectorSetRequest, ShardId, VectorIndexConfig, VectorSetId, VectorSimilarity,
 };
 use sqlx::PgPool;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tonic::{Code, Request};
 
 #[sqlx::test]
@@ -49,6 +49,13 @@ async fn test_new_shard_with_single_vectorset(pool: PgPool) -> anyhow::Result<()
         }))
         .await;
     assert!(response.is_ok());
+    let shard_id = &response.as_ref().unwrap().get_ref().id;
+
+    let response = fixture
+        .api_client
+        .list_vector_sets(Request::new(ShardId { id: shard_id.clone() }))
+        .await?;
+    assert_eq!(response.into_inner().vectorsets, ["english"]);
 
     Ok(())
 }
@@ -70,6 +77,54 @@ async fn test_new_shard_with_multiple_vectorset(pool: PgPool) -> anyhow::Result<
         }))
         .await;
     assert!(response.is_ok());
+    let shard_id = &response.as_ref().unwrap().get_ref().id;
+
+    let response = fixture
+        .api_client
+        .list_vector_sets(Request::new(ShardId { id: shard_id.clone() }))
+        .await?;
+    let vectorsets = response.into_inner().vectorsets;
+    assert_eq!(
+        HashSet::from_iter(vectorsets.iter().map(|v| v.as_str())),
+        HashSet::from(["english", "multilingual", "spanish"])
+    );
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn test_add_vectorset_to_shard(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+
+    let new_shard_response = fixture
+        .api_client
+        .new_shard(Request::new(NewShardRequest {
+            kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
+            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            ..Default::default()
+        }))
+        .await?;
+    let shard_id = &new_shard_response.get_ref().id;
+
+    let response = fixture
+        .api_client
+        .add_vector_set(Request::new(NewVectorSetRequest {
+            id: Some(VectorSetId {
+                shard: Some(ShardId {
+                    id: shard_id.clone(),
+                }),
+                vectorset: "multilingual".to_string(),
+            }),
+            config: Some(VectorIndexConfig {
+                similarity: VectorSimilarity::Dot.into(),
+                normalize_vectors: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
+        .await?;
+
+    assert_eq!(response.get_ref().status(), Status::Ok);
 
     Ok(())
 }
