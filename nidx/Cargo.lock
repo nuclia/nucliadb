@@ -1471,6 +1471,7 @@ dependencies = [
  "nidx_protos",
  "nidx_tantivy",
  "nidx_types",
+ "rayon",
  "tantivy",
  "tempfile",
 ]
