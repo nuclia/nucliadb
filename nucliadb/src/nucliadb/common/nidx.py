@@ -21,6 +21,7 @@
 import os
 from typing import Optional
 
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.settings import DriverConfig
 from nucliadb.ingest.settings import settings as ingest_settings
@@ -46,9 +47,14 @@ class NidxUtility:
     api_client = None
     searcher_client = None
 
-    async def initialize(self): ...
-    async def finalize(self): ...
-    async def index(self, msg: IndexMessage) -> int: ...
+    async def initialize(self):
+        raise NotImplementedError()
+
+    async def finalize(self):
+        raise NotImplementedError()
+
+    async def index(self, msg: IndexMessage) -> int:
+        raise NotImplementedError()
 
 
 class NidxBindingUtility(NidxUtility):
@@ -140,6 +146,7 @@ async def start_nidx_utility() -> Optional[NidxUtility]:
         logger.warn("nidx already initialized, will not reinitialize")
         return nidx
 
+    nidx_utility: NidxUtility
     if settings.standalone_mode:
         nidx_utility = NidxBindingUtility()
     else:
@@ -173,5 +180,33 @@ def get_nidx_searcher_client() -> Optional[NidxSearcherStub]:
     nidx = get_nidx()
     if nidx:
         return nidx.searcher_client
+    else:
+        return None
+
+
+class FakeNode(AbstractIndexNode):
+    def __init__(self, searcher_client):
+        self.client = searcher_client
+
+    @property
+    def reader(self):
+        return self.client
+
+    @property
+    def writer(self):
+        return None
+
+    def is_read_replica(_):
+        return False
+
+    @property
+    def id(self):
+        return "nidx"
+
+
+def get_nidx_fake_node() -> Optional[FakeNode]:
+    nidx = get_nidx_searcher_client()
+    if nidx:
+        return FakeNode(nidx)
     else:
         return None
