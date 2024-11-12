@@ -69,17 +69,21 @@ def _storage_config(prefix: str, bucket: Optional[str]) -> dict[str, str]:
         config[f"{prefix}__OBJECT_STORE"] = "file"
         config[f"{prefix}__FILE_PATH"] = file_path
     elif storage_settings.file_backend == FileBackendConfig.GCS:
+        gcs_bucket = bucket or extended_storage_settings.gcs_indexing_bucket
         config[f"{prefix}__OBJECT_STORE"] = "gcs"
-        config[f"{prefix}__BUCKET"] = bucket or extended_storage_settings.gcs_indexing_bucket
+        if gcs_bucket:
+            config[f"{prefix}__BUCKET"] = gcs_bucket
         if storage_settings.gcs_base64_creds:
             config[f"{prefix}__BASE64_CREDS"] = storage_settings.gcs_base64_creds
         if storage_settings.gcs_endpoint_url:
             config[f"{prefix}__ENDPOINT"] = storage_settings.gcs_endpoint_url
     elif storage_settings.file_backend == FileBackendConfig.S3:
+        s3_bucket = bucket or extended_storage_settings.s3_indexing_bucket
         config[f"{prefix}__OBJECT_STORE"] = "s3"
-        config[f"{prefix}__BUCKET"] = bucket or extended_storage_settings.s3_indexing_bucket
-        config[f"{prefix}__CLIENT_ID"] = storage_settings.s3_client_id
-        config[f"{prefix}__CLIENT_SECRET"] = storage_settings.s3_client_secret
+        if s3_bucket:
+            config[f"{prefix}__BUCKET"] = s3_bucket
+        config[f"{prefix}__CLIENT_ID"] = storage_settings.s3_client_id or ""
+        config[f"{prefix}__CLIENT_SECRET"] = storage_settings.s3_client_secret or ""
         config[f"{prefix}__REGION_NAME"] = storage_settings.s3_region_name or ""
         if storage_settings.s3_endpoint:
             config[f"{prefix}__ENDPOINT"] = storage_settings.s3_endpoint
