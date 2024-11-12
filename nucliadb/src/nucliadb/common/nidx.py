@@ -168,7 +168,7 @@ def get_nidx() -> Optional[NidxUtility]:
     return get_utility(Utility.NIDX)
 
 
-def get_nidx_api_client() -> Optional[NidxApiStub]:
+def get_nidx_api_client() -> Optional["NidxApiStub"]:
     nidx = get_nidx()
     if nidx:
         return nidx.api_client
@@ -176,7 +176,7 @@ def get_nidx_api_client() -> Optional[NidxApiStub]:
         return None
 
 
-def get_nidx_searcher_client() -> Optional[NidxSearcherStub]:
+def get_nidx_searcher_client() -> Optional["NidxSearcherStub"]:
     nidx = get_nidx()
     if nidx:
         return nidx.searcher_client
