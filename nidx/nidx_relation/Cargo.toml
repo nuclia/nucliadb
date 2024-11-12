@@ -10,7 +10,6 @@ nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
 nidx_tantivy = { version = "0.1.0", path = "../nidx_tantivy" }
 nidx_types = { version = "0.1.0", path = "../nidx_types" }
 tantivy = "0.22"
-rayon = "1.10"
 
 [dev-dependencies]
 tempfile = "3"

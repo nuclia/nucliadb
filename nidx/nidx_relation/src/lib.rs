@@ -32,7 +32,6 @@ use nidx_tantivy::{
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
 };
 use nidx_types::OpenIndexMetadata;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use reader::{HashedRelationNode, RelationsReaderService};
 use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
@@ -132,7 +131,7 @@ impl RelationSearcher {
 
     pub fn suggest(&self, prefixes: Vec<String>) -> Vec<RelationNode> {
         let requests =
-            prefixes.par_iter().filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH).cloned().map(|prefix| {
+            prefixes.iter().filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH).cloned().map(|prefix| {
                 RelationSearchRequest {
                     prefix: Some(RelationPrefixSearchRequest {
                         prefix,
