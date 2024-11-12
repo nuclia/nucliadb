@@ -53,7 +53,9 @@ async fn test_new_shard_with_single_vectorset(pool: PgPool) -> anyhow::Result<()
 
     let response = fixture
         .api_client
-        .list_vector_sets(Request::new(ShardId { id: shard_id.clone() }))
+        .list_vector_sets(Request::new(ShardId {
+            id: shard_id.clone(),
+        }))
         .await?;
     assert_eq!(response.into_inner().vectorsets, ["english"]);
 
@@ -81,7 +83,9 @@ async fn test_new_shard_with_multiple_vectorset(pool: PgPool) -> anyhow::Result<
 
     let response = fixture
         .api_client
-        .list_vector_sets(Request::new(ShardId { id: shard_id.clone() }))
+        .list_vector_sets(Request::new(ShardId {
+            id: shard_id.clone(),
+        }))
         .await?;
     let vectorsets = response.into_inner().vectorsets;
     assert_eq!(
@@ -170,21 +174,23 @@ async fn test_remove_vectorset(pool: PgPool) -> anyhow::Result<()> {
 
     let response = fixture
         .api_client
-        .remove_vector_set(Request::new(
-            VectorSetId { shard: Some(ShardId { id: shard_id.clone() }), vectorset: "multilingual".to_string() }
-        ))
+        .remove_vector_set(Request::new(VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id.clone(),
+            }),
+            vectorset: "multilingual".to_string(),
+        }))
         .await?;
     assert_eq!(response.into_inner().status(), Status::Ok);
 
     let response = fixture
         .api_client
-        .list_vector_sets(Request::new(ShardId { id: shard_id.clone() }))
+        .list_vector_sets(Request::new(ShardId {
+            id: shard_id.clone(),
+        }))
         .await?;
     let vectorsets = response.into_inner().vectorsets;
-    assert_eq!(
-        HashSet::from_iter(vectorsets.iter().map(|v| v.as_str())),
-        HashSet::from(["english", "spanish"])
-    );
+    assert_eq!(HashSet::from_iter(vectorsets.iter().map(|v| v.as_str())), HashSet::from(["english", "spanish"]));
 
     Ok(())
 }
@@ -209,30 +215,34 @@ async fn test_cant_remove_all_vectorsets(pool: PgPool) -> anyhow::Result<()> {
 
     let response = fixture
         .api_client
-        .remove_vector_set(Request::new(
-            VectorSetId { shard: Some(ShardId { id: shard_id.clone() }), vectorset: "english".to_string() }
-        ))
+        .remove_vector_set(Request::new(VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id.clone(),
+            }),
+            vectorset: "english".to_string(),
+        }))
         .await?;
     assert_eq!(response.into_inner().status(), Status::Ok);
 
     let response = fixture
         .api_client
-        .remove_vector_set(Request::new(
-            VectorSetId { shard: Some(ShardId { id: shard_id.clone() }), vectorset: "multilingual".to_string() }
-        ))
+        .remove_vector_set(Request::new(VectorSetId {
+            shard: Some(ShardId {
+                id: shard_id.clone(),
+            }),
+            vectorset: "multilingual".to_string(),
+        }))
         .await;
     assert!(response.is_err());
 
     let response = fixture
         .api_client
-        .list_vector_sets(Request::new(ShardId { id: shard_id.clone() }))
+        .list_vector_sets(Request::new(ShardId {
+            id: shard_id.clone(),
+        }))
         .await?;
     let vectorsets = response.into_inner().vectorsets;
-    assert_eq!(
-        HashSet::from_iter(vectorsets.iter().map(|v| v.as_str())),
-        HashSet::from(["multilingual"])
-    );
+    assert_eq!(HashSet::from_iter(vectorsets.iter().map(|v| v.as_str())), HashSet::from(["multilingual"]));
 
     Ok(())
 }
-
