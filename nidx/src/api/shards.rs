@@ -80,7 +80,7 @@ pub async fn delete_vectorset(meta: &NidxMetadata, shard_id: Uuid, vectorset: &s
     let count =
         Index::for_shard(&mut *tx, shard_id).await?.iter().filter(|index| index.kind == IndexKind::Vector).count();
     if count <= 1 {
-        return Err(NidxError::InvalidRequest("Can't delete the your vectorset".to_string()));
+        return Err(NidxError::InvalidRequest("Can't delete the last vectorset".to_string()));
     }
 
     let index = Index::find(&mut *tx, shard_id, IndexKind::Vector, vectorset).await?;
