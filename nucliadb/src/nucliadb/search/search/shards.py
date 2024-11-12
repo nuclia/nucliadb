@@ -61,11 +61,26 @@ async def get_shard(node: AbstractIndexNode, shard_id: str) -> Shard:
 async def query_paragraph_shard(
     node: AbstractIndexNode, shard: str, query: ParagraphSearchRequest
 ) -> ParagraphSearchResponse:
-    req = ParagraphSearchRequest()
-    req.CopyFrom(query)
-    req.id = shard
+    # convert paragraph search request to regular search request
+    req = SearchRequest(
+        shard=shard,
+        with_duplicates=query.with_duplicates,
+        body=query.body,
+        fields=query.fields,
+        order=query.order,
+        faceted=query.faceted,
+        page_number=query.page_number,
+        result_per_page=query.result_per_page,
+        timestamps=query.timestamps,
+        only_faceted=query.only_faceted,
+        advanced_query=query.advanced_query,
+        key_filters=query.key_filters,
+        reload=query.reload,
+        min_score_bm25=query.min_score,
+        security=query.security,
+    )
     with node_observer({"type": "paragraph_search", "node_id": node.id}):
-        return await node.reader.ParagraphSearch(req)  # type: ignore
+        return await node.reader.Search(req)  # type: ignore
 
 
 async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestRequest) -> SuggestResponse:
