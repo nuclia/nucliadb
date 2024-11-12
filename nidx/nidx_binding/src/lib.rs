@@ -5,9 +5,10 @@ use nidx::grpc_server::GrpcServer;
 use nidx::indexer::index_resource;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::SyncedSearcher;
-use nidx::settings::{EnvSettings, MetadataSettings, ObjectStoreConfig, StorageSettings};
+use nidx::settings::EnvSettings;
 use nidx::Settings;
 use nidx_protos::Resource;
+use std::collections::HashMap;
 use std::path::Path;
 use tokio::runtime::Runtime;
 
@@ -25,36 +26,19 @@ pub struct NidxBinding {
 #[pymethods]
 impl NidxBinding {
     #[new]
-    pub fn start() -> NidxBinding {
+    pub fn start(mut settings: HashMap<String, String>) -> NidxBinding {
+        settings.insert("INDEXER__NATS_SERVER".to_string(), "".to_string());
+
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let mut binding = rt.block_on(NidxBinding::new()).unwrap();
+        let mut binding = rt.block_on(NidxBinding::new(settings)).unwrap();
         binding.runtime = Some(rt);
         binding
     }
 }
 
 impl NidxBinding {
-    pub async fn new() -> anyhow::Result<Self> {
-        let settings = Settings::from_env_settings(EnvSettings {
-            indexer: Some(nidx::settings::IndexerSettings {
-                object_store: ObjectStoreConfig::File {
-                    file_path: "data/blob/fake/".to_string(),
-                }
-                .client(),
-                nats_server: String::new(),
-            }),
-            storage: Some(StorageSettings {
-                object_store: ObjectStoreConfig::File {
-                    file_path: "data/blob/fake/".to_string(),
-                }
-                .client(),
-            }),
-            merge: Default::default(),
-            metadata: MetadataSettings {
-                database_url: "postgresql://postgres@localhost/test".to_string(),
-            },
-        })
-        .await?;
+    pub async fn new(binding_settings: HashMap<String, String>) -> anyhow::Result<Self> {
+        let settings = Settings::from_env_settings(EnvSettings::from_map(binding_settings)).await?;
 
         // API server
         let api_service = ApiServer::new(settings.metadata.clone()).into_service();

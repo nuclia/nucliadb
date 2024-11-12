@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
@@ -174,6 +175,11 @@ impl EnvSettings {
         let config = Config::builder().add_source(env.separator("__")).build().unwrap();
         config.try_deserialize().unwrap()
     }
+
+    pub fn from_map(vars: HashMap<String, String>) -> Self {
+        let env = Environment::default().source(Some(vars));
+        Self::from_config_environment(env)
+    }
 }
 
 /// Settings wrapper that holds opens a connection to the database
@@ -221,8 +227,7 @@ mod tests {
             ("INDEXER__NATS_SERVER", "localhost"),
             ("MERGE__MIN_NUMBER_OF_SEGMENTS", "1234"),
         ];
-        let env = Environment::default().source(Some(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string())))));
-        let settings = EnvSettings::from_config_environment(env);
+        let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
         assert_eq!(&settings.metadata.database_url, "postgresql://localhost");
         assert_eq!(&settings.indexer.unwrap().nats_server, "localhost");
         assert_eq!(settings.merge.min_number_of_segments, 1234);
