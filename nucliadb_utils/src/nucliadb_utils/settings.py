@@ -110,7 +110,7 @@ class StorageSettings(BaseSettings):
         description="If using LOCAL `file_backend` storage, directory where files should be stored",
     )
     local_indexing_bucket: Optional[str] = Field(
-        default=None,
+        default="indexer",
         description="If using LOCAL `file_backend` storage, subdirectory where indexing data is stored",
     )
     upload_token_expiration: int = Field(

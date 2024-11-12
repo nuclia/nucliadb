@@ -73,8 +73,8 @@ from tests.utils import inject_message
 logger = logging.getLogger(__name__)
 
 # Minimum support PostgreSQL version
-# Reason: We want the btree_gin extension to support uuid's
-images.settings["postgresql"]["version"] = "11"
+# Reason: We want the btree_gin extension to support uuid's (pg11) and `gen_random_uuid()` (pg13)
+images.settings["postgresql"]["version"] = "13"
 images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
 
 

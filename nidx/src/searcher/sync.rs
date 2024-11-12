@@ -93,7 +93,10 @@ async fn delete_index(
         // remove directory for the index, effectively deleting all segment data
         // stored locally
         let index_location = sync_metadata.index_location(&index_id);
-        tokio::fs::remove_dir_all(index_location).await?;
+        match tokio::fs::remove_dir_all(index_location).await {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
+            _ => (),
+        }
         notifier.send(index_id).await?;
     }
     Ok(())
