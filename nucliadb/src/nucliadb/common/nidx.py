@@ -93,7 +93,7 @@ class NidxBindingUtility(NidxUtility):
         del self.binding
 
     async def index(self, msg: IndexMessage) -> int:
-        raise "Not implemented yet"
+        return self.binding.index(msg.SerializeToString())
 
 
 class NidxServiceUtility(NidxUtility):
