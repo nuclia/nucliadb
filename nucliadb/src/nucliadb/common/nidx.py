@@ -38,7 +38,8 @@ from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_ut
 NIDX_INSTALLED = False
 if os.environ.get("NIDX_ENABLED"):
     try:
-        from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub
+        # TODO: Remove this ignore once nidx_protos is actually required
+        from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub  # type: ignore
 
         NIDX_INSTALLED = True
     except ImportError:
