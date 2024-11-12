@@ -64,7 +64,7 @@ impl TextIndexer {
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
         index_document(&mut indexer, resource, field_schema)?;
-        Ok(Some(indexer.finalize()?))
+        indexer.finalize()
     }
 
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
