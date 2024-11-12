@@ -27,7 +27,7 @@ use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
 
 use crate::{
-    errors::NidxResult,
+    errors::{NidxError, NidxResult},
     metadata::{Index, IndexKind},
     NidxMetadata,
 };
@@ -40,6 +40,9 @@ pub async fn search(
     search_request: SearchRequest,
 ) -> NidxResult<SearchResponse> {
     let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
+    if search_request.vectorset.is_empty() {
+        return Err(NidxError::invalid("Vectorset is required"));
+    }
 
     // TODO: Avoid querying here, the information can be take from synced metadata
     let paragraph_index = Index::find(&meta.pool, shard_id, IndexKind::Paragraph, "paragraph").await?;

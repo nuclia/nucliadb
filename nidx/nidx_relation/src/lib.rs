@@ -23,16 +23,19 @@ mod reader;
 mod resource_indexer;
 mod schema;
 
-use nidx_protos::{resource::ResourceStatus, RelationSearchRequest, RelationSearchResponse};
+use nidx_protos::{
+    relation_node::NodeType, resource::ResourceStatus, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest,
+    RelationSearchRequest, RelationSearchResponse,
+};
 use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
 };
 use nidx_types::OpenIndexMetadata;
-use reader::RelationsReaderService;
+use reader::{HashedRelationNode, RelationsReaderService};
 use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 use tantivy::{
     directory::MmapDirectory,
     indexer::merge_indices,
@@ -40,6 +43,11 @@ use tantivy::{
     schema::Field,
     Term,
 };
+
+/// Minimum length for a word to be accepted as a entity to search for
+/// suggestions. Low values can provide too much noise and higher ones can
+/// remove important words from suggestion
+const MIN_SUGGEST_PREFIX_LENGTH: usize = 2;
 
 pub struct RelationIndexer;
 
@@ -69,7 +77,7 @@ impl RelationIndexer {
         }
 
         index_relations(&mut indexer, resource, field_schema)?;
-        Ok(Some(indexer.finalize()?))
+        indexer.finalize()
     }
 
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
@@ -119,5 +127,37 @@ impl RelationSearcher {
 
     pub fn search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
         self.reader.search(request)
+    }
+
+    pub fn suggest(&self, prefixes: Vec<String>) -> Vec<RelationNode> {
+        let requests =
+            prefixes.iter().filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH).cloned().map(|prefix| {
+                RelationSearchRequest {
+                    prefix: Some(RelationPrefixSearchRequest {
+                        prefix,
+                        node_filters: vec![RelationNodeFilter {
+                            node_type: NodeType::Entity.into(),
+                            ..Default::default()
+                        }],
+                    }),
+                    ..Default::default()
+                }
+            });
+
+        let responses: Vec<_> = requests.map(|request| self.search(&request)).collect();
+
+        // REVIEW: we are ignoring errors on search, we may want to, at least, log something
+        let entities = responses
+            .into_iter()
+            .flatten() // unwrap errors and continue with successful results
+            .flat_map(|response| response.prefix)
+            .flat_map(|prefix_response| prefix_response.nodes.into_iter());
+
+        // remove duplicate entities
+        let mut seen: HashSet<HashedRelationNode> = HashSet::new();
+        let mut ent_result = entities.collect::<Vec<_>>();
+        ent_result.retain(|e| seen.insert(e.clone().into()));
+
+        ent_result
     }
 }
