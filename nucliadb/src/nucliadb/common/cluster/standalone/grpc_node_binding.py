@@ -116,16 +116,6 @@ class StandaloneReaderWrapper:
         pb.ParseFromString(pb_bytes)
         return pb
 
-    async def RelationSearch(self, request: RelationSearchRequest) -> RelationSearchResponse:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            self.executor, self.reader.relation_search, request.SerializeToString()
-        )
-        pb_bytes = bytes(result)
-        pb = RelationSearchResponse()
-        pb.ParseFromString(pb_bytes)
-        return pb
-
     async def GetShard(self, request: GetShardRequest) -> NodeResourcesShard:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(

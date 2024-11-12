@@ -22,7 +22,6 @@ from typing import Any
 from nucliadb_protos.nodereader_pb2 import (
     EdgeList,
     RelationEdge,
-    RelationSearchResponse,
 )
 from nucliadb_protos.noderesources_pb2 import (
     EmptyResponse,
@@ -89,11 +88,6 @@ class DummyReaderStub:  # pragma: no cover
     async def GetShard(self, data):  # pragma: no cover
         self.calls.setdefault("GetShard", []).append(data)
         return NodeResourcesShard(shard_id="shard", fields=2, paragraphs=2, sentences=2)
-
-    async def RelationSearch(self, data):  # pragma: no cover
-        self.calls.setdefault("RelationSearch", []).append(data)
-        result = RelationSearchResponse()
-        return result
 
     async def RelationEdges(self, data):  # pragma: no cover
         self.calls.setdefault("RelationEdges", []).append(data)
