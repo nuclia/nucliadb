@@ -23,7 +23,7 @@ use std::str::FromStr;
 
 use crate::errors::NidxError;
 use crate::grpc_server::RemappedGrpcService;
-use crate::metadata::{IndexKind, Shard};
+use crate::metadata::{Index, IndexKind, Shard};
 use nidx_protos::nidx::nidx_api_server::*;
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
@@ -74,6 +74,7 @@ impl NidxApi for ApiServer {
             sentences: *index_stats.get(&IndexKind::Vector).unwrap_or(&0) as u64,
         }))
     }
+
     async fn new_shard(&self, request: Request<NewShardRequest>) -> Result<Response<ShardCreated>> {
         // TODO? analytics event
         let request = request.into_inner();
@@ -117,16 +118,67 @@ impl NidxApi for ApiServer {
         }))
     }
 
-    async fn add_vector_set(&self, _request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>> {
-        todo!()
+    async fn add_vector_set(&self, request: Request<NewVectorSetRequest>) -> Result<Response<OpStatus>> {
+        let request = request.into_inner();
+        let Some(VectorSetId {
+            shard: Some(ShardId {
+                id: ref shard_id,
+            }),
+            ref vectorset,
+        }) = request.id
+        else {
+            return Err(NidxError::invalid("Vectorset ID is required").into());
+        };
+        let shard_id = Uuid::from_str(shard_id).map_err(NidxError::from)?;
+        let config = if let Some(config) = request.config {
+            VectorConfig::try_from(config)
+                .map_err(|error| NidxError::invalid(&format!("Invalid vectorset configuration: {error:?}")))?
+        } else {
+            return Err(NidxError::invalid("Vectorset configuration is required").into());
+        };
+
+        Index::create(&self.meta.pool, shard_id, vectorset, config.into()).await.map_err(NidxError::from)?;
+
+        Ok(Response::new(OpStatus {
+            status: op_status::Status::Ok.into(),
+            detail: "Vectorset successfully created".to_string(),
+            ..Default::default()
+        }))
     }
 
-    async fn remove_vector_set(&self, _request: Request<VectorSetId>) -> Result<Response<OpStatus>> {
-        todo!()
+    async fn remove_vector_set(&self, request: Request<VectorSetId>) -> Result<Response<OpStatus>> {
+        let VectorSetId {
+            shard: Some(ShardId {
+                id: ref shard_id,
+            }),
+            ref vectorset,
+        } = request.into_inner()
+        else {
+            return Err(NidxError::invalid("Vectorset ID is required").into());
+        };
+        let shard_id = Uuid::from_str(shard_id).map_err(NidxError::from)?;
+
+        shards::delete_vectorset(&self.meta, shard_id, vectorset).await?;
+
+        Ok(Response::new(OpStatus {
+            status: op_status::Status::Ok.into(),
+            detail: "Vectorset successfully deleted".to_string(),
+            ..Default::default()
+        }))
     }
 
-    async fn list_vector_sets(&self, _request: Request<ShardId>) -> Result<Response<VectorSetList>> {
-        todo!()
+    async fn list_vector_sets(&self, request: Request<ShardId>) -> Result<Response<VectorSetList>> {
+        let request = request.into_inner();
+        let shard_id = Uuid::from_str(&request.id).map_err(NidxError::from)?;
+        // TODO: query only vector indexes
+        let indexes = Index::for_shard(&self.meta.pool, shard_id).await.map_err(NidxError::from)?;
+
+        let vectorsets =
+            indexes.into_iter().filter(|index| index.kind == IndexKind::Vector).map(|index| index.name).collect();
+        Ok(tonic::Response::new(VectorSetList {
+            shard: Some(request),
+            vectorsets,
+        }))
     }
 
     async fn get_metadata(&self, _request: Request<EmptyQuery>) -> Result<Response<NodeMetadata>> {

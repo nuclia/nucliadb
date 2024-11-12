@@ -23,6 +23,7 @@ mod index_cache;
 mod query_language;
 mod query_planner;
 mod shard_search;
+mod shard_suggest;
 mod sync;
 
 use index_cache::IndexCache;
