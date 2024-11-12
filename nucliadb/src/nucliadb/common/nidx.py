@@ -32,15 +32,18 @@ from nucliadb_utils import logger
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import FileBackendConfig, indexing_settings, storage_settings
+from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
-try:
-    from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub
+NIDX_INSTALLED = False
+if os.environ.get("NIDX_ENABLED"):
+    try:
+        # TODO: Remove this ignore once nidx_protos is actually required
+        from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub  # type: ignore
 
-    NIDX_INSTALLED = True
-except ImportError:
-    logger.info("nidx not installed")
-    NIDX_INSTALLED = False
+        NIDX_INSTALLED = True
+    except ImportError:
+        logger.info("nidx not installed")
 
 
 class NidxUtility:
@@ -57,6 +60,38 @@ class NidxUtility:
         raise NotImplementedError()
 
 
+def _storage_config(prefix: str, bucket: Optional[str]) -> dict[str, str]:
+    config = {}
+    if storage_settings.file_backend == FileBackendConfig.LOCAL:
+        local_bucket = bucket or storage_settings.local_indexing_bucket
+        file_path = f"{storage_settings.local_files}/{local_bucket}"
+        os.makedirs(file_path, exist_ok=True)
+
+        config[f"{prefix}__OBJECT_STORE"] = "file"
+        config[f"{prefix}__FILE_PATH"] = file_path
+    elif storage_settings.file_backend == FileBackendConfig.GCS:
+        gcs_bucket = bucket or extended_storage_settings.gcs_indexing_bucket
+        config[f"{prefix}__OBJECT_STORE"] = "gcs"
+        if gcs_bucket:
+            config[f"{prefix}__BUCKET"] = gcs_bucket
+        if storage_settings.gcs_base64_creds:
+            config[f"{prefix}__BASE64_CREDS"] = storage_settings.gcs_base64_creds
+        if storage_settings.gcs_endpoint_url:
+            config[f"{prefix}__ENDPOINT"] = storage_settings.gcs_endpoint_url
+    elif storage_settings.file_backend == FileBackendConfig.S3:
+        s3_bucket = bucket or extended_storage_settings.s3_indexing_bucket
+        config[f"{prefix}__OBJECT_STORE"] = "s3"
+        if s3_bucket:
+            config[f"{prefix}__BUCKET"] = s3_bucket
+        config[f"{prefix}__CLIENT_ID"] = storage_settings.s3_client_id or ""
+        config[f"{prefix}__CLIENT_SECRET"] = storage_settings.s3_client_secret or ""
+        config[f"{prefix}__REGION_NAME"] = storage_settings.s3_region_name or ""
+        if storage_settings.s3_endpoint:
+            config[f"{prefix}__ENDPOINT"] = storage_settings.s3_endpoint
+
+    return config
+
+
 class NidxBindingUtility(NidxUtility):
     """Implements Nidx utility using the binding"""
 
@@ -64,24 +99,10 @@ class NidxBindingUtility(NidxUtility):
         if ingest_settings.driver != DriverConfig.PG:
             raise ValueError("nidx_binding requires DRIVER=pg")
 
-        if storage_settings.file_backend != FileBackendConfig.LOCAL:
-            # This is a limitation just to simplify configuration, it can be removed if needed
-            raise ValueError("nidx_binding requires FILE_BACKEND=local")
-
-        if storage_settings.local_files is None or storage_settings.local_indexing_bucket is None:
-            raise ValueError("nidx_binding requires LOCAL_FILES and LOCAL_INDEXING_BUCKET to be set")
-
-        indexing_path = storage_settings.local_files + "/" + storage_settings.local_indexing_bucket
-        nidx_storage_path = storage_settings.local_files + "/nidx"
-        os.makedirs(indexing_path, exist_ok=True)
-        os.makedirs(nidx_storage_path, exist_ok=True)
-
         self.config = {
             "METADATA__DATABASE_URL": ingest_settings.driver_pg_url,
-            "INDEXER__OBJECT_STORE": "file",
-            "INDEXER__FILE_PATH": indexing_path,
-            "STORAGE__OBJECT_STORE": "file",
-            "STORAGE__FILE_PATH": nidx_storage_path,
+            **_storage_config("INDEXER", None),
+            **_storage_config("STORAGE", "nidx"),
         }
 
     async def initialize(self):
