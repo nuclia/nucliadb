@@ -18,9 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-// disable clippy lint caused by rstest proc macro
-#![allow(clippy::items_after_test_module)]
-
 mod common;
 
 use common::services::NidxFixture;
