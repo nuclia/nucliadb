@@ -35,13 +35,14 @@ from nucliadb_utils.settings import FileBackendConfig, indexing_settings, storag
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
-try:
-    from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub
+NIDX_INSTALLED = False
+if os.environ.get("NIDX_ENABLED"):
+    try:
+        from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub
 
-    NIDX_INSTALLED = True
-except ImportError:
-    logger.info("nidx not installed")
-    NIDX_INSTALLED = False
+        NIDX_INSTALLED = True
+    except ImportError:
+        logger.info("nidx not installed")
 
 
 class NidxUtility:
