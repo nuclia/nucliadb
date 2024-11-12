@@ -31,6 +31,7 @@ from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common.nidx import get_nidx_fake_node
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
     query_paragraph_shard,
@@ -166,17 +167,15 @@ async def node_query(
             )
 
             # nidx testing
-            if nidx and settings.nidx_address:
-                from nucliadb.common.cluster.index_node import IndexNode
+            if nidx:
+                fake_node = get_nidx_fake_node()
+                if fake_node is None:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="nidx not available",
+                    )
+                node = fake_node
 
-                node = IndexNode(
-                    id="nidx",
-                    address=settings.nidx_address,
-                    shard_count=0,
-                    available_disk=0,
-                    dummy=False,
-                    primary_id=None,
-                )
                 shard_id = shard_obj.shard
         except KeyError:
             incomplete_results = True

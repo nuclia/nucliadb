@@ -50,8 +50,11 @@ def config_standalone_driver(nucliadb_args: Settings):
         # no driver specified, for standalone, we try to automate some settings here
         storage_settings.file_backend = FileBackendConfig.LOCAL
 
-    if storage_settings.file_backend == FileBackendConfig.LOCAL and storage_settings.local_files is None:
-        storage_settings.local_files = "./data/blob"
+    if storage_settings.file_backend == FileBackendConfig.LOCAL:
+        if storage_settings.local_files is None:
+            storage_settings.local_files = "./data/blob"
+        if storage_settings.local_indexing_bucket is None:
+            storage_settings.local_indexing_bucket = "indexer"
 
     # need to force inject this to env var
     if "DATA_PATH" not in os.environ:

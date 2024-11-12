@@ -62,8 +62,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     if not cluster_settings.standalone_mode and indexing_settings.index_jetstream_servers is not None:
         await start_indexing_utility(SERVICE_NAME)
 
-    if indexing_settings.index_nidx_subject is not None:
-        await start_nidx_utility()
+    await start_nidx_utility()
 
     await start_audit_utility(SERVICE_NAME)
 
