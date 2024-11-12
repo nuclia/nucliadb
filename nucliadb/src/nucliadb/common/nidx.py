@@ -18,37 +18,113 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import TYPE_CHECKING, Optional
+import os
+from typing import Optional
 
+from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.settings import settings
+from nucliadb.ingest.settings import DriverConfig
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_protos.nodewriter_pb2 import (
     IndexMessage,
 )
 from nucliadb_utils import logger
+from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import indexing_settings
+from nucliadb_utils.settings import FileBackendConfig, indexing_settings, storage_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
-if TYPE_CHECKING:
-    from nucliadb.common.cluster.manager import AbstractIndexNode
+try:
+    from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub
+
+    NIDX_INSTALLED = True
+except ImportError:
+    logger.info("nidx not installed")
+    NIDX_INSTALLED = False
 
 
-class NidxIndexer:
-    def __init__(
-        self,
-        subject: str,
-        nats_servers: list[str],
-        nats_creds: Optional[str] = None,
-    ):
+class NidxUtility:
+    api_client = None
+    searcher_client = None
+
+    async def initialize(self):
+        raise NotImplementedError()
+
+    async def finalize(self):
+        raise NotImplementedError()
+
+    async def index(self, msg: IndexMessage) -> int:
+        raise NotImplementedError()
+
+
+class NidxBindingUtility(NidxUtility):
+    """Implements Nidx utility using the binding"""
+
+    def __init__(self):
+        if ingest_settings.driver != DriverConfig.PG:
+            raise ValueError("nidx_binding requires DRIVER=pg")
+
+        if storage_settings.file_backend != FileBackendConfig.LOCAL:
+            # This is a limitation just to simplify configuration, it can be removed if needed
+            raise ValueError("nidx_binding requires FILE_BACKEND=local")
+
+        if storage_settings.local_files is None or storage_settings.local_indexing_bucket is None:
+            raise ValueError("nidx_binding requires LOCAL_FILES and LOCAL_INDEXING_BUCKET to be set")
+
+        indexing_path = storage_settings.local_files + "/" + storage_settings.local_indexing_bucket
+        nidx_storage_path = storage_settings.local_files + "/nidx"
+        os.makedirs(indexing_path, exist_ok=True)
+        os.makedirs(nidx_storage_path, exist_ok=True)
+
+        self.config = {
+            "METADATA__DATABASE_URL": ingest_settings.driver_pg_url,
+            "INDEXER__OBJECT_STORE": "file",
+            "INDEXER__FILE_PATH": indexing_path,
+            "STORAGE__OBJECT_STORE": "file",
+            "STORAGE__FILE_PATH": nidx_storage_path,
+        }
+
+    async def initialize(self):
+        import nidx_binding  # type: ignore
+
+        self.binding = nidx_binding.NidxBinding(self.config)
+        self.api_client = NidxApiStub(
+            get_traced_grpc_channel(f"localhost:{self.binding.api_port}", "nidx_api")
+        )
+        self.searcher_client = NidxSearcherStub(
+            get_traced_grpc_channel(f"localhost:{self.binding.searcher_port}", "nidx_searcher")
+        )
+
+    async def finalize(self):
+        del self.binding
+
+    async def index(self, msg: IndexMessage) -> int:
+        return self.binding.index(msg.SerializeToString())
+
+
+class NidxServiceUtility(NidxUtility):
+    """Implements Nidx utility connecting to the network service"""
+
+    def __init__(self):
+        if indexing_settings.index_nidx_subject is None:
+            raise ValueError("nidx subject needed for nidx utility")
+
+        if not settings.nidx_api_address or not settings.nidx_searcher_address:
+            raise ValueError("NIDX_API and NIDX_SEARCHER are required")
+
         self.nats_connection_manager = NatsConnectionManager(
             service_name="NidxIndexer",
-            nats_servers=nats_servers,
-            nats_creds=nats_creds,
+            nats_servers=indexing_settings.index_jetstream_servers,
+            nats_creds=indexing_settings.index_jetstream_auth,
         )
-        self.subject = subject
+        self.subject = indexing_settings.index_nidx_subject
 
     async def initialize(self):
         await self.nats_connection_manager.initialize()
+        self.api_client = NidxApiStub(get_traced_grpc_channel(settings.nidx_api_address, "nidx_api"))
+        self.searcher_client = NidxSearcherStub(
+            get_traced_grpc_channel(settings.nidx_searcher_address, "nidx_searcher")
+        )
 
     async def finalize(self):
         await self.nats_connection_manager.finalize()
@@ -61,14 +137,21 @@ class NidxIndexer:
         return res.seq
 
 
-async def start_nidx_utility() -> NidxIndexer:
-    if indexing_settings.index_nidx_subject is None:
-        raise ValueError("nidx subject needed for nidx utility")
-    nidx_utility = NidxIndexer(
-        subject=indexing_settings.index_nidx_subject,
-        nats_creds=indexing_settings.index_jetstream_auth,
-        nats_servers=indexing_settings.index_jetstream_servers,
-    )
+async def start_nidx_utility() -> Optional[NidxUtility]:
+    if not NIDX_INSTALLED:
+        return None
+
+    nidx = get_nidx()
+    if nidx:
+        logger.warn("nidx already initialized, will not reinitialize")
+        return nidx
+
+    nidx_utility: NidxUtility
+    if settings.standalone_mode:
+        nidx_utility = NidxBindingUtility()
+    else:
+        nidx_utility = NidxServiceUtility()
+
     await nidx_utility.initialize()
     set_utility(Utility.NIDX, nidx_utility)
     return nidx_utility
@@ -81,20 +164,49 @@ async def stop_nidx_utility():
         await nidx_utility.finalize()
 
 
-def get_nidx() -> NidxIndexer:
+def get_nidx() -> Optional[NidxUtility]:
     return get_utility(Utility.NIDX)
 
 
-def get_nidx_api_client() -> Optional["AbstractIndexNode"]:
-    if settings.nidx_api:
-        from nucliadb.common.cluster.manager import IndexNode
+def get_nidx_api_client() -> Optional["NidxApiStub"]:
+    nidx = get_nidx()
+    if nidx:
+        return nidx.api_client
+    else:
+        return None
 
-        nidx_api = IndexNode(
-            id="nidx-api",
-            address=settings.nidx_api,
-            shard_count=0,
-            available_disk=0,
-        )
-        return nidx_api
+
+def get_nidx_searcher_client() -> Optional["NidxSearcherStub"]:
+    nidx = get_nidx()
+    if nidx:
+        return nidx.searcher_client
+    else:
+        return None
+
+
+class FakeNode(AbstractIndexNode):
+    def __init__(self, searcher_client):
+        self.client = searcher_client
+
+    @property
+    def reader(self):
+        return self.client
+
+    @property
+    def writer(self):
+        return None
+
+    def is_read_replica(_):
+        return False
+
+    @property
+    def id(self):
+        return "nidx"
+
+
+def get_nidx_fake_node() -> Optional[FakeNode]:
+    nidx = get_nidx_searcher_client()
+    if nidx:
+        return FakeNode(nidx)
     else:
         return None

@@ -118,7 +118,7 @@ jobs:
           python-version: "3.9.20"
           cache: true
       - name: Install venv
-        run: pdm sync -d --clean --no-editable
+        run: pdm sync -d --clean --no-editable --without nidx
       - name: Clean build
         run: find . -name build | xargs rm -r || true
       - name: Lint source code
@@ -209,7 +209,7 @@ jobs:
           python-version: "3.12.5"
           cache: true
       - name: Install venv
-        run: pdm sync -d --clean --no-editable
+        run: pdm sync -d --clean --no-editable --without nidx
       - name: Upload virtualenv to cache
         uses: actions/cache/save@v4
         with:

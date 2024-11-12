@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{sync::Arc, time::Duration};
+use std::{future::Future, sync::Arc, time::Duration};
 
 use async_nats::jetstream::consumer::PullConsumer;
 use futures::StreamExt;
@@ -35,13 +35,36 @@ use crate::{
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let indexer_settings = settings.indexer.as_ref().unwrap();
-    let merger_settings = settings.merge.clone();
+    let storage_settings = settings.indexer.as_ref().unwrap();
+    let merge_settings = settings.merge.clone();
     let meta = settings.metadata.clone();
 
     let client = async_nats::connect(&indexer_settings.nats_server).await?;
     let jetstream = async_nats::jetstream::new(client);
-    let mut consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
+    let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
 
+    run_tasks(meta, storage_settings.object_store.clone(), merge_settings, NatsAckFloor(consumer)).await
+}
+
+#[derive(Clone)]
+struct NatsAckFloor(PullConsumer);
+
+impl GetAckFloor for NatsAckFloor {
+    async fn get(&mut self) -> anyhow::Result<i64> {
+        Ok(self.0.info().await?.ack_floor.stream_sequence as i64)
+    }
+}
+
+pub trait GetAckFloor {
+    fn get(&mut self) -> impl Future<Output = anyhow::Result<i64>> + Send;
+}
+
+pub async fn run_tasks(
+    meta: NidxMetadata,
+    storage: Arc<DynObjectStore>,
+    merge_settings: MergeSettings,
+    mut ack_floor: impl GetAckFloor + Clone + Send + 'static,
+) -> anyhow::Result<()> {
     let mut tasks = JoinSet::new();
 
     let meta2 = meta.clone();
@@ -55,7 +78,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     });
 
     let meta2 = meta.clone();
-    let storage = indexer_settings.object_store.clone();
+    let storage = storage.clone();
     tasks.spawn(async move {
         loop {
             if let Err(e) = purge_segments(&meta2, &storage).await {
@@ -76,12 +99,11 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     });
 
     let meta2 = meta.clone();
-    let mut consumer2 = consumer.clone();
+    let mut ack_floor_copy = ack_floor.clone();
     tasks.spawn(async move {
         loop {
-            match consumer2.info().await {
-                Ok(consumer_info) => {
-                    let oldest_confirmed_seq = consumer_info.ack_floor.stream_sequence;
+            match ack_floor_copy.get().await {
+                Ok(oldest_confirmed_seq) => {
                     let oldest_pending_seq = oldest_confirmed_seq + 1;
                     if let Err(e) = purge_deletions(&meta2, oldest_pending_seq).await {
                         warn!(?e, "Error in purge_deletions task");
@@ -96,11 +118,10 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     });
 
     tasks.spawn(async move {
-        let merge_scheduler = MergeScheduler::from_settings(&merger_settings);
+        let merge_scheduler = MergeScheduler::from_settings(&merge_settings);
         loop {
-            match consumer.info().await {
-                Ok(consumer_info) => {
-                    let oldest_confirmed_seq = consumer_info.ack_floor.stream_sequence;
+            match ack_floor.get().await {
+                Ok(oldest_confirmed_seq) => {
                     if let Err(e) = merge_scheduler.schedule_merges(&meta, Seq::from(oldest_confirmed_seq)).await {
                         warn!(?e, "Error in schedule_merges task");
                     }
@@ -113,8 +134,8 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
         }
     });
 
-    tasks.join_next().await;
-    println!("A task finished, exiting");
+    let task = tasks.join_next().await;
+    error!(?task, "A scheduling task finished, exiting");
 
     Ok(())
 }
@@ -172,7 +193,7 @@ pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) 
     Ok(())
 }
 
-pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> anyhow::Result<()> {
+pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: i64) -> anyhow::Result<()> {
     // Purge deletions that don't apply to any segment and won't apply to any
     // segment pending to process
     sqlx::query!(
@@ -185,7 +206,7 @@ pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: u64) -> an
         WHERE deletions.index_id = oldest_segments.index_id
         AND deletions.seq <= oldest_segments.seq
         AND deletions.seq <= $1",
-        oldest_pending_seq as i64
+        oldest_pending_seq
     )
     .execute(&meta.pool)
     .await?;

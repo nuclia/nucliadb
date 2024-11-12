@@ -70,6 +70,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             continue;
         };
 
+        // TODO: Implement deletions
         let resource = match download_message(indexer_storage.clone(), &index_message.storage_key).await {
             Ok(r) => r,
             Err(e) => {
@@ -88,6 +89,8 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
                 warn!("Error processing index message {e:?}")
             }
         };
+
+        // TODO: Delete indexer message on success
     }
 
     Ok(())

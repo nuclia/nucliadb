@@ -61,6 +61,10 @@ sdk = [
     "-e file:///${PROJECT_ROOT}/nucliadb_dataset#egg=nucliadb-dataset",
     "requests-mock>=1.12.1",
 ]
+nidx = [
+    "-e file:///${PROJECT_ROOT}/nidx/nidx_binding",
+    "-e file:///${PROJECT_ROOT}/nidx/nidx_protos",
+]
 
 [tool.setuptools]
 py-modules = []

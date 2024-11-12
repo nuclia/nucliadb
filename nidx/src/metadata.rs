@@ -41,14 +41,14 @@ pub struct NidxMetadata {
 }
 
 impl NidxMetadata {
-    pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
+    pub async fn new(database_url: &str) -> sqlx::Result<Self> {
         let pool =
             sqlx::postgres::PgPoolOptions::new().acquire_timeout(Duration::from_secs(2)).connect(database_url).await?;
 
         Self::new_with_pool(pool).await
     }
 
-    pub async fn new_with_pool(pool: sqlx::PgPool) -> Result<Self, sqlx::Error> {
+    pub async fn new_with_pool(pool: sqlx::PgPool) -> sqlx::Result<Self> {
         // Run migrations inside a transaction that holds a global lock, avoids races
         let mut tx = pool.begin().await?;
         sqlx::query!("SELECT pg_advisory_xact_lock($1)", MIGRATION_LOCK_ID).execute(&mut *tx).await?;
@@ -60,8 +60,20 @@ impl NidxMetadata {
         })
     }
 
-    pub async fn transaction(&self) -> Result<sqlx::Transaction<sqlx::Postgres>, sqlx::Error> {
+    pub async fn transaction(&self) -> sqlx::Result<sqlx::Transaction<sqlx::Postgres>> {
         self.pool.begin().await
+    }
+
+    /// Used by nidx_binding to insert in seq order (we don't have NATS to keep sequence)
+    pub async fn max_seq(&self) -> sqlx::Result<i64> {
+        let seqs = sqlx::query_scalar!(
+            r#"SELECT COALESCE(MAX(seq), 1) AS "seq!" FROM segments
+               UNION
+               SELECT COALESCE(MAX(seq), 1) AS "seq!" FROM deletions"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(*seqs.iter().max().unwrap_or(&1))
     }
 }
 

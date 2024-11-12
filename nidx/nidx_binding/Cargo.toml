@@ -1,0 +1,16 @@
+[package]
+name = "nidx_binding"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "nidx_binding"
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1.0.93"
+nidx = { version = "0.1.0", path = ".." }
+nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
+pyo3 = "0.22.0"
+tokio = "1.41.1"
+tonic = "0.12.3"
