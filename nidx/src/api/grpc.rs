@@ -146,8 +146,25 @@ impl NidxApi for ApiServer {
         }))
     }
 
-    async fn remove_vector_set(&self, _request: Request<VectorSetId>) -> Result<Response<OpStatus>> {
-        todo!()
+    async fn remove_vector_set(&self, request: Request<VectorSetId>) -> Result<Response<OpStatus>> {
+        let VectorSetId {
+            shard: Some(ShardId {
+                id: ref shard_id,
+            }),
+            ref vectorset,
+        } = request.into_inner()
+        else {
+            return Err(NidxError::invalid("Vectorset ID is required").into());
+        };
+        let shard_id = Uuid::from_str(shard_id).map_err(NidxError::from)?;
+
+        shards::delete_vectorset(&self.meta, shard_id, vectorset).await?;
+
+        Ok(Response::new(OpStatus {
+            status: op_status::Status::Ok.into(),
+            detail: "Vectorset successfully deleted".to_string(),
+            ..Default::default()
+        }))
     }
 
     async fn list_vector_sets(&self, request: Request<ShardId>) -> Result<Response<VectorSetList>> {

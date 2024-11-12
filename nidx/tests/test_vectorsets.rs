@@ -148,3 +148,91 @@ async fn test_new_shard_without_vectorset_not_allowed(pool: PgPool) -> anyhow::R
 
     Ok(())
 }
+
+#[sqlx::test]
+async fn test_remove_vectorset(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+
+    let response = fixture
+        .api_client
+        .new_shard(Request::new(NewShardRequest {
+            kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
+            vectorsets_configs: HashMap::from([
+                ("english".to_string(), VectorIndexConfig::default()),
+                ("multilingual".to_string(), VectorIndexConfig::default()),
+                ("spanish".to_string(), VectorIndexConfig::default()),
+            ]),
+            ..Default::default()
+        }))
+        .await;
+    assert!(response.is_ok());
+    let shard_id = &response.as_ref().unwrap().get_ref().id;
+
+    let response = fixture
+        .api_client
+        .remove_vector_set(Request::new(
+            VectorSetId { shard: Some(ShardId { id: shard_id.clone() }), vectorset: "multilingual".to_string() }
+        ))
+        .await?;
+    assert_eq!(response.into_inner().status(), Status::Ok);
+
+    let response = fixture
+        .api_client
+        .list_vector_sets(Request::new(ShardId { id: shard_id.clone() }))
+        .await?;
+    let vectorsets = response.into_inner().vectorsets;
+    assert_eq!(
+        HashSet::from_iter(vectorsets.iter().map(|v| v.as_str())),
+        HashSet::from(["english", "spanish"])
+    );
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn test_cant_remove_all_vectorsets(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+
+    let response = fixture
+        .api_client
+        .new_shard(Request::new(NewShardRequest {
+            kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
+            vectorsets_configs: HashMap::from([
+                ("english".to_string(), VectorIndexConfig::default()),
+                ("multilingual".to_string(), VectorIndexConfig::default()),
+            ]),
+            ..Default::default()
+        }))
+        .await;
+    assert!(response.is_ok());
+    let shard_id = &response.as_ref().unwrap().get_ref().id;
+
+    let response = fixture
+        .api_client
+        .remove_vector_set(Request::new(
+            VectorSetId { shard: Some(ShardId { id: shard_id.clone() }), vectorset: "english".to_string() }
+        ))
+        .await?;
+    assert_eq!(response.into_inner().status(), Status::Ok);
+
+    let response = fixture
+        .api_client
+        .remove_vector_set(Request::new(
+            VectorSetId { shard: Some(ShardId { id: shard_id.clone() }), vectorset: "multilingual".to_string() }
+        ))
+        .await;
+    assert!(response.is_err());
+
+    let response = fixture
+        .api_client
+        .list_vector_sets(Request::new(ShardId { id: shard_id.clone() }))
+        .await?;
+    let vectorsets = response.into_inner().vectorsets;
+    assert_eq!(
+        HashSet::from_iter(vectorsets.iter().map(|v| v.as_str())),
+        HashSet::from(["multilingual"])
+    );
+
+    Ok(())
+}
+

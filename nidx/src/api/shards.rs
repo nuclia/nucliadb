@@ -24,7 +24,7 @@ use nidx_vector::config::VectorConfig;
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
-use crate::metadata::{Index, IndexConfig, MergeJob, Segment, Shard};
+use crate::metadata::{Index, IndexConfig, IndexKind, MergeJob, Segment, Shard};
 use crate::NidxMetadata;
 
 pub async fn create_shard(
@@ -68,6 +68,26 @@ pub async fn delete_shard(meta: &NidxMetadata, shard_id: Uuid) -> NidxResult<()>
     }
 
     shard.mark_delete(&mut *tx).await?;
+    tx.commit().await?;
+
+    Ok(())
+}
+
+pub async fn delete_vectorset(meta: &NidxMetadata, shard_id: Uuid, vectorset: &str) -> NidxResult<()> {
+    let mut tx = meta.transaction().await?;
+
+    // TODO: query to check how many vector indexes we have left
+    let count =
+        Index::for_shard(&mut *tx, shard_id).await?.iter().filter(|index| index.kind == IndexKind::Vector).count();
+    if count <= 1 {
+        return Err(NidxError::InvalidRequest("Can't delete the your vectorset".to_string()));
+    }
+
+    let index = Index::find(&mut *tx, shard_id, IndexKind::Vector, vectorset).await?;
+    MergeJob::delete_many_by_index(&mut *tx, index.id).await?;
+    Segment::mark_delete_by_index(&mut *tx, index.id).await?;
+    index.mark_delete(&mut *tx).await?;
+
     tx.commit().await?;
 
     Ok(())
