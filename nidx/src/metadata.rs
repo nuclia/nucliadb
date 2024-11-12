@@ -64,7 +64,7 @@ impl NidxMetadata {
         self.pool.begin().await
     }
 
-    /// Used by binding to insert in seq order (we don't have NATS to keep sequence)
+    /// Used by nidx_binding to insert in seq order (we don't have NATS to keep sequence)
     pub async fn max_seq(&self) -> sqlx::Result<i64> {
         let seqs = sqlx::query_scalar!(
             r#"SELECT COALESCE(MAX(seq), 1) AS "seq!" FROM segments
