@@ -453,7 +453,6 @@ message ShardFileChunk {
 service NodeReader {
     rpc GetShard(GetShardRequest) returns (noderesources.Shard) {}
 
-    rpc VectorSearch(VectorSearchRequest) returns (VectorSearchResponse) {}
     rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.VectorSetID) returns (IdCollection) {}

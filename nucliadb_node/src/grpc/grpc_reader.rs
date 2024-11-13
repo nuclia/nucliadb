@@ -230,28 +230,6 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    async fn vector_search(
-        &self,
-        request: tonic::Request<VectorSearchRequest>,
-    ) -> Result<tonic::Response<VectorSearchResponse>, tonic::Status> {
-        let span = Span::current();
-        let vector_request = request.into_inner();
-        let shard_id = vector_request.id.clone();
-        let info = info_span!(parent: &span, "vector search");
-        let shards = Arc::clone(&self.shards);
-        let task = move || {
-            let shard = obtain_shard(shards, shard_id)?;
-            run_with_telemetry(info, move || shard.vector_search(vector_request))
-        };
-        let response = tokio::task::spawn_blocking(task)
-            .await
-            .map_err(|error| tonic::Status::internal(format!("Blocking task panicked: {error:?}")))?;
-        match response {
-            Ok(response) => Ok(tonic::Response::new(response)),
-            Err(error) => Err(tonic::Status::internal(error.to_string())),
-        }
-    }
-
     async fn document_ids(
         &self,
         request: tonic::Request<ShardId>,

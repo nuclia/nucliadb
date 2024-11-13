@@ -623,15 +623,6 @@ impl ShardReader {
         })
     }
 
-    #[tracing::instrument(skip_all)]
-    pub fn vector_search(&self, search_request: VectorSearchRequest) -> NodeResult<VectorSearchResponse> {
-        let span = tracing::Span::current();
-
-        run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
-            self.vectors_index_search(&search_request, &VectorsContext::default())
-        })
-    }
-
     pub fn update(&self) -> NodeResult<()> {
         let shard_path = self.metadata.shard_path();
         // TODO: while we don't have all shards migrated, we still have to

@@ -30,7 +30,6 @@ service NidxApi {
 }
 
 service NidxSearcher {
-  rpc VectorSearch(nodereader.VectorSearchRequest) returns (nodereader.VectorSearchResponse) {}
   rpc DocumentIds(noderesources.ShardId) returns (nodereader.IdCollection) {}
   rpc ParagraphIds(noderesources.ShardId) returns (nodereader.IdCollection) {}
   rpc VectorIds(noderesources.VectorSetID) returns (nodereader.IdCollection) {}
