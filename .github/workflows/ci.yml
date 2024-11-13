@@ -201,6 +201,22 @@ jobs:
           path: "target/release/node_*er"
           key: node-bin-${{ github.sha }}
 
+  build-nidx-binary:
+    name: Build nidx binary
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+      - name: Compile
+        run: cd nidx && cargo build --release
+      - name: Upload binaries to cache
+        uses: actions/cache/save@v4
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+
   build-virtual-env:
     name: Build virtual environment
     runs-on: ubuntu-24.04
@@ -311,6 +327,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - build-node-binaries
+      - build-nidx-binary
       - build-virtual-env
     steps:
       - uses: actions/checkout@v4
@@ -336,6 +353,16 @@ jobs:
 
       - name: Build sidecar image
         run: make build-sidecar
+
+      - name: Restore nidx binary
+        uses: actions/cache/restore@v4
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker images for nidx
+        run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
 
       - name: Run tests
         env:
