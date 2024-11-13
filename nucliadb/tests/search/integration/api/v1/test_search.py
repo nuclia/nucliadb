@@ -28,6 +28,7 @@ from nucliadb.common.cluster.manager import INDEX_NODES
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX
+from nucliadb.search.search.shards import query_paragraph_shard
 from nucliadb.tests.vectors import Q
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import (
@@ -177,7 +178,7 @@ async def test_search_resource_all(
                     vrequest.result_per_page = 20
                     vrequest.min_score = -1.0
 
-                    paragraphs = await node_obj.reader.ParagraphSearch(prequest)  # type: ignore
+                    paragraphs = await query_paragraph_shard(node_obj, replica.shard.id, prequest)
                     documents = await node_obj.reader.DocumentSearch(drequest)  # type: ignore
 
                     assert paragraphs.total == 1
