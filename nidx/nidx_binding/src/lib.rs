@@ -7,7 +7,7 @@ use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
 use nidx::indexer::{download_message, index_resource};
 use nidx::searcher::grpc::SearchServer;
-use nidx::searcher::SyncedSearcher;
+use nidx::searcher::{SyncStatus, SyncedSearcher};
 use nidx::settings::EnvSettings;
 use nidx::Settings;
 use nidx_protos::prost::*;
@@ -17,6 +17,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
+use tokio::sync::watch;
 
 #[derive(Clone)]
 struct SeqSource(Arc<AtomicI64>);
@@ -37,6 +38,7 @@ pub struct NidxBinding {
     settings: Settings,
     seq: SeqSource,
     runtime: Option<Runtime>,
+    sync_watcher: watch::Receiver<SyncStatus>,
 }
 
 #[pymethods]
@@ -76,6 +78,16 @@ impl NidxBinding {
 
         Ok(seq)
     }
+
+    /// Wait for the searcher to be synced. Used in nucliadb tests
+    pub fn wait_for_sync(&mut self) {
+        self.runtime.as_ref().unwrap().block_on(async {
+            // Wait for a new sync to start
+            self.sync_watcher.wait_for(|s| matches!(s, SyncStatus::Syncing)).await.unwrap();
+            // Wait for it to finish
+            self.sync_watcher.wait_for(|s| matches!(s, SyncStatus::Synced)).await.unwrap();
+        });
+    }
 }
 
 impl NidxBinding {
@@ -89,15 +101,16 @@ impl NidxBinding {
         tokio::task::spawn(api_server.serve(api_service));
 
         // Searcher API
+        let (sync_reporter, sync_watcher) = watch::channel(SyncStatus::Syncing);
         let searcher = SyncedSearcher::new(settings.metadata.clone(), Path::new("/tmp/searcher"));
         let searcher_api = SearchServer::new(settings.metadata.clone(), searcher.index_cache());
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
         tokio::task::spawn(searcher_server.serve(searcher_api.into_service()));
         let settings_copy = settings.clone();
-        tokio::task::spawn(
-            async move { searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone()).await },
-        );
+        tokio::task::spawn(async move {
+            searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone(), Some(sync_reporter)).await
+        });
 
         // Scheduler
         let seq = SeqSource(Arc::new(settings.metadata.max_seq().await?.into()));
@@ -118,6 +131,7 @@ impl NidxBinding {
             settings,
             seq,
             runtime: None,
+            sync_watcher,
         })
     }
 }

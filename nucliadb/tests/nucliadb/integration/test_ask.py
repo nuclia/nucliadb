@@ -31,6 +31,7 @@ from nucliadb.search.predict import (
     JSONGenerativeResponse,
     StatusGenerativeResponse,
 )
+from nucliadb.common.nidx import get_nidx
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AskRequest,
@@ -61,6 +62,7 @@ async def test_ask(
     nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
+    get_nidx().wait_for_sync()
     resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "query"})
     assert resp.status_code == 200
 
@@ -108,6 +110,9 @@ async def resource(nucliadb_writer, knowledgebox):
     )
     assert resp.status_code in (200, 201)
     rid = resp.json()["uuid"]
+
+    get_nidx().wait_for_sync()
+
     yield rid
 
 
@@ -157,7 +162,7 @@ async def test_sync_ask_returns_prompt_context(
         json={"query": "title", "debug": debug},
         headers={"X-Synchronous": "True"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     resp_data = SyncAskResponse.model_validate_json(resp.content)
     if debug:
         assert resp_data.prompt_context
@@ -186,6 +191,9 @@ async def resources(nucliadb_writer, knowledgebox):
         assert resp.status_code in (200, 201)
         rid = resp.json()["uuid"]
         rids.append(rid)
+
+    get_nidx().wait_for_sync()
+
     yield rids
 
 
@@ -707,6 +715,8 @@ async def test_ask_rag_strategy_prequeries_with_full_resource(
     nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
+    get_nidx().wait_for_sync()
+
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
         json={
