@@ -112,13 +112,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            nidx
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v4
         with:
           python-version: "3.9.20"
           cache: true
+      # Needed for nidx_protos (rust)
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - name: Install venv
-        run: pdm sync -d --clean --no-editable --without nidx
+        run: pdm sync -d --clean --no-editable
       - name: Clean build
         run: find . -name build | xargs rm -r || true
       - name: Lint source code
@@ -197,19 +205,45 @@ jobs:
           path: "target/release/node_*er"
           key: node-bin-${{ github.sha }}
 
+  build-nidx-binary:
+    name: Build nidx binary
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nidx
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+      - name: Compile
+        run: cd nidx && cargo build --release
+      - name: Upload binaries to cache
+        uses: actions/cache/save@v4
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+
   build-virtual-env:
     name: Build virtual environment
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            nidx
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v4
         with:
           python-version: "3.12.5"
           cache: true
+      # Needed for nidx_protos (rust)
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - name: Install venv
-        run: pdm sync -d --clean --no-editable --without nidx
+        run: pdm sync -d --clean --no-editable
       - name: Upload virtualenv to cache
         uses: actions/cache/save@v4
         with:
@@ -288,6 +322,61 @@ jobs:
         run: make build-sidecar
 
       - name: Run tests
+        run: source .venv/bin/activate && make -C nucliadb test-cov-search
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./nucliadb/coverage.xml
+          flags: nucliadb-search
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  nucliadb-search-tests-nidx:
+    name: NucliaDB search tests (nidx)
+    runs-on: ubuntu-24.04
+    needs:
+      - build-node-binaries
+      - build-nidx-binary
+      - build-virtual-env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.5"
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Restore binaries
+        uses: actions/cache/restore@v4
+        with:
+          path: "target/release/node_*er"
+          key: node-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker images for node
+        run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
+
+      - name: Build sidecar image
+        run: make build-sidecar
+
+      - name: Restore nidx binary
+        uses: actions/cache/restore@v4
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker images for nidx
+        run: mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
+
+      - name: Run tests
+        env:
+          NIDX_ENABLED: 1
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
 
       - name: Upload coverage to Codecov
