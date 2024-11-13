@@ -23,7 +23,7 @@ mod common;
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
-use common::{NodeFixture, TestNodeWriter};
+use common::{NodeFixture, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::op_status::Status;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::relation::RelationType;
@@ -33,6 +33,7 @@ use nucliadb_core::protos::{
     EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode, RelationNodeFilter,
     RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, Resource, ResourceId,
 };
+use nucliadb_protos::nodereader::SearchRequest;
 use rstest::*;
 use tonic::Request;
 use uuid::Uuid;
@@ -338,19 +339,21 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     // Test: prefixed search with empty term. Results are limited
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: String::new(),
                 ..Default::default()
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
-    assert!(response.get_ref().prefix.is_some());
-    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    assert!(response.prefix.is_some());
+    let prefix_response = response.prefix.as_ref().unwrap();
     let results = &prefix_response.nodes;
     // TODO this constants is spread between relations and paragraphs. It should
     // be in a single place and common for everyone
@@ -361,8 +364,9 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     // Test: prefixed search with "cat" term (some results)
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "cat".to_string(),
@@ -372,12 +376,13 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
                 }],
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     let expected = HashSet::from_iter(["Cat".to_string(), "Catwoman".to_string(), "Batman".to_string()]);
-    assert!(response.get_ref().prefix.is_some());
-    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    assert!(response.prefix.is_some());
+    let prefix_response = response.prefix.as_ref().unwrap();
     let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
@@ -385,8 +390,9 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     // Test: prefixed search with "cat" and filters
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "cat".to_string(),
@@ -396,17 +402,19 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
                 }],
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     let expected = HashSet::from_iter(["Cat".to_string()]);
-    assert!(response.get_ref().prefix.is_some());
-    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    assert!(response.prefix.is_some());
+    let prefix_response = response.prefix.as_ref().unwrap();
     let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "cat".to_string(),
@@ -416,12 +424,13 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
                 }],
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     let expected = HashSet::from_iter(["Catwoman".to_string()]);
-    assert!(response.get_ref().prefix.is_some());
-    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    assert!(response.prefix.is_some());
+    let prefix_response = response.prefix.as_ref().unwrap();
     let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
@@ -429,8 +438,9 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     // Test: prefixed search with node filters and empty query
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: String::new(),
@@ -440,12 +450,13 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
                 }],
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     let expected = HashSet::from_iter(["Cat".to_string()]);
-    assert!(response.get_ref().prefix.is_some());
-    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    assert!(response.prefix.is_some());
+    let prefix_response = response.prefix.as_ref().unwrap();
     let results = prefix_response.nodes.iter().map(|node| node.value.to_owned()).collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
@@ -453,19 +464,21 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     // Test: prefixed search with "zzz" term (empty results)
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "zzz".to_string(),
                 ..Default::default()
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
-    assert!(response.get_ref().prefix.is_some());
-    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    assert!(response.prefix.is_some());
+    let prefix_response = response.prefix.as_ref().unwrap();
     let results = &prefix_response.nodes;
     assert!(results.is_empty());
 
@@ -500,8 +513,9 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     // Test: neighbours search on existent node
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![relation_nodes.get("Swallow").unwrap().clone()],
@@ -509,23 +523,25 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                 ..Default::default()
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     let expected = HashSet::from_iter([
         ("Poetry".to_string(), "Swallow".to_string()),
         ("Swallow".to_string(), "Animal".to_string()),
         ("Swallow".to_string(), "Fly".to_string()),
     ]);
-    let neighbour_relations = extract_relations(response.get_ref());
+    let neighbour_relations = extract_relations(&response);
     assert_eq!(neighbour_relations, expected);
 
     // --------------------------------------------------------------
     // Test: neighbours search on multiple existent nodes
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![
@@ -536,8 +552,9 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                 ..Default::default()
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     let expected = HashSet::from_iter([
         ("Newton".to_string(), "Physics".to_string()),
@@ -545,15 +562,16 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
         ("Becquer".to_string(), "Poetry".to_string()),
         ("Joan Antoni".to_string(), "Becquer".to_string()),
     ]);
-    let neighbour_relations = extract_relations(response.get_ref());
+    let neighbour_relations = extract_relations(&response);
     assert_eq!(neighbour_relations, expected);
 
     // --------------------------------------------------------------
     // Test: neighbours search on non existent node
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![RelationNode {
@@ -565,18 +583,20 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                 ..Default::default()
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
-    let neighbours = extract_relations(response.get_ref());
+    let neighbours = extract_relations(&response);
     assert!(neighbours.is_empty());
 
     // --------------------------------------------------------------
     // Test: neighbours search with filters
     // --------------------------------------------------------------
 
-    let response = reader
-        .relation_search(RelationSearchRequest {
+    let response = relation_search(
+        &mut reader,
+        RelationSearchRequest {
             shard_id: shard_id.clone(),
             subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![relation_nodes.get("Poetry").unwrap().clone()],
@@ -584,12 +604,30 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                 ..Default::default()
             }),
             ..Default::default()
-        })
-        .await?;
+        },
+    )
+    .await?;
 
     let expected = HashSet::from_iter([("Poetry".to_string(), "Swallow".to_string())]);
-    let neighbour_relations = extract_relations(response.get_ref());
+    let neighbour_relations = extract_relations(&response);
     assert!(expected.is_subset(&neighbour_relations));
 
     Ok(())
+}
+
+// NOTE: we removed RelationSearch but, as we are moving to nidx, we don't want
+// to waste time migrating tests
+async fn relation_search(
+    reader: &mut TestNodeReader,
+    request: RelationSearchRequest,
+) -> anyhow::Result<RelationSearchResponse> {
+    let request = SearchRequest {
+        shard: request.shard_id,
+        vectorset: "english".to_string(),
+        relation_prefix: request.prefix,
+        relation_subgraph: request.subgraph,
+        ..Default::default()
+    };
+    let response = reader.search(request).await?;
+    Ok(response.into_inner().relation.unwrap())
 }

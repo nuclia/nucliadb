@@ -31,14 +31,14 @@ use tantivy::TantivyError;
 /// A Term Set Query matches all of the documents containing any of the Term provided
 #[derive(Debug, Clone)]
 pub struct SetQuery {
-    set: SetWightWrapper,
+    set: SetWeightWrapper,
 }
 
 impl SetQuery {
     /// Create a Term Set Query
     pub fn new(field: Field, values: Vec<String>) -> Self {
         let values = values.into_iter().collect();
-        let set = SetWightWrapper::new(SetWeight {
+        let set = SetWeightWrapper::new(SetWeight {
             field,
             values,
         });
@@ -56,9 +56,9 @@ impl Query for SetQuery {
 }
 
 #[derive(Clone, Debug)]
-struct SetWightWrapper(Arc<SetWeight>);
+struct SetWeightWrapper(Arc<SetWeight>);
 
-impl SetWightWrapper {
+impl SetWeightWrapper {
     fn new(v: SetWeight) -> Self {
         Self(Arc::new(v))
     }
@@ -70,7 +70,7 @@ struct SetWeight {
     values: HashSet<String>,
 }
 
-impl Weight for SetWightWrapper {
+impl Weight for SetWeightWrapper {
     fn scorer(&self, reader: &SegmentReader, boost: Score) -> tantivy::Result<Box<dyn Scorer>> {
         let max_doc = reader.max_doc();
         let mut doc_bitset = BitSet::with_max_value(max_doc);

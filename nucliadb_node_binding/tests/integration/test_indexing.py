@@ -24,8 +24,6 @@ import pytest
 
 from nucliadb_node_binding import NodeReader, NodeWriter  # type: ignore
 from nucliadb_protos.nodereader_pb2 import (
-    DocumentSearchRequest,
-    DocumentSearchResponse,
     SearchRequest,
     SearchResponse,
 )
@@ -98,17 +96,3 @@ async def _test_set_and_search(channel):
     searchpb.document = True
     pbresult = cluster.call_search_api("search", searchpb, SearchResponse)
     assert pbresult.document.total == 1
-
-
-@pytest.mark.asyncio
-async def test_set_and_document_search(data_path):
-    cluster = IndexNode()
-    shard_id = cluster.create_shard("test-kbid")
-    cluster.create_resource(shard_id)
-
-    # search using the document search API
-    searchpb = DocumentSearchRequest()
-    searchpb.id = shard_id
-    searchpb.body = "lovely"
-    pbresult = cluster.call_search_api("document_search", searchpb, DocumentSearchResponse)
-    assert pbresult.total == 1

@@ -635,7 +635,6 @@ class QueryParser:
 
 async def paragraph_query_to_pb(
     kbid: str,
-    features: list[SearchOptions],
     rid: str,
     query: str,
     fields: list[str],
@@ -650,13 +649,37 @@ async def paragraph_query_to_pb(
     sort: Optional[str] = None,
     sort_ord: str = SortOrder.DESC.value,
     with_duplicates: bool = False,
-) -> nodereader_pb2.ParagraphSearchRequest:
-    request = nodereader_pb2.ParagraphSearchRequest()
-    request.with_duplicates = with_duplicates
+) -> nodereader_pb2.SearchRequest:
+    request = nodereader_pb2.SearchRequest()
+    request.paragraph = True
 
     # We need to ask for all and cut later
     request.page_number = 0
     request.result_per_page = page_number * page_size + page_size
+
+    request.body = query
+
+    # we don't have a specific filter only for resource_ids but key_filters
+    # parse "rid" and "rid/field" like ids, so it does the job
+    request.key_filters.append(rid)
+
+    if len(filters) > 0:
+        field_labels = filters
+        paragraph_labels: list[str] = []
+        if has_classification_label_filters(filters):
+            classification_labels = await get_classification_labels(kbid)
+            field_labels, paragraph_labels = split_labels_by_type(filters, classification_labels)
+        request.filter.field_labels.extend(field_labels)
+        request.filter.paragraph_labels.extend(paragraph_labels)
+
+    request.faceted.labels.extend([translate_label(facet) for facet in faceted])
+    request.fields.extend(fields)
+
+    if sort:
+        request.order.field = sort
+        request.order.type = sort_ord  # type: ignore
+
+    request.with_duplicates = with_duplicates
 
     if range_creation_start is not None:
         request.timestamps.from_created.FromDatetime(range_creation_start)
@@ -669,24 +692,6 @@ async def paragraph_query_to_pb(
 
     if range_modification_end is not None:
         request.timestamps.to_modified.FromDatetime(range_modification_end)
-
-    if SearchOptions.KEYWORD in features:
-        request.uuid = rid
-        request.body = query
-        if len(filters) > 0:
-            field_labels = filters
-            paragraph_labels: list[str] = []
-            if has_classification_label_filters(filters):
-                classification_labels = await get_classification_labels(kbid)
-                field_labels, paragraph_labels = split_labels_by_type(filters, classification_labels)
-            request.filter.field_labels.extend(field_labels)
-            request.filter.paragraph_labels.extend(paragraph_labels)
-
-        request.faceted.labels.extend([translate_label(facet) for facet in faceted])
-        if sort:
-            request.order.field = sort
-            request.order.type = sort_ord  # type: ignore
-        request.fields.extend(fields)
 
     return request
 
