@@ -238,4 +238,6 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
             await asyncio.sleep(1)
 
     assert all(checks.values())
+    # Wait an extra couple of seconds for reader/searcher to catch up
+    await asyncio.sleep(2)
     return knowledgebox_ingest
