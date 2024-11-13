@@ -105,7 +105,7 @@ async def resource_search(
             return HTTPClientError(status_code=412, detail=str(exc))
 
         results, incomplete_results, queried_nodes = await node_query(
-            kbid, Method.PARAGRAPH, pb_query, shards
+            kbid, Method.SEARCH, pb_query, shards
         )
 
         # We need to merge

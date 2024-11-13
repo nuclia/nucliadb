@@ -225,7 +225,7 @@ async def get_relations_results(
             _,
         ) = await node_query(
             kbid,
-            Method.RELATIONS,
+            Method.SEARCH,
             request,
             target_shard_replicas=target_shard_replicas,
             timeout=timeout,

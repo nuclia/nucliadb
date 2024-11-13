@@ -19,7 +19,7 @@
 
 import asyncio
 import json
-from enum import Enum
+from enum import Enum, auto
 from typing import Any, Optional, Sequence, TypeVar, Union, overload
 
 from fastapi import HTTPException
@@ -51,17 +51,13 @@ from nucliadb_utils.utilities import has_feature
 
 
 class Method(Enum):
-    SEARCH = 1
-    PARAGRAPH = 2
-    SUGGEST = 3
-    RELATIONS = 4
+    SEARCH = auto()
+    SUGGEST = auto()
 
 
 METHODS = {
     Method.SEARCH: query_shard,
-    Method.PARAGRAPH: query_shard,
     Method.SUGGEST: suggest_shard,
-    Method.RELATIONS: query_shard,
 }
 
 REQUEST_TYPE = Union[SuggestRequest, SearchRequest]
