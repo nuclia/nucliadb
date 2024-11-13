@@ -30,11 +30,9 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
-from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     NucliaDBClientType,
-    ResourceProperties,
     ResourceSearchResults,
     SearchParamDefaults,
     SortField,
@@ -78,13 +76,6 @@ async def resource_search(
         SearchParamDefaults.range_modification_end
     ),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
-    show: list[ResourceProperties] = fastapi_query(
-        SearchParamDefaults.show, default=list(ResourceProperties)
-    ),
-    field_type_filter: list[FieldTypeName] = fastapi_query(
-        SearchParamDefaults.field_type_filter, alias="field_type"
-    ),
-    extracted: list[ExtractedDataTypeName] = fastapi_query(SearchParamDefaults.extracted),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: list[str] = fastapi_query(SearchParamDefaults.shards),
@@ -123,9 +114,6 @@ async def resource_search(
             count=page_size,
             page=page_number,
             kbid=kbid,
-            show=show,
-            field_type_filter=field_type_filter,
-            extracted=extracted,
             highlight_split=highlight,
             min_score=0.0,
         )

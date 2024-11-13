@@ -549,9 +549,6 @@ async def merge_paragraphs_results(
     count: int,
     page: int,
     kbid: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
     highlight_split: bool,
     min_score: float,
 ) -> ResourceSearchResults:
