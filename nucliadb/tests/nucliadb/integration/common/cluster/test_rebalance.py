@@ -62,6 +62,8 @@ async def test_rebalance_kb_shards(
         )
         assert resp.status_code == 201
 
+    breakpoint()
+
     counters1_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/counters")
     shards1_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
     counters1 = counters1_resp.json()

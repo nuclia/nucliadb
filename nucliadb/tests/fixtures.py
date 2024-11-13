@@ -37,6 +37,7 @@ from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.nidx import get_nidx
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.migrator.migrator import run_pg_schema_migrations
@@ -174,12 +175,32 @@ async def nucliadb(
     await server.shutdown()
 
 
+# Set of httpx hooks that wait for nidx to be synced before each reader request, but only if we made
+# a write first (there is no need to wait if we get a sequence of consecutive read requests)
+_nidx_is_dirty = False
+
+
+async def wait_for_sync(request):
+    global _nidx_is_dirty
+    if _nidx_is_dirty:
+        nidx = get_nidx()
+        if nidx:
+            nidx.wait_for_sync()
+            _nidx_is_dirty = False
+
+
+async def mark_dirty(request):
+    global _nidx_is_dirty
+    _nidx_is_dirty = True
+
+
 @pytest.fixture(scope="function")
 async def nucliadb_reader(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "READER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
+        event_hooks={"request": [wait_for_sync]},
     ) as client:
         yield client
 
@@ -190,6 +211,7 @@ async def nucliadb_writer(nucliadb: Settings):
         headers={"X-NUCLIADB-ROLES": "WRITER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
+        event_hooks={"request": [mark_dirty]},
     ) as client:
         yield client
 
@@ -200,6 +222,7 @@ async def nucliadb_manager(nucliadb: Settings):
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
+        event_hooks={"request": [mark_dirty]},
     ) as client:
         yield client
 
