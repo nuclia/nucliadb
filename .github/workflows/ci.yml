@@ -120,9 +120,6 @@ jobs:
       # Needed for nidx_protos (rust)
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
-      # Needed for nidx_protos (python) because grpcio_tools does not include goole/protobuf/Timestamp
-      - name: Install protobuf-dev
-        run: sudo apt install libprotobuf-dev
 
       - name: Install venv
         run: pdm sync -d --clean --no-editable
@@ -218,9 +215,6 @@ jobs:
       # Needed for nidx_protos (rust)
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
-      # Needed for nidx_protos (python) because grpcio_tools does not include goole/protobuf/Timestamp
-      - name: Install protobuf-dev
-        run: sudo apt install libprotobuf-dev
 
       - name: Install venv
         run: pdm sync -d --clean --no-editable
