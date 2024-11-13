@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
 import dataclasses
 import logging
 import os
@@ -25,13 +26,14 @@ from typing import Union
 
 import backoff
 import docker  # type: ignore
+import nats
 import pytest
 from grpc import insecure_channel
 from grpc_health.v1 import health_pb2_grpc
 from grpc_health.v1.health_pb2 import HealthCheckRequest
+from nats.js.api import ConsumerConfig
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
-from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
@@ -105,6 +107,29 @@ images.settings["nucliadb_node_sidecar"] = {
             "node_sidecar",
         ],
         "ports": {"4447": ("0.0.0.0", 0)},
+        "publish_all_ports": False,
+        "platform": "linux/amd64",
+    },
+}
+
+images.settings["nidx"] = {
+    "image": "nidx",
+    "version": "latest",
+    "env": {},
+    "options": {
+        # A few indexers on purpose for faster indexing
+        "command": [
+            "nidx",
+            "api",
+            "searcher",
+            "indexer",
+            "indexer",
+            "indexer",
+            "indexer",
+            "scheduler",
+            "worker",
+        ],
+        "ports": {"10000": ("0.0.0.0", 0), "10001": ("0.0.0.0", 0)},
         "publish_all_ports": False,
         "platform": "linux/amd64",
     },
@@ -188,6 +213,10 @@ class nucliadbNodeSidecar(BaseImage):
             return result.status == 1
         except:  # noqa
             return False
+
+
+class NidxImage(BaseImage):
+    name = "nidx"
 
 
 nucliadb_node_1_reader = nucliadbNodeReader()
@@ -377,20 +406,49 @@ def s3_node_storage(s3):
     return NodeS3Storage(server=s3)
 
 
-def lazy_load_storage_backend():
+@pytest.fixture(scope="session")
+def node_storage(request):
     backend = get_testing_storage_backend()
     if backend == "gcs":
-        return [lazy_fixture.lf("gcs_node_storage")]
+        return request.getfixturevalue("gcs_node_storage")
     elif backend == "s3":
-        return [lazy_fixture.lf("s3_node_storage")]
+        return request.getfixturevalue("s3_node_storage")
     else:
         print(f"Unknown storage backend {backend}, using gcs")
-        return [lazy_fixture.lf("gcs_node_storage")]
+        return request.getfixturevalue("gcs_node_storage")
 
 
-@pytest.fixture(scope="session", params=lazy_load_storage_backend())
-def node_storage(request):
-    return request.param
+@pytest.fixture(scope="session")
+def gcs_nidx_storage(gcs):
+    return {
+        "INDEXER__OBJECT_STORE": "gcs",
+        "INDEXER__BUCKET": "indexing",
+        "INDEXER__ENDPOINT": gcs,
+        "STORAGE__OBJECT_STORE": "gcs",
+        "STORAGE__ENDPOINT": gcs,
+        "STORAGE__BUCKET": "nidx",
+    }
+
+
+@pytest.fixture(scope="session")
+def s3_nidx_storage(s3):
+    return {
+        "INDEXER__OBJECT_STORE": "s3",
+        "INDEXER__BUCKET": "indexing",
+        "INDEXER__ENDPOINT": s3,
+        "STORAGE__OBJECT_STORE": "s3",
+        "STORAGE__ENDPOINT": s3,
+        "STORAGE__BUCKET": "nidx",
+    }
+
+
+@pytest.fixture(scope="session")
+def nidx_storage(request):
+    backend = get_testing_storage_backend()
+    if backend == "gcs":
+        return request.getfixturevalue("gcs_nidx_storage")
+    elif backend == "s3":
+        return request.getfixturevalue("s3_nidx_storage")
 
 
 @pytest.fixture(scope="session", autouse=False)
@@ -406,8 +464,47 @@ def _node(natsd: str, node_storage):
     nr.stop()
 
 
+@pytest.fixture(scope="session")
+async def _nidx(natsd, nidx_storage, pg):
+    if not os.environ.get("NIDX_ENABLED"):
+        yield
+        return
+
+    # Create needed NATS stream/consumer
+    nc = await nats.connect(servers=[natsd])
+    js = nc.jetstream()
+    await js.add_stream(name="nidx", subjects=["nidx"])
+    await js.add_consumer(stream="nidx", config=ConsumerConfig(name="nidx"))
+    await nc.drain()
+    await nc.close()
+
+    # Run nidx
+    images.settings["nidx"]["env"] = {
+        "RUST_LOG": "info",
+        "METADATA__DATABASE_URL": f"postgresql://postgres:postgres@172.17.0.1:{pg[1]}/postgres",
+        "INDEXER__NATS_SERVER": natsd.replace("localhost", "172.17.0.1"),
+        **nidx_storage,
+    }
+    image = NidxImage()
+    image.run()
+
+    api_port = image.get_port(10000)
+    searcher_port = image.get_port(10001)
+
+    # Configure settings
+    from nucliadb_utils.settings import indexing_settings
+
+    cluster_settings.nidx_api_address = f"localhost:{api_port}"
+    cluster_settings.nidx_searcher_address = f"localhost:{searcher_port}"
+    indexing_settings.index_nidx_subject = "nidx"
+
+    yield
+
+    image.stop()
+
+
 @pytest.fixture(scope="function")
-def node(_node, request):
+def node(_nidx, _node, request):
     # clean up all shard data before each test
     channel1 = insecure_channel(f"{_node['writer1']['host']}:{_node['writer1']['port']}")
     channel2 = insecure_channel(f"{_node['writer2']['host']}:{_node['writer2']['port']}")

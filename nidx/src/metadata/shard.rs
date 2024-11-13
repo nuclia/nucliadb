@@ -61,6 +61,8 @@ impl Shard {
             r#"SELECT kind as "kind: IndexKind", SUM(records)::bigint as "records!" FROM indexes
               JOIN segments ON index_id = indexes.id
               WHERE shard_id = $1
+              AND indexes.deleted_at IS NULL
+              AND segments.delete_at IS NULL
               GROUP BY kind"#,
             self.id
         )
