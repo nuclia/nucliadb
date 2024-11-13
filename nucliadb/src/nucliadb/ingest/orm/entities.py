@@ -47,7 +47,6 @@ from nucliadb_protos.nodereader_pb2 import (
     Faceted,
     RelationNodeFilter,
     RelationPrefixSearchRequest,
-    RelationSearchRequest,
     RelationSearchResponse,
     SearchRequest,
     SearchResponse,
@@ -208,16 +207,17 @@ class EntitiesManager:
         shard_manager = get_shard_manager()
 
         async def do_entities_search(node: AbstractIndexNode, shard_id: str) -> RelationSearchResponse:
-            request = RelationSearchRequest(
-                shard_id=shard_id,
-                prefix=RelationPrefixSearchRequest(
+            request = SearchRequest(
+                shard=shard_id,
+                relation_prefix=RelationPrefixSearchRequest(
                     prefix="",
                     node_filters=[
                         RelationNodeFilter(node_type=RelationNode.NodeType.ENTITY, node_subtype=group)
                     ],
                 ),
             )
-            return await node.reader.RelationSearch(request)  # type: ignore
+            response = await node.reader.Search(request)  # type: ignore
+            return response.relation
 
         results = await shard_manager.apply_for_all_shards(
             self.kbid,

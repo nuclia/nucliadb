@@ -19,7 +19,7 @@
 
 import asyncio
 import json
-from enum import Enum
+from enum import Enum, auto
 from typing import Any, Optional, Sequence, TypeVar, Union, overload
 
 from fastapi import HTTPException
@@ -34,17 +34,11 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.nidx import get_nidx_fake_node
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
-    query_paragraph_shard,
     query_shard,
-    relations_shard,
     suggest_shard,
 )
 from nucliadb.search.settings import settings
 from nucliadb_protos.nodereader_pb2 import (
-    ParagraphSearchRequest,
-    ParagraphSearchResponse,
-    RelationSearchRequest,
-    RelationSearchResponse,
     SearchRequest,
     SearchResponse,
     SuggestRequest,
@@ -57,27 +51,21 @@ from nucliadb_utils.utilities import has_feature
 
 
 class Method(Enum):
-    SEARCH = 1
-    PARAGRAPH = 2
-    SUGGEST = 3
-    RELATIONS = 4
+    SEARCH = auto()
+    SUGGEST = auto()
 
 
 METHODS = {
     Method.SEARCH: query_shard,
-    Method.PARAGRAPH: query_paragraph_shard,
     Method.SUGGEST: suggest_shard,
-    Method.RELATIONS: relations_shard,
 }
 
-REQUEST_TYPE = Union[SuggestRequest, ParagraphSearchRequest, SearchRequest, RelationSearchRequest]
+REQUEST_TYPE = Union[SuggestRequest, SearchRequest]
 
 T = TypeVar(
     "T",
     SuggestResponse,
-    ParagraphSearchResponse,
     SearchResponse,
-    RelationSearchResponse,
 )
 
 
@@ -97,36 +85,12 @@ async def node_query(
 async def node_query(
     kbid: str,
     method: Method,
-    pb_query: ParagraphSearchRequest,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = True,
-    timeout: Optional[float] = None,
-    retry_on_primary: bool = True,
-) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
-
-
-@overload
-async def node_query(
-    kbid: str,
-    method: Method,
     pb_query: SearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
-
-
-@overload
-async def node_query(
-    kbid: str,
-    method: Method,
-    pb_query: RelationSearchRequest,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = True,
-    timeout: Optional[float] = None,
-    retry_on_primary: bool = True,
-) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 async def node_query(

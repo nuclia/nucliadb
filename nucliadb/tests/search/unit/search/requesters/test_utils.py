@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -85,28 +85,22 @@ def shard_manager():
 
 
 @pytest.fixture()
-def search_methods():
+def faulty_search_methods():
     def fake_search(node: AbstractIndexNode, shard: str, query: nodereader_pb2.SearchRequest):
         if node.is_read_replica():
             raise Exception()
         return nodereader_pb2.SearchResponse()
 
-    original = utils.METHODS
-    utils.METHODS = {
-        utils.Method.SEARCH: AsyncMock(side_effect=fake_search),
-        utils.Method.PARAGRAPH: AsyncMock(),
-    }
-
-    yield utils.METHODS
-
-    utils.METHODS = original
+    faulty_methods = {utils.Method.SEARCH: AsyncMock(side_effect=fake_search)}
+    with patch.dict(utils.METHODS, faulty_methods, clear=True):
+        yield faulty_methods
 
 
 @pytest.mark.asyncio
 async def test_node_query_retries_primary_if_secondary_fails(
     fake_nodes,
     shard_manager,
-    search_methods,
+    faulty_search_methods,
 ):
     """Setting up a node and a faulty replica, validate primary is queried if
     secondary fails.
@@ -120,19 +114,33 @@ async def test_node_query_retries_primary_if_secondary_fails(
         use_read_replica_nodes=True,
     )
     # secondary fails, primary is called
-    assert search_methods[utils.Method.SEARCH].await_count == 2
+    assert faulty_search_methods[utils.Method.SEARCH].await_count == 2
     assert len(queried_nodes) == 2
     assert queried_nodes[0][0].is_read_replica()
     assert not queried_nodes[1][0].is_read_replica()
 
+
+@pytest.fixture()
+def mocked_search_methods():
+    methods = {utils.Method.SEARCH: AsyncMock()}
+    with patch.dict(utils.METHODS, methods, clear=True):
+        yield methods
+
+
+@pytest.mark.asyncio
+async def test_node_dont_retry_if_secondary_succeeds(
+    fake_nodes,
+    shard_manager,
+    mocked_search_methods,
+):
     results, incomplete_results, queried_nodes = await utils.node_query(
         kbid="my-kbid",
-        method=utils.Method.PARAGRAPH,
+        method=utils.Method.SEARCH,
         pb_query=Mock(),
         use_read_replica_nodes=True,
     )
     # secondary succeeds, no fallback call to primary
-    assert search_methods[utils.Method.PARAGRAPH].await_count == 1
+    assert mocked_search_methods[utils.Method.SEARCH].await_count == 1
     assert len(queried_nodes) == 1
     assert queried_nodes[0][0].is_read_replica()
 
