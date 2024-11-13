@@ -49,7 +49,7 @@ from nucliadb_models.search import (
     parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
-from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
+from nucliadb_protos.nodereader_pb2 import RelationSearchResponse, SearchRequest, SearchResponse
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.utilities import get_audit
 
@@ -214,25 +214,26 @@ async def get_relations_results(
     try:
         predict = get_predict()
         detected_entities = await predict.detect_entities(kbid, text_answer)
-        relation_request = RelationSearchRequest()
-        relation_request.subgraph.entry_points.extend(detected_entities)
-        relation_request.subgraph.depth = 1
+        request = SearchRequest()
+        request.relation_subgraph.entry_points.extend(detected_entities)
+        request.relation_subgraph.depth = 1
 
-        relations_results: list[RelationSearchResponse]
+        results: list[SearchResponse]
         (
-            relations_results,
+            results,
             _,
             _,
         ) = await node_query(
             kbid,
             Method.RELATIONS,
-            relation_request,
+            request,
             target_shard_replicas=target_shard_replicas,
             timeout=timeout,
             use_read_replica_nodes=True,
             retry_on_primary=False,
         )
-        return await merge_relations_results(relations_results, relation_request.subgraph)
+        relations_results: list[RelationSearchResponse] = [result.relation for result in results]
+        return await merge_relations_results(relations_results, request.relation_subgraph)
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error getting relations results")

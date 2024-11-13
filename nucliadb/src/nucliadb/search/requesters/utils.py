@@ -35,13 +35,10 @@ from nucliadb.common.nidx import get_nidx_fake_node
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
     query_shard,
-    relations_shard,
     suggest_shard,
 )
 from nucliadb.search.settings import settings
 from nucliadb_protos.nodereader_pb2 import (
-    RelationSearchRequest,
-    RelationSearchResponse,
     SearchRequest,
     SearchResponse,
     SuggestRequest,
@@ -64,16 +61,15 @@ METHODS = {
     Method.SEARCH: query_shard,
     Method.PARAGRAPH: query_shard,
     Method.SUGGEST: suggest_shard,
-    Method.RELATIONS: relations_shard,
+    Method.RELATIONS: query_shard,
 }
 
-REQUEST_TYPE = Union[SuggestRequest, SearchRequest, RelationSearchRequest]
+REQUEST_TYPE = Union[SuggestRequest, SearchRequest]
 
 T = TypeVar(
     "T",
     SuggestResponse,
     SearchResponse,
-    RelationSearchResponse,
 )
 
 
@@ -99,18 +95,6 @@ async def node_query(
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
-
-
-@overload
-async def node_query(
-    kbid: str,
-    method: Method,
-    pb_query: RelationSearchRequest,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = True,
-    timeout: Optional[float] = None,
-    retry_on_primary: bool = True,
-) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 async def node_query(
