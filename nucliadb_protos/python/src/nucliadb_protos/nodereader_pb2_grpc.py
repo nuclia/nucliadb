@@ -27,11 +27,6 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchResponse.FromString,
                 )
-        self.ParagraphSearch = channel.unary_unary(
-                '/nodereader.NodeReader/ParagraphSearch',
-                request_serializer=nucliadb__protos_dot_nodereader__pb2.ParagraphSearchRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodereader__pb2.ParagraphSearchResponse.FromString,
-                )
         self.VectorSearch = channel.unary_unary(
                 '/nodereader.NodeReader/VectorSearch',
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchRequest.SerializeToString,
@@ -106,12 +101,6 @@ class NodeReaderServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def DocumentSearch(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ParagraphSearch(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -203,11 +192,6 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.DocumentSearch,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchRequest.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchResponse.SerializeToString,
-            ),
-            'ParagraphSearch': grpc.unary_unary_rpc_method_handler(
-                    servicer.ParagraphSearch,
-                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.ParagraphSearchRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodereader__pb2.ParagraphSearchResponse.SerializeToString,
             ),
             'VectorSearch': grpc.unary_unary_rpc_method_handler(
                     servicer.VectorSearch,
@@ -312,23 +296,6 @@ class NodeReader(object):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/DocumentSearch',
             nucliadb__protos_dot_nodereader__pb2.DocumentSearchRequest.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.DocumentSearchResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def ParagraphSearch(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/ParagraphSearch',
-            nucliadb__protos_dot_nodereader__pb2.ParagraphSearchRequest.SerializeToString,
-            nucliadb__protos_dot_nodereader__pb2.ParagraphSearchResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

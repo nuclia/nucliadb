@@ -901,31 +901,6 @@ pub mod node_reader_client {
                 .insert(GrpcMethod::new("nodereader.NodeReader", "DocumentSearch"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn paragraph_search(
-            &mut self,
-            request: impl tonic::IntoRequest<super::ParagraphSearchRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ParagraphSearchResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/nodereader.NodeReader/ParagraphSearch",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("nodereader.NodeReader", "ParagraphSearch"));
-            self.inner.unary(req, path, codec).await
-        }
         pub async fn vector_search(
             &mut self,
             request: impl tonic::IntoRequest<super::VectorSearchRequest>,
@@ -1230,13 +1205,6 @@ pub mod node_reader_server {
             tonic::Response<super::DocumentSearchResponse>,
             tonic::Status,
         >;
-        async fn paragraph_search(
-            &self,
-            request: tonic::Request<super::ParagraphSearchRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::ParagraphSearchResponse>,
-            tonic::Status,
-        >;
         async fn vector_search(
             &self,
             request: tonic::Request<super::VectorSearchRequest>,
@@ -1468,52 +1436,6 @@ pub mod node_reader_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = DocumentSearchSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/nodereader.NodeReader/ParagraphSearch" => {
-                    #[allow(non_camel_case_types)]
-                    struct ParagraphSearchSvc<T: NodeReader>(pub Arc<T>);
-                    impl<
-                        T: NodeReader,
-                    > tonic::server::UnaryService<super::ParagraphSearchRequest>
-                    for ParagraphSearchSvc<T> {
-                        type Response = super::ParagraphSearchResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::ParagraphSearchRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as NodeReader>::paragraph_search(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = ParagraphSearchSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

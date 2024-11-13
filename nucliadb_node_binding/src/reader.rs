@@ -190,18 +190,6 @@ impl NodeReader {
         }
     }
 
-    pub fn paragraph_search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let paragraph_request =
-            ParagraphSearchRequest::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
-        let shard_id = paragraph_request.id.clone();
-        let shard = self.obtain_shard(shard_id)?;
-        let response = shard.paragraph_search(paragraph_request);
-        match response {
-            Ok(response) => Ok(PyList::new(py, response.encode_to_vec())),
-            Err(error) => Err(IndexNodeException::new_err(error.to_string())),
-        }
-    }
-
     pub fn relation_edges<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(request)).expect("Error decoding arguments");
         let shard = self.obtain_shard(shard_id.id)?;

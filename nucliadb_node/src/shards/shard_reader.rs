@@ -28,10 +28,9 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest, ParagraphSearchResponse,
-    RelationPrefixSearchRequest, RelationSearchRequest, SearchRequest, SearchResponse, Shard, ShardFile,
-    ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
-    VectorSearchRequest, VectorSearchResponse,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, RelationPrefixSearchRequest, RelationSearchRequest,
+    SearchRequest, SearchResponse, Shard, ShardFile, ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures,
+    SuggestRequest, SuggestResponse, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::query_language;
 use nucliadb_core::query_language::BooleanExpression;
@@ -621,15 +620,6 @@ impl ShardReader {
 
         Ok(ShardFileList {
             files,
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn paragraph_search(&self, search_request: ParagraphSearchRequest) -> NodeResult<ParagraphSearchResponse> {
-        let span = tracing::Span::current();
-
-        run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
-            read_rw_lock(&self.paragraph_reader).search(&search_request, &ParagraphsContext::default())
         })
     }
 

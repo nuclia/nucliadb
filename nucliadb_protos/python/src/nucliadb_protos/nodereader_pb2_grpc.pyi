@@ -76,11 +76,6 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.DocumentSearchResponse,
     ]
 
-    ParagraphSearch: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodereader_pb2.ParagraphSearchRequest,
-        nucliadb_protos.nodereader_pb2.ParagraphSearchResponse,
-    ]
-
     VectorSearch: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.VectorSearchRequest,
         nucliadb_protos.nodereader_pb2.VectorSearchResponse,
@@ -154,11 +149,6 @@ class NodeReaderAsyncStub:
     DocumentSearch: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.DocumentSearchRequest,
         nucliadb_protos.nodereader_pb2.DocumentSearchResponse,
-    ]
-
-    ParagraphSearch: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodereader_pb2.ParagraphSearchRequest,
-        nucliadb_protos.nodereader_pb2.ParagraphSearchResponse,
     ]
 
     VectorSearch: grpc.aio.UnaryUnaryMultiCallable[
@@ -239,13 +229,6 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.DocumentSearchRequest,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.nodereader_pb2.DocumentSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.DocumentSearchResponse]]: ...
-
-    @abc.abstractmethod
-    def ParagraphSearch(
-        self,
-        request: nucliadb_protos.nodereader_pb2.ParagraphSearchRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodereader_pb2.ParagraphSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.ParagraphSearchResponse]]: ...
 
     @abc.abstractmethod
     def VectorSearch(

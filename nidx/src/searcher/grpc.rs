@@ -60,13 +60,6 @@ impl NidxSearcher for SearchServer {
         todo!()
     }
 
-    async fn paragraph_search(
-        &self,
-        _request: Request<ParagraphSearchRequest>,
-    ) -> Result<Response<ParagraphSearchResponse>> {
-        todo!()
-    }
-
     async fn vector_search(&self, _request: Request<VectorSearchRequest>) -> Result<Response<VectorSearchResponse>> {
         todo!()
     }

@@ -106,16 +106,6 @@ class StandaloneReaderWrapper:
             else:
                 raise
 
-    async def ParagraphSearch(self, request: ParagraphSearchRequest) -> ParagraphSearchResponse:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            self.executor, self.reader.paragraph_search, request.SerializeToString()
-        )
-        pb_bytes = bytes(result)
-        pb = ParagraphSearchResponse()
-        pb.ParseFromString(pb_bytes)
-        return pb
-
     async def GetShard(self, request: GetShardRequest) -> NodeResourcesShard:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
