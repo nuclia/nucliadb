@@ -204,19 +204,19 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
             raise Exception("Could not find shard")
         await txn.abort()
 
+    checks: dict[str, bool] = {}
     if os.environ.get("NIDX_ENABLED"):
-        checks = {0: False}
+        checks[""] = False
         nidx_api = get_nidx_api_client()
         req = GetShardRequest()
         req.shard_id.id = shard.shard
         for i in range(30):
             count_shard: Shard = await nidx_api.GetShard(req)  # type: ignore
             if count_shard.fields >= count:
-                checks[0] = True
+                checks[""] = True
                 break
             await asyncio.sleep(1)
     else:
-        checks: dict[str, bool] = {}
         for replica in shard.replicas:
             if replica.shard.id not in checks:
                 checks[replica.shard.id] = False
