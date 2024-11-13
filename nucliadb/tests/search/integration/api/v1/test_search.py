@@ -174,7 +174,7 @@ async def test_search_resource_all(
                     vectors = response.vector
 
                     assert paragraphs.total == 1
-                    assert documents.document.total == 1
+                    assert documents.total == 1
 
                     # 0-19 : My own text Ramon
                     # 20-45 : This is great to be here
