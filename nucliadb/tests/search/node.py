@@ -467,6 +467,7 @@ def _node(natsd: str, node_storage):
 @pytest.fixture(scope="session")
 async def _nidx(natsd, nidx_storage, pg):
     if not os.environ.get("NIDX_ENABLED"):
+        yield
         return
 
     # Create needed NATS stream/consumer
