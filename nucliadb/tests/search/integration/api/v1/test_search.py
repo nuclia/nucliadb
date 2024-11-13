@@ -32,8 +32,8 @@ from nucliadb.search.search.shards import query_paragraph_shard
 from nucliadb.tests.vectors import Q
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import (
-    DocumentSearchRequest,
     ParagraphSearchRequest,
+    SearchRequest,
     VectorSearchRequest,
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -167,9 +167,10 @@ async def test_search_resource_all(
                     prequest.body = "Ramon"
                     prequest.result_per_page = 10
 
-                    drequest = DocumentSearchRequest()
-                    drequest.id = replica.shard.id
+                    drequest = SearchRequest()
+                    drequest.shard = replica.shard.id
                     drequest.body = "Ramon"
+                    drequest.document = True
                     drequest.result_per_page = 10
 
                     vrequest = VectorSearchRequest()
@@ -179,10 +180,10 @@ async def test_search_resource_all(
                     vrequest.min_score = -1.0
 
                     paragraphs = await query_paragraph_shard(node_obj, replica.shard.id, prequest)
-                    documents = await node_obj.reader.DocumentSearch(drequest)  # type: ignore
+                    documents = await node_obj.reader.Search(drequest)  # type: ignore
 
                     assert paragraphs.total == 1
-                    assert documents.total == 1
+                    assert documents.document.total == 1
 
                     vectors = await node_obj.reader.VectorSearch(vrequest)  # type: ignore
 
