@@ -372,7 +372,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Build docker images for nidx
-        run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
+        run: mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
 
       - name: Run tests
         env:
