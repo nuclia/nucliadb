@@ -344,7 +344,7 @@ async def merge_paragraph_results(
     highlight: bool,
     sort: SortOptions,
     min_score: float,
-):
+) -> Paragraphs:
     raw_paragraph_list: list[tuple[ParagraphResult, SortValue]] = []
     facets: dict[str, Any] = {}
     query = None
@@ -545,7 +545,7 @@ async def merge_results(
 
 
 async def merge_paragraphs_results(
-    paragraph_responses: list[ParagraphSearchResponse],
+    responses: list[SearchResponse],
     count: int,
     page: int,
     kbid: str,
@@ -556,8 +556,8 @@ async def merge_paragraphs_results(
     min_score: float,
 ) -> ResourceSearchResults:
     paragraphs = []
-    for result in paragraph_responses:
-        paragraphs.append(result)
+    for result in responses:
+        paragraphs.append(result.paragraph)
 
     api_results = ResourceSearchResults()
 

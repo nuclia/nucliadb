@@ -22,8 +22,6 @@ import asyncio
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_protos.nodereader_pb2 import (
     GetShardRequest,
-    ParagraphSearchRequest,
-    ParagraphSearchResponse,
     RelationSearchRequest,
     RelationSearchResponse,
     SearchRequest,
@@ -56,46 +54,6 @@ async def get_shard(node: AbstractIndexNode, shard_id: str) -> Shard:
     req.shard_id.id = shard_id
     with node_observer({"type": "get_shard", "node_id": node.id}):
         return await node.reader.GetShard(req)  # type: ignore
-
-
-async def query_paragraph_shard(
-    node: AbstractIndexNode, shard: str, query: ParagraphSearchRequest
-) -> ParagraphSearchResponse:
-    req = SearchRequest()
-    req.shard = shard
-    req.paragraph = True
-
-    req.body = query.body
-    req.filter.CopyFrom(query.filter)
-    req.fields.extend(query.fields)
-    req.key_filters.extend(query.key_filters)
-    req.order.CopyFrom(query.order)
-    req.faceted.CopyFrom(query.faceted)
-    req.page_number = query.page_number
-    req.result_per_page = query.result_per_page
-    req.timestamps.CopyFrom(query.timestamps)
-    req.with_duplicates = query.with_duplicates
-    req.only_faceted = query.only_faceted
-    req.min_score_bm25 = query.min_score
-    req.reload = query.reload  # DEPRECATED
-
-    # optional fields must be checked, otherwise we'll set it with default value
-    # instead of leave it unset. In Rust-land, we'll be changing a None for a
-    # Some("")
-    if query.HasField("advanced_query"):
-        req.advanced_query = query.advanced_query
-    if query.HasField("security"):
-        req.security.CopyFrom(query.security)
-
-    # As search request don't have a rid field to filter, we pass it as a
-    # key_filter, that internally will look for "rid" or "rid/field" like
-    # strings and apply the proper filter
-    if query.uuid:
-        req.key_filters.append(query.uuid)
-
-    with node_observer({"type": "paragraph_search", "node_id": node.id}):
-        response = await node.reader.Search(req)  # type: ignore
-        return response.paragraph
 
 
 async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestRequest) -> SuggestResponse:

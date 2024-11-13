@@ -36,7 +36,6 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     ResourceProperties,
     ResourceSearchResults,
-    SearchOptions,
     SearchParamDefaults,
     SortField,
     SortOrder,
@@ -97,7 +96,6 @@ async def resource_search(
         try:
             pb_query = await paragraph_query_to_pb(
                 kbid,
-                [SearchOptions.KEYWORD],
                 rid,
                 query,
                 fields,
