@@ -22,10 +22,6 @@ import asyncio
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb_protos.nodereader_pb2 import (
     GetShardRequest,
-    ParagraphSearchRequest,
-    ParagraphSearchResponse,
-    RelationSearchRequest,
-    RelationSearchResponse,
     SearchRequest,
     SearchResponse,
     SuggestRequest,
@@ -58,29 +54,9 @@ async def get_shard(node: AbstractIndexNode, shard_id: str) -> Shard:
         return await node.reader.GetShard(req)  # type: ignore
 
 
-async def query_paragraph_shard(
-    node: AbstractIndexNode, shard: str, query: ParagraphSearchRequest
-) -> ParagraphSearchResponse:
-    req = ParagraphSearchRequest()
-    req.CopyFrom(query)
-    req.id = shard
-    with node_observer({"type": "paragraph_search", "node_id": node.id}):
-        return await node.reader.ParagraphSearch(req)  # type: ignore
-
-
 async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestRequest) -> SuggestResponse:
     req = SuggestRequest()
     req.CopyFrom(query)
     req.shard = shard
     with node_observer({"type": "suggest", "node_id": node.id}):
         return await node.reader.Suggest(req)  # type: ignore
-
-
-async def relations_shard(
-    node: AbstractIndexNode, shard: str, query: RelationSearchRequest
-) -> RelationSearchResponse:
-    req = RelationSearchRequest()
-    req.CopyFrom(query)
-    req.shard_id = shard
-    with node_observer({"type": "relation_search", "node_id": node.id}):
-        return await node.reader.RelationSearch(req)  # type: ignore

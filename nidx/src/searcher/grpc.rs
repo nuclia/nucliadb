@@ -53,31 +53,6 @@ impl SearchServer {
 
 #[tonic::async_trait]
 impl NidxSearcher for SearchServer {
-    async fn document_search(
-        &self,
-        _request: Request<DocumentSearchRequest>,
-    ) -> Result<Response<DocumentSearchResponse>> {
-        todo!()
-    }
-
-    async fn paragraph_search(
-        &self,
-        _request: Request<ParagraphSearchRequest>,
-    ) -> Result<Response<ParagraphSearchResponse>> {
-        todo!()
-    }
-
-    async fn vector_search(&self, _request: Request<VectorSearchRequest>) -> Result<Response<VectorSearchResponse>> {
-        todo!()
-    }
-
-    async fn relation_search(
-        &self,
-        _request: Request<RelationSearchRequest>,
-    ) -> Result<Response<RelationSearchResponse>> {
-        todo!()
-    }
-
     async fn document_ids(&self, _request: Request<noderesources::ShardId>) -> Result<Response<IdCollection>> {
         todo!()
     }
