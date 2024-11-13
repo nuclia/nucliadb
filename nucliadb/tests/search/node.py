@@ -34,7 +34,6 @@ from grpc_health.v1.health_pb2 import HealthCheckRequest
 from nats.js.api import ConsumerConfig
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
-from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
@@ -407,20 +406,16 @@ def s3_node_storage(s3):
     return NodeS3Storage(server=s3)
 
 
-def lazy_load_storage_backend():
+@pytest.fixture(scope="session")
+def node_storage(request):
     backend = get_testing_storage_backend()
     if backend == "gcs":
-        return [lazy_fixture.lf("gcs_node_storage")]
+        return request.getfixturevalue("gcs_node_storage")
     elif backend == "s3":
-        return [lazy_fixture.lf("s3_node_storage")]
+        return request.getfixturevalue("s3_node_storage")
     else:
         print(f"Unknown storage backend {backend}, using gcs")
-        return [lazy_fixture.lf("gcs_node_storage")]
-
-
-@pytest.fixture(scope="session", params=lazy_load_storage_backend())
-def node_storage(request):
-    return request.param
+        return request.getfixturevalue("gcs_node_storage")
 
 
 @pytest.fixture(scope="session")
@@ -447,19 +442,13 @@ def s3_nidx_storage(s3):
     }
 
 
-def lazy_load_nidx_storage_backend():
+@pytest.fixture(scope="session")
+def nidx_storage(request):
     backend = get_testing_storage_backend()
     if backend == "gcs":
-        return [lazy_fixture.lf("gcs_nidx_storage")]
+        return request.getfixturevalue("gcs_nidx_storage")
     elif backend == "s3":
-        return [lazy_fixture.lf("s3_nidx_storage")]
-    else:
-        raise Exception(f"Unknown storage backend {backend}")
-
-
-@pytest.fixture(scope="session", params=lazy_load_nidx_storage_backend())
-def nidx_storage(request):
-    return request.param
+        return request.getfixturevalue("s3_nidx_storage")
 
 
 @pytest.fixture(scope="session", autouse=False)
