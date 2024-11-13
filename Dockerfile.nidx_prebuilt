@@ -1,0 +1,11 @@
+#
+# Dockerfile for nucliadb's index node, using the provided binaries
+# NOTE: Binaries should be built in the same image as this Dockerfile or older (for glibc compatibility)
+# For a version that compiles the binaries inside docker, see `Dockerfile.nidx`
+#
+
+FROM ubuntu:24.04
+
+RUN apt update && apt install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY ./builds/nidx /usr/local/bin/nidx
+RUN chmod +x /usr/local/bin/nidx
