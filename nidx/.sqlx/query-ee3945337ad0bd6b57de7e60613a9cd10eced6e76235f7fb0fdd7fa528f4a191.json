@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT kind as \"kind: IndexKind\", SUM(records)::bigint as \"records!\" FROM indexes\n              JOIN segments ON index_id = indexes.id\n              WHERE shard_id = $1\n              GROUP BY kind",
+  "query": "SELECT kind as \"kind: IndexKind\", SUM(records)::bigint as \"records!\" FROM indexes\n              JOIN segments ON index_id = indexes.id\n              WHERE shard_id = $1\n              AND indexes.deleted_at IS NULL\n              AND segments.delete_at IS NULL\n              GROUP BY kind",
   "describe": {
     "columns": [
       {
@@ -36,5 +36,5 @@
       null
     ]
   },
-  "hash": "ef25d1b091b8edce55dcd7f0a2f528537cd9329ab7297b81ace0aba8c0e1bb0e"
+  "hash": "ee3945337ad0bd6b57de7e60613a9cd10eced6e76235f7fb0fdd7fa528f4a191"
 }

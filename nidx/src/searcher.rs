@@ -93,7 +93,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
 
     let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
-    let server = GrpcServer::new("localhost:10001").await?;
+    let server = GrpcServer::new("0.0.0.0:10001").await?;
     let api_task = tokio::task::spawn(server.serve(api.into_service()));
     let search_task = tokio::task::spawn(async move { searcher.run(storage).await });
 

@@ -23,6 +23,7 @@ from fastapi import FastAPI
 
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.utils import setup_driver
+from nucliadb.common.nidx import start_nidx_utility
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.predict import start_predict_engine
@@ -46,6 +47,7 @@ async def lifespan(app: FastAPI):
 
     await setup_driver()
     await setup_cluster()
+    await start_nidx_utility()
 
     await start_audit_utility(SERVICE_NAME)
 

@@ -19,12 +19,11 @@
 //
 
 use nidx::{api, indexer, maintenance, searcher, Settings};
-use std::collections::HashSet;
 use tokio::{main, task::JoinSet};
 
 #[main]
 async fn main() -> anyhow::Result<()> {
-    let args: HashSet<_> = std::env::args().skip(1).collect();
+    let args: Vec<_> = std::env::args().skip(1).collect();
 
     tracing_subscriber::fmt::init();
 
