@@ -71,16 +71,6 @@ class NodeReaderStub:
         nucliadb_protos.noderesources_pb2.Shard,
     ]
 
-    DocumentSearch: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodereader_pb2.DocumentSearchRequest,
-        nucliadb_protos.nodereader_pb2.DocumentSearchResponse,
-    ]
-
-    VectorSearch: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodereader_pb2.VectorSearchRequest,
-        nucliadb_protos.nodereader_pb2.VectorSearchResponse,
-    ]
-
     DocumentIds: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.nodereader_pb2.IdCollection,
@@ -144,16 +134,6 @@ class NodeReaderAsyncStub:
     GetShard: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.GetShardRequest,
         nucliadb_protos.noderesources_pb2.Shard,
-    ]
-
-    DocumentSearch: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodereader_pb2.DocumentSearchRequest,
-        nucliadb_protos.nodereader_pb2.DocumentSearchResponse,
-    ]
-
-    VectorSearch: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodereader_pb2.VectorSearchRequest,
-        nucliadb_protos.nodereader_pb2.VectorSearchResponse,
     ]
 
     DocumentIds: grpc.aio.UnaryUnaryMultiCallable[
@@ -222,20 +202,6 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.GetShardRequest,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.noderesources_pb2.Shard, collections.abc.Awaitable[nucliadb_protos.noderesources_pb2.Shard]]: ...
-
-    @abc.abstractmethod
-    def DocumentSearch(
-        self,
-        request: nucliadb_protos.nodereader_pb2.DocumentSearchRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodereader_pb2.DocumentSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.DocumentSearchResponse]]: ...
-
-    @abc.abstractmethod
-    def VectorSearch(
-        self,
-        request: nucliadb_protos.nodereader_pb2.VectorSearchRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.nodereader_pb2.VectorSearchResponse, collections.abc.Awaitable[nucliadb_protos.nodereader_pb2.VectorSearchResponse]]: ...
 
     @abc.abstractmethod
     def DocumentIds(

@@ -22,16 +22,6 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.GetShardRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_noderesources__pb2.Shard.FromString,
                 )
-        self.DocumentSearch = channel.unary_unary(
-                '/nodereader.NodeReader/DocumentSearch',
-                request_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchResponse.FromString,
-                )
-        self.VectorSearch = channel.unary_unary(
-                '/nodereader.NodeReader/VectorSearch',
-                request_serializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchResponse.FromString,
-                )
         self.DocumentIds = channel.unary_unary(
                 '/nodereader.NodeReader/DocumentIds',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
@@ -95,18 +85,6 @@ class NodeReaderServicer(object):
     """
 
     def GetShard(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DocumentSearch(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def VectorSearch(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -187,16 +165,6 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.GetShard,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.GetShardRequest.FromString,
                     response_serializer=nucliadb__protos_dot_noderesources__pb2.Shard.SerializeToString,
-            ),
-            'DocumentSearch': grpc.unary_unary_rpc_method_handler(
-                    servicer.DocumentSearch,
-                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentSearchResponse.SerializeToString,
-            ),
-            'VectorSearch': grpc.unary_unary_rpc_method_handler(
-                    servicer.VectorSearch,
-                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodereader__pb2.VectorSearchResponse.SerializeToString,
             ),
             'DocumentIds': grpc.unary_unary_rpc_method_handler(
                     servicer.DocumentIds,
@@ -279,40 +247,6 @@ class NodeReader(object):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/GetShard',
             nucliadb__protos_dot_nodereader__pb2.GetShardRequest.SerializeToString,
             nucliadb__protos_dot_noderesources__pb2.Shard.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DocumentSearch(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/DocumentSearch',
-            nucliadb__protos_dot_nodereader__pb2.DocumentSearchRequest.SerializeToString,
-            nucliadb__protos_dot_nodereader__pb2.DocumentSearchResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def VectorSearch(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/VectorSearch',
-            nucliadb__protos_dot_nodereader__pb2.VectorSearchRequest.SerializeToString,
-            nucliadb__protos_dot_nodereader__pb2.VectorSearchResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
