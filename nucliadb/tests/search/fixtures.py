@@ -205,9 +205,9 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
         await txn.abort()
 
     checks: dict[str, bool] = {}
-    if os.environ.get("NIDX_ENABLED"):
+    nidx_api = get_nidx_api_client()
+    if nidx_api:
         checks[""] = False
-        nidx_api = get_nidx_api_client()
         req = GetShardRequest()
         req.shard_id.id = shard.shard
         for i in range(30):
