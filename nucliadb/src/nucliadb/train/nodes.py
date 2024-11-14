@@ -55,7 +55,8 @@ class TrainShardManager(manager.KBShardManager):
         except StopIteration:
             raise KeyError("Shard not found")
 
-        node_obj, shard_id = manager.choose_node(shard_object)
+        # TODO: Id streams not yet implemented in nidx
+        node_obj, shard_id = manager.choose_node(shard_object, use_nidx=False)
         return node_obj, shard_id
 
     async def get_kb_obj(self, txn: Transaction, kbid: str) -> Optional[KnowledgeBox]:

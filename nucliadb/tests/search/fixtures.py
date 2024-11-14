@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-import os
 from enum import Enum
 from typing import AsyncIterable, Optional
 

@@ -36,6 +36,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.nidx import NIDX_ENABLED
 from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
@@ -466,7 +467,7 @@ def _node(natsd: str, node_storage):
 
 @pytest.fixture(scope="session")
 async def _nidx(natsd, nidx_storage, pg):
-    if not os.environ.get("NIDX_ENABLED"):
+    if not NIDX_ENABLED:
         yield
         return
 

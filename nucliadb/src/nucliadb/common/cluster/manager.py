@@ -36,7 +36,7 @@ from nucliadb.common.cluster.exceptions import (
     ShardsNotFound,
 )
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.nidx import get_nidx, get_nidx_api_client
+from nucliadb.common.nidx import NIDX_ENABLED, get_nidx, get_nidx_api_client, get_nidx_fake_node
 from nucliadb_protos import (
     knowledgebox_pb2,
     nodereader_pb2,
@@ -144,13 +144,17 @@ class KBShardManager:
         kbid: str,
         aw: Callable[[AbstractIndexNode, str], Awaitable[Any]],
         timeout: float,
+        *,
+        use_nidx: bool,
         use_read_replica_nodes: bool = False,
     ) -> list[Any]:
         shards = await self.get_shards_by_kbid(kbid)
         ops = []
 
         for shard_obj in shards:
-            node, shard_id = choose_node(shard_obj, use_read_replica_nodes=use_read_replica_nodes)
+            node, shard_id = choose_node(
+                shard_obj, use_nidx=use_nidx, use_read_replica_nodes=use_read_replica_nodes
+            )
             if shard_id is None:
                 raise ShardNotFound("Found a node but not a shard")
 
@@ -349,13 +353,9 @@ class KBShardManager:
 
         if nidx is not None:
             nidxpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
-            nidxpb.node = node_id
             nidxpb.shard = shard.shard
-            nidxpb.txid = txid
             nidxpb.resource = uuid
             nidxpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
-            nidxpb.partition = partition
-            nidxpb.kbid = kb
             await nidx.index(nidxpb)
 
     async def add_resource(
@@ -439,8 +439,12 @@ class KBShardManager:
                 )
 
         await self.apply_for_all_shards(
-            kbid, _create_vectorset, timeout=10, use_read_replica_nodes=False
+            kbid, _create_vectorset, timeout=10, use_nidx=False, use_read_replica_nodes=False
         )
+        if NIDX_ENABLED:
+            await self.apply_for_all_shards(
+                kbid, _create_vectorset, timeout=10, use_nidx=True, use_read_replica_nodes=False
+            )
 
     async def delete_vectorset(self, kbid: str, vectorset_id: str):
         """Delete a vectorset from all KB shards"""
@@ -453,8 +457,12 @@ class KBShardManager:
                 )
 
         await self.apply_for_all_shards(
-            kbid, _delete_vectorset, timeout=10, use_read_replica_nodes=False
+            kbid, _delete_vectorset, timeout=10, use_nidx=False, use_read_replica_nodes=False
         )
+        if NIDX_ENABLED:
+            await self.apply_for_all_shards(
+                kbid, _delete_vectorset, timeout=10, use_nidx=True, use_read_replica_nodes=False
+            )
 
 
 class StandaloneKBShardManager(KBShardManager):
@@ -590,6 +598,7 @@ def get_all_shard_nodes(
 def choose_node(
     shard: writer_pb2.ShardObject,
     *,
+    use_nidx: bool,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = False,
 ) -> tuple[AbstractIndexNode, str]:
@@ -605,6 +614,13 @@ def choose_node(
     `target_shard_replicas` is the least preferent.
 
     """
+
+    # Use nidx if requested and enabled, fallback to node
+    if use_nidx:
+        fake_node = get_nidx_fake_node()
+        if fake_node:
+            return fake_node, shard.shard
+
     target_shard_replicas = target_shard_replicas or []
 
     shard_nodes = get_all_shard_nodes(shard, use_read_replicas=use_read_replica_nodes)
