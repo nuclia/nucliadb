@@ -31,6 +31,7 @@ from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import (
     get_external_index_manager,
 )
+from nucliadb.common.nidx import get_nidx_fake_node
 from nucliadb_protos import nodewriter_pb2, writer_pb2
 from nucliadb_telemetry import errors
 
@@ -107,6 +108,7 @@ async def create_rollover_shards(
 
     logger.info("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
+    nidx_node = get_nidx_fake_node()
 
     async with datamanagers.with_ro_transaction() as txn:
         try:
@@ -184,6 +186,14 @@ async def create_rollover_shards(
                 shard.replicas.append(replica)
                 created_shards.append(shard)
                 replicas_created += 1
+
+            if nidx_node:
+                nidx_shard = await nidx_node.new_shard_with_vectorsets(
+                    kbid,
+                    vectorsets_configs=vectorsets,
+                )
+                shard.nidx_shard_id = nidx_shard.id
+
     except Exception as e:
         errors.capture_exception(e)
         logger.exception("Unexpected error creating new shard")

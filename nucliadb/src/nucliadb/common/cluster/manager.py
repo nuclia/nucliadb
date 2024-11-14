@@ -318,6 +318,17 @@ class KBShardManager:
                         exc_info=True,
                     )
 
+        nidx_api = get_nidx_api_client()
+        if nidx_api:
+            try:
+                await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
+            except Exception as rollback_error:
+                errors.capture_exception(rollback_error)
+                logger.error(
+                    f"New shard rollback error. Nidx Shard: {shard.nidx_shard_id}",
+                    exc_info=True,
+                )
+
     def indexing_replicas(self, shard: writer_pb2.ShardObject) -> list[tuple[str, str]]:
         """
         Returns the replica ids and nodes for the shard replicas
