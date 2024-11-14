@@ -23,7 +23,6 @@ import hashlib
 from functools import partial
 
 from httpx import AsyncClient
-from tests.utils import inject_message, dirty_index
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
@@ -33,6 +32,7 @@ from nucliadb.common.nidx import get_nidx
 from nucliadb_protos import noderesources_pb2, nodewriter_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import dirty_index, inject_message
 
 
 async def test_reindex(

@@ -22,7 +22,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
-from tests.utils import broker_resource, inject_message
 
 from nucliadb.learning_proxy import (
     LearningConfiguration,
@@ -51,6 +50,7 @@ from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import broker_resource, inject_message
 
 
 @pytest.mark.asyncio
