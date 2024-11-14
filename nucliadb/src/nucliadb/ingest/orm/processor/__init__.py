@@ -22,6 +22,7 @@ import logging
 from typing import Optional
 
 import aiohttp.client_exceptions
+import nats.errors
 
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.settings import settings as cluster_settings
@@ -325,6 +326,7 @@ class Processor:
                 aiohttp.client_exceptions.ClientError,
                 ConflictError,
                 MaindbServerError,
+                nats.errors.NoRespondersError,
             ):  # pragma: no cover
                 # Unhandled exceptions here that should bubble and hard fail
                 # XXX We swallow too many exceptions here!
