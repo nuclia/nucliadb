@@ -106,7 +106,7 @@ async def node_members(request: Request) -> JSONResponse:
 
 
 async def alive(request: Request) -> JSONResponse:
-    if len(manager.get_index_nodes()) == 0 and settings.driver != "local":
+    if len(manager.get_index_nodes()) == 0:
         return JSONResponse({"status": "error"}, status_code=503)
     else:
         return JSONResponse({"status": "ok"})

@@ -25,13 +25,7 @@ import pytest
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.pg import PGDriver
 
-TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg,local").split(",")
-
-
-@pytest.mark.skip(reason="Local driver doesn't implement saving info in intermediate nodes")
-@pytest.mark.skipif("local" not in TESTING_MAINDB_DRIVERS, reason="local not in TESTING_MAINDB_DRIVERS")
-async def test_local_driver(local_driver):
-    await driver_basic(local_driver)
+TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg").split(",")
 
 
 @pytest.mark.skipif("pg" not in TESTING_MAINDB_DRIVERS, reason="pg not in TESTING_MAINDB_DRIVERS")

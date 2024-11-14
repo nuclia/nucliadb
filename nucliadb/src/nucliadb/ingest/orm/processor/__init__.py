@@ -188,11 +188,13 @@ class Processor:
                     shard = await kb.get_resource_shard(shard_id)
                     if shard is None:
                         raise AttributeError("Shard not available")
-                    await self._maybe_external_index_delete_resource(message.kbid, uuid)
                     await pgcatalog_delete(txn, message.kbid, uuid)
-                    await self.index_node_shard_manager.delete_resource(
-                        shard, message.uuid, seqid, partition, message.kbid
-                    )
+                    if await has_external_index(message.kbid):
+                        await self.external_index_delete_resource(message.kbid, uuid)
+                    else:
+                        await self.index_node_shard_manager.delete_resource(
+                            shard, message.uuid, seqid, partition, message.kbid
+                        )
                     try:
                         await kb.delete_resource(message.uuid)
                     except Exception as exc:
@@ -281,17 +283,18 @@ class Processor:
                         resource.replace_indexer(await resource.generate_index_message(reindex=True))
 
                 if resource and resource.modified:
-                    await self.index_resource(  # noqa
-                        resource=resource,
-                        txn=txn,
-                        uuid=uuid,
-                        kbid=kbid,
-                        seqid=seqid,
-                        partition=partition,
-                        kb=kb,
-                        source=messages_source(messages),
-                    )
-
+                    if message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+                        await self.index_resource(  # noqa
+                            resource=resource,
+                            txn=txn,
+                            uuid=uuid,
+                            kbid=kbid,
+                            seqid=seqid,
+                            partition=partition,
+                            kb=kb,
+                            source=messages_source(messages),
+                        )
+                    await pgcatalog_update(txn, kbid, resource)
                     if transaction_check:
                         await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()
@@ -409,9 +412,13 @@ class Processor:
                 txn, kbid=kbid, rid=uuid, shard=shard.shard
             )
 
-        if shard is not None:
-            index_message = resource.indexer.brain
-            await self._maybe_external_index_add_resource(kbid, uuid, index_message)
+        if shard is None:
+            raise AttributeError("Shard is not available")
+
+        index_message = resource.indexer.brain
+        if await has_external_index(kbid):
+            await self.external_index_add_resource(kbid, uuid, index_message)
+        else:
             await self.index_node_shard_manager.add_resource(
                 shard,
                 index_message,
@@ -421,17 +428,13 @@ class Processor:
                 source=source,
             )
 
-            await pgcatalog_update(txn, kbid, resource)
-        else:
-            raise AttributeError("Shard is not available")
-
-    async def _maybe_external_index_delete_resource(self, kbid: str, resource_uuid: str):
+    async def external_index_delete_resource(self, kbid: str, resource_uuid: str):
         external_index_manager = await get_external_index_manager(kbid=kbid)
         if external_index_manager is None:
             return
         await external_index_manager.delete_resource(resource_uuid=resource_uuid)
 
-    async def _maybe_external_index_add_resource(
+    async def external_index_add_resource(
         self,
         kbid: str,
         resource_uuid: str,
@@ -721,3 +724,11 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
                 if len(vectorset_sentences.sentences) > 0:
                     return True
     return False
+
+
+async def has_external_index(kbid: str) -> bool:
+    """
+    Returns True if the KB has an external index provider configured.
+    """
+    external_index_manager = await get_external_index_manager(kbid=kbid)
+    return external_index_manager is not None
