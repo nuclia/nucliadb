@@ -23,12 +23,12 @@ from io import BytesIO
 import pytest
 from pytest_lazy_fixtures import lazy_fixture
 
+from nucliadb.common.nidx import NIDX_ENABLED
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
 from nucliadb_models import content_types
 from nucliadb_utils.storages.storage import Storage
-from nucliadb.common.nidx import NIDX_ENABLED
 
 
 @pytest.fixture(scope="function")
