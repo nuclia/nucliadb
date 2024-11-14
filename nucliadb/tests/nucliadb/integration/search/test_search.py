@@ -19,7 +19,6 @@
 #
 import asyncio
 import math
-import os
 from datetime import datetime, timedelta
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
@@ -50,8 +49,6 @@ from nucliadb_utils.utilities import (
     set_utility,
 )
 from tests.utils import broker_resource, inject_message
-
-TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg,local").split(",")
 
 
 @pytest.mark.asyncio
@@ -330,88 +327,6 @@ async def test_paragraph_search_with_filters(
     assert paragraph_results[0]["field"] == "summary"
 
 
-@pytest.mark.asyncio
-@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog does not support with_status")
-async def test_catalog_can_filter_by_processing_status(
-    nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox,
-):
-    """
-    Test description:
-    - Creates a resource for each processing status value.
-    - Checks that if not specified, search returns all resources.
-    - Checks that search is able to filter by each value.
-    - Checks that we can get counts for each processing status
-    """
-    valid_status = ["PROCESSED", "PENDING", "ERROR"]
-
-    created = 0
-    for status_name, status_value in rpb.Metadata.Status.items():
-        if status_name not in valid_status:
-            continue
-        bm = broker_resource(knowledgebox)
-        bm.basic.metadata.status = status_value
-        await inject_message(nucliadb_grpc, bm)
-        created += 1
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-        },
-    )
-    assert resp.status_code == 200
-    assert len(resp.json()["resources"]) == created
-
-    # Two should be PROCESSED (the ERROR is counted as processed)
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-            "with_status": "PROCESSED",
-        },
-    )
-    assert resp.status_code == 200
-    assert len(resp.json()["resources"]) == 2
-
-    # One should be PENDING
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-            "with_status": "PENDING",
-        },
-    )
-    assert resp.status_code == 200
-    assert len(resp.json()["resources"]) == 1
-
-    # Get the list of PENDING
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-            "filters": ["/metadata.status/PENDING"],
-        },
-    )
-    assert resp.status_code == 200
-    assert len(resp.json()["resources"]) == 1
-
-    # Check facets by processing status
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-            "faceted": ["/metadata.status"],
-        },
-    )
-    assert resp.status_code == 200
-    resp_json = resp.json()
-    facets = resp_json["fulltext"]["facets"]
-    for status in valid_status:
-        assert facets["/metadata.status"][f"/metadata.status/{status}"] == 1
-
-
 @pytest.mark.skip(reason="Needs sc-5626")
 @pytest.mark.asyncio
 async def test_(
@@ -649,68 +564,6 @@ async def test_search_relations(
 
         for expected_relation in expected[entity]["related_to"]:
             assert expected_relation in entities[entity]["related_to"]
-
-
-@pytest.mark.asyncio
-@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog does not support with_status")
-async def test_processing_status_doesnt_change_on_search_after_processed(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox,
-):
-    # Inject a resource with status=PROCESSED
-    bm = broker_resource(knowledgebox)
-    bm.basic.metadata.status = rpb.Metadata.Status.PROCESSED
-    await inject_message(nucliadb_grpc, bm)
-
-    # Check that search for resource list shows it
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-            "with_status": "PROCESSED",
-        },
-    )
-    assert resp.status_code == 200
-    assert len(resp.json()["resources"]) == 1
-
-    # Edit the resource so that status=PENDING
-    assert (
-        await nucliadb_writer.patch(
-            f"/kb/{knowledgebox}/resource/{bm.uuid}",
-            json={
-                "title": "My new title",
-            },
-        )
-    ).status_code == 200
-
-    # Wait a bit until for the node to index it
-    await asyncio.sleep(1)
-
-    # Check that search for resource list still shows it
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-            "with_status": "PROCESSED",
-        },
-    )
-    assert resp.status_code == 200
-    assert len(resp.json()["resources"]) == 1
-
-    # Check that facets count it as PENDING though
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-            "faceted": ["/metadata.status"],
-        },
-    )
-    assert resp.status_code == 200
-    resp_json = resp.json()
-    facets = resp_json["fulltext"]["facets"]
-    assert facets["/metadata.status"] == {"/metadata.status/PENDING": 1}
 
 
 @pytest.mark.asyncio
@@ -1481,32 +1334,6 @@ async def test_search_handles_limits_exceeded_error(
     resp = await nucliadb_reader.post(f"/kb/{kb}/search", json={})
     assert resp.status_code == 402
     assert resp.json() == {"detail": "over the quota"}
-
-
-@pytest.mark.asyncio
-@pytest.mark.skipif("pg" in TESTING_MAINDB_DRIVERS, reason="PG catalog cannot do shards")
-async def test_catalog_returns_shard_and_node_data(
-    nucliadb_reader: AsyncClient,
-    knowledgebox,
-):
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-        },
-    )
-    assert resp.status_code == 200
-    assert len(resp.json()["shards"]) > 0
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
-        params={
-            "query": "",
-            "debug": "true",
-        },
-    )
-    assert resp.status_code == 200
-    assert len(resp.json()["nodes"]) > 0
 
 
 @pytest.mark.asyncio
