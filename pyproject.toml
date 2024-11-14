@@ -25,6 +25,8 @@ dev = [
     "-e file:///${PROJECT_ROOT}/nucliadb_protos/python",
     "-e file:///${PROJECT_ROOT}/nucliadb_telemetry[all]",
     "-e file:///${PROJECT_ROOT}/nucliadb_utils[cache,fastapi,storages]",
+    "-e file:///${PROJECT_ROOT}/nidx/nidx_protos",
+    "-e file:///${PROJECT_ROOT}/nidx/nidx_binding",
     # Linting
     "mypy-protobuf>=3.6.0",
     "mypy==1.10",

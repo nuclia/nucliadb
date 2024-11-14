@@ -40,8 +40,8 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.utilities import Utility, get_utility, set_utility
 from tests.train.utils import get_batches_from_train_response_stream
+from tests.utils.dirty_index import wait_for_sync
 
 _dir = os.path.dirname(__file__)
 _testdata_dir = os.path.join(_dir, "..", "..", "tests", "testdata")
@@ -125,8 +125,6 @@ async def image_classification_resource(
 
     broker_message = generate_image_classification_broker_message(selections, kbid, rid, field_id)
 
-    original_storage = get_utility(Utility.STORAGE)
-    set_utility(Utility.STORAGE, AsyncMock())
     mock_set = AsyncMock(return_value=None)
     mock_get = AsyncMock(return_value=broker_message.file_extracted_data[0])
     with (
@@ -136,10 +134,9 @@ async def image_classification_resource(
         resp = await nucliadb_grpc.ProcessMessage(  # type: ignore
             iter([broker_message]), timeout=10, wait_for_ready=True
         )
+        await wait_for_sync()
         assert resp.status == OpStatusWriter.Status.OK
         yield
-
-    set_utility(Utility.STORAGE, original_storage)
 
 
 def generate_image_classification_fieldmetadata(selections: dict, field_id: str) -> list[dict[str, Any]]:
