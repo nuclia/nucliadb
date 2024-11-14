@@ -71,7 +71,9 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             continue;
         };
 
-        if let Err(e) = process_index_message(&meta, indexer_storage, segment_storage, index_message, seq).await {
+        if let Err(e) =
+            process_index_message(&meta, indexer_storage.clone(), segment_storage.clone(), index_message, seq).await
+        {
             warn!("Error processing index message {e:?}");
             continue;
         }
@@ -89,16 +91,16 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
 
 pub async fn process_index_message(
     meta: &NidxMetadata,
-    indexer_storage: &Arc<DynObjectStore>,
-    segment_storage: &Arc<DynObjectStore>,
+    indexer_storage: Arc<DynObjectStore>,
+    segment_storage: Arc<DynObjectStore>,
     index_message: IndexMessage,
     seq: Seq,
 ) -> anyhow::Result<()> {
     match index_message.typemessage() {
         TypeMessage::Deletion => delete_resource(meta, &index_message.shard, index_message.resource, seq).await,
         TypeMessage::Creation => {
-            let resource = download_message(indexer_storage.clone(), &index_message.storage_key).await?;
-            index_resource(meta, segment_storage.clone(), &index_message.shard, resource, seq).await
+            let resource = download_message(indexer_storage, &index_message.storage_key).await?;
+            index_resource(meta, segment_storage, &index_message.shard, resource, seq).await
         }
     }
 }
@@ -110,6 +112,7 @@ pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: Stri
     let mut tx = meta.transaction().await?;
     for index in indexes {
         Deletion::create(&mut *tx, index.id, seq, &[resource.clone()]).await?;
+        index.updated(&mut *tx).await?;
     }
     tx.commit().await?;
 

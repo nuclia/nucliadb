@@ -61,8 +61,8 @@ impl NidxBinding {
         let result = self.runtime.as_ref().unwrap().block_on(async {
             process_index_message(
                 &self.settings.metadata,
-                &object_store,
-                &self.settings.storage.as_ref().unwrap().object_store.clone(),
+                object_store,
+                self.settings.storage.as_ref().unwrap().object_store.clone(),
                 msg,
                 seq.into(),
             )

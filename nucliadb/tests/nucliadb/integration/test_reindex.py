@@ -23,15 +23,16 @@ import hashlib
 from functools import partial
 
 from httpx import AsyncClient
+from tests.utils import inject_message, dirty_index
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb_protos import noderesources_pb2
+from nucliadb.common.nidx import get_nidx
+from nucliadb_protos import noderesources_pb2, nodewriter_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import inject_message
 
 
 async def test_reindex(
@@ -67,6 +68,7 @@ async def _test_reindex(
     assert len(content["sentences"]["results"]) > 0
     assert len(content["paragraphs"]["results"]) > 0
 
+    # Clean the indexes without touching maindb
     async def clean_shard(resources: list[str], node: AbstractIndexNode, shard_replica_id: str):
         nonlocal rid
         return await node.writer.RemoveResource(  # type: ignore
@@ -80,6 +82,15 @@ async def _test_reindex(
     results = await shard_manager.apply_for_all_shards(kbid, partial(clean_shard, [rid]), timeout=5)
     for result in results:
         assert not isinstance(result, Exception)
+
+    nidx = get_nidx()
+    if nidx:
+        for shard in await shard_manager.get_shards_by_kbid(kbid):
+            msg = nodewriter_pb2.IndexMessage(
+                shard=shard.shard, typemessage=nodewriter_pb2.DELETION, resource=rid
+            )
+            await nidx.index(msg)
+        await dirty_index.mark_dirty()
 
     await asyncio.sleep(0.5)
 
