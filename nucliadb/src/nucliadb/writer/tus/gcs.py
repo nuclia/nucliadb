@@ -33,8 +33,8 @@ from urllib.parse import quote_plus
 
 import aiohttp
 import backoff
-import google.auth.compute_engine.credentials  # type: ignore
 import google.auth.transport.requests  # type: ignore
+import google.oauth2.credentials  # type: ignore
 from google.auth.exceptions import DefaultCredentialsError  # type: ignore
 from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
 
