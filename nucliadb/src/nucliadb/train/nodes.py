@@ -58,7 +58,7 @@ class TrainShardManager(manager.KBShardManager):
             raise KeyError("Shard not found")
 
         node_obj, shard_id = manager.choose_node(
-            shard_object, use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": self.kbid})
+            shard_object, use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": kbid})
         )
         return node_obj, shard_id
 
