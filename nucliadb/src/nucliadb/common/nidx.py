@@ -59,6 +59,9 @@ class NidxUtility:
     async def index(self, msg: IndexMessage) -> int:
         raise NotImplementedError()
 
+    def wait_for_sync(self):
+        pass
+
 
 def _storage_config(prefix: str, bucket: Optional[str]) -> dict[str, str]:
     config = {}
@@ -121,6 +124,9 @@ class NidxBindingUtility(NidxUtility):
 
     async def index(self, msg: IndexMessage) -> int:
         return self.binding.index(msg.SerializeToString())
+
+    def wait_for_sync(self):
+        self.binding.wait_for_sync()
 
 
 class NidxServiceUtility(NidxUtility):
@@ -222,6 +228,14 @@ class FakeNode(AbstractIndexNode):
 
     @property
     def id(self):
+        return "nidx"
+
+    @property
+    def address(self):
+        return "nidx"
+
+    @property
+    def primary_id(self):
         return "nidx"
 
 

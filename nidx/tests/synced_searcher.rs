@@ -21,14 +21,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use nidx::indexer::index_resource;
-use nidx::metadata::Deletion;
+use nidx::indexer::{index_resource, process_index_message};
 use nidx::searcher::SyncedSearcher;
 use nidx::{
     metadata::{Index, Shard},
     NidxMetadata,
 };
-use nidx_protos::VectorSearchRequest;
+use nidx_protos::{IndexMessage, TypeMessage, VectorSearchRequest};
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;
 use nidx_vector::VectorSearcher;
@@ -43,7 +42,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let synced_searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
     let index_cache = synced_searcher.index_cache();
     let storage_copy = storage.clone();
-    let search_task = tokio::spawn(async move { synced_searcher.run(storage_copy).await });
+    let search_task = tokio::spawn(async move { synced_searcher.run(storage_copy, None).await });
 
     let index = Index::create(
         &meta.pool,
@@ -75,9 +74,14 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     assert_eq!(result.documents.len(), 1);
 
     // Delete the resource, it should disappear from results
-    // TODO: Test by sending a deletion message to the deletion method (not implemented yet)
-    Deletion::create(&meta.pool, index.id, 2i64.into(), &[resource.resource.unwrap().uuid]).await?;
-    index.updated(&meta.pool).await?;
+    let deletion = IndexMessage {
+        shard: index.shard_id.to_string(),
+        resource: resource.resource.unwrap().uuid,
+        typemessage: TypeMessage::Deletion.into(),
+        ..Default::default()
+    };
+    // We will not use indexer storage here, so it's fine to pass an incorrect indexer storage
+    process_index_message(&meta, storage.clone(), storage.clone(), deletion, 2i64.into()).await?;
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
