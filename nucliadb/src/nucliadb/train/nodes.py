@@ -39,7 +39,9 @@ from nucliadb_protos.train_pb2 import (
     TrainSentence,
 )
 from nucliadb_protos.writer_pb2 import ShardObject
+from nucliadb_utils import const
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import has_feature
 
 
 class TrainShardManager(manager.KBShardManager):
@@ -55,8 +57,9 @@ class TrainShardManager(manager.KBShardManager):
         except StopIteration:
             raise KeyError("Shard not found")
 
-        # TODO: Id streams not yet implemented in nidx
-        node_obj, shard_id = manager.choose_node(shard_object, use_nidx=False)
+        node_obj, shard_id = manager.choose_node(
+            shard_object, use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": self.kbid})
+        )
         return node_obj, shard_id
 
     async def get_kb_obj(self, txn: Transaction, kbid: str) -> Optional[KnowledgeBox]:
