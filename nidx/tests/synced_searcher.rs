@@ -43,7 +43,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let synced_searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
     let index_cache = synced_searcher.index_cache();
     let storage_copy = storage.clone();
-    let search_task = tokio::spawn(async move { synced_searcher.run(storage_copy).await });
+    let search_task = tokio::spawn(async move { synced_searcher.run(storage_copy, None).await });
 
     let index = Index::create(
         &meta.pool,

@@ -37,7 +37,6 @@ from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.nidx import get_nidx
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.migrator.migrator import run_pg_schema_migrations
@@ -70,6 +69,7 @@ from nucliadb_utils.utilities import (
     set_utility,
 )
 from tests.utils import inject_message
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 logger = logging.getLogger(__name__)
 
@@ -173,25 +173,6 @@ async def nucliadb(
     reset_config()
     clear_global_cache()
     await server.shutdown()
-
-
-# Set of httpx hooks that wait for nidx to be synced before each reader request, but only if we made
-# a write first (there is no need to wait if we get a sequence of consecutive read requests)
-_nidx_is_dirty = False
-
-
-async def wait_for_sync(request):
-    global _nidx_is_dirty
-    if _nidx_is_dirty:
-        nidx = get_nidx()
-        if nidx:
-            nidx.wait_for_sync()
-            _nidx_is_dirty = False
-
-
-async def mark_dirty(request):
-    global _nidx_is_dirty
-    _nidx_is_dirty = True
 
 
 @pytest.fixture(scope="function")

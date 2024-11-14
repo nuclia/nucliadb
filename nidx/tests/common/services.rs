@@ -73,9 +73,9 @@ impl NidxFixture {
         let searcher_port = searcher_server.port()?;
         tokio::task::spawn(searcher_server.serve(searcher_api.into_service()));
         let settings_copy = settings.clone();
-        tokio::task::spawn(
-            async move { searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone()).await },
-        );
+        tokio::task::spawn(async move {
+            searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone(), None).await
+        });
 
         // Clients
         let searcher_client = NidxSearcherClient::connect(format!("http://localhost:{searcher_port}")).await?;

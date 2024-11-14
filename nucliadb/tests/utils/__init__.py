@@ -23,6 +23,7 @@ from datetime import datetime
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils.dirty_index import mark_dirty
 
 
 def broker_resource(kbid: str, rid=None, slug=None, title=None, summary=None) -> BrokerMessage:
@@ -118,5 +119,6 @@ def broker_resource_with_title_paragraph(
 
 
 async def inject_message(writer: WriterStub, message: BrokerMessage):
+    await mark_dirty()
     resp = await writer.ProcessMessage([message])  # type: ignore
     assert resp.status == OpStatusWriter.Status.OK

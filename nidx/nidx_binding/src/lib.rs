@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
-use nidx::indexer::{download_message, index_resource};
+use nidx::indexer::process_index_message;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::{SyncStatus, SyncedSearcher};
 use nidx::settings::EnvSettings;
@@ -54,18 +54,16 @@ impl NidxBinding {
     }
 
     pub fn index(&mut self, bytes: Vec<u8>) -> PyResult<i64> {
-        // TODO: Can this be simplified into the indexer code?
         let msg = IndexMessage::decode(&bytes[..]).unwrap();
 
         let seq = self.seq.0.load(std::sync::atomic::Ordering::Relaxed);
         let object_store = self.settings.indexer.as_ref().unwrap().object_store.clone();
         let result = self.runtime.as_ref().unwrap().block_on(async {
-            let resource = download_message(object_store, &msg.storage_key).await?;
-            index_resource(
+            process_index_message(
                 &self.settings.metadata,
-                self.settings.storage.as_ref().unwrap().object_store.clone(),
-                &msg.shard,
-                resource,
+                &object_store,
+                &self.settings.storage.as_ref().unwrap().object_store.clone(),
+                msg,
                 seq.into(),
             )
             .await
