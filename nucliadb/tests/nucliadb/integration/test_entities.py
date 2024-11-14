@@ -59,6 +59,7 @@ from tests.utils.entities import (
     update_entities_group,
     wait_until_entity,
 )
+from tests.utils.dirty_index import wait_for_sync
 
 pytestmark = pytest.mark.asyncio
 
@@ -123,6 +124,7 @@ async def processing_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
         )
     bm.relations.extend(relations)
     await inject_message(nucliadb_grpc, bm)
+    await wait_for_sync()
 
 
 @pytest.fixture
@@ -181,6 +183,7 @@ async def annotated_entities(
 
 @pytest.fixture
 async def user_entities(nucliadb_writer: AsyncClient, knowledgebox: str):
+    await wait_for_sync()
     payload = CreateEntitiesGroupPayload(
         group="ANIMALS",
         entities={

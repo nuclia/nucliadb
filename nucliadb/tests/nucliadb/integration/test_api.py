@@ -51,6 +51,7 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
+from tests.utils.dirty_index import wait_for_sync
 
 
 @pytest.mark.asyncio
@@ -286,6 +287,7 @@ async def test_entitygroups(
     nucliadb_grpc: WriterStub,
     knowledgebox: str,
 ):
+    await wait_for_sync()
     entitygroup = {
         "group": "group1",
         "title": "Kitchen",
