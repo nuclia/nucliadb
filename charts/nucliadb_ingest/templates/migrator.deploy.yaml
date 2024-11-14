@@ -49,7 +49,7 @@ spec:
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
-      serviceAccount:  {{ ((.Values.migrator).serviceAccount) | default "default" }}
+      serviceAccountName:  {{ ((.Values.migrator).serviceAccount) | default "default" }}
       containers:
       - name: migrator
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

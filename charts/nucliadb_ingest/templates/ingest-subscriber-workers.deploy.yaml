@@ -47,7 +47,7 @@ spec:
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
-      serviceAccount: {{ ((.Values.ingest_subscriber_workers).serviceAccount) | default "default" }}
+      serviceAccountName: {{ ((.Values.ingest_subscriber_workers).serviceAccount) | default "default" }}
       containers:
       - name: ingest-subscriber-workers
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
