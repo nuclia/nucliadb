@@ -28,6 +28,7 @@ from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
 from nucliadb_models import content_types
 from nucliadb_utils.storages.storage import Storage
+from nucliadb.common.nidx import NIDX_ENABLED
 
 
 @pytest.fixture(scope="function")
@@ -42,15 +43,21 @@ def header_encode(some_string):
     return base64.b64encode(some_string.encode()).decode()
 
 
+storages = [
+    lazy_fixture.lf("gcs_storage"),
+    lazy_fixture.lf("s3_storage"),
+    lazy_fixture.lf("local_storage"),
+    # lazy_fixture.lf("azure_storage"),
+]
+# TODO: Azure blob storage not supported by nidx
+if not NIDX_ENABLED:
+    storages.append(lazy_fixture.lf("azure_storage"))
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "storage",
-    [
-        lazy_fixture.lf("gcs_storage"),
-        lazy_fixture.lf("s3_storage"),
-        lazy_fixture.lf("local_storage"),
-        lazy_fixture.lf("azure_storage"),
-    ],
+    storages,
     indirect=True,
 )
 async def test_file_tus_upload_and_download(

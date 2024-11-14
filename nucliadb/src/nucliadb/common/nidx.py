@@ -218,11 +218,6 @@ class NodeNidxAdapter:
         self.GetMetadata = api_client.GetMetadata
 
         # Searcher methods
-        self.DocumentIds = searcher_client.DocumentIds
-        self.ParagraphIds = searcher_client.ParagraphIds
-        self.VectorIds = searcher_client.VectorIds
-        self.RelationIds = searcher_client.RelationIds
-        self.RelationEdges = searcher_client.RelationEdges
         self.Search = searcher_client.Search
         self.Suggest = searcher_client.Suggest
         self.Paragraphs = searcher_client.Paragraphs
