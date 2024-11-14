@@ -56,6 +56,7 @@ from nucliadb_utils.utilities import (
 from tests.ingest.fixtures import make_extracted_text
 from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
 from tests.utils import inject_message
+from tests.utils.dirty_index import wait_for_sync
 from tests.utils.predict import predict_query_hook
 
 DEFAULT_VECTOR_DIMENSION = 512
@@ -77,12 +78,18 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     logic_shard = shards[0]
     node, shard_id = manager.choose_node(logic_shard, use_nidx=NIDX_ENABLED)
 
+    await wait_for_sync()
+
     test_cases = [
-        # If there is just one vectorset, it should be used by default when
-        # no vectorset is specified
-        (vectorset_dimension, ""),
         (vectorset_dimension, vectorset_id),
     ]
+
+    if not NIDX_ENABLED:
+        # If there is just one vectorset, it should be used by default when
+        # no vectorset is specified.
+        # This is no longer supported in nidx
+        test_cases.append((vectorset_dimension, ""))
+
     for dimension, vectorset in test_cases:
         query_pb = nodereader_pb2.SearchRequest(
             shard=shard_id,

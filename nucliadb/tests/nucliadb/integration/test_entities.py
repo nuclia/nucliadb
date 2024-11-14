@@ -53,13 +53,13 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.writer_pb2 import GetEntitiesGroupRequest, GetEntitiesGroupResponse
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
+from tests.utils.dirty_index import wait_for_sync
 from tests.utils.entities import (
     create_entities_group,
     delete_entities_group,
     update_entities_group,
     wait_until_entity,
 )
-from tests.utils.dirty_index import wait_for_sync
 
 pytestmark = pytest.mark.asyncio
 
