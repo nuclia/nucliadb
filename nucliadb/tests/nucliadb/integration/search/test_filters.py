@@ -42,6 +42,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
+from tests.utils.dirty_index import mark_dirty
 
 
 class ClassificationLabels:
@@ -333,6 +334,7 @@ async def test_filtering_before_and_after_reindexing(
         await _test_filtering(nucliadb_reader, kbid, f)
 
     await rollover.rollover_kb_index(app_context, kbid)
+    await mark_dirty()
 
     for f in FILTERS:
         await _test_filtering(nucliadb_reader, kbid, f)
