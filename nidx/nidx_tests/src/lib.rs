@@ -26,7 +26,7 @@ use relation_node::NodeType;
 use uuid::Uuid;
 
 pub fn minimal_resource(shard_id: String) -> Resource {
-    let resource_id = Uuid::new_v4().to_string();
+    let resource_id = Uuid::new_v4().simple().to_string();
 
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let timestamp = Timestamp {

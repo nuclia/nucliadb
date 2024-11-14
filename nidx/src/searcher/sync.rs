@@ -29,16 +29,26 @@ use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
+use tokio::sync::watch;
 use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
+
+pub enum SyncStatus {
+    Syncing,
+    Synced,
+}
 
 pub async fn run_sync(
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
     index_metadata: Arc<SyncMetadata>,
     notifier: Sender<IndexId>,
+    sync_status: Option<watch::Sender<SyncStatus>>,
 ) -> anyhow::Result<()> {
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
     loop {
+        if let Some(ref sync_status) = sync_status {
+            sync_status.send(SyncStatus::Syncing)?;
+        }
         let deleted = Index::marked_to_delete(&meta.pool).await?;
         for index_id in deleted.into_iter() {
             // TODO: Handle errors
@@ -50,6 +60,9 @@ pub async fn run_sync(
             // TODO: Handle errors
             last_updated_at = max(last_updated_at, index.updated_at);
             sync_index(&meta, storage.clone(), Arc::clone(&index_metadata), index, &notifier).await?;
+        }
+        if let Some(ref sync_status) = sync_status {
+            sync_status.send(SyncStatus::Synced)?;
         }
 
         tokio::time::sleep(Duration::from_secs(1)).await;

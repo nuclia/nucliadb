@@ -130,6 +130,7 @@ async def node_query(
 
             # Query with nidx if installed
             fake_node = get_nidx_fake_node()
+
             if fake_node:
                 node = fake_node
                 shard_id = shard_obj.shard
