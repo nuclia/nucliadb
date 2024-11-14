@@ -58,6 +58,10 @@ class MaxTransactionSizeExceededError(Exception):
     pass
 
 
+class StreamingServerTimeoutError(Exception):
+    pass
+
+
 class LocalTransactionUtility:
     async def commit(
         self,
@@ -204,6 +208,16 @@ class TransactionUtility:
             res = await self.js.publish(target_subject, writer.SerializeToString(), headers=headers)
         except nats.errors.MaxPayloadError as ex:
             raise MaxTransactionSizeExceededError() from ex
+        except nats.errors.TimeoutError as ex:
+            logger.exception(
+                "Nats server timeout error on publish",
+                extra={
+                    "partition": partition,
+                    "kbid": writer.kbid,
+                    "resource": writer.uuid,
+                },
+            )
+            raise StreamingServerTimeoutError() from ex
 
         waiting_for.seq = res.seq
 
