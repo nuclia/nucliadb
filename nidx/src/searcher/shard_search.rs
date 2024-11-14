@@ -40,9 +40,8 @@ pub async fn search(
     search_request: SearchRequest,
 ) -> NidxResult<SearchResponse> {
     let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
-    if search_request.vectorset.is_empty() {
-        return Err(NidxError::invalid("Vectorset is required"));
-    }
+
+    let query_plan = query_planner::build_query_plan(search_request.clone())?;
 
     // TODO: Avoid querying here, the information can be take from synced metadata
     let paragraph_index = Index::find(&meta.pool, shard_id, IndexKind::Paragraph, "paragraph").await?;
@@ -54,8 +53,16 @@ pub async fn search(
     let text_index = Index::find(&meta.pool, shard_id, IndexKind::Text, "text").await?;
     let text_searcher_arc = index_cache.get(&text_index.id).await?;
 
-    let vector_index = Index::find(&meta.pool, shard_id, IndexKind::Vector, &search_request.vectorset).await?;
-    let vector_seacher_arc = index_cache.get(&vector_index.id).await?;
+    // TODO: Better way to check this
+    let vector_seacher_arc = if query_plan.index_queries.vectors_request.is_some() {
+        if search_request.vectorset.is_empty() {
+            return Err(NidxError::invalid("Vectorset is required"));
+        }
+        let vector_index = Index::find(&meta.pool, shard_id, IndexKind::Vector, &search_request.vectorset).await?;
+        Some(index_cache.get(&vector_index.id).await?)
+    } else {
+        None
+    };
 
     let search_results = tokio::task::spawn_blocking(move || {
         blocking_search(
@@ -63,7 +70,7 @@ pub async fn search(
             paragraph_searcher_arc.as_ref().into(),
             relation_searcher_arc.as_ref().into(),
             text_searcher_arc.as_ref().into(),
-            vector_seacher_arc.as_ref().into(),
+            vector_seacher_arc.as_ref().map(|v| v.as_ref().into()),
         )
     })
     .await??;
@@ -75,10 +82,10 @@ fn blocking_search(
     paragraph_searcher: &ParagraphSearcher,
     relation_searcher: &RelationSearcher,
     text_searcher: &TextSearcher,
-    vector_searcher: &VectorSearcher,
+    vector_searcher: Option<&VectorSearcher>,
 ) -> anyhow::Result<SearchResponse> {
-    let query_plan = query_planner::build_query_plan(search_request)?;
     let search_id = uuid::Uuid::new_v4().to_string();
+    let query_plan = query_planner::build_query_plan(search_request)?;
     let mut index_queries = query_plan.index_queries;
 
     // Apply pre-filtering to the query plan
@@ -102,7 +109,7 @@ fn blocking_search(
 
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();
-        move || vector_searcher.search(&request, &index_queries.vectors_context)
+        move || vector_searcher.unwrap().search(&request, &index_queries.vectors_context)
     });
 
     let mut rtext = None;

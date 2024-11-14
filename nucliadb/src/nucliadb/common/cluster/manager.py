@@ -512,11 +512,8 @@ class StandaloneKBShardManager(KBShardManager):
         if nidx is not None:
             indexpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
             indexpb.shard = shard.shard
-            indexpb.txid = txid
             indexpb.resource = uuid
             indexpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
-            indexpb.partition = partition
-            indexpb.kbid = kb
             await nidx.index(indexpb)
 
     @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)

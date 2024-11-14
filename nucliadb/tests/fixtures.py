@@ -66,6 +66,7 @@ from nucliadb_utils.utilities import (
     set_utility,
 )
 from tests.utils import inject_message
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +178,7 @@ async def nucliadb_reader(nucliadb: Settings):
         headers={"X-NUCLIADB-ROLES": "READER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
+        event_hooks={"request": [wait_for_sync]},
     ) as client:
         yield client
 
@@ -187,6 +189,7 @@ async def nucliadb_writer(nucliadb: Settings):
         headers={"X-NUCLIADB-ROLES": "WRITER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
+        event_hooks={"request": [mark_dirty]},
     ) as client:
         yield client
 
@@ -197,6 +200,7 @@ async def nucliadb_manager(nucliadb: Settings):
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
         base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
+        event_hooks={"request": [mark_dirty]},
     ) as client:
         yield client
 
