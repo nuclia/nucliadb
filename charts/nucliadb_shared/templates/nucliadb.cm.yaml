@@ -87,4 +87,12 @@ data:
 {{- if .Values.flag_settings_url }}
   FLAG_SETTINGS_URL: "{{ .Values.flag_settings_url }}"
 {{- end }}
+
+{{- with .Values.nidx }}
+  NIDX_ENABLED: "{{ .Values.flag_settings_url }}"
+  INDEX_NIDX_SUBJECT: {{ .nats_subject }}
+  NIDX_API_ADDRESS: {{ .api_address }}
+  NIDX_SEARCHER_ADDRES: {{ .searcher_address }}
+{{- end }}
+
 {{- end }}
