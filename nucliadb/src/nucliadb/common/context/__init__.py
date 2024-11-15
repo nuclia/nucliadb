@@ -24,6 +24,7 @@ from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
+from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.partition import PartitionUtility
@@ -78,11 +79,13 @@ class ApplicationContext:
             )
             self.indexing = await start_indexing_utility()
         self.transaction = await start_transaction_utility(self.service_name)
+        self.nidx = await start_nidx_utility()
 
     async def finalize(self) -> None:
         if not self._initialized:
             return
 
+        await stop_nidx_utility()
         await stop_transaction_utility()
         if not in_standalone_mode():
             await stop_indexing_utility()
