@@ -1077,6 +1077,8 @@ pub struct ShardObject {
     pub timestamp: ::core::option::Option<::prost_types::Timestamp>,
     #[prost(bool, tag = "5")]
     pub read_only: bool,
+    #[prost(string, tag = "6")]
+    pub nidx_shard_id: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
