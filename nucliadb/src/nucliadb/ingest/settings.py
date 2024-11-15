@@ -39,7 +39,7 @@ class DriverConfig(Enum):
 
 
 class DriverSettings(BaseSettings):
-    driver: DriverConfig = Field(default=DriverConfig.NOT_SET, description="K/V storage driver")
+    driver: DriverConfig = Field(default=DriverConfig.PG, description="K/V storage driver")
     driver_pg_url: Optional[str] = Field(
         default=None,
         description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",  # noqa
