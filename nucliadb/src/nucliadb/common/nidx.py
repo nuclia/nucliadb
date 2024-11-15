@@ -21,6 +21,8 @@
 import os
 from typing import Optional
 
+from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub
+
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.settings import settings
 from nucliadb.ingest.settings import DriverConfig
@@ -35,15 +37,7 @@ from nucliadb_utils.settings import FileBackendConfig, indexing_settings, storag
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
-NIDX_INSTALLED = False
-if os.environ.get("NIDX_ENABLED"):
-    try:
-        # TODO: Remove this ignore once nidx_protos is actually required
-        from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub  # type: ignore
-
-        NIDX_INSTALLED = True
-    except ImportError:
-        logger.info("nidx not installed")
+NIDX_ENABLED = bool(os.environ.get("NIDX_ENABLED"))
 
 
 class NidxUtility:
@@ -134,10 +128,10 @@ class NidxServiceUtility(NidxUtility):
 
     def __init__(self):
         if indexing_settings.index_nidx_subject is None:
-            raise ValueError("nidx subject needed for nidx utility")
+            raise ValueError("INDEX_NIDX_SUBJECT needed for nidx utility")
 
         if not settings.nidx_api_address or not settings.nidx_searcher_address:
-            raise ValueError("NIDX_API and NIDX_SEARCHER are required")
+            raise ValueError("NIDX_API_ADDRESS and NIDX_SEARCHER_ADDRESS are required")
 
         self.nats_connection_manager = NatsConnectionManager(
             service_name="NidxIndexer",
@@ -165,7 +159,7 @@ class NidxServiceUtility(NidxUtility):
 
 
 async def start_nidx_utility() -> Optional[NidxUtility]:
-    if not NIDX_INSTALLED:
+    if not NIDX_ENABLED:
         return None
 
     nidx = get_nidx()
@@ -211,9 +205,34 @@ def get_nidx_searcher_client() -> Optional["NidxSearcherStub"]:
         return None
 
 
+# TODO: Remove the index node abstraction
+class NodeNidxAdapter:
+    def __init__(self, api_client, searcher_client):
+        # API methods
+        self.GetShard = api_client.GetShard
+        self.NewShard = api_client.NewShard
+        self.DeleteShard = api_client.DeleteShard
+        self.ListShards = api_client.ListShards
+        self.AddVectorSet = api_client.AddVectorSet
+        self.RemoveVectorSet = api_client.RemoveVectorSet
+        self.ListVectorSets = api_client.ListVectorSets
+        self.GetMetadata = api_client.GetMetadata
+
+        # Searcher methods
+        self.DocumentIds = searcher_client.DocumentIds
+        self.ParagraphIds = searcher_client.ParagraphIds
+        self.VectorIds = searcher_client.VectorIds
+        self.RelationIds = searcher_client.RelationIds
+        self.RelationEdges = searcher_client.RelationEdges
+        self.Search = searcher_client.Search
+        self.Suggest = searcher_client.Suggest
+        self.Paragraphs = searcher_client.Paragraphs
+        self.Documents = searcher_client.Documents
+
+
 class FakeNode(AbstractIndexNode):
-    def __init__(self, searcher_client):
-        self.client = searcher_client
+    def __init__(self, api_client, searcher_client):
+        self.client = NodeNidxAdapter(api_client, searcher_client)
 
     @property
     def reader(self):
@@ -221,7 +240,7 @@ class FakeNode(AbstractIndexNode):
 
     @property
     def writer(self):
-        return None
+        return self.client
 
     def is_read_replica(_):
         return False
@@ -240,8 +259,8 @@ class FakeNode(AbstractIndexNode):
 
 
 def get_nidx_fake_node() -> Optional[FakeNode]:
-    nidx = get_nidx_searcher_client()
+    nidx = get_nidx()
     if nidx:
-        return FakeNode(nidx)
+        return FakeNode(nidx.api_client, nidx.searcher_client)
     else:
         return None

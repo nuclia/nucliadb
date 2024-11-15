@@ -13,9 +13,9 @@ use nidx::Settings;
 use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
+use tempfile::{tempdir, TempDir};
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
 
@@ -39,6 +39,7 @@ pub struct NidxBinding {
     seq: SeqSource,
     runtime: Option<Runtime>,
     sync_watcher: watch::Receiver<SyncStatus>,
+    _searcher_work_dir: TempDir,
 }
 
 #[pymethods]
@@ -99,8 +100,9 @@ impl NidxBinding {
         tokio::task::spawn(api_server.serve(api_service));
 
         // Searcher API
+        let searcher_work_dir = tempdir()?;
         let (sync_reporter, sync_watcher) = watch::channel(SyncStatus::Syncing);
-        let searcher = SyncedSearcher::new(settings.metadata.clone(), Path::new("/tmp/searcher"));
+        let searcher = SyncedSearcher::new(settings.metadata.clone(), searcher_work_dir.path());
         let searcher_api = SearchServer::new(settings.metadata.clone(), searcher.index_cache());
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
@@ -130,6 +132,7 @@ impl NidxBinding {
             seq,
             runtime: None,
             sync_watcher,
+            _searcher_work_dir: searcher_work_dir,
         })
     }
 }
