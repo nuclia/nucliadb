@@ -21,7 +21,7 @@ use crate::query_io;
 use crate::set_query::SetQuery;
 use itertools::Itertools;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
-use nidx_protos::{ParagraphItem, ParagraphSearchRequest, StreamRequest, SuggestRequest};
+use nidx_protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
 use nidx_types::query_language::BooleanExpression;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -35,22 +35,6 @@ use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::{self, ParagraphSchema};
 use crate::stop_words::is_stop_word;
 type QueryP = (Occur, Box<dyn Query>);
-
-pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
-impl ParagraphIterator {
-    pub fn new<I>(inner: I) -> ParagraphIterator
-    where
-        I: Iterator<Item = ParagraphItem> + Send + 'static,
-    {
-        ParagraphIterator(Box::new(inner))
-    }
-}
-impl Iterator for ParagraphIterator {
-    type Item = ParagraphItem;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
-    }
-}
 
 // In an ideal world this should be part of the actual request, but since
 // we use protos all the way down the stack here we are. Once the protos use
