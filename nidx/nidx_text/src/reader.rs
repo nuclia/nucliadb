@@ -43,22 +43,6 @@ use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, ReloadPolicy, Searcher};
 use tracing::*;
 
-pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
-impl DocumentIterator {
-    pub fn new<I>(inner: I) -> DocumentIterator
-    where
-        I: Iterator<Item = DocumentItem> + Send + 'static,
-    {
-        DocumentIterator(Box::new(inner))
-    }
-}
-impl Iterator for DocumentIterator {
-    type Item = DocumentItem;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
-    }
-}
-
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
         .top_k(facet, 50)
@@ -268,7 +252,7 @@ impl TextReaderService {
         })
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<DocumentIterator> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem>> {
         let producer = BatchProducer {
             offset: 0,
             total: self.count()?,
@@ -278,7 +262,7 @@ impl TextReaderService {
             searcher: self.reader.searcher(),
             query: search_query::create_streaming_query(&self.schema, request),
         };
-        Ok(DocumentIterator::new(producer.flatten()))
+        Ok(producer.flatten())
     }
 
     fn count(&self) -> anyhow::Result<usize> {
