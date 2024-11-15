@@ -34,6 +34,9 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 import nucliadb_sdk
 
+images.settings["postgresql"]["version"] = "11"
+images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
+
 images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
     "version": "latest",
@@ -81,8 +84,9 @@ class NucliaFixture:
 
 @pytest.fixture(scope="session")
 def nucliadb(pg):
+    pg_host, pg_port = pg
     # Setup the connection to pg for the maindb driver
-    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+    url = f"postgresql://postgres:postgres@{pg_host}:{pg_port}/postgres"
     images.settings["nucliadb"]["env"]["DRIVER"] = "PG"
     images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = url
 
@@ -122,11 +126,8 @@ def nucliadb(pg):
         container = NucliaDB()
         host, port = container.run()
         network = container.container_obj.attrs["NetworkSettings"]
-        if os.environ.get("TESTING", "") == "jenkins":
-            grpc = 8060
-        else:
-            service_port = "8060/tcp"
-            grpc = network["Ports"][service_port][0]["HostPort"]
+        service_port = "8060/tcp"
+        grpc = network["Ports"][service_port][0]["HostPort"]
         yield NucliaFixture(
             host=host,
             port=port,
