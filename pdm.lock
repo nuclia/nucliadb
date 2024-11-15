@@ -5,7 +5,7 @@
 groups = ["default", "dev", "nidx", "sdk", "sidecar"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:6d48f679c11d3bea635a4ad30770dd4f52172340a65bace9b60f863dfc77c0d2"
+content_hash = "sha256:7bab3f7385bb318621b804e117005b73c90be34936423ee3b648d5c28a484fb2"
 
 [[metadata.targets]]
 requires_python = ">=3.9"
@@ -2032,14 +2032,14 @@ version = "0.1.0"
 requires_python = ">=3.8"
 path = "./nidx/nidx_binding"
 summary = ""
-groups = ["nidx"]
+groups = ["dev", "nidx"]
 
 [[package]]
 name = "nidx-protos"
 version = "0.0.1"
 path = "./nidx/nidx_protos"
 summary = ""
-groups = ["default"]
+groups = ["default", "dev"]
 
 [[package]]
 name = "nkeys"

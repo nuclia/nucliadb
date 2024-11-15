@@ -89,7 +89,7 @@ async def _test_reindex(
     if nidx:
         for shard in await shard_manager.get_shards_by_kbid(kbid):
             msg = nodewriter_pb2.IndexMessage(
-                shard=shard.shard, typemessage=nodewriter_pb2.DELETION, resource=rid
+                shard=shard.nidx_shard_id, typemessage=nodewriter_pb2.DELETION, resource=rid
             )
             await nidx.index(msg)
         await dirty_index.mark_dirty()

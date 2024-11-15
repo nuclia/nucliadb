@@ -32,6 +32,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.dirty_index import wait_for_sync
 
 
 @pytest.mark.asyncio
@@ -87,6 +88,7 @@ async def test_generator_token_classification(
 async def inject_resource_with_token_classification(knowledgebox, writer):
     bm = broker_resource(knowledgebox)
     await inject_message(writer, bm)
+    await wait_for_sync()
     await asyncio.sleep(0.1)
     return bm.uuid
 

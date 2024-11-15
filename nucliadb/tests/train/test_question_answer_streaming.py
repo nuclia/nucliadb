@@ -34,6 +34,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.dirty_index import wait_for_sync
 
 
 async def get_question_answer_streaming_batch_from_response(
@@ -101,6 +102,7 @@ async def test_generator_question_answer_streaming(
 
 async def inject_resources_with_question_answers(kbid: str, nucliadb_grpc: WriterStub):
     await inject_message(nucliadb_grpc, smb_wonder_bm(kbid))
+    await wait_for_sync()
     await asyncio.sleep(0.1)
 
 
@@ -202,6 +204,7 @@ async def test_generator_question_answer_streaming_streams_qa_annotations(
         },
     )
     assert resp.status == 201, resp.text
+    await wait_for_sync()
 
     async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200

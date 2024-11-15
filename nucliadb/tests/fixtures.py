@@ -435,6 +435,7 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStu
     bm.kbid = knowledgebox
     bm.relations.extend(edges)
     await inject_message(nucliadb_grpc, bm)
+    await wait_for_sync()
 
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/entitiesgroups",
