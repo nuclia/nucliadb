@@ -32,6 +32,7 @@ from nucliadb.search import API_PREFIX
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
@@ -178,12 +179,52 @@ async def multiple_search_resource(
     """
     n_resources = 100
     fields_per_resource = 3
-    for count in range(1, n_resources + 1):
-        message = broker_resource(knowledgebox_ingest)
-        await processor.process(message=message, seqid=count)
+    count = 0
+    for _ in range(1, n_resources + 1):
+        writer_bm, processing_bm = split_broker_message_by_source(broker_resource(knowledgebox_ingest))
+        await processor.process(message=writer_bm, seqid=count)
+        count += 1
+        await processor.process(message=processing_bm, seqid=count)
+        count += 1
 
     await wait_for_shard(knowledgebox_ingest, n_resources * fields_per_resource)
     return knowledgebox_ingest
+
+
+def split_broker_message_by_source(message: BrokerMessage) -> tuple[BrokerMessage, BrokerMessage]:
+    writer_fields = [
+        "basic",
+        "files",
+        "origin",
+        "security",
+        "links",
+        "texts",
+        "conversations",
+        "relations",
+        "delete_fields",
+        "extra",
+    ]
+    processing_fields = [
+        "extracted_text",
+        "field_metadata",
+        "field_vectors",
+        "field_large_metadata",
+        "file_extracted_data",
+        "link_extracted_data",
+        "question_answers",
+    ]
+    writer = BrokerMessage()
+    writer.CopyFrom(message)
+    writer.source = BrokerMessage.MessageSource.WRITER
+    for field in processing_fields:
+        writer.ClearField(field)  # type: ignore
+
+    processing = BrokerMessage()
+    processing.CopyFrom(message)
+    processing.source = BrokerMessage.MessageSource.PROCESSOR
+    for field in writer_fields:
+        processing.ClearField(field)  # type: ignore
+    return writer, processing
 
 
 async def inject_message(processor, knowledgebox_ingest, message, count: int = 1) -> str:
