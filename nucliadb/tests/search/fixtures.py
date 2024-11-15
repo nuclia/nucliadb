@@ -208,7 +208,7 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     if nidx_api:
         checks[""] = False
         req = GetShardRequest()
-        req.shard_id.id = shard.shard
+        req.shard_id.id = shard.nidx_shard_id
         for i in range(30):
             count_shard: Shard = await nidx_api.GetShard(req)  # type: ignore
             if count_shard.fields >= count:

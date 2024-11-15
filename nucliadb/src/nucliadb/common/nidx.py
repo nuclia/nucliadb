@@ -164,7 +164,6 @@ async def start_nidx_utility() -> Optional[NidxUtility]:
 
     nidx = get_nidx()
     if nidx:
-        logger.warn("nidx already initialized, will not reinitialize")
         return nidx
 
     nidx_utility: NidxUtility
