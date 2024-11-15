@@ -103,7 +103,7 @@ class ShardCreatorHandler:
         async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
             # remember, a lock will do at least 1+ reads and 1 write.
             # with heavy writes, this adds some simple k/v pressure
-            node, shard_id = choose_node(current_shard)
+            node, shard_id = choose_node(current_shard, use_nidx=True)
             shard: nodereader_pb2.Shard = await node.reader.GetShard(
                 nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
             )
