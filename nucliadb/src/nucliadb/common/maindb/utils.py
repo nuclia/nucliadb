@@ -29,13 +29,6 @@ try:
 except ImportError:  # pragma: no cover
     PG = False
 
-try:
-    from nucliadb.common.maindb.local import LocalDriver
-
-    FILES = True
-except ImportError:  # pragma: no cover
-    FILES = False
-
 
 def get_driver() -> Driver:
     driver = get_utility(Utility.MAINDB_DRIVER)
@@ -61,14 +54,6 @@ async def setup_driver() -> Driver:
             acquire_timeout_ms=settings.driver_pg_connection_pool_acquire_timeout_ms,
         )
         set_utility(Utility.MAINDB_DRIVER, pg_driver)
-    elif settings.driver == DriverConfig.LOCAL:
-        if not FILES:
-            raise ConfigurationError("`aiofiles` python package not installed.")
-        if settings.driver_local_url is None:
-            raise ConfigurationError("No DRIVER_LOCAL_URL env var defined.")
-
-        local_driver = LocalDriver(settings.driver_local_url)
-        set_utility(Utility.MAINDB_DRIVER, local_driver)
     else:
         raise ConfigurationError(f"Invalid DRIVER defined configured: {settings.driver}")
 

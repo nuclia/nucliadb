@@ -18,5 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 pytest_plugins = [
+    "pytest_docker_fixtures",
     "nucliadb_sdk.tests.fixtures",
 ]

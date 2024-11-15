@@ -343,7 +343,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        maindb_driver: ["pg"]
         shard: [0, 1, 2]
 
     steps:
@@ -365,8 +364,6 @@ jobs:
       - name: Run NucliaDB tests
         # These tests can be flaky, let's retry them...
         uses: nick-fields/retry@v3
-        env:
-          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
         with:
           max_attempts: 2
           retry_on: error

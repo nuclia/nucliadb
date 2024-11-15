@@ -26,7 +26,6 @@ from httpx import AsyncClient
 
 import nucliadb_models
 from nucliadb.common import datamanagers
-from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import PushPayload
 from nucliadb.writer.api.v1.router import (
@@ -233,9 +232,6 @@ async def test_reprocess_resource(
     mocker,
     maindb_driver,
 ) -> None:
-    if isinstance(maindb_driver, (LocalDriver)):
-        pytest.skip("Keys might not be ordered correctly in this driver")
-
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
