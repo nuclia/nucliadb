@@ -2030,7 +2030,6 @@ files = [
 name = "nidx-binding"
 version = "0.1.0"
 requires_python = ">=3.8"
-editable = true
 path = "./nidx/nidx_binding"
 summary = ""
 groups = ["dev", "nidx"]
@@ -2038,7 +2037,6 @@ groups = ["dev", "nidx"]
 [[package]]
 name = "nidx-protos"
 version = "0.0.1"
-editable = true
 path = "./nidx/nidx_protos"
 summary = ""
 groups = ["default", "dev"]

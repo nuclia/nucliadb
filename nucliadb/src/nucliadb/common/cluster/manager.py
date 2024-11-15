@@ -319,7 +319,7 @@ class KBShardManager:
                     )
 
         nidx_api = get_nidx_api_client()
-        if nidx_api:
+        if nidx_api and shard.nidx_shard_id:
             try:
                 await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
             except Exception as rollback_error:
