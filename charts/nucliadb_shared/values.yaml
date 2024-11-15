@@ -98,3 +98,8 @@ flag_settings_url: null
 
 encryption:
   secret_key: XX
+
+# nidx:
+#   api_address:
+#   searcher_address:
+#   nats_subject:

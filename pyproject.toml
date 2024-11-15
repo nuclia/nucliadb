@@ -4,11 +4,16 @@ requires-python = ">=3.9"
 version = "0.0.0"
 dependencies = [
     "nucliadb @ file:///${PROJECT_ROOT}/nucliadb",
+    # TODO: We don't want to add nidx-protos as a nucliadb dependency yet
+    "nidx-protos @ file:///${PROJECT_ROOT}/nidx/nidx_protos",
 ]
 
 [project.optional-dependencies]
 sidecar = [
     "nucliadb-sidecar @ file:///${PROJECT_ROOT}/nucliadb_sidecar",
+]
+nidx = [
+    "nidx-binding @ file:///${PROJECT_ROOT}/nidx/nidx_binding",
 ]
 [tool.pdm.dev-dependencies]
 dev = [
@@ -60,10 +65,6 @@ sdk = [
     "-e file:///${PROJECT_ROOT}/nucliadb_sdk#egg=nucliadb-sdk",
     "-e file:///${PROJECT_ROOT}/nucliadb_dataset#egg=nucliadb-dataset",
     "requests-mock>=1.12.1",
-]
-nidx = [
-    "-e file:///${PROJECT_ROOT}/nidx/nidx_binding",
-    "-e file:///${PROJECT_ROOT}/nidx/nidx_protos",
 ]
 
 [tool.setuptools]
