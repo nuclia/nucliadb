@@ -42,6 +42,7 @@ async def component_nucliadb_reader(
     # this fixture. This should be fixed or explained
     local_files,
     dummy_index_node_cluster,
+    dummy_nidx_utility,
     reader_api_server: FastAPI,
 ) -> AsyncIterator[AsyncClient]:
     with patch.object(running_settings, "debug", False):
