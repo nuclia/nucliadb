@@ -53,6 +53,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.writer_pb2 import GetEntitiesGroupRequest, GetEntitiesGroupResponse
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
+from tests.utils.dirty_index import wait_for_sync
 from tests.utils.entities import (
     create_entities_group,
     delete_entities_group,
@@ -123,6 +124,7 @@ async def processing_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
         )
     bm.relations.extend(relations)
     await inject_message(nucliadb_grpc, bm)
+    await wait_for_sync()
 
 
 @pytest.fixture
@@ -181,6 +183,7 @@ async def annotated_entities(
 
 @pytest.fixture
 async def user_entities(nucliadb_writer: AsyncClient, knowledgebox: str):
+    await wait_for_sync()
     payload = CreateEntitiesGroupPayload(
         group="ANIMALS",
         entities={
