@@ -241,15 +241,16 @@ class _NodeRunner:
 
     def start(self):
         docker_platform_name = self.docker_client.api.version()["Platform"]["Name"].upper()
-        if "GITHUB_ACTION" not in os.environ and (
-            "DESKTOP" in docker_platform_name
-            # newer versions use community
-            or "DOCKER ENGINE - COMMUNITY" == docker_platform_name
-        ):
+        if "GITHUB_ACTION" in os.environ:
+            # Valid when using github actions
+            docker_internal_host = "172.17.0.1"
+        elif docker_platform_name == "DOCKER ENGINE - COMMUNITY":
+            # for linux users
+            docker_internal_host = "172.17.0.1"
+        elif "DOCKER DESKTOP" in docker_platform_name:
             # Valid when using Docker desktop
             docker_internal_host = "host.docker.internal"
         else:
-            # Valid when using github actions
             docker_internal_host = "172.17.0.1"
 
         self.volume_node_1 = self.docker_client.volumes.create(driver="local")
