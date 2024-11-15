@@ -89,10 +89,10 @@ data:
 {{- end }}
 
 {{- with .Values.nidx }}
-  NIDX_ENABLED: "{{ .Values.flag_settings_url }}"
-  INDEX_NIDX_SUBJECT: {{ .nats_subject }}
-  NIDX_API_ADDRESS: {{ .api_address }}
-  NIDX_SEARCHER_ADDRES: {{ .searcher_address }}
+  NIDX_ENABLED: "1"
+  INDEX_NIDX_SUBJECT: "{{ .nats_subject }}"
+  NIDX_API_ADDRESS: "{{ .api_address }}"
+  NIDX_SEARCHER_ADDRES: "{{ .searcher_address }}"
 {{- end }}
 
 {{- end }}
