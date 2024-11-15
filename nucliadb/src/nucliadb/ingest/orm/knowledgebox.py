@@ -304,8 +304,8 @@ class KnowledgeBox:
             # so this call shouldn't be costly
             if nidx_api is not None:
                 for shard in shards_obj.shards:
-                    shard_id = shard.shard
-                    await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard_id))
+                    if shard.nidx_shard_id:
+                        await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
 
         if kb_config is not None:
             await cls._maybe_delete_external_indexes(kbid, kb_config.external_index_provider)

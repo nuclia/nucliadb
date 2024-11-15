@@ -1422,8 +1422,10 @@ class ShardObject(google.protobuf.message.Message):
     REPLICAS_FIELD_NUMBER: builtins.int
     TIMESTAMP_FIELD_NUMBER: builtins.int
     READ_ONLY_FIELD_NUMBER: builtins.int
+    NIDX_SHARD_ID_FIELD_NUMBER: builtins.int
     shard: builtins.str
     read_only: builtins.bool
+    nidx_shard_id: builtins.str
     @property
     def replicas(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardReplica]: ...
     @property
@@ -1435,9 +1437,10 @@ class ShardObject(google.protobuf.message.Message):
         replicas: collections.abc.Iterable[global___ShardReplica] | None = ...,
         timestamp: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         read_only: builtins.bool = ...,
+        nidx_shard_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["read_only", b"read_only", "replicas", b"replicas", "shard", b"shard", "timestamp", b"timestamp"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["nidx_shard_id", b"nidx_shard_id", "read_only", b"read_only", "replicas", b"replicas", "shard", b"shard", "timestamp", b"timestamp"]) -> None: ...
 
 global___ShardObject = ShardObject
 
