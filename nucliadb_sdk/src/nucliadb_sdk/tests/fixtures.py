@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from typing import Optional
 from uuid import uuid4
 
-import docker
+import docker  # type: ignore
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore
@@ -146,7 +146,7 @@ def nucliadb(pg):
         if child:
             child.kill()
     else:
-        breakpoint()
+        # We need to replace the localhost with the internal docker host to allow container-to-container communication
         images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = images.settings["nucliadb"]["env"][
             "DRIVER_PG_URL"
         ].replace("localhost", get_docker_internal_host())
