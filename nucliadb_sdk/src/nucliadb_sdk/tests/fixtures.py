@@ -150,7 +150,6 @@ def nucliadb(pg):
         images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = images.settings["nucliadb"]["env"][
             "DRIVER_PG_URL"
         ].replace("localhost", get_docker_internal_host())
-        print("NucliaDB running on", images.settings["nucliadb"]["env"]["DRIVER_PG_URL"])
         container = NucliaDB()
         host, port = container.run()
         network = container.container_obj.attrs["NetworkSettings"]
