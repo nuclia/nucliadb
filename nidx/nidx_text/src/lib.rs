@@ -27,12 +27,12 @@ mod search_query;
 
 use std::path::Path;
 
-use nidx_protos::{DocumentSearchRequest, DocumentSearchResponse, StreamRequest};
+use nidx_protos::{DocumentItem, DocumentSearchRequest, DocumentSearchResponse, StreamRequest};
 use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
 use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
 use nidx_types::OpenIndexMetadata;
 use prefilter::{PreFilterRequest, PreFilterResponse};
-use reader::{DocumentIterator, TextReaderService};
+use reader::TextReaderService;
 use resource_indexer::index_document;
 use schema::TextSchema;
 
@@ -127,7 +127,7 @@ impl TextSearcher {
         self.reader.prefilter(request)
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<DocumentIterator> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem>> {
         self.reader.iterator(request)
     }
 }

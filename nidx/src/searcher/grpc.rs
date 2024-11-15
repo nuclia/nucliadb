@@ -27,6 +27,7 @@ use tonic::{service::Routes, Request, Response, Result, Status};
 
 use crate::{grpc_server::RemappedGrpcService, NidxMetadata};
 
+use super::streams::{document_iterator, paragraph_iterator};
 use super::{index_cache::IndexCache, shard_search, shard_suggest};
 use tracing::*;
 
@@ -53,26 +54,6 @@ impl SearchServer {
 
 #[tonic::async_trait]
 impl NidxSearcher for SearchServer {
-    async fn document_ids(&self, _request: Request<noderesources::ShardId>) -> Result<Response<IdCollection>> {
-        todo!()
-    }
-
-    async fn paragraph_ids(&self, _request: Request<noderesources::ShardId>) -> Result<Response<IdCollection>> {
-        todo!()
-    }
-
-    async fn vector_ids(&self, _request: Request<noderesources::VectorSetId>) -> Result<Response<IdCollection>> {
-        todo!()
-    }
-
-    async fn relation_ids(&self, _request: Request<noderesources::ShardId>) -> Result<Response<IdCollection>> {
-        todo!()
-    }
-
-    async fn relation_edges(&self, _request: Request<noderesources::ShardId>) -> Result<Response<EdgeList>> {
-        todo!()
-    }
-
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
         let response = shard_search::search(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
         match response {
@@ -97,12 +78,26 @@ impl NidxSearcher for SearchServer {
 
     type ParagraphsStream = Pin<Box<dyn Stream<Item = Result<ParagraphItem, Status>> + Send>>;
 
-    async fn paragraphs(&self, _request: Request<StreamRequest>) -> Result<Response<Self::ParagraphsStream>> {
-        todo!()
+    async fn paragraphs(&self, request: Request<StreamRequest>) -> Result<Response<Self::ParagraphsStream>> {
+        let response = paragraph_iterator(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
+        match response {
+            Ok(response) => Ok(Response::new(Box::pin(futures::stream::iter(response.map(Result::Ok))))),
+            Err(e) => {
+                error!(?e, "Error in paragraphs stream");
+                Err(Status::internal(e.to_string()))
+            }
+        }
     }
     type DocumentsStream = Pin<Box<dyn Stream<Item = Result<DocumentItem, Status>> + Send>>;
 
-    async fn documents(&self, _request: Request<StreamRequest>) -> Result<Response<Self::DocumentsStream>> {
-        todo!()
+    async fn documents(&self, request: Request<StreamRequest>) -> Result<Response<Self::DocumentsStream>> {
+        let response = document_iterator(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
+        match response {
+            Ok(response) => Ok(Response::new(Box::pin(futures::stream::iter(response.map(Result::Ok))))),
+            Err(e) => {
+                error!(?e, "Error in paragraphs stream");
+                Err(Status::internal(e.to_string()))
+            }
+        }
     }
 }

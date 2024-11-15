@@ -8,21 +8,11 @@ import "nucliadb_protos/nodewriter.proto";
 service NidxApi {
   rpc GetShard(nodereader.GetShardRequest) returns (noderesources.Shard) {}
 
-  // rpc GetShardFiles(GetShardFilesRequest) returns (ShardFileList) {};
-  // rpc DownloadShardFile(DownloadShardFileRequest) returns (stream
-  // ShardFileChunk) {};
-
   rpc NewShard(nodewriter.NewShardRequest) returns (noderesources.ShardCreated) {}
   rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
   rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}
-  // rpc GC(noderesources.ShardId) returns (GarbageCollectorResponse) {}
-  // rpc Merge(noderesources.ShardId) returns (MergeResponse) {}
 
-  // rpc SetResource(noderesources.Resource) returns (OpStatus) {}
-  // rpc SetResourceFromStorage(IndexMessage) returns (OpStatus) {}
-  // rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
-
-  rpc AddVectorSet(nodewriter.NewVectorSetRequest) returns (nodewriter.OpStatus) {} // New
+  rpc AddVectorSet(nodewriter.NewVectorSetRequest) returns (nodewriter.OpStatus) {}
   rpc RemoveVectorSet(noderesources.VectorSetID) returns (nodewriter.OpStatus) {}
   rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
 
@@ -30,12 +20,6 @@ service NidxApi {
 }
 
 service NidxSearcher {
-  rpc DocumentIds(noderesources.ShardId) returns (nodereader.IdCollection) {}
-  rpc ParagraphIds(noderesources.ShardId) returns (nodereader.IdCollection) {}
-  rpc VectorIds(noderesources.VectorSetID) returns (nodereader.IdCollection) {}
-  rpc RelationIds(noderesources.ShardId) returns (nodereader.IdCollection) {}
-  rpc RelationEdges(noderesources.ShardId) returns (nodereader.EdgeList) {}
-
   rpc Search(nodereader.SearchRequest) returns (nodereader.SearchResponse) {}
   rpc Suggest(nodereader.SuggestRequest) returns (nodereader.SuggestResponse) {}
 
