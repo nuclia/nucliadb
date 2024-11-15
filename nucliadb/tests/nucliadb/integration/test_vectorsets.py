@@ -79,7 +79,6 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     node, shard_id = manager.choose_node(logic_shard, use_nidx=NIDX_ENABLED)
     await wait_for_sync()
 
-
     test_cases = [
         (vectorset_dimension, vectorset_id),
     ]
