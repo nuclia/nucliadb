@@ -81,6 +81,11 @@ class NucliaFixture:
 
 @pytest.fixture(scope="session")
 def nucliadb(pg):
+    # Setup the connection to pg for the maindb driver
+    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+    images.settings["nucliadb"]["env"]["DRIVER"] = "PG"
+    images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = url
+
     if os.environ.get("TEST_LOCAL_NUCLIADB"):
         host = os.environ.get("TEST_LOCAL_NUCLIADB")
         child = None
@@ -114,10 +119,6 @@ def nucliadb(pg):
         if child:
             child.kill()
     else:
-        url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-        images.settings["nucliadb"]["env"]["DRIVER"] = "PG"
-        images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = url
-
         container = NucliaDB()
         host, port = container.run()
         network = container.container_obj.attrs["NetworkSettings"]
