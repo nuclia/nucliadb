@@ -68,7 +68,7 @@ async def wait_until_entity(
             GetEntitiesGroupRequest(kb=KnowledgeBoxID(uuid=kbid), group=group)
         )
         found = entity in response.group.entities
-        assert time.time() - start < timeout, "Timeout while waiting for entity {group}/{entity}"
+        assert time.time() - start < timeout, f"Timeout while waiting for entity {group}/{entity}"
 
         if not found:
             await asyncio.sleep(0.1)

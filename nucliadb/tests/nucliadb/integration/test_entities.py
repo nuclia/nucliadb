@@ -175,7 +175,7 @@ async def annotated_entities(
         assert retries < 10, "Broker message indexing took too much, might be a test error"
 
         # small sleep to give time for indexing
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
         retries += 1
 
 
@@ -205,9 +205,9 @@ async def entities(
 ):
     """Single fixture to get entities injected in different ways."""
     # Ensure entities are properly stored/indexed
-    await wait_until_entity(nucliadb_grpc, knowledgebox, "ANIMALS", "cat")
-    await wait_until_entity(nucliadb_grpc, knowledgebox, "ANIMALS", "dolphin")
-    await wait_until_entity(nucliadb_grpc, knowledgebox, "ANIMALS", "bird")
+    await wait_until_entity(nucliadb_grpc, knowledgebox, "ANIMALS", "cat", timeout=2)
+    await wait_until_entity(nucliadb_grpc, knowledgebox, "ANIMALS", "dolphin", timeout=2)
+    await wait_until_entity(nucliadb_grpc, knowledgebox, "ANIMALS", "bird", timeout=2)
 
 
 @pytest.mark.asyncio

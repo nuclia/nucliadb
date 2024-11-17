@@ -286,7 +286,7 @@ class Processor:
 
                 if resource and resource.modified:
                     await pgcatalog_update(txn, kbid, resource)
-                    if message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+                    if self.should_index_resource(message):
                         await self.index_resource(  # noqa
                             resource=resource,
                             txn=txn,
@@ -377,6 +377,21 @@ class Processor:
                     raise DeadletteredError() from handled_exception
 
         return None
+
+    def should_index_resource(self, message: writer_pb2.BrokerMessage) -> bool:
+        """
+        We try to delay indexing a resource as much as possible to avoid having to allocate a shard to
+        the resource before we know how big it is going to be.
+
+        Typically, we only index a resource when we receive the broker message coming from its processing.
+        However, there are some exceptions to this rule:
+        - If the message is coming from the writer and has some entity annotations
+        """
+        message_from_processing = message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+        has_entity_annotations = any(
+            len(field_metadata.token) > 0 for field_metadata in message.basic.fieldmetadata
+        )
+        return message_from_processing or has_entity_annotations
 
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
@@ -739,3 +754,41 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
                 if len(vectorset_sentences.sentences) > 0:
                     return True
     return False
+
+
+def split_broker_message_by_source(
+    message: writer_pb2.BrokerMessage,
+) -> tuple[writer_pb2.BrokerMessage, writer_pb2.BrokerMessage]:
+    writer_fields = [
+        "basic",
+        "files",
+        "origin",
+        "security",
+        "links",
+        "texts",
+        "conversations",
+        "relations",
+        "delete_fields",
+        "extra",
+    ]
+    processing_fields = [
+        "extracted_text",
+        "field_metadata",
+        "field_vectors",
+        "field_large_metadata",
+        "file_extracted_data",
+        "link_extracted_data",
+        "question_answers",
+    ]
+    writer = writer_pb2.BrokerMessage()
+    writer.CopyFrom(message)
+    writer.source = writer_pb2.BrokerMessage.MessageSource.WRITER
+    for field in processing_fields:
+        writer.ClearField(field)  # type: ignore
+
+    processing = writer_pb2.BrokerMessage()
+    processing.CopyFrom(message)
+    processing.source = writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+    for field in writer_fields:
+        processing.ClearField(field)  # type: ignore
+    return writer, processing

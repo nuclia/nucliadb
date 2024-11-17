@@ -28,11 +28,11 @@ from redis import asyncio as aioredis
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.cache import clear_ingest_cache
+from nucliadb.ingest.orm.processor import split_broker_message_by_source
 from nucliadb.search import API_PREFIX
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
-from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
@@ -159,10 +159,8 @@ async def test_search_resource(
     """
     Create a resource that has every possible bit of information
     """
-    message1 = broker_resource(
-        knowledgebox_ingest, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug"
-    )
-    kbid = await inject_message(processor, knowledgebox_ingest, message1)
+    bm = broker_resource(knowledgebox_ingest, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug")
+    kbid = await inject_message(processor, knowledgebox_ingest, bm, count=1)
     resource_field_count = 3
     await wait_for_shard(knowledgebox_ingest, resource_field_count)
     yield kbid
@@ -175,13 +173,17 @@ async def multiple_search_resource(
     knowledgebox_ingest,
 ):
     """
-    Create 100 resources that have every possible bit of information
+    Create 100 resources that have every possible bit of information.
+
+    Each resource is fully created with two broker message ingestions: one for the
+    writer and one for the processor.
     """
     n_resources = 100
     fields_per_resource = 3
     count = 0
     for _ in range(1, n_resources + 1):
-        writer_bm, processing_bm = split_broker_message_by_source(broker_resource(knowledgebox_ingest))
+        bm = broker_resource(knowledgebox_ingest)
+        writer_bm, processing_bm = split_broker_message_by_source(bm)
         await processor.process(message=writer_bm, seqid=count)
         count += 1
         await processor.process(message=processing_bm, seqid=count)
@@ -191,44 +193,10 @@ async def multiple_search_resource(
     return knowledgebox_ingest
 
 
-def split_broker_message_by_source(message: BrokerMessage) -> tuple[BrokerMessage, BrokerMessage]:
-    writer_fields = [
-        "basic",
-        "files",
-        "origin",
-        "security",
-        "links",
-        "texts",
-        "conversations",
-        "relations",
-        "delete_fields",
-        "extra",
-    ]
-    processing_fields = [
-        "extracted_text",
-        "field_metadata",
-        "field_vectors",
-        "field_large_metadata",
-        "file_extracted_data",
-        "link_extracted_data",
-        "question_answers",
-    ]
-    writer = BrokerMessage()
-    writer.CopyFrom(message)
-    writer.source = BrokerMessage.MessageSource.WRITER
-    for field in processing_fields:
-        writer.ClearField(field)  # type: ignore
-
-    processing = BrokerMessage()
-    processing.CopyFrom(message)
-    processing.source = BrokerMessage.MessageSource.PROCESSOR
-    for field in writer_fields:
-        processing.ClearField(field)  # type: ignore
-    return writer, processing
-
-
 async def inject_message(processor, knowledgebox_ingest, message, count: int = 1) -> str:
-    await processor.process(message=message, seqid=count)
+    writer_bm, processing_bm = split_broker_message_by_source(message)
+    await processor.process(message=writer_bm, seqid=1)
+    await processor.process(message=processing_bm, seqid=2)
     await wait_for_shard(knowledgebox_ingest, count)
     return knowledgebox_ingest
 
