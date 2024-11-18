@@ -20,7 +20,9 @@
 
 import pytest
 from httpx import AsyncClient
+from pytest_mock import MockFixture
 
+from nucliadb.search.search import find, find_merge
 from nucliadb_models.search import KnowledgeboxFindResults, Reranker
 
 
@@ -61,3 +63,66 @@ async def test_reranker(
     ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])
     assert find_retrieval == ask_retrieval
     assert len(find_retrieval.best_matches) == 7
+
+
+async def test_predict_reranker_requests_more_results(
+    nucliadb_reader: AsyncClient,
+    philosophy_books_kb: str,
+    mocker: MockFixture,
+):
+    """Validate predict reranker asks for more results than the user and we send
+    them to Predict API.
+
+    """
+    kbid = philosophy_books_kb
+    reranker = Reranker.PREDICT_RERANKER
+
+    spy_build_find_response = mocker.spy(find, "build_find_response")
+    spy_cut_page = mocker.spy(find_merge, "cut_page")
+
+    ask_resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/ask",
+        headers={
+            "x-synchronous": "true",
+        },
+        json={
+            "query": "the",
+            "reranker": reranker,
+            "min_score": {"bm25": 0, "semantic": -10},
+            "top_k": 5,
+        },
+    )
+    assert ask_resp.status_code == 200
+
+    find_resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "the",
+            "reranker": reranker,
+            "min_score": {"bm25": 0, "semantic": -10},
+            "top_k": 5,
+        },
+    )
+    assert find_resp.status_code == 200
+
+    assert spy_build_find_response.call_count == spy_cut_page.call_count == 2
+
+    for i in range(spy_build_find_response.call_count):
+        build_find_response_call = spy_build_find_response.call_args[i]
+        cut_page_call = spy_cut_page.call_args[i]
+
+        search_responses = build_find_response_call[0]
+        assert len(search_responses) == 1
+
+        search_response = search_responses[0]
+        assert len(search_response.paragraph.results) == 7
+
+        items, page_size, page_number = cut_page_call
+        assert len(items) == 7
+        assert page_size == 25
+        assert page_number == 0
+
+    find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
+    ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])
+    assert find_retrieval == ask_retrieval
+    assert len(find_retrieval.best_matches) == 5
