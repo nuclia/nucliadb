@@ -26,6 +26,7 @@ from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
+from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.broker_message import generate_broker_message
@@ -467,19 +468,22 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
                 if shard is not None:
                     index_message = brain.brain
-                    await self.proc._maybe_external_index_add_resource(
-                        request.kbid,
-                        request.rid,
-                        index_message,
-                    )
-                    await self.shards_manager.add_resource(
-                        shard,
-                        index_message,
-                        0,
-                        partition=self.partitions[0],
-                        kb=request.kbid,
-                        reindex_id=uuid.uuid4().hex,
-                    )
+                    external_index_manager = await get_external_index_manager(kbid=request.kbid)
+                    if external_index_manager is not None:
+                        await self.proc.external_index_add_resource(
+                            external_index_manager,
+                            request.rid,
+                            index_message,
+                        )
+                    else:
+                        await self.shards_manager.add_resource(
+                            shard,
+                            index_message,
+                            0,
+                            partition=self.partitions[0],
+                            kb=request.kbid,
+                            reindex_id=uuid.uuid4().hex,
+                        )
 
                 response = IndexStatus()
                 return response

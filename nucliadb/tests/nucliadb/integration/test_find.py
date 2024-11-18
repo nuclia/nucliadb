@@ -48,8 +48,6 @@ async def test_find_with_label_changes(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    await asyncio.sleep(1)
-
     # should get 1 result
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/find",

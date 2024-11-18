@@ -386,12 +386,14 @@ class Processor:
         Typically, we only index a resource when we receive the broker message coming from its processing.
         However, there are some exceptions to this rule:
         - If the message is coming from the writer and has some entity annotations
+        - If the message is coming from the writer and has security information
         """
         message_from_processing = message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
         has_entity_annotations = any(
             len(field_metadata.token) > 0 for field_metadata in message.basic.fieldmetadata
         )
-        return message_from_processing or has_entity_annotations
+        has_security = message.HasField("security")
+        return message_from_processing or has_entity_annotations or has_security
 
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
