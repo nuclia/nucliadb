@@ -108,16 +108,16 @@ async def test_predict_reranker_requests_more_results(
     assert spy_build_find_response.call_count == spy_cut_page.call_count == 2
 
     for i in range(spy_build_find_response.call_count):
-        build_find_response_call = spy_build_find_response.call_args[i]
-        cut_page_call = spy_cut_page.call_args[i]
+        build_find_response_call = spy_build_find_response.call_args_list[i]
+        cut_page_call = spy_cut_page.call_args_list[i]
 
-        search_responses = build_find_response_call[0]
+        search_responses = build_find_response_call.args[0]
         assert len(search_responses) == 1
 
         search_response = search_responses[0]
         assert len(search_response.paragraph.results) == 7
 
-        items, page_size, page_number = cut_page_call
+        items, page_size, page_number = cut_page_call.args
         assert len(items) == 7
         assert page_size == 25
         assert page_number == 0
