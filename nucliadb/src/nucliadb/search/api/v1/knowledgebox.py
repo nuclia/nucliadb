@@ -131,6 +131,7 @@ async def _kb_counters(
         counters.sentences = node_index_counts.sentences
         is_small_kb = node_index_counts.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
         resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
+        counters.resources = resource_count
     counters.index_size = counters.paragraphs * AVG_PARAGRAPH_SIZE_BYTES
     if debug and queried_shards is not None:
         counters.shards = queried_shards
