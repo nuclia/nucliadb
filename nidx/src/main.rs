@@ -18,7 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx::{api, indexer, maintenance, searcher, Settings};
+use std::sync::Arc;
+
+use nidx::{api, indexer, maintenance, metrics, searcher, Settings};
+use prometheus_client::registry::Registry;
 use tokio::{main, task::JoinSet};
 
 #[main]
@@ -28,14 +31,17 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let settings = Settings::from_env().await?;
+    let mut metrics_registry = Registry::with_prefix("nidx");
+    metrics::register(&mut metrics_registry);
+    let metric_registry = Arc::new(metrics_registry);
     let mut tasks = JoinSet::new();
     args.iter().for_each(|arg| {
         match arg.as_str() {
             "indexer" => tasks.spawn(indexer::run(settings.clone())),
             "worker" => tasks.spawn(maintenance::worker::run(settings.clone())),
             "scheduler" => tasks.spawn(maintenance::scheduler::run(settings.clone())),
-            "searcher" => tasks.spawn(searcher::run(settings.clone())),
-            "api" => tasks.spawn(api::run(settings.clone())),
+            "searcher" => tasks.spawn(searcher::run(settings.clone(), metric_registry.clone())),
+            "api" => tasks.spawn(api::run(settings.clone(), metric_registry.clone())),
             other => panic!("Unknown component: {other}"),
         };
     });

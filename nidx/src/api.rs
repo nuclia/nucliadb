@@ -21,17 +21,20 @@
 pub mod grpc;
 pub mod shards;
 
+use std::sync::Arc;
+
+use prometheus_client::registry::Registry;
 use tracing::debug;
 
 use crate::{grpc_server::GrpcServer, Settings};
 
-pub async fn run(settings: Settings) -> anyhow::Result<()> {
+pub async fn run(settings: Settings, metrics: Arc<Registry>) -> anyhow::Result<()> {
     let meta = settings.metadata.clone();
 
     let service = grpc::ApiServer::new(meta).into_service();
     let server = GrpcServer::new("0.0.0.0:10000").await?;
     debug!("Running API at port {}", server.port()?);
-    server.serve(service).await?;
+    server.serve(service, metrics).await?;
 
     Ok(())
 }

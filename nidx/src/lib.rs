@@ -23,6 +23,7 @@ pub mod grpc_server;
 pub mod indexer;
 pub mod maintenance;
 pub mod metadata;
+pub mod metrics;
 pub mod searcher;
 mod segment_store;
 pub mod settings;
