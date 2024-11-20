@@ -82,4 +82,7 @@ class Driver:
 
     @asynccontextmanager
     async def transaction(self, read_only: bool = False) -> AsyncGenerator[Transaction, None]:
-        yield Transaction()
+        txn = Transaction()
+        yield txn
+        if txn.open:
+            await txn.abort()

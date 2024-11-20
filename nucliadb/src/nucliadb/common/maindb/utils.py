@@ -16,11 +16,20 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from warnings import warn
+
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+
+try:
+    from nucliadb.common.maindb.local import LocalDriver
+
+    FILES = True
+except ImportError:  # pragma: no cover
+    FILES = False
 
 try:
     from nucliadb.common.maindb.pg import PGDriver
@@ -54,6 +63,14 @@ async def setup_driver() -> Driver:
             acquire_timeout_ms=settings.driver_pg_connection_pool_acquire_timeout_ms,
         )
         set_utility(Utility.MAINDB_DRIVER, pg_driver)
+    elif settings.driver == DriverConfig.LOCAL:
+        if not FILES:
+            raise ConfigurationError("`aiofiles` python package not installed.")
+        if settings.driver_local_url is None:
+            raise ConfigurationError("No DRIVER_LOCAL_URL env var defined.")
+        local_driver = LocalDriver(settings.driver_local_url)
+        set_utility(Utility.MAINDB_DRIVER, local_driver)
+        warn("LocalDriver is not recommended for production use", RuntimeWarning)
     else:
         raise ConfigurationError(f"Invalid DRIVER defined configured: {settings.driver}")
 
