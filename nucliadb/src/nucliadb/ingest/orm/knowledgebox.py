@@ -372,20 +372,9 @@ class KnowledgeBox:
     @classmethod
     async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
         prefix = KB_KEYS.format(kbid=kbid)
-        while True:
-            async with driver.transaction(read_only=True) as txn:
-                all_keys = [key async for key in txn.keys(match=prefix, count=-1)]
-
-            if len(all_keys) == 0:
-                break
-
-            # We commit deletions in chunks because otherwise
-            # tikv complains if there is too much data to commit
-            for chunk_of_keys in chunker(all_keys, chunk_size):
-                async with driver.transaction() as txn:
-                    for key in chunk_of_keys:
-                        await txn.delete(key)
-                    await txn.commit()
+        async with driver.transaction() as txn:
+            await txn.delete_by_prefix(prefix)
+            await txn.commit()
 
     async def get_resource_shard(self, shard_id: str) -> Optional[writer_pb2.ShardObject]:
         async with datamanagers.with_ro_transaction() as txn:
