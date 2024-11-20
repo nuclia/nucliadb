@@ -21,7 +21,8 @@
 from typing import cast
 
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.pg import PGTransaction
+from nucliadb.common.maindb.pg import PGDriver, PGTransaction
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb_telemetry import metrics
 
 from ..resource import Resource
@@ -33,8 +34,15 @@ def _pg_transaction(txn: Transaction) -> PGTransaction:
     return cast(PGTransaction, txn)
 
 
+def pgcatalog_enabled(kbid):
+    return isinstance(get_driver(), PGDriver)
+
+
 @observer.wrap({"type": "update"})
 async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
+    if not pgcatalog_enabled(kbid):
+        return
+
     if resource.basic is None:
         raise ValueError("Cannot index into the catalog a resource without basic metadata ")
 
@@ -68,6 +76,8 @@ async def pgcatalog_update(txn: Transaction, kbid: str, resource: Resource):
 
 @observer.wrap({"type": "delete"})
 async def pgcatalog_delete(txn: Transaction, kbid: str, rid: str):
+    if not pgcatalog_enabled(kbid):
+        return
     async with _pg_transaction(txn).connection.cursor() as cur:
         await cur.execute(
             "DELETE FROM catalog where kbid = %(kbid)s AND rid = %(rid)s", {"kbid": kbid, "rid": rid}
