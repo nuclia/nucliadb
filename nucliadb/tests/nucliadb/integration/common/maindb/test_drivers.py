@@ -207,16 +207,12 @@ async def _test_keys_async_generator(driver):
 
 
 async def _test_transaction_context_manager(driver):
-    # It should abort the transaction if there are uncommited changes
     async with driver.transaction() as txn:
-        assert txn.open
-        await txn.set("/some/key", b"some value")
-    try:
-        assert not txn.open
-    except AssertionError:
-        if not isinstance(driver, PGDriver):
-            # PG driver does not close connections?!
-            raise
+        await txn.set("/some/key/3523532", b"some value")
+    assert not txn.open
+
+    async with driver.transaction() as txn:
+        assert await txn.get("/some/key/3523532") is None
 
     # It should not attempt to abort if commited
     async with driver.transaction() as txn:

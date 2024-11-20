@@ -329,7 +329,12 @@ class PGDriver(Driver):
             yield ReadOnlyPGTransaction(self)
         else:
             async with self._get_connection() as conn:
-                yield PGTransaction(self, conn)
+                txn = PGTransaction(self, conn)
+                try:
+                    yield txn
+                finally:
+                    if txn.open:
+                        await txn.abort()
 
     @asynccontextmanager
     async def _get_connection(self) -> AsyncGenerator[psycopg.AsyncConnection, None]:
