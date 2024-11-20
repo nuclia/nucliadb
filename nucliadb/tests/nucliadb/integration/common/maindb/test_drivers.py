@@ -37,6 +37,10 @@ async def test_local_driver(local_driver):
     await driver_basic(local_driver)
 
 
+async def test_pg_driver(pg_maindb_driver):
+    await driver_basic(pg_maindb_driver)
+
+
 async def test_pg_driver_pool_timeout(pg):
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
     driver = PGDriver(url, connection_pool_min_size=1, connection_pool_max_size=1)
