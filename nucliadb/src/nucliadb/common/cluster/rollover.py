@@ -280,8 +280,8 @@ async def index_to_rollover_index(
                 txn, kbid=kbid, rid=resource_id
             )
         if shard_id is None:
-            logger.warning(
-                "Shard id not found for resource. Skipping indexing as it may have been deleted",
+            logger.info(
+                "Shard id not found for resource. Skipping indexing as it may not have been processed yet.",
                 extra={"kbid": kbid, "resource_id": resource_id},
             )
             async with datamanagers.with_transaction() as txn:

@@ -101,7 +101,7 @@ class Processor:
 
     Not all writes are going to have a transaction id. For example, writes
     coming from processor can be coming through a different channel
-    and can not use the txn id
+    and can not use the txn id.
     """
 
     messages: dict[str, list[writer_pb2.BrokerMessage]]
@@ -170,46 +170,27 @@ class Processor:
         partition: str,
         transaction_check: bool = True,
     ) -> None:
+        kbid = message.kbid
         async with self.driver.transaction() as txn:
             try:
-                kb = KnowledgeBox(txn, self.storage, message.kbid)
-
+                kb = KnowledgeBox(txn, self.storage, kbid)
                 uuid = await self.get_resource_uuid(kb, message)
-                async with locking.distributed_lock(
-                    locking.RESOURCE_INDEX_LOCK.format(kbid=message.kbid, resource_id=uuid)
-                ):
-                    # we need to have a lock at indexing time because we don't know if
-                    # a resource was in the process of being moved when a delete occurred
-                    shard_id = await datamanagers.resources.get_resource_shard_id(
-                        txn, kbid=message.kbid, rid=uuid
+                await pgcatalog_delete(txn, kbid, uuid)
+                await self.unindex_resource(txn, kb, uuid, seqid, partition)
+                try:
+                    await kb.delete_resource(uuid)
+                except Exception as exc:
+                    logger.exception("Error deleting resource", extra={"kbid": kbid, "rid": uuid})
+                    await txn.abort()
+                    await self.notify_abort(
+                        partition=partition,
+                        seqid=seqid,
+                        multi=message.multiid,
+                        kbid=kbid,
+                        rid=uuid,
+                        source=message.source,
                     )
-                if shard_id is None:
-                    logger.warning(f"Resource {uuid} does not exist")
-                else:
-                    shard = await kb.get_resource_shard(shard_id)
-                    if shard is None:
-                        raise AttributeError("Shard not available")
-                    await pgcatalog_delete(txn, message.kbid, uuid)
-                    external_index_manager = await get_external_index_manager(kbid=message.kbid)
-                    if external_index_manager is not None:
-                        await self.external_index_delete_resource(external_index_manager, uuid)
-                    else:
-                        await self.index_node_shard_manager.delete_resource(
-                            shard, message.uuid, seqid, partition, message.kbid
-                        )
-                    try:
-                        await kb.delete_resource(message.uuid)
-                    except Exception as exc:
-                        await txn.abort()
-                        await self.notify_abort(
-                            partition=partition,
-                            seqid=seqid,
-                            multi=message.multiid,
-                            kbid=message.kbid,
-                            rid=message.uuid,
-                            source=message.source,
-                        )
-                        raise exc
+                    raise exc
             finally:
                 if txn.open:
                     if transaction_check:
@@ -235,6 +216,13 @@ class Processor:
                 await txn.commit()
         finally:
             resource.txn = prev_txn
+
+    def needs_indexing(self, source: nodewriter_pb2.IndexMessageSource, created_in_txn: bool) -> bool:
+        """
+        We don't need to index anything at resource creation.
+        This allows to have a deferred resource-to-shard assignment.
+        """
+        return source == nodewriter_pb2.IndexMessageSource.PROCESSOR or not created_in_txn
 
     @processor_observer.wrap({"type": "txn"})
     async def txn(
@@ -286,16 +274,18 @@ class Processor:
 
                 if resource and resource.modified:
                     await pgcatalog_update(txn, kbid, resource)
-                    await self.index_resource(  # noqa
-                        resource=resource,
-                        txn=txn,
-                        uuid=uuid,
-                        kbid=kbid,
-                        seqid=seqid,
-                        partition=partition,
-                        kb=kb,
-                        source=messages_source(messages),
-                    )
+                    source = messages_source(messages)
+                    if self.needs_indexing(source, created):
+                        await self.index_resource(  # noqa
+                            resource=resource,
+                            txn=txn,
+                            uuid=uuid,
+                            kbid=kbid,
+                            seqid=seqid,
+                            partition=partition,
+                            kb=kb,
+                            source=source,
+                        )
                     if transaction_check:
                         await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()
@@ -377,17 +367,21 @@ class Processor:
 
         return None
 
+    async def get_resource_shard_id(self, txn: Transaction, kbid: str, uuid: str) -> Optional[str]:
+        """
+        We need to have a lock at indexing time because we don't know if a resource
+        was moved to another shard while it was being indexed
+        """
+        async with locking.distributed_lock(
+            locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=uuid)
+        ):
+            return await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+
     async def get_or_assign_resource_shard(
         self, txn: Transaction, kb: KnowledgeBox, uuid: str
     ) -> writer_pb2.ShardObject:
         kbid = kb.kbid
-        async with locking.distributed_lock(
-            locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=uuid)
-        ):
-            # we need to have a lock at indexing time because we don't know if
-            # a resource was move to another shard while it was being indexed
-            shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
-
+        shard_id = await self.get_resource_shard_id(txn, kbid, uuid)
         shard = None
         if shard_id is not None:
             # Resource already has a shard assigned
@@ -417,6 +411,10 @@ class Processor:
         kb: KnowledgeBox,
         source: nodewriter_pb2.IndexMessageSource.ValueType,
     ) -> None:
+        """
+        Indexes a resource's fields that are being updated in the current message transaction.
+        We assume that the index message has already been computed at this point.
+        """
         validate_indexable_resource(resource.indexer.brain)
         shard = await self.get_or_assign_resource_shard(txn, kb, uuid)
         index_message = resource.indexer.brain
@@ -432,6 +430,28 @@ class Processor:
                 kb=kbid,
                 source=source,
             )
+
+    @processor_observer.wrap({"type": "unindex_resource"})
+    async def unindex_resource(self, txn: Transaction, kb: KnowledgeBox, uuid: str, seqid, partition):
+        """
+        Remove all resource fields from the index.
+        """
+        kbid = kb.kbid
+        shard_id = await self.get_resource_shard_id(txn, kbid, uuid)
+        if shard_id is None:
+            logger.info(
+                "Resource does not exist or it hasn't been indexed yet",
+                extra={"kbid": kbid, "rid": uuid},
+            )
+            return
+        shard = await kb.get_resource_shard(shard_id)
+        if shard is None:
+            raise AttributeError("Shard not available")
+        external_index_manager = await get_external_index_manager(kbid=kbid)
+        if external_index_manager is not None:
+            await self.external_index_delete_resource(external_index_manager, uuid)
+        else:
+            await self.index_node_shard_manager.delete_resource(shard, uuid, seqid, partition, kbid)
 
     async def external_index_delete_resource(
         self, external_index_manager: ExternalIndexManager, resource_uuid: str

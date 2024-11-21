@@ -125,7 +125,7 @@ async def move_set_of_kb_resources(
                     txn, kbid=kbid, rid=resource_id, for_update=True
                 )
                 if found_shard_id is None:
-                    # resource deleted
+                    # resource deleted or not indexed yet
                     continue
                 if found_shard_id != from_shard_id:
                     # resource could have already been moved
