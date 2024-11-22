@@ -337,7 +337,7 @@ async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str,
     v1.end = 19
     v1.start_paragraph = 0
     v1.end_paragraph = 45
-    v1.vector.extend([1.0, 2.0, 3.0])
+    v1.vector.extend([1.0] * 512)
     ev.vectors.vectors.vectors.append(v1)
 
     v2 = rpb.Vector()
@@ -345,7 +345,7 @@ async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str,
     v2.end = 45
     v2.start_paragraph = 0
     v2.end_paragraph = 45
-    v2.vector.extend([4.0, 5.0, 6.0])
+    v2.vector.extend([1.0] * 512)
     ev.vectors.vectors.vectors.append(v2)
 
     v3 = rpb.Vector()
@@ -353,7 +353,7 @@ async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str,
     v3.end = 65
     v3.start_paragraph = 47
     v3.end_paragraph = 64
-    v3.vector.extend([7.0, 8.0, 9.0])
+    v3.vector.extend([1.0] * 512)
     ev.vectors.vectors.vectors.append(v3)
 
     bm.field_vectors.append(ev)
