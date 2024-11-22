@@ -59,10 +59,8 @@ async def create_rollover_index(
     external: Optional[ExternalIndexManager] = None,
 ) -> None:
     """
-    Creates a new index for a knowledgebox in the cluster and to the external index provider if configured.
+    Creates a new index for a knowledgebox in the index node cluster or to the external index provider if configured.
     """
-    await create_rollover_shards(app_context, kbid, drain_nodes=drain_nodes)
-
     if external is not None:
         if external.supports_rollover:
             await create_rollover_external_index(kbid, external)
@@ -71,6 +69,8 @@ async def create_rollover_index(
                 "External index provider does not support rollover",
                 extra={"kbid": kbid, "external_index_provider": external.type.value},
             )
+    else:
+        await create_rollover_shards(app_context, kbid, drain_nodes=drain_nodes)
 
 
 async def create_rollover_external_index(kbid: str, external: ExternalIndexManager) -> None:
@@ -319,9 +319,10 @@ async def index_to_rollover_index(
 
         if external is not None:
             await external.index_resource(resource_id, index_message, to_rollover_indexes=True)
-        await index_resource_to_shard(
-            app_context, kbid, resource_id, shard, resource_index_message=index_message
-        )
+        else:
+            await index_resource_to_shard(
+                app_context, kbid, resource_id, shard, resource_index_message=index_message
+            )
 
         async with datamanagers.with_transaction() as txn:
             await datamanagers.rollover.add_indexed(
@@ -554,9 +555,10 @@ async def validate_indexed_data(
                 index_message,
                 to_rollover_indexes=True,
             )
-        await index_resource_to_shard(
-            app_context, kbid, resource_id, shard, resource_index_message=index_message
-        )
+        else:
+            await index_resource_to_shard(
+                app_context, kbid, resource_id, shard, resource_index_message=index_message
+            )
         repaired_resources.append(resource_id)
         async with datamanagers.with_transaction() as txn:
             await datamanagers.rollover.add_indexed(
@@ -643,9 +645,9 @@ async def rollover_kb_index(
     This is a very expensive operation and should be done with care.
 
     Process:
-    - Create new index for kb index (index node shards and external indexes, if configured)
+    - Create new index for kb index (index node shards or external indexes if configured)
     - Schedule all resources to be indexed
-    - Index all resources into new kb index (index node shards and external indexes, if configured)
+    - Index all resources into new kb index (index node shards or external indexes if configured)
     - Cut over replicas to new shards (and external indexes if configured)
     - Validate that all resources are in the new kb index
     - Clean up indexed data
