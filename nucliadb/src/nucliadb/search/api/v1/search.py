@@ -27,6 +27,8 @@ from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.maindb.pg import PGDriver
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger, predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -290,6 +292,9 @@ async def catalog(
     returns bm25 results on titles and it does not support vector search.
     It is useful for listing resources in a knowledge box.
     """
+    if not pgcatalog_enabled():  # pragma: no cover
+        return HTTPClientError(status_code=501, detail="PG driver is needed for catalog search")
+
     maybe_log_request_payload(kbid, "/catalog", item)
     start_time = time()
     try:
@@ -493,3 +498,7 @@ async def search(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
     return search_results, incomplete_results
+
+
+def pgcatalog_enabled():
+    return isinstance(get_driver(), PGDriver)

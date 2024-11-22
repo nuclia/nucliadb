@@ -27,10 +27,12 @@ from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
 from nucliadb.common.cluster import manager
+from nucliadb.ingest.settings import DriverConfig
 from nucliadb.middleware import ProcessTimeHeaderMiddleware
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import lifespan
+from nucliadb.search.settings import settings
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.fastapi.utils import (
     client_disconnect_handler,
@@ -105,7 +107,7 @@ async def node_members(request: Request) -> JSONResponse:
 
 
 async def alive(request: Request) -> JSONResponse:
-    if len(manager.get_index_nodes()) == 0:
+    if len(manager.get_index_nodes()) == 0 and settings.driver != DriverConfig.LOCAL:
         return JSONResponse({"status": "error"}, status_code=503)
     else:
         return JSONResponse({"status": "ok"})
