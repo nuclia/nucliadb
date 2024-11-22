@@ -33,6 +33,7 @@ from urllib.parse import quote_plus
 
 import aiohttp
 import backoff
+import google.auth.compute_engine.credentials  # type: ignore
 import google.auth.transport.requests  # type: ignore
 import google.oauth2.credentials  # type: ignore
 from google.auth.exceptions import DefaultCredentialsError  # type: ignore
@@ -90,7 +91,9 @@ class GCloudBlobStore(BlobStore):
         return {"AUTHORIZATION": f"Bearer {token}"}
 
     def _get_access_token(self):
-        if isinstance(self._credentials, google.oauth2.credentials.Credentials):
+        if isinstance(
+            self._credentials, google.auth.compute_engine.credentials.Credentials
+        ) or isinstance(self._credentials, google.oauth2.credentials.Credentials):
             # google default auth object
             if self._credentials.expired or self._credentials.valid is False:
                 request = google.auth.transport.requests.Request()
