@@ -49,7 +49,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       dnsPolicy: ClusterFirst
-      serviceAccount: {{ .Values.indexer.serviceAccount | default "default" }}
+      serviceAccountName: {{ .Values.indexer.serviceAccount | default "default" }}
       containers:
       - name: nidx-indexer
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

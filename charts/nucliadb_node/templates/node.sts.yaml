@@ -56,7 +56,7 @@ spec:
 {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
-      serviceAccount: {{ .Values.serviceAccount | default "default" }}
+      serviceAccountName: {{ .Values.serviceAccount | default "default" }}
 {{- if .Values.nats.secretName }}
       volumes:
       - name: nats-creds

@@ -35,7 +35,7 @@ from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_quer
 from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import fetch_resources, merge_results
-from nucliadb.search.search.pgcatalog import pgcatalog_enabled, pgcatalog_search
+from nucliadb.search.search.pgcatalog import pgcatalog_search
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
@@ -322,51 +322,15 @@ async def catalog(
                 range_modification_end=item.range_modification_end,
                 hidden=item.hidden,
             )
-            pb_query, _, _ = await query_parser.parse()
-
-            if not pgcatalog_enabled(kbid):
-                (results, _, queried_nodes) = await node_query(
-                    kbid,
-                    Method.SEARCH,
-                    pb_query,
-                    target_shard_replicas=item.shards,
-                    # Catalog should not go to read replicas because we want it to be
-                    # consistent and most up to date results
-                    use_read_replica_nodes=False,
-                )
-
-                # We need to merge
-                search_results = await merge_results(
-                    results,
-                    count=item.page_size,
-                    page=item.page_number,
-                    kbid=kbid,
-                    show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
-                    field_type_filter=list(FieldTypeName),
-                    extracted=[],
-                    sort=sort,
-                    requested_relations=pb_query.relation_subgraph,
-                    min_score=query_parser.min_score,
-                    highlight=False,
-                )
-                catalog_results = CatalogResponse(
-                    resources=search_results.resources,
-                    fulltext=search_results.fulltext,
-                )
-            else:
-                catalog_results = CatalogResponse()
-                catalog_results.fulltext = await pgcatalog_search(query_parser)
-                catalog_results.resources = await fetch_resources(
-                    resources=[r.rid for r in catalog_results.fulltext.results],
-                    kbid=kbid,
-                    show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
-                    field_type_filter=list(FieldTypeName),
-                    extracted=[],
-                )
-                queried_nodes = []
-            if len(queried_nodes) > 0:
-                queried_shards = [shard_id for _, shard_id in queried_nodes]
-                catalog_results.shards = queried_shards
+            catalog_results = CatalogResponse()
+            catalog_results.fulltext = await pgcatalog_search(query_parser)
+            catalog_results.resources = await fetch_resources(
+                resources=[r.rid for r in catalog_results.fulltext.results],
+                kbid=kbid,
+                show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
+                field_type_filter=list(FieldTypeName),
+                extracted=[],
+            )
             return catalog_results
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))

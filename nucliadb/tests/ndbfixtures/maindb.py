@@ -18,19 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-import os
-from pathlib import Path
 from typing import AsyncIterator
 from unittest.mock import patch
 
 import psycopg
 import pytest
-from pytest import FixtureRequest
 from pytest_docker_fixtures import images
-from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.local import LocalDriver
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
@@ -49,41 +44,14 @@ images.settings["postgresql"]["version"] = "11"
 images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
 
 
-def maindb_settings_lazy_fixtures(default_drivers="local"):
-    driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
-    return [lazy_fixture.lf(f"{driver_type}_maindb_settings") for driver_type in driver_types.split(",")]
+@pytest.fixture(scope="function")
+def maindb_settings(pg_maindb_settings):
+    yield pg_maindb_settings
 
 
-@pytest.fixture(scope="function", params=maindb_settings_lazy_fixtures())
-def maindb_settings(request: FixtureRequest):
-    """
-    Allows dynamically loading the driver fixtures via env vars.
-
-    TESTING_MAINDB_DRIVERS=redis,local pytest nucliadb/tests/
-
-    Any test using the nucliadb fixture will be run twice, once with redis driver and once with local driver.
-    """
-    yield request.param
-
-
-def maindb_driver_lazy_fixtures(default_drivers: str = "pg"):
-    """
-    Allows running tests using maindb_driver for each supported driver type via env vars.
-
-    TESTING_MAINDB_DRIVERS=redis,local pytest nucliadb/tests/ingest
-
-    Any test using the maindb_driver fixture will be run twice, once with redis_driver and once with local_driver.
-    """
-    driver_types = os.environ.get("TESTING_MAINDB_DRIVERS", default_drivers)
-    return [lazy_fixture.lf(f"{driver_type}_maindb_driver") for driver_type in driver_types.split(",")]
-
-
-@pytest.fixture(
-    scope="function",
-    params=maindb_driver_lazy_fixtures(),
-)
-async def maindb_driver(request: FixtureRequest) -> AsyncIterator[Driver]:
-    driver: Driver = request.param
+@pytest.fixture(scope="function")
+async def maindb_driver(pg_maindb_driver) -> AsyncIterator[Driver]:
+    driver: Driver = pg_maindb_driver
     set_utility(Utility.MAINDB_DRIVER, driver)
 
     yield driver
@@ -144,30 +112,6 @@ async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
         )
         await driver.initialize()
         await run_pg_schema_migrations(driver)
-
-        yield driver
-
-        await driver.finalize()
-
-
-@pytest.fixture(scope="function")
-def local_maindb_settings(tmp_path: Path):
-    return DriverSettings(
-        driver=DriverConfig.LOCAL,
-        driver_local_url=str((tmp_path / "main").absolute()),
-    )
-
-
-@pytest.fixture(scope="function")
-async def local_maindb_driver(local_maindb_settings: DriverSettings) -> AsyncIterator[Driver]:
-    path = local_maindb_settings.driver_local_url
-    assert path is not None
-    with (
-        patch.object(ingest_settings, "driver", DriverConfig.LOCAL),
-        patch.object(ingest_settings, "driver_local_url", path),
-    ):
-        driver: Driver = LocalDriver(url=path)
-        await driver.initialize()
 
         yield driver
 

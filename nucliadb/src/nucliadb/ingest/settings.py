@@ -26,7 +26,6 @@ from pydantic_settings import BaseSettings
 
 class DriverConfig(Enum):
     PG = "pg"
-    LOCAL = "local"
     NOT_SET = "notset"  # setting not provided
 
     @classmethod
@@ -40,11 +39,7 @@ class DriverConfig(Enum):
 
 
 class DriverSettings(BaseSettings):
-    driver: DriverConfig = Field(default=DriverConfig.NOT_SET, description="K/V storage driver")
-    driver_local_url: Optional[str] = Field(
-        default=None,
-        description="Local path to store data on file system. Example: /nucliadb/data/main",
-    )
+    driver: DriverConfig = Field(default=DriverConfig.PG, description="K/V storage driver")
     driver_pg_url: Optional[str] = Field(
         default=None,
         description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",  # noqa

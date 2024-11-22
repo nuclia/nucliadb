@@ -55,7 +55,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       dnsPolicy: ClusterFirst
-      serviceAccount: {{ .Values.scheduler.serviceAccount | default "default" }}
+      serviceAccountName: {{ .Values.scheduler.serviceAccount | default "default" }}
       containers:
       - name: nidx-scheduler
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"

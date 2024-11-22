@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import Optional
 from uuid import uuid4
 
+import docker  # type: ignore
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore
@@ -34,11 +35,14 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 import nucliadb_sdk
 
+images.settings["postgresql"]["version"] = "11"
+images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
+images.settings["postgresql"]["env"]["POSTGRES_DB"] = "postgres"
+
 images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
     "version": "latest",
     "env": {
-        "DRIVER": "local",
         "NUCLIADB_DISABLE_ANALYTICS": "True",
         "dummy_predict": "True",
         "dummy_processing": "True",
@@ -80,8 +84,35 @@ class NucliaFixture:
     container: Optional[NucliaDB] = None
 
 
+def get_docker_internal_host():
+    """
+    This is needed for the case when we are starting a nucliadb container for testing,
+    it needs to know the docker internal host to connect to pg container that is on the same network.
+    """
+    docker_client = docker.from_env(version=BaseImage.docker_version)
+    docker_platform_name = docker_client.api.version()["Platform"]["Name"].upper()
+    if "GITHUB_ACTION" in os.environ:
+        # Valid when using github actions
+        docker_internal_host = "172.17.0.1"
+    elif docker_platform_name == "DOCKER ENGINE - COMMUNITY":
+        # for linux users
+        docker_internal_host = "172.17.0.1"
+    elif "DOCKER DESKTOP" in docker_platform_name:
+        # Valid when using Docker desktop
+        docker_internal_host = "host.docker.internal"
+    else:
+        docker_internal_host = "172.17.0.1"
+    return docker_internal_host
+
+
 @pytest.fixture(scope="session")
-def nucliadb():
+def nucliadb(pg):
+    pg_host, pg_port = pg
+    # Setup the connection to pg for the maindb driver
+    url = f"postgresql://postgres:postgres@{pg_host}:{pg_port}/postgres"
+    images.settings["nucliadb"]["env"]["DRIVER"] = "PG"
+    images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = url
+
     if os.environ.get("TEST_LOCAL_NUCLIADB"):
         host = os.environ.get("TEST_LOCAL_NUCLIADB")
         child = None
@@ -115,14 +146,15 @@ def nucliadb():
         if child:
             child.kill()
     else:
+        # We need to replace the localhost with the internal docker host to allow container-to-container communication
+        images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = images.settings["nucliadb"]["env"][
+            "DRIVER_PG_URL"
+        ].replace("localhost", get_docker_internal_host())
         container = NucliaDB()
         host, port = container.run()
         network = container.container_obj.attrs["NetworkSettings"]
-        if os.environ.get("TESTING", "") == "jenkins":
-            grpc = 8060
-        else:
-            service_port = "8060/tcp"
-            grpc = network["Ports"][service_port][0]["HostPort"]
+        service_port = "8060/tcp"
+        grpc = network["Ports"][service_port][0]["HostPort"]
         yield NucliaFixture(
             host=host,
             port=port,

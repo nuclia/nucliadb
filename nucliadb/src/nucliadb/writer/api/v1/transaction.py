@@ -21,7 +21,11 @@
 from fastapi import HTTPException
 
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_utils.transaction import MaxTransactionSizeExceededError, TransactionCommitTimeoutError
+from nucliadb_utils.transaction import (
+    MaxTransactionSizeExceededError,
+    StreamingServerTimeoutError,
+    TransactionCommitTimeoutError,
+)
 from nucliadb_utils.utilities import get_transaction_utility
 
 
@@ -38,4 +42,9 @@ async def commit(writer: BrokerMessage, partition: int, wait: bool = True) -> No
         raise HTTPException(
             status_code=413,
             detail="Transaction size exceeded. The resource is too large to be stored. Consider using file fields or split into multiple requests.",
+        )
+    except StreamingServerTimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Timeout waiting for the streaming server to respond. Please back off and retry.",
         )

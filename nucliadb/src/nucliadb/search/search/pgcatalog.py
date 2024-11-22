@@ -146,10 +146,6 @@ def _pg_driver() -> PGDriver:
     return cast(PGDriver, get_driver())
 
 
-def pgcatalog_enabled(kbid):
-    return isinstance(get_driver(), PGDriver)
-
-
 @observer.wrap({"op": "search"})
 async def pgcatalog_search(query_parser: QueryParser) -> Resources:
     # Prepare SQL query

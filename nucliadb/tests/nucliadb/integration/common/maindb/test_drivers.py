@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import os
 
 import psycopg_pool
 import pytest
@@ -25,16 +24,7 @@ import pytest
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.pg import PGDriver
 
-TESTING_MAINDB_DRIVERS = os.environ.get("TESTING_MAINDB_DRIVERS", "pg,local").split(",")
 
-
-@pytest.mark.skip(reason="Local driver doesn't implement saving info in intermediate nodes")
-@pytest.mark.skipif("local" not in TESTING_MAINDB_DRIVERS, reason="local not in TESTING_MAINDB_DRIVERS")
-async def test_local_driver(local_driver):
-    await driver_basic(local_driver)
-
-
-@pytest.mark.skipif("pg" not in TESTING_MAINDB_DRIVERS, reason="pg not in TESTING_MAINDB_DRIVERS")
 async def test_pg_driver_pool_timeout(pg):
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
     driver = PGDriver(url, connection_pool_min_size=1, connection_pool_max_size=1)

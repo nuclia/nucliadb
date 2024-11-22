@@ -17,4 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = ["nucliadb_sdk.tests.fixtures", "nucliadb_dataset.tests.fixtures"]
+pytest_plugins = [
+    "pytest_docker_fixtures",
+    "nucliadb_sdk.tests.fixtures",
+    "nucliadb_dataset.tests.fixtures",
+]
