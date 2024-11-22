@@ -23,6 +23,7 @@ use futures::stream::StreamExt;
 use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
 use nidx_protos::Resource;
+use nidx_protos::TypeMessage;
 use nidx_types::Seq;
 use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
@@ -70,25 +71,50 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             continue;
         };
 
-        let resource = match download_message(indexer_storage.clone(), &index_message.storage_key).await {
-            Ok(r) => r,
-            Err(e) => {
-                warn!("Error downloading index message {e:?}");
-                continue;
-            }
-        };
+        if let Err(e) =
+            process_index_message(&meta, indexer_storage.clone(), segment_storage.clone(), index_message, seq).await
+        {
+            warn!("Error processing index message {e:?}");
+            continue;
+        }
 
-        match index_resource(&meta, segment_storage.clone(), &index_message.shard, resource, seq).await {
-            Ok(()) => {
-                if let Err(e) = acker.ack().await {
-                    warn!("Error ack'ing NATS message {e:?}")
-                }
-            }
-            Err(e) => {
-                warn!("Error processing index message {e:?}")
-            }
-        };
+        if let Err(e) = acker.ack().await {
+            warn!("Error acking index message {e:?}");
+            continue;
+        }
+
+        // TODO: Delete indexer message on success
     }
+
+    Ok(())
+}
+
+pub async fn process_index_message(
+    meta: &NidxMetadata,
+    indexer_storage: Arc<DynObjectStore>,
+    segment_storage: Arc<DynObjectStore>,
+    index_message: IndexMessage,
+    seq: Seq,
+) -> anyhow::Result<()> {
+    match index_message.typemessage() {
+        TypeMessage::Deletion => delete_resource(meta, &index_message.shard, index_message.resource, seq).await,
+        TypeMessage::Creation => {
+            let resource = download_message(indexer_storage, &index_message.storage_key).await?;
+            index_resource(meta, segment_storage, &index_message.shard, resource, seq).await
+        }
+    }
+}
+
+pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: String, seq: Seq) -> anyhow::Result<()> {
+    let shard_id = Uuid::parse_str(shard_id)?;
+    let indexes = Index::for_shard(&meta.pool, shard_id).await?;
+
+    let mut tx = meta.transaction().await?;
+    for index in indexes {
+        Deletion::create(&mut *tx, index.id, seq, &[resource.clone()]).await?;
+        index.updated(&mut *tx).await?;
+    }
+    tx.commit().await?;
 
     Ok(())
 }
@@ -117,6 +143,8 @@ pub async fn index_resource(
     let num_vector_indexes = indexes.iter().filter(|i| matches!(i.kind, IndexKind::Vector)).count();
     let single_vector_index = num_vector_indexes == 1;
 
+    // TODO: Index in parallel
+    // TODO: Save all indexes as a transaction (to avoid issues reprocessing the same message)
     for index in indexes {
         let output_dir = tempfile::tempdir()?;
 

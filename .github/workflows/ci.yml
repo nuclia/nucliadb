@@ -112,11 +112,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            nidx
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v4
         with:
           python-version: "3.9.20"
           cache: true
+      # Needed for nidx_protos (rust)
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - name: Install venv
         run: pdm sync -d --clean --no-editable
       - name: Clean build
@@ -197,19 +205,45 @@ jobs:
           path: "target/release/node_*er"
           key: node-bin-${{ github.sha }}
 
+  build-nidx-binary:
+    name: Build nidx binary
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nidx
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+      - name: Compile
+        run: cd nidx && cargo build --release
+      - name: Upload binaries to cache
+        uses: actions/cache/save@v4
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+
   build-virtual-env:
     name: Build virtual environment
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            nidx
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v4
         with:
           python-version: "3.12.5"
           cache: true
+      # Needed for nidx_protos (rust)
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - name: Install venv
-        run: pdm sync -d --clean --no-editable
+        run: pdm sync -d --clean --no-editable -G nidx
       - name: Upload virtualenv to cache
         uses: actions/cache/save@v4
         with:
@@ -306,34 +340,6 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: test
       run: cargo test --workspace --all-features
-
-  nidx-tests:
-    name: nidx tests
-    runs-on: ubuntu-24.04
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 1s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-    - uses: actions/checkout@v4
-    - uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: nidx
-    - name: Install Protoc
-      uses: arduino/setup-protoc@v3
-    - name: test
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
-        SQLX_OFFLINE: true
-      run: cd nidx && cargo test --workspace --all-features
 
   nucliadb-tests:
     name: NucliaDB tests
@@ -460,6 +466,181 @@ jobs:
         with:
           file: ./${{ matrix.package }}/coverage.xml
           flags: ${{ matrix.package }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Tests with nidx
+  nidx-tests:
+    name: nidx tests
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 1s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: nidx
+    - name: Install Protoc
+      uses: arduino/setup-protoc@v3
+    - name: test
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
+        SQLX_OFFLINE: true
+      run: cd nidx && cargo test --workspace --all-features
+
+  nucliadb-search-tests-nidx:
+    name: NucliaDB search tests (nidx)
+    runs-on: ubuntu-24.04
+    needs:
+      - build-node-binaries
+      - build-nidx-binary
+      - build-virtual-env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.5"
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Restore binaries
+        uses: actions/cache/restore@v4
+        with:
+          path: "target/release/node_*er"
+          key: node-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker images for node
+        run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
+
+      - name: Build sidecar image
+        run: make build-sidecar
+
+      - name: Restore nidx binary
+        uses: actions/cache/restore@v4
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker images for nidx
+        run: mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
+
+      - name: Run tests
+        env:
+          NIDX_ENABLED: 1
+        run: source .venv/bin/activate && make -C nucliadb test-cov-search
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./nucliadb/coverage.xml
+          flags: nucliadb-search
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  nucliadb-tests-nidx:
+    name: NucliaDB tests (nidx)
+    runs-on: ubuntu-24.04
+    needs:
+      - build-virtual-env
+    strategy:
+      fail-fast: false
+      matrix:
+        maindb_driver: ["pg"]
+        shard: [0, 1, 2]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.5"
+
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Run NucliaDB tests
+        # These tests can be flaky, let's retry them...
+        uses: nick-fields/retry@v3
+        env:
+          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
+          NIDX_ENABLED: 1
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 10
+          command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" || make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./nucliadb/coverage.xml
+          flags: nucliadb
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  nucliadb-components-tests-nidx:
+    name: NucliaDB components tests (nidx)
+    runs-on: ubuntu-24.04
+    needs:
+      - build-virtual-env
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - ingest
+          - reader
+          - standalone
+          - train
+          - writer
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.5"
+
+      - name: Restore venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Run package tests
+        run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
+        env:
+          NIDX_ENABLED: 1
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./nucliadb/coverage.xml
+          flags: nucliadb-${{ matrix.component }}
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 

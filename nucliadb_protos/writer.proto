@@ -379,6 +379,7 @@ message ShardObject {
     repeated ShardReplica replicas = 3;
     google.protobuf.Timestamp timestamp = 4 [deprecated = true];
     bool read_only = 5;
+    string nidx_shard_id = 6;
 }
 
 message Shards {

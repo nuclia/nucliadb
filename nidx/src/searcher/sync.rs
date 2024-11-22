@@ -29,16 +29,26 @@ use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
+use tokio::sync::watch;
 use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
+
+pub enum SyncStatus {
+    Syncing,
+    Synced,
+}
 
 pub async fn run_sync(
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
     index_metadata: Arc<SyncMetadata>,
     notifier: Sender<IndexId>,
+    sync_status: Option<watch::Sender<SyncStatus>>,
 ) -> anyhow::Result<()> {
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
     loop {
+        if let Some(ref sync_status) = sync_status {
+            sync_status.send(SyncStatus::Syncing)?;
+        }
         let deleted = Index::marked_to_delete(&meta.pool).await?;
         for index_id in deleted.into_iter() {
             // TODO: Handle errors
@@ -50,6 +60,9 @@ pub async fn run_sync(
             // TODO: Handle errors
             last_updated_at = max(last_updated_at, index.updated_at);
             sync_index(&meta, storage.clone(), Arc::clone(&index_metadata), index, &notifier).await?;
+        }
+        if let Some(ref sync_status) = sync_status {
+            sync_status.send(SyncStatus::Synced)?;
         }
 
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -64,11 +77,6 @@ async fn sync_index(
     notifier: &Sender<IndexId>,
 ) -> anyhow::Result<()> {
     let operations = Operations::load_for_index(&meta.pool, &index.id).await?;
-    // Empty index, just created, no need to sync
-    if operations.0.is_empty() {
-        return Ok(());
-    }
-
     let diff = sync_metadata.diff(&index.id, &operations).await;
 
     // Download new segments
@@ -98,7 +106,10 @@ async fn delete_index(
         // remove directory for the index, effectively deleting all segment data
         // stored locally
         let index_location = sync_metadata.index_location(&index_id);
-        tokio::fs::remove_dir_all(index_location).await?;
+        match tokio::fs::remove_dir_all(index_location).await {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
+            _ => (),
+        }
         notifier.send(index_id).await?;
     }
     Ok(())
@@ -335,8 +346,8 @@ mod tests {
 
         // Initial sync with empty data
         sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
-        // No notification sent for empty index
-        assert!(rx.try_recv().is_err());
+        // We get a notification even for an empty index (so we don't return errors for empty indexes)
+        assert!(rx.try_recv().is_ok());
         // No data yet
         assert!(downloaded_segments(&index_path).is_err());
 

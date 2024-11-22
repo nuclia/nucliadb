@@ -21,7 +21,11 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
+use nidx_paragraph::ParagraphIndexer;
+use nidx_relation::RelationIndexer;
+use nidx_text::TextIndexer;
 use nidx_types::{OpenIndexMetadata, SegmentMetadata, Seq};
+use nidx_vector::VectorIndexer;
 use object_store::DynObjectStore;
 use serde::Deserialize;
 use tempfile::tempdir;
@@ -125,12 +129,12 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
 
     let work_dir = tempdir()?;
     let work_path = work_dir.path().to_path_buf();
-    let index_config = index.config().unwrap();
+    let vector_config = index.config();
     let merged: NewSegment = tokio::task::spawn_blocking(move || match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer.merge(&work_path, index_config, merge_inputs).map(|x| x.into()),
-        IndexKind::Text => nidx_text::TextIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
-        IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
-        IndexKind::Relation => nidx_relation::RelationIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+        IndexKind::Vector => VectorIndexer.merge(&work_path, vector_config.unwrap(), merge_inputs).map(|x| x.into()),
+        IndexKind::Text => TextIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+        IndexKind::Paragraph => ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+        IndexKind::Relation => RelationIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
     })
     .await??;
 

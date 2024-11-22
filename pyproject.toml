@@ -4,11 +4,16 @@ requires-python = ">=3.9"
 version = "0.0.0"
 dependencies = [
     "nucliadb @ file:///${PROJECT_ROOT}/nucliadb",
+    # TODO: We don't want to add nidx-protos as a nucliadb dependency yet
+    "nidx-protos @ file:///${PROJECT_ROOT}/nidx/nidx_protos",
 ]
 
 [project.optional-dependencies]
 sidecar = [
     "nucliadb-sidecar @ file:///${PROJECT_ROOT}/nucliadb_sidecar",
+]
+nidx = [
+    "nidx-binding @ file:///${PROJECT_ROOT}/nidx/nidx_binding",
 ]
 [tool.pdm.dev-dependencies]
 dev = [
@@ -20,6 +25,8 @@ dev = [
     "-e file:///${PROJECT_ROOT}/nucliadb_protos/python",
     "-e file:///${PROJECT_ROOT}/nucliadb_telemetry[all]",
     "-e file:///${PROJECT_ROOT}/nucliadb_utils[cache,fastapi,storages]",
+    "-e file:///${PROJECT_ROOT}/nidx/nidx_protos",
+    "-e file:///${PROJECT_ROOT}/nidx/nidx_binding",
     # Linting
     "mypy-protobuf>=3.6.0",
     "mypy==1.10",

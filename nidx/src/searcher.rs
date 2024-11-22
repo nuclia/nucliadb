@@ -23,12 +23,15 @@ mod index_cache;
 mod query_language;
 mod query_planner;
 mod shard_search;
+mod shard_suggest;
+mod streams;
 mod sync;
 
 use index_cache::IndexCache;
 use object_store::DynObjectStore;
 use sync::run_sync;
 use sync::SyncMetadata;
+use tokio::sync::watch;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -39,6 +42,7 @@ use crate::grpc_server::GrpcServer;
 use crate::{NidxMetadata, Settings};
 
 pub use index_cache::IndexSearcher;
+pub use sync::SyncStatus;
 
 pub struct SyncedSearcher {
     index_cache: Arc<IndexCache>,
@@ -58,7 +62,7 @@ impl SyncedSearcher {
         }
     }
 
-    pub async fn run(&self, storage: Arc<DynObjectStore>) {
+    pub async fn run(&self, storage: Arc<DynObjectStore>, watcher: Option<watch::Sender<SyncStatus>>) {
         let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
         let index_cache_copy = self.index_cache.clone();
         let refresher_task = tokio::task::spawn(async move {
@@ -68,7 +72,7 @@ impl SyncedSearcher {
             }
         });
         let sync_task =
-            tokio::task::spawn(run_sync(self.meta.clone(), storage.clone(), self.sync_metadata.clone(), tx));
+            tokio::task::spawn(run_sync(self.meta.clone(), storage.clone(), self.sync_metadata.clone(), tx, watcher));
         tokio::select! {
             r = sync_task => {
                 println!("sync_task() completed first {:?}", r)
@@ -92,9 +96,9 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
 
     let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
-    let server = GrpcServer::new("localhost:10001").await?;
+    let server = GrpcServer::new("0.0.0.0:10001").await?;
     let api_task = tokio::task::spawn(server.serve(api.into_service()));
-    let search_task = tokio::task::spawn(async move { searcher.run(storage).await });
+    let search_task = tokio::task::spawn(async move { searcher.run(storage, None).await });
 
     tokio::select! {
         r = search_task => {

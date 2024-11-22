@@ -19,7 +19,7 @@
 
 import asyncio
 import json
-from enum import Enum
+from enum import Enum, auto
 from typing import Any, Optional, Sequence, TypeVar, Union, overload
 
 from fastapi import HTTPException
@@ -33,17 +33,11 @@ from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.search import logger
 from nucliadb.search.search.shards import (
-    query_paragraph_shard,
     query_shard,
-    relations_shard,
     suggest_shard,
 )
 from nucliadb.search.settings import settings
 from nucliadb_protos.nodereader_pb2 import (
-    ParagraphSearchRequest,
-    ParagraphSearchResponse,
-    RelationSearchRequest,
-    RelationSearchResponse,
     SearchRequest,
     SearchResponse,
     SuggestRequest,
@@ -56,27 +50,21 @@ from nucliadb_utils.utilities import has_feature
 
 
 class Method(Enum):
-    SEARCH = 1
-    PARAGRAPH = 2
-    SUGGEST = 3
-    RELATIONS = 4
+    SEARCH = auto()
+    SUGGEST = auto()
 
 
 METHODS = {
     Method.SEARCH: query_shard,
-    Method.PARAGRAPH: query_paragraph_shard,
     Method.SUGGEST: suggest_shard,
-    Method.RELATIONS: relations_shard,
 }
 
-REQUEST_TYPE = Union[SuggestRequest, ParagraphSearchRequest, SearchRequest, RelationSearchRequest]
+REQUEST_TYPE = Union[SuggestRequest, SearchRequest]
 
 T = TypeVar(
     "T",
     SuggestResponse,
-    ParagraphSearchResponse,
     SearchResponse,
-    RelationSearchResponse,
 )
 
 
@@ -96,37 +84,12 @@ async def node_query(
 async def node_query(
     kbid: str,
     method: Method,
-    pb_query: ParagraphSearchRequest,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = True,
-    timeout: Optional[float] = None,
-    retry_on_primary: bool = True,
-) -> tuple[list[ParagraphSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
-
-
-@overload
-async def node_query(
-    kbid: str,
-    method: Method,
     pb_query: SearchRequest,
     target_shard_replicas: Optional[list[str]] = None,
     use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
-    nidx: bool = False,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
-
-
-@overload
-async def node_query(
-    kbid: str,
-    method: Method,
-    pb_query: RelationSearchRequest,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = True,
-    timeout: Optional[float] = None,
-    retry_on_primary: bool = True,
-) -> tuple[list[RelationSearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
 async def node_query(
@@ -137,7 +100,6 @@ async def node_query(
     use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
     retry_on_primary: bool = True,
-    nidx: bool = False,
 ) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
     timeout = timeout or settings.search_timeout
     use_read_replica_nodes = use_read_replica_nodes and has_feature(
@@ -161,23 +123,10 @@ async def node_query(
         try:
             node, shard_id = cluster_manager.choose_node(
                 shard_obj,
+                use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": kbid}),
                 use_read_replica_nodes=use_read_replica_nodes,
                 target_shard_replicas=target_shard_replicas,
             )
-
-            # nidx testing
-            if nidx and settings.nidx_address:
-                from nucliadb.common.cluster.index_node import IndexNode
-
-                node = IndexNode(
-                    id="nidx",
-                    address=settings.nidx_address,
-                    shard_count=0,
-                    available_disk=0,
-                    dummy=False,
-                    primary_id=None,
-                )
-                shard_id = shard_obj.shard
         except KeyError:
             incomplete_results = True
         else:

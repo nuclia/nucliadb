@@ -21,10 +21,12 @@ use std::{collections::HashMap, time::SystemTime};
 
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::*;
+use relation::RelationType;
+use relation_node::NodeType;
 use uuid::Uuid;
 
 pub fn minimal_resource(shard_id: String) -> Resource {
-    let resource_id = Uuid::new_v4().to_string();
+    let resource_id = Uuid::new_v4().simple().to_string();
 
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let timestamp = Timestamp {
@@ -122,6 +124,136 @@ pub fn little_prince(shard_id: impl Into<String>, vectorsets: Option<&[&str]>) -
         )]);
     }
     summary_paragraphs.insert(format!("{rid}/a/summary/0-150"), index_paragraph);
+    resource.paragraphs.insert(
+        "a/summary".to_string(),
+        IndexParagraphs {
+            paragraphs: summary_paragraphs,
+        },
+    );
+
+    resource
+}
+
+pub fn people_and_places(shard_id: impl Into<String>) -> Resource {
+    let shard_id = shard_id.into();
+
+    let mut resource = minimal_resource(shard_id);
+    let rid = &resource.resource.as_ref().unwrap().uuid;
+
+    resource.texts.insert(
+        format!("{}/title", resource.resource.as_ref().unwrap().uuid),
+        TextInformation {
+            text: "People and places".to_string(),
+            ..Default::default()
+        },
+    );
+    resource.texts.insert(
+        format!("{}/summary", resource.resource.as_ref().unwrap().uuid),
+        TextInformation {
+            text: "Test entities to validate suggest on relations index".to_string(),
+            ..Default::default()
+        },
+    );
+
+    let resource_node = RelationNode {
+        value: rid.clone(),
+        ntype: NodeType::Resource as i32,
+        subtype: String::new(),
+    };
+
+    let collaborators = ["Anastasia", "Irene"].into_iter().map(|collaborator| RelationNode {
+        value: collaborator.to_string(),
+        ntype: NodeType::User as i32,
+        subtype: "".to_string(),
+    });
+
+    let people = ["Anna", "Anthony", "Bárcenas", "Ben", "John"].into_iter().map(|person| RelationNode {
+        value: person.to_string(),
+        ntype: NodeType::Entity as i32,
+        subtype: "person".to_string(),
+    });
+
+    let cities = ["Barcelona", "New York", "York"].into_iter().map(|city| RelationNode {
+        value: city.to_string(),
+        ntype: NodeType::Entity as i32,
+        subtype: "city".to_string(),
+    });
+
+    let countries = ["Israel", "Netherlands", "Solomon Islands"].into_iter().map(|country| RelationNode {
+        value: country.to_string(),
+        ntype: NodeType::Entity as i32,
+        subtype: "country".to_string(),
+    });
+
+    let entities = people.chain(cities).chain(countries);
+
+    let mut relations = vec![];
+    relations.extend(collaborators.map(|node| Relation {
+        relation: RelationType::Colab as i32,
+        source: Some(resource_node.clone()),
+        to: Some(node),
+        ..Default::default()
+    }));
+    relations.extend(entities.map(|node| Relation {
+        relation: RelationType::Entity as i32,
+        source: Some(resource_node.clone()),
+        to: Some(node),
+        ..Default::default()
+    }));
+
+    resource.relations.extend(relations);
+
+    resource
+}
+
+pub fn thus_spoke_zarathustra(shard_id: impl Into<String>) -> Resource {
+    let shard_id = shard_id.into();
+    let mut resource = minimal_resource(shard_id);
+    let rid = &resource.resource.as_ref().unwrap().uuid;
+
+    resource.labels.push("/s/p/de".to_string()); // language=de
+
+    resource.texts.insert(
+        "a/title".to_string(),
+        TextInformation {
+            text: "Thus Spoke Zarathustra".to_string(),
+            ..Default::default()
+        },
+    );
+    let mut title_paragraphs = HashMap::new();
+    title_paragraphs.insert(
+        format!("{rid}/a/title/0-22"),
+        IndexParagraph {
+            start: 0,
+            end: 22,
+            field: "a/title".to_string(),
+            ..Default::default()
+        },
+    );
+    resource.paragraphs.insert(
+        "a/title".to_string(),
+        IndexParagraphs {
+            paragraphs: title_paragraphs,
+        },
+    );
+
+    resource.texts.insert(
+        "a/summary".to_string(),
+        TextInformation {
+            text: "Philosophical book written by Frederich Nietzche".to_string(),
+            ..Default::default()
+        },
+    );
+    let mut summary_paragraphs = HashMap::new();
+    summary_paragraphs.insert(
+        format!("{rid}/a/summary/0-48"),
+        IndexParagraph {
+            start: 0,
+            end: 48,
+            field: "a/summary".to_string(),
+            ..Default::default()
+        },
+    );
     resource.paragraphs.insert(
         "a/summary".to_string(),
         IndexParagraphs {

@@ -32,6 +32,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.dirty_index import wait_for_sync
 
 
 async def get_paragraph_streaming_batch_from_response(
@@ -85,6 +86,7 @@ async def test_generator_paragraph_streaming(
 async def inject_resources_with_paragraphs(kbid: str, nucliadb_grpc: WriterStub):
     await inject_message(nucliadb_grpc, smb_wonder_bm(kbid))
     await asyncio.sleep(0.1)
+    await wait_for_sync()
 
 
 def smb_wonder_bm(kbid: str) -> BrokerMessage:

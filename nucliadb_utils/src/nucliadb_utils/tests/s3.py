@@ -66,8 +66,8 @@ async def s3_storage_settings(s3) -> dict[str, Any]:
     settings = {
         "file_backend": FileBackendConfig.S3,
         "s3_endpoint": s3,
-        "s3_client_id": "",
-        "s3_client_secret": "",
+        "s3_client_id": "fake",
+        "s3_client_secret": "fake",
         "s3_ssl": False,
         "s3_verify_ssl": False,
         "s3_region_name": None,
@@ -106,5 +106,6 @@ async def s3_storage(s3, s3_storage_settings: dict[str, Any]):
         bucket_tags=storage_settings.s3_bucket_tags,
     )
     await storage.initialize()
+    await storage.create_bucket("nidx")
     yield storage
     await storage.finalize()

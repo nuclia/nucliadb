@@ -33,8 +33,8 @@ use tantivy::{DocAddress, Index, IndexReader};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
+use crate::search_query::SharedTermC;
 use crate::search_query::{self, ParagraphsContext};
-use crate::search_query::{ParagraphIterator, SharedTermC};
 use crate::search_response::{extract_labels, SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
 const FUZZY_DISTANCE: u8 = 1;
@@ -111,7 +111,7 @@ impl ParagraphReaderService {
         }))
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<ParagraphIterator> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem>> {
         let producer = BatchProducer {
             offset: 0,
             total: self.count()?,
@@ -120,7 +120,7 @@ impl ParagraphReaderService {
             searcher: self.reader.searcher(),
             query: search_query::streaming_query(&self.schema, request),
         };
-        Ok(ParagraphIterator::new(producer.flatten()))
+        Ok(producer.flatten())
     }
 
     pub fn search(

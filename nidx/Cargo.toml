@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy", "nidx_paragraph", "nidx_relation"]
+members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy", "nidx_paragraph", "nidx_relation", "nidx_binding"]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -31,7 +31,11 @@ nidx_text = { version = "0.1.0", path = "nidx_text" }
 nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
 nidx_relation = { version = "0.1.0", path = "nidx_relation" }
 config = { version = "0.14.1", default-features = false }
+thiserror = "2.0.0"
+tower = "0.5.1"
+http = "1.1.0"
 
 [dev-dependencies]
+itertools = "0.13.0"
 nidx_tests = { path = "nidx_tests" }
 rand = "0.8.5"

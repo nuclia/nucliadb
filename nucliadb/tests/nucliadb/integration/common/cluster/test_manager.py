@@ -143,7 +143,7 @@ async def test_choose_node_always_prefer_the_same_node(shards, shard_index: int,
     shard = shards.shards[shard_index]
     node_ids = set()
     for i in range(100):
-        node, _ = manager.choose_node(shard)
+        node, _ = manager.choose_node(shard, use_nidx=False)
         node_ids.add(node.id)
     assert len(node_ids) == 1
 
@@ -155,14 +155,14 @@ async def test_choose_node_attempts_target_replicas_but_is_not_imperative(shards
     r1 = shard.replicas[1].shard.id
     n1 = shard.replicas[1].node
 
-    node, replica_id = manager.choose_node(shard, target_shard_replicas=[r0])
+    node, replica_id = manager.choose_node(shard, use_nidx=False, target_shard_replicas=[r0])
     assert replica_id == r0
     assert node.id == n0
 
     # Change the node-0 to a non-existent node id in order to
     # test the target_shard_replicas logic is not imperative
     shard.replicas[0].node = "I-do-not-exist"
-    node, replica_id = manager.choose_node(shard, target_shard_replicas=[r0])
+    node, replica_id = manager.choose_node(shard, use_nidx=False, target_shard_replicas=[r0])
     assert replica_id == r1
     assert node.id == n1
 
@@ -174,7 +174,7 @@ async def test_choose_node_raises_if_no_nodes(shards):
     shard.replicas[1].node = "bar"
 
     with pytest.raises(NoHealthyNodeAvailable):
-        manager.choose_node(shard)
+        manager.choose_node(shard, use_nidx=False)
 
 
 @pytest.mark.asyncio
@@ -188,7 +188,7 @@ async def test_apply_for_all_shards(fake_kbid: str, shards, maindb_driver: Drive
     async def fun(node: AbstractIndexNode, shard_id: str):
         nodes.append((shard_id, node.id))
 
-    await shard_manager.apply_for_all_shards(kbid, fun, timeout=10)
+    await shard_manager.apply_for_all_shards(kbid, fun, timeout=10, use_nidx=False)
 
     nodes.sort()
     assert len(nodes) == 2

@@ -28,10 +28,11 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb_protos import noderesources_pb2
+from nucliadb.common.nidx import get_nidx
+from nucliadb_protos import noderesources_pb2, nodewriter_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import inject_message
+from tests.utils import dirty_index, inject_message
 
 
 async def test_reindex(
@@ -67,6 +68,7 @@ async def _test_reindex(
     assert len(content["sentences"]["results"]) > 0
     assert len(content["paragraphs"]["results"]) > 0
 
+    # Clean the indexes without touching maindb
     async def clean_shard(resources: list[str], node: AbstractIndexNode, shard_replica_id: str):
         nonlocal rid
         return await node.writer.RemoveResource(  # type: ignore
@@ -77,9 +79,20 @@ async def _test_reindex(
         )
 
     shard_manager = KBShardManager()
-    results = await shard_manager.apply_for_all_shards(kbid, partial(clean_shard, [rid]), timeout=5)
+    results = await shard_manager.apply_for_all_shards(
+        kbid, partial(clean_shard, [rid]), timeout=5, use_nidx=False
+    )
     for result in results:
         assert not isinstance(result, Exception)
+
+    nidx = get_nidx()
+    if nidx:
+        for shard in await shard_manager.get_shards_by_kbid(kbid):
+            msg = nodewriter_pb2.IndexMessage(
+                shard=shard.nidx_shard_id, typemessage=nodewriter_pb2.DELETION, resource=rid
+            )
+            await nidx.index(msg)
+        await dirty_index.mark_dirty()
 
     await asyncio.sleep(0.5)
 
@@ -122,7 +135,7 @@ async def test_reindex_vector_duplication(
     shard_manager = KBShardManager()
     shards = await shard_manager.get_shards_by_kbid(kbid)
     assert len(shards) == 1
-    node, shard_replica_id = manager.choose_node(shards[0])
+    node, shard_replica_id = manager.choose_node(shards[0], use_nidx=False)
 
     ids_before = {}
     async with datamanagers.with_ro_transaction() as txn:

@@ -47,7 +47,9 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires, requires_one
+from nucliadb_utils.utilities import has_feature
 
 MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
 
@@ -115,19 +117,23 @@ async def _kb_counters(
         sentences=0,
         index_size=0,
     )
-    node_index_counts, queried_shards = await get_node_index_counts(kbid)
-    counters.fields = node_index_counts.fields
     external_index_manager = await get_external_index_manager(kbid)
     if external_index_manager is not None:
         index_counts = await external_index_manager.get_index_counts()
         counters.paragraphs = index_counts.paragraphs
         counters.sentences = index_counts.sentences
+        is_small_kb = index_counts.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
+        resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
+        # TODO: Find a way to query the fields count from the external index provider or use the catalog
+        counters.resources = counters.fields = resource_count
     else:
+        node_index_counts, queried_shards = await get_node_index_counts(kbid)
+        counters.fields = node_index_counts.fields
         counters.paragraphs = node_index_counts.paragraphs
         counters.sentences = node_index_counts.sentences
-    is_small_kb = counters.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
-    resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
-    counters.resources = resource_count
+        is_small_kb = node_index_counts.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
+        resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
+        counters.resources = resource_count
     counters.index_size = counters.paragraphs * AVG_PARAGRAPH_SIZE_BYTES
     if debug and queried_shards is not None:
         counters.shards = queried_shards
@@ -159,7 +165,9 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
     queried_shards = []
     for shard_object in shard_groups:
         try:
-            node, shard_id = choose_node(shard_object)
+            node, shard_id = choose_node(
+                shard_object, use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": kbid})
+            )
         except KeyError:
             raise HTTPException(
                 status_code=500,

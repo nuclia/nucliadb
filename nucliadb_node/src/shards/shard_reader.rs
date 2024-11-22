@@ -28,9 +28,8 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos;
 use nucliadb_core::protos::shard_created::{DocumentService, ParagraphService, RelationService, VectorService};
 use nucliadb_core::protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest, ParagraphSearchResponse,
-    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard,
-    ShardFile, ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
+    EdgeList, RelationPrefixSearchRequest, RelationSearchRequest, SearchRequest, SearchResponse, Shard, ShardFile,
+    ShardFileChunk, ShardFileList, StreamRequest, SuggestFeatures, SuggestRequest, SuggestResponse,
     VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_core::query_language;
@@ -621,41 +620,6 @@ impl ShardReader {
 
         Ok(ShardFileList {
             files,
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn paragraph_search(&self, search_request: ParagraphSearchRequest) -> NodeResult<ParagraphSearchResponse> {
-        let span = tracing::Span::current();
-
-        run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
-            read_rw_lock(&self.paragraph_reader).search(&search_request, &ParagraphsContext::default())
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn document_search(&self, search_request: DocumentSearchRequest) -> NodeResult<DocumentSearchResponse> {
-        let span = tracing::Span::current();
-
-        run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
-            read_rw_lock(&self.text_reader).search(&search_request)
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn vector_search(&self, search_request: VectorSearchRequest) -> NodeResult<VectorSearchResponse> {
-        let span = tracing::Span::current();
-
-        run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
-            self.vectors_index_search(&search_request, &VectorsContext::default())
-        })
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn relation_search(&self, search_request: RelationSearchRequest) -> NodeResult<RelationSearchResponse> {
-        let span = tracing::Span::current();
-
-        run_with_telemetry(info_span!(parent: &span, "relation reader search"), || {
-            read_rw_lock(&self.relation_reader).search(&search_request)
         })
     }
 

@@ -28,7 +28,7 @@ mod search_response;
 mod set_query;
 mod stop_words;
 
-use nidx_protos::{ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest};
+use nidx_protos::{ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest};
 use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
@@ -37,7 +37,6 @@ use nidx_types::OpenIndexMetadata;
 use reader::ParagraphReaderService;
 use resource_indexer::index_paragraphs;
 use schema::ParagraphSchema;
-use search_query::ParagraphIterator;
 pub use search_query::ParagraphsContext;
 use std::path::Path;
 use tantivy::{
@@ -87,7 +86,7 @@ impl ParagraphIndexer {
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
         index_paragraphs(&mut indexer, resource, field_schema)?;
-        Ok(Some(indexer.finalize()?))
+        indexer.finalize()
     }
 
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
@@ -146,7 +145,7 @@ impl ParagraphSearcher {
         self.reader.suggest(request)
     }
 
-    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<ParagraphIterator> {
+    pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem>> {
         self.reader.iterator(request)
     }
 }

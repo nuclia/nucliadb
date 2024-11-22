@@ -47,7 +47,6 @@ from nucliadb_protos.nodereader_pb2 import (
     Faceted,
     RelationNodeFilter,
     RelationPrefixSearchRequest,
-    RelationSearchRequest,
     RelationSearchResponse,
     SearchRequest,
     SearchResponse,
@@ -55,6 +54,8 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from .exceptions import EntityManagementException
 
@@ -208,21 +209,23 @@ class EntitiesManager:
         shard_manager = get_shard_manager()
 
         async def do_entities_search(node: AbstractIndexNode, shard_id: str) -> RelationSearchResponse:
-            request = RelationSearchRequest(
-                shard_id=shard_id,
-                prefix=RelationPrefixSearchRequest(
+            request = SearchRequest(
+                shard=shard_id,
+                relation_prefix=RelationPrefixSearchRequest(
                     prefix="",
                     node_filters=[
                         RelationNodeFilter(node_type=RelationNode.NodeType.ENTITY, node_subtype=group)
                     ],
                 ),
             )
-            return await node.reader.RelationSearch(request)  # type: ignore
+            response = await node.reader.Search(request)  # type: ignore
+            return response.relation
 
         results = await shard_manager.apply_for_all_shards(
             self.kbid,
             do_entities_search,
             settings.relation_search_timeout,
+            use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": self.kbid}),
             use_read_replica_nodes=self.use_read_replica_nodes,
         )
         for result in results:
@@ -324,6 +327,7 @@ class EntitiesManager:
             self.kbid,
             query_indexed_entities_group_names,
             settings.relation_types_timeout,
+            use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": self.kbid}),
             use_read_replica_nodes=self.use_read_replica_nodes,
         )
         for result in results:

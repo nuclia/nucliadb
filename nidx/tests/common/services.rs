@@ -18,21 +18,27 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::time::Duration;
+
 use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
+use nidx::indexer::index_resource;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::SyncedSearcher;
 use nidx::settings::{EnvSettings, MetadataSettings, ObjectStoreConfig, StorageSettings};
 use nidx::{NidxMetadata, Settings};
-use nidx_protos::node_reader_client::NodeReaderClient;
-use nidx_protos::node_writer_client::NodeWriterClient;
+use nidx_protos::nidx::nidx_api_client::NidxApiClient;
+use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
+use nidx_protos::Resource;
 use sqlx::PgPool;
 use tempfile::tempdir;
 use tonic::transport::Channel;
 
 pub struct NidxFixture {
-    pub searcher_client: NodeReaderClient<Channel>,
-    pub api_client: NodeWriterClient<Channel>,
+    pub searcher_client: NidxSearcherClient<Channel>,
+    pub api_client: NidxApiClient<Channel>,
+    settings: Settings,
+    seq: i64,
 }
 
 impl NidxFixture {
@@ -66,15 +72,38 @@ impl NidxFixture {
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
         tokio::task::spawn(searcher_server.serve(searcher_api.into_service()));
-        tokio::task::spawn(async move { searcher.run(settings.storage.as_ref().unwrap().object_store.clone()).await });
+        let settings_copy = settings.clone();
+        tokio::task::spawn(async move {
+            searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone(), None).await
+        });
 
         // Clients
-        let searcher_client = NodeReaderClient::connect(format!("http://localhost:{searcher_port}")).await?;
-        let api_client = NodeWriterClient::connect(format!("http://localhost:{api_port}")).await?;
+        let searcher_client = NidxSearcherClient::connect(format!("http://localhost:{searcher_port}")).await?;
+        let api_client = NidxApiClient::connect(format!("http://localhost:{api_port}")).await?;
 
         Ok(NidxFixture {
             searcher_client,
             api_client,
+            settings,
+            seq: 1,
         })
+    }
+
+    pub async fn index_resource(&mut self, shard_id: &str, resource: Resource) -> anyhow::Result<()> {
+        index_resource(
+            &self.settings.metadata,
+            self.settings.storage.as_ref().unwrap().object_store.clone(),
+            shard_id,
+            resource,
+            self.seq.into(),
+        )
+        .await?;
+        self.seq += 1;
+        Ok(())
+    }
+
+    pub async fn wait_sync(&self) {
+        // TODO: Check the searcher has synced? For now, waiting twice the sync interval
+        tokio::time::sleep(Duration::from_secs(2)).await;
     }
 }

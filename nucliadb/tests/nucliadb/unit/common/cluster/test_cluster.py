@@ -126,13 +126,15 @@ def test_choose_node_with_two_primary_nodes():
     node, _ = manager.choose_node(
         writer_pb2.ShardObject(
             replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-0")]
-        )
+        ),
+        use_nidx=False,
     )
     assert node.id == "node-0"
     node, _ = manager.choose_node(
         writer_pb2.ShardObject(
             replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-1")]
-        )
+        ),
+        use_nidx=False,
     )
     assert node.id == "node-1"
 
@@ -152,6 +154,7 @@ def test_choose_node_with_two_read_replicas():
         writer_pb2.ShardObject(
             replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-0")]
         ),
+        use_nidx=False,
         use_read_replica_nodes=True,
     )
     assert node.id == "node-replica-0"
@@ -159,6 +162,7 @@ def test_choose_node_with_two_read_replicas():
         writer_pb2.ShardObject(
             replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-1")]
         ),
+        use_nidx=False,
         use_read_replica_nodes=True,
     )
     assert node.id == "node-replica-1"
@@ -182,6 +186,7 @@ def test_choose_node_no_healthy_node_available():
                     writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-1")
                 ]
             ),
+            use_nidx=False,
             use_read_replica_nodes=True,
         )
 
@@ -195,7 +200,7 @@ def repeated_choose_node(
     node_ids = []
 
     for _ in range(count):
-        node, shard_id = manager.choose_node(shard, **kwargs)
+        node, shard_id = manager.choose_node(shard, use_nidx=False, **kwargs)
         shard_ids.append(shard_id)
         node_ids.append(node.id)
 
