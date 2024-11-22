@@ -59,8 +59,12 @@ async def create_rollover_index(
     external: Optional[ExternalIndexManager] = None,
 ) -> None:
     """
-    Creates a new index for a knowledgebox in the index node cluster or to the external index provider if configured.
+    Creates a new index for a knowledgebox in the index node cluster (and to the external index provider if configured).
+    For the external index case, we still need the shard on the index node cluster to be created because
+    it is used to store the rollover state during the rollover. However, the actual indexing will be done
+    by the external index provider.
     """
+    await create_rollover_shards(app_context, kbid, drain_nodes=drain_nodes)
     if external is not None:
         if external.supports_rollover:
             await create_rollover_external_index(kbid, external)
@@ -69,8 +73,6 @@ async def create_rollover_index(
                 "External index provider does not support rollover",
                 extra={"kbid": kbid, "external_index_provider": external.type.value},
             )
-    else:
-        await create_rollover_shards(app_context, kbid, drain_nodes=drain_nodes)
 
 
 async def create_rollover_external_index(kbid: str, external: ExternalIndexManager) -> None:
