@@ -26,6 +26,7 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 
 # These should be refactored
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.utilities import get_storage
 
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
 
 
 KB_RESOURCE_BASIC = "/kbs/{kbid}/r/{uuid}"
+KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
 KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
@@ -126,15 +128,24 @@ async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> Optional[resour
 
 
 async def get_basic_raw(txn: Transaction, *, kbid: str, rid: str) -> Optional[bytes]:
-    raw_basic = await txn.get(KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid))
+    if ingest_settings.driver == "local":
+        raw_basic = await txn.get(KB_RESOURCE_BASIC_FS.format(kbid=kbid, uuid=rid))
+    else:
+        raw_basic = await txn.get(KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid))
     return raw_basic
 
 
 async def set_basic(txn: Transaction, *, kbid: str, rid: str, basic: resources_pb2.Basic):
-    await txn.set(
-        KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid),
-        basic.SerializeToString(),
-    )
+    if ingest_settings.driver == "local":
+        await txn.set(
+            KB_RESOURCE_BASIC_FS.format(kbid=kbid, uuid=rid),
+            basic.SerializeToString(),
+        )
+    else:
+        await txn.set(
+            KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid),
+            basic.SerializeToString(),
+        )
 
 
 # Origin
