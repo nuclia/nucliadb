@@ -281,7 +281,6 @@ jobs:
   upload-chart-nidx:
     name: Upload nidx chart
     runs-on: ubuntu-24.04
-    if: inputs.environment == 'dev'
     needs:
       - build-nidx-image
     steps:
@@ -348,7 +347,6 @@ jobs:
   deploy-nucliadb-components:
     name: Deploy NucliaDB components
     runs-on: ubuntu-24.04
-    if: ${{ !failure() && !cancelled() && needs.upload-chart-nucliadb-shared.result != 'skipped' && needs.upload-chart-nucliadb-component.result != 'skipped' && needs.upload-chart-nucliadb-node.result != 'skipped' }}
     needs:
       - upload-chart-nucliadb-shared
       - upload-charts-nucliadb-component

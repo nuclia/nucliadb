@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import AlreadyExists, EntitiesGroupNotFound
@@ -26,6 +26,7 @@ from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
+from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.broker_message import generate_broker_message
@@ -446,32 +447,17 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
                 resobj = ResourceORM(txn, self.storage, kbobj, request.rid)
                 resobj.disable_vectors = not request.reindex_vectors
-
                 brain = await resobj.generate_index_message(reindex=True)
-                shard_id = await datamanagers.resources.get_resource_shard_id(
-                    txn, kbid=request.kbid, rid=request.rid
-                )
-                shard: Optional[writer_pb2.ShardObject] = None
-                if shard_id is not None:
-                    shard = await kbobj.get_resource_shard(shard_id)
-
-                if shard is None:
-                    shard = await self.shards_manager.get_current_active_shard(txn, request.kbid)
-                    if shard is None:
-                        # no shard currently exists, create one
-                        shard = await self.shards_manager.create_shard_by_kbid(txn, request.kbid)
-
-                    await datamanagers.resources.set_resource_shard_id(
-                        txn, kbid=request.kbid, rid=request.rid, shard=shard.shard
-                    )
-
-                if shard is not None:
-                    index_message = brain.brain
-                    await self.proc._maybe_external_index_add_resource(
+                shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, request.rid)
+                index_message = brain.brain
+                external_index_manager = await get_external_index_manager(kbid=request.kbid)
+                if external_index_manager is not None:
+                    await self.proc.external_index_add_resource(
                         request.kbid,
                         request.rid,
                         index_message,
                     )
+                else:
                     await self.shards_manager.add_resource(
                         shard,
                         index_message,
@@ -480,7 +466,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                         kb=request.kbid,
                         reindex_id=uuid.uuid4().hex,
                     )
-
                 response = IndexStatus()
                 return response
         except Exception as e:

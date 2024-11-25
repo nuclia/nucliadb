@@ -168,7 +168,6 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
         Indexes a resource to the external index provider.
         """
         if not self.supports_rollover and to_rollover_indexes:
-            self.clean_index_message(resource_data)
             logger.info(
                 "Indexing to rollover indexes not supported",
                 extra={
@@ -192,19 +191,8 @@ class ExternalIndexManager(abc.ABC, metaclass=abc.ABCMeta):
                 await self._index_resource(
                     resource_uuid, resource_data, to_rollover_indexes=to_rollover_indexes
                 )
-                self.clean_index_message(resource_data)
             except Exception as ex:
                 raise ExternalIndexingError() from ex
-
-    def clean_index_message(self, index_message: Resource) -> None:
-        """
-        Clear the fields that are already stored in the external index,
-        and we don't want to store them again in the IndexNode cluster.
-        """
-        index_message.ClearField("sentences_to_delete")
-        index_message.ClearField("paragraphs_to_delete")
-        index_message.ClearField("paragraphs")
-        index_message.ClearField("relations")
 
     async def get_index_counts(self) -> IndexCounts:
         """

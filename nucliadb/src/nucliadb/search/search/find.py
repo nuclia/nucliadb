@@ -156,7 +156,7 @@ async def _index_node_retrieval(
             },
         )
     elif search_time > settings.slow_find_log_threshold:
-        logger.warning(
+        logger.info(
             "Slow find query",
             extra={
                 "kbid": kbid,
