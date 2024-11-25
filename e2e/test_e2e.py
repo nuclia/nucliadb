@@ -150,7 +150,7 @@ def test_b64_file_upload(kbid: str):
         },
         json={
             "files": {
-                "image.png": {
+                "image": {
                      "file": {
                          "payload": base64.b64encode(image).decode("utf-8"),
                      }
@@ -166,7 +166,7 @@ def test_b64_file_upload(kbid: str):
 
     # Check that the image can be downloaded and is the same as the one uploaded
     resp = requests.get(
-        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resource/{resource_id}/files/image.png"),
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resource/{resource_id}/file/image/download/field"),
         headers={
             "content-type": "application/json",
             "X-NUCLIADB-ROLES": "READER",
