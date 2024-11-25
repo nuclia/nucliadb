@@ -615,7 +615,7 @@ class QueryParser:
         """
         rank_fusion_window = 0
         if rank_fusion is not None:
-            rank_fusion_window = rank_fusion.window or 0
+            rank_fusion_window = rank_fusion.window
 
         reranker_window = 0
         if reranker is not None:

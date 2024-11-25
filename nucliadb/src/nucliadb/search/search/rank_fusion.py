@@ -19,7 +19,7 @@
 #
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable, Optional, cast
+from typing import Iterable, cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
@@ -48,11 +48,11 @@ rank_fusion_observer = Observer(
 
 
 class RankFusionAlgorithm(ABC):
-    def __init__(self, window: Optional[int] = None):
+    def __init__(self, window: int):
         self._window = window
 
     @property
-    def window(self) -> Optional[int]:
+    def window(self) -> int:
         """Phony number used to compute the number of elements to retrieve and
         feed the rank fusion algorithm.
 
@@ -129,7 +129,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         self,
         k: float = 60.0,
         *,
-        window: Optional[int] = None,
+        window: int,
         keyword_weight: float = 1.0,
         semantic_weight: float = 1.0,
     ):
@@ -179,10 +179,6 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
 
         merged.sort(key=lambda x: x.score, reverse=True)
         return merged
-
-
-def get_default_rank_fusion() -> RankFusionAlgorithm:
-    return LegacyRankFusion(window=None)
 
 
 def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorithm:

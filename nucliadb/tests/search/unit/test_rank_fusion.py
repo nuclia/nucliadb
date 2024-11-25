@@ -211,7 +211,7 @@ def test_legacy_rank_fusion_algorithm(
     expected: list[tuple[str, float, SCORE_TYPE]],
 ):
     """Basic test to validate how our own rank fusion algorithm works"""
-    rank_fusion = LegacyRankFusion()
+    rank_fusion = LegacyRankFusion(window=20)
     merged = rank_fusion.fuse(keyword=keyword, semantic=semantic)
     results = [(item.paragraph_id.rid, round(item.score, 1), item.score_type) for item in merged]
     assert results == expected
@@ -359,7 +359,7 @@ def test_reciprocal_rank_fusion_algorithm(
     semantic: list[TextBlockMatch],
     expected: list[tuple[str, float]],
 ):
-    rrf = ReciprocalRankFusion(k=RRF_TEST_K)
+    rrf = ReciprocalRankFusion(k=RRF_TEST_K, window=20)
     merged = rrf.fuse(keyword, semantic)
     results = [(item.paragraph_id.rid, round(item.score, 6)) for item in merged]
     assert results == expected
@@ -427,7 +427,7 @@ def test_reciprocal_rank_fusion_boosting(
     semantic: list[TextBlockMatch],
     expected: list[tuple[str, float]],
 ):
-    rrf = ReciprocalRankFusion(k=RRF_TEST_K, keyword_weight=2, semantic_weight=0.5)
+    rrf = ReciprocalRankFusion(k=RRF_TEST_K, window=20, keyword_weight=2, semantic_weight=0.5)
     merged = rrf.fuse(keyword, semantic)
     results = [(item.paragraph_id.rid, round(item.score, 6)) for item in merged]
     assert results == expected
