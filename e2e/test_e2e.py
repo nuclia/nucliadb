@@ -1,3 +1,4 @@
+import base64
 import io
 import os
 import random
@@ -107,6 +108,10 @@ def test_config_check(kbid: str):
 
 
 def test_resource_processed(kbid: str, resource_id: str):
+    wait_for_resource_processed(kbid, resource_id)
+
+
+def wait_for_resource_processed(kbid: str, resource_id: str):
     start = time.time()
     while True:
         resp = requests.get(
@@ -131,6 +136,41 @@ def test_resource_processed(kbid: str, resource_id: str):
             print(f"Waiting for resource to process: {int(waited)}s")
 
         time.sleep(5)
+
+
+def test_b64_file_upload(kbid: str):
+    image = b"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABjElEQVR42mNk"
+    resp = requests.post(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resources"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "WRITER",
+            "x-ndb-client": "web",
+        },
+        json={
+            "files": {
+                "image.png": {
+                     "file": {
+                         "payload": base64.b64encode(image).decode("utf-8"),
+                     }
+                }
+            }
+        }
+    )
+    raise_for_status(resp)
+    resource_id = resp.json()["uuid"]
+    wait_for_resource_processed(kbid, resource_id)
+
+    resp = requests.get(
+        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resource/{resource_id}/files/image.png"),
+        headers={
+            "content-type": "application/json",
+            "X-NUCLIADB-ROLES": "READER",
+            "x-ndb-client": "web",
+        },
+    )
+    raise_for_status(resp)
+    assert resp.content == image
 
 
 def test_search(kbid: str, resource_id: str):
