@@ -13,9 +13,7 @@ def load_reqs(filename):
         return [
             line.strip()
             for line in reqs_file.readlines()
-            if not (
-                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
-            )
+            if not (re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line))
         ]
 
 
@@ -75,12 +73,7 @@ setup(
         "nats": requirements_nats,
         "fastapi": requirements_fastapi,
         "all": list(
-            set(
-                requirements_otel
-                + requirements_grpc
-                + requirements_nats
-                + requirements_fastapi
-            )
+            set(requirements_otel + requirements_grpc + requirements_nats + requirements_fastapi)
         ),
     },
     package_data={"": ["*.txt", "*.md"], "nucliadb_telemetry": ["py.typed"]},
