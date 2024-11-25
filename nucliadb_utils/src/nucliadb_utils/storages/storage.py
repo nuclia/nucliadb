@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import base64
 import hashlib
 import uuid
 from io import BytesIO
@@ -352,18 +353,20 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         content_type: str,
         md5: Optional[str] = None,
     ):
+        decoded_payload = base64.b64decode(payload)
         cf = CloudFile()
         cf.filename = filename
         cf.content_type = content_type
-        cf.size = len(payload)
+        cf.size = len(decoded_payload)
         cf.source = self.source  # type: ignore
 
         if md5 is None:
-            md5hash = hashlib.md5(payload).digest()
+            md5hash = hashlib.md5(decoded_payload).digest()
             cf.md5 = md5hash.decode()
         else:
             cf.md5 = md5
-        buffer = BytesIO(payload)
+
+        buffer = BytesIO(decoded_payload)
 
         async def splitter(alldata: BytesIO):
             while True:
