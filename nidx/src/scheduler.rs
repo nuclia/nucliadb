@@ -18,20 +18,22 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{future::Future, sync::Arc, time::Duration};
-
-use async_nats::jetstream::consumer::PullConsumer;
-use futures::StreamExt;
-use nidx_types::Seq;
-use object_store::DynObjectStore;
-use tokio::{task::JoinSet, time::sleep};
-use tracing::*;
+mod metrics_task;
+mod purge;
 
 use crate::{
-    metadata::{MergeJob, Segment, SegmentId},
+    metadata::{MergeJob, SegmentId},
     settings::MergeSettings,
     NidxMetadata, Settings,
 };
+use async_nats::jetstream::consumer::PullConsumer;
+use nidx_types::Seq;
+use object_store::DynObjectStore;
+// TODO: This should not be public but it's used in tests
+pub use purge::*;
+use std::{future::Future, sync::Arc, time::Duration};
+use tokio::{task::JoinSet, time::sleep};
+use tracing::*;
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let indexer_settings = settings.indexer.as_ref().unwrap();
@@ -117,18 +119,29 @@ pub async fn run_tasks(
         }
     });
 
+    let meta2 = meta.clone();
     tasks.spawn(async move {
         let merge_scheduler = MergeScheduler::from_settings(&merge_settings);
         loop {
             match ack_floor.get().await {
                 Ok(oldest_confirmed_seq) => {
-                    if let Err(e) = merge_scheduler.schedule_merges(&meta, Seq::from(oldest_confirmed_seq)).await {
+                    if let Err(e) = merge_scheduler.schedule_merges(&meta2, Seq::from(oldest_confirmed_seq)).await {
                         warn!(?e, "Error in schedule_merges task");
                     }
                 }
                 Err(e) => {
                     warn!(?e, "Error while getting consumer information");
                 }
+            }
+            sleep(Duration::from_secs(15)).await;
+        }
+    });
+
+    let meta2 = meta.clone();
+    tasks.spawn(async move {
+        loop {
+            if let Err(e) = metrics_task::update_metrics(&meta2).await {
+                info!(?e, "Error updating scheduler metrics");
             }
             sleep(Duration::from_secs(15)).await;
         }
@@ -166,90 +179,6 @@ pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
     for j in failed_jobs {
         error!(j.id, "Failed job");
     }
-
-    Ok(())
-}
-
-/// Purge segments that have not been ready for a while:
-/// - Uploads that failed
-/// - Recent deletions
-pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) -> anyhow::Result<()> {
-    let deleted_segments = Segment::marked_as_deleted(&meta.pool).await?;
-    let paths = deleted_segments.iter().map(|sid| Ok(sid.storage_key()));
-    let results = storage.delete_stream(futures::stream::iter(paths).boxed()).collect::<Vec<_>>().await;
-
-    let mut deleted = Vec::new();
-    for (segment_id, result) in deleted_segments.into_iter().zip(results.iter()) {
-        match result {
-            Ok(_)
-            | Err(object_store::Error::NotFound {
-                ..
-            }) => deleted.push(segment_id),
-            Err(e) => warn!(?e, "Error deleting segment from storage"),
-        }
-    }
-    Segment::delete_many(&meta.pool, &deleted).await?;
-
-    Ok(())
-}
-
-pub async fn purge_deletions(meta: &NidxMetadata, oldest_pending_seq: i64) -> anyhow::Result<()> {
-    // Purge deletions that don't apply to any segment and won't apply to any
-    // segment pending to process
-    sqlx::query!(
-        "WITH oldest_segments AS (
-            SELECT index_id, MIN(seq) AS seq FROM segments
-            WHERE delete_at IS NULL
-            GROUP BY index_id
-        )
-        DELETE FROM deletions USING oldest_segments
-        WHERE deletions.index_id = oldest_segments.index_id
-        AND deletions.seq <= oldest_segments.seq
-        AND deletions.seq <= $1",
-        oldest_pending_seq
-    )
-    .execute(&meta.pool)
-    .await?;
-
-    // Purge deletions for indexes marked to delete
-    sqlx::query!(
-        "WITH indexes_to_delete AS (
-             SELECT indexes.id
-             FROM indexes
-             WHERE indexes.deleted_at IS NOT NULL
-         )
-         DELETE FROM deletions USING indexes_to_delete
-         WHERE deletions.index_id = indexes_to_delete.id"
-    )
-    .execute(&meta.pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Purge shards and indexes marked to delete when it's safe to do so, i.e.,
-/// after all segments and deletions have been removed
-pub async fn purge_deleted_shards_and_indexes(meta: &NidxMetadata) -> anyhow::Result<()> {
-    sqlx::query!(
-        "DELETE FROM indexes
-         WHERE (
-             deleted_at IS NOT NULL
-             AND NOT EXISTS(SELECT 1 FROM segments WHERE index_id = indexes.id)
-             AND NOT EXISTS(SELECT 1 FROM deletions where index_id = deletions.index_id)
-         )"
-    )
-    .execute(&meta.pool)
-    .await?;
-
-    sqlx::query!(
-        "DELETE FROM shards
-         WHERE (
-             deleted_at IS NOT NULL
-             AND NOT EXISTS(SELECT 1 FROM indexes WHERE shard_id = shards.id)
-         )"
-    )
-    .execute(&meta.pool)
-    .await?;
 
     Ok(())
 }
@@ -436,7 +365,7 @@ mod tests {
 
         use super::*;
 
-        use crate::metadata::{Index, IndexConfig, IndexId, NidxMetadata, Shard};
+        use crate::metadata::{Index, IndexConfig, IndexId, NidxMetadata, Segment, Shard};
 
         fn merge_scheduler() -> MergeScheduler {
             MergeScheduler::from_settings(&MergeSettings {

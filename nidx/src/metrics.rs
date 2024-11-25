@@ -1,9 +1,3 @@
-use lazy_static::lazy_static;
-use prometheus_client::{
-    metrics::{counter::Counter, family::Family},
-    registry::Registry,
-};
-
 macro_rules! metrics {
     {
         // Start a repetition:
@@ -13,8 +7,14 @@ macro_rules! metrics {
         ),
         *
     } => {
+        use lazy_static::lazy_static;
+        use prometheus_client::{
+            metrics::{gauge::Gauge, family::Family},
+            registry::Registry,
+        };
+
         lazy_static! {
-            $(static ref $id: $type = Default::default();)*
+            $(pub static ref $id: $type = Default::default();)*
         }
 
         pub fn register(metrics: &mut Registry) {
@@ -23,6 +23,21 @@ macro_rules! metrics {
     };
 }
 
-metrics! {
-    QUEUED_JOBS: Counter as "queued_jobs" ("Number of merge jobs in the queue")
+pub mod scheduler {
+    use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue};
+
+    #[derive(Clone, Debug, EncodeLabelValue, PartialEq, Eq, Hash)]
+    pub enum JobState {
+        Queued,
+        Running,
+    }
+
+    #[derive(Clone, Debug, EncodeLabelSet, PartialEq, Eq, Hash)]
+    pub struct JobFamily {
+        pub state: JobState,
+    }
+
+    metrics! {
+        QUEUED_JOBS: Family<JobFamily, Gauge> as "merge_jobs" ("Number of merge jobs in diffeerent states")
+    }
 }

@@ -29,7 +29,6 @@ mod sync;
 
 use index_cache::IndexCache;
 use object_store::DynObjectStore;
-use prometheus_client::registry::Registry;
 use sync::run_sync;
 use sync::SyncMetadata;
 use tokio::sync::watch;
@@ -89,7 +88,7 @@ impl SyncedSearcher {
     }
 }
 
-pub async fn run(settings: Settings, metrics: Arc<Registry>) -> anyhow::Result<()> {
+pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let work_dir = tempdir()?;
     let meta = settings.metadata.clone();
     let storage = settings.storage.as_ref().expect("Storage settings needed").object_store.clone();
@@ -98,7 +97,7 @@ pub async fn run(settings: Settings, metrics: Arc<Registry>) -> anyhow::Result<(
 
     let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
     let server = GrpcServer::new("0.0.0.0:10001").await?;
-    let api_task = tokio::task::spawn(server.serve(api.into_service(), metrics));
+    let api_task = tokio::task::spawn(server.serve(api.into_service()));
     let search_task = tokio::task::spawn(async move { searcher.run(storage, None).await });
 
     tokio::select! {

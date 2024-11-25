@@ -21,12 +21,13 @@ pub mod api;
 mod errors;
 pub mod grpc_server;
 pub mod indexer;
-pub mod maintenance;
 pub mod metadata;
 pub mod metrics;
+pub mod scheduler;
 pub mod searcher;
 mod segment_store;
 pub mod settings;
+pub mod worker;
 
 pub use metadata::NidxMetadata;
 pub use settings::Settings;

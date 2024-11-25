@@ -18,20 +18,41 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod grpc;
-pub mod shards;
+use crate::{
+    metrics::{
+        self,
+        scheduler::{JobFamily, JobState},
+    },
+    NidxMetadata,
+};
 
-use tracing::debug;
+pub async fn update_metrics(metadb: &NidxMetadata) -> anyhow::Result<()> {
+    update_merge_job_metric(metadb).await?;
 
-use crate::{grpc_server::GrpcServer, Settings};
+    Ok(())
+}
 
-pub async fn run(settings: Settings) -> anyhow::Result<()> {
-    let meta = settings.metadata.clone();
-
-    let service = grpc::ApiServer::new(meta).into_service();
-    let server = GrpcServer::new("0.0.0.0:10000").await?;
-    debug!("Running API at port {}", server.port()?);
-    server.serve(service).await?;
+pub async fn update_merge_job_metric(metadb: &NidxMetadata) -> anyhow::Result<()> {
+    let job_states = sqlx::query!(
+        r#"
+        SELECT running_at IS NOT NULL AS "running!",
+        COUNT(*) AS "count!"
+        FROM merge_jobs GROUP BY 1"#
+    )
+    .fetch_all(&metadb.pool)
+    .await?;
+    for record in job_states {
+        let state = if record.running {
+            JobState::Running
+        } else {
+            JobState::Queued
+        };
+        metrics::scheduler::QUEUED_JOBS
+            .get_or_create(&JobFamily {
+                state,
+            })
+            .set(record.count);
+    }
 
     Ok(())
 }

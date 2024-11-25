@@ -256,8 +256,8 @@ mod tests {
     use tempfile::tempdir;
 
     use crate::{
-        maintenance::scheduler::purge_deletions,
         metadata::{Deletion, Index, Segment, SegmentId, Shard},
+        scheduler::purge_deletions,
         searcher::sync::{sync_index, Operations, SyncMetadata},
         NidxMetadata,
     };

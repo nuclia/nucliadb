@@ -18,9 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::sync::Arc;
-
-use prometheus_client::registry::Registry;
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tonic::service::Routes;
 
@@ -36,21 +33,8 @@ impl GrpcServer {
         Ok(self.0.local_addr()?.port())
     }
 
-    pub async fn serve(self, routes: Routes, metrics: Arc<Registry>) -> anyhow::Result<()> {
-        let router = routes
-            .into_axum_router()
-            .route(
-                "/metrics",
-                axum::routing::get(|| async move {
-                    let mut buffer = String::new();
-                    if prometheus_client::encoding::text::encode(&mut buffer, &metrics).is_err() {
-                        Err("Error encoding metrics")
-                    } else {
-                        Ok(buffer)
-                    }
-                }),
-            )
-            .into_make_service();
+    pub async fn serve(self, routes: Routes) -> anyhow::Result<()> {
+        let router = routes.into_axum_router().into_make_service();
 
         axum::serve(self.0, router).await?;
         Ok(())

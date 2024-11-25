@@ -37,6 +37,7 @@ spec:
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
+        nidxMetrics: "enabled"
     spec:
       {{- with .Values.scheduler.nodeSelector }}
       nodeSelector:
@@ -63,6 +64,9 @@ spec:
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
         ports:
+        - name: metrics
+          port: 10010
+          protocol: TCP
         {{- with .Values.scheduler.resources }}
         resources:
           {{- toYaml . | nindent 10 }}
