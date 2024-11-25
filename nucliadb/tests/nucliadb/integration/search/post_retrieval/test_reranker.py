@@ -80,28 +80,25 @@ async def test_predict_reranker_requests_more_results(
     spy_build_find_response = mocker.spy(find, "build_find_response")
     spy_cut_page = mocker.spy(find_merge, "cut_page")
 
+    payload = {
+        "query": "the",
+        "reranker": reranker,
+        "min_score": {"bm25": 0, "semantic": -10},
+        "top_k": 5,
+    }
+
     ask_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/ask",
         headers={
             "x-synchronous": "true",
         },
-        json={
-            "query": "the",
-            "reranker": reranker,
-            "min_score": {"bm25": 0, "semantic": -10},
-            "top_k": 5,
-        },
+        json=payload,
     )
     assert ask_resp.status_code == 200
 
     find_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
-        json={
-            "query": "the",
-            "reranker": reranker,
-            "min_score": {"bm25": 0, "semantic": -10},
-            "top_k": 5,
-        },
+        json=payload,
     )
     assert find_resp.status_code == 200
 

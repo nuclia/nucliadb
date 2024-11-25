@@ -389,6 +389,12 @@ class ReciprocalRankFusion(_BaseRankFusion):
         title="RRF k parameter",
         description="k parameter changes the influence top-ranked and lower-ranked elements have. Research has shown that 60 is a performant value across datasets",  # noqa: E501
     )
+    window: Optional[int] = Field(
+        default=None,
+        le=500,
+        title="RRF window",
+        description="Number of elements for retrieval to do RRF. Window must be greater or equal to top_k. Greater values will increase probability of multi match at cost of retrieval time",  # noqa: E501
+    )
     boosting: ReciprocalRankFusionWeights = Field(
         default_factory=ReciprocalRankFusionWeights,
         title="Retrievers boosting",

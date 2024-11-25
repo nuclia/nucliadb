@@ -18,15 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Union, cast
+from typing import cast
 
 from nucliadb.search.search.query_parser.exceptions import ParserError
 from nucliadb.search.search.query_parser.models import (
+    LegacyRankFusion,
     MultiMatchBoosterReranker,
     NoopReranker,
     ParsedFindRequest,
     PredictReranker,
     RankFusion,
+    ReciprocalRankFusion,
     Reranker,
 )
 from nucliadb_models import search as search_models
@@ -69,20 +71,34 @@ class _FindParser:
         return top_k
 
     def _parse_rank_fusion(self) -> RankFusion:
-        top_k = self._parse_top_k()
+        rank_fusion: RankFusion
 
-        rank_fusion_kind: Union[search_models.LegacyRankFusion, search_models.ReciprocalRankFusion]
+        top_k = self._parse_top_k()
+        window = top_k
+
         if isinstance(self.item.rank_fusion, search_models.RankFusionName):
             if self.item.rank_fusion == search_models.RankFusionName.LEGACY:
-                rank_fusion_kind = search_models.LegacyRankFusion()
+                rank_fusion = LegacyRankFusion(window=window)
             elif self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
-                rank_fusion_kind = search_models.ReciprocalRankFusion()
+                rank_fusion = ReciprocalRankFusion(window=window)
             else:
                 raise ParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
-        else:
-            rank_fusion_kind = self.item.rank_fusion
 
-        return RankFusion(kind=rank_fusion_kind, window=top_k)
+        elif isinstance(self.item.rank_fusion, search_models.LegacyRankFusion):
+            rank_fusion = LegacyRankFusion(window=window)
+
+        elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
+            window = max(self.item.rank_fusion.window or 0, top_k)
+            rank_fusion = ReciprocalRankFusion(
+                k=self.item.rank_fusion.k,
+                boosting=self.item.rank_fusion.boosting,
+                window=window,
+            )
+
+        else:
+            raise ParserError(f"Unknown rank fusion {self.item.rank_fusion}")
+
+        return rank_fusion
 
     def _parse_reranker(self) -> Reranker:
         top_k = self._parse_top_k()

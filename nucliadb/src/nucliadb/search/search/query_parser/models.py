@@ -19,7 +19,6 @@
 #
 
 from dataclasses import dataclass
-from typing import Union
 
 from pydantic import (
     BaseModel,
@@ -33,7 +32,16 @@ from nucliadb_models import search as search_models
 
 class RankFusion(BaseModel):
     window: int = Field(le=500)
-    kind: Union[search_models.LegacyRankFusion, search_models.ReciprocalRankFusion]
+
+
+class LegacyRankFusion(RankFusion): ...
+
+
+class ReciprocalRankFusion(RankFusion):
+    k: float = Field(default=60.0)
+    boosting: search_models.ReciprocalRankFusionWeights = Field(
+        default_factory=search_models.ReciprocalRankFusionWeights
+    )
 
 
 # reranking

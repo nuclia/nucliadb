@@ -42,7 +42,11 @@ from nucliadb.search.search.metrics import (
     query_parse_dependency_observer,
 )
 from nucliadb.search.search.query_parser import models as parser_models
-from nucliadb.search.search.rank_fusion import get_default_rank_fusion, get_rank_fusion
+from nucliadb.search.search.rank_fusion import (
+    RankFusionAlgorithm,
+    get_default_rank_fusion,
+    get_rank_fusion,
+)
 from nucliadb.search.search.rerankers import (
     Reranker,
     get_default_reranker,
@@ -322,7 +326,7 @@ class QueryParser:
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
         await self.parse_min_score(request, incomplete)
-        await self.adjust_page_size(request, self.reranker)
+        await self.adjust_page_size(request, self.rank_fusion, self.reranker)
         return request, incomplete, autofilters
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
@@ -618,18 +622,22 @@ class QueryParser:
             return self.max_tokens.answer
         return None
 
-    async def adjust_page_size(self, request: nodereader_pb2.SearchRequest, reranker: Reranker):
-        """Some rerankers want more results than the requested by the user so
-        reranking can have more choices. This function adjust the number of
-        retrieval results requested according to the reranker needs."""
+    async def adjust_page_size(
+        self, request: nodereader_pb2.SearchRequest, rank_fusion: RankFusionAlgorithm, reranker: Reranker
+    ):
+        """Adjust requested page size depending on rank fusion and reranking algorithms.
 
-        if not reranker.needs_extra_results:
-            return
+        Some rerankers want more results than the requested by the user so
+        reranking can have more choices.
 
-        print("pre reranker adjust", request.result_per_page)
-        if reranker.window is not None:
-            request.result_per_page = reranker.window
-        print("post reranker adjust", request.result_per_page)
+        """
+        print("pre page adjust", request.result_per_page)
+        request.result_per_page = max(
+            request.result_per_page,
+            rank_fusion.window or 0,
+            reranker.window or 0,
+        )
+        print("post page adjust", request.result_per_page)
 
 
 async def paragraph_query_to_pb(

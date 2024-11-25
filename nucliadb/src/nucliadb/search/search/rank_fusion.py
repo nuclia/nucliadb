@@ -24,7 +24,6 @@ from typing import Iterable, Optional, cast
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
 from nucliadb.search.search.query_parser import models as parser_models
-from nucliadb_models import search as search_models
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_telemetry.metrics import Observer
 
@@ -185,23 +184,22 @@ def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorith
     """Given a rank fusion API type, return the appropiate rank fusion algorithm instance"""
     algorithm: RankFusionAlgorithm
     window = rank_fusion.window
-    kind = rank_fusion.kind
 
-    if isinstance(kind, search_models.LegacyRankFusion):
-        kind = cast(search_models.LegacyRankFusion, kind)
+    if isinstance(rank_fusion, parser_models.LegacyRankFusion):
+        rank_fusion = cast(parser_models.LegacyRankFusion, rank_fusion)
         algorithm = LegacyRankFusion(window=window)
 
-    elif isinstance(kind, search_models.ReciprocalRankFusion):
-        kind = cast(search_models.ReciprocalRankFusion, kind)
+    elif isinstance(rank_fusion, parser_models.ReciprocalRankFusion):
+        rank_fusion = cast(parser_models.ReciprocalRankFusion, rank_fusion)
         algorithm = ReciprocalRankFusion(
-            k=kind.k,
+            k=rank_fusion.k,
             window=window,
-            keyword_weight=kind.boosting.keyword,
-            semantic_weight=kind.boosting.semantic,
+            keyword_weight=rank_fusion.boosting.keyword,
+            semantic_weight=rank_fusion.boosting.semantic,
         )
 
     else:
-        logger.error(f"Unknown rank fusion algorithm {type(kind)}: {rank_fusion}. Using default")
+        logger.error(f"Unknown rank fusion algorithm {type(rank_fusion)}: {rank_fusion}. Using default")
         algorithm = LegacyRankFusion(window=window)
 
     return algorithm
