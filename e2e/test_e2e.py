@@ -152,6 +152,8 @@ def test_b64_file_upload(kbid: str):
             "files": {
                 "image": {
                      "file": {
+                         "filename": "image.png",
+                         "content_type": "image/png",
                          "payload": base64.b64encode(image).decode("utf-8"),
                      }
                 }
