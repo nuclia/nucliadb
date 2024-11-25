@@ -206,10 +206,6 @@ class MultiMatchBoosterReranker(Reranker):
         return reranked
 
 
-def get_default_reranker() -> Reranker:
-    return MultiMatchBoosterReranker()
-
-
 def get_reranker(reranker: parser_models.Reranker) -> Reranker:
     algorithm: Reranker
 
@@ -225,7 +221,7 @@ def get_reranker(reranker: parser_models.Reranker) -> Reranker:
 
     else:
         logger.warning(f"Unknown reranker requested: {reranker}. Using default instead")
-        algorithm = get_default_reranker()
+        algorithm = MultiMatchBoosterReranker()
 
     return algorithm
 
