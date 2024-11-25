@@ -139,6 +139,7 @@ def wait_for_resource_processed(kbid: str, resource_id: str):
 
 
 def test_b64_file_upload(kbid: str):
+    # Create a resource with an image embedded as base64 in the payload
     image = b"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABjElEQVR42mNk"
     resp = requests.post(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resources"),
@@ -159,8 +160,11 @@ def test_b64_file_upload(kbid: str):
     )
     raise_for_status(resp)
     resource_id = resp.json()["uuid"]
+
+    # Check that the resource is processed without errors
     wait_for_resource_processed(kbid, resource_id)
 
+    # Check that the image can be downloaded and is the same as the one uploaded
     resp = requests.get(
         os.path.join(BASE_URL, f"api/v1/kb/{kbid}/resource/{resource_id}/files/image.png"),
         headers={
