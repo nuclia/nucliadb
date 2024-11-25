@@ -53,18 +53,23 @@ class RankFusionAlgorithm(ABC):
 
     @property
     def window(self) -> Optional[int]:
-        """Number of elements produced by the rank fusion algorithm."""
+        """Phony number used to compute the number of elements to retrieve and
+        feed the rank fusion algorithm.
+
+        This is here for convinience, but a query plan should be the way to go.
+
+        """
         return self._window
 
     def fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
     ) -> list[TextBlockMatch]:
-        """Fuse keyword and semantic results and return a merged list containing
-        at most `window` elements.
+        """Fuse keyword and semantic results and return a list with the merged
+        results.
 
         """
         merged = self._fuse(keyword, semantic)
-        return merged[: self.window]
+        return merged
 
     @abstractmethod
     def _fuse(

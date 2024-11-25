@@ -631,13 +631,11 @@ class QueryParser:
         reranking can have more choices.
 
         """
-        print("pre page adjust", request.result_per_page)
         request.result_per_page = max(
             request.result_per_page,
             rank_fusion.window or 0,
             reranker.window or 0,
         )
-        print("post page adjust", request.result_per_page)
 
 
 async def paragraph_query_to_pb(

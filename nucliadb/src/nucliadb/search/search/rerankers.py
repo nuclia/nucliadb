@@ -64,10 +64,8 @@ class RerankingOptions:
 class Reranker(ABC):
     @abstractproperty
     def window(self) -> Optional[int]:
-        """Number of elements produced by the reranker. If `None`, no specific
-        window will be enforced.
-
-        """
+        """Number of elements the reranker requests. `None` means no specific
+        window is enforced."""
         ...
 
     @property
@@ -80,8 +78,12 @@ class Reranker(ABC):
         at most, `window` elements.
 
         """
+        # Enforce reranker window and drop the rest
+        # XXX: other search engines allow a mix of reranked and not reranked
+        # results, there's no technical reason we can't do it
+        items = items[: self.window]
         reranked = await self._rerank(items, options)
-        return reranked[: self.window]
+        return reranked
 
     @abstractmethod
     async def _rerank(
@@ -132,12 +134,6 @@ class PredictReranker(Reranker):
             return []
 
         predict = get_predict()
-
-        # Enforce reranker window and drop the rest
-        #
-        # TODO: other search engines allow a mix of reranked and not reranked
-        # results, there's no technical reason we can't do it
-        items = items[: self.window]
 
         # Conversion to format expected by predict. At the same time,
         # deduplicates paragraphs found in different indices
