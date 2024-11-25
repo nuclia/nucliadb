@@ -25,17 +25,17 @@ from nucliadb.search.search.query_parser.models import (
     LegacyRankFusion,
     MultiMatchBoosterReranker,
     NoopReranker,
-    ParsedFindRequest,
     PredictReranker,
     RankFusion,
     ReciprocalRankFusion,
     Reranker,
+    UnitRetrieval,
 )
 from nucliadb_models import search as search_models
 from nucliadb_models.search import FindRequest
 
 
-def parse_find(item: FindRequest) -> ParsedFindRequest:
+def parse_find(item: FindRequest) -> UnitRetrieval:
     parser = _FindParser(item)
     return parser.parse()
 
@@ -44,7 +44,7 @@ class _FindParser:
     def __init__(self, item: FindRequest):
         self.item = item
 
-    def parse(self) -> ParsedFindRequest:
+    def parse(self) -> UnitRetrieval:
         top_k = self._parse_top_k()
         rank_fusion = self._parse_rank_fusion()
         reranker = self._parse_reranker()
@@ -57,7 +57,7 @@ class _FindParser:
             reranker = cast(PredictReranker, reranker)
             rank_fusion.window = max(rank_fusion.window, reranker.window)
 
-        return ParsedFindRequest(
+        return UnitRetrieval(
             top_k=top_k,
             rank_fusion=rank_fusion,
             reranker=reranker,

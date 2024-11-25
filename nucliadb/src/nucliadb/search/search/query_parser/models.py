@@ -60,11 +60,11 @@ class PredictReranker(Reranker):
     window: int = Field(le=500)
 
 
-# Parsed requests
+# retrieval operation
 
 
 @dataclass
-class ParsedFindRequest:
+class UnitRetrieval:
     top_k: int
     rank_fusion: RankFusion
     reranker: Reranker
