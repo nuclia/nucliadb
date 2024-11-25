@@ -19,13 +19,13 @@
 #
 
 import logging
-import math
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
+from typing import Optional, cast
 
 from nucliadb.search.predict import ProxiedPredictAPIError, SendToPredictError
+from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.utilities import get_predict
-from nucliadb_models import search as search_models
 from nucliadb_models.internal.predict import RerankModel
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -60,51 +60,48 @@ class RerankingOptions:
     # Query used to retrieve the results to be reranked. Smart rerankers will use it
     query: str
 
-    # Number of results requested by the user (can be different from the amount
-    # of retrieval results)
-    top_k: int
-
 
 class Reranker(ABC):
     @abstractproperty
-    def needs_extra_results(self) -> bool: ...
-
-    @abstractmethod
-    def items_needed(self, requested: int, shards: int = 1) -> int:
-        """Return the number of retrieval results (per shard) the reranker
-        needs.
-
-        `requested` is the amount of results requested
-        `shards`: for sharded index providers, this is the amount of shards that
-        will be queried
+    def window(self) -> Optional[int]:
+        """Number of elements produced by the reranker. If `None`, no specific
+        window will be enforced.
 
         """
         ...
 
-    @abstractmethod
+    @property
+    def needs_extra_results(self) -> bool:
+        return self.window is not None
+
     async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         """Given a query and a set of resources, rerank elements and return the
-        list of reranked items sorted by decreasing score.
+        list of reranked items sorted by decreasing score. The list will contain
+        at most, `window` elements.
 
         """
-        ...
+        reranked = await self._rerank(items, options)
+        return reranked[: self.window]
+
+    @abstractmethod
+    async def _rerank(
+        self, items: list[RerankableItem], options: RerankingOptions
+    ) -> list[RankedItem]: ...
 
 
 class NoopReranker(Reranker):
     """No-operation reranker. Given a list of items to rerank, it does nothing
     with them and return the items in the same order. It can be use to not alter
     the previous ordering.
+
     """
 
     @property
-    def needs_extra_results(self) -> bool:
-        return False
-
-    def items_needed(self, requested: int, shards: int = 1) -> int:
-        return requested
+    def window(self) -> Optional[int]:
+        return None
 
     @reranker_observer.wrap({"type": "noop"})
-    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
+    async def _rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         return [
             RankedItem(
                 id=item.id,
@@ -116,22 +113,31 @@ class NoopReranker(Reranker):
 
 
 class PredictReranker(Reranker):
-    @property
-    def needs_extra_results(self) -> bool:
-        return True
+    """Rerank using a reranking model.
 
-    def items_needed(self, requested: int, shards: int = 1) -> int:
-        # we want a x5 factor with a top of 500 results
-        reranker_requested = min(requested * shards * 5, 500)
-        actual_requested = requested * shards
-        return math.ceil(max(reranker_requested, actual_requested) / shards)
+    It uses Predict API to rerank elements using a model trained for this
+
+    """
+
+    def __init__(self, window: int):
+        self._window = window
+
+    @property
+    def window(self) -> int:
+        return self._window
 
     @reranker_observer.wrap({"type": "predict"})
-    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
+    async def _rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         if len(items) == 0:
             return []
 
         predict = get_predict()
+
+        # Enforce reranker window and drop the rest
+        #
+        # TODO: other search engines allow a mix of reranked and not reranked
+        # results, there's no technical reason we can't do it
+        items = items[: self.window]
 
         # Conversion to format expected by predict. At the same time,
         # deduplicates paragraphs found in different indices
@@ -163,7 +169,7 @@ class PredictReranker(Reranker):
                 for id, score in response.context_scores.items()
             ]
         sort_by_score(reranked)
-        best = reranked[: options.top_k]
+        best = reranked
         return best
 
 
@@ -171,14 +177,11 @@ class MultiMatchBoosterReranker(Reranker):
     """This reranker gives more value to items that come from different indices"""
 
     @property
-    def needs_extra_results(self) -> bool:
-        return False
-
-    def items_needed(self, requested: int, shards: int = 1) -> int:
-        return requested
+    def window(self) -> Optional[int]:
+        return None
 
     @reranker_observer.wrap({"type": "multi_match_booster"})
-    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
+    async def _rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         """Given a list of rerankable items, boost matches that appear multiple
         times. The returned list can be smaller than the initial, as repeated
         matches are deduplicated.
@@ -211,18 +214,24 @@ def get_default_reranker() -> Reranker:
     return MultiMatchBoosterReranker()
 
 
-def get_reranker(kind: search_models.Reranker) -> Reranker:
-    reranker: Reranker
-    if kind == search_models.Reranker.PREDICT_RERANKER:
-        reranker = PredictReranker()
-    elif kind == search_models.Reranker.MULTI_MATCH_BOOSTER:
-        reranker = MultiMatchBoosterReranker()
-    elif kind == search_models.Reranker.NOOP:
-        reranker = NoopReranker()
+def get_reranker(reranker: parser_models.Reranker) -> Reranker:
+    algorithm: Reranker
+
+    if isinstance(reranker, parser_models.NoopReranker):
+        algorithm = NoopReranker()
+
+    elif isinstance(reranker, parser_models.MultiMatchBoosterReranker):
+        algorithm = MultiMatchBoosterReranker()
+
+    elif isinstance(reranker, parser_models.PredictReranker):
+        reranker = cast(parser_models.PredictReranker, reranker)
+        algorithm = PredictReranker(reranker.window)
+
     else:
-        logger.warning(f"Unknown reranker requested: {kind}. Using default instead")
-        reranker = get_default_reranker()
-    return reranker
+        logger.warning(f"Unknown reranker requested: {reranker}. Using default instead")
+        algorithm = get_default_reranker()
+
+    return algorithm
 
 
 def sort_by_score(items: list[RankedItem]):

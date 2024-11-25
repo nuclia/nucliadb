@@ -36,8 +36,8 @@ from nucliadb.search.search.hydrator import (
 )
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.rank_fusion import get_rank_fusion
-from nucliadb.search.search.rerankers import RerankingOptions, get_reranker
+from nucliadb.search.search.query_parser.parser import parse_find
+from nucliadb.search.search.rerankers import RerankingOptions
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
     min_score_from_payload,
@@ -202,8 +202,8 @@ async def _external_index_retrieval(
         reranking_options=RerankingOptions(
             kbid=kbid,
             query=search_request.body,
-            top_k=query_parser.page_size,
         ),
+        top_k=query_parser.page_size,
     )
     find_resources = compose_find_resources(text_blocks, resources)
 
@@ -246,8 +246,10 @@ async def query_parser_from_find_request(
 
     hidden = await filter_hidden_resources(kbid, item.show_hidden)
 
-    reranker = get_reranker(item.reranker)
-    rank_fusion = get_rank_fusion(item.rank_fusion)
+    parsed_find = parse_find(item)
+    rank_fusion = parsed_find.rank_fusion
+    reranker = parsed_find.reranker
+
     query_parser = QueryParser(
         kbid=kbid,
         features=item.features,

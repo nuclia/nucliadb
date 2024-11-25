@@ -105,7 +105,8 @@ async def test_predict_reranker_requests_more_results(
     )
     assert find_resp.status_code == 200
 
-    assert spy_build_find_response.call_count == spy_cut_page.call_count == 2
+    assert spy_build_find_response.call_count == 2
+    assert spy_cut_page.call_count == 2
 
     for i in range(spy_build_find_response.call_count):
         build_find_response_call = spy_build_find_response.call_args_list[i]

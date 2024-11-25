@@ -41,11 +41,12 @@ from nucliadb.search.search.metrics import (
     node_features,
     query_parse_dependency_observer,
 )
-from nucliadb.search.search.rank_fusion import RankFusionAlgorithm, get_default_rank_fusion
+from nucliadb.search.search.query_parser import models as parser_models
+from nucliadb.search.search.rank_fusion import get_default_rank_fusion, get_rank_fusion
 from nucliadb.search.search.rerankers import (
-    PredictReranker,
     Reranker,
     get_default_reranker,
+    get_reranker,
 )
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
@@ -128,8 +129,8 @@ class QueryParser:
         rephrase_prompt: Optional[str] = None,
         max_tokens: Optional[MaxTokens] = None,
         hidden: Optional[bool] = None,
-        rank_fusion: RankFusionAlgorithm = get_default_rank_fusion(),
-        reranker: Reranker = get_default_reranker(),
+        rank_fusion: Optional[parser_models.RankFusion] = None,
+        reranker: Optional[parser_models.Reranker] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -170,16 +171,24 @@ class QueryParser:
             self.label_filters = translate_label_filters(self.label_filters)
             self.flat_label_filters = flatten_filter_literals(self.label_filters)
         self.max_tokens = max_tokens
-        self.rank_fusion = rank_fusion
+
+        if rank_fusion is None:
+            self.rank_fusion = get_default_rank_fusion()
+        else:
+            self.rank_fusion = get_rank_fusion(rank_fusion)
+
         self.reranker: Reranker
-        if page_number > 0 and isinstance(reranker, PredictReranker):
-            logger.warning(
-                "Trying to use predict reranker with pagination. Using default instead",
-                extra={"kbid": kbid},
-            )
+        if reranker is None:
             self.reranker = get_default_reranker()
         else:
-            self.reranker = reranker
+            if page_number > 0 and isinstance(reranker, parser_models.Reranker):
+                logger.warning(
+                    "Trying to use predict reranker with pagination. Using default instead",
+                    extra={"kbid": kbid},
+                )
+                self.reranker = get_default_reranker()
+            else:
+                self.reranker = get_reranker(reranker)
 
     @property
     def has_vector_search(self) -> bool:
@@ -617,20 +626,10 @@ class QueryParser:
         if not reranker.needs_extra_results:
             return
 
-        async with datamanagers.with_ro_transaction() as txn:
-            external_provider = await datamanagers.kb.get_external_index_provider_metadata(
-                txn, kbid=self.kbid
-            )
-            shards = 1
-            if external_provider is None:
-                # index nodes are sharded, we need to know how many shards we'll query
-                kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
-                if kb_shards is None:
-                    logger.warning("Trying to query a KB with no shards", extra={"kbid": self.kbid})
-                    return
-                shards = len(kb_shards.shards)
-
-        request.result_per_page = reranker.items_needed(self.page_size, shards)
+        print("pre reranker adjust", request.result_per_page)
+        if reranker.window is not None:
+            request.result_per_page = reranker.window
+        print("post reranker adjust", request.result_per_page)
 
 
 async def paragraph_query_to_pb(

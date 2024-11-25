@@ -36,8 +36,9 @@ from nucliadb.search.search.find_merge import (
     keyword_result_to_text_block_match,
     semantic_result_to_text_block_match,
 )
+from nucliadb.search.search.query_parser.parser import parse_find
 from nucliadb.search.search.rank_fusion import LegacyRankFusion, ReciprocalRankFusion, get_rank_fusion
-from nucliadb_models.search import SCORE_TYPE
+from nucliadb_models.search import SCORE_TYPE, FindRequest
 from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 
 
@@ -51,7 +52,8 @@ from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
     ],
 )
 def test_get_rank_fusion(rank_fusion, expected_type: Type):
-    algorithm = get_rank_fusion(rank_fusion)
+    item = FindRequest(rank_fusion=rank_fusion)
+    algorithm = get_rank_fusion(parse_find(item).rank_fusion)
     assert isinstance(algorithm, expected_type)
 
 

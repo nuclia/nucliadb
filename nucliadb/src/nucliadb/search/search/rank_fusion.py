@@ -19,10 +19,11 @@
 #
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable, Union, cast
+from typing import Iterable, Optional, cast
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
+from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb_models import search as search_models
 from nucliadb_models.search import SCORE_TYPE
 from nucliadb_telemetry.metrics import Observer
@@ -48,8 +49,26 @@ rank_fusion_observer = Observer(
 
 
 class RankFusionAlgorithm(ABC):
-    @abstractmethod
+    def __init__(self, window: Optional[int] = None):
+        self._window = window
+
+    @property
+    def window(self) -> Optional[int]:
+        """Number of elements produced by the rank fusion algorithm."""
+        return self._window
+
     def fuse(
+        self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
+    ) -> list[TextBlockMatch]:
+        """Fuse keyword and semantic results and return a merged list containing
+        at most `window` elements.
+
+        """
+        merged = self._fuse(keyword, semantic)
+        return merged[: self.window]
+
+    @abstractmethod
+    def _fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
     ) -> list[TextBlockMatch]: ...
 
@@ -64,7 +83,7 @@ class LegacyRankFusion(RankFusionAlgorithm):
     """
 
     @rank_fusion_observer.wrap({"type": "legacy"})
-    def fuse(
+    def _fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
     ) -> list[TextBlockMatch]:
         merged: list[TextBlockMatch] = []
@@ -106,19 +125,21 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         self,
         k: float = 60.0,
         *,
+        window: Optional[int] = None,
         keyword_weight: float = 1.0,
         semantic_weight: float = 1.0,
     ):
+        super().__init__(window)
         # Constant used in RRF, studies agree on 60 as a good default value
         # giving good results across many datasets. k allow bigger score
         # difference among the best results and a smaller score difference among
         # bad results
-        self.k = k
-        self.keyword_boost = keyword_weight
-        self.semantic_boost = semantic_weight
+        self._k = k
+        self._keyword_boost = keyword_weight
+        self._semantic_boost = semantic_weight
 
     @rank_fusion_observer.wrap({"type": "reciprocal_rank_fusion"})
-    def fuse(
+    def _fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
     ) -> list[TextBlockMatch]:
         scores: dict[ParagraphId, float] = {}
@@ -129,14 +150,14 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         semantic = [s for s in sorted(semantic, key=lambda r: r.score, reverse=True)]
 
         rankings = [
-            (keyword, self.keyword_boost),
-            (semantic, self.semantic_boost),
+            (keyword, self._keyword_boost),
+            (semantic, self._semantic_boost),
         ]
         for r, (ranking, boost) in enumerate(rankings):
             for i, result in enumerate(ranking):
                 id = result.paragraph_id
                 scores.setdefault(id, 0)
-                scores[id] += 1 / (self.k + i) * boost
+                scores[id] += 1 / (self._k + i) * boost
 
                 position = (r, i)
                 match_positions.setdefault(result.paragraph_id, []).append(position)
@@ -157,35 +178,30 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
 
 
 def get_default_rank_fusion() -> RankFusionAlgorithm:
-    return LegacyRankFusion()
+    return LegacyRankFusion(window=None)
 
 
-def get_rank_fusion(
-    rf: Union[search_models.RankFusionName, search_models.RankFusion],
-) -> RankFusionAlgorithm:
+def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorithm:
     """Given a rank fusion API type, return the appropiate rank fusion algorithm instance"""
     algorithm: RankFusionAlgorithm
+    window = rank_fusion.window
+    kind = rank_fusion.kind
 
-    if isinstance(rf, search_models.LegacyRankFusion):
-        rf = cast(search_models.LegacyRankFusion, rf)
-        algorithm = LegacyRankFusion()
+    if isinstance(kind, search_models.LegacyRankFusion):
+        kind = cast(search_models.LegacyRankFusion, kind)
+        algorithm = LegacyRankFusion(window=window)
 
-    elif isinstance(rf, search_models.ReciprocalRankFusion):
-        rf = cast(search_models.ReciprocalRankFusion, rf)
+    elif isinstance(kind, search_models.ReciprocalRankFusion):
+        kind = cast(search_models.ReciprocalRankFusion, kind)
         algorithm = ReciprocalRankFusion(
-            k=rf.k,
-            keyword_weight=rf.boosting.keyword,
-            semantic_weight=rf.boosting.semantic,
+            k=kind.k,
+            window=window,
+            keyword_weight=kind.boosting.keyword,
+            semantic_weight=kind.boosting.semantic,
         )
 
-    elif rf == search_models.RankFusionName.LEGACY:
-        algorithm = LegacyRankFusion()
-
-    elif rf == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
-        algorithm = ReciprocalRankFusion()
-
     else:
-        logger.error(f"Unknown rank fusion algorithm {type(rf)} {rf}. Using default")
-        algorithm = get_default_rank_fusion()
+        logger.error(f"Unknown rank fusion algorithm {type(kind)}: {rank_fusion}. Using default")
+        algorithm = LegacyRankFusion(window=window)
 
     return algorithm

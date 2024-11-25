@@ -20,8 +20,8 @@
 
 import random
 
+from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.find_merge import (
-    cut_page,
     keyword_result_to_text_block_match,
     semantic_result_to_text_block_match,
 )
