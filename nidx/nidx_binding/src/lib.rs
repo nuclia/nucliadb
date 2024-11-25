@@ -1,5 +1,5 @@
-use nidx::maintenance::scheduler::{self, GetAckFloor};
-use nidx::maintenance::worker;
+use nidx::scheduler::{self, GetAckFloor};
+use nidx::worker;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
