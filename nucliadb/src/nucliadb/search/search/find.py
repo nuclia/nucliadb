@@ -34,10 +34,22 @@ from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
 )
-from nucliadb.search.search.metrics import RAGMetrics
+from nucliadb.search.search.metrics import (
+    RAGMetrics,
+)
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.search.query_parser.parser import parse_find
-from nucliadb.search.search.rerankers import RerankingOptions
+from nucliadb.search.search.rank_fusion import (
+    RankFusionAlgorithm,
+    get_rank_fusion,
+)
+from nucliadb.search.search.rerankers import (
+    NoopReranker,
+    Reranker,
+    RerankingOptions,
+    get_reranker,
+)
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
     min_score_from_payload,
@@ -94,7 +106,9 @@ async def _index_node_retrieval(
     audit = get_audit()
     start_time = time()
 
-    query_parser = await query_parser_from_find_request(kbid, item, generative_model=generative_model)
+    query_parser, rank_fusion, reranker = await query_parser_from_find_request(
+        kbid, item, generative_model=generative_model
+    )
     with metrics.time("query_parse"):
         pb_query, incomplete_results, autofilters = await query_parser.parse()
 
@@ -119,8 +133,8 @@ async def _index_node_retrieval(
             extracted=item.extracted,
             field_type_filter=item.field_type_filter,
             highlight=item.highlight,
-            rank_fusion_algorithm=query_parser.rank_fusion,
-            reranker=query_parser.reranker,
+            rank_fusion_algorithm=rank_fusion,
+            reranker=reranker,
         )
 
     search_time = time() - start_time
@@ -182,7 +196,9 @@ async def _external_index_retrieval(
     Parse the query, query the external index, and hydrate the results.
     """
     # Parse query
-    query_parser = await query_parser_from_find_request(kbid, item, generative_model=generative_model)
+    query_parser, _, reranker = await query_parser_from_find_request(
+        kbid, item, generative_model=generative_model
+    )
     search_request, incomplete_results, _ = await query_parser.parse()
 
     # Query index
@@ -198,7 +214,7 @@ async def _external_index_retrieval(
             field_type_filter=item.field_type_filter,
         ),
         text_block_hydration_options=TextBlockHydrationOptions(),
-        reranker=query_parser.reranker,
+        reranker=reranker,
         reranking_options=RerankingOptions(
             kbid=kbid,
             query=search_request.body,
@@ -237,7 +253,7 @@ class ScoredParagraph:
 
 async def query_parser_from_find_request(
     kbid: str, item: FindRequest, *, generative_model: Optional[str] = None
-) -> QueryParser:
+) -> tuple[QueryParser, RankFusionAlgorithm, Reranker]:
     item.min_score = min_score_from_payload(item.min_score)
 
     if SearchOptions.SEMANTIC in item.features:
@@ -246,9 +262,22 @@ async def query_parser_from_find_request(
 
     hidden = await filter_hidden_resources(kbid, item.show_hidden)
 
-    parsed_find = parse_find(item)
-    rank_fusion = parsed_find.rank_fusion
-    reranker = parsed_find.reranker
+    # XXX this is becoming the new /find query parsing, this should be moved to
+    # a cleaner abstraction
+
+    parsed = parse_find(item)
+
+    rank_fusion = get_rank_fusion(parsed.rank_fusion)
+
+    reranker: Reranker
+    if item.page_number > 0 and isinstance(parsed.reranker, parser_models.Reranker):
+        logger.warning(
+            "Trying to use predict reranker with pagination. Reranker won't be used",
+            extra={"kbid": kbid},
+        )
+        reranker = NoopReranker()
+    else:
+        reranker = get_reranker(parsed.reranker)
 
     query_parser = QueryParser(
         kbid=kbid,
@@ -280,4 +309,4 @@ async def query_parser_from_find_request(
         rank_fusion=rank_fusion,
         reranker=reranker,
     )
-    return query_parser
+    return (query_parser, rank_fusion, reranker)
