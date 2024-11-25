@@ -13,7 +13,9 @@ def load_reqs(filename):
         return [
             line.strip()
             for line in reqs_file.readlines()
-            if not (re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line))
+            if not (
+                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
+            )
         ]
 
 
@@ -30,13 +32,13 @@ requirements_otel = [
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
 requirements_grpc = [
-    "grpcio>=1.44.0,<1.63.0",
-    "grpcio-health-checking>=1.44.0,<1.63.0",
-    "grpcio-channelz>=1.44.0,<1.63.0",
-    "grpcio-status>=1.44.0,<1.63.0",
-    "grpcio-tools>=1.44.0,<1.63.0",
-    "grpcio-testing>=1.44.0,<1.63.0",
-    "grpcio-reflection>=1.44.0,<1.63.0",
+    "grpcio>=1.44.0",
+    "grpcio-health-checking>=1.44.0",
+    "grpcio-channelz>=1.44.0",
+    "grpcio-status>=1.44.0",
+    "grpcio-tools>=1.44.0",
+    "grpcio-testing>=1.44.0",
+    "grpcio-reflection>=1.44.0",
 ] + requirements_otel
 requirements_nats = ["nats-py[nkeys]>=2.5.0", "PyNaCl"] + requirements_otel
 requirements_fastapi = ["fastapi"] + requirements_otel
@@ -73,7 +75,12 @@ setup(
         "nats": requirements_nats,
         "fastapi": requirements_fastapi,
         "all": list(
-            set(requirements_otel + requirements_grpc + requirements_nats + requirements_fastapi)
+            set(
+                requirements_otel
+                + requirements_grpc
+                + requirements_nats
+                + requirements_fastapi
+            )
         ),
     },
     package_data={"": ["*.txt", "*.md"], "nucliadb_telemetry": ["py.typed"]},
