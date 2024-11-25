@@ -101,7 +101,13 @@ async def build_find_response(
     )
 
     # cut
-    text_blocks_page, next_page = cut_page(merged_text_blocks, page_size, page_number)
+
+    # we assume nobody is using pagination + predict reranker. Query parser is
+    # enforcing it and pagination will be removed soon
+    if reranker.needs_extra_results:
+        text_blocks_page, next_page = cut_page(merged_text_blocks, reranker.items_needed(page_size), 0)
+    else:
+        text_blocks_page, next_page = cut_page(merged_text_blocks, page_size, page_number)
 
     # hydrate and rerank
     resource_hydration_options = ResourceHydrationOptions(
