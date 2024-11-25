@@ -65,8 +65,7 @@ spec:
           {{- include "toEnv" .Values.env | nindent 10 }}
         ports:
         - name: metrics
-          port: 10010
-          protocol: TCP
+          containerPort: 10010
         {{- with .Values.scheduler.resources }}
         resources:
           {{- toYaml . | nindent 10 }}

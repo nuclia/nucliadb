@@ -61,4 +61,4 @@ spec:
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-      terminationGracePeriod: 300
+      terminationGracePeriodSeconds: 120
