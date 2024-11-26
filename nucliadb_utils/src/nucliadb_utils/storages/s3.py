@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import base64
 from contextlib import AsyncExitStack
 from datetime import datetime
 from typing import AsyncGenerator, AsyncIterator, Optional
@@ -547,5 +548,10 @@ def parse_object_metadata(obj: dict, key: str) -> ObjectMetadata:
     # Content type
     content_type = custom_metadata.get("content_type") or obj.get("ContentType") or ""
     # Filename
-    filename = custom_metadata.get("filename") or key.split("/")[-1]
+    base64_filename = custom_metadata.get("base64_filename")
+    if base64_filename:
+        filename = base64.b64decode(base64_filename).decode()
+    else:
+        filename = custom_metadata.get("filename") or key.split("/")[-1]
+
     return ObjectMetadata(size=size, content_type=content_type, filename=filename)
