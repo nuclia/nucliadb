@@ -72,7 +72,7 @@ class S3FileStorageManager(FileStorageManager):
             await self._abort_multipart(dm)
 
         custom_metadata: dict[str, str] = {
-            "base64_filename": str(base64.b64encode((dm.filename or "").encode())),
+            "base64_filename": base64.b64encode((dm.filename or "").encode()).decode(),
             "content_type": dm.content_type or "",
             "size": str(dm.size),
         }

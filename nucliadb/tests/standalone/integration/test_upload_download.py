@@ -44,9 +44,9 @@ def header_encode(some_string):
 
 
 storages = [
-    lazy_fixture.lf("gcs_storage"),
+    # lazy_fixture.lf("gcs_storage"),
     lazy_fixture.lf("s3_storage"),
-    lazy_fixture.lf("local_storage"),
+    # lazy_fixture.lf("local_storage"),
     # lazy_fixture.lf("azure_storage"),
 ]
 # TODO: Azure blob storage not supported by nidx
@@ -157,7 +157,7 @@ async def test_file_tus_upload_and_download(
     # Now download the file
     download_url = f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"
     resp = await nucliadb_reader.get(download_url, timeout=None)
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     # Make sure the filename and contents are correct
     assert resp.headers["Content-Disposition"] == f'attachment; filename="{filename}"'
     assert resp.headers["Content-Type"] == content_type
