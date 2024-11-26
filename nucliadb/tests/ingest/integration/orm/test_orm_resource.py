@@ -540,6 +540,7 @@ async def test_generate_index_message_cancels_labels(
         assert "/l/labelset1/label1" in resource_brain.brain.texts["a/title"].labels
 
         # Cancel the label and regenerate brain
+        assert resource.basic
         resource.basic.usermetadata.ClearField("classifications")
         resource.basic.usermetadata.classifications.add(
             labelset="labelset1", label="label1", cancelled_by_user=True
