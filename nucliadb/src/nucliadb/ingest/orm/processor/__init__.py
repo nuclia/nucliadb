@@ -268,13 +268,39 @@ class Processor:
                 for message in messages:
                     if resource is not None:
                         assert resource.uuid == message.uuid
-                    result = await self.apply_resource(message, kb, resource)
 
-                    if result is None:
-                        continue
+                    if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+                        resource = await kb.get(uuid)
 
-                    resource, _created = result
-                    created = created or _created
+                        if resource is None:
+                            # It's a new resource
+                            resource = await kb.add_resource(uuid, message.slug, message.basic)
+                            created = True
+                        else:
+                            # It's an update from writer for an existing resource
+                            ...
+
+                    elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+                        resource = await kb.get(uuid)
+                        if resource is None:
+                            logger.info(
+                                f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
+                            )
+                            continue
+                        else:
+                            # It's an update from processor for an existing resource
+                            ...
+
+                        # TODO: generated fields thingy
+
+                    else:
+                        # TODO: use a more concrete exception
+                        raise Exception(f"Unknown broker message source {message.source}")
+
+                    # apply changes from the broker message to the resource
+                    await self.apply_resource(message, resource, update=(not created))
+
+                # index message
 
                 if resource:
                     await resource.compute_global_text()
@@ -518,40 +544,12 @@ class Processor:
     async def apply_resource(
         self,
         message: writer_pb2.BrokerMessage,
-        kb: KnowledgeBox,
-        resource: Optional[Resource] = None,
-    ) -> Optional[tuple[Resource, bool]]:
-        """
-        Convert a broker message into a resource object, and apply it to the database
-        """
-        created = False
-
-        if resource is None:
-            # Make sure we load the resource in case it already exists on db
-            if message.uuid is None and message.slug:
-                uuid = await kb.get_resource_uuid_by_slug(message.slug)
-            else:
-                uuid = message.uuid
-            resource = await kb.get(uuid)
-
-        if resource is None and message.source is message.MessageSource.WRITER:
-            # It's a new resource
-            resource = await kb.add_resource(uuid, message.slug, message.basic)
-            created = True
-        elif resource is not None:
-            # It's an update of an existing resource, can come either from writer or
-            # from processing
+        resource: Resource,
+        update: bool = False,
+    ):
+        """Apply broker message to resource object in the database"""
+        if update:
             await self.maybe_update_resource_basic(resource, message)
-        elif resource is None and message.source is message.MessageSource.PROCESSOR:
-            # It's a new resource, and somehow we received the message coming from processing before
-            # the "fast" one, this shouldn't happen
-            logger.info(
-                f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
-            )
-            return None
-
-        if resource is None:
-            return None
 
         if message.HasField("origin"):
             await resource.set_origin(message.origin)
@@ -564,7 +562,6 @@ class Processor:
 
         await resource.apply_fields(message)
         await resource.apply_extracted(message)
-        return (resource, created)
 
     async def maybe_update_resource_basic(
         self, resource: Resource, message: writer_pb2.BrokerMessage
