@@ -30,13 +30,13 @@ requirements_otel = [
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
 requirements_grpc = [
-    "grpcio>=1.44.0,<1.63.0",
-    "grpcio-health-checking>=1.44.0,<1.63.0",
-    "grpcio-channelz>=1.44.0,<1.63.0",
-    "grpcio-status>=1.44.0,<1.63.0",
-    "grpcio-tools>=1.44.0,<1.63.0",
-    "grpcio-testing>=1.44.0,<1.63.0",
-    "grpcio-reflection>=1.44.0,<1.63.0",
+    "grpcio>=1.44.0",
+    "grpcio-health-checking>=1.44.0",
+    "grpcio-channelz>=1.44.0",
+    "grpcio-status>=1.44.0",
+    "grpcio-tools>=1.44.0",
+    "grpcio-testing>=1.44.0",
+    "grpcio-reflection>=1.44.0",
 ] + requirements_otel
 requirements_nats = ["nats-py[nkeys]>=2.5.0", "PyNaCl"] + requirements_otel
 requirements_fastapi = ["fastapi"] + requirements_otel
