@@ -524,3 +524,27 @@ async def test_generate_index_message_vectorsets(
                 for sentence in vs_sentences.sentences.values():
                     assert len(sentence.vector) == config_dimension
                     assert sentence.vector == [vectorset_index] * config_dimension
+
+
+async def test_generate_index_message_cancels_labels(
+    storage, maindb_driver, cache, fake_node, knowledgebox_with_vectorsets: str
+):
+    # Create a resource with all possible metadata in it
+    resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
+
+    async with maindb_driver.transaction() as txn:
+        resource.txn = txn  # I don't like this but this is the API we have...
+        resource_brain = await resource.generate_index_message()
+
+        # There is a label in the generated resource
+        assert "/l/labelset1/label1" in resource_brain.brain.texts["a/title"].labels
+
+        # Cancel the label and regenerate brain
+        resource.basic.usermetadata.ClearField("classifications")
+        resource.basic.usermetadata.classifications.add(
+            labelset="labelset1", label="label1", cancelled_by_user=True
+        )
+        resource_brain = await resource.generate_index_message()
+
+        # Label is not generated anymore
+        assert "/l/labelset1/label1" not in resource_brain.brain.texts["a/title"].labels

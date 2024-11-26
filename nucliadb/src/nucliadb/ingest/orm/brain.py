@@ -564,7 +564,7 @@ class ResourceBrain:
         user_canceled_labels: set[str] = set()
         if basic_user_metadata is not None:
             user_canceled_labels.update(
-                f"/l/{classification.labelset}/{classification.label}"
+                f"{classification.labelset}/{classification.label}"
                 for classification in basic_user_metadata.classifications
                 if classification.cancelled_by_user
             )
