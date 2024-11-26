@@ -32,11 +32,14 @@ from aiobotocore.client import AioBaseClient  # type: ignore
 from aiobotocore.session import AioSession, get_session  # type: ignore
 
 from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_telemetry import errors
+from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import logger
 from nucliadb_utils.storages.exceptions import UnparsableResponse
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
+
+s3_ops_observer = metrics.Observer("s3_ops", labels={"type": ""})
+
 
 MB = 1024 * 1024
 MIN_UPLOAD_SIZE = 5 * MB
@@ -78,6 +81,7 @@ class S3StorageField(StorageField):
         jitter=backoff.random_jitter,
         max_tries=MAX_TRIES,
     )
+    @s3_ops_observer.wrap({"type": "download"})
     async def _download(
         self,
         uri,
@@ -98,6 +102,7 @@ class S3StorageField(StorageField):
             else:
                 raise
 
+    @s3_ops_observer.wrap({"type": "iter_data"})
     async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         # Suports field and key based iter
         uri = self.field.uri if self.field else self.key
@@ -114,6 +119,7 @@ class S3StorageField(StorageField):
             yield data
             data = await stream.read(CHUNK_SIZE)
 
+    @s3_ops_observer.wrap({"type": "abort_multipart"})
     async def _abort_multipart(self):
         try:
             mpu = self.field.resumable_uri
@@ -125,6 +131,7 @@ class S3StorageField(StorageField):
         except Exception:
             logger.warning("Could not abort multipart upload", exc_info=True)
 
+    @s3_ops_observer.wrap({"type": "start_upload"})
     async def start(self, cf: CloudFile) -> CloudFile:
         if self.field is not None and self.field.upload_uri != "":
             # Field has already a file beeing uploaded, cancel
@@ -166,6 +173,7 @@ class S3StorageField(StorageField):
         jitter=backoff.random_jitter,
         max_tries=MAX_TRIES,
     )
+    @s3_ops_observer.wrap({"type": "create_multipart"})
     async def _create_multipart(self, bucket_name: str, upload_id: str, cf: CloudFile):
         return await self.storage._s3aioclient.create_multipart_upload(
             Bucket=bucket_name,
@@ -177,6 +185,7 @@ class S3StorageField(StorageField):
             },
         )
 
+    @s3_ops_observer.wrap({"type": "append_data"})
     async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int:
         size = 0
         if self.field is None:
@@ -204,6 +213,7 @@ class S3StorageField(StorageField):
         jitter=backoff.random_jitter,
         max_tries=MAX_TRIES,
     )
+    @s3_ops_observer.wrap({"type": "upload_part"})
     async def _upload_part(self, cf: CloudFile, data: bytes):
         if self.field is None:
             raise AttributeError("No field configured")
@@ -215,6 +225,7 @@ class S3StorageField(StorageField):
             Body=data,
         )
 
+    @s3_ops_observer.wrap({"type": "finish_upload"})
     async def finish(self):
         if self.field is None:
             raise AttributeError("No field configured")
@@ -245,6 +256,7 @@ class S3StorageField(StorageField):
         jitter=backoff.random_jitter,
         max_tries=MAX_TRIES,
     )
+    @s3_ops_observer.wrap({"type": "complete_multipart"})
     async def _complete_multipart_upload(self):
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.
@@ -264,6 +276,7 @@ class S3StorageField(StorageField):
             MultipartUpload=part_info,
         )
 
+    @s3_ops_observer.wrap({"type": "exists"})
     async def exists(self) -> Optional[ObjectMetadata]:
         """
         Existence can be checked either with a CloudFile data in the field attribute
@@ -292,6 +305,7 @@ class S3StorageField(StorageField):
                 return None
             raise
 
+    @s3_ops_observer.wrap({"type": "copy"})
     async def copy(
         self,
         origin_uri: str,
@@ -305,6 +319,7 @@ class S3StorageField(StorageField):
             Key=destination_uri,
         )
 
+    @s3_ops_observer.wrap({"type": "move"})
     async def move(
         self,
         origin_uri: str,
@@ -396,6 +411,7 @@ class S3Storage(Storage):
     async def finalize(self):
         await self._exit_stack.__aexit__(None, None, None)
 
+    @s3_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
         if uri:
             try:
