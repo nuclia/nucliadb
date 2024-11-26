@@ -122,7 +122,7 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
     rid = "myrid"
     kbid = "mykb_tus_test"
 
-    metadata: dict[str, str] = {}
+    metadata: dict[str, str] = {"filename": "non-ascii is problematic - Ôñ"}
     bucket_name = storage.get_bucket_name(kbid)
     assert bucket_name in [
         "test_mykb_tus_test",
