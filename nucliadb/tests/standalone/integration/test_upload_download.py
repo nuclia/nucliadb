@@ -44,9 +44,9 @@ def header_encode(some_string):
 
 
 storages = [
-    # lazy_fixture.lf("gcs_storage"),
+    lazy_fixture.lf("gcs_storage"),
     lazy_fixture.lf("s3_storage"),
-    # lazy_fixture.lf("local_storage"),
+    lazy_fixture.lf("local_storage"),
     # lazy_fixture.lf("azure_storage"),
 ]
 # TODO: Azure blob storage not supported by nidx
