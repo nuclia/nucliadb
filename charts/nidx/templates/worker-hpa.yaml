@@ -1,0 +1,20 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nidx-worker
+  labels:
+    app: nidx-worker
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nidx-worker
+  minReplicas: {{ dig "hpa" "minReplicas" 1 .Values.worker}}
+  maxReplicas: {{ dig "hpa" "maxReplicas" 10 .Values.worker}}
+  {{- with .Values.worker.hpa }}
+  metrics: {{- toYaml .metrics | nindent 4}}
+  {{- end }}

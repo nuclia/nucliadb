@@ -25,7 +25,7 @@ use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
 use tonic::{service::Routes, Request, Response, Result, Status};
 
-use crate::{grpc_server::RemappedGrpcService, NidxMetadata};
+use crate::NidxMetadata;
 
 use super::streams::{document_iterator, paragraph_iterator};
 use super::{index_cache::IndexCache, shard_search, shard_suggest};
@@ -44,11 +44,8 @@ impl SearchServer {
         }
     }
 
-    pub fn into_service(self) -> RemappedGrpcService {
-        RemappedGrpcService {
-            routes: Routes::new(NidxSearcherServer::new(self)),
-            package: "nidx.NidxSearcher".to_string(),
-        }
+    pub fn into_service(self) -> Routes {
+        Routes::new(NidxSearcherServer::new(self))
     }
 }
 

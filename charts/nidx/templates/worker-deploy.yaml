@@ -9,7 +9,6 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: nidx-worker
@@ -61,3 +60,4 @@ spec:
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
+      terminationGracePeriodSeconds: 120

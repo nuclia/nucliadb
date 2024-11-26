@@ -29,8 +29,8 @@ use uuid::Uuid;
 
 use nidx::api::shards;
 use nidx::indexer::index_resource;
-use nidx::maintenance::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
 use nidx::metadata::{Index, IndexId, Segment};
+use nidx::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
 use nidx::{metadata::Shard, NidxMetadata};
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;

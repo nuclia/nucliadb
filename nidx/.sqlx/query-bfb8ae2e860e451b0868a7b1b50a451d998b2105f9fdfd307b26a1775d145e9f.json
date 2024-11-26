@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n        COUNT(*) FILTER (WHERE started_at IS NULL) AS \"queued!\",\n        COUNT(*) FILTER (WHERE started_at IS NOT NULL) AS \"running!\"\n        FROM merge_jobs;\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "queued!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "running!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "bfb8ae2e860e451b0868a7b1b50a451d998b2105f9fdfd307b26a1775d145e9f"
+}

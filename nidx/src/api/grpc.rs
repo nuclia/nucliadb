@@ -22,7 +22,6 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::errors::NidxError;
-use crate::grpc_server::RemappedGrpcService;
 use crate::metadata::{Index, IndexKind, Shard};
 use nidx_protos::nidx::nidx_api_server::*;
 use nidx_protos::*;
@@ -45,11 +44,8 @@ impl ApiServer {
         }
     }
 
-    pub fn into_service(self) -> RemappedGrpcService {
-        RemappedGrpcService {
-            routes: Routes::new(NidxApiServer::new(self)),
-            package: "nidx.NidxApi".to_string(),
-        }
+    pub fn into_service(self) -> Routes {
+        Routes::new(NidxApiServer::new(self))
     }
 }
 
