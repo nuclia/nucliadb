@@ -18,15 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+
 import pytest
 from httpx import AsyncClient
+from pytest_mock import MockFixture
 
+from nucliadb.search.search import find, find_merge
 from nucliadb_models.search import (
     SCORE_TYPE,
     KnowledgeboxFindResults,
     LegacyRankFusion,
     ReciprocalRankFusion,
-    Reranker,
+    RerankerName,
 )
 
 
@@ -52,7 +55,7 @@ async def test_rank_fusion(
         },
         json={
             "query": "the",
-            "reranker": Reranker.NOOP,
+            "reranker": RerankerName.NOOP,
             "rank_fusion": rank_fusion,
             "min_score": {"bm25": 0, "semantic": -10},
         },
@@ -63,7 +66,7 @@ async def test_rank_fusion(
         f"/kb/{kbid}/find",
         json={
             "query": "the",
-            "reranker": Reranker.NOOP,
+            "reranker": RerankerName.NOOP,
             "rank_fusion": rank_fusion,
             "min_score": {"bm25": 0, "semantic": -10},
         },
@@ -87,3 +90,66 @@ def get_score_types(results: KnowledgeboxFindResults) -> set[SCORE_TYPE]:
             for paragraph in fields.paragraphs.values():
                 score_types.add(paragraph.score_type)
     return score_types
+
+
+async def test_reciprocal_rank_fusion_requests_more_results(
+    nucliadb_reader: AsyncClient,
+    philosophy_books_kb: str,
+    mocker: MockFixture,
+):
+    """Validate predict reranker asks for more results than the user and we send
+    them to Predict API.
+
+    """
+    kbid = philosophy_books_kb
+
+    spy_build_find_response = mocker.spy(find, "build_find_response")
+    spy_cut_page = mocker.spy(find_merge, "cut_page")
+
+    payload = {
+        "query": "the",
+        "min_score": {"bm25": 0, "semantic": -10},
+        "rank_fusion": {
+            "name": "rrf",
+            "window": 5,
+        },
+        "top_k": 3,
+    }
+
+    ask_resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/ask",
+        headers={
+            "x-synchronous": "true",
+        },
+        json=payload,
+    )
+    assert ask_resp.status_code == 200
+
+    find_resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json=payload,
+    )
+    assert find_resp.status_code == 200
+
+    assert spy_build_find_response.call_count == 2
+    assert spy_cut_page.call_count == 2
+
+    for i in range(spy_build_find_response.call_count):
+        build_find_response_call = spy_build_find_response.call_args_list[i]
+        cut_page_call = spy_cut_page.call_args_list[i]
+
+        search_responses = build_find_response_call.args[0]
+        assert len(search_responses) == 1
+
+        search_response = search_responses[0]
+        assert len(search_response.paragraph.results) == 5
+
+        items, page_size, page_number = cut_page_call.args
+        assert len(items) == 5
+        assert page_size == 3
+        assert page_number == 0
+
+    find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
+    ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])
+    assert find_retrieval == ask_retrieval
+    assert len(find_retrieval.best_matches) == 3

@@ -41,11 +41,11 @@ from nucliadb.search.search.metrics import (
     node_features,
     query_parse_dependency_observer,
 )
-from nucliadb.search.search.rank_fusion import RankFusionAlgorithm, get_default_rank_fusion
+from nucliadb.search.search.rank_fusion import (
+    RankFusionAlgorithm,
+)
 from nucliadb.search.search.rerankers import (
-    PredictReranker,
     Reranker,
-    get_default_reranker,
 )
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
@@ -128,8 +128,8 @@ class QueryParser:
         rephrase_prompt: Optional[str] = None,
         max_tokens: Optional[MaxTokens] = None,
         hidden: Optional[bool] = None,
-        rank_fusion: RankFusionAlgorithm = get_default_rank_fusion(),
-        reranker: Reranker = get_default_reranker(),
+        rank_fusion: Optional[RankFusionAlgorithm] = None,
+        reranker: Optional[Reranker] = None,
     ):
         self.kbid = kbid
         self.features = features
@@ -171,15 +171,7 @@ class QueryParser:
             self.flat_label_filters = flatten_filter_literals(self.label_filters)
         self.max_tokens = max_tokens
         self.rank_fusion = rank_fusion
-        self.reranker: Reranker
-        if page_number > 0 and isinstance(reranker, PredictReranker):
-            logger.warning(
-                "Trying to use predict reranker with pagination. Using default instead",
-                extra={"kbid": kbid},
-            )
-            self.reranker = get_default_reranker()
-        else:
-            self.reranker = reranker
+        self.reranker = reranker
 
     @property
     def has_vector_search(self) -> bool:
@@ -313,7 +305,7 @@ class QueryParser:
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
         await self.parse_min_score(request, incomplete)
-        await self.adjust_page_size(request, self.reranker)
+        await self.adjust_page_size(request, self.rank_fusion, self.reranker)
         return request, incomplete, autofilters
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
@@ -609,28 +601,31 @@ class QueryParser:
             return self.max_tokens.answer
         return None
 
-    async def adjust_page_size(self, request: nodereader_pb2.SearchRequest, reranker: Reranker):
-        """Some rerankers want more results than the requested by the user so
-        reranking can have more choices. This function adjust the number of
-        retrieval results requested according to the reranker needs."""
+    async def adjust_page_size(
+        self,
+        request: nodereader_pb2.SearchRequest,
+        rank_fusion: Optional[RankFusionAlgorithm],
+        reranker: Optional[Reranker],
+    ):
+        """Adjust requested page size depending on rank fusion and reranking algorithms.
 
-        if not reranker.needs_extra_results:
-            return
+        Some rerankers want more results than the requested by the user so
+        reranking can have more choices.
 
-        async with datamanagers.with_ro_transaction() as txn:
-            external_provider = await datamanagers.kb.get_external_index_provider_metadata(
-                txn, kbid=self.kbid
-            )
-            shards = 1
-            if external_provider is None:
-                # index nodes are sharded, we need to know how many shards we'll query
-                kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
-                if kb_shards is None:
-                    logger.warning("Trying to query a KB with no shards", extra={"kbid": self.kbid})
-                    return
-                shards = len(kb_shards.shards)
+        """
+        rank_fusion_window = 0
+        if rank_fusion is not None:
+            rank_fusion_window = rank_fusion.window
 
-        request.result_per_page = reranker.items_needed(self.page_size, shards)
+        reranker_window = 0
+        if reranker is not None:
+            reranker_window = reranker.window or 0
+
+        request.result_per_page = max(
+            request.result_per_page,
+            rank_fusion_window,
+            reranker_window,
+        )
 
 
 async def paragraph_query_to_pb(

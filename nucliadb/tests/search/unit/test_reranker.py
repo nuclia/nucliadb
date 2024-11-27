@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Optional
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -43,14 +44,14 @@ from nucliadb_models.search import (
 
 
 class DummyReranker(Reranker):
+    def __init__(self, window: int):
+        self._window = window
+
     @property
-    def needs_extra_results(self) -> bool:
-        return False
+    def window(self) -> Optional[int]:
+        return self._window
 
-    def items_needed(self, requested: int, shards: int = 1) -> int:
-        return requested
-
-    async def rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
+    async def _rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
         reranked = [
             RankedItem(
                 id=item.id,
@@ -65,7 +66,7 @@ class DummyReranker(Reranker):
 
 async def test_rerank_find_response():
     """Validate manipulation of find response by the reranker"""
-    reranker: Reranker = DummyReranker()
+    reranker: Reranker = DummyReranker(window=3)
 
     find_response = KnowledgeboxFindResults(
         resources={
@@ -112,7 +113,7 @@ async def test_rerank_find_response():
         for field in resource.fields.values()
         for paragraph_id, paragraph in field.paragraphs.items()
     ]
-    reranked = await reranker.rerank(to_rerank, RerankingOptions(kbid="kbid", query="my query", top_k=3))
+    reranked = await reranker.rerank(to_rerank, RerankingOptions(kbid="kbid", query="my query"))
     apply_reranking(find_response, reranked)
 
     ranking = []
@@ -138,14 +139,14 @@ async def test_predict_reranker_dont_call_predict_with_empty_results():
     with patch(
         "nucliadb.search.search.rerankers.get_predict", new=Mock(return_value=predict)
     ) as get_predict:
-        reranker = PredictReranker()
+        reranker = PredictReranker(window=20)
 
         await reranker.rerank(items=[], options=Mock())
         assert get_predict.call_count == 0
 
         reranked = await reranker.rerank(
             items=[RerankableItem(id="id", score=1, score_type=SCORE_TYPE.VECTOR, content="bla bla")],
-            options=RerankingOptions(kbid="kbid", query="my query", top_k=20),
+            options=RerankingOptions(kbid="kbid", query="my query"),
         )
         assert get_predict.call_count == 1
 
@@ -165,7 +166,7 @@ async def test_predict_reranker_handles_predict_failures(
     with patch(
         "nucliadb.search.search.rerankers.get_predict", new=Mock(return_value=predict)
     ) as get_predict:
-        reranker = PredictReranker()
+        reranker = PredictReranker(window=20)
 
         await reranker.rerank(items=[], options=Mock())
         assert get_predict.call_count == 0
@@ -176,7 +177,7 @@ async def test_predict_reranker_handles_predict_failures(
                 RerankableItem(id="2", score=0.6, score_type=SCORE_TYPE.VECTOR, content="bla bla"),
                 RerankableItem(id="3", score=1.5, score_type=SCORE_TYPE.BOTH, content="bla bla"),
             ],
-            options=RerankingOptions(kbid="kbid", query="my query", top_k=20),
+            options=RerankingOptions(kbid="kbid", query="my query"),
         )
         assert get_predict.call_count == 1
 

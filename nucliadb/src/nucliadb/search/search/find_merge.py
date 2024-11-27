@@ -18,11 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Any, Iterable, Union
+from typing import Iterable, Union
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import SERVICE_NAME, logger
+from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
     TextBlockHydrationOptions,
@@ -101,11 +102,11 @@ async def build_find_response(
     )
 
     # cut
-
-    # we assume nobody is using pagination + predict reranker. Query parser is
-    # enforcing it and pagination will be removed soon
+    # we assume pagination + predict reranker is forbidden and has been already
+    # enforced/validated by the query parsing.
     if reranker.needs_extra_results:
-        text_blocks_page, next_page = cut_page(merged_text_blocks, reranker.items_needed(page_size), 0)
+        assert reranker.window is not None, "Reranker definition must enforce this condition"
+        text_blocks_page, next_page = cut_page(merged_text_blocks, reranker.window, 0)
     else:
         text_blocks_page, next_page = cut_page(merged_text_blocks, page_size, page_number)
 
@@ -117,7 +118,7 @@ async def build_find_response(
         highlight=highlight,
         ematches=search_response.paragraph.ematches,  # type: ignore
     )
-    reranking_options = RerankingOptions(kbid=kbid, query=query, top_k=page_size)
+    reranking_options = RerankingOptions(kbid=kbid, query=query)
     text_blocks, resources, best_matches = await hydrate_and_rerank(
         text_blocks_page,
         kbid,
@@ -125,6 +126,7 @@ async def build_find_response(
         text_block_hydration_options=text_block_hydration_options,
         reranker=reranker,
         reranking_options=reranking_options,
+        top_k=page_size,
     )
 
     # build relations graph
@@ -303,15 +305,6 @@ def semantic_results_to_text_block_matches(items: Iterable[DocumentScored]) -> l
     return text_blocks
 
 
-def cut_page(items: list[Any], page_size: int, page_number: int) -> tuple[list[Any], bool]:
-    """Return a slice of `items` representing the specified page and a boolean
-    indicating whether there is a next page or not"""
-    start = page_size * page_number
-    end = start + page_size
-    next_page = len(items) > end
-    return items[start:end], next_page
-
-
 @merge_observer.wrap({"type": "hydrate_and_rerank"})
 async def hydrate_and_rerank(
     text_blocks: Iterable[TextBlockMatch],
@@ -321,6 +314,7 @@ async def hydrate_and_rerank(
     text_block_hydration_options: TextBlockHydrationOptions,
     reranker: Reranker,
     reranking_options: RerankingOptions,
+    top_k: int,
 ) -> tuple[list[TextBlockMatch], list[Resource], list[str]]:
     """Given a list of text blocks from a retrieval operation, hydrate and
     rerank the results.
@@ -398,6 +392,10 @@ async def hydrate_and_rerank(
         for text_block in hydrated_text_blocks
     ]
     reranked = await reranker.rerank(to_rerank, reranking_options)
+
+    # after reranking, we can cut to the number of results the user wants, so we
+    # don't hydrate unnecessary stuff
+    reranked = reranked[:top_k]
 
     matches = []
     for item in reranked:
