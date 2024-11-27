@@ -29,7 +29,7 @@ from nucliadb_models.search import (
     KnowledgeboxFindResults,
     LegacyRankFusion,
     ReciprocalRankFusion,
-    Reranker,
+    RerankerName,
 )
 
 
@@ -55,7 +55,7 @@ async def test_rank_fusion(
         },
         json={
             "query": "the",
-            "reranker": Reranker.NOOP,
+            "reranker": RerankerName.NOOP,
             "rank_fusion": rank_fusion,
             "min_score": {"bm25": 0, "semantic": -10},
         },
@@ -66,7 +66,7 @@ async def test_rank_fusion(
         f"/kb/{kbid}/find",
         json={
             "query": "the",
-            "reranker": Reranker.NOOP,
+            "reranker": RerankerName.NOOP,
             "rank_fusion": rank_fusion,
             "min_score": {"bm25": 0, "semantic": -10},
         },

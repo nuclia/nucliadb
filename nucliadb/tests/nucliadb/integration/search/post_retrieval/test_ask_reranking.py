@@ -30,21 +30,23 @@ from nucliadb_models.search import (
     FindRequest,
     KnowledgeboxFindResults,
     NucliaDBClientType,
-    Reranker,
+    PredictReranker,
+    RerankerName,
 )
 
 
 @pytest.mark.parametrize(
     "reranker,expected_reranker",
     [
-        (Reranker.MULTI_MATCH_BOOSTER, Reranker.MULTI_MATCH_BOOSTER),
-        (Reranker.PREDICT_RERANKER, Reranker.PREDICT_RERANKER),
-        (Reranker.NOOP, Reranker.NOOP),
+        (RerankerName.MULTI_MATCH_BOOSTER, RerankerName.MULTI_MATCH_BOOSTER),
+        (RerankerName.PREDICT_RERANKER, RerankerName.PREDICT_RERANKER),
+        (RerankerName.NOOP, RerankerName.NOOP),
+        (PredictReranker(window=20), RerankerName.PREDICT_RERANKER),
     ],
 )
 async def test_ask_forwarding_rerank_options_to_find(
-    reranker: Reranker,
-    expected_reranker: Reranker,
+    reranker: RerankerName,
+    expected_reranker: RerankerName,
 ):
     kbid = "kbid"
     find_mock = AsyncMock(return_value=(KnowledgeboxFindResults(resources={}), False, Mock()))

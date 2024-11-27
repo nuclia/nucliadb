@@ -414,7 +414,7 @@ RankFusion = Annotated[
 ]
 
 
-class Reranker(str, Enum):
+class RerankerName(str, Enum):
     """Rerankers
 
     - Multi-match booster (default, deprecated): given a set of results from different
@@ -438,6 +438,23 @@ class Reranker(str, Enum):
     ] = "multi_match_booster"
     PREDICT_RERANKER = "predict"
     NOOP = "noop"
+
+
+class _BaseReranker(BaseModel):
+    name: str
+
+
+class PredictReranker(_BaseReranker):
+    name: Literal[RerankerName.PREDICT_RERANKER] = RerankerName.PREDICT_RERANKER
+    window: Optional[int] = Field(
+        default=None,
+        le=200,
+        title="Reranker window",
+        description="Number of elements reranker will use. Window must be greater or equal to top_k. Greater values will improve results at cost of retrieval and reranking time. By default, this reranker uses a default of 2 times top_k",  # noqa: E501
+    )
+
+
+Reranker = Annotated[PredictReranker, Field(discriminator="name")]
 
 
 class KnowledgeBoxCount(BaseModel):
@@ -575,7 +592,7 @@ class SearchParamDefaults:
         description="Rank fusion algorithm to use to merge results from multiple retrievers (keyword, semantic)",
     )
     reranker = ParamDefault(
-        default=Reranker.MULTI_MATCH_BOOSTER,
+        default=RerankerName.MULTI_MATCH_BOOSTER,
         title="Reranker",
         description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval\nDEPRECATION! multi_match_booster will be deprecated and predict will be the new default",  # noqa: E501
     )
@@ -1336,7 +1353,7 @@ class AskRequest(AuditMetadataBase):
     rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
         SearchParamDefaults.rank_fusion.to_pydantic_field()
     )
-    reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
+    reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
     citations: bool = Field(
         default=False,
         description="Whether to include the citations for the answer in the response",
@@ -1561,7 +1578,7 @@ class FindRequest(BaseSearchRequest):
     rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
         SearchParamDefaults.rank_fusion.to_pydantic_field()
     )
-    reranker: Reranker = SearchParamDefaults.reranker.to_pydantic_field()
+    reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],

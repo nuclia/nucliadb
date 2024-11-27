@@ -105,15 +105,25 @@ class _FindParser:
 
         top_k = self._parse_top_k()
 
-        if self.item.reranker == search_models.Reranker.NOOP:
-            reranking = NoopReranker()
+        if isinstance(self.item.reranker, search_models.RerankerName):
+            if self.item.reranker == search_models.RerankerName.NOOP:
+                reranking = NoopReranker()
 
-        elif self.item.reranker == search_models.Reranker.MULTI_MATCH_BOOSTER:
-            reranking = MultiMatchBoosterReranker()
+            elif self.item.reranker == search_models.RerankerName.MULTI_MATCH_BOOSTER:
+                reranking = MultiMatchBoosterReranker()
 
-        elif self.item.reranker == search_models.Reranker.PREDICT_RERANKER:
+            elif self.item.reranker == search_models.RerankerName.PREDICT_RERANKER:
+                # for predict rearnker, by default, we want a x2 factor with a
+                # top of 200 results
+                reranking = PredictReranker(window=min(top_k * 5, 200))
+
+            else:
+                raise ParserError(f"Unknown reranker algorithm: {self.item.reranker}")
+
+        elif isinstance(self.item.reranker, search_models.PredictReranker):
             # for predict rearnker, we want a x2 factor with a top of 200 results
-            reranking = PredictReranker(window=min(top_k * 5, 200))
+            user_window = self.item.reranker.window
+            reranking = PredictReranker(window=min(max(user_window or 0, top_k), 200))
 
         else:
             raise ParserError(f"Unknown reranker {self.item.reranker}")

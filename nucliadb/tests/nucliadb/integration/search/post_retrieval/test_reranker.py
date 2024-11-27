@@ -18,16 +18,24 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Union
+
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockFixture
 
 from nucliadb.search.search import find, find_merge
-from nucliadb_models.search import KnowledgeboxFindResults, Reranker
+from nucliadb_models.search import KnowledgeboxFindResults, PredictReranker, RerankerName
 
 
 @pytest.mark.parametrize(
-    "reranker", [Reranker.MULTI_MATCH_BOOSTER, Reranker.PREDICT_RERANKER, Reranker.NOOP]
+    "reranker",
+    [
+        RerankerName.MULTI_MATCH_BOOSTER,
+        RerankerName.PREDICT_RERANKER,
+        RerankerName.NOOP,
+        PredictReranker(window=50),
+    ],
 )
 async def test_reranker(
     nucliadb_reader: AsyncClient,
@@ -65,17 +73,25 @@ async def test_reranker(
     assert len(find_retrieval.best_matches) == 7
 
 
+@pytest.mark.parametrize(
+    "reranker,top_k,extra",
+    [
+        (RerankerName.PREDICT_RERANKER, 25),
+        (PredictReranker(window=25), 25),
+    ],
+)
 async def test_predict_reranker_requests_more_results(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
     mocker: MockFixture,
+    reranker: Union[RerankerName, PredictReranker],
+    extra: int,
 ):
     """Validate predict reranker asks for more results than the user and we send
     them to Predict API.
 
     """
     kbid = philosophy_books_kb
-    reranker = Reranker.PREDICT_RERANKER
 
     spy_build_find_response = mocker.spy(find, "build_find_response")
     spy_cut_page = mocker.spy(find_merge, "cut_page")
@@ -117,7 +133,7 @@ async def test_predict_reranker_requests_more_results(
 
         items, page_size, page_number = cut_page_call.args
         assert len(items) == 7
-        assert page_size == 25
+        assert page_size == extra
         assert page_number == 0
 
     find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
