@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import cast
+
+from pydantic import ValidationError
 
 from nucliadb.search.search.query_parser.exceptions import ParserError
 from nucliadb.search.search.query_parser.models import (
@@ -46,15 +47,20 @@ class _FindParser:
 
     def parse(self) -> UnitRetrieval:
         top_k = self._parse_top_k()
-        rank_fusion = self._parse_rank_fusion()
-        reranker = self._parse_reranker()
+        try:
+            rank_fusion = self._parse_rank_fusion()
+        except ValidationError as exc:
+            raise ParserError(f"Parsing error in rank fusion: {str(exc)}") from exc
+        try:
+            reranker = self._parse_reranker()
+        except ValidationError as exc:
+            raise ParserError(f"Parsing error in reranker: {str(exc)}") from exc
 
         # Adjust retrieval windows. Our current implementation assume:
         # `top_k <= reranker.window <= rank_fusion.window`
         # and as rank fusion is done before reranking, we must ensure rank
         # fusion window is at least, the reranker window
         if isinstance(reranker, PredictReranker):
-            reranker = cast(PredictReranker, reranker)
             rank_fusion.window = max(rank_fusion.window, reranker.window)
 
         return UnitRetrieval(
@@ -88,11 +94,11 @@ class _FindParser:
             rank_fusion = LegacyRankFusion(window=window)
 
         elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
-            window = max(self.item.rank_fusion.window or 0, window)
+            user_window = self.item.rank_fusion.window
             rank_fusion = ReciprocalRankFusion(
                 k=self.item.rank_fusion.k,
                 boosting=self.item.rank_fusion.boosting,
-                window=window,
+                window=min(max(user_window or 0, top_k), 500),
             )
 
         else:
@@ -115,13 +121,12 @@ class _FindParser:
             elif self.item.reranker == search_models.RerankerName.PREDICT_RERANKER:
                 # for predict rearnker, by default, we want a x2 factor with a
                 # top of 200 results
-                reranking = PredictReranker(window=min(top_k * 5, 200))
+                reranking = PredictReranker(window=min(top_k * 2, 200))
 
             else:
                 raise ParserError(f"Unknown reranker algorithm: {self.item.reranker}")
 
         elif isinstance(self.item.reranker, search_models.PredictReranker):
-            # for predict rearnker, we want a x2 factor with a top of 200 results
             user_window = self.item.reranker.window
             reranking = PredictReranker(window=min(max(user_window or 0, top_k), 200))
 

@@ -34,7 +34,7 @@ from nucliadb_models.search import KnowledgeboxFindResults, PredictReranker, Rer
         RerankerName.MULTI_MATCH_BOOSTER,
         RerankerName.PREDICT_RERANKER,
         RerankerName.NOOP,
-        PredictReranker(window=50),
+        PredictReranker(window=50).model_dump(),
     ],
 )
 async def test_reranker(
@@ -74,10 +74,10 @@ async def test_reranker(
 
 
 @pytest.mark.parametrize(
-    "reranker,top_k,extra",
+    "reranker,extra",
     [
-        (RerankerName.PREDICT_RERANKER, 25),
-        (PredictReranker(window=25), 25),
+        (RerankerName.PREDICT_RERANKER, 5 * 2),
+        (PredictReranker(window=5 * 2).model_dump(), 5 * 2),
     ],
 )
 async def test_predict_reranker_requests_more_results(

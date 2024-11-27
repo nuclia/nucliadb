@@ -41,7 +41,7 @@ from nucliadb_models.search import (
         (RerankerName.MULTI_MATCH_BOOSTER, RerankerName.MULTI_MATCH_BOOSTER),
         (RerankerName.PREDICT_RERANKER, RerankerName.PREDICT_RERANKER),
         (RerankerName.NOOP, RerankerName.NOOP),
-        (PredictReranker(window=20), RerankerName.PREDICT_RERANKER),
+        (PredictReranker(window=20), PredictReranker(window=20)),
     ],
 )
 async def test_ask_forwarding_rerank_options_to_find(
