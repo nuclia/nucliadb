@@ -121,8 +121,8 @@ class PredictReranker(Reranker):
         return True
 
     def items_needed(self, requested: int, shards: int = 1) -> int:
-        # we want a x5 factor with a top of 500 results
-        reranker_requested = min(requested * shards * 5, 500)
+        # we want a x2 factor with a top of 500 results
+        reranker_requested = min(requested * shards * 2, 500)
         actual_requested = requested * shards
         return math.ceil(max(reranker_requested, actual_requested) / shards)
 
