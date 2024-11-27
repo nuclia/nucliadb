@@ -26,7 +26,7 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search.search import cache
-from nucliadb_telemetry import metrics
+from nucliadb_telemetry import errors, metrics
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
@@ -123,7 +123,11 @@ async def get_paragraph_text(
     )
 
     if highlight:
-        text = highlight_paragraph(text, words=matches, ematches=ematches)
+        try:
+            text = highlight_paragraph(text, words=matches, ematches=ematches)
+        except Exception as ex:
+            errors.capture_exception(ex)
+            logger.exception("Error highlighting paragraph", extra={"kbid": kbid})
     return text
 
 
