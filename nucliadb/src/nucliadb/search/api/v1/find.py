@@ -42,6 +42,7 @@ from nucliadb_models.search import (
     NucliaDBClientType,
     RankFusionName,
     Reranker,
+    RerankerName,
     ResourceProperties,
     SearchOptions,
     SearchParamDefaults,
@@ -129,7 +130,7 @@ async def find_knowledgebox(
     rank_fusion: RankFusionName = fastapi_query(
         SearchParamDefaults.rank_fusion, include_in_schema=False
     ),
-    reranker: Reranker = fastapi_query(SearchParamDefaults.reranker),
+    reranker: Union[RerankerName, Reranker] = fastapi_query(SearchParamDefaults.reranker),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),

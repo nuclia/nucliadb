@@ -454,7 +454,7 @@ class PredictReranker(_BaseReranker):
     )
 
 
-Reranker = Annotated[PredictReranker, Field(discriminator="name")]
+Reranker = Annotated[Union[PredictReranker], Field(discriminator="name")]
 
 
 class KnowledgeBoxCount(BaseModel):
