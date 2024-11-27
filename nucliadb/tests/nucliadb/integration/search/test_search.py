@@ -1501,6 +1501,59 @@ async def test_catalog_faceted(
 
 
 @pytest.mark.asyncio
+async def test_catalog_faceted_labels(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    # 4 resources:
+    # 1 with /l/labelset0/label0
+    # 2 with /l/labelset0/label1
+    # 1 with /l/labelset1/label0
+    for label in range(2):
+        for count in range(label + 1):
+            bm = broker_resource(knowledgebox)
+            c = rpb.Classification()
+            c.labelset = f"labelset0"
+            c.label = f"label{label}"
+            bm.basic.usermetadata.classifications.append(c)
+            await inject_message(nucliadb_grpc, bm)
+
+    bm = broker_resource(knowledgebox)
+    c = rpb.Classification()
+    c.labelset = "labelset1"
+    c.label = "label0"
+    bm.basic.usermetadata.classifications.append(c)
+    await inject_message(nucliadb_grpc, bm)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog?faceted=/classification.labels/labelset0",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["facets"] == {
+        "/classification.labels/labelset0": {
+            "/classification.labels/labelset0/label0": 1,
+            "/classification.labels/labelset0/label1": 2,
+        }
+    }
+
+    # This is used by the check missing labels button in dashboard
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog?faceted=/classification.labels",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["facets"] == {
+        "/classification.labels": {
+            "/classification.labels/labelset0": 3,
+            "/classification.labels/labelset1": 1,
+        }
+    }
+
+
+@pytest.mark.asyncio
 async def test_catalog_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
