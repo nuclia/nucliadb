@@ -74,7 +74,7 @@ class _FindParser:
         rank_fusion: RankFusion
 
         top_k = self._parse_top_k()
-        window = top_k
+        window = min(top_k, 500)
 
         if isinstance(self.item.rank_fusion, search_models.RankFusionName):
             if self.item.rank_fusion == search_models.RankFusionName.LEGACY:
@@ -88,7 +88,7 @@ class _FindParser:
             rank_fusion = LegacyRankFusion(window=window)
 
         elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
-            window = max(self.item.rank_fusion.window or 0, top_k)
+            window = max(self.item.rank_fusion.window or 0, window)
             rank_fusion = ReciprocalRankFusion(
                 k=self.item.rank_fusion.k,
                 boosting=self.item.rank_fusion.boosting,
@@ -101,9 +101,9 @@ class _FindParser:
         return rank_fusion
 
     def _parse_reranker(self) -> Reranker:
-        top_k = self._parse_top_k()
-
         reranking: Reranker
+
+        top_k = self._parse_top_k()
 
         if self.item.reranker == search_models.Reranker.NOOP:
             reranking = NoopReranker()
@@ -112,8 +112,8 @@ class _FindParser:
             reranking = MultiMatchBoosterReranker()
 
         elif self.item.reranker == search_models.Reranker.PREDICT_RERANKER:
-            # for predict rearnker, we want a x5 factor with a top of 500 results
-            reranking = PredictReranker(window=min(top_k * 5, 500))
+            # for predict rearnker, we want a x2 factor with a top of 200 results
+            reranking = PredictReranker(window=min(top_k * 5, 200))
 
         else:
             raise ParserError(f"Unknown reranker {self.item.reranker}")

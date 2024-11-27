@@ -25,7 +25,7 @@ import pytest
 
 from nucliadb.search.search.find_merge import build_find_response
 from nucliadb.search.search.rank_fusion import LegacyRankFusion
-from nucliadb.search.search.rerankers import NoopReranker
+from nucliadb.search.search.rerankers import MultiMatchBoosterReranker
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import SCORE_TYPE, ResourceProperties
 from nucliadb_protos import nodereader_pb2, noderesources_pb2
@@ -146,7 +146,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any]):
             extracted=[],
             highlight=True,
             rank_fusion_algorithm=LegacyRankFusion(window=20),
-            reranker=NoopReranker(),
+            reranker=MultiMatchBoosterReranker(),
         )
         resp = find_response.model_dump()
         assert expected_find_response == resp

@@ -57,7 +57,7 @@ class MultiMatchBoosterReranker(Reranker): ...
 
 
 class PredictReranker(Reranker):
-    window: int = Field(le=500)
+    window: int = Field(le=200)
 
 
 # retrieval operation
