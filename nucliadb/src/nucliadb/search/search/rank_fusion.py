@@ -19,7 +19,7 @@
 #
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable, cast
+from typing import Iterable
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
@@ -187,11 +187,9 @@ def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorith
     window = rank_fusion.window
 
     if isinstance(rank_fusion, parser_models.LegacyRankFusion):
-        rank_fusion = cast(parser_models.LegacyRankFusion, rank_fusion)
         algorithm = LegacyRankFusion(window=window)
 
     elif isinstance(rank_fusion, parser_models.ReciprocalRankFusion):
-        rank_fusion = cast(parser_models.ReciprocalRankFusion, rank_fusion)
         algorithm = ReciprocalRankFusion(
             k=rank_fusion.k,
             window=window,

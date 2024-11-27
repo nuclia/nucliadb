@@ -21,7 +21,7 @@
 import logging
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import Optional
 
 from nucliadb.search.predict import ProxiedPredictAPIError, SendToPredictError
 from nucliadb.search.search.query_parser import models as parser_models
@@ -216,7 +216,6 @@ def get_reranker(reranker: parser_models.Reranker) -> Reranker:
         algorithm = MultiMatchBoosterReranker()
 
     elif isinstance(reranker, parser_models.PredictReranker):
-        reranker = cast(parser_models.PredictReranker, reranker)
         algorithm = PredictReranker(reranker.window)
 
     else:
