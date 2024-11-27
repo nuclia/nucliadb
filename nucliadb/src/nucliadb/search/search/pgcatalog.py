@@ -19,6 +19,7 @@
 #
 
 import logging
+from collections import defaultdict
 from typing import Any, cast
 
 from psycopg.rows import dict_row
@@ -158,7 +159,7 @@ async def pgcatalog_search(query_parser: QueryParser) -> Resources:
         if query_parser.faceted:
             with observer({"op": "facets"}):
                 tmp_facets: dict[str, dict[str, int]] = {
-                    translate_label(f): {} for f in query_parser.faceted
+                    translate_label(f): defaultdict(int) for f in query_parser.faceted
                 }
                 facet_filters = " OR ".join(f"label LIKE '{f}/%%'" for f in tmp_facets.keys())
                 for facet in tmp_facets.keys():
@@ -176,10 +177,17 @@ async def pgcatalog_search(query_parser: QueryParser) -> Resources:
 
                 for row in await cur.fetchall():
                     label = row["label"]
-                    parent = "/".join(label.split("/")[:-1])
+                    label_parts = label.split("/")
+                    parent = "/".join(label_parts[:-1])
                     count = row["count"]
                     if parent in tmp_facets:
                         tmp_facets[parent][translate_system_to_alias_label(label)] = count
+
+                    # No need to get recursive because our facets are at most 3 levels deep (e.g: /l/set/label)
+                    if len(label_parts) >= 3:
+                        grandparent = "/".join(label_parts[:-2])
+                        if grandparent in tmp_facets:
+                            tmp_facets[grandparent][translate_system_to_alias_label(parent)] += count
 
                 facets = {translate_system_to_alias_label(k): v for k, v in tmp_facets.items()}
 
