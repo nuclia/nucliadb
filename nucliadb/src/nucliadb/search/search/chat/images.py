@@ -62,3 +62,16 @@ async def get_paragraph_image(kbid: str, paragraph_id: ParagraphId, reference: s
         content_type="image/png",
     )
     return image
+
+
+async def get_file_image(kbid: str, rid: str, field_id: str) -> Optional[Image]:
+    storage = await get_storage(service_name=SERVICE_NAME)
+    sf = storage.file_field(kbid, rid, field_id)
+    image_bytes = (await sf.storage.downloadbytes(sf.bucket, sf.key)).read()
+    if not image_bytes:
+        return None
+    image = Image(
+        b64encoded=base64.b64encode(image_bytes).decode(),
+        content_type="image/png",
+    )
+    return image

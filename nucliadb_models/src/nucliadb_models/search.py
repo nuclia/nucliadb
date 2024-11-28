@@ -1184,10 +1184,15 @@ Types for which the metadata is not found at the resource are ignored and not ad
 
 class ConversationalStrategy(RagStrategy):
     name: Literal["conversation"] = "conversation"
-    attachments: bool = Field(
+    attachments_text: bool = Field(
         default=False,
         title="Add attachments on context",
         description="Add attachments on context retrieved on conversation",
+    )
+    attachments_images: bool = Field(
+        default=False,
+        title="Add attachments images on context",
+        description="Add attachments images on context retrieved on conversation if they are mime type image and using a visual LLM",
     )
     full: bool = Field(
         default=True,

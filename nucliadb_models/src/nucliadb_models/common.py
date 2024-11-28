@@ -93,12 +93,6 @@ class FieldID(BaseModel):
     field: str
 
 
-class FieldRef(BaseModel):
-    field_type: FieldID.FieldType
-    field_id: str
-    split: Optional[str] = None
-
-
 class File(BaseModel):
     filename: Optional[str] = None
     content_type: str = "application/octet-stream"
@@ -206,6 +200,12 @@ class FieldTypeName(str, Enum):
     LINK = "link"
     CONVERSATION = "conversation"
     GENERIC = "generic"
+
+
+class FieldRef(BaseModel):
+    field_type: FieldTypeName
+    field_id: str
+    split: Optional[str] = None
 
 
 class Classification(BaseModel):
