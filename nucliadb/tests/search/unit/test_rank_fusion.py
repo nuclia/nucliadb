@@ -45,9 +45,7 @@ from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
 @pytest.mark.parametrize(
     "rank_fusion,expected_type",
     [
-        (search_models.RankFusionName.LEGACY, LegacyRankFusion),
         (search_models.RankFusionName.RECIPROCAL_RANK_FUSION, ReciprocalRankFusion),
-        (search_models.LegacyRankFusion(), LegacyRankFusion),
         (search_models.ReciprocalRankFusion(), ReciprocalRankFusion),
     ],
 )

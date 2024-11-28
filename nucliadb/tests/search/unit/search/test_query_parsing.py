@@ -40,7 +40,6 @@ def test_find_query_parsing__top_k():
 @pytest.mark.parametrize(
     "rank_fusion,expected",
     [
-        (search_models.RankFusionName.LEGACY, parser_models.LegacyRankFusion(window=20)),
         (
             search_models.RankFusionName.RECIPROCAL_RANK_FUSION,
             parser_models.ReciprocalRankFusion(window=20),

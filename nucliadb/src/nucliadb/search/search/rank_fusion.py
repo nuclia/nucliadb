@@ -186,10 +186,7 @@ def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorith
     algorithm: RankFusionAlgorithm
     window = rank_fusion.window
 
-    if isinstance(rank_fusion, parser_models.LegacyRankFusion):
-        algorithm = LegacyRankFusion(window=window)
-
-    elif isinstance(rank_fusion, parser_models.ReciprocalRankFusion):
+    if isinstance(rank_fusion, parser_models.ReciprocalRankFusion):
         algorithm = ReciprocalRankFusion(
             k=rank_fusion.k,
             window=window,
@@ -199,6 +196,6 @@ def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorith
 
     else:
         logger.error(f"Unknown rank fusion algorithm {type(rank_fusion)}: {rank_fusion}. Using default")
-        algorithm = LegacyRankFusion(window=window)
+        algorithm = ReciprocalRankFusion(window=window)
 
     return algorithm

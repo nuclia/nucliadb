@@ -365,16 +365,11 @@ class SortOptions(BaseModel):
 
 
 class RankFusionName(str, Enum):
-    LEGACY = "legacy"
     RECIPROCAL_RANK_FUSION = "rrf"
 
 
 class _BaseRankFusion(BaseModel):
     name: str
-
-
-class LegacyRankFusion(_BaseRankFusion):
-    name: Literal[RankFusionName.LEGACY] = RankFusionName.LEGACY
 
 
 class ReciprocalRankFusionWeights(BaseModel):
@@ -409,7 +404,7 @@ This kind of boosting can be useful in multilingual search, for example, where k
 
 
 RankFusion = Annotated[
-    Union[LegacyRankFusion, ReciprocalRankFusion],
+    Union[ReciprocalRankFusion],
     Field(discriminator="name"),
 ]
 
@@ -587,7 +582,7 @@ class SearchParamDefaults:
         description="List of search features to use. Each value corresponds to a lookup into on of the different indexes",
     )
     rank_fusion = ParamDefault(
-        default=RankFusionName.LEGACY,
+        default=RankFusionName.RECIPROCAL_RANK_FUSION,
         title="Rank fusion",
         description="Rank fusion algorithm to use to merge results from multiple retrievers (keyword, semantic)",
     )
