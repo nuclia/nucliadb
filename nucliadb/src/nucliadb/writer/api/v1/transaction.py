@@ -18,12 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import backoff
 from fastapi import HTTPException
 
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_utils import const
 from nucliadb_utils.transaction import (
     MaxTransactionSizeExceededError,
-    StreamingServerTimeoutError,
+    StreamingServerError,
     TransactionCommitTimeoutError,
 )
 from nucliadb_utils.utilities import get_transaction_utility
@@ -31,8 +33,7 @@ from nucliadb_utils.utilities import get_transaction_utility
 
 async def commit(writer: BrokerMessage, partition: int, wait: bool = True) -> None:
     try:
-        transaction = get_transaction_utility()
-        await transaction.commit(writer, partition, wait=wait)
+        await transaction_commit(writer, partition, wait)
     except TransactionCommitTimeoutError:
         raise HTTPException(
             status_code=501,
@@ -43,8 +44,24 @@ async def commit(writer: BrokerMessage, partition: int, wait: bool = True) -> No
             status_code=413,
             detail="Transaction size exceeded. The resource is too large to be stored. Consider using file fields or split into multiple requests.",
         )
-    except StreamingServerTimeoutError:
+    except StreamingServerError:
         raise HTTPException(
             status_code=504,
             detail="Timeout waiting for the streaming server to respond. Please back off and retry.",
         )
+
+
+@backoff.on_exception(
+    backoff.expo,
+    (StreamingServerError,),
+    jitter=backoff.random_jitter,
+    max_tries=3,
+)
+async def transaction_commit(writer: BrokerMessage, partition: int, wait: bool = True):
+    transaction = get_transaction_utility()
+    await transaction.commit(
+        writer,
+        partition,
+        wait=wait,
+        target_subject=const.Streams.INGEST.subject.format(partition=partition),
+    )
