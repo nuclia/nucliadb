@@ -35,7 +35,12 @@ from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.utils_pb2 import RelationNode
 
 # Bw/c import to avoid breaking users
-from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
+from nucliadb_models.internal.predict import (
+    Ner,
+    QueryInfo,
+    SentenceSearch,
+    TokenSearch,
+)  # noqa isort: skip
 from nucliadb_models.internal.shards import (  # noqa isort: skip
     DocumentServiceEnum,
     ParagraphServiceEnum,
@@ -383,7 +388,9 @@ class ReciprocalRankFusionWeights(BaseModel):
 
 
 class ReciprocalRankFusion(_BaseRankFusion):
-    name: Literal[RankFusionName.RECIPROCAL_RANK_FUSION] = RankFusionName.RECIPROCAL_RANK_FUSION
+    name: Literal[
+        RankFusionName.RECIPROCAL_RANK_FUSION
+    ] = RankFusionName.RECIPROCAL_RANK_FUSION
     k: float = Field(
         default=60.0,
         title="RRF k parameter",
@@ -434,7 +441,9 @@ class RerankerName(str, Enum):
 
     MULTI_MATCH_BOOSTER: Annotated[
         str,
-        deprecated("We recommend switching to the new default predict reranker for far better results"),
+        deprecated(
+            "We recommend switching to the new default predict reranker for far better results"
+        ),
     ] = "multi_match_booster"
     PREDICT_RERANKER = "predict"
     NOOP = "noop"
@@ -465,7 +474,10 @@ class KnowledgeBoxCount(BaseModel):
 
 class SearchParamDefaults:
     query = ParamDefault(
-        default="", title="Query", description="The query to search for", max_items=20_000
+        default="",
+        title="Query",
+        description="The query to search for",
+        max_items=20_000,
     )
     suggest_query = ParamDefault(
         default=..., title="Query", description="The query to get suggestions for"
@@ -729,16 +741,18 @@ class CatalogRequest(BaseModel):
         description="Filter results by resource processing status",
         deprecated="Use filters instead",
     )
-    range_creation_start: Optional[DateTime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
-    )
-    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_start.to_pydantic_field()
-    )
-    range_modification_end: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_end.to_pydantic_field()
-    )
+    range_creation_start: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
     hidden: Optional[bool] = SearchParamDefaults.hidden.to_pydantic_field()
 
     @field_validator("faceted")
@@ -795,7 +809,9 @@ class BaseSearchRequest(AuditMetadataBase):
         title="Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters",  # noqa: E501
     )
-    page_number: int = SearchParamDefaults.page_number.to_pydantic_field(deprecated=True)
+    page_number: int = SearchParamDefaults.page_number.to_pydantic_field(
+        deprecated=True
+    )
     page_size: int = SearchParamDefaults.page_size.to_pydantic_field(deprecated=True)
     top_k: Optional[int] = SearchParamDefaults.top_k.to_pydantic_field()
     min_score: Optional[Union[float, MinScore]] = Field(
@@ -803,17 +819,21 @@ class BaseSearchRequest(AuditMetadataBase):
         title="Minimum score",
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa: E501
     )
-    range_creation_start: Optional[DateTime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
-    )
-    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_start.to_pydantic_field()
-    )
-    range_modification_end: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_end.to_pydantic_field()
-    )
-    features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
+    range_creation_start: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
+    features: list[
+        SearchOptions
+    ] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             SearchOptions.KEYWORD,
             SearchOptions.FULLTEXT,
@@ -823,16 +843,24 @@ class BaseSearchRequest(AuditMetadataBase):
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
-    extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
+    field_type_filter: list[
+        FieldTypeName
+    ] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: list[
+        ExtractedDataTypeName
+    ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: list[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[list[float]] = SearchParamDefaults.vector.to_pydantic_field()
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
     with_synonyms: bool = SearchParamDefaults.with_synonyms.to_pydantic_field()
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
-    resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
-    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    resource_filters: list[
+        str
+    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    security: Optional[
+        RequestSecurity
+    ] = SearchParamDefaults.security.to_pydantic_field()
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
 
     rephrase: bool = Field(
@@ -918,7 +946,9 @@ class MaxTokens(BaseModel):
     )
 
 
-def parse_max_tokens(max_tokens: Optional[Union[int, MaxTokens]]) -> Optional[MaxTokens]:
+def parse_max_tokens(
+    max_tokens: Optional[Union[int, MaxTokens]]
+) -> Optional[MaxTokens]:
     if isinstance(max_tokens, int):
         # If the max_tokens is an integer, it is interpreted as the max_tokens value for the generated answer.
         # The max tokens for the context is set to None to use the default value for the model (comes in the
@@ -958,7 +988,9 @@ class ChatModel(BaseModel):
     user_prompt: Optional[UserPrompt] = Field(
         default=None, description="Optional custom prompt input by the user"
     )
-    citations: bool = Field(default=False, description="Whether to include the citations in the answer")
+    citations: bool = Field(
+        default=False, description="Whether to include the citations in the answer"
+    )
     citation_threshold: Optional[float] = Field(
         default=None,
         description="If citations is True, this sets the similarity threshold (0 to 1) for paragraphs to be included as citations. Lower values result in more citations. If not provided, Nuclia's default threshold is used.",  # noqa: E501
@@ -971,7 +1003,9 @@ class ChatModel(BaseModel):
         description="The generative model to use for the predict chat endpoint. If not provided, the model configured for the Knowledge Box is used.",  # noqa: E501
     )
 
-    max_tokens: Optional[int] = Field(default=None, description="Maximum characters to generate")
+    max_tokens: Optional[int] = Field(
+        default=None, description="Maximum characters to generate"
+    )
 
     query_context_images: dict[str, Image] = Field(
         default={},
@@ -990,7 +1024,9 @@ class ChatModel(BaseModel):
         default=False,
         description="Whether to reorder the query context based on a reranker",
     )
-    top_k: Optional[int] = Field(default=None, description="Number of best elements to get from")
+    top_k: Optional[int] = Field(
+        default=None, description="Number of best elements to get from"
+    )
 
 
 class RephraseModel(BaseModel):
@@ -1012,6 +1048,7 @@ class RagStrategyName:
     NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
     METADATA_EXTENSION = "metadata_extension"
     PREQUERIES = "prequeries"
+    CONVERSATION = "conversation"
 
 
 class ImageRagStrategyName:
@@ -1053,10 +1090,15 @@ class FieldExtensionStrategy(RagStrategy):
             try:
                 field_type, _ = field.strip("/").split("/")
             except ValueError:
-                raise ValueError(f"Field '{field}' is not in the format {{field_type}}/{{field_name}}")
+                raise ValueError(
+                    f"Field '{field}' is not in the format {{field_type}}/{{field_name}}"
+                )
             if field_type not in ALLOWED_FIELD_TYPES:
                 allowed_field_types_part = ", ".join(
-                    [f"'{fid}' for '{fname}' fields" for fid, fname in ALLOWED_FIELD_TYPES.items()]
+                    [
+                        f"'{fid}' for '{fname}' fields"
+                        for fid, fname in ALLOWED_FIELD_TYPES.items()
+                    ]
                 )
                 raise ValueError(
                     f"Field '{field}' does not have a valid field type. "
@@ -1137,6 +1179,26 @@ Types for which the metadata is not found at the resource are ignored and not ad
             ["origin", "classification_labels"],
             ["ners"],
         ],
+    )
+
+
+class ConversationalStrategy(RagStrategy):
+    name: Literal["conversation"] = "conversation"
+    attachments: bool = Field(
+        default=False,
+        title="Add attachments on context",
+        description="Add attachments on context retrieved on conversation",
+    )
+    full: bool = Field(
+        default=True,
+        title="Add all conversation",
+        description="Add all conversation fields on matched blocks",
+    )
+    max_messages: int = Field(
+        default=15,
+        title="Max messages",
+        description="Max messages to append in case its not full field",
+        ge=0,
     )
 
 
@@ -1226,12 +1288,14 @@ RagStrategies = Annotated[
         HierarchyResourceStrategy,
         NeighbouringParagraphsStrategy,
         MetadataExtensionStrategy,
+        ConversationalStrategy,
         PreQueriesStrategy,
     ],
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
-    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy], Field(discriminator="name")
+    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy],
+    Field(discriminator="name"),
 ]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
@@ -1321,21 +1385,29 @@ class AskRequest(AuditMetadataBase):
         description="Minimum score to filter search results. Results with a lower score will be ignored. Accepts either a float or a dictionary with the minimum scores for the bm25 and vector indexes. If a float is provided, it is interpreted as the minimum score for vector index search.",  # noqa: E501
     )
     features: list[ChatOptions] = SearchParamDefaults.chat_features.to_pydantic_field()
-    range_creation_start: Optional[DateTime] = (
-        SearchParamDefaults.range_creation_start.to_pydantic_field()
-    )
-    range_creation_end: Optional[DateTime] = SearchParamDefaults.range_creation_end.to_pydantic_field()
-    range_modification_start: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_start.to_pydantic_field()
-    )
-    range_modification_end: Optional[DateTime] = (
-        SearchParamDefaults.range_modification_end.to_pydantic_field()
-    )
+    range_creation_start: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_creation_start.to_pydantic_field()
+    range_creation_end: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_creation_end.to_pydantic_field()
+    range_modification_start: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_modification_start.to_pydantic_field()
+    range_modification_end: Optional[
+        DateTime
+    ] = SearchParamDefaults.range_modification_end.to_pydantic_field()
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
-    field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
-    extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
+    field_type_filter: list[
+        FieldTypeName
+    ] = SearchParamDefaults.field_type_filter.to_pydantic_field()
+    extracted: list[
+        ExtractedDataTypeName
+    ] = SearchParamDefaults.extracted.to_pydantic_field()
     shards: list[str] = SearchParamDefaults.shards.to_pydantic_field()
-    context: Optional[list[ChatContextMessage]] = SearchParamDefaults.chat_context.to_pydantic_field()
+    context: Optional[
+        list[ChatContextMessage]
+    ] = SearchParamDefaults.chat_context.to_pydantic_field()
     extra_context: Optional[list[str]] = Field(
         default=None,
         title="Extra query context",
@@ -1344,16 +1416,20 @@ class AskRequest(AuditMetadataBase):
     )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
-    resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
+    resource_filters: list[
+        str
+    ] = SearchParamDefaults.resource_filters.to_pydantic_field()
     prompt: Optional[Union[str, CustomPrompt]] = Field(
         default=None,
         title="Prompts",
         description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa: E501
     )
-    rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
-        SearchParamDefaults.rank_fusion.to_pydantic_field()
-    )
-    reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
+    rank_fusion: SkipJsonSchema[
+        Union[RankFusionName, RankFusion]
+    ] = SearchParamDefaults.rank_fusion.to_pydantic_field()
+    reranker: Union[
+        RerankerName, Reranker
+    ] = SearchParamDefaults.reranker.to_pydantic_field()
     citations: bool = Field(
         default=False,
         description="Whether to include the citations for the answer in the response",
@@ -1364,7 +1440,9 @@ class AskRequest(AuditMetadataBase):
         ge=0.0,
         le=1.0,
     )
-    security: Optional[RequestSecurity] = SearchParamDefaults.security.to_pydantic_field()
+    security: Optional[
+        RequestSecurity
+    ] = SearchParamDefaults.security.to_pydantic_field()
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
     rag_strategies: list[RagStrategies] = Field(
         default=[],
@@ -1388,7 +1466,12 @@ If empty, the default strategy is used, which simply adds the text of the matchi
             ],
             [{"name": "hierarchy", "count": 2}],
             [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
-            [{"name": "metadata_extension", "types": ["origin", "classification_labels"]}],
+            [
+                {
+                    "name": "metadata_extension",
+                    "types": ["origin", "classification_labels"],
+                }
+            ],
             [
                 {
                     "name": "prequeries",
@@ -1462,7 +1545,9 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
 
     @field_validator("rag_strategies", mode="before")
     @classmethod
-    def validate_rag_strategies(cls, rag_strategies: list[RagStrategies]) -> list[RagStrategies]:
+    def validate_rag_strategies(
+        cls, rag_strategies: list[RagStrategies]
+    ) -> list[RagStrategies]:
         strategy_names: set[str] = set()
         for strategy in rag_strategies or []:
             if isinstance(strategy, dict):
@@ -1569,16 +1654,20 @@ class SummarizedResponse(BaseModel):
 
 
 class FindRequest(BaseSearchRequest):
-    features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
+    features: list[
+        SearchOptions
+    ] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             SearchOptions.KEYWORD,
             SearchOptions.SEMANTIC,
         ]
     )
-    rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
-        SearchParamDefaults.rank_fusion.to_pydantic_field()
-    )
-    reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
+    rank_fusion: SkipJsonSchema[
+        Union[RankFusionName, RankFusion]
+    ] = SearchParamDefaults.rank_fusion.to_pydantic_field()
+    reranker: Union[
+        RerankerName, Reranker
+    ] = SearchParamDefaults.reranker.to_pydantic_field()
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
@@ -1668,10 +1757,12 @@ class KnowledgeboxFindResults(JsonBaseModel):
     query: Optional[str] = None
     total: int = 0
     page_number: int = Field(
-        default=0, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+        default=0,
+        description="Pagination will be deprecated, please, refer to `top_k` in the request",
     )
     page_size: int = Field(
-        default=20, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+        default=20,
+        description="Pagination will be deprecated, please, refer to `top_k` in the request",
     )
     next_page: bool = Field(
         default=False,
@@ -1718,7 +1809,9 @@ class FeedbackRequest(BaseModel):
         description="The task the feedback is for. For now, only `CHAT` task is available",
     )
     feedback: Optional[str] = Field(None, title="Feedback", description="Feedback text")
-    text_block_id: Optional[str] = Field(None, title="Text block", description="Text block id")
+    text_block_id: Optional[str] = Field(
+        None, title="Text block", description="Text block id"
+    )
 
 
 def validate_facets(facets):
