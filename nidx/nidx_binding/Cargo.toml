@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 anyhow = "1.0.93"
-nidx = { version = "0.1.0", path = ".." }
+nidx = { version = "0.1.0", path = "..", default-features = false }
 nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
 pyo3 = "0.22.0"
 tempfile = "3.14.0"

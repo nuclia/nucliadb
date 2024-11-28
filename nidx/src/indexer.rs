@@ -52,7 +52,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
         let info = match msg.info() {
             Ok(info) => info,
             Err(e) => {
-                error!("Invalid NATS message {e:?}, skipping");
+                error!(?e, "Invalid NATS message, skipping");
                 let _ = msg.ack().await;
                 continue;
             }
@@ -66,20 +66,23 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
 
         let (msg, acker) = msg.split();
 
-        let Ok(index_message) = IndexMessage::decode(msg.payload) else {
-            warn!("Error decoding index message");
-            continue;
+        let index_message = match IndexMessage::decode(msg.payload) {
+            Ok(index_message) => index_message,
+            Err(e) => {
+                warn!(?e, "Error decoding index message");
+                continue;
+            }
         };
 
         if let Err(e) =
             process_index_message(&meta, indexer_storage.clone(), segment_storage.clone(), index_message, seq).await
         {
-            warn!("Error processing index message {e:?}");
+            warn!(?e, "Error processing index message");
             continue;
         }
 
         if let Err(e) = acker.ack().await {
-            warn!("Error acking index message {e:?}");
+            warn!(?e, "Error acking index message");
             continue;
         }
 

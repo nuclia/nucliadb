@@ -22,13 +22,39 @@ use std::sync::Arc;
 
 use nidx::{api, indexer, metrics, scheduler, searcher, worker, Settings};
 use prometheus_client::registry::Registry;
-use tokio::{main, net::TcpListener, task::JoinSet};
+use sentry::IntoDsn;
+use tokio::{net::TcpListener, task::JoinSet};
+use tracing::*;
+use tracing_subscriber::prelude::*;
 
-#[main]
-async fn main() -> anyhow::Result<()> {
+// Main wrapper needed to initialize Sentry before Tokio
+fn main() -> anyhow::Result<()> {
+    let sentry_options = if let Ok(dsn) = std::env::var("SENTRY_DSN") {
+        sentry::ClientOptions {
+            dsn: dsn.into_dsn()?,
+            release: sentry::release_name!(),
+            ..Default::default()
+        }
+    } else {
+        // No Sentry config provided, fallback to printing traces to logs
+        sentry::ClientOptions {
+            dsn: "http://disabled:disabled@disabled/disabled".into_dsn()?,
+            before_send: Some(Arc::new(|event| {
+                debug!("Sentry error {event:#?}");
+                None
+            })),
+            ..Default::default()
+        }
+    };
+    let _guard = sentry::init(sentry_options);
+
+    tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(do_main())
+}
+
+async fn do_main() -> anyhow::Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
 
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::registry().with(tracing_subscriber::fmt::layer()).with(sentry_tracing::layer()).init();
 
     let settings = Settings::from_env().await?;
     let mut metrics = Registry::with_prefix("nidx");

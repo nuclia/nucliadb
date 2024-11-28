@@ -3,6 +3,10 @@ name = "nidx"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "nidx"
+required-features = ["telemetry"]
+
 [workspace]
 members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy", "nidx_paragraph", "nidx_relation", "nidx_binding"]
 
@@ -37,6 +41,12 @@ http = "1.1.0"
 prometheus-client = "0.22.3"
 axum = "0.7.9"
 lazy_static = "1.5.0"
+sentry = { version = "0.34.0", optional = true }
+sentry-tracing = { version = "0.34.0", optional = true }
+
+[features]
+default = ["telemetry"]
+telemetry = ["dep:sentry", "dep:sentry-tracing"]
 
 [dev-dependencies]
 itertools = "0.13.0"
