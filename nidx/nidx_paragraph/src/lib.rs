@@ -95,6 +95,7 @@ impl ParagraphIndexer {
         resource.paragraphs_to_delete.clone()
     }
 
+    #[instrument(name = "paragraph::merge", skip_all)]
     pub fn merge(
         &self,
         work_dir: &Path,

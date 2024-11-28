@@ -71,6 +71,7 @@ impl VectorIndexer {
         resource.sentences_to_delete.clone()
     }
 
+    #[instrument(name = "vector::merge", skip_all)]
     pub fn merge(
         &self,
         work_dir: &Path,

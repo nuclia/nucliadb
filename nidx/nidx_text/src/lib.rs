@@ -73,6 +73,7 @@ impl TextIndexer {
         vec![resource.resource.as_ref().unwrap().uuid.clone()]
     }
 
+    #[instrument(name = "text::merge", skip_all)]
     pub fn merge(
         &self,
         work_dir: &Path,

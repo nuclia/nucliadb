@@ -30,7 +30,6 @@ use object_store::{DynObjectStore, ObjectStore};
 use opentelemetry::global::get_text_map_propagator;
 use opentelemetry::propagation::Extractor;
 use opentelemetry::trace::TraceContextExt;
-use opentelemetry::Context;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::*;
@@ -83,15 +82,12 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             continue;
         }
 
-        // Reset OTEL context on each message
-        let _context_guard = Context::new().attach();
         let span = info_span!("indexer_message", ?seq);
         let (msg, acker) = msg.split();
         if let Some(headers) = msg.headers {
             let parent_context = get_text_map_propagator(|p| p.extract(&NatsHeaders(&headers)));
             span.add_link(parent_context.span().span_context().clone());
         }
-        drop(_context_guard);
 
         let index_message = match IndexMessage::decode(msg.payload) {
             Ok(index_message) => index_message,
