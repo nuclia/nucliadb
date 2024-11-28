@@ -358,6 +358,30 @@ class Relations(google.protobuf.message.Message):
 global___Relations = Relations
 
 @typing.final
+class FieldRef(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    FIELD_TYPE_FIELD_NUMBER: builtins.int
+    FIELD_ID_FIELD_NUMBER: builtins.int
+    SPLIT_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    field_type: global___FieldType.ValueType
+    field_id: builtins.str
+    split: builtins.str
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        field_type: global___FieldType.ValueType = ...,
+        field_id: builtins.str = ...,
+        split: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["field_id", b"field_id", "field_type", b"field_type", "split", b"split", "uuid", b"uuid"]) -> None: ...
+
+global___FieldRef = FieldRef
+
+@typing.final
 class MessageContent(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -389,7 +413,7 @@ class MessageContent(google.protobuf.message.Message):
     @property
     def attachments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___CloudFile]: ...
     @property
-    def attachments_fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+    def attachments_fields(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldRef]:
         """Store links or fields on root resource fields to be processed as normal fields"""
 
     def __init__(
@@ -398,35 +422,11 @@ class MessageContent(google.protobuf.message.Message):
         text: builtins.str = ...,
         format: global___MessageContent.Format.ValueType = ...,
         attachments: collections.abc.Iterable[global___CloudFile] | None = ...,
-        attachments_fields: collections.abc.Iterable[builtins.str] | None = ...,
+        attachments_fields: collections.abc.Iterable[global___FieldRef] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["attachments", b"attachments", "attachments_fields", b"attachments_fields", "format", b"format", "text", b"text"]) -> None: ...
 
 global___MessageContent = MessageContent
-
-@typing.final
-class FieldRef(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    UUID_FIELD_NUMBER: builtins.int
-    FIELD_TYPE_FIELD_NUMBER: builtins.int
-    FIELD_ID_FIELD_NUMBER: builtins.int
-    SPLIT_FIELD_NUMBER: builtins.int
-    uuid: builtins.str
-    field_type: global___FieldType.ValueType
-    field_id: builtins.str
-    split: builtins.str
-    def __init__(
-        self,
-        *,
-        uuid: builtins.str = ...,
-        field_type: global___FieldType.ValueType = ...,
-        field_id: builtins.str = ...,
-        split: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["field_id", b"field_id", "field_type", b"field_type", "split", b"split", "uuid", b"uuid"]) -> None: ...
-
-global___FieldRef = FieldRef
 
 @typing.final
 class Message(google.protobuf.message.Message):
