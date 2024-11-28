@@ -83,6 +83,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldMetadata as FieldMetadata,
     FieldQuestionAnswerWrapper as FieldQuestionAnswerWrapper,
     FieldQuestionAnswers as FieldQuestionAnswers,
+    FieldRef as FieldRef,
     FieldText as FieldText,
     FieldType as FieldType,
     FileExtractedData as FileExtractedData,
