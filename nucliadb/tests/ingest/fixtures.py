@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import Optional
+from typing import Iterable, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -72,19 +72,19 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def processor(maindb_driver, storage, pubsub):
+def processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
 
 
 @pytest.fixture(scope="function")
-async def stream_processor(maindb_driver, storage, pubsub):
+def stream_processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
 
 
 @pytest.fixture(scope="function")
-async def local_files():
+def local_files():
     storage_settings.local_testing_files = f"{dirname(__file__)}"
 
 
@@ -153,7 +153,7 @@ async def pubsub(natsd):
 
 
 @pytest.fixture(scope="function")
-async def fake_node(indexing_utility, shard_manager):
+def fake_node(indexing_utility, shard_manager):
     manager.INDEX_NODES.clear()
     manager.add_index_node(
         id=str(uuid.uuid4()),

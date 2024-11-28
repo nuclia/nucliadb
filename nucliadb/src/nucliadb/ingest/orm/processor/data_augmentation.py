@@ -20,12 +20,12 @@
 
 import logging
 from dataclasses import dataclass, field
+from typing import Optional
 
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.processing import ProcessingEngine, PushPayload
-from nucliadb_protos import (
-    writer_pb2,
-)
+from nucliadb.ingest.processing import ProcessingEngine, PushPayload, Source
+from nucliadb_models.text import PushTextFormat, Text
+from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_utils.utilities import Utility, get_partitioning, get_utility
 
@@ -98,12 +98,12 @@ async def send_generated_fields_to_process(
     processing: ProcessingEngine = get_utility(Utility.PROCESSING)
 
     payload = _generate_processing_payload_for_fields(kbid, resource.uuid, generated_fields, bm)
-    processing_info = await processing.send_to_process(payload, partition)
-
-    logger.info(
-        "Sent generated fields to process",
-        extra={"processing_info": processing_info},
-    )
+    if payload is not None:
+        processing_info = await processing.send_to_process(payload, partition)
+        logger.info(
+            "Sent generated fields to process",
+            extra={"processing_info": processing_info},
+        )
 
 
 def _generate_processing_payload_for_fields(
@@ -111,12 +111,49 @@ def _generate_processing_payload_for_fields(
     rid: str,
     fields: GeneratedFields,
     bm: writer_pb2.BrokerMessage,
-) -> PushPayload:
+) -> Optional[PushPayload]:
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
 
     payload = PushPayload(kbid=kbid, uuid=rid, userid="nucliadb-ingest", partition=partition)
 
-    # TODO: implement
+    payload.kbid = bm.kbid
+    payload.uuid = rid
+    payload.source = Source.INGEST
+    payload.slug = bm.slug
 
-    return payload
+    # populate generated fields
+
+    for text in fields.texts:
+        payload.textfield[text] = _bm_text_field_to_processing(bm.texts[text])
+
+    for file in fields.files:
+        logger.warning(
+            "Ingest received a broker message from processor with a new file field! Skipping",
+            extra={"kbid": kbid, "rid": rid, "field_id": file},
+        )
+        pass
+
+    for link in fields.links:
+        logger.warning(
+            "Ingest received a broker message from processor with a new link field!",
+            extra={"kbid": kbid, "rid": rid, "field_id": link},
+        )
+        pass
+
+    for conversation in fields.conversations:
+        logger.warning(
+            "Ingest received a broker message from processor with a new conversation field! Skipping",
+            extra={"kbid": kbid, "rid": rid, "field_id": conversation},
+        )
+        pass
+
+    if len(fields.texts) > 0:
+        return payload
+    else:
+        # we don't want to send weird empty messages to processing
+        return None
+
+
+def _bm_text_field_to_processing(text_field: resources_pb2.FieldText) -> Text:
+    return Text(body=text_field.body, format=PushTextFormat(text_field.format))
