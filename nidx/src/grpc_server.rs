@@ -21,6 +21,7 @@
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tonic::service::Routes;
 
+#[cfg(feature = "telemetry")]
 use crate::telemetry;
 
 /// A tonic server that allows binding to and returning a random port.
@@ -36,10 +37,12 @@ impl GrpcServer {
     }
 
     pub async fn serve(self, routes: Routes) -> anyhow::Result<()> {
-        let telemetry_layer = telemetry::middleware::GrpcInstrumentorLayer;
-        let router = routes.into_axum_router().layer(telemetry_layer).into_make_service();
+        let router = routes.into_axum_router();
 
-        axum::serve(self.0, router).await?;
+        #[cfg(feature = "telemetry")]
+        let router = router.layer(telemetry::middleware::GrpcInstrumentorLayer);
+
+        axum::serve(self.0, router.into_make_service()).await?;
         Ok(())
     }
 }

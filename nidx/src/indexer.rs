@@ -19,7 +19,6 @@
 //
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
-use async_nats::HeaderMap;
 use futures::stream::StreamExt;
 use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
@@ -27,30 +26,16 @@ use nidx_protos::Resource;
 use nidx_protos::TypeMessage;
 use nidx_types::Seq;
 use object_store::{DynObjectStore, ObjectStore};
-use opentelemetry::global::get_text_map_propagator;
-use opentelemetry::propagation::Extractor;
-use opentelemetry::trace::TraceContextExt;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::*;
-use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use uuid::Uuid;
 
 use crate::segment_store::pack_and_upload;
 use crate::{metadata::*, Settings};
 
-struct NatsHeaders<'a>(&'a HeaderMap);
-
-impl<'a> Extractor for NatsHeaders<'a> {
-    fn get(&self, key: &str) -> Option<&str> {
-        self.0.get(key).map(|v| v.as_str())
-    }
-
-    fn keys(&self) -> Vec<&str> {
-        // Not implemented since it's not needed by zipkin propagator
-        Vec::new()
-    }
-}
+#[cfg(feature = "telemetry")]
+use crate::telemetry;
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let meta = settings.metadata.clone();
@@ -84,9 +69,10 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
 
         let span = info_span!("indexer_message", ?seq);
         let (msg, acker) = msg.split();
+
+        #[cfg(feature = "telemetry")]
         if let Some(headers) = msg.headers {
-            let parent_context = get_text_map_propagator(|p| p.extract(&NatsHeaders(&headers)));
-            span.add_link(parent_context.span().span_context().clone());
+            telemetry::set_trace_from_nats(&span, headers);
         }
 
         let index_message = match IndexMessage::decode(msg.payload) {

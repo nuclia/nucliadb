@@ -25,9 +25,13 @@ use std::time::Duration;
 
 use crate::settings::{LogFormat, TelemetrySettings};
 use log_format::StructuredFormat;
+use opentelemetry::global::get_text_map_propagator;
+use opentelemetry::propagation::Extractor;
+use opentelemetry::trace::TraceContextExt;
 use opentelemetry::{trace::TracerProvider as _, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{trace::TracerProvider, Resource};
+use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use tracing_subscriber::{filter::FilterFn, fmt, prelude::*, EnvFilter};
 
 pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
@@ -69,4 +73,22 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
     tracing_subscriber::registry().with(log_layer).with(sentry_tracing::layer()).with(otel_layer).init();
 
     Ok(())
+}
+
+struct NatsHeaders<'a>(&'a async_nats::HeaderMap);
+
+impl<'a> Extractor for NatsHeaders<'a> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.0.get(key).map(|v| v.as_str())
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        // Not implemented since it's not needed by zipkin propagator
+        Vec::new()
+    }
+}
+
+pub fn set_trace_from_nats(span: &tracing::Span, headers: async_nats::HeaderMap) {
+    let parent_context = get_text_map_propagator(|p| p.extract(&NatsHeaders(&headers)));
+    span.add_link(parent_context.span().span_context().clone());
 }
