@@ -44,7 +44,7 @@ from nucliadb_utils.utilities import has_feature
 
 consumer_observer = metrics.Observer(
     "message_processor",
-    labels={"source": "", "parition": ""},
+    labels={"source": "", "partition": ""},
     buckets=[
         0.01,
         0.025,
@@ -189,8 +189,7 @@ class IngestConsumer:
                 kbid = pb.kbid
                 try:
                     source = "writer" if pb.source == pb.MessageSource.WRITER else "processor"
-                    partition = self.partition
-                    with consumer_observer({"source": source, "partition": partition}):
+                    with consumer_observer({"source": source, "partition": self.partition}):
                         await self._process(pb, seqid)
                 except SequenceOrderViolation as err:
                     logger.log(
