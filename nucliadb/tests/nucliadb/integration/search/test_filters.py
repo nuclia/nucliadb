@@ -17,11 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
+from nucliadb.search.search.rank_fusion import LegacyRankFusion
 from nucliadb.tests.vectors import V1, V2, Q
 from nucliadb_models.labels import Label, LabelSetKind
 from nucliadb_models.search import MinScore, SearchOptions
@@ -348,16 +351,17 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         filter_paragraphs.append(FILTERS_TO_PARAGRAPHS.get(fltr, set()))
     expected_paragraphs = set.intersection(*filter_paragraphs)
 
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json=dict(
-            query="",
-            filters=filters,
-            features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
-            vector=Q,
-            min_score=MinScore(semantic=-1).model_dump(),
-        ),
-    )
+    with patch("nucliadb.search.search.find.get_rank_fusion", return_value=LegacyRankFusion(window=20)):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json=dict(
+                query="",
+                filters=filters,
+                features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
+                vector=Q,
+                min_score=MinScore(semantic=-1).model_dump(),
+            ),
+        )
     assert resp.status_code == 200, resp.text
     content = resp.json()
 

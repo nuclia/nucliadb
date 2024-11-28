@@ -107,6 +107,16 @@ class LegacyRankFusion(RankFusionAlgorithm):
         return merged
 
 
+class CombSimple(RankFusionAlgorithm):
+    @rank_fusion_observer.wrap({"type": "legacy"})
+    def _fuse(
+        self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
+    ) -> list[TextBlockMatch]:
+        merged = [*keyword, *semantic]
+        merged.sort(key=lambda r: r.score, reverse=True)
+        return merged
+
+
 class ReciprocalRankFusion(RankFusionAlgorithm):
     """Rank-based rank fusion algorithm. Discounts the weight of documents
     occurring deep in retrieved lists using a reciprocal distribution. It can be
