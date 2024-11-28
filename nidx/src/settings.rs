@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use std::ops::Deref;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -19,6 +17,9 @@ use std::ops::Deref;
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as base64;
@@ -146,6 +147,19 @@ impl Default for MergeSettings {
     }
 }
 
+#[derive(Clone, Deserialize, Debug, Default)]
+pub enum LogFormat {
+    #[default]
+    Pretty,
+    Structured,
+}
+
+#[derive(Clone, Deserialize, Debug, Default)]
+#[serde(default)]
+pub struct TelemetrySettings {
+    pub log_format: LogFormat,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct EnvSettings {
     /// Connection to the metadata database
@@ -164,6 +178,10 @@ pub struct EnvSettings {
     /// Required by scheduler
     #[serde(default)]
     pub merge: MergeSettings,
+
+    /// Telemetry configuration
+    #[serde(default)]
+    pub telemetry: TelemetrySettings,
 }
 
 impl EnvSettings {

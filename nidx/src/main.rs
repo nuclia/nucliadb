@@ -18,14 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::sync::Arc;
+mod telemetry;
 
-use nidx::{api, indexer, metrics, scheduler, searcher, worker, Settings};
+use nidx::{api, indexer, metrics, scheduler, searcher, settings::EnvSettings, worker, Settings};
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;
+use std::sync::Arc;
 use tokio::{net::TcpListener, task::JoinSet};
 use tracing::*;
-use tracing_subscriber::prelude::*;
 
 // Main wrapper needed to initialize Sentry before Tokio
 fn main() -> anyhow::Result<()> {
@@ -52,13 +52,14 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn do_main() -> anyhow::Result<()> {
-    let args: Vec<_> = std::env::args().skip(1).collect();
+    let env_settings = EnvSettings::from_env();
+    telemetry::init(&env_settings.telemetry);
 
-    tracing_subscriber::registry().with(tracing_subscriber::fmt::layer()).with(sentry_tracing::layer()).init();
-
-    let settings = Settings::from_env().await?;
+    let settings = Settings::from_env_settings(env_settings).await?;
     let mut metrics = Registry::with_prefix("nidx");
+
     let mut tasks = JoinSet::new();
+    let args: Vec<_> = std::env::args().skip(1).collect();
     args.iter().for_each(|arg| {
         match arg.as_str() {
             "indexer" => tasks.spawn(indexer::run(settings.clone())),
