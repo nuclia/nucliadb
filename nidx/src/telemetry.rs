@@ -19,28 +19,54 @@
 //
 
 mod log_format;
+pub mod middleware;
 
+use std::time::Duration;
+
+use crate::settings::{LogFormat, TelemetrySettings};
 use log_format::StructuredFormat;
-use nidx::settings::TelemetrySettings;
-use opentelemetry::trace::TracerProvider as _;
-use opentelemetry_sdk::trace::TracerProvider;
-use tracing_subscriber::prelude::*;
+use opentelemetry::{trace::TracerProvider as _, KeyValue};
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::{trace::TracerProvider, Resource};
+use tracing_subscriber::{filter::FilterFn, fmt, prelude::*, EnvFilter};
 
-pub fn init(settings: &TelemetrySettings) {
+pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
     // Configure logging format
+    let env_filter = EnvFilter::from_default_env();
     let log_layer = match settings.log_format {
-        nidx::settings::LogFormat::Pretty => tracing_subscriber::fmt::layer().boxed(),
-        nidx::settings::LogFormat::Structured => {
-            tracing_subscriber::fmt::layer().json().event_format(StructuredFormat).boxed()
-        }
+        LogFormat::Pretty => fmt::layer().with_filter(env_filter).boxed(),
+        LogFormat::Structured => fmt::layer().json().event_format(StructuredFormat).with_filter(env_filter).boxed(),
     };
 
-    // Traces go to OpenTelemetry
-    let provider =
-        TracerProvider::builder().with_simple_exporter(opentelemetry_stdout::SpanExporter::default()).build();
-    let tracer = provider.tracer("readme_example");
-    // Create a tracing layer with the configured tracer
-    let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+    // Trace propagation is done in Zipkin format (b3-* headers)
+    opentelemetry::global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
+    // Traces go to the collector in OTLP format
+    let otel_layer = if let Some(otlp_collector_address) = &settings.otlp_collector_address {
+        let otlp_exporter = opentelemetry_otlp::SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint(otlp_collector_address)
+            .with_timeout(Duration::from_secs(2))
+            .build()?;
+        let provider = TracerProvider::builder()
+            .with_batch_exporter(otlp_exporter, opentelemetry_sdk::runtime::Tokio)
+            .with_resource(Resource::new(vec![KeyValue::new("service.name", "nidx")]))
+            .build();
+        let tracer_otlp = provider.tracer("nidx");
+
+        let span_filter = FilterFn::new(|meta| meta.module_path().is_some_and(|module| module.starts_with("nidx")));
+        Some(
+            tracing_opentelemetry::layer()
+                .with_tracer(tracer_otlp)
+                .with_filter(EnvFilter::from_default_env())
+                .with_filter(span_filter),
+        )
+    } else {
+        None
+    };
+
+    // Initialize all telemetry layers
     tracing_subscriber::registry().with(log_layer).with(sentry_tracing::layer()).with(otel_layer).init();
+
+    Ok(())
 }

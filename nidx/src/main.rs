@@ -18,9 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod telemetry;
-
-use nidx::{api, indexer, metrics, scheduler, searcher, settings::EnvSettings, worker, Settings};
+use nidx::{api, indexer, metrics, scheduler, searcher, settings::EnvSettings, telemetry, worker, Settings};
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;
 use std::sync::Arc;
@@ -53,7 +51,7 @@ fn main() -> anyhow::Result<()> {
 
 async fn do_main() -> anyhow::Result<()> {
     let env_settings = EnvSettings::from_env();
-    telemetry::init(&env_settings.telemetry);
+    telemetry::init(&env_settings.telemetry)?;
 
     let settings = Settings::from_env_settings(env_settings).await?;
     let mut metrics = Registry::with_prefix("nidx");

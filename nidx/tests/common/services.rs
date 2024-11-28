@@ -57,6 +57,7 @@ impl NidxFixture {
                 metadata: MetadataSettings {
                     database_url: "ignored".to_string(),
                 },
+                telemetry: Default::default(),
             },
         };
         // API server

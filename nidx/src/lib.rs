@@ -29,5 +29,8 @@ mod segment_store;
 pub mod settings;
 pub mod worker;
 
+#[cfg(feature = "telemetry")]
+pub mod telemetry;
+
 pub use metadata::NidxMetadata;
 pub use settings::Settings;

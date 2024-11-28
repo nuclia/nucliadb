@@ -158,6 +158,7 @@ pub enum LogFormat {
 #[serde(default)]
 pub struct TelemetrySettings {
     pub log_format: LogFormat,
+    pub otlp_collector_address: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

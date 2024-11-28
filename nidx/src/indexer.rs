@@ -19,6 +19,7 @@
 //
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
+use async_nats::HeaderMap;
 use futures::stream::StreamExt;
 use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
@@ -26,13 +27,31 @@ use nidx_protos::Resource;
 use nidx_protos::TypeMessage;
 use nidx_types::Seq;
 use object_store::{DynObjectStore, ObjectStore};
+use opentelemetry::global::get_text_map_propagator;
+use opentelemetry::propagation::Extractor;
+use opentelemetry::trace::TraceContextExt;
+use opentelemetry::Context;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::*;
+use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use uuid::Uuid;
 
 use crate::segment_store::pack_and_upload;
 use crate::{metadata::*, Settings};
+
+struct NatsHeaders<'a>(&'a HeaderMap);
+
+impl<'a> Extractor for NatsHeaders<'a> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.0.get(key).map(|v| v.as_str())
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        // Not implemented since it's not needed by zipkin propagator
+        Vec::new()
+    }
+}
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let meta = settings.metadata.clone();
@@ -64,7 +83,15 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             continue;
         }
 
+        // Reset OTEL context on each message
+        let _context_guard = Context::new().attach();
+        let span = info_span!("indexer_message", ?seq);
         let (msg, acker) = msg.split();
+        if let Some(headers) = msg.headers {
+            let parent_context = get_text_map_propagator(|p| p.extract(&NatsHeaders(&headers)));
+            span.add_link(parent_context.span().span_context().clone());
+        }
+        drop(_context_guard);
 
         let index_message = match IndexMessage::decode(msg.payload) {
             Ok(index_message) => index_message,
@@ -75,7 +102,9 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
         };
 
         if let Err(e) =
-            process_index_message(&meta, indexer_storage.clone(), segment_storage.clone(), index_message, seq).await
+            process_index_message(&meta, indexer_storage.clone(), segment_storage.clone(), index_message, seq)
+                .instrument(span)
+                .await
         {
             warn!(?e, "Error processing index message");
             continue;
@@ -108,6 +137,7 @@ pub async fn process_index_message(
     }
 }
 
+#[instrument(skip(meta))]
 pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: String, seq: Seq) -> anyhow::Result<()> {
     let shard_id = Uuid::parse_str(shard_id)?;
     let indexes = Index::for_shard(&meta.pool, shard_id).await?;
@@ -122,6 +152,7 @@ pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: Stri
     Ok(())
 }
 
+#[instrument(skip(storage))]
 pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -> anyhow::Result<Resource> {
     let get_result = storage.get(&object_store::path::Path::from(storage_key)).await?;
     let bytes = get_result.bytes().await?;
@@ -130,6 +161,7 @@ pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -
     Ok(resource)
 }
 
+#[instrument(skip_all)]
 pub async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
@@ -141,8 +173,8 @@ pub async fn index_resource(
     let indexes = Index::for_shard(&meta.pool, shard_id).await?;
     let resource = Arc::new(resource);
 
-    info!(?seq, ?shard_id, "Indexing message to shard");
-
+    let rid = resource.resource.as_ref().map(|r| &r.uuid);
+    info!(?seq, ?shard_id, rid, "Indexing message to shard");
     let num_vector_indexes = indexes.iter().filter(|i| matches!(i.kind, IndexKind::Vector)).count();
     let single_vector_index = num_vector_indexes == 1;
 
@@ -156,8 +188,9 @@ pub async fn index_resource(
         let resource = Arc::clone(&resource);
         let path = output_dir.path().to_path_buf();
         let index_2 = Arc::clone(&index);
+        let span = Span::current();
         let (new_segment, deletions) = tokio::task::spawn_blocking(move || {
-            index_resource_to_index(&index_2, &resource, &path, single_vector_index)
+            span.in_scope(|| index_resource_to_index(&index_2, &resource, &path, single_vector_index))
         })
         .await??;
         let Some(new_segment) = new_segment else {

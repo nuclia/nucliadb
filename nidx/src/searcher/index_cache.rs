@@ -386,7 +386,7 @@ mod tests {
     fn test_lru() {
         let mut cache: ResourceCache<usize, usize> = ResourceCache::new_with_capacity(NonZeroUsize::new(2).unwrap());
 
-        let items = vec![Arc::new(0), Arc::new(1), Arc::new(2), Arc::new(3)];
+        let items = [Arc::new(0), Arc::new(1), Arc::new(2), Arc::new(3)];
 
         // Keeps the latest inserted ones
         cache.insert(&0, &items[0]);
