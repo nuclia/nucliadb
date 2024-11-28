@@ -26,6 +26,7 @@ from typing import Any, Optional, Union
 import nats
 import nats.errors
 from nats.aio.client import Client
+from nats.aio.errors import ErrConnectionClosed
 from nats.js.client import JetStreamContext
 
 from nucliadb_protos.writer_pb2 import (
@@ -58,7 +59,7 @@ class MaxTransactionSizeExceededError(Exception):
     pass
 
 
-class StreamingServerTimeoutError(Exception):
+class StreamingServerError(Exception):
     pass
 
 
@@ -199,7 +200,13 @@ class TransactionUtility:
         request_id = uuid.uuid4().hex
 
         if wait:
-            waiting_event = await self.wait_for_commited(writer.kbid, waiting_for, request_id=request_id)
+            try:
+                waiting_event = await self.wait_for_commited(
+                    writer.kbid, waiting_for, request_id=request_id
+                )
+            except ErrConnectionClosed:
+                logger.error("Connection to NATS is closed")
+                raise StreamingServerError()
 
         if target_subject is None:
             target_subject = const.Streams.INGEST.subject.format(partition=partition)
@@ -217,7 +224,7 @@ class TransactionUtility:
                     "resource": writer.uuid,
                 },
             )
-            raise StreamingServerTimeoutError() from ex
+            raise StreamingServerError() from ex
 
         waiting_for.seq = res.seq
 
