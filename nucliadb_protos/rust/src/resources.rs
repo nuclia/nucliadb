@@ -262,13 +262,11 @@ pub struct Relations {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldRef {
-    #[prost(string, tag = "1")]
-    pub uuid: ::prost::alloc::string::String,
-    #[prost(enumeration = "FieldType", tag = "2")]
+    #[prost(enumeration = "FieldType", tag = "1")]
     pub field_type: i32,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag = "2")]
     pub field_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "4")]
+    #[prost(string, tag = "3")]
     pub split: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]

@@ -54,7 +54,10 @@ TEST_CONVERSATION_PAYLOAD = {
             "content": {
                 "text": "Hi people!",
                 "format": "PLAIN",
-                "files": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")],
+                "attachments": [
+                    load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")
+                ],
+                "attachments_fields": [{"field_type": "file", "field_id": "file"}],
             },
             "ident": "message_id_001",
         }
@@ -82,7 +85,9 @@ TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
         "content": {
             "text": "Hi people!",
             "format": "PLAIN",
-            "attachments": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")],
+            "attachments": [
+                load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")
+            ],
         },
         "ident": "message_id_001",
     }
@@ -209,11 +214,15 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
         rid = data["uuid"]
 
         # Text
-        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1")
+        resp = await client.delete(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1"
+        )
         assert resp.status_code == 204
 
         # Link
-        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1")
+        resp = await client.delete(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1"
+        )
         assert resp.status_code == 204
 
         # Conversation
@@ -222,7 +231,9 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
         )
 
         # File
-        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1")
+        resp = await client.delete(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1"
+        )
         assert resp.status_code == 204
 
 

@@ -113,10 +113,9 @@ message Relations {
 }
 
 message FieldRef {
-    string uuid = 1;
-    FieldType field_type = 2;
-    string field_id = 3;
-    string split = 4;
+    FieldType field_type = 1;
+    string field_id = 2;
+    string split = 3;
 }
 
 message MessageContent {

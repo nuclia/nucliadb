@@ -112,7 +112,9 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             parsed_text["format"] = models.PushTextFormat[parsed_text["format"]]
             toprocess.textfield[field_id] = models.Text(**parsed_text)
 
-        if field_type_name is FieldTypeName.CONVERSATION and isinstance(field, Conversation):
+        if field_type_name is FieldTypeName.CONVERSATION and isinstance(
+            field, Conversation
+        ):
             metadata = await field.get_metadata()
             if metadata.pages == 0:
                 continue
@@ -133,10 +135,16 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                         await processing.convert_internal_cf_to_str(cf, storage)
                         for cf in message.content.attachments
                     ]
-                    parsed_message["content"]["format"] = resources_pb2.MessageContent.Format.Value(
+                    if "attachments_fields" in parsed_message["content"]:
+                        del parsed_message["content"]["attachments_fields"]
+                    parsed_message["content"][
+                        "format"
+                    ] = resources_pb2.MessageContent.Format.Value(
                         parsed_message["content"]["format"]
                     )
-                    full_conversation.messages.append(models.PushMessage(**parsed_message))
+                    full_conversation.messages.append(
+                        models.PushMessage(**parsed_message)
+                    )
             toprocess.conversationfield[field_id] = full_conversation
 
 
@@ -149,7 +157,9 @@ async def parse_fields(
     x_skip_store: bool,
 ):
     for key, file_field in item.files.items():
-        await parse_file_field(key, file_field, writer, toprocess, kbid, uuid, skip_store=x_skip_store)
+        await parse_file_field(
+            key, file_field, writer, toprocess, kbid, uuid, skip_store=x_skip_store
+        )
 
     for key, link_field in item.links.items():
         parse_link_field(key, link_field, writer, toprocess)
@@ -158,7 +168,9 @@ async def parse_fields(
         parse_text_field(key, text_field, writer, toprocess)
 
     for key, conversation_field in item.conversations.items():
-        await parse_conversation_field(key, conversation_field, writer, toprocess, kbid, uuid)
+        await parse_conversation_field(
+            key, conversation_field, writer, toprocess, kbid, uuid
+        )
 
 
 def parse_text_field(
@@ -168,7 +180,9 @@ def parse_text_field(
     toprocess: PushPayload,
 ) -> None:
     writer.texts[key].body = text_field.body
-    writer.texts[key].format = resources_pb2.FieldText.Format.Value(text_field.format.value)
+    writer.texts[key].format = resources_pb2.FieldText.Format.Value(
+        text_field.format.value
+    )
     etw = resources_pb2.ExtractedTextWrapper()
     etw.field.field = key
     etw.field.field_type = resources_pb2.FieldType.TEXT
@@ -327,7 +341,9 @@ async def parse_conversation_field(
         )
 
         cm.content.text = message.content.text
-        cm.content.format = resources_pb2.MessageContent.Format.Value(message.content.format.value)
+        cm.content.format = resources_pb2.MessageContent.Format.Value(
+            message.content.format.value
+        )
 
         for count, file in enumerate(message.content.attachments):
             sf_conv_field: StorageField = storage.conversation_field(
