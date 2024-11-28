@@ -36,6 +36,16 @@ message CloudFile {
 }
 
 
+enum FieldType {
+    reserved 2, 3, 5;
+
+    FILE = 0;
+    LINK = 1;
+    TEXT = 4;
+    GENERIC = 6;  // Base title/summary fields
+    CONVERSATION = 7;
+}
+
 message Basic {
     enum QueueType {
         PRIVATE = 0;
@@ -102,6 +112,13 @@ message Relations {
     repeated utils.Relation relations = 1;
 }
 
+message FieldRef {
+    string uuid = 1;
+    FieldType field_type = 2;
+    string field_id = 3;
+    string split = 4;
+}
+
 message MessageContent {
     enum Format {
         PLAIN = 0;
@@ -113,7 +130,10 @@ message MessageContent {
     string text = 1;
     Format format = 2;
     repeated CloudFile attachments = 4;
+    // Store links or fields on root resource fields to be processed as normal fields
+    repeated FieldRef attachments_fields = 5;
 }
+
 
 message Message {
     google.protobuf.Timestamp timestamp = 1;
@@ -562,15 +582,6 @@ message RowsPreview {
     map<string, Sheet> sheets = 1;
 }
 
-enum FieldType {
-    reserved 2, 3, 5;
-
-    FILE = 0;
-    LINK = 1;
-    TEXT = 4;
-    GENERIC = 6;  // Base title/summary fields
-    CONVERSATION = 7;
-}
 
 message FieldID {
     FieldType field_type = 1;

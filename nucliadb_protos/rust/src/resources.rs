@@ -261,6 +261,18 @@ pub struct Relations {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldRef {
+    #[prost(string, tag = "1")]
+    pub uuid: ::prost::alloc::string::String,
+    #[prost(enumeration = "FieldType", tag = "2")]
+    pub field_type: i32,
+    #[prost(string, tag = "3")]
+    pub field_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub split: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MessageContent {
     #[prost(string, tag = "1")]
     pub text: ::prost::alloc::string::String,
@@ -268,6 +280,9 @@ pub struct MessageContent {
     pub format: i32,
     #[prost(message, repeated, tag = "4")]
     pub attachments: ::prost::alloc::vec::Vec<CloudFile>,
+    /// Store links or fields on root resource fields to be processed as normal fields
+    #[prost(message, repeated, tag = "5")]
+    pub attachments_fields: ::prost::alloc::vec::Vec<FieldRef>,
 }
 /// Nested message and enum types in `MessageContent`.
 pub mod message_content {
