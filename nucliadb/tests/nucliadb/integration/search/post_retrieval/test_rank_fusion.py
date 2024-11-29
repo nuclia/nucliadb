@@ -27,7 +27,6 @@ from nucliadb.search.search import find, find_merge
 from nucliadb_models.search import (
     SCORE_TYPE,
     KnowledgeboxFindResults,
-    LegacyRankFusion,
     ReciprocalRankFusion,
     RerankerName,
 )
@@ -36,7 +35,6 @@ from nucliadb_models.search import (
 @pytest.mark.parametrize(
     "rank_fusion,expected_score_types",
     [
-        (LegacyRankFusion().model_dump(), {SCORE_TYPE.BM25}),
         (ReciprocalRankFusion().model_dump(), {SCORE_TYPE.RANK_FUSION}),
     ],
 )

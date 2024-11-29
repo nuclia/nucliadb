@@ -34,9 +34,6 @@ class RankFusion(BaseModel):
     window: int = Field(le=500)
 
 
-class LegacyRankFusion(RankFusion): ...
-
-
 class ReciprocalRankFusion(RankFusion):
     k: float = Field(default=60.0)
     boosting: search_models.ReciprocalRankFusionWeights = Field(

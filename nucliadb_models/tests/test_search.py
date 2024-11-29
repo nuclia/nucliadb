@@ -95,11 +95,8 @@ def test_find_request_fulltext_feature_not_allowed():
 @pytest.mark.parametrize(
     "rank_fusion,expected",
     [
-        ("legacy", search.RankFusionName.LEGACY),
         ("rrf", search.RankFusionName.RECIPROCAL_RANK_FUSION),
-        (search.RankFusionName.LEGACY, search.RankFusionName.LEGACY),
         (search.RankFusionName.RECIPROCAL_RANK_FUSION, search.RankFusionName.RECIPROCAL_RANK_FUSION),
-        (search.LegacyRankFusion(), search.LegacyRankFusion()),
         (search.ReciprocalRankFusion(), search.ReciprocalRankFusion()),
     ],
 )
