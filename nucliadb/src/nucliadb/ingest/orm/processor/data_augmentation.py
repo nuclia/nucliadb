@@ -20,13 +20,13 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Sequence
 
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import ProcessingEngine, PushPayload, Source
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_protos import resources_pb2, writer_pb2
-from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.resources_pb2 import FieldID, FieldType
 from nucliadb_utils.utilities import Utility, get_partitioning, get_utility
 
 logger = logging.getLogger("ingest-processor")
@@ -61,20 +61,38 @@ async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource)
 
     # search all fields
 
+    all_fields = await resource.get_all_field_ids(for_update=False)
+    fields: Sequence[FieldID]
+    if all_fields is None:
+        logger.warning(
+            "Trying to compute generated fields but all_fields key is missing!",
+            extra={
+                "kbid": bm.kbid,
+                "rid": resource.uuid,
+            },
+        )
+        fields = []
+    else:
+        fields = all_fields.fields
+
     for field_id in bm.texts:
-        if not resource.has_field(FieldType.TEXT, field_id):
+        field = FieldID(field_type=FieldType.TEXT, field=field_id)
+        if field not in fields:
             generated_fields.texts.append(field_id)
 
     for field_id in bm.links:
-        if not resource.has_field(FieldType.LINK, field_id):
+        field = FieldID(field_type=FieldType.LINK, field=field_id)
+        if field not in fields:
             generated_fields.links.append(field_id)
 
     for field_id in bm.files:
-        if not resource.has_field(FieldType.FILE, field_id):
+        field = FieldID(field_type=FieldType.FILE, field=field_id)
+        if field not in fields:
             generated_fields.files.append(field_id)
 
     for field_id in bm.conversations:
-        if not resource.has_field(FieldType.CONVERSATION, field_id):
+        field = FieldID(field_type=FieldType.CONVERSATION, field=field_id)
+        if field not in fields:
             generated_fields.conversations.append(field_id)
 
     return generated_fields
