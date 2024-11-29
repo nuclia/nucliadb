@@ -34,6 +34,7 @@ from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
+    InvalidBrokerMessage,
     ResourceNotIndexable,
     SequenceOrderViolation,
 )
@@ -301,8 +302,7 @@ class Processor:
                             )
 
                     else:
-                        # TODO: use a more concrete exception
-                        raise Exception(f"Unknown broker message source {message.source}")
+                        raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
 
                     # apply changes from the broker message to the resource
                     await self.apply_resource(message, resource, update=(not created))
