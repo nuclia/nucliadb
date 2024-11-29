@@ -162,9 +162,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
                 id = result.paragraph_id
                 score, score_type = scores.setdefault(id, (0, result.score_type))
                 score += 1 / (self._k + i) * boost
-                if (score_type == SCORE_TYPE.BM25 and result.score_type == SCORE_TYPE.VECTOR) or (
-                    score_type == SCORE_TYPE.VECTOR and result.score_type == SCORE_TYPE.BM25
-                ):
+                if {score_type, result.score_type} == {SCORE_TYPE.BM25, SCORE_TYPE.VECTOR}:
                     score_type = SCORE_TYPE.BOTH
                 scores[id] = (score, score_type)
 
