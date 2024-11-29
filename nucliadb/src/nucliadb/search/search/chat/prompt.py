@@ -774,10 +774,10 @@ async def conversation_prompt_context(
 
                 if conversational_strategy.attachments_images and visual_llm:
                     for attachment in attachments:
-                        field: File = await resource.get_field(
+                        file_field: File = await resource.get_field(
                             attachment.field_id, attachment.field_type, load=True
                         )  # type: ignore
-                        field_metadata = await field.get_field_metadata()
+                        field_metadata = await file_field.get_field_metadata()
                         if field_metadata is not None and field_metadata.metadata.mime_type.startswith(
                             "image"
                         ):
