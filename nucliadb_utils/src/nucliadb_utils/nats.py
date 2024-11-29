@@ -169,6 +169,7 @@ class NatsConnectionManager:
                 pass
             await self._nc.close()
             self._subscriptions = []
+            self._pull_subscriptions = {}
 
     async def disconnected_cb(self) -> None:
         logger.info("Disconnected from NATS!")
@@ -235,6 +236,39 @@ class NatsConnectionManager:
         self._subscriptions.append((sub, subscription_lost_cb))
 
         return sub
+
+    async def pull_subscribe(
+        self,
+        *,
+        subject: str,
+        stream: str,
+        durable: Optional[str] = None,
+        cb: Callable[[Msg], Awaitable[None]],
+        config: Optional[nats.js.api.ConsumerConfig] = None,
+    ) -> None:
+        pull_sub = await self.js.pull_subscribe(
+            stream=stream,
+            subject=subject,
+            durable=durable,
+            config=config,
+        )
+        max_ack_pending = (config.max_ack_pending if config else 0) or 1
+
+        async def consume(pull_sub: JetStreamContext.PullSubscription):
+            while True:
+                try:
+                    messages = await pull_sub.fetch(max_ack_pending)
+                    for message in messages:
+                        await cb(message)
+                except asyncio.CancelledError:
+                    break
+                except TimeoutError:
+                    pass
+                except Exception:
+                    logger.exception("Error in pull_subscribe task")
+
+        task = asyncio.create_task(consume(pull_sub), name=f"pull_subscribe_{subject}")
+        self._pull_subscriptions[subject] = (pull_sub, task)
 
     async def _remove_subscription(self, subscription: Subscription):
         async with self._lock:
