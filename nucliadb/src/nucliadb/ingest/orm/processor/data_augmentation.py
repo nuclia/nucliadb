@@ -39,13 +39,18 @@ class GeneratedFields:
     files: list[str] = field(default_factory=list)
     conversations: list[str] = field(default_factory=list)
 
-    def __len__(self):
-        return len(self.texts) + len(self.links) + len(self.files) + len(self.conversations)
+    def is_empty(self) -> bool:
+        return (
+            len(self.texts) > 0
+            or len(self.links) > 0
+            or len(self.files) > 0
+            or len(self.conversations) > 0
+        )
 
 
 async def has_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource) -> bool:
     generated_fields = await _get_generated_fields(bm, resource)
-    return len(generated_fields) > 0
+    return generated_fields.is_empty()
 
 
 async def _get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource) -> GeneratedFields:
