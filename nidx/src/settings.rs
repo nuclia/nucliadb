@@ -155,10 +155,17 @@ pub enum LogFormat {
 }
 
 #[derive(Clone, Deserialize, Debug, Default)]
+pub struct SentryConfig {
+    pub dsn: String,
+    pub environment: String,
+}
+
+#[derive(Clone, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct TelemetrySettings {
     pub log_format: LogFormat,
     pub otlp_collector_address: Option<String>,
+    pub sentry: Option<SentryConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

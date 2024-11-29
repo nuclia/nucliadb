@@ -27,9 +27,12 @@ use tracing::*;
 
 // Main wrapper needed to initialize Sentry before Tokio
 fn main() -> anyhow::Result<()> {
-    let sentry_options = if let Ok(dsn) = std::env::var("SENTRY_DSN") {
+    let env_settings = EnvSettings::from_env();
+
+    let sentry_options = if let Some(sentry) = &env_settings.telemetry.sentry {
         sentry::ClientOptions {
-            dsn: dsn.into_dsn()?,
+            dsn: sentry.dsn.clone().into_dsn()?,
+            environment: Some(sentry.environment.clone().into()),
             release: sentry::release_name!(),
             ..Default::default()
         }
@@ -46,11 +49,10 @@ fn main() -> anyhow::Result<()> {
     };
     let _guard = sentry::init(sentry_options);
 
-    tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(do_main())
+    tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(do_main(env_settings))
 }
 
-async fn do_main() -> anyhow::Result<()> {
-    let env_settings = EnvSettings::from_env();
+async fn do_main(env_settings: EnvSettings) -> anyhow::Result<()> {
     telemetry::init(&env_settings.telemetry)?;
 
     let settings = Settings::from_env_settings(env_settings).await?;
