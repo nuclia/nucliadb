@@ -19,7 +19,7 @@
 #
 import base64
 import uuid
-from typing import AsyncIterator, Iterable, Optional
+from typing import AsyncIterator, Iterable
 from unittest.mock import patch
 
 import pytest
@@ -81,7 +81,6 @@ async def test_send_to_process_generated_fields(
     processor: Processor,
     partition_utility: PartitionUtility,
     processing_utility: DummyProcessingEngine,
-    climbing_export_path: Optional[str],
 ):
     kbid = knowledgebox_ingest
     rid = uuid.uuid4().hex
