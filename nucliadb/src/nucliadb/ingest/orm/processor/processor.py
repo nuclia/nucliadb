@@ -296,7 +296,7 @@ class Processor:
                             ...
 
                         generated_fields = await get_generated_fields(message, resource)
-                        if not generated_fields.is_empty():
+                        if generated_fields.is_not_empty():
                             await send_generated_fields_to_process(
                                 kbid, resource, generated_fields, message
                             )

@@ -39,8 +39,8 @@ class GeneratedFields:
     files: list[str] = field(default_factory=list)
     conversations: list[str] = field(default_factory=list)
 
-    def is_empty(self) -> bool:
-        return (len(self.texts) + len(self.links) + len(self.files) + len(self.conversations)) == 0
+    def is_not_empty(self) -> bool:
+        return (len(self.texts) + len(self.links) + len(self.files) + len(self.conversations)) > 0
 
 
 async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource) -> GeneratedFields:
