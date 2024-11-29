@@ -363,7 +363,7 @@ class KBShardManager:
             indexpb.kbid = kb
             await indexing.index(indexpb, node_id)
 
-        if nidx is not None:
+        if nidx is not None and shard.nidx_shard_id:
             nidxpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
             nidxpb.shard = shard.nidx_shard_id
             nidxpb.resource = uuid
@@ -417,7 +417,7 @@ class KBShardManager:
             indexpb.shard = replica_id
             await indexing.index(indexpb, node_id)
 
-        if nidx is not None:
+        if nidx is not None and shard.nidx_shard_id:
             indexpb.shard = shard.nidx_shard_id
             await nidx.index(indexpb)
 
@@ -529,7 +529,7 @@ class StandaloneKBShardManager(KBShardManager):
             )
 
         nidx = get_nidx()
-        if nidx is not None:
+        if nidx is not None and shard.nidx_shard_id:
             indexpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
             indexpb.shard = shard.nidx_shard_id
             indexpb.resource = uuid
@@ -563,7 +563,7 @@ class StandaloneKBShardManager(KBShardManager):
             )
 
         nidx = get_nidx()
-        if nidx is not None:
+        if nidx is not None and shard.nidx_shard_id:
             storage = await get_storage()
             indexpb = IndexMessage()
             storage_key = await storage.indexing(
