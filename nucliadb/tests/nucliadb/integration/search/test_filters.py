@@ -24,7 +24,7 @@ from httpx import AsyncClient
 
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
-from nucliadb.search.search.rank_fusion import LegacyRankFusion
+from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb.tests.vectors import V1, V2, Q
 from nucliadb_models.labels import Label, LabelSetKind
 from nucliadb_models.search import MinScore, SearchOptions
@@ -351,7 +351,9 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         filter_paragraphs.append(FILTERS_TO_PARAGRAPHS.get(fltr, set()))
     expected_paragraphs = set.intersection(*filter_paragraphs)
 
-    with patch("nucliadb.search.search.find.get_rank_fusion", return_value=LegacyRankFusion(window=20)):
+    with patch(
+        "nucliadb.search.search.find.get_rank_fusion", return_value=ReciprocalRankFusion(window=20)
+    ):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
             json=dict(
