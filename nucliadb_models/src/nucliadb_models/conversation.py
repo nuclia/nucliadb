@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, List, Optional, Type, TypeVar
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
 
-from nucliadb_models import CloudLink, FileB64, FieldRef
+from nucliadb_models import CloudLink, FieldRef, FileB64
 from nucliadb_models.utils import DateTime
 from nucliadb_protos import resources_pb2
 
