@@ -1604,7 +1604,6 @@ class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
     BOTH = "BOTH"
-    RANK_FUSION = "RANK_FUSION"
     RERANKER = "RERANKER"
 
 

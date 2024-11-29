@@ -35,7 +35,8 @@ from nucliadb_models.search import (
 @pytest.mark.parametrize(
     "rank_fusion,expected_score_types",
     [
-        (ReciprocalRankFusion().model_dump(), {SCORE_TYPE.RANK_FUSION}),
+        # TODO: use better data and add here BOTH and VECTOR
+        (ReciprocalRankFusion().model_dump(), {SCORE_TYPE.BM25}),
     ],
 )
 async def test_rank_fusion(
