@@ -46,10 +46,10 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
     opentelemetry::global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
     // Traces go to the collector in OTLP format
-    let otel_layer = if let Some(otlp_collector_address) = &settings.otlp_collector_address {
+    let otel_layer = if let Some(otlp_collector_url) = &settings.otlp_collector_url {
         let otlp_exporter = opentelemetry_otlp::SpanExporter::builder()
             .with_tonic()
-            .with_endpoint(otlp_collector_address)
+            .with_endpoint(otlp_collector_url)
             .with_timeout(Duration::from_secs(2))
             .build()?;
         let provider = TracerProvider::builder()

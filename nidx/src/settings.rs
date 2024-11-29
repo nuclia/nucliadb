@@ -164,7 +164,7 @@ pub struct SentryConfig {
 #[serde(default)]
 pub struct TelemetrySettings {
     pub log_format: LogFormat,
-    pub otlp_collector_address: Option<String>,
+    pub otlp_collector_url: Option<String>,
     pub sentry: Option<SentryConfig>,
 }
 
