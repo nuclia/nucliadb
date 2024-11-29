@@ -42,7 +42,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.processor.auditing import collect_audit_fields
 from nucliadb.ingest.orm.processor.data_augmentation import (
-    has_generated_fields,
+    get_generated_fields,
     send_generated_fields_to_process,
 )
 from nucliadb.ingest.orm.resource import Resource
@@ -294,8 +294,11 @@ class Processor:
                             # It's an update from processor for an existing resource
                             ...
 
-                        if await has_generated_fields(message, resource):
-                            await send_generated_fields_to_process(kbid, resource, message)
+                        generated_fields = await get_generated_fields(message, resource)
+                        if not generated_fields.is_empty():
+                            await send_generated_fields_to_process(
+                                kbid, resource, generated_fields, message
+                            )
 
                     else:
                         # TODO: use a more concrete exception

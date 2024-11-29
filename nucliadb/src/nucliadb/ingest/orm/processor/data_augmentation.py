@@ -48,12 +48,7 @@ class GeneratedFields:
         )
 
 
-async def has_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource) -> bool:
-    generated_fields = await _get_generated_fields(bm, resource)
-    return generated_fields.is_empty()
-
-
-async def _get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource) -> GeneratedFields:
+async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource) -> GeneratedFields:
     """Processing can send messages with generated fields. Those can be
     generated with a data augmentation task and, as learning can't queue it to
     process, nucliadb is responsible to send the generated field to process (and
@@ -93,10 +88,9 @@ async def _get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource
 async def send_generated_fields_to_process(
     kbid: str,
     resource: Resource,
+    generated_fields: GeneratedFields,
     bm: writer_pb2.BrokerMessage,
 ):
-    generated_fields = await _get_generated_fields(bm, resource)
-
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, resource.uuid)
 
