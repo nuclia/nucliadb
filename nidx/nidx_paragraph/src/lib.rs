@@ -46,6 +46,7 @@ use tantivy::{
     schema::{Field, Schema},
     Term,
 };
+use tracing::instrument;
 
 pub struct ParagraphIndexer;
 
@@ -77,6 +78,7 @@ impl ParagraphDeletionQueryBuilder {
 }
 
 impl ParagraphIndexer {
+    #[instrument(name = "paragraph::index_resource", skip_all)]
     pub fn index_resource(
         &self,
         output_dir: &Path,
@@ -93,6 +95,7 @@ impl ParagraphIndexer {
         resource.paragraphs_to_delete.clone()
     }
 
+    #[instrument(name = "paragraph::merge", skip_all)]
     pub fn merge(
         &self,
         work_dir: &Path,
@@ -120,6 +123,7 @@ pub struct ParagraphSearcher {
 }
 
 impl ParagraphSearcher {
+    #[instrument(name = "paragraph::open", skip_all)]
     pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
         let schema = ParagraphSchema::new().schema;
         let index = open_index_with_deletions(schema.clone(), open_index, ParagraphDeletionQueryBuilder::new(&schema))?;
@@ -133,6 +137,7 @@ impl ParagraphSearcher {
         })
     }
 
+    #[instrument(name = "paragraph::search", skip_all)]
     pub fn search(
         &self,
         request: &ParagraphSearchRequest,
@@ -141,6 +146,7 @@ impl ParagraphSearcher {
         self.reader.search(request, context)
     }
 
+    #[instrument(name = "paragraph::suggest", skip_all)]
     pub fn suggest(&self, request: &SuggestRequest) -> anyhow::Result<ParagraphSearchResponse> {
         self.reader.suggest(request)
     }

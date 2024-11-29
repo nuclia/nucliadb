@@ -28,6 +28,7 @@ use nidx_text::{
     TextSearcher,
 };
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator, QueryContext};
+use tracing::{instrument, Span};
 
 use crate::{
     metadata::{Index, IndexKind},
@@ -47,6 +48,7 @@ const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 ///
 /// TODO: review implementation. Timestamps are not used and we are probably
 /// filtering twice in the prefilter and paragraphs filter
+#[instrument(skip_all)]
 pub async fn suggest(
     meta: &NidxMetadata,
     index_cache: Arc<IndexCache>,
@@ -64,13 +66,16 @@ pub async fn suggest(
     let relation_index = Index::find(&meta.pool, shard_id, IndexKind::Relation, "relation").await?;
     let relation_searcher_arc = index_cache.get(&relation_index.id).await?;
 
+    let current = Span::current();
     let suggest_results = tokio::task::spawn_blocking(move || {
-        blocking_suggest(
-            request,
-            text_searcher_arc.as_ref().into(),
-            paragraph_searcher_arc.as_ref().into(),
-            relation_searcher_arc.as_ref().into(),
-        )
+        current.in_scope(|| {
+            blocking_suggest(
+                request,
+                text_searcher_arc.as_ref().into(),
+                paragraph_searcher_arc.as_ref().into(),
+                relation_searcher_arc.as_ref().into(),
+            )
+        })
     })
     .await??;
 
@@ -141,13 +146,15 @@ fn blocking_suggest(
 
     std::thread::scope(|scope| {
         if let Some(task) = paragraph_task {
+            let current = Span::current();
             let rparagraph = &mut rparagraph;
-            scope.spawn(move || *rparagraph = Some(task()));
+            scope.spawn(move || *rparagraph = Some(current.in_scope(task)));
         }
 
         if let Some(task) = relation_task {
+            let current = Span::current();
             let rrelation = &mut rrelation;
-            scope.spawn(move || *rrelation = Some(task()));
+            scope.spawn(move || *rrelation = Some(current.in_scope(task)));
         }
     });
 

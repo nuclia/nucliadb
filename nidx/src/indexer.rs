@@ -34,6 +34,9 @@ use uuid::Uuid;
 use crate::segment_store::pack_and_upload;
 use crate::{metadata::*, Settings};
 
+#[cfg(feature = "telemetry")]
+use crate::telemetry;
+
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let meta = settings.metadata.clone();
 
@@ -52,7 +55,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
         let info = match msg.info() {
             Ok(info) => info,
             Err(e) => {
-                error!("Invalid NATS message {e:?}, skipping");
+                error!(?e, "Invalid NATS message, skipping");
                 let _ = msg.ack().await;
                 continue;
             }
@@ -64,22 +67,33 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             continue;
         }
 
+        let span = info_span!("indexer_message", ?seq);
         let (msg, acker) = msg.split();
 
-        let Ok(index_message) = IndexMessage::decode(msg.payload) else {
-            warn!("Error decoding index message");
-            continue;
+        #[cfg(feature = "telemetry")]
+        if let Some(headers) = msg.headers {
+            telemetry::set_trace_from_nats(&span, headers);
+        }
+
+        let index_message = match IndexMessage::decode(msg.payload) {
+            Ok(index_message) => index_message,
+            Err(e) => {
+                warn!(?e, "Error decoding index message");
+                continue;
+            }
         };
 
         if let Err(e) =
-            process_index_message(&meta, indexer_storage.clone(), segment_storage.clone(), index_message, seq).await
+            process_index_message(&meta, indexer_storage.clone(), segment_storage.clone(), index_message, seq)
+                .instrument(span)
+                .await
         {
-            warn!("Error processing index message {e:?}");
+            warn!(?e, "Error processing index message");
             continue;
         }
 
         if let Err(e) = acker.ack().await {
-            warn!("Error acking index message {e:?}");
+            warn!(?e, "Error acking index message");
             continue;
         }
 
@@ -105,6 +119,7 @@ pub async fn process_index_message(
     }
 }
 
+#[instrument(skip(meta))]
 pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: String, seq: Seq) -> anyhow::Result<()> {
     let shard_id = Uuid::parse_str(shard_id)?;
     let indexes = Index::for_shard(&meta.pool, shard_id).await?;
@@ -119,6 +134,7 @@ pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: Stri
     Ok(())
 }
 
+#[instrument(skip(storage))]
 pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -> anyhow::Result<Resource> {
     let get_result = storage.get(&object_store::path::Path::from(storage_key)).await?;
     let bytes = get_result.bytes().await?;
@@ -127,6 +143,7 @@ pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -
     Ok(resource)
 }
 
+#[instrument(skip_all)]
 pub async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
@@ -138,8 +155,8 @@ pub async fn index_resource(
     let indexes = Index::for_shard(&meta.pool, shard_id).await?;
     let resource = Arc::new(resource);
 
-    info!(?seq, ?shard_id, "Indexing message to shard");
-
+    let rid = resource.resource.as_ref().map(|r| &r.uuid);
+    info!(?seq, ?shard_id, rid, "Indexing message to shard");
     let num_vector_indexes = indexes.iter().filter(|i| matches!(i.kind, IndexKind::Vector)).count();
     let single_vector_index = num_vector_indexes == 1;
 
@@ -153,8 +170,9 @@ pub async fn index_resource(
         let resource = Arc::clone(&resource);
         let path = output_dir.path().to_path_buf();
         let index_2 = Arc::clone(&index);
+        let span = Span::current();
         let (new_segment, deletions) = tokio::task::spawn_blocking(move || {
-            index_resource_to_index(&index_2, &resource, &path, single_vector_index)
+            span.in_scope(|| index_resource_to_index(&index_2, &resource, &path, single_vector_index))
         })
         .await??;
         let Some(new_segment) = new_segment else {

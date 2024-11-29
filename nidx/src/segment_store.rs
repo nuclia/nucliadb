@@ -25,6 +25,7 @@ use futures::TryStreamExt;
 use object_store::DynObjectStore;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::SyncIoBridge;
+use tracing::*;
 
 use crate::metadata::SegmentId;
 
@@ -64,6 +65,7 @@ where
     }
 }
 
+#[instrument(skip(storage))]
 pub async fn pack_and_upload(
     storage: Arc<DynObjectStore>,
     local_path: &Path,

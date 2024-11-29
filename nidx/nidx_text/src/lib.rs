@@ -44,6 +44,7 @@ use tantivy::{
     query::{Query, TermSetQuery},
     Term,
 };
+use tracing::instrument;
 
 pub struct TextIndexer;
 
@@ -55,6 +56,7 @@ impl DeletionQueryBuilder for TextDeletionQueryBuilder {
 }
 
 impl TextIndexer {
+    #[instrument(name = "text::index_resource", skip_all)]
     pub fn index_resource(
         &self,
         output_dir: &Path,
@@ -71,6 +73,7 @@ impl TextIndexer {
         vec![resource.resource.as_ref().unwrap().uuid.clone()]
     }
 
+    #[instrument(name = "text::merge", skip_all)]
     pub fn merge(
         &self,
         work_dir: &Path,
@@ -98,6 +101,7 @@ pub struct TextSearcher {
 }
 
 impl TextSearcher {
+    #[instrument(name = "text::open", skip_all)]
     pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
         let schema = TextSchema::new().schema;
         let index = open_index_with_deletions(
@@ -115,6 +119,7 @@ impl TextSearcher {
         })
     }
 
+    #[instrument(name = "text::search", skip_all)]
     pub fn search(
         &self,
         request: &DocumentSearchRequest,
@@ -123,6 +128,7 @@ impl TextSearcher {
         self.reader.search(request, context)
     }
 
+    #[instrument(name = "text::prefilter", skip_all)]
     pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
         self.reader.prefilter(request)
     }

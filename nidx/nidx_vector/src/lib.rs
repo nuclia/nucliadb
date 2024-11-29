@@ -39,6 +39,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 use thiserror::Error;
+use tracing::instrument;
 
 pub use data_point_provider::reader::VectorsContext;
 pub use indexer::SEGMENT_TAGS;
@@ -53,6 +54,7 @@ type VectorSegmentMetadata = SegmentMetadata<VectorSegmentMeta>;
 pub struct VectorIndexer;
 
 impl VectorIndexer {
+    #[instrument(name = "vector::index_resource", skip_all)]
     pub fn index_resource(
         &self,
         output_dir: &Path,
@@ -69,6 +71,7 @@ impl VectorIndexer {
         resource.sentences_to_delete.clone()
     }
 
+    #[instrument(name = "vector::merge", skip_all)]
     pub fn merge(
         &self,
         work_dir: &Path,
@@ -115,6 +118,7 @@ pub struct VectorSearcher {
 }
 
 impl VectorSearcher {
+    #[instrument(name = "vector::open", skip_all)]
     pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> anyhow::Result<Self> {
         let mut delete_log = DTrie::new();
 
@@ -127,6 +131,7 @@ impl VectorSearcher {
         })
     }
 
+    #[instrument(name = "vector::search", skip_all)]
     pub fn search(
         &self,
         request: &VectorSearchRequest,
