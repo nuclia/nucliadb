@@ -38,6 +38,7 @@ from nucliadb.common.datamanagers.resources import (
 from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.external_index_providers.pinecone import PineconeIndexManager
 from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
@@ -325,6 +326,8 @@ class KnowledgeBox:
         need to delete the kb shards and also deletes the related storage
         buckets.
 
+        Removes all catalog entries related to the kb.
+
         As non-empty buckets cannot be deleted, they are scheduled to be
         deleted instead. Actually, this empties the bucket asynchronouysly
         but it doesn't delete it. To do it, we save a marker using the
@@ -339,6 +342,8 @@ class KnowledgeBox:
         async with driver.transaction() as txn:
             storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
             await txn.set(storage_to_delete, b"")
+
+            await catalog_delete_kb(txn, kbid)
 
             # Delete KB Shards
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
@@ -531,3 +536,10 @@ def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
         for paragraph_annotation in ufm.paragraphs:
             key = compute_paragraph_key(uuid, paragraph_annotation.key)
             paragraph_annotation.key = key
+
+
+async def catalog_delete_kb(txn: Transaction, kbid: str):
+    if not isinstance(txn, PGTransaction):
+        return    
+    async with txn.connection.cursor() as cur:
+        await cur.execute("DELETE FROM catalog where kbid = %(kbid)s", {"kbid": kbid})
