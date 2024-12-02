@@ -329,7 +329,6 @@ async def _clean_natsd(natsd):
 
 @pytest.fixture(scope="function")
 async def nats_manager(natsd):
-    breakpoint()
     ncm = await start_nats_manager("service_name", [natsd], None)
     yield ncm
     await stop_nats_manager()

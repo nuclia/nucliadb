@@ -119,7 +119,6 @@ async def gcs_storage(gcs, gcs_storage_settings: dict[str, Any]):
         labels=storage_settings.gcs_bucket_labels,
         anonymous=True,
     )
-    breakpoint()
     await storage.initialize()
     await storage.create_bucket("nidx")
     yield storage
