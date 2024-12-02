@@ -46,10 +46,12 @@ from nucliadb_utils.utilities import (
     start_audit_utility,
     start_indexing_utility,
     start_nats_manager,
+    start_partitioning_utility,
     start_transaction_utility,
     stop_audit_utility,
     stop_indexing_utility,
     stop_nats_manager,
+    stop_partitioning_utility,
     stop_transaction_utility,
 )
 
@@ -62,11 +64,14 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     if not cluster_settings.standalone_mode and indexing_settings.index_jetstream_servers is not None:
         await start_indexing_utility(SERVICE_NAME)
 
+    start_partitioning_utility()
+
     await start_nidx_utility()
 
     await start_audit_utility(SERVICE_NAME)
 
     finalizers = [
+        stop_partitioning_utility,
         stop_transaction_utility,
         stop_indexing_utility,
         stop_audit_utility,
