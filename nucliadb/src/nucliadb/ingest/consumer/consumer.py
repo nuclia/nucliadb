@@ -107,17 +107,16 @@ class IngestConsumer:
         await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST.name,
             subject=subject,
-            durable=durable_name,
+            durable=None,
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
-                durable_name=durable_name,
+                durable_name=None,
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
                 opt_start_seq=last_seqid,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
         logger.info(
@@ -279,14 +278,13 @@ class IngestProcessedConsumer(IngestConsumer):
         await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST_PROCESSED.name,
             subject=subject,
-            durable=durable,
+            durable=None,
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
         logger.info(

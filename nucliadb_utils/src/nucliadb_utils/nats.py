@@ -117,6 +117,7 @@ class NatsConnectionManager:
         self._nats_servers = nats_servers
         self._nats_creds = nats_creds
         self._subscriptions = []
+        self._pull_subscriptions = {}
         self._lock = asyncio.Lock()
         self._healthy = True
         self._last_unhealthy: Optional[float] = None
