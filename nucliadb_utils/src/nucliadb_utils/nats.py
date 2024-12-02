@@ -104,7 +104,9 @@ class MessageProgressUpdater:
 class NatsConnectionManager:
     _nc: NATSClient
     _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
-    _pull_subscriptions: dict[str, tuple[JetStreamContext.PullSubscription, asyncio.Task]]
+    _pull_subscriptions: dict[
+        str, tuple[JetStreamContext.PullSubscription, asyncio.Task, Callable[[], Awaitable[None]]]
+    ]
     _unhealthy_timeout = 10  # needs to be unhealth for 10 seconds to be unhealthy and force exit
 
     def __init__(
@@ -166,7 +168,7 @@ class NatsConnectionManager:
             self._subscriptions = []
 
             # Finalize pull subscriptions
-            for pull_sub, task in self._pull_subscriptions.values():
+            for pull_sub, task, _ in self._pull_subscriptions.values():
                 task.cancel()
                 try:
                     await task
@@ -322,7 +324,7 @@ class NatsConnectionManager:
 
     async def pull_unsubscribe(self, subject: str):
         try:
-            pull_sub, task = self._pull_subscriptions.pop(subject)
+            pull_sub, task, _ = self._pull_subscriptions.pop(subject)
             task.cancel()
             await task
             await pull_sub.unsubscribe()
