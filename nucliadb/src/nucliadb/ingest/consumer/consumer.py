@@ -98,6 +98,15 @@ class IngestConsumer:
         await self.setup_nats_subscription()
         self.initialized = True
 
+    async def finalize(self):
+        if self.initialized:
+            await self.teardown_nats_subscription()
+            self.initialized = False
+
+    async def teardown_nats_subscription(self):
+        subject = const.Streams.INGEST.subject.format(partition=self.partition)
+        await self.nats_connection_manager.pull_unsubscribe(subject)
+
     async def setup_nats_subscription(self):
         last_seqid = await sequence_manager.get_last_seqid(self.driver, self.partition)
         if last_seqid is None:
@@ -109,6 +118,7 @@ class IngestConsumer:
             subject=subject,
             durable=durable_name,
             cb=self.subscription_worker,
+            subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
                 durable_name=durable_name,
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,

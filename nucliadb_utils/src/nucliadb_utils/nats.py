@@ -157,11 +157,25 @@ class NatsConnectionManager:
 
     async def finalize(self):
         async with self._lock:
+            # Finalize push subscriptions
             for sub, _ in self._subscriptions:
                 try:
                     await sub.drain()
                 except nats.errors.ConnectionClosedError:  # pragma: no cover
                     pass
+            self._subscriptions = []
+
+            # Finalize pull subscriptions
+            for pull_sub, task in self._pull_subscriptions.values():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                await pull_sub.unsubscribe()
+            self._pull_subscriptions = {}
+
+            # Close the connection
             try:
                 await asyncio.wait_for(self._nc.drain(), timeout=1)
             except (
@@ -170,8 +184,6 @@ class NatsConnectionManager:
             ):  # pragma: no cover
                 pass
             await self._nc.close()
-            self._subscriptions = []
-            self._pull_subscriptions = {}
 
     async def disconnected_cb(self) -> None:
         logger.info("Disconnected from NATS!")
@@ -192,6 +204,25 @@ class NatsConnectionManager:
                 except Exception:
                     logger.exception(
                         f"Error resubscribing to {sub.subject} on {self._nc.connected_url.netloc}"
+                    )
+                    # should force exit here to restart the service
+                    self._healthy = False
+                    raise
+
+            existing_pull_subs = self._pull_subscriptions
+            self._pull_subscriptions = {}
+            for subject, (pull_sub, task, recon_callback) in existing_pull_subs.items():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                try:
+                    await pull_sub.unsubscribe()
+                    await recon_callback()
+                except Exception:
+                    logger.exception(
+                        f"Error resubscribing to {subject} on {self._nc.connected_url.netloc}"
                     )
                     # should force exit here to restart the service
                     self._healthy = False
@@ -244,8 +275,9 @@ class NatsConnectionManager:
         *,
         subject: str,
         stream: str,
-        durable: Optional[str] = None,
         cb: Callable[[Msg], Awaitable[None]],
+        subscription_lost_cb: Callable[[], Awaitable[None]],
+        durable: Optional[str] = None,
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> None:
         pull_sub = await self.js.pull_subscribe(
@@ -254,23 +286,24 @@ class NatsConnectionManager:
             stream=stream,
             config=config,  # type: ignore
         )
-        max_ack_pending = (config.max_ack_pending if config else 0) or 1
 
-        async def consume(pull_sub: JetStreamContext.PullSubscription):
+        async def consume(pull_sub: JetStreamContext.PullSubscription, subject: str):
             while True:
                 try:
-                    messages = await pull_sub.fetch(max_ack_pending)
+                    messages = await pull_sub.fetch(batch=1)
                     for message in messages:
                         await cb(message)
                 except asyncio.CancelledError:
+                    # Handle task cancellation
+                    logger.info("Pull subscription consume task cancelled", extra={"subject": subject})
                     break
                 except TimeoutError:
                     pass
                 except Exception:
-                    logger.exception("Error in pull_subscribe task")
+                    logger.exception("Error in pull_subscribe task", extra={"subject": subject})
 
-        task = asyncio.create_task(consume(pull_sub), name=f"pull_subscribe_{subject}")
-        self._pull_subscriptions[subject] = (pull_sub, task)
+        task = asyncio.create_task(consume(pull_sub, subject), name=f"pull_subscribe_{subject}")
+        self._pull_subscriptions[subject] = (pull_sub, task, subscription_lost_cb)
 
     async def _remove_subscription(self, subscription: Subscription):
         async with self._lock:
@@ -286,3 +319,13 @@ class NatsConnectionManager:
     async def unsubscribe(self, subscription: Subscription):
         await subscription.unsubscribe()
         await self._remove_subscription(subscription)
+
+    async def pull_unsubscribe(self, subject: str):
+        try:
+            pull_sub, task = self._pull_subscriptions.pop(subject)
+            task.cancel()
+            await task
+            await pull_sub.unsubscribe()
+        except KeyError:
+            logger.warning(f"Pull subscription {subject} not found")
+            pass
