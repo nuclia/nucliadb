@@ -268,6 +268,7 @@ async def start_transaction_utility(
     service_name: Optional[str] = None,
 ) -> TransactionUtility:
     from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
+
     current = get_transaction_utility()
     if current is not None:
         logger.debug("Warning, transaction utility was already set, ignoring")
