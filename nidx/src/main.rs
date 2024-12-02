@@ -18,21 +18,48 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::sync::Arc;
-
-use nidx::{api, indexer, metrics, scheduler, searcher, worker, Settings};
+use nidx::{api, indexer, metrics, scheduler, searcher, settings::EnvSettings, telemetry, worker, Settings};
 use prometheus_client::registry::Registry;
-use tokio::{main, net::TcpListener, task::JoinSet};
+use sentry::IntoDsn;
+use std::sync::Arc;
+use tokio::{net::TcpListener, task::JoinSet};
+use tracing::*;
 
-#[main]
-async fn main() -> anyhow::Result<()> {
-    let args: Vec<_> = std::env::args().skip(1).collect();
+// Main wrapper needed to initialize Sentry before Tokio
+fn main() -> anyhow::Result<()> {
+    let env_settings = EnvSettings::from_env();
 
-    tracing_subscriber::fmt::init();
+    let sentry_options = if let Some(sentry) = &env_settings.telemetry.sentry {
+        sentry::ClientOptions {
+            dsn: sentry.dsn.clone().into_dsn()?,
+            environment: Some(sentry.environment.clone().into()),
+            release: sentry::release_name!(),
+            ..Default::default()
+        }
+    } else {
+        // No Sentry config provided, fallback to printing traces to logs
+        sentry::ClientOptions {
+            dsn: "http://disabled:disabled@disabled/disabled".into_dsn()?,
+            before_send: Some(Arc::new(|event| {
+                debug!("Sentry error {event:#?}");
+                None
+            })),
+            ..Default::default()
+        }
+    };
+    let _guard = sentry::init(sentry_options);
 
-    let settings = Settings::from_env().await?;
+    tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(do_main(env_settings))
+}
+
+async fn do_main(env_settings: EnvSettings) -> anyhow::Result<()> {
+    telemetry::init(&env_settings.telemetry)?;
+
+    let settings = Settings::from_env_settings(env_settings).await?;
     let mut metrics = Registry::with_prefix("nidx");
+
     let mut tasks = JoinSet::new();
+    let args: Vec<_> = std::env::args().skip(1).collect();
     args.iter().for_each(|arg| {
         match arg.as_str() {
             "indexer" => tasks.spawn(indexer::run(settings.clone())),

@@ -43,6 +43,7 @@ use tantivy::{
     schema::Field,
     Term,
 };
+use tracing::instrument;
 
 /// Minimum length for a word to be accepted as a entity to search for
 /// suggestions. Low values can provide too much noise and higher ones can
@@ -64,6 +65,7 @@ impl RelationDeletionQueryBuilder {
 }
 
 impl RelationIndexer {
+    #[instrument(name = "relation::index_resource", skip_all)]
     pub fn index_resource(
         &self,
         output_dir: &Path,
@@ -84,6 +86,7 @@ impl RelationIndexer {
         vec![resource.resource.as_ref().unwrap().uuid.clone()]
     }
 
+    #[instrument(name = "relation::merge", skip_all)]
     pub fn merge(
         &self,
         work_dir: &Path,
@@ -111,6 +114,7 @@ pub struct RelationSearcher {
 }
 
 impl RelationSearcher {
+    #[instrument(name = "relation::open", skip_all)]
     pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
         let schema = RelationSchema::new();
         let deletions_query = RelationDeletionQueryBuilder::new(&schema);
@@ -125,10 +129,12 @@ impl RelationSearcher {
         })
     }
 
+    #[instrument(name = "relation::search", skip_all)]
     pub fn search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
         self.reader.search(request)
     }
 
+    #[instrument(name = "relation::suggest", skip_all)]
     pub fn suggest(&self, prefixes: Vec<String>) -> Vec<RelationNode> {
         let requests =
             prefixes.iter().filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH).cloned().map(|prefix| {

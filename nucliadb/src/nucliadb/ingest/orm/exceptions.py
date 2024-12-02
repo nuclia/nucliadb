@@ -56,3 +56,7 @@ class EntityManagementException(Exception):
 
 class VectorSetConflict(Exception):
     pass
+
+
+class InvalidBrokerMessage(ValueError):
+    pass

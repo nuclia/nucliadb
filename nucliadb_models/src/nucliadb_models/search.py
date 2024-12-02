@@ -372,16 +372,11 @@ class SortOptions(BaseModel):
 
 
 class RankFusionName(str, Enum):
-    LEGACY = "legacy"
     RECIPROCAL_RANK_FUSION = "rrf"
 
 
 class _BaseRankFusion(BaseModel):
     name: str
-
-
-class LegacyRankFusion(_BaseRankFusion):
-    name: Literal[RankFusionName.LEGACY] = RankFusionName.LEGACY
 
 
 class ReciprocalRankFusionWeights(BaseModel):
@@ -418,7 +413,7 @@ This kind of boosting can be useful in multilingual search, for example, where k
 
 
 RankFusion = Annotated[
-    Union[LegacyRankFusion, ReciprocalRankFusion],
+    Union[ReciprocalRankFusion],
     Field(discriminator="name"),
 ]
 
@@ -601,7 +596,7 @@ class SearchParamDefaults:
         description="List of search features to use. Each value corresponds to a lookup into on of the different indexes",
     )
     rank_fusion = ParamDefault(
-        default=RankFusionName.LEGACY,
+        default=RankFusionName.RECIPROCAL_RANK_FUSION,
         title="Rank fusion",
         description="Rank fusion algorithm to use to merge results from multiple retrievers (keyword, semantic)",
     )
@@ -1431,12 +1426,8 @@ class AskRequest(AuditMetadataBase):
         title="Prompts",
         description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa: E501
     )
-    rank_fusion: SkipJsonSchema[
-        Union[RankFusionName, RankFusion]
-    ] = SearchParamDefaults.rank_fusion.to_pydantic_field()
-    reranker: Union[
-        RerankerName, Reranker
-    ] = SearchParamDefaults.reranker.to_pydantic_field()
+    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
+    reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
     citations: bool = Field(
         default=False,
         description="Whether to include the citations for the answer in the response",
@@ -1669,12 +1660,8 @@ class FindRequest(BaseSearchRequest):
             SearchOptions.SEMANTIC,
         ]
     )
-    rank_fusion: SkipJsonSchema[
-        Union[RankFusionName, RankFusion]
-    ] = SearchParamDefaults.rank_fusion.to_pydantic_field()
-    reranker: Union[
-        RerankerName, Reranker
-    ] = SearchParamDefaults.reranker.to_pydantic_field()
+    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
+    reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
         default=[],
@@ -1705,7 +1692,6 @@ class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
     BOTH = "BOTH"
-    RANK_FUSION = "RANK_FUSION"
     RERANKER = "RERANKER"
 
 

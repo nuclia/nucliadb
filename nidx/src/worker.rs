@@ -45,6 +45,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     loop {
         let job = MergeJob::take(&meta.pool).await?;
         if let Some(job) = job {
+            let span = info_span!("worker_job", ?job.id);
             info!(job.id, "Running job");
 
             // Start keep alive to mark progress
@@ -57,7 +58,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
                 }
             });
 
-            match run_job(&meta, &job, storage.clone()).await {
+            match run_job(&meta, &job, storage.clone()).instrument(span).await {
                 Ok(_) => info!(job.id, "Job completed"),
                 Err(e) => warn!(job.id, ?e, "Job failed"),
             }
@@ -114,7 +115,8 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
         let work_dir = download_dir.path().join(i.to_string());
         download_tasks.spawn(download_segment(storage, s.id, work_dir));
     });
-    match download_tasks.join_all().await.into_iter().reduce(Result::and) {
+    let span = info_span!("download_segments");
+    match download_tasks.join_all().instrument(span).await.into_iter().reduce(Result::and) {
         None => return Err(anyhow!("No segments downloaded")),
         Some(Err(e)) => return Err(e),
         Some(Ok(())) => {}
@@ -130,11 +132,16 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     let work_dir = tempdir()?;
     let work_path = work_dir.path().to_path_buf();
     let vector_config = index.config();
-    let merged: NewSegment = tokio::task::spawn_blocking(move || match index.kind {
-        IndexKind::Vector => VectorIndexer.merge(&work_path, vector_config.unwrap(), merge_inputs).map(|x| x.into()),
-        IndexKind::Text => TextIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
-        IndexKind::Paragraph => ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
-        IndexKind::Relation => RelationIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+    let span = Span::current();
+    let merged: NewSegment = tokio::task::spawn_blocking(move || {
+        span.in_scope(|| match index.kind {
+            IndexKind::Vector => {
+                VectorIndexer.merge(&work_path, vector_config.unwrap(), merge_inputs).map(|x| x.into())
+            }
+            IndexKind::Text => TextIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+            IndexKind::Paragraph => ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+            IndexKind::Relation => RelationIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+        })
     })
     .await??;
 

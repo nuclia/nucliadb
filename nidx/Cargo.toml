@@ -3,6 +3,10 @@ name = "nidx"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "nidx"
+required-features = ["telemetry"]
+
 [workspace]
 members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy", "nidx_paragraph", "nidx_relation", "nidx_binding"]
 
@@ -23,7 +27,7 @@ tokio-util = { version = "0.7.12", features = ["io", "io-util", "compat"] }
 uuid = { version = "1.10.0", features = ["v4"] }
 nidx_types = { version = "0.1.0", path = "nidx_types" }
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 nidx_protos = { version = "0.1.0", path = "nidx_protos" }
 tonic = "0.12.3"
 lru = "0.12.5"
@@ -32,11 +36,35 @@ nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
 nidx_relation = { version = "0.1.0", path = "nidx_relation" }
 config = { version = "0.14.1", default-features = false }
 thiserror = "2.0.0"
-tower = "0.5.1"
-http = "1.1.0"
 prometheus-client = "0.22.3"
 axum = "0.7.9"
 lazy_static = "1.5.0"
+tower = "0.5.1"
+
+# Telemetry dependencies (can be disabled, e.g: in nidx_binding)
+sentry = { version = "0.34.0", optional = true }
+sentry-tracing = { version = "0.34.0", optional = true }
+opentelemetry_sdk = { version = "0.27.1", optional = true, features = ["rt-tokio"] }
+opentelemetry-zipkin = { version = "0.27.0", optional = true }
+opentelemetry-otlp = { version = "0.27.0", optional = true }
+tracing-opentelemetry = { version = "0.28.0", optional = true }
+opentelemetry = { version = "0.27.1", optional = true }
+tracing-core = { version = "0.1.33", optional = true }
+tracing-serde = { version = "0.2.0", optional = true }
+
+[features]
+default = ["telemetry"]
+telemetry = [
+    "dep:sentry",
+    "dep:sentry-tracing",
+    "dep:opentelemetry_sdk",
+    "dep:opentelemetry-zipkin",
+    "dep:opentelemetry-otlp",
+    "dep:tracing-opentelemetry",
+    "dep:opentelemetry",
+    "dep:tracing-core",
+    "dep:tracing-serde"
+]
 
 [dev-dependencies]
 itertools = "0.13.0"

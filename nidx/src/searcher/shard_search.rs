@@ -25,6 +25,7 @@ use nidx_protos::{SearchRequest, SearchResponse};
 use nidx_relation::RelationSearcher;
 use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
+use tracing::{instrument, Span};
 
 use crate::{
     errors::{NidxError, NidxResult},
@@ -34,6 +35,7 @@ use crate::{
 
 use super::{index_cache::IndexCache, query_planner};
 
+#[instrument(skip_all)]
 pub async fn search(
     meta: &NidxMetadata,
     index_cache: Arc<IndexCache>,
@@ -64,14 +66,17 @@ pub async fn search(
         None
     };
 
+    let current = Span::current();
     let search_results = tokio::task::spawn_blocking(move || {
-        blocking_search(
-            search_request,
-            paragraph_searcher_arc.as_ref().into(),
-            relation_searcher_arc.as_ref().into(),
-            text_searcher_arc.as_ref().into(),
-            vector_seacher_arc.as_ref().map(|v| v.as_ref().into()),
-        )
+        current.in_scope(|| {
+            blocking_search(
+                search_request,
+                paragraph_searcher_arc.as_ref().into(),
+                relation_searcher_arc.as_ref().into(),
+                text_searcher_arc.as_ref().into(),
+                vector_seacher_arc.as_ref().map(|v| v.as_ref().into()),
+            )
+        })
     })
     .await??;
     Ok(search_results)
@@ -119,23 +124,27 @@ fn blocking_search(
 
     std::thread::scope(|scope| {
         if let Some(task) = paragraph_task {
+            let current = Span::current();
             let rparagraph = &mut rparagraph;
-            scope.spawn(move || *rparagraph = Some(task()));
+            scope.spawn(move || *rparagraph = Some(current.in_scope(task)));
         }
 
         if let Some(task) = relation_task {
+            let current = Span::current();
             let rrelation = &mut rrelation;
-            scope.spawn(move || *rrelation = Some(task()));
+            scope.spawn(move || *rrelation = Some(current.in_scope(task)));
         }
 
         if let Some(task) = text_task {
+            let current = Span::current();
             let rtext = &mut rtext;
-            scope.spawn(move || *rtext = Some(task()));
+            scope.spawn(move || *rtext = Some(current.in_scope(task)));
         }
 
         if let Some(task) = vector_task {
+            let current = Span::current();
             let rvector = &mut rvector;
-            scope.spawn(move || *rvector = Some(task()));
+            scope.spawn(move || *rvector = Some(current.in_scope(task)));
         }
     });
 
