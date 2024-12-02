@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import enum
 from typing import Optional, Union
 
 from fastapi import Header, Request, Response
@@ -33,10 +34,23 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     AskRequest,
     NucliaDBClientType,
+    RankFusion,
+    RankFusionName,
+    SearchParamDefaults,
     SyncAskResponse,
     parse_max_tokens,
 )
 from nucliadb_utils.authentication import requires
+
+
+class LegacyRankFusionName(enum.Enum):
+    LEGACY_RANK_FUSION = "legacy"
+
+
+class LegacyAskRequest(AskRequest):
+    rank_fusion: Union[LegacyRankFusionName, RankFusionName, RankFusion] = (
+        SearchParamDefaults.rank_fusion.to_pydantic_field()  # type: ignore
+    )
 
 
 @api.post(
@@ -52,7 +66,7 @@ from nucliadb_utils.authentication import requires
 async def ask_knowledgebox_endpoint(
     request: Request,
     kbid: str,
-    item: AskRequest,
+    item: LegacyAskRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
