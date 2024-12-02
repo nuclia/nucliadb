@@ -95,10 +95,6 @@ class _FindParser:
                 window=min(max(user_window or 0, top_k), 500),
             )
 
-        elif str(self.item.rank_fusion) == "LegacyRankFusionName.LEGACY_RANK_FUSION":
-            # This is a lie, for backwards compatibility
-            rank_fusion = ReciprocalRankFusion(window=window)
-
         else:
             raise ParserError(f"Unknown rank fusion {self.item.rank_fusion}")
 
