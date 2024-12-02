@@ -34,6 +34,7 @@ from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consu
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.partitions import assign_partitions
+from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
 from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
@@ -141,11 +142,14 @@ async def main_orm_grpc():  # pragma: no cover
 async def main_ingest_processed_consumer():  # pragma: no cover
     finalizers = await initialize()
 
+    await start_processing_engine()
     metrics_server = await serve_metrics()
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
     consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
 
-    await run_until_exit([grpc_health_finalizer, consumer, metrics_server.shutdown] + finalizers)
+    await run_until_exit(
+        [grpc_health_finalizer, consumer, metrics_server.shutdown, stop_processing_engine] + finalizers
+    )
 
 
 async def main_subscriber_workers():  # pragma: no cover

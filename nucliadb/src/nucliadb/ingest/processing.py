@@ -44,7 +44,7 @@ from nucliadb_utils.settings import (
     storage_settings,
 )
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,13 @@ async def start_processing_engine():
         )
     await processing_engine.initialize()
     set_utility(Utility.PROCESSING, processing_engine)
+
+
+async def stop_processing_engine():
+    utility = get_utility(Utility.PROCESSING)
+    if utility is not None:
+        await utility.finalize()
+        clean_utility(Utility.PROCESSING)
 
 
 class ProcessingDriverType(Enum):

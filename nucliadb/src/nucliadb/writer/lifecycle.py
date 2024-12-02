@@ -22,14 +22,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from nucliadb.common.context.fastapi import inject_app_context
-from nucliadb.ingest.processing import start_processing_engine
+from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.back_pressure import start_materializer, stop_materializer
 from nucliadb.writer.settings import back_pressure_settings
 from nucliadb.writer.tus import finalize as storage_finalize
 from nucliadb.writer.tus import initialize as storage_initialize
-from nucliadb.writer.utilities import get_processing
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.utilities import (
@@ -61,9 +60,7 @@ async def lifespan(app: FastAPI):
         await stop_materializer()
     await stop_transaction_utility()
     await stop_ingest()
-    processing = get_processing()
-    if processing is not None:
-        await processing.finalize()
+    await stop_processing_engine()
     await storage_finalize()
     await clean_telemetry(SERVICE_NAME)
     await finalize_utilities()
