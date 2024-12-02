@@ -50,8 +50,7 @@ aiodns>=3.0.0
 
 types-orjson
 
-psycopg[pool]
-psycopg2-binary
+psycopg[binary,pool]
 
 # improve dependency resolution
 multidict>=6.0.4
