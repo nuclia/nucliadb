@@ -18,17 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import random
-from typing import cast
 import uuid
+from typing import cast
 from unittest.mock import AsyncMock
 
-from nucliadb.common.maindb.pg import PGTransaction
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
@@ -232,4 +232,6 @@ async def kb_catalog_entries_count(driver: Driver, kbid: str) -> int:
                 (kbid,),
             )
             count = await cur.fetchone()
+            if count is None:
+                return 0
             return count[0]
