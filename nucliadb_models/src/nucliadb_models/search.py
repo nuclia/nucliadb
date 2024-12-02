@@ -1530,7 +1530,7 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         if isinstance(values, dict):
             rank_fusion = values.get("rank_fusion")
             if isinstance(rank_fusion, str) and rank_fusion == "legacy":
-                values["rank_fusion"] = "rrf"
+                values["rank_fusion"] = RankFusionName.RECIPROCAL_RANK_FUSION
         return values
 
 
@@ -1651,7 +1651,7 @@ class FindRequest(BaseSearchRequest):
         if isinstance(values, dict):
             rank_fusion = values.get("rank_fusion")
             if isinstance(rank_fusion, str) and rank_fusion == "legacy":
-                values["rank_fusion"] = "rrf"
+                values["rank_fusion"] = RankFusionName.RECIPROCAL_RANK_FUSION
         return values
 
 
