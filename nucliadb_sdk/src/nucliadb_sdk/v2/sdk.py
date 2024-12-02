@@ -508,6 +508,16 @@ class _NucliaDBBase:
         response_type=None,
     )
 
+    # Field endpoints
+    delete_field_by_id = _request_builder(
+        name="delete_field_by_id",
+        path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
+        method="DELETE",
+        path_params=("kbid", "rid", "field_type", "field_id"),
+        request_type=None,
+        response_type=None,
+    )
+
     # Conversation endpoints
     add_conversation_message = _request_builder(
         name="add_conversation_message",
