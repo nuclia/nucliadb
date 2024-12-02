@@ -30,7 +30,7 @@ class Streams:
 
         name = "nucliadb"
         subject = "ndb.consumer.{partition}"
-        group = "nucliadb-{partition}"
+        group = "nucliadb-pull-{partition}"
 
     class INGEST_PROCESSED:
         """
@@ -40,7 +40,7 @@ class Streams:
 
         name = "nucliadb"
         subject = "ndb.consumer.processed"
-        group = "nucliadb-processed"
+        group = "nucliadb-pull-processed"
 
     class INDEX:
         """
