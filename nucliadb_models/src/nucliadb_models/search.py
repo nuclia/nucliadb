@@ -1522,6 +1522,17 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
                 )
         return rag_strategies
 
+    @model_validator(mode="before")
+    @classmethod
+    def fix_legacy_rank_fusion(cls, values):
+        """Dirty fix to allow passing "legacy" as rank fusion algorithm but
+        convert it to RRF"""
+        if isinstance(values, dict):
+            rank_fusion = values.get("rank_fusion")
+            if isinstance(rank_fusion, str) and rank_fusion == "legacy":
+                values["rank_fusion"] = "rrf"
+        return values
+
 
 # Alias (for backwards compatiblity with testbed)
 class ChatRequest(AskRequest):
@@ -1631,6 +1642,17 @@ class FindRequest(BaseSearchRequest):
         if SearchOptions.FULLTEXT in v or SearchOptions.FULLTEXT == v:
             raise ValueError("fulltext search not supported")
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def fix_legacy_rank_fusion(cls, values):
+        """Dirty fix to allow passing "legacy" as rank fusion algorithm but
+        convert it to RRF"""
+        if isinstance(values, dict):
+            rank_fusion = values.get("rank_fusion")
+            if isinstance(rank_fusion, str) and rank_fusion == "legacy":
+                values["rank_fusion"] = "rrf"
+        return values
 
 
 class SCORE_TYPE(str, Enum):
