@@ -104,6 +104,7 @@ class MessageProgressUpdater:
 class NatsConnectionManager:
     _nc: NATSClient
     _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
+    _pull_subscriptions: dict[str, tuple[JetStreamContext.PullSubscription, asyncio.Task]]
     _unhealthy_timeout = 10  # needs to be unhealth for 10 seconds to be unhealthy and force exit
 
     def __init__(
@@ -248,10 +249,10 @@ class NatsConnectionManager:
         config: Optional[nats.js.api.ConsumerConfig] = None,
     ) -> None:
         pull_sub = await self.js.pull_subscribe(
+            subject,
+            durable=durable,  # type: ignore
             stream=stream,
-            subject=subject,
-            durable=durable,
-            config=config,
+            config=config,  # type: ignore
         )
         max_ack_pending = (config.max_ack_pending if config else 0) or 1
 
