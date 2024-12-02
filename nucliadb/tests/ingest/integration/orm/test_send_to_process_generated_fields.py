@@ -30,6 +30,7 @@ from nucliadb.ingest.processing import (
     ProcessingEngine,
     Source,
     start_processing_engine,
+    stop_processing_engine,
 )
 from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldID, FieldType
 from nucliadb_protos.utils_pb2 import ExtractedText
@@ -42,7 +43,6 @@ from nucliadb_utils.settings import (
 )
 from nucliadb_utils.utilities import (
     Utility,
-    clean_utility,
     get_utility,
     start_partitioning_utility,
     stop_partitioning_utility,
@@ -64,8 +64,7 @@ async def dummy_processing() -> AsyncIterator[ProcessingEngine]:
 
         yield processing
 
-        clean_utility(Utility.PROCESSING)
-        await processing.finalize()
+        await stop_processing_engine()
 
 
 @pytest.fixture(scope="function")
