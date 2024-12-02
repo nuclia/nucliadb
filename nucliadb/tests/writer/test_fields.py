@@ -54,7 +54,8 @@ TEST_CONVERSATION_PAYLOAD = {
             "content": {
                 "text": "Hi people!",
                 "format": "PLAIN",
-                "files": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")],
+                "attachments": [load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpeg")],
+                "attachments_fields": [{"field_type": "file", "field_id": "file"}],
             },
             "ident": "message_id_001",
         }

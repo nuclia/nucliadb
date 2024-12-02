@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, List, Optional, Type, TypeVar
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
 
-from nucliadb_models import CloudLink, FileB64
+from nucliadb_models import CloudLink, FieldRef, FileB64
 from nucliadb_models.utils import DateTime
 from nucliadb_protos import resources_pb2
 
@@ -55,6 +55,7 @@ class MessageContent(BaseModel):
     text: Optional[str] = None
     format: Optional[MessageFormat] = None
     attachments: Optional[List[CloudLink]] = None
+    attachments_fields: List[FieldRef] = []
 
 
 class MessageType(Enum):
@@ -121,6 +122,7 @@ class InputMessageContent(BaseModel):
     text: str
     format: MessageFormat = MessageFormat.PLAIN
     attachments: List[FileB64] = []
+    attachments_fields: List[FieldRef] = []
 
 
 class InputMessage(BaseModel):

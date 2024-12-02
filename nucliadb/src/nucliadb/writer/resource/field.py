@@ -133,6 +133,9 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                         await processing.convert_internal_cf_to_str(cf, storage)
                         for cf in message.content.attachments
                     ]
+                    if "attachments_fields" in parsed_message["content"]:
+                        # Not defined on the push payload
+                        del parsed_message["content"]["attachments_fields"]
                     parsed_message["content"]["format"] = resources_pb2.MessageContent.Format.Value(
                         parsed_message["content"]["format"]
                     )

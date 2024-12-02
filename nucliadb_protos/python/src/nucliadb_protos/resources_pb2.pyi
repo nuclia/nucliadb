@@ -361,23 +361,20 @@ global___Relations = Relations
 class FieldRef(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    UUID_FIELD_NUMBER: builtins.int
     FIELD_TYPE_FIELD_NUMBER: builtins.int
     FIELD_ID_FIELD_NUMBER: builtins.int
     SPLIT_FIELD_NUMBER: builtins.int
-    uuid: builtins.str
     field_type: global___FieldType.ValueType
     field_id: builtins.str
     split: builtins.str
     def __init__(
         self,
         *,
-        uuid: builtins.str = ...,
         field_type: global___FieldType.ValueType = ...,
         field_id: builtins.str = ...,
         split: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["field_id", b"field_id", "field_type", b"field_type", "split", b"split", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["field_id", b"field_id", "field_type", b"field_type", "split", b"split"]) -> None: ...
 
 global___FieldRef = FieldRef
 

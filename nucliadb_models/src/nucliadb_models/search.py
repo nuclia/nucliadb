@@ -26,6 +26,9 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self, deprecated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
+
+# Bw/c import to avoid breaking users
+# noqa isort: skip
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
@@ -34,8 +37,6 @@ from nucliadb_protos.audit_pb2 import ClientType, TaskType
 from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.utils_pb2 import RelationNode
 
-# Bw/c import to avoid breaking users
-from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
 from nucliadb_models.internal.shards import (  # noqa isort: skip
     DocumentServiceEnum,
     ParagraphServiceEnum,
@@ -460,7 +461,10 @@ class KnowledgeBoxCount(BaseModel):
 
 class SearchParamDefaults:
     query = ParamDefault(
-        default="", title="Query", description="The query to search for", max_items=20_000
+        default="",
+        title="Query",
+        description="The query to search for",
+        max_items=20_000,
     )
     suggest_query = ParamDefault(
         default=..., title="Query", description="The query to get suggestions for"
@@ -1007,6 +1011,7 @@ class RagStrategyName:
     NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
     METADATA_EXTENSION = "metadata_extension"
     PREQUERIES = "prequeries"
+    CONVERSATION = "conversation"
 
 
 class ImageRagStrategyName:
@@ -1135,6 +1140,31 @@ Types for which the metadata is not found at the resource are ignored and not ad
     )
 
 
+class ConversationalStrategy(RagStrategy):
+    name: Literal["conversation"] = "conversation"
+    attachments_text: bool = Field(
+        default=False,
+        title="Add attachments on context",
+        description="Add attachments on context retrieved on conversation",
+    )
+    attachments_images: bool = Field(
+        default=False,
+        title="Add attachments images on context",
+        description="Add attachments images on context retrieved on conversation if they are mime type image and using a visual LLM",
+    )
+    full: bool = Field(
+        default=False,
+        title="Add all conversation",
+        description="Add all conversation fields on matched blocks",
+    )
+    max_messages: int = Field(
+        default=15,
+        title="Max messages",
+        description="Max messages to append in case its not full field",
+        ge=0,
+    )
+
+
 class PreQuery(BaseModel):
     request: "FindRequest" = Field(
         title="Request",
@@ -1221,12 +1251,14 @@ RagStrategies = Annotated[
         HierarchyResourceStrategy,
         NeighbouringParagraphsStrategy,
         MetadataExtensionStrategy,
+        ConversationalStrategy,
         PreQueriesStrategy,
     ],
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
-    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy], Field(discriminator="name")
+    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy],
+    Field(discriminator="name"),
 ]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
@@ -1381,7 +1413,12 @@ If empty, the default strategy is used, which simply adds the text of the matchi
             ],
             [{"name": "hierarchy", "count": 2}],
             [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
-            [{"name": "metadata_extension", "types": ["origin", "classification_labels"]}],
+            [
+                {
+                    "name": "metadata_extension",
+                    "types": ["origin", "classification_labels"],
+                }
+            ],
             [
                 {
                     "name": "prequeries",
@@ -1658,10 +1695,12 @@ class KnowledgeboxFindResults(JsonBaseModel):
     query: Optional[str] = None
     total: int = 0
     page_number: int = Field(
-        default=0, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+        default=0,
+        description="Pagination will be deprecated, please, refer to `top_k` in the request",
     )
     page_size: int = Field(
-        default=20, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+        default=20,
+        description="Pagination will be deprecated, please, refer to `top_k` in the request",
     )
     next_page: bool = Field(
         default=False,
