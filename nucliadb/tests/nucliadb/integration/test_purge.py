@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import random
+from typing import cast
 import uuid
 from unittest.mock import AsyncMock
 
+from nucliadb.common.maindb.pg import PGTransaction
 import pytest
 from httpx import AsyncClient
 
@@ -72,6 +74,8 @@ async def test_purge_deletes_everything_from_maindb(
     keys_after_create = await list_all_keys(maindb_driver)
     assert len(keys_after_create) > 0
 
+    assert await kb_catalog_entries_count(maindb_driver, kbid) > 0
+
     resp = await nucliadb_manager.delete(f"/kb/{kbid}")
     assert resp.status_code == 200
 
@@ -88,6 +92,9 @@ async def test_purge_deletes_everything_from_maindb(
     # A marker key has been added to delete storage when bucket is empty (that
     # can take a while so it will happen asynchronously too)
     assert any([key.startswith(KB_TO_DELETE_STORAGE_BASE) for key in keys_after_purge_kb])
+
+    # Catalog entries should be deleted too at this point
+    assert await kb_catalog_entries_count(maindb_driver, kbid) == 0
 
     await purge_kb_storage(maindb_driver, storage)
 
@@ -214,3 +221,15 @@ async def list_all_keys(driver: Driver) -> list[str]:
     async with driver.transaction() as txn:
         keys = [key async for key in txn.keys(match="")]
     return keys
+
+
+async def kb_catalog_entries_count(driver: Driver, kbid: str) -> int:
+    async with driver.transaction() as txn:
+        txn = cast(PGTransaction, txn)
+        async with txn.connection.cursor() as cur:
+            await cur.execute(
+                "SELECT COUNT(*) FROM catalog WHERE kbid = %s",
+                (kbid,),
+            )
+            count = await cur.fetchone()
+            return count[0]

@@ -538,8 +538,9 @@ def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
             paragraph_annotation.key = key
 
 
+@processor_observer.wrap({"type": "catalog_delete_kb"})
 async def catalog_delete_kb(txn: Transaction, kbid: str):
     if not isinstance(txn, PGTransaction):
-        return    
+        return
     async with txn.connection.cursor() as cur:
         await cur.execute("DELETE FROM catalog where kbid = %(kbid)s", {"kbid": kbid})
