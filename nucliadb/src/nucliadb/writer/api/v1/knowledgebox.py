@@ -26,7 +26,9 @@ from starlette.requests import Request
 
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
-from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
+from nucliadb.common.external_index_providers.exceptions import (
+    ExternalIndexCreationError,
+)
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -261,7 +263,11 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Respo
     try:
         await vectorsets.add(kbid, vectorset_id)
     except learning_proxy.ProxiedLearningConfigError as err:
-        return Response(status_code=err.status_code, content=err.content, media_type=err.content_type)
+        return Response(
+            status_code=err.status_code,
+            content=err.content,
+            media_type=err.content_type,
+        )
     return Response(status_code=200)
 
 
@@ -279,5 +285,9 @@ async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Re
     try:
         await vectorsets.delete(kbid, vectorset_id)
     except learning_proxy.ProxiedLearningConfigError as err:
-        return Response(status_code=err.status_code, content=err.content, media_type=err.content_type)
+        return Response(
+            status_code=err.status_code,
+            content=err.content,
+            media_type=err.content_type,
+        )
     return Response(status_code=200)

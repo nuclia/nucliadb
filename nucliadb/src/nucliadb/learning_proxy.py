@@ -124,7 +124,9 @@ class LearningConfiguration(BaseModel):
             raise ValueError("Semantic vector size is inconsistent with matryoshka dimensions")
         return self
 
-    def into_semantic_models_metadata(self) -> dict[str, knowledgebox_pb2.SemanticModelMetadata]:
+    def into_semantic_models_metadata(
+        self,
+    ) -> dict[str, knowledgebox_pb2.SemanticModelMetadata]:
         result = {}
         for model_name, config in self.semantic_model_configs.items():
             result[model_name] = config.into_semantic_model_metadata()
