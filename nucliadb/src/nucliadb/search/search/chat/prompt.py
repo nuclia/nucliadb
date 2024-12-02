@@ -19,8 +19,9 @@
 #
 import asyncio
 import copy
+from collections import deque
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple, Union, cast
+from typing import Deque, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import yaml
 from pydantic import BaseModel
@@ -29,14 +30,20 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.search import logger
 from nucliadb.search.search import cache
-from nucliadb.search.search.chat.images import get_page_image, get_paragraph_image
+from nucliadb.search.search.chat.images import (
+    get_file_image,
+    get_page_image,
+    get_paragraph_image,
+)
 from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
     SCORE_TYPE,
+    ConversationalStrategy,
     FieldExtensionStrategy,
     FindParagraph,
     FullResourceStrategy,
@@ -124,7 +131,7 @@ async def get_next_conversation_messages(
     num_messages: int,
     message_type: Optional[resources_pb2.Message.MessageType.ValueType] = None,
     msg_to: Optional[str] = None,
-):
+) -> List[resources_pb2.Message]:
     output = []
     cmetadata = await field_obj.get_metadata()
     for current_page in range(page, cmetadata.pages + 1):
@@ -155,12 +162,17 @@ async def find_conversation_message(
 
 
 async def get_expanded_conversation_messages(
-    *, kb: KnowledgeBoxORM, rid: str, field_id: str, mident: str
+    *,
+    kb: KnowledgeBoxORM,
+    rid: str,
+    field_id: str,
+    mident: str,
+    max_messages: int = CONVERSATION_MESSAGE_CONTEXT_EXPANSION,
 ) -> list[resources_pb2.Message]:
     resource = await kb.get(rid)
     if resource is None:  # pragma: no cover
         return []
-    field_obj = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)
+    field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)  # type: ignore
     found_message, found_page, found_idx = await find_conversation_message(
         field_obj=field_obj, mident=mident
     )
@@ -180,7 +192,7 @@ async def get_expanded_conversation_messages(
             field_obj=field_obj,
             page=found_page,
             start_idx=found_idx + 1,
-            num_messages=CONVERSATION_MESSAGE_CONTEXT_EXPANSION,
+            num_messages=max_messages,
         )
 
 
@@ -414,7 +426,10 @@ async def extend_prompt_context_with_ner(context, kbid, text_block_ids: list[Tex
             fcm = await field.get_field_metadata()
             if fcm is not None:
                 # Data Augmentation + Processor entities
-                for data_aumgentation_task_id, entities_wrapper in fcm.metadata.entities.items():
+                for (
+                    data_aumgentation_task_id,
+                    entities_wrapper,
+                ) in fcm.metadata.entities.items():
                     for entity in entities_wrapper.entities:
                         ners.setdefault(entity.label, set()).add(entity.text)
                 # Legacy processor entities
@@ -669,6 +684,112 @@ async def neighbouring_paragraphs_prompt_context(
             context[pid.full()] = text
 
 
+async def conversation_prompt_context(
+    context: CappedPromptContext,
+    kbid: str,
+    ordered_paragraphs: list[FindParagraph],
+    conversational_strategy: ConversationalStrategy,
+    visual_llm: bool,
+):
+    analyzed_fields: List[str] = []
+    async with get_driver().transaction(read_only=True) as txn:
+        storage = await get_storage()
+        kb = KnowledgeBoxORM(txn, storage, kbid)
+        for paragraph in ordered_paragraphs:
+            context[paragraph.id] = _clean_paragraph_text(paragraph)
+
+            # If the paragraph is a conversation and it matches semantically, we assume we
+            # have matched with the question, therefore try to include the answer to the
+            # context by pulling the next few messages of the conversation field
+            rid, field_type, field_id, mident = paragraph.id.split("/")[:4]
+            if field_type == "c" and paragraph.score_type in (
+                SCORE_TYPE.VECTOR,
+                SCORE_TYPE.BOTH,
+            ):
+                field_unique_id = "-".join([rid, field_type, field_id])
+                if field_unique_id in analyzed_fields:
+                    continue
+                resource = await kb.get(rid)
+                if resource is None:  # pragma: no cover
+                    continue
+
+                field_obj: Conversation = await resource.get_field(
+                    field_id, FIELD_TYPE_STR_TO_PB["c"], load=True
+                )  # type: ignore
+                cmetadata = await field_obj.get_metadata()
+
+                attachments: List[resources_pb2.FieldRef] = []
+                if conversational_strategy.full:
+                    for current_page in range(1, cmetadata.pages + 1):
+                        conv = await field_obj.db_get_value(current_page)
+                        for message in conv.messages:
+                            text = message.content.text.strip()
+                            pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
+                            context[pid] = text
+                            attachments.extend(message.content.attachments_fields)
+                else:
+                    # Add first message
+                    first_page = await field_obj.db_get_value()
+                    if len(first_page.messages) > 0:
+                        message = first_page.messages[0]
+                        text = message.content.text.strip()
+                        pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
+                        context[pid] = text
+                        attachments.extend(message.content.attachments_fields)
+
+                    messages: Deque[resources_pb2.Message] = deque(
+                        maxlen=conversational_strategy.max_messages
+                    )
+
+                    pending = -1
+                    for page in range(1, cmetadata.pages + 1):
+                        # Collect the messages with the window asked by the user arround the match paragraph
+                        conv = await field_obj.db_get_value(page)
+                        for message in conv.messages:
+                            messages.append(message)
+                            if pending > 0:
+                                pending -= 1
+                            if message.ident == mident:
+                                pending = (conversational_strategy.max_messages - 1) // 2
+                            if pending == 0:
+                                break
+                        if pending == 0:
+                            break
+
+                    for message in messages:
+                        text = message.content.text.strip()
+                        pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
+                        context[pid] = text
+                        attachments.extend(message.content.attachments_fields)
+
+                if conversational_strategy.attachments_text:
+                    # add on the context the images if vlm enabled
+                    for attachment in attachments:
+                        field: File = await resource.get_field(
+                            attachment.field_id, attachment.field_type, load=True
+                        )  # type: ignore
+                        extracted_text = await field.get_extracted_text()
+                        if extracted_text is not None:
+                            pid = f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text) + 1}"
+                            context[pid] = extracted_text.text
+
+                if conversational_strategy.attachments_images and visual_llm:
+                    for attachment in attachments:
+                        file_field: File = await resource.get_field(
+                            attachment.field_id, attachment.field_type, load=True
+                        )  # type: ignore
+                        field_metadata = await file_field.get_field_metadata()
+                        if field_metadata is not None and field_metadata.metadata.mime_type.startswith(
+                            "image"
+                        ):
+                            image = await get_file_image(kbid, rid, attachment.field_id)
+                            if image is not None:
+                                pid = f"{rid}/f/{attachment.field_id}/0-0"
+                                context.images[pid] = image
+
+                analyzed_fields.append(field_unique_id)
+
+
 async def hierarchy_prompt_context(
     context: CappedPromptContext,
     kbid: str,
@@ -828,7 +949,8 @@ class PromptContextBuilder:
                     paragraph_image_strategy = cast(ParagraphImageStrategy, strategy)
             else:  # pragma: no cover
                 logger.warning(
-                    "Unknown image strategy", extra={"strategy": strategy.name, "kbid": self.kbid}
+                    "Unknown image strategy",
+                    extra={"strategy": strategy.name, "kbid": self.kbid},
                 )
         page_images_added = 0
         for paragraph in self.ordered_paragraphs:
@@ -889,9 +1011,12 @@ class PromptContextBuilder:
         neighbouring_paragraphs: Optional[NeighbouringParagraphsStrategy] = None
         field_extension: Optional[FieldExtensionStrategy] = None
         metadata_extension: Optional[MetadataExtensionStrategy] = None
+        conversational_strategy: Optional[ConversationalStrategy] = None
         for strategy in self.strategies:
             if strategy.name == RagStrategyName.FIELD_EXTENSION:
                 field_extension = cast(FieldExtensionStrategy, strategy)
+            elif strategy.name == RagStrategyName.CONVERSATION:
+                conversational_strategy = cast(ConversationalStrategy, strategy)
             elif strategy.name == RagStrategyName.FULL_RESOURCE:
                 full_resource = cast(FullResourceStrategy, strategy)
                 if self.resource:  # pragma: no cover
@@ -907,13 +1032,18 @@ class PromptContextBuilder:
             elif strategy.name != RagStrategyName.PREQUERIES:  # pragma: no cover
                 # Prequeries are not handled here
                 logger.warning(
-                    "Unknown rag strategy", extra={"strategy": strategy.name, "kbid": self.kbid}
+                    "Unknown rag strategy",
+                    extra={"strategy": strategy.name, "kbid": self.kbid},
                 )
 
         if full_resource:
             # When full resoure is enabled, only metadata extension is allowed.
             await full_resource_prompt_context(
-                context, self.kbid, self.ordered_paragraphs, self.resource, full_resource
+                context,
+                self.kbid,
+                self.ordered_paragraphs,
+                self.resource,
+                full_resource,
             )
             if metadata_extension:
                 await extend_prompt_context_with_metadata(context, self.kbid, metadata_extension)
@@ -939,6 +1069,14 @@ class PromptContextBuilder:
                 self.kbid,
                 self.ordered_paragraphs,
                 field_extension,
+            )
+        if conversational_strategy:
+            await conversation_prompt_context(
+                context,
+                self.kbid,
+                self.ordered_paragraphs,
+                conversational_strategy,
+                self.visual_llm,
             )
         if metadata_extension:
             await extend_prompt_context_with_metadata(context, self.kbid, metadata_extension)

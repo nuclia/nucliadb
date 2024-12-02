@@ -91,6 +91,7 @@ async def create_resource(
     item: CreateResourcePayload,
     kbid: str,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
     if item.hidden and not (kb_config and kb_config.hidden_resources_enabled):
@@ -112,7 +113,7 @@ async def create_resource(
         uuid=uuid,
         kbid=kbid,
         partition=partition,
-        userid=request.headers.get("X-NUCLIADB-USER", ""),
+        userid=x_nucliadb_user,
         processing_options=item.processing_options,
     )
 

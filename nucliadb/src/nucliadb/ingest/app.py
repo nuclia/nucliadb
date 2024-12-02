@@ -34,6 +34,7 @@ from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consu
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.partitions import assign_partitions
+from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
 from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry import errors
@@ -46,10 +47,12 @@ from nucliadb_utils.utilities import (
     start_audit_utility,
     start_indexing_utility,
     start_nats_manager,
+    start_partitioning_utility,
     start_transaction_utility,
     stop_audit_utility,
     stop_indexing_utility,
     stop_nats_manager,
+    stop_partitioning_utility,
     stop_transaction_utility,
 )
 
@@ -62,11 +65,14 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     if not cluster_settings.standalone_mode and indexing_settings.index_jetstream_servers is not None:
         await start_indexing_utility(SERVICE_NAME)
 
+    start_partitioning_utility()
+
     await start_nidx_utility()
 
     await start_audit_utility(SERVICE_NAME)
 
     finalizers = [
+        stop_partitioning_utility,
         stop_transaction_utility,
         stop_indexing_utility,
         stop_audit_utility,
@@ -136,11 +142,14 @@ async def main_orm_grpc():  # pragma: no cover
 async def main_ingest_processed_consumer():  # pragma: no cover
     finalizers = await initialize()
 
+    await start_processing_engine()
     metrics_server = await serve_metrics()
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
     consumer = await consumer_service.start_ingest_processed_consumer(SERVICE_NAME)
 
-    await run_until_exit([grpc_health_finalizer, consumer, metrics_server.shutdown] + finalizers)
+    await run_until_exit(
+        [grpc_health_finalizer, consumer, metrics_server.shutdown, stop_processing_engine] + finalizers
+    )
 
 
 async def main_subscriber_workers():  # pragma: no cover

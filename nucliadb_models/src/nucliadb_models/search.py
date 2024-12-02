@@ -26,6 +26,9 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self, deprecated
 
 from nucliadb_models.common import FieldTypeName, ParamDefault
+
+# Bw/c import to avoid breaking users
+# noqa isort: skip
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
@@ -34,8 +37,6 @@ from nucliadb_protos.audit_pb2 import ClientType, TaskType
 from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.utils_pb2 import RelationNode
 
-# Bw/c import to avoid breaking users
-from nucliadb_models.internal.predict import Ner, QueryInfo, SentenceSearch, TokenSearch  # noqa isort: skip
 from nucliadb_models.internal.shards import (  # noqa isort: skip
     DocumentServiceEnum,
     ParagraphServiceEnum,
@@ -365,16 +366,11 @@ class SortOptions(BaseModel):
 
 
 class RankFusionName(str, Enum):
-    LEGACY = "legacy"
     RECIPROCAL_RANK_FUSION = "rrf"
 
 
 class _BaseRankFusion(BaseModel):
     name: str
-
-
-class LegacyRankFusion(_BaseRankFusion):
-    name: Literal[RankFusionName.LEGACY] = RankFusionName.LEGACY
 
 
 class ReciprocalRankFusionWeights(BaseModel):
@@ -409,7 +405,7 @@ This kind of boosting can be useful in multilingual search, for example, where k
 
 
 RankFusion = Annotated[
-    Union[LegacyRankFusion, ReciprocalRankFusion],
+    Union[ReciprocalRankFusion],
     Field(discriminator="name"),
 ]
 
@@ -465,7 +461,10 @@ class KnowledgeBoxCount(BaseModel):
 
 class SearchParamDefaults:
     query = ParamDefault(
-        default="", title="Query", description="The query to search for", max_items=20_000
+        default="",
+        title="Query",
+        description="The query to search for",
+        max_items=20_000,
     )
     suggest_query = ParamDefault(
         default=..., title="Query", description="The query to get suggestions for"
@@ -587,7 +586,7 @@ class SearchParamDefaults:
         description="List of search features to use. Each value corresponds to a lookup into on of the different indexes",
     )
     rank_fusion = ParamDefault(
-        default=RankFusionName.LEGACY,
+        default=RankFusionName.RECIPROCAL_RANK_FUSION,
         title="Rank fusion",
         description="Rank fusion algorithm to use to merge results from multiple retrievers (keyword, semantic)",
     )
@@ -1012,6 +1011,7 @@ class RagStrategyName:
     NEIGHBOURING_PARAGRAPHS = "neighbouring_paragraphs"
     METADATA_EXTENSION = "metadata_extension"
     PREQUERIES = "prequeries"
+    CONVERSATION = "conversation"
 
 
 class ImageRagStrategyName:
@@ -1140,6 +1140,31 @@ Types for which the metadata is not found at the resource are ignored and not ad
     )
 
 
+class ConversationalStrategy(RagStrategy):
+    name: Literal["conversation"] = "conversation"
+    attachments_text: bool = Field(
+        default=False,
+        title="Add attachments on context",
+        description="Add attachments on context retrieved on conversation",
+    )
+    attachments_images: bool = Field(
+        default=False,
+        title="Add attachments images on context",
+        description="Add attachments images on context retrieved on conversation if they are mime type image and using a visual LLM",
+    )
+    full: bool = Field(
+        default=False,
+        title="Add all conversation",
+        description="Add all conversation fields on matched blocks",
+    )
+    max_messages: int = Field(
+        default=15,
+        title="Max messages",
+        description="Max messages to append in case its not full field",
+        ge=0,
+    )
+
+
 class PreQuery(BaseModel):
     request: "FindRequest" = Field(
         title="Request",
@@ -1226,12 +1251,14 @@ RagStrategies = Annotated[
         HierarchyResourceStrategy,
         NeighbouringParagraphsStrategy,
         MetadataExtensionStrategy,
+        ConversationalStrategy,
         PreQueriesStrategy,
     ],
     Field(discriminator="name"),
 ]
 RagImagesStrategies = Annotated[
-    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy], Field(discriminator="name")
+    Union[PageImageStrategy, ParagraphImageStrategy, TableImageStrategy],
+    Field(discriminator="name"),
 ]
 PromptContext = dict[str, str]
 PromptContextOrder = dict[str, int]
@@ -1350,9 +1377,7 @@ class AskRequest(AuditMetadataBase):
         title="Prompts",
         description="Use to customize the prompts given to the generative model. Both system and user prompts can be customized. If a string is provided, it is interpreted as the user prompt.",  # noqa: E501
     )
-    rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
-        SearchParamDefaults.rank_fusion.to_pydantic_field()
-    )
+    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
     reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
     citations: bool = Field(
         default=False,
@@ -1388,7 +1413,12 @@ If empty, the default strategy is used, which simply adds the text of the matchi
             ],
             [{"name": "hierarchy", "count": 2}],
             [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
-            [{"name": "metadata_extension", "types": ["origin", "classification_labels"]}],
+            [
+                {
+                    "name": "metadata_extension",
+                    "types": ["origin", "classification_labels"],
+                }
+            ],
             [
                 {
                     "name": "prequeries",
@@ -1492,6 +1522,17 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
                 )
         return rag_strategies
 
+    @model_validator(mode="before")
+    @classmethod
+    def fix_legacy_rank_fusion(cls, values):
+        """Dirty fix to allow passing "legacy" as rank fusion algorithm but
+        convert it to RRF"""
+        if isinstance(values, dict):
+            rank_fusion = values.get("rank_fusion")
+            if isinstance(rank_fusion, str) and rank_fusion == "legacy":
+                values["rank_fusion"] = RankFusionName.RECIPROCAL_RANK_FUSION
+        return values
+
 
 # Alias (for backwards compatiblity with testbed)
 class ChatRequest(AskRequest):
@@ -1575,9 +1616,7 @@ class FindRequest(BaseSearchRequest):
             SearchOptions.SEMANTIC,
         ]
     )
-    rank_fusion: SkipJsonSchema[Union[RankFusionName, RankFusion]] = (
-        SearchParamDefaults.rank_fusion.to_pydantic_field()
-    )
+    rank_fusion: Union[RankFusionName, RankFusion] = SearchParamDefaults.rank_fusion.to_pydantic_field()
     reranker: Union[RerankerName, Reranker] = SearchParamDefaults.reranker.to_pydantic_field()
 
     keyword_filters: Union[list[str], list[Filter]] = Field(
@@ -1604,12 +1643,22 @@ class FindRequest(BaseSearchRequest):
             raise ValueError("fulltext search not supported")
         return v
 
+    @model_validator(mode="before")
+    @classmethod
+    def fix_legacy_rank_fusion(cls, values):
+        """Dirty fix to allow passing "legacy" as rank fusion algorithm but
+        convert it to RRF"""
+        if isinstance(values, dict):
+            rank_fusion = values.get("rank_fusion")
+            if isinstance(rank_fusion, str) and rank_fusion == "legacy":
+                values["rank_fusion"] = RankFusionName.RECIPROCAL_RANK_FUSION
+        return values
+
 
 class SCORE_TYPE(str, Enum):
     VECTOR = "VECTOR"
     BM25 = "BM25"
     BOTH = "BOTH"
-    RANK_FUSION = "RANK_FUSION"
     RERANKER = "RERANKER"
 
 
@@ -1668,10 +1717,12 @@ class KnowledgeboxFindResults(JsonBaseModel):
     query: Optional[str] = None
     total: int = 0
     page_number: int = Field(
-        default=0, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+        default=0,
+        description="Pagination will be deprecated, please, refer to `top_k` in the request",
     )
     page_size: int = Field(
-        default=20, description="Pagination will be deprecated, please, refer to `top_k` in the request"
+        default=20,
+        description="Pagination will be deprecated, please, refer to `top_k` in the request",
     )
     next_page: bool = Field(
         default=False,

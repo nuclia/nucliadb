@@ -200,6 +200,12 @@ class FieldTypeName(str, Enum):
     GENERIC = "generic"
 
 
+class FieldRef(BaseModel):
+    field_type: FieldTypeName
+    field_id: str
+    split: Optional[str] = None
+
+
 class Classification(BaseModel):
     labelset: str
     label: str

@@ -23,7 +23,6 @@ from pydantic import ValidationError
 
 from nucliadb.search.search.query_parser.exceptions import ParserError
 from nucliadb.search.search.query_parser.models import (
-    LegacyRankFusion,
     MultiMatchBoosterReranker,
     NoopReranker,
     PredictReranker,
@@ -83,15 +82,10 @@ class _FindParser:
         window = min(top_k, 500)
 
         if isinstance(self.item.rank_fusion, search_models.RankFusionName):
-            if self.item.rank_fusion == search_models.RankFusionName.LEGACY:
-                rank_fusion = LegacyRankFusion(window=window)
-            elif self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
+            if self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
                 rank_fusion = ReciprocalRankFusion(window=window)
             else:
                 raise ParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
-
-        elif isinstance(self.item.rank_fusion, search_models.LegacyRankFusion):
-            rank_fusion = LegacyRankFusion(window=window)
 
         elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
             user_window = self.item.rank_fusion.window

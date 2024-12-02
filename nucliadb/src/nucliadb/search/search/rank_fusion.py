@@ -146,7 +146,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
     def _fuse(
         self, keyword: Iterable[TextBlockMatch], semantic: Iterable[TextBlockMatch]
     ) -> list[TextBlockMatch]:
-        scores: dict[ParagraphId, float] = {}
+        scores: dict[ParagraphId, tuple[float, SCORE_TYPE]] = {}
         match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
 
         # sort results by it's score before merging them
@@ -160,8 +160,11 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         for r, (ranking, boost) in enumerate(rankings):
             for i, result in enumerate(ranking):
                 id = result.paragraph_id
-                scores.setdefault(id, 0)
-                scores[id] += 1 / (self._k + i) * boost
+                score, score_type = scores.setdefault(id, (0, result.score_type))
+                score += 1 / (self._k + i) * boost
+                if {score_type, result.score_type} == {SCORE_TYPE.BM25, SCORE_TYPE.VECTOR}:
+                    score_type = SCORE_TYPE.BOTH
+                scores[id] = (score, score_type)
 
                 position = (r, i)
                 match_positions.setdefault(result.paragraph_id, []).append(position)
@@ -171,10 +174,10 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
             # we are getting only one position, effectively deduplicating
             # multiple matches for the same text block
             r, i = match_positions[paragraph_id][0]
-            score = scores[paragraph_id]
+            score, score_type = scores[paragraph_id]
             result = rankings[r][0][i]
             result.score = score
-            result.score_type = SCORE_TYPE.RANK_FUSION
+            result.score_type = score_type
             merged.append(result)
 
         merged.sort(key=lambda x: x.score, reverse=True)
@@ -186,10 +189,7 @@ def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorith
     algorithm: RankFusionAlgorithm
     window = rank_fusion.window
 
-    if isinstance(rank_fusion, parser_models.LegacyRankFusion):
-        algorithm = LegacyRankFusion(window=window)
-
-    elif isinstance(rank_fusion, parser_models.ReciprocalRankFusion):
+    if isinstance(rank_fusion, parser_models.ReciprocalRankFusion):
         algorithm = ReciprocalRankFusion(
             k=rank_fusion.k,
             window=window,
@@ -199,6 +199,6 @@ def get_rank_fusion(rank_fusion: parser_models.RankFusion) -> RankFusionAlgorith
 
     else:
         logger.error(f"Unknown rank fusion algorithm {type(rank_fusion)}: {rank_fusion}. Using default")
-        algorithm = LegacyRankFusion(window=window)
+        algorithm = ReciprocalRankFusion(window=window)
 
     return algorithm

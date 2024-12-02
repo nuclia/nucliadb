@@ -43,7 +43,7 @@ def driver(txn):
 def sm():
     mock = AsyncMock()
     mock.add_resource = AsyncMock()
-    with patch("nucliadb.ingest.orm.processor.get_shard_manager", return_value=mock):
+    with patch("nucliadb.ingest.orm.processor.processor.get_shard_manager", return_value=mock):
         yield mock
 
 

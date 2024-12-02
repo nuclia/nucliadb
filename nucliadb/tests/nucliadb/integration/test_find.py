@@ -24,6 +24,7 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb_models.search import SearchOptions
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -472,15 +473,18 @@ async def test_find_highlight(
 ):
     kbid = philosophy_books_kb
 
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "query": "Who was Marcus Aurelius?",
-            "features": ["keyword", "semantic", "relations"],
-            "highlight": True,
-        },
-    )
-    assert resp.status_code == 200
+    with patch(
+        "nucliadb.search.search.find.get_rank_fusion", return_value=ReciprocalRankFusion(window=20)
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": "Who was Marcus Aurelius?",
+                "features": ["keyword", "semantic", "relations"],
+                "highlight": True,
+            },
+        )
+        assert resp.status_code == 200
 
     body = resp.json()
     assert len(body["resources"]) == 1

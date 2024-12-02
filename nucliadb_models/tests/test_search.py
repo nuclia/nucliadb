@@ -95,11 +95,8 @@ def test_find_request_fulltext_feature_not_allowed():
 @pytest.mark.parametrize(
     "rank_fusion,expected",
     [
-        ("legacy", search.RankFusionName.LEGACY),
         ("rrf", search.RankFusionName.RECIPROCAL_RANK_FUSION),
-        (search.RankFusionName.LEGACY, search.RankFusionName.LEGACY),
         (search.RankFusionName.RECIPROCAL_RANK_FUSION, search.RankFusionName.RECIPROCAL_RANK_FUSION),
-        (search.LegacyRankFusion(), search.LegacyRankFusion()),
         (search.ReciprocalRankFusion(), search.ReciprocalRankFusion()),
     ],
 )
@@ -115,3 +112,11 @@ def test_rank_fusion_errors():
         search.FindRequest(rank_fusion="unknown")
     with pytest.raises(ValueError):
         search.AskRequest(query="q", rank_fusion="unknown")
+
+
+def test_legacy_rank_fusion_fix():
+    req = search.FindRequest(rank_fusion="legacy")
+    assert req.rank_fusion == "rrf"
+
+    req = search.FindRequest.model_validate({"rank_fusion": "legacy"})
+    assert req.rank_fusion == "rrf"
