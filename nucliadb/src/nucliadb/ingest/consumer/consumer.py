@@ -103,14 +103,14 @@ class IngestConsumer:
         if last_seqid is None:
             last_seqid = 1
         subject = const.Streams.INGEST.subject.format(partition=self.partition)
-        durable_name = subject
+        durable_name = const.Streams.INGEST.group.format(partition=self.partition)
         await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST.name,
             subject=subject,
-            durable=None,
+            durable=durable_name,
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
-                durable_name=None,
+                durable_name=durable_name,
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
                 opt_start_seq=last_seqid,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
@@ -274,13 +274,15 @@ class IngestProcessedConsumer(IngestConsumer):
     """
 
     async def setup_nats_subscription(self):
-        subject = durable = const.Streams.INGEST_PROCESSED.subject
+        subject = const.Streams.INGEST_PROCESSED.subject
+        durable_name = const.Streams.INGEST_PROCESSED.group
         await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST_PROCESSED.name,
             subject=subject,
-            durable=None,
+            durable=durable_name,
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
+                durable_name=durable_name,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
