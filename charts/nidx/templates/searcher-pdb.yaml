@@ -1,0 +1,17 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nidx-searcher
+  labels:
+    app: nidx-searcher
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  selector:
+    matchLabels:
+      app: nidx-searcher
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  maxUnavailable: 1

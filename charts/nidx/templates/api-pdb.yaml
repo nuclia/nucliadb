@@ -1,0 +1,17 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nidx-api
+  labels:
+    app: nidx-api
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  selector:
+    matchLabels:
+      app: nidx-api
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  minAvailable: 1
