@@ -24,7 +24,7 @@ There are three types of resource notifications:
   - `resource_processed`: notifies about a resource being processed by nuclia and the results have been written to the database.
   - `resource_indexed`: indicates that resource metadata has been indexed and is ready to search.
 
-the complete models for resource notifications can be found at [the NucliaDB models package](https://github.com/nuclia/nucliadb/blob/main/nucliadb_models/nucliadb_models/notifications.py).
+the complete models for resource notifications can be found at [the NucliaDB models package](https://github.com/nuclia/nucliadb/blob/main/nucliadb_models/src/nucliadb_models/notifications.py).
 
 Any NucliaDB HTTP request on a resource will typically yield 3 notifications:
 
