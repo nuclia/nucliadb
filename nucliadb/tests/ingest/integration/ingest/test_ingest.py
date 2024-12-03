@@ -823,7 +823,8 @@ async def test_pull_consumers(nats_manager, pg_maindb_driver, local_storage):
     try:
         await nats_manager.js.add_stream(
             config=StreamConfig(
-                name="foobar", subjects=[const.Streams.INGEST.subject.format(partition=1)]
+                name=const.Streams.INGEST.name,
+                subjects=[const.Streams.INGEST.subject.format(partition=1)],
             )
         )
     except nats.js.errors.BadRequestError:
