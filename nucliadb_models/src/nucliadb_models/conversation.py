@@ -83,13 +83,15 @@ class Conversation(BaseModel):
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.Conversation) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
+        as_dict = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+        for conv_message in as_dict.get("messages", []):
+            for attachment_field in conv_message.get("content", {}).get("attachments_fields", []):
+                attachment_field["field_type"] = attachment_field["field_type"].lower()
+        return cls(**as_dict)
 
 
 class FieldConversation(BaseModel):
