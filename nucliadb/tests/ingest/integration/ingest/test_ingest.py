@@ -871,9 +871,10 @@ async def test_pull_consumers(nats_manager, pg_maindb_driver, local_storage):
 
         # Wait for the messages to be processed by the consumer
         checks = 0
-        while not len(received_bms) == 11:
+        while not len(received_bms) == 10 or checks > 100:
             await asyncio.sleep(0.3)
             checks += 1
+        assert checks < 100, "Messages were not processed in time"
         assert len(received_bms) == 10
         assert [bm.slug for bm in received_bms] == [f"slug-{i}" for i in range(10)]
 
