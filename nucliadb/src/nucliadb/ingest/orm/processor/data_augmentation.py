@@ -64,13 +64,6 @@ async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource)
     all_fields = await resource.get_all_field_ids(for_update=False)
     fields: Sequence[FieldID]
     if all_fields is None:
-        logger.warning(
-            "Trying to compute generated fields but all_fields key is missing!",
-            extra={
-                "kbid": bm.kbid,
-                "rid": resource.uuid,
-            },
-        )
         fields = []
     else:
         fields = all_fields.fields
