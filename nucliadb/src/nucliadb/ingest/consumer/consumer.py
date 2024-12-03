@@ -329,6 +329,11 @@ class IngestProcessedConsumer(IngestConsumer):
 
     async def setup_nats_subscription(self):
         last_sequence_id = await self.get_last_seqid()
+        if last_sequence_id is None:
+            delivery_policy = nats.js.api.DeliverPolicy.ALL
+        else:
+            delivery_policy = nats.js.api.DeliverPolicy.BY_START_SEQUENCE
+
         subject = const.Streams.INGEST_PROCESSED.subject
         durable_name = const.Streams.INGEST_PROCESSED.group
         await self.nats_connection_manager.pull_subscribe(
@@ -340,6 +345,7 @@ class IngestProcessedConsumer(IngestConsumer):
             config=nats.js.api.ConsumerConfig(
                 durable_name=durable_name,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
+                deliver_policy=delivery_policy,
                 opt_start_seq=last_sequence_id,
                 max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
