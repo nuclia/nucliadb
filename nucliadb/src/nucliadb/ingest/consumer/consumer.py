@@ -291,6 +291,7 @@ class IngestProcessedConsumer(IngestConsumer):
             subject=subject,
             durable=durable_name,
             cb=self.subscription_worker,
+            subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
                 durable_name=durable_name,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,

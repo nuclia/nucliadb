@@ -820,11 +820,15 @@ async def test_ingest_update_labels(
 
 
 async def test_pull_consumers(nats_manager, pg_maindb_driver, local_storage):
-    await nats_manager.js.add_stream(
-        config=StreamConfig(
-            name=const.Streams.INGEST.name, subjects=[const.Streams.INGEST.subject.format(partition=1)]
+    try:
+        await nats_manager.js.add_stream(
+            config=StreamConfig(
+                name="foobar", subjects=[const.Streams.INGEST.subject.format(partition=1)]
+            )
         )
-    )
+    except nats.js.errors.BadRequestError:
+        # Stream already exists
+        pass
     ingest_consumer = IngestConsumer(
         driver=pg_maindb_driver,
         storage=local_storage,
