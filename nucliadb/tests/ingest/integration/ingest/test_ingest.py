@@ -17,10 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import base64
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
+from unittest import mock
 from unittest.mock import DEFAULT, Mock, patch
 from uuid import uuid4
 
@@ -28,6 +30,7 @@ import nats
 import pytest
 from nats.aio.client import Client
 from nats.js import JetStreamContext
+from nats.js.api import StreamConfig
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME
@@ -35,6 +38,7 @@ from nucliadb.ingest.consumer.auditing import (
     IndexAuditHandler,
     ResourceWritesAuditHandler,
 )
+from nucliadb.ingest.consumer.consumer import IngestConsumer
 from nucliadb.ingest.orm.exceptions import DeadletteredError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
@@ -64,9 +68,11 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_utils import const
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 EXAMPLE_VECTOR = base64.b64decode(
@@ -811,3 +817,65 @@ async def test_ingest_update_labels(
         assert f"{rid}/f/some_text" in brain.paragraphs_to_delete
         assert f"{rid}/f/some_text" in brain.sentences_to_delete
         assert "/l/names/john" in brain.labels
+
+
+async def test_pull_consumers(nats_manager, pg_maindb_driver, local_storage):
+    try:
+        await nats_manager.js.add_stream(
+            config=StreamConfig(
+                name=const.Streams.INGEST.name,
+                subjects=[const.Streams.INGEST.subject.format(partition=1)],
+            )
+        )
+    except nats.js.errors.BadRequestError:
+        # Stream already exists
+        pass
+    ingest_consumer = IngestConsumer(
+        driver=pg_maindb_driver,
+        storage=local_storage,
+        nats_connection_manager=nats_manager,
+        partition=1,
+    )
+
+    received_bms = []
+
+    async def _subscription_worker(msg):
+        bm = BrokerMessage()
+        bm.ParseFromString(msg.data)
+        received_bms.append(bm)
+        await msg.ack()
+
+    with mock.patch.object(ingest_consumer, "subscription_worker", _subscription_worker):
+        await ingest_consumer.initialize()
+
+        # Produce some messages
+        transaction_util = TransactionUtility(
+            nats_servers=nats_manager._nats_servers,
+            nats_creds=nats_manager._nats_creds,
+        )
+        await transaction_util.initialize()
+        for i in range(10):
+            bm = BrokerMessage(
+                kbid=str(uuid4()),
+                uuid=str(uuid4()),
+                slug=f"slug-{i}",
+                type=BrokerMessage.AUTOCOMMIT,
+                source=BrokerMessage.MessageSource.WRITER,
+            )
+            await transaction_util.commit(
+                writer=bm,
+                partition=1,
+                wait=False,
+                target_subject=const.Streams.INGEST.subject.format(partition=1),
+            )
+
+        # Wait for the messages to be processed by the consumer
+        checks = 0
+        while not len(received_bms) == 10 or checks > 100:
+            await asyncio.sleep(0.3)
+            checks += 1
+        assert checks < 100, "Messages were not processed in time"
+        assert len(received_bms) == 10
+        assert [bm.slug for bm in received_bms] == [f"slug-{i}" for i in range(10)]
+
+    await ingest_consumer.finalize()
