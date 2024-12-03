@@ -69,6 +69,10 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
+    const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
+    },
 }
 
 

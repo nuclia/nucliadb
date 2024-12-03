@@ -294,7 +294,7 @@ class IngestProcessedConsumer(IngestConsumer):
         This code must be deleted once the new pull consumers are deployed on all environments and all the old push consumers have been deleted.
         From then on, we will rely on the nats server to keep track of the last sequence id.
         """
-        if not has_feature(const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED, default=True):
+        if not has_feature(const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED):
             logger.warning(
                 f"Feature flag {const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED} is not enabled. Relying on nats to keep track of the last sequence id."
             )
