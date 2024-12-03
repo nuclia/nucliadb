@@ -262,7 +262,14 @@ async def full_resource_prompt_context(
         for paragraph in ordered_paragraphs:
             resource_uuid = parse_text_block_id(paragraph.id).rid
             if resource_uuid not in ordered_resources:
-                ordered_resources.append(resource_uuid)
+                skip = False
+                if strategy.apply_to is not None:
+                    # decide whether the resource should be extended or not
+                    for label in strategy.apply_to.exclude:
+                        skip = skip or (label in (paragraph.labels or []))
+
+                if not skip:
+                    ordered_resources.append(resource_uuid)
 
     # For each resource, collect the extracted text from all its fields.
     resources_extracted_texts = await run_concurrently(

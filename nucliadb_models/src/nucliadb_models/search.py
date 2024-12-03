@@ -1066,6 +1066,13 @@ class FieldExtensionStrategy(RagStrategy):
         return fields
 
 
+class FullResourceApplyTo(BaseModel):
+    exclude: list[str] = Field(
+        default_factory=list,
+        description="Use only the paragraph for the resources containing any of these labels",
+    )
+
+
 class FullResourceStrategy(RagStrategy):
     name: Literal["full_resource"] = "full_resource"
     count: Optional[int] = Field(
@@ -1078,6 +1085,11 @@ class FullResourceStrategy(RagStrategy):
         default=False,
         title="Include remaining text blocks",
         description="Whether to include the remaining text blocks after the maximum number of resources has been reached.",
+    )
+    apply_to: Optional[FullResourceApplyTo] = Field(
+        default=None,
+        title="Apply to certain resources only",
+        description="Define which resources to include/exclude from serialization",
     )
 
 
