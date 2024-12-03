@@ -58,6 +58,7 @@ impl NidxFixture {
                     database_url: "ignored".to_string(),
                 },
                 telemetry: Default::default(),
+                work_path: None,
             },
         };
         // API server
@@ -94,6 +95,7 @@ impl NidxFixture {
         index_resource(
             &self.settings.metadata,
             self.settings.storage.as_ref().unwrap().object_store.clone(),
+            &tempfile::env::temp_dir(),
             shard_id,
             resource,
             self.seq.into(),

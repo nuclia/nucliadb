@@ -27,6 +27,7 @@ use nidx_protos::TypeMessage;
 use nidx_types::Seq;
 use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::*;
 use uuid::Uuid;
@@ -50,6 +51,11 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let jetstream = async_nats::jetstream::new(nats_client);
     let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
     let mut subscription = consumer.stream().max_messages_per_batch(1).messages().await?;
+
+    let work_path = match &settings.work_path {
+        Some(work_path) => PathBuf::from(work_path),
+        None => tempfile::env::temp_dir(),
+    };
 
     while let Some(Ok(msg)) = subscription.next().await {
         let info = match msg.info() {
@@ -83,10 +89,16 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             }
         };
 
-        if let Err(e) =
-            process_index_message(&meta, indexer_storage.clone(), segment_storage.clone(), index_message, seq)
-                .instrument(span)
-                .await
+        if let Err(e) = process_index_message(
+            &meta,
+            indexer_storage.clone(),
+            segment_storage.clone(),
+            &work_path,
+            index_message,
+            seq,
+        )
+        .instrument(span)
+        .await
         {
             warn!(?e, "Error processing index message");
             continue;
@@ -107,6 +119,7 @@ pub async fn process_index_message(
     meta: &NidxMetadata,
     indexer_storage: Arc<DynObjectStore>,
     segment_storage: Arc<DynObjectStore>,
+    work_path: &Path,
     index_message: IndexMessage,
     seq: Seq,
 ) -> anyhow::Result<()> {
@@ -114,7 +127,7 @@ pub async fn process_index_message(
         TypeMessage::Deletion => delete_resource(meta, &index_message.shard, index_message.resource, seq).await,
         TypeMessage::Creation => {
             let resource = download_message(indexer_storage, &index_message.storage_key).await?;
-            index_resource(meta, segment_storage, &index_message.shard, resource, seq).await
+            index_resource(meta, segment_storage, work_path, &index_message.shard, resource, seq).await
         }
     }
 }
@@ -147,6 +160,7 @@ pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -
 pub async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
+    work_path: &Path,
     shard_id: &str,
     resource: Resource,
     seq: Seq,
@@ -163,7 +177,7 @@ pub async fn index_resource(
     // TODO: Index in parallel
     // TODO: Save all indexes as a transaction (to avoid issues reprocessing the same message)
     for index in indexes {
-        let output_dir = tempfile::tempdir()?;
+        let output_dir = tempfile::tempdir_in(work_path)?;
 
         // Index the resource
         let index = Arc::new(index);
@@ -244,6 +258,7 @@ mod tests {
         index_resource(
             &meta,
             storage.clone(),
+            &tempfile::env::temp_dir(),
             &shard.id.to_string(),
             little_prince(shard.id.to_string(), None),
             123i64.into(),

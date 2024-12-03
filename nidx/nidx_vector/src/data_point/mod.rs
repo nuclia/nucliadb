@@ -129,6 +129,9 @@ where
     let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
     let mut ops = HnswOps::new(&tracker);
     for id in start_node_index..no_nodes {
+        if id % 1000 == 0 {
+            println!("{id} / {no_nodes}")
+        }
         ops.insert(Address(id), &mut index)
     }
 

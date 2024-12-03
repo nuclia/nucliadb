@@ -46,7 +46,7 @@ pub use indexer::SEGMENT_TAGS;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VectorSegmentMeta {
-    tags: HashSet<String>,
+    pub tags: HashSet<String>,
 }
 
 type VectorSegmentMetadata = SegmentMetadata<VectorSegmentMeta>;

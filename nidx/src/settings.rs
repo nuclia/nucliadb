@@ -190,6 +190,10 @@ pub struct EnvSettings {
     /// Telemetry configuration
     #[serde(default)]
     pub telemetry: TelemetrySettings,
+
+    /// Work path, used by searcher/indexer/worker to create all local files
+    /// If not specified, will work with temporary directories inside /tmp
+    pub work_path: Option<String>,
 }
 
 impl EnvSettings {
