@@ -33,9 +33,10 @@ use object_store::DynObjectStore;
 pub use purge::*;
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::{task::JoinSet, time::sleep};
+use tokio_util::sync::CancellationToken;
 use tracing::*;
 
-pub async fn run(settings: Settings) -> anyhow::Result<()> {
+pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let indexer_settings = settings.indexer.as_ref().unwrap();
     let storage_settings = settings.indexer.as_ref().unwrap();
     let merge_settings = settings.merge.clone();
@@ -45,7 +46,12 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let jetstream = async_nats::jetstream::new(client);
     let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
 
-    run_tasks(meta, storage_settings.object_store.clone(), merge_settings, NatsAckFloor(consumer)).await
+    tokio::select! {
+        _ = run_tasks(meta, storage_settings.object_store.clone(), merge_settings, NatsAckFloor(consumer)) => {},
+        _ = shutdown.cancelled() => {}
+    }
+
+    Ok(())
 }
 
 #[derive(Clone)]

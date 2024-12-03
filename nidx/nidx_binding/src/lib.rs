@@ -18,6 +18,7 @@ use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 struct SeqSource(Arc<AtomicI64>);
@@ -92,12 +93,13 @@ impl NidxBinding {
 impl NidxBinding {
     pub async fn new(binding_settings: HashMap<String, String>) -> anyhow::Result<Self> {
         let settings = Settings::from_env_settings(EnvSettings::from_map(binding_settings)).await?;
+        let shutdown = CancellationToken::new();
 
         // API server
         let api_service = ApiServer::new(settings.metadata.clone()).into_service();
         let api_server = GrpcServer::new("localhost:0").await?;
         let api_port = api_server.port()?;
-        tokio::task::spawn(api_server.serve(api_service));
+        tokio::task::spawn(api_server.serve(api_service, shutdown.clone()));
 
         // Searcher API
         let searcher_work_dir = tempdir()?;
@@ -106,10 +108,13 @@ impl NidxBinding {
         let searcher_api = SearchServer::new(settings.metadata.clone(), searcher.index_cache());
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
-        tokio::task::spawn(searcher_server.serve(searcher_api.into_service()));
+        tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));
         let settings_copy = settings.clone();
+        let shutdown2 = shutdown.clone();
         tokio::task::spawn(async move {
-            searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone(), Some(sync_reporter)).await
+            searcher
+                .run(settings_copy.storage.as_ref().unwrap().object_store.clone(), shutdown2, Some(sync_reporter))
+                .await
         });
 
         // Scheduler
@@ -123,7 +128,7 @@ impl NidxBinding {
 
         // Worker
         let settings_copy = settings.clone();
-        tokio::task::spawn(worker::run(settings_copy));
+        tokio::task::spawn(worker::run(settings_copy, shutdown.clone()));
 
         Ok(NidxBinding {
             searcher_port,

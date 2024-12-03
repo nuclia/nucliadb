@@ -30,6 +30,7 @@ use object_store::DynObjectStore;
 use serde::Deserialize;
 use tempfile::tempdir;
 use tokio::task::JoinSet;
+use tokio_util::sync::CancellationToken;
 use tracing::*;
 
 use crate::{
@@ -38,11 +39,11 @@ use crate::{
     NidxMetadata, Settings,
 };
 
-pub async fn run(settings: Settings) -> anyhow::Result<()> {
+pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let storage = settings.storage.as_ref().unwrap().object_store.clone();
     let meta = settings.metadata.clone();
 
-    loop {
+    while !shutdown.is_cancelled() {
         let job = MergeJob::take(&meta.pool).await?;
         if let Some(job) = job {
             let span = info_span!("worker_job", ?job.id);
@@ -67,9 +68,14 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
             keepalive.abort();
         } else {
             debug!("No jobs, waiting for more");
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(5)) => {},
+                _ = shutdown.cancelled() => {},
+            }
         }
     }
+
+    Ok(())
 }
 
 /// This structure (its trait) is passed to the indexes in order to open a searcher.

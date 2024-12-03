@@ -32,6 +32,7 @@ use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::Resource;
 use sqlx::PgPool;
 use tempfile::tempdir;
+use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 pub struct NidxFixture {
@@ -43,6 +44,7 @@ pub struct NidxFixture {
 
 impl NidxFixture {
     pub async fn new(pool: PgPool) -> anyhow::Result<Self> {
+        let shutdown = CancellationToken::new();
         let settings = Settings {
             metadata: NidxMetadata::new_with_pool(pool).await?,
             settings: EnvSettings {
@@ -64,7 +66,7 @@ impl NidxFixture {
         let api_service = ApiServer::new(settings.metadata.clone()).into_service();
         let api_server = GrpcServer::new("localhost:0").await?;
         let api_port = api_server.port()?;
-        tokio::task::spawn(api_server.serve(api_service));
+        tokio::task::spawn(api_server.serve(api_service, shutdown.clone()));
 
         // Searcher API
         let work_dir = tempdir()?;
@@ -72,10 +74,10 @@ impl NidxFixture {
         let searcher_api = SearchServer::new(settings.metadata.clone(), searcher.index_cache());
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
-        tokio::task::spawn(searcher_server.serve(searcher_api.into_service()));
+        tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));
         let settings_copy = settings.clone();
         tokio::task::spawn(async move {
-            searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone(), None).await
+            searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone(), shutdown.clone(), None).await
         });
 
         // Clients
