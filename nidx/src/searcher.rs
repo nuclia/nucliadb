@@ -34,6 +34,7 @@ use sync::SyncMetadata;
 use tokio::sync::watch;
 
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tempfile::tempdir;
@@ -90,10 +91,14 @@ impl SyncedSearcher {
 
 pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let work_dir = tempdir()?;
+    let work_path = match &settings.work_path {
+        Some(work_path) => &PathBuf::from(&work_path.clone()),
+        None => work_dir.path(),
+    };
     let meta = settings.metadata.clone();
     let storage = settings.storage.as_ref().expect("Storage settings needed").object_store.clone();
 
-    let searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
+    let searcher = SyncedSearcher::new(meta.clone(), work_path);
 
     let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
     let server = GrpcServer::new("0.0.0.0:10001").await?;

@@ -50,14 +50,22 @@ spec:
       {{- end }}
       dnsPolicy: ClusterFirst
       serviceAccountName: {{ .Values.searcher.serviceAccount | default "default" }}
+      volumes:
+      - name: data-dir
+        emptyDir:
       containers:
       - name: nidx-searcher
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         command: ["nidx", "searcher"]
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
+          - name: WORK_PATH
+            value: "/data"
         ports:
         {{- with .Values.searcher.resources }}
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
+        volumeMounts:
+        - name: data-dir
+          mountPath: "/data"
