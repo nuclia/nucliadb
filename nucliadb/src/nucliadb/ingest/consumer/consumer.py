@@ -25,6 +25,7 @@ from typing import Optional, Union
 import backoff
 import nats
 import nats.js.api
+import nats.js.errors
 from nats.aio.client import Msg
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
@@ -283,7 +284,56 @@ class IngestProcessedConsumer(IngestConsumer):
     other writes are going to be coming from user actions and we don't want to slow them down.
     """
 
+    async def get_last_seqid(self) -> Optional[int]:
+        """
+        XXX NOTE: Getting the last sequence id for the processed pull consumer is only needed when the new pull consumer is created.
+
+        For environments where we had the previous push consumer, we need to get the last sequence id from the old consumer info so that
+        we can start from there.
+
+        This code must be deleted once the new pull consumers are deployed on all environments and all the old push consumers have been deleted.
+        From then on, we will rely on the nats server to keep track of the last sequence id.
+        """
+        if not has_feature(const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED):
+            logger.warning(
+                f"Feature flag {const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED} is not enabled. Relying on nats to keep track of the last sequence id."
+            )
+            return None
+
+        try:
+            push_consumer_info: nats.js.api.ConsumerInfo = (
+                await self.nats_connection_manager.js.consumer_info(
+                    stream=const.Streams.INGEST_PROCESSED.name,
+                    # This is the old consumer name
+                    consumer="nucliadb-processed",
+                    timeout=2,
+                )
+            )
+            # Start from the last non-acked message
+            if push_consumer_info.ack_floor is None:
+                logger.warning(
+                    f"Nats consumer {push_consumer_info.name} has no ack floor. Starting from scratch."
+                )
+                return 1
+            last_seqid = push_consumer_info.ack_floor.consumer_seq + 1
+            logger.info(
+                f"Starting from last sequence id {last_seqid} for {const.Streams.INGEST_PROCESSED.name}"
+            )
+            return last_seqid
+        except (nats.js.errors.NotFoundError, nats.errors.TimeoutError):
+            logger.warning(
+                f"Could not get last sequence id for {const.Streams.INGEST_PROCESSED.name}. Starting from scratch."
+            )
+            # Start from scratch
+            return 1
+
     async def setup_nats_subscription(self):
+        last_sequence_id = await self.get_last_seqid()
+        if last_sequence_id is None:
+            delivery_policy = nats.js.api.DeliverPolicy.ALL
+        else:
+            delivery_policy = nats.js.api.DeliverPolicy.BY_START_SEQUENCE
+
         subject = const.Streams.INGEST_PROCESSED.subject
         durable_name = const.Streams.INGEST_PROCESSED.group
         await self.nats_connection_manager.pull_subscribe(
@@ -295,6 +345,8 @@ class IngestProcessedConsumer(IngestConsumer):
             config=nats.js.api.ConsumerConfig(
                 durable_name=durable_name,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
+                deliver_policy=delivery_policy,
+                opt_start_seq=last_sequence_id,
                 max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
