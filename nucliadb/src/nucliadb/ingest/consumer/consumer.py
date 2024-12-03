@@ -98,29 +98,40 @@ class IngestConsumer:
         await self.setup_nats_subscription()
         self.initialized = True
 
+    async def finalize(self):
+        if self.initialized:
+            await self.teardown_nats_subscription()
+            self.initialized = False
+
+    async def teardown_nats_subscription(self):
+        subject = const.Streams.INGEST.subject.format(partition=self.partition)
+        await self.nats_connection_manager.pull_unsubscribe(subject)
+
     async def setup_nats_subscription(self):
         last_seqid = await sequence_manager.get_last_seqid(self.driver, self.partition)
         if last_seqid is None:
             last_seqid = 1
         subject = const.Streams.INGEST.subject.format(partition=self.partition)
-        await self.nats_connection_manager.subscribe(
-            subject=subject,
-            queue=const.Streams.INGEST.group.format(partition=self.partition),
+        durable_name = const.Streams.INGEST.group.format(partition=self.partition)
+        await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST.name,
-            flow_control=True,
+            subject=subject,
+            durable=durable_name,
             cb=self.subscription_worker,
             subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
+                durable_name=durable_name,
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
                 opt_start_seq=last_seqid,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
+                max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
-        logger.info(f"Subscribed to {subject} on stream {const.Streams.INGEST.name} from {last_seqid}")
+        logger.info(
+            f"Subscribed pull consumer to {subject} on stream {const.Streams.INGEST.name} from {last_seqid}"
+        )
 
     @backoff.on_exception(backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):
@@ -274,22 +285,24 @@ class IngestProcessedConsumer(IngestConsumer):
 
     async def setup_nats_subscription(self):
         subject = const.Streams.INGEST_PROCESSED.subject
-        await self.nats_connection_manager.subscribe(
-            subject=subject,
-            queue=const.Streams.INGEST_PROCESSED.group,
+        durable_name = const.Streams.INGEST_PROCESSED.group
+        await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST_PROCESSED.name,
-            flow_control=True,
+            subject=subject,
+            durable=durable_name,
             cb=self.subscription_worker,
             subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
+                durable_name=durable_name,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_ack_pending=100,  # custom ack pending here
+                max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
-        logger.info(f"Subscribed to {subject} on stream {const.Streams.INGEST_PROCESSED.name}")
+        logger.info(
+            f"Subscribed pull consumer to {subject} on stream {const.Streams.INGEST_PROCESSED.name}"
+        )
 
     @backoff.on_exception(backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):
