@@ -286,13 +286,13 @@ class IngestProcessedConsumer(IngestConsumer):
 
     async def get_last_seqid(self) -> Optional[int]:
         """
-        XXX NOTE: Getting the last sequence id for the processed stream is only needed when the consumer is created.
+        XXX NOTE: Getting the last sequence id for the processed pull consumer is only needed when the new pull consumer is created.
 
-        For environments where we had the previous push consumer, we need to get the last sequence id from the consumer info so that
+        For environments where we had the previous push consumer, we need to get the last sequence id from the old consumer info so that
         we can start from there.
 
-        This code must be deleted once the new consumers are deployed on all environments and the previous consumers have been deleted.
-        From then on, we rely on the nats server to keep track of the last sequence id.
+        This code must be deleted once the new pull consumers are deployed on all environments and all the old push consumers have been deleted.
+        From then on, we will rely on the nats server to keep track of the last sequence id.
         """
         if not has_feature(const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED, default=True):
             logger.warning(
