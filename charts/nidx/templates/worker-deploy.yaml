@@ -49,15 +49,23 @@ spec:
       {{- end }}
       dnsPolicy: ClusterFirst
       serviceAccountName: {{ .Values.worker.serviceAccount | default "default" }}
+      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds | default 120 }}
+      volumes:
+      - name: data-dir
+        emptyDir:
       containers:
       - name: nidx-worker
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         command: ["nidx", "worker"]
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
+          - name: WORK_PATH
+            value: "/data"
         ports:
         {{- with .Values.worker.resources }}
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-      terminationGracePeriodSeconds: 120
+        volumeMounts:
+        - name: data-dir
+          mountPath: "/data"
