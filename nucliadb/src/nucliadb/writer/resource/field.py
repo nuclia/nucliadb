@@ -176,11 +176,6 @@ def parse_text_field(
 ) -> None:
     writer.texts[key].body = text_field.body
     writer.texts[key].format = resources_pb2.FieldText.Format.Value(text_field.format.value)
-    etw = resources_pb2.ExtractedTextWrapper()
-    etw.field.field = key
-    etw.field.field_type = resources_pb2.FieldType.TEXT
-    etw.body.text = text_field.body
-    writer.extracted_text.append(etw)
     toprocess.textfield[key] = models.Text(
         body=text_field.body,
         format=getattr(models.PushTextFormat, text_field.format.value),
