@@ -108,7 +108,12 @@ class IngestConsumer:
 
     async def teardown_nats_subscription(self):
         if self.subscription is not None:
-            await self.nats_connection_manager.unsubscribe(self.subscription)
+            try:
+                await self.nats_connection_manager.unsubscribe(self.subscription)
+            except nats.errors.ConnectionClosedError:
+                logger.warning("Connection closed while unsubscribing")
+                pass
+            self.subscription = None
 
     async def setup_nats_subscription(self):
         last_seqid = await sequence_manager.get_last_seqid(self.driver, self.partition)
