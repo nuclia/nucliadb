@@ -336,10 +336,10 @@ jobs:
     name: Node Rust tests
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
-    - uses: Swatinem/rust-cache@v2
-    - name: test
-      run: cargo test --workspace --all-features
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: test
+        run: cargo test --workspace --all-features
 
   nucliadb-tests:
     name: NucliaDB tests
@@ -486,17 +486,17 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-    - uses: actions/checkout@v4
-    - uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: nidx
-    - name: Install Protoc
-      uses: arduino/setup-protoc@v3
-    - name: test
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
-        SQLX_OFFLINE: true
-      run: cd nidx && cargo test --workspace --all-features
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nidx
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+      - name: test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
+          SQLX_OFFLINE: true
+        run: cd nidx && cargo test --workspace --all-features
 
   nucliadb-search-tests-nidx:
     name: NucliaDB search tests (nidx)
@@ -590,7 +590,7 @@ jobs:
           max_attempts: 2
           retry_on: error
           timeout_minutes: 10
-          command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" || make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
+          command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 2" || make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
