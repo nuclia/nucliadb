@@ -28,8 +28,9 @@ use nidx::{
 };
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;
-use std::{path::Path, sync::Arc};
-use tokio::{net::TcpListener, task::JoinSet};
+use std::{collections::HashMap, sync::Arc};
+use tokio::{net::TcpListener, signal, task::JoinSet};
+use tokio_util::sync::CancellationToken;
 use tracing::*;
 
 #[derive(Debug, clap::Parser)]
@@ -96,35 +97,77 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
     let settings = Settings::from_env_settings(env_settings).await?;
     let mut metrics = Registry::with_prefix("nidx");
 
+    let shutdown = CancellationToken::new();
+
+    let mut task_ids = HashMap::new();
     let mut tasks = JoinSet::new();
     components.iter().for_each(|component| {
-        match component {
-            Component::Indexer => tasks.spawn(indexer::run(settings.clone())),
-            Component::Worker => tasks.spawn(worker::run(settings.clone())),
+        let task = match component {
+            Component::Indexer => tasks.spawn(indexer::run(settings.clone(), shutdown.clone())),
+            Component::Worker => tasks.spawn(worker::run(settings.clone(), shutdown.clone())),
             Component::Scheduler => {
                 metrics::scheduler::register(&mut metrics);
-                tasks.spawn(scheduler::run(settings.clone()))
+                tasks.spawn(scheduler::run(settings.clone(), shutdown.clone()))
             }
             Component::Searcher => {
                 metrics::searcher::register(&mut metrics);
-                tasks.spawn(searcher::run(settings.clone()))
+                tasks.spawn(searcher::run(settings.clone(), shutdown.clone()))
             }
-            Component::Api => tasks.spawn(api::run(settings.clone())),
+            Component::Api => tasks.spawn(api::run(settings.clone(), shutdown.clone())),
         };
+        task_ids.insert(task.id(), component);
     });
 
-    tasks.spawn(metrics_server(metrics));
-    let control = ControlServer {
-        meta: settings.metadata.clone(),
-    };
-    tasks.spawn(async move { control.run(Path::new(settings.control_socket.as_ref().unwrap())).await });
+    // Purposely not tracked, we want metrics until the process finally dies
+    tokio::spawn(metrics_server(metrics));
+    if let Some(control_socket) = &settings.control_socket {
+        let control_socket = control_socket.clone();
+        let control = ControlServer {
+            meta: settings.metadata.clone(),
+        };
+        tasks.spawn(async move { control.run(&control_socket).await });
+    }
 
-    while let Some(join_result) = tasks.join_next().await {
-        let task_result = join_result?;
+    let termination_listener = async {
+        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
+        let mut sigquit = signal::unix::signal(signal::unix::SignalKind::quit()).unwrap();
+
+        tokio::select! {
+            _ = sigterm.recv() => info!("Terminating on SIGTERM"),
+            _ = sigquit.recv() => info!("Terminating on SIGQUIT"),
+            _ = signal::ctrl_c() => info!("Terminating on ctrl-c"),
+        }
+    };
+
+    // Wait for termination signal or any task to die
+    tokio::select! {
+        Some(join_result) = tasks.join_next_with_id() => {
+            let (id, result) = join_result.unwrap();
+            let task_name = task_ids.get(&id).map(|x| format!("{x:?}")).unwrap_or("<unknown>".to_string());
+            if let Err(e) = result {
+                panic!("Task {task_name} finished with error, stopping: {e:?}");
+            } else {
+                panic!("Task {task_name} unexpectedly exited without error");
+            }
+        }
+        _ = termination_listener => {}
+    }
+
+    // Initiate shutdown
+    info!("Initiating graceful shutdown");
+    shutdown.cancel();
+
+    while let Some(join_result) = tasks.join_next_with_id().await {
+        let (id, task_result) = join_result.unwrap();
+        let task_name = task_ids.get(&id).map(|x| format!("{x:?}")).unwrap_or("<unknown>".to_string());
         if let Err(e) = task_result {
-            panic!("Task finished with error, stopping: {e:?}");
+            panic!("Task {task_name} finished with error, stopping: {e:?}");
+        } else {
+            debug!("Task {task_name} exited without error");
         }
     }
+
+    info!("Successfully shutted down");
 
     Ok(())
 }

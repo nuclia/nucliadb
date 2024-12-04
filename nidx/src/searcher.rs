@@ -32,6 +32,9 @@ use object_store::DynObjectStore;
 use sync::run_sync;
 use sync::SyncMetadata;
 use tokio::sync::watch;
+use tokio::task::JoinSet;
+use tokio_util::sync::CancellationToken;
+use tracing::*;
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -63,25 +66,58 @@ impl SyncedSearcher {
         }
     }
 
-    pub async fn run(&self, storage: Arc<DynObjectStore>, watcher: Option<watch::Sender<SyncStatus>>) {
+    pub async fn run(
+        &self,
+        storage: Arc<DynObjectStore>,
+        shutdown: CancellationToken,
+        watcher: Option<watch::Sender<SyncStatus>>,
+    ) -> anyhow::Result<()> {
         let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
         let index_cache_copy = self.index_cache.clone();
-        let refresher_task = tokio::task::spawn(async move {
-            while let Some(index_id) = rx.recv().await {
-                // TODO: Do something smarter
-                index_cache_copy.remove(&index_id).await;
-            }
-        });
-        let sync_task =
-            tokio::task::spawn(run_sync(self.meta.clone(), storage.clone(), self.sync_metadata.clone(), tx, watcher));
-        tokio::select! {
-            r = sync_task => {
-                println!("sync_task() completed first {:?}", r)
-            }
-            r = refresher_task => {
-                println!("refresher_task() completed first {:?}", r)
+
+        let mut tasks = JoinSet::new();
+        let refresher_task = tasks
+            .spawn(async move {
+                while let Some(index_id) = rx.recv().await {
+                    // TODO: Do something smarter
+                    index_cache_copy.remove(&index_id).await;
+                }
+
+                Ok(())
+            })
+            .id();
+
+        let sync_task = tasks.spawn(run_sync(
+            self.meta.clone(),
+            storage.clone(),
+            self.sync_metadata.clone(),
+            shutdown.clone(),
+            tx,
+            watcher,
+        ));
+        let sync_task_id = sync_task.id();
+
+        while let Some(join_result) = tasks.join_next_with_id().await {
+            let (id, result) = join_result.unwrap();
+            let task_name = if id == refresher_task {
+                "refresher"
+            } else if id == sync_task_id {
+                "sync"
+            } else {
+                unreachable!()
+            };
+            if let Err(e) = result {
+                error!("Task {task_name} exited with error {e:?}");
+                return Err(e);
+            } else {
+                info!("Task {task_name} exited without error");
+                if !shutdown.is_cancelled() {
+                    panic!("Unexpected task termination without graceful shutdown");
+                }
             }
         }
+
+        Ok(())
     }
 
     pub fn index_cache(&self) -> Arc<IndexCache> {
@@ -89,7 +125,7 @@ impl SyncedSearcher {
     }
 }
 
-pub async fn run(settings: Settings) -> anyhow::Result<()> {
+pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let work_dir = tempdir()?;
     let work_path = match &settings.work_path {
         Some(work_path) => &PathBuf::from(&work_path.clone()),
@@ -102,16 +138,29 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
 
     let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
     let server = GrpcServer::new("0.0.0.0:10001").await?;
-    let api_task = tokio::task::spawn(server.serve(api.into_service()));
 
-    let search_task = tokio::task::spawn(async move { searcher.run(storage, None).await });
+    let mut tasks = JoinSet::new();
+    let api_task = tasks.spawn(server.serve(api.into_service(), shutdown.clone())).id();
+    let shutdown2 = shutdown.clone();
+    let search_task = tasks.spawn(async move { searcher.run(storage, shutdown2, None).await }).id();
 
-    tokio::select! {
-        r = search_task => {
-            println!("sync_task() completed first {:?}", r)
-        }
-        r = api_task => {
-            println!("api_task() completed first {:?}", r)
+    while let Some(join_result) = tasks.join_next_with_id().await {
+        let (id, result) = join_result.unwrap();
+        let task_name = if id == api_task {
+            "searcher_api"
+        } else if id == search_task {
+            "synced_searcher"
+        } else {
+            unreachable!()
+        };
+        if let Err(e) = result {
+            error!("Task {task_name} exited with error {e:?}");
+            return Err(e);
+        } else {
+            info!("Task {task_name} exited without error");
+            if !shutdown.is_cancelled() {
+                panic!("Unexpected task termination without graceful shutdown");
+            }
         }
     }
 

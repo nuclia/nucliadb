@@ -29,6 +29,7 @@ use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 use tracing::*;
 use uuid::Uuid;
 
@@ -38,7 +39,7 @@ use crate::{metadata::*, Settings};
 #[cfg(feature = "telemetry")]
 use crate::telemetry;
 
-pub async fn run(settings: Settings) -> anyhow::Result<()> {
+pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let meta = settings.metadata.clone();
 
     let indexer_settings = settings.indexer.as_ref().ok_or(anyhow!("Indexer settings required"))?;
@@ -57,7 +58,17 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
         None => tempfile::env::temp_dir(),
     };
 
-    while let Some(Ok(msg)) = subscription.next().await {
+    while !shutdown.is_cancelled() {
+        let sub_msg = tokio::select! {
+            sub_msg = subscription.next() => sub_msg,
+            _ = shutdown.cancelled() => { return Ok(()) }
+        };
+        let msg = match sub_msg {
+            Some(Ok(msg)) => msg,
+            Some(Err(e)) => return Err(e.into()),
+            None => return Err(anyhow!("Could not get message from NATS")),
+        };
+
         let info = match msg.info() {
             Ok(info) => info,
             Err(e) => {

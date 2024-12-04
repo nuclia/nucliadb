@@ -20,6 +20,7 @@
 
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as base64;
@@ -193,10 +194,10 @@ pub struct EnvSettings {
 
     /// Work path, used by searcher/indexer/worker to create all local files
     /// If not specified, will work with temporary directories inside /tmp
-    pub work_path: Option<String>,
+    pub work_path: Option<PathBuf>,
 
     /// Path to a UNIX socket to control the nidx process
-    pub control_socket: Option<String>,
+    pub control_socket: Option<PathBuf>,
 }
 
 impl EnvSettings {

@@ -1802,6 +1802,7 @@ dependencies = [
  "pyo3",
  "tempfile",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
