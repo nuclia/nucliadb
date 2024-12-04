@@ -111,6 +111,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
             }
             Component::Searcher => {
                 metrics::searcher::register(&mut metrics);
+                metrics::searcher::SYNC_DELAY.set(100_000.0); // Initialize to something large since we don't know yet, but it's not 0
                 tasks.spawn(searcher::run(settings.clone(), shutdown.clone()))
             }
             Component::Api => tasks.spawn(api::run(settings.clone(), shutdown.clone())),
@@ -125,7 +126,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
         let control = ControlServer {
             meta: settings.metadata.clone(),
         };
-        tasks.spawn(async move { control.run(&control_socket).await });
+        tokio::spawn(async move { control.run(&control_socket).await });
     }
 
     let termination_listener = async {
