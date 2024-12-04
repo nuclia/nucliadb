@@ -39,6 +39,7 @@ from nucliadb.search.search.chat.images import (
     get_page_image,
     get_paragraph_image,
 )
+from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
 from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
@@ -63,7 +64,7 @@ from nucliadb_models.search import (
     TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2
-from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
+from nucliadb_utils.asyncio_utils import run_concurrently
 from nucliadb_utils.utilities import get_storage
 
 MAX_RESOURCE_TASKS = 5
@@ -234,39 +235,6 @@ async def default_prompt_context(
                     context[pid] = text
 
 
-async def get_field_extracted_text(kbid: str, field_id: FieldId) -> Optional[tuple[FieldId, str]]:
-    extracted_text_pb = await cache.get_extracted_text_from_field_id(kbid, field_id)
-    if extracted_text_pb is None:  # pragma: no cover
-        return None
-    return field_id, extracted_text_pb.text
-
-
-async def get_resource_extracted_texts(
-    kbid: str,
-    resource_uuid: str,
-) -> list[tuple[FieldId, str]]:
-    resource = await cache.get_resource(kbid, resource_uuid)
-    if resource is None:  # pragma: no cover
-        return []
-
-    # Schedule the extraction of the text of each field in the resource
-    async with get_driver().transaction(read_only=True) as txn:
-        resource.txn = txn
-        runner = ConcurrentRunner(max_tasks=MAX_RESOURCE_FIELD_TASKS)
-        for field_type, field_key in await resource.get_fields(force=True):
-            field_id = FieldId.from_pb(resource_uuid, field_type, field_key)
-            runner.schedule(get_field_extracted_text(kbid, field_id))
-        # Include the summary aswell
-        runner.schedule(
-            get_field_extracted_text(kbid, FieldId(rid=resource_uuid, type="a", key="summary"))
-        )
-
-        # Wait for the results
-        results = await runner.wait()
-
-    return [result for result in results if result is not None]
-
-
 async def full_resource_prompt_context(
     context: CappedPromptContext,
     kbid: str,
@@ -281,9 +249,9 @@ async def full_resource_prompt_context(
     Arguments:
         context: The context to be updated.
         kbid: The knowledge box id.
-        results: The results of the retrieval (find) operation.
+        ordered_paragraphs: The results of the retrieval (find) operation.
         resource: The resource to be included in the context. This is used only when chatting with a specific resource with no retrieval.
-        number_of_full_resources: The number of full resources to include in the context.
+        strategy: strategy instance containing, for example, the number of full resources to include in the context.
     """  # noqa: E501
     if resource is not None:
         # The user has specified a resource to be included in the context.
@@ -294,12 +262,19 @@ async def full_resource_prompt_context(
         for paragraph in ordered_paragraphs:
             resource_uuid = parse_text_block_id(paragraph.id).rid
             if resource_uuid not in ordered_resources:
-                ordered_resources.append(resource_uuid)
+                skip = False
+                if strategy.apply_to is not None:
+                    # decide whether the resource should be extended or not
+                    for label in strategy.apply_to.exclude:
+                        skip = skip or (label in (paragraph.labels or []))
+
+                if not skip:
+                    ordered_resources.append(resource_uuid)
 
     # For each resource, collect the extracted text from all its fields.
     resources_extracted_texts = await run_concurrently(
         [
-            get_resource_extracted_texts(kbid, resource_uuid)
+            hydrate_resource_text(kbid, resource_uuid, max_concurrent_tasks=MAX_RESOURCE_FIELD_TASKS)
             for resource_uuid in ordered_resources[: strategy.count]
         ],
         max_concurrent=MAX_RESOURCE_TASKS,
@@ -510,7 +485,7 @@ async def field_extension_prompt_context(
                 # Invalid field id, skiping
                 continue
 
-    tasks = [get_field_extracted_text(kbid, fid) for fid in extend_field_ids]
+    tasks = [hydrate_field_text(kbid, fid) for fid in extend_field_ids]
     field_extracted_texts = await run_concurrently(tasks)
 
     for result in field_extracted_texts:

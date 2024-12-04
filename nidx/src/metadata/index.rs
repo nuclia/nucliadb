@@ -115,6 +115,18 @@ impl Index {
         .await
     }
 
+    pub async fn get_many(meta: impl Executor<'_, Database = Postgres>, ids: &[&IndexId]) -> sqlx::Result<Vec<Index>> {
+        sqlx::query_as!(
+            Index,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
+               FROM indexes
+               WHERE id = ANY($1) AND deleted_at IS NULL"#,
+            ids as &[&IndexId]
+        )
+        .fetch_all(meta)
+        .await
+    }
+
     pub async fn find(
         meta: impl Executor<'_, Database = Postgres>,
         shard_id: Uuid,

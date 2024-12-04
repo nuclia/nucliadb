@@ -103,7 +103,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any]):
                             id="rid-3/t/field-c/5/0-30",
                         ),
                         score=1.5,
-                        labels=["u/link", "/k/text"],  # these are not propagated
+                        labels=["u/link", "/k/text"],
                     ),
                     nodereader_pb2.DocumentScored(
                         doc_id=nodereader_pb2.DocumentVectorIdentifier(
@@ -307,7 +307,7 @@ def expected_find_response():
                                 "fuzzy_result": False,
                                 "id": "rid-3/t/field-c/0-30",
                                 "is_a_table": False,
-                                "labels": [],
+                                "labels": ["u/link", "/k/text"],
                                 "order": 1,
                                 "page_with_visual": False,
                                 "position": {

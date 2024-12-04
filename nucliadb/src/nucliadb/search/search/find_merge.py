@@ -243,7 +243,9 @@ def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
             start_seconds=[x for x in item.metadata.position.start_seconds],
             end_seconds=[x for x in item.metadata.position.end_seconds],
         ),
-        paragraph_labels=[x for x in item.labels],  # XXX could be list(paragraph.labels)?
+        # XXX: we should split labels
+        field_labels=[],
+        paragraph_labels=list(item.labels),
         fuzzy_search=fuzzy_result,
         is_a_table=item.metadata.representation.is_a_table,
         representation_file=item.metadata.representation.file,
@@ -283,9 +285,9 @@ def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
             start_seconds=[x for x in item.metadata.position.start_seconds],
             end_seconds=[x for x in item.metadata.position.end_seconds],
         ),
-        # TODO: get labels from index
+        # XXX: we should split labels
         field_labels=[],
-        paragraph_labels=[],
+        paragraph_labels=list(item.labels),
         fuzzy_search=False,  # semantic search doesn't have fuzziness
         is_a_table=item.metadata.representation.is_a_table,
         representation_file=item.metadata.representation.file,

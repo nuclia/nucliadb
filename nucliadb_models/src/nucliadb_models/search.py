@@ -1066,6 +1066,14 @@ class FieldExtensionStrategy(RagStrategy):
         return fields
 
 
+class FullResourceApplyTo(BaseModel):
+    exclude: list[str] = Field(
+        default_factory=list,
+        title="Labels to exclude from full resource expansion",
+        description="Resources from matches containing any of these labels won't expand to the full resource. This may be useful to exclude long and not interesting resources and expend less tokens",  # noqa: E501
+    )
+
+
 class FullResourceStrategy(RagStrategy):
     name: Literal["full_resource"] = "full_resource"
     count: Optional[int] = Field(
@@ -1078,6 +1086,11 @@ class FullResourceStrategy(RagStrategy):
         default=False,
         title="Include remaining text blocks",
         description="Whether to include the remaining text blocks after the maximum number of resources has been reached.",
+    )
+    apply_to: Optional[FullResourceApplyTo] = Field(
+        default=None,
+        title="Apply to certain resources only",
+        description="Define which resources to exclude from serialization",
     )
 
 
