@@ -317,8 +317,8 @@ class NatsConnectionManager:
                     continue
                 self._subscriptions.pop(index)
                 return
-            for index, (sub, _, _) in enumerate(self._pull_subscriptions):
-                if sub is not subscription:
+            for index, (psub, _, _) in enumerate(self._pull_subscriptions):
+                if psub is not subscription:
                     continue
                 self._pull_subscriptions.pop(index)
                 return
