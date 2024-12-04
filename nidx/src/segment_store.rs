@@ -98,7 +98,7 @@ pub async fn download_segment(
     let reader = SyncIoBridge::new(reader.compat());
 
     let mut tar = tar::Archive::new(reader);
-    tokio::task::spawn_blocking(move || tar.unpack(output_dir).unwrap()).await?;
+    tokio::task::spawn_blocking(move || tar.unpack(output_dir)).await??;
 
     Ok(())
 }
