@@ -31,6 +31,7 @@ use std::{
 };
 use tokio::sync::watch;
 use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
+use tokio_util::sync::CancellationToken;
 
 pub enum SyncStatus {
     Syncing,
@@ -41,22 +42,29 @@ pub async fn run_sync(
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
     index_metadata: Arc<SyncMetadata>,
+    shutdown: CancellationToken,
     notifier: Sender<IndexId>,
     sync_status: Option<watch::Sender<SyncStatus>>,
 ) -> anyhow::Result<()> {
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
-    loop {
+    while !shutdown.is_cancelled() {
         if let Some(ref sync_status) = sync_status {
             sync_status.send(SyncStatus::Syncing)?;
         }
         let deleted = Index::marked_to_delete(&meta.pool).await?;
         for index_id in deleted.into_iter() {
+            if shutdown.is_cancelled() {
+                break;
+            }
             // TODO: Handle errors
             delete_index(index_id, Arc::clone(&index_metadata), &notifier).await?;
         }
 
         let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
         for index in indexes {
+            if shutdown.is_cancelled() {
+                break;
+            }
             // TODO: Handle errors
             last_updated_at = max(last_updated_at, index.updated_at);
             sync_index(&meta, storage.clone(), Arc::clone(&index_metadata), index, &notifier).await?;
@@ -67,6 +75,8 @@ pub async fn run_sync(
 
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+
+    Ok(())
 }
 
 async fn sync_index(
@@ -240,9 +250,7 @@ impl GuardedIndexMetadata {
     }
 
     pub async fn get(&self) -> Option<RwLockReadGuard<IndexMetadata>> {
-        let Some(m) = self.guard.get(&self.index_id) else {
-            return None;
-        };
+        let m = self.guard.get(&self.index_id)?;
         Some(m.read().await)
     }
 }

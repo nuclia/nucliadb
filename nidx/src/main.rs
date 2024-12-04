@@ -21,8 +21,9 @@
 use nidx::{api, indexer, metrics, scheduler, searcher, settings::EnvSettings, telemetry, worker, Settings};
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;
-use std::sync::Arc;
-use tokio::{net::TcpListener, task::JoinSet};
+use std::{collections::HashMap, sync::Arc};
+use tokio::{net::TcpListener, signal, task::JoinSet};
+use tokio_util::sync::CancellationToken;
 use tracing::*;
 
 // Main wrapper needed to initialize Sentry before Tokio
@@ -58,30 +59,70 @@ async fn do_main(env_settings: EnvSettings) -> anyhow::Result<()> {
     let settings = Settings::from_env_settings(env_settings).await?;
     let mut metrics = Registry::with_prefix("nidx");
 
+    let shutdown = CancellationToken::new();
+
+    let mut task_ids = HashMap::new();
     let mut tasks = JoinSet::new();
     let args: Vec<_> = std::env::args().skip(1).collect();
     args.iter().for_each(|arg| {
         match arg.as_str() {
-            "indexer" => tasks.spawn(indexer::run(settings.clone())),
-            "worker" => tasks.spawn(worker::run(settings.clone())),
+            "indexer" => task_ids.insert(tasks.spawn(indexer::run(settings.clone(), shutdown.clone())).id(), "indexer"),
+            "worker" => task_ids.insert(tasks.spawn(worker::run(settings.clone(), shutdown.clone())).id(), "worker"),
             "scheduler" => {
                 metrics::scheduler::register(&mut metrics);
-                tasks.spawn(scheduler::run(settings.clone()))
+                task_ids.insert(tasks.spawn(scheduler::run(settings.clone(), shutdown.clone())).id(), "scheduler")
             }
-            "searcher" => tasks.spawn(searcher::run(settings.clone())),
-            "api" => tasks.spawn(api::run(settings.clone())),
+            "searcher" => {
+                task_ids.insert(tasks.spawn(searcher::run(settings.clone(), shutdown.clone())).id(), "searcher")
+            }
+            "api" => task_ids.insert(tasks.spawn(api::run(settings.clone(), shutdown.clone())).id(), "api"),
             other => panic!("Unknown component: {other}"),
         };
     });
 
-    tasks.spawn(metrics_server(metrics));
+    // Purposely not tracked, we want metrics until the process finally dies
+    tokio::spawn(metrics_server(metrics));
 
-    while let Some(join_result) = tasks.join_next().await {
-        let task_result = join_result?;
+    let termination_listener = async {
+        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
+        let mut sigquit = signal::unix::signal(signal::unix::SignalKind::quit()).unwrap();
+
+        tokio::select! {
+            _ = sigterm.recv() => info!("Terminating on SIGTERM"),
+            _ = sigquit.recv() => info!("Terminating on SIGQUIT"),
+            _ = signal::ctrl_c() => info!("Terminating on ctrl-c"),
+        }
+    };
+
+    // Wait for termination signal or any task to die
+    tokio::select! {
+        Some(join_result) = tasks.join_next_with_id() => {
+            let (id, result) = join_result.unwrap();
+            let task_name = task_ids.get(&id).unwrap_or(&"<unknown>");
+            if let Err(e) = result {
+                panic!("Task {task_name} finished with error, stopping: {e:?}");
+            } else {
+                panic!("Task {task_name} unexpectedly exited without error");
+            }
+        }
+        _ = termination_listener => {}
+    }
+
+    // Initiate shutdown
+    info!("Initiating graceful shutdown");
+    shutdown.cancel();
+
+    while let Some(join_result) = tasks.join_next_with_id().await {
+        let (id, task_result) = join_result.unwrap();
+        let task_name = task_ids.get(&id).unwrap_or(&"<unknown>");
         if let Err(e) = task_result {
-            panic!("Task finished with error, stopping: {e:?}");
+            panic!("Task {task_name} finished with error, stopping: {e:?}");
+        } else {
+            debug!("Task {task_name} exited without error");
         }
     }
+
+    info!("Successfully shutted down");
 
     Ok(())
 }
