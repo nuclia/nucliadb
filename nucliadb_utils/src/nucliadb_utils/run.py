@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import inspect
 import logging
 import signal
 from typing import Awaitable, Callable
@@ -44,6 +45,9 @@ async def run_until_exit(finalizers: list[Callable[[], Awaitable[None]]], sleep:
 
     for finalizer in finalizers:
         try:
-            await finalizer()
+            if inspect.iscoroutinefunction(finalizer):
+                await finalizer()
+            else:
+                finalizer()
         except Exception:
             logger.exception("Error while finalizing", exc_info=True)

@@ -18,7 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::anyhow;
 use nidx_paragraph::ParagraphIndexer;
@@ -28,7 +32,6 @@ use nidx_types::{OpenIndexMetadata, SegmentMetadata, Seq};
 use nidx_vector::VectorIndexer;
 use object_store::DynObjectStore;
 use serde::Deserialize;
-use tempfile::tempdir;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
@@ -42,6 +45,11 @@ use crate::{
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let storage = settings.storage.as_ref().unwrap().object_store.clone();
     let meta = settings.metadata.clone();
+
+    let work_path = match &settings.work_path {
+        Some(work_path) => PathBuf::from(work_path),
+        None => tempfile::env::temp_dir(),
+    };
 
     while !shutdown.is_cancelled() {
         let job = MergeJob::take(&meta.pool).await?;
@@ -59,7 +67,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
                 }
             });
 
-            match run_job(&meta, &job, storage.clone()).instrument(span).await {
+            match run_job(&meta, &job, storage.clone(), &work_path).instrument(span).await {
                 Ok(_) => info!(job.id, "Job completed"),
                 Err(e) => warn!(job.id, ?e, "Job failed"),
             }
@@ -100,7 +108,12 @@ impl<T: for<'de> Deserialize<'de>> OpenIndexMetadata<T> for MergeInputs {
     }
 }
 
-pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObjectStore>) -> anyhow::Result<()> {
+pub async fn run_job(
+    meta: &NidxMetadata,
+    job: &MergeJob,
+    storage: Arc<DynObjectStore>,
+    work_path: &Path,
+) -> anyhow::Result<()> {
     // TODO: Should jobs be generic or keep the merge_job idea?
     let segments = job.segments(&meta.pool).await?;
     let index = Index::get(&meta.pool, job.index_id).await?;
@@ -112,7 +125,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
     }
     let segment_ids = segments.iter().map(|s| s.id).collect::<Vec<_>>();
     let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, job.seq).await?;
-    let download_dir = tempdir()?;
+    let download_dir = tempfile::tempdir_in(work_path)?;
 
     // Download segments
     let mut download_tasks = JoinSet::new();
@@ -135,7 +148,7 @@ pub async fn run_job(meta: &NidxMetadata, job: &MergeJob, storage: Arc<DynObject
         deletions,
     };
 
-    let work_dir = tempdir()?;
+    let work_dir = tempfile::tempdir_in(work_path)?;
     let work_path = work_dir.path().to_path_buf();
     let vector_config = index.config();
     let span = Span::current();

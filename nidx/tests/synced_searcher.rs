@@ -65,7 +65,15 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
 
     // Index a resource and search for it
     let resource = little_prince(index.shard_id.to_string(), None);
-    index_resource(&meta, storage.clone(), &index.shard_id.to_string(), resource.clone(), 1i64.into()).await?;
+    index_resource(
+        &meta,
+        storage.clone(),
+        &tempfile::env::temp_dir(),
+        &index.shard_id.to_string(),
+        resource.clone(),
+        1i64.into(),
+    )
+    .await?;
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -83,7 +91,8 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
         ..Default::default()
     };
     // We will not use indexer storage here, so it's fine to pass an incorrect indexer storage
-    process_index_message(&meta, storage.clone(), storage.clone(), deletion, 2i64.into()).await?;
+    process_index_message(&meta, storage.clone(), storage.clone(), &tempfile::env::temp_dir(), deletion, 2i64.into())
+        .await?;
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 

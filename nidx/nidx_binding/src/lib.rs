@@ -65,6 +65,7 @@ impl NidxBinding {
                 &self.settings.metadata,
                 object_store,
                 self.settings.storage.as_ref().unwrap().object_store.clone(),
+                &tempfile::env::temp_dir(),
                 msg,
                 seq.into(),
             )

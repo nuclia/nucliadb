@@ -32,7 +32,7 @@ ndb = NucliaDB(region=Region.ON_PREM, api="http://localhost:8080/api")
 
 Then, each method of the `NucliaDB` class maps to an HTTP endpoint of the NucliaDB API. The parameters it accepts correspond to the Pydantic models associated to the request body scheme of the endpoint.
 
-The method-to-endpoint mappings for the sdk are declared in-code [in the _NucliaDBBase class](https://github.com/nuclia/nucliadb/blob/main/nucliadb_sdk/nucliadb_sdk/v2/sdk.py).
+The method-to-endpoint mappings for the sdk are declared in-code [in the _NucliaDBBase class](https://github.com/nuclia/nucliadb/blob/main/nucliadb_sdk/src/nucliadb_sdk/v2/sdk.py).
 
 For instance, to create a resource in your Knowledge Box, the endpoint is defined [here](https://docs.nuclia.dev/docs/api#tag/Resources/operation/Create_Resource_kb__kbid__resources_post).
 

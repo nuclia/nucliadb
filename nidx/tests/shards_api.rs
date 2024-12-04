@@ -65,10 +65,19 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 
     // Index a resource with paragraph/vectors
     let resource = little_prince(shard.id.to_string(), Some(&["multilingual", "english"]));
-    index_resource(&meta, storage.clone(), &shard.id.to_string(), resource.clone(), 1i64.into()).await?;
+    index_resource(
+        &meta,
+        storage.clone(),
+        &tempfile::env::temp_dir(),
+        &shard.id.to_string(),
+        resource.clone(),
+        1i64.into(),
+    )
+    .await?;
     // Index a resource with deletions
     let resource = people_and_places(shard.id.to_string());
-    index_resource(&meta, storage.clone(), &shard.id.to_string(), resource, 2i64.into()).await?;
+    index_resource(&meta, storage.clone(), &tempfile::env::temp_dir(), &shard.id.to_string(), resource, 2i64.into())
+        .await?;
 
     for index in shard.indexes(&meta.pool).await? {
         let segments = index.segments(&meta.pool).await?;
