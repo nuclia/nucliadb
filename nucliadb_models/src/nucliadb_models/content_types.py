@@ -68,6 +68,16 @@ EXTRA_VALID_CONTENT_TYPES = {
     "text/yaml",
     "video/x-m4v",
     "video/YouTube",
+    "image/tif",
+    "video/qt",
+    "video/webp",
+    "application/rtf",
+    "application/x-zip",
+    "video/mkv",
+    "image/x-ico",
+    "audio/m4a",
+    "image/svg+xml",
+    "video/x-msvideo",
 } | NUCLIA_CUSTOM_CONTENT_TYPES
 
 
