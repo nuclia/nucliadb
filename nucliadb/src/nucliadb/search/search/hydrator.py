@@ -70,7 +70,7 @@ class TextBlockHydrationOptions(BaseModel):
 @hydrator_observer.wrap({"type": "resource_text"})
 async def hydrate_resource_text(
     kbid: str, rid: str, *, max_concurrent_tasks: int
-) -> list[Optional[tuple[FieldId, str]]]:
+) -> list[tuple[FieldId, str]]:
     resource = await cache.get_resource(kbid, rid)
     if resource is None:  # pragma: no cover
         return []
