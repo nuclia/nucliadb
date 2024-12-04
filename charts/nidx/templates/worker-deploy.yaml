@@ -69,3 +69,6 @@ spec:
         volumeMounts:
         - name: data-dir
           mountPath: "/data"
+        livenessProbe:
+          exec:
+            command: ["nidx", "ctl", "alive"]

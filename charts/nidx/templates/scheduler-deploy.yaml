@@ -70,3 +70,6 @@ spec:
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
+        livenessProbe:
+          exec:
+            command: ["nidx", "ctl", "alive"]

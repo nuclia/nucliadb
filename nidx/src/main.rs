@@ -101,6 +101,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
 
     let mut task_ids = HashMap::new();
     let mut tasks = JoinSet::new();
+    let mut has_searcher = false;
     components.iter().for_each(|component| {
         let task = match component {
             Component::Indexer => tasks.spawn(indexer::run(settings.clone(), shutdown.clone())),
@@ -110,6 +111,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
                 tasks.spawn(scheduler::run(settings.clone(), shutdown.clone()))
             }
             Component::Searcher => {
+                has_searcher = true;
                 metrics::searcher::register(&mut metrics);
                 metrics::searcher::SYNC_DELAY.set(100_000.0); // Initialize to something large since we don't know yet, but it's not 0
                 tasks.spawn(searcher::run(settings.clone(), shutdown.clone()))
@@ -123,9 +125,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
     tokio::spawn(metrics_server(metrics));
     if let Some(control_socket) = &settings.control_socket {
         let control_socket = control_socket.clone();
-        let control = ControlServer {
-            meta: settings.metadata.clone(),
-        };
+        let mut control = ControlServer::new(settings.metadata.clone(), has_searcher);
         tokio::spawn(async move { control.run(&control_socket).await });
     }
 

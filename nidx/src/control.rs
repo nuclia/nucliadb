@@ -32,10 +32,22 @@ use crate::{metrics, settings::EnvSettings, telemetry, NidxMetadata};
 
 #[derive(Debug, Serialize, Deserialize, clap::Subcommand)]
 pub enum ControlRequest {
+    Alive,
     Ready,
     SetLogLevel {
         level: String,
     },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Alive {
+    database: bool,
+}
+
+impl Alive {
+    fn all_ok(&self) -> bool {
+        self.database
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,10 +56,14 @@ enum ControlResponse {
     Success,
     Failure(String),
 
+    // Response for ControlRequest::Alive
+    Alive(Alive),
+
     // Response for ControlRequest::Ready
     Ready {
-        database: bool,
+        alive: Alive,
         searcher_sync_delay: Option<f64>,
+        searcher_initally_synced: Option<bool>,
     },
 }
 
@@ -62,10 +78,18 @@ impl From<anyhow::Result<()>> for ControlResponse {
 
 pub struct ControlServer {
     pub meta: NidxMetadata,
+    pub searcher_synced: Option<bool>,
 }
 
 impl ControlServer {
-    pub async fn run(&self, socket_path: &Path) -> anyhow::Result<()> {
+    pub fn new(meta: NidxMetadata, has_searcher: bool) -> Self {
+        Self {
+            meta,
+            searcher_synced: has_searcher.then_some(false),
+        }
+    }
+
+    pub async fn run(&mut self, socket_path: &Path) -> anyhow::Result<()> {
         let _ = std::fs::remove_file(socket_path);
         let socket = UnixListener::bind(socket_path)?;
         loop {
@@ -80,7 +104,7 @@ impl ControlServer {
         }
     }
 
-    pub async fn run_connection(&self, mut stream: UnixStream) -> anyhow::Result<()> {
+    pub async fn run_connection(&mut self, mut stream: UnixStream) -> anyhow::Result<()> {
         let mut buf = Vec::new();
         stream.read_to_end(&mut buf).await?;
         let response = self.execute_command(serde_json::from_slice(&buf)?).await;
@@ -90,23 +114,37 @@ impl ControlServer {
         Ok(())
     }
 
-    async fn execute_command(&self, req: ControlRequest) -> ControlResponse {
+    async fn execute_command(&mut self, req: ControlRequest) -> ControlResponse {
         match req {
-            ControlRequest::Ready => {
-                let metric = metrics::searcher::SYNC_DELAY.get();
-                println!("metric={metric:?}");
-                ControlResponse::Ready {
-                    database: self.meta.pool.acquire().await.is_ok(),
-                    searcher_sync_delay: if metric < 0.0 {
-                        None
-                    } else {
-                        Some(metric)
-                    },
-                }
-            }
+            ControlRequest::Alive => ControlResponse::Alive(self.alive().await),
+            ControlRequest::Ready => self.ready().await,
             ControlRequest::SetLogLevel {
                 level,
             } => telemetry::set_log_level(&level).into(),
+        }
+    }
+
+    async fn alive(&self) -> Alive {
+        Alive {
+            database: self.meta.pool.acquire().await.is_ok(),
+        }
+    }
+
+    async fn ready(&mut self) -> ControlResponse {
+        let searcher_sync_delay = if let Some(synced) = self.searcher_synced {
+            let delay = metrics::searcher::SYNC_DELAY.get();
+            if !synced && delay < 60.0 {
+                self.searcher_synced = Some(true)
+            }
+            Some(delay)
+        } else {
+            None
+        };
+
+        ControlResponse::Ready {
+            alive: self.alive().await,
+            searcher_sync_delay,
+            searcher_initally_synced: self.searcher_synced,
         }
     }
 }
@@ -121,13 +159,18 @@ pub fn control_client(settings: &EnvSettings, request: ControlRequest) -> anyhow
     let response: ControlResponse = serde_json::from_reader(stream)?;
     println!("{response:#?}");
 
-    // Special handling for readyness check
-    if let ControlResponse::Ready {
-        database,
-        searcher_sync_delay,
+    // Special handling for liveliness/readyness check
+    if let ControlResponse::Alive(alive) = response {
+        if !alive.all_ok() {
+            return Err(anyhow!("Not alive"));
+        }
+    } else if let ControlResponse::Ready {
+        alive,
+        searcher_sync_delay: _,
+        searcher_initally_synced,
     } = response
     {
-        if !(database && searcher_sync_delay.map(|d| d < 60.0).unwrap_or_default()) {
+        if !(alive.all_ok() && searcher_initally_synced.unwrap_or(true)) {
             return Err(anyhow!("Not ready"));
         }
     }
