@@ -104,8 +104,8 @@ class MessageProgressUpdater:
 class NatsConnectionManager:
     _nc: NATSClient
     _subscriptions: list[tuple[Subscription, Callable[[], Awaitable[None]]]]
-    _pull_subscriptions: dict[
-        str, tuple[JetStreamContext.PullSubscription, asyncio.Task, Callable[[], Awaitable[None]]]
+    _pull_subscriptions: list[
+        tuple[JetStreamContext.PullSubscription, asyncio.Task, Callable[[], Awaitable[None]]]
     ]
     _unhealthy_timeout = 10  # needs to be unhealth for 10 seconds to be unhealthy and force exit
 
@@ -120,7 +120,7 @@ class NatsConnectionManager:
         self._nats_servers = nats_servers
         self._nats_creds = nats_creds
         self._subscriptions = []
-        self._pull_subscriptions = {}
+        self._pull_subscriptions = []
         self._lock = asyncio.Lock()
         self._healthy = True
         self._last_unhealthy: Optional[float] = None
@@ -168,14 +168,14 @@ class NatsConnectionManager:
             self._subscriptions = []
 
             # Finalize pull subscriptions
-            for pull_sub, task, _ in self._pull_subscriptions.values():
+            for pull_sub, task, _ in self._pull_subscriptions:
                 task.cancel()
                 try:
                     await task
                 except asyncio.CancelledError:
                     pass
                 await pull_sub.unsubscribe()
-            self._pull_subscriptions = {}
+            self._pull_subscriptions = []
 
             # Close the connection
             try:
@@ -212,8 +212,8 @@ class NatsConnectionManager:
                     raise
 
             existing_pull_subs = self._pull_subscriptions
-            self._pull_subscriptions = {}
-            for subject, (pull_sub, task, recon_callback) in existing_pull_subs.items():
+            self._pull_subscriptions = []
+            for pull_sub, task, recon_callback in existing_pull_subs:
                 task.cancel()
                 try:
                     await task
@@ -224,7 +224,7 @@ class NatsConnectionManager:
                     await recon_callback()
                 except Exception:
                     logger.exception(
-                        f"Error resubscribing to {subject} on {self._nc.connected_url.netloc}"
+                        f"Error resubscribing to pull subscription on {self._nc.connected_url.netloc}"
                     )
                     # should force exit here to restart the service
                     self._healthy = False
@@ -281,18 +281,18 @@ class NatsConnectionManager:
         subscription_lost_cb: Callable[[], Awaitable[None]],
         durable: Optional[str] = None,
         config: Optional[nats.js.api.ConsumerConfig] = None,
-    ) -> None:
-        pull_sub = await self.js.pull_subscribe(
+    ) -> JetStreamContext.PullSubscription:
+        psub = await self.js.pull_subscribe(
             subject,
             durable=durable,  # type: ignore
             stream=stream,
             config=config,  # type: ignore
         )
 
-        async def consume(pull_sub: JetStreamContext.PullSubscription, subject: str):
+        async def consume(psub: JetStreamContext.PullSubscription, subject: str):
             while True:
                 try:
-                    messages = await pull_sub.fetch(batch=1)
+                    messages = await psub.fetch(batch=1)
                     for message in messages:
                         await cb(message)
                 except asyncio.CancelledError:
@@ -304,30 +304,25 @@ class NatsConnectionManager:
                 except Exception:
                     logger.exception("Error in pull_subscribe task", extra={"subject": subject})
 
-        task = asyncio.create_task(consume(pull_sub, subject), name=f"pull_subscribe_{subject}")
-        self._pull_subscriptions[subject] = (pull_sub, task, subscription_lost_cb)
+        task = asyncio.create_task(consume(psub, subject), name=f"pull_subscribe_{subject}")
+        self._pull_subscriptions.append((psub, task, subscription_lost_cb))
+        return psub
 
-    async def _remove_subscription(self, subscription: Subscription):
+    async def _remove_subscription(
+        self, subscription: Union[Subscription, JetStreamContext.PullSubscription]
+    ):
         async with self._lock:
-            sub_index = None
             for index, (sub, _) in enumerate(self._subscriptions):
                 if sub is not subscription:
                     continue
-                sub_index = index
-                break
-            if sub_index is not None:
-                self._subscriptions.pop(sub_index)
+                self._subscriptions.pop(index)
+                return
+            for index, (sub, _, _) in enumerate(self._pull_subscriptions):
+                if sub is not subscription:
+                    continue
+                self._pull_subscriptions.pop(index)
+                return
 
-    async def unsubscribe(self, subscription: Subscription):
+    async def unsubscribe(self, subscription: Union[Subscription, JetStreamContext.PullSubscription]):
         await subscription.unsubscribe()
         await self._remove_subscription(subscription)
-
-    async def pull_unsubscribe(self, subject: str):
-        try:
-            pull_sub, task, _ = self._pull_subscriptions.pop(subject)
-            task.cancel()
-            await task
-            await pull_sub.unsubscribe()
-        except KeyError:
-            logger.warning(f"Pull subscription {subject} not found")
-            pass

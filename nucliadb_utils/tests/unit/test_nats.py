@@ -129,6 +129,30 @@ class TestNatsConnectionManager:
         nats_conn.drain.assert_called_once()
         nats_conn.close.assert_called_once()
 
+    async def test_pull_unsubscribe(self, manager: nats.NatsConnectionManager, nats_conn, js):
+        await manager.initialize()
+
+        cb = AsyncMock()
+        lost_cb = AsyncMock()
+        psub = await manager.pull_subscribe(
+            subject="subject",
+            stream="stream",
+            cb=cb,
+            subscription_lost_cb=lost_cb,
+            durable="queue",
+        )
+        assert len(manager._pull_subscriptions) == 1
+
+        await manager.unsubscribe(psub)
+
+        psub.unsubscribe.assert_awaited_once()
+        assert len(manager._pull_subscriptions) == 0
+
+        await manager.finalize()
+
+        nats_conn.drain.assert_called_once()
+        nats_conn.close.assert_called_once()
+
 
 async def test_message_progress_updater():
     in_progress = AsyncMock()

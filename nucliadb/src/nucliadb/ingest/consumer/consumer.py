@@ -27,6 +27,7 @@ import nats
 import nats.js.api
 import nats.js.errors
 from nats.aio.client import Msg
+from nats.js import JetStreamContext
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.maindb.driver import Driver
@@ -85,6 +86,7 @@ class IngestConsumer:
 
         self.lock = lock or asyncio.Lock()
         self.processor = Processor(driver, storage, pubsub, partition)
+        self.subscription: Optional[JetStreamContext.PullSubscription] = None
 
     async def ack_message(self, msg: Msg, kbid: Optional[str] = None):
         context = {}
@@ -105,8 +107,8 @@ class IngestConsumer:
             self.initialized = False
 
     async def teardown_nats_subscription(self):
-        subject = const.Streams.INGEST.subject.format(partition=self.partition)
-        await self.nats_connection_manager.pull_unsubscribe(subject)
+        if self.subscription is not None:
+            await self.nats_connection_manager.unsubscribe(self.subscription)
 
     async def setup_nats_subscription(self):
         last_seqid = await sequence_manager.get_last_seqid(self.driver, self.partition)
@@ -114,7 +116,7 @@ class IngestConsumer:
             last_seqid = 1
         subject = const.Streams.INGEST.subject.format(partition=self.partition)
         durable_name = const.Streams.INGEST.group.format(partition=self.partition)
-        await self.nats_connection_manager.pull_subscribe(
+        self.subscription = await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST.name,
             subject=subject,
             durable=durable_name,
@@ -294,9 +296,9 @@ class IngestProcessedConsumer(IngestConsumer):
         This code must be deleted once the new pull consumers are deployed on all environments and all the old push consumers have been deleted.
         From then on, we will rely on the nats server to keep track of the last sequence id.
         """
-        if not has_feature(const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED):
+        if has_feature(const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED):
             logger.warning(
-                f"Feature flag {const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED} is not enabled. Relying on nats to keep track of the last sequence id."
+                f"Feature flag {const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED} is enabled. Relying on nats to keep track of the last sequence id."
             )
             return None
 
@@ -336,7 +338,7 @@ class IngestProcessedConsumer(IngestConsumer):
 
         subject = const.Streams.INGEST_PROCESSED.subject
         durable_name = const.Streams.INGEST_PROCESSED.group
-        await self.nats_connection_manager.pull_subscribe(
+        self.subscription = await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST_PROCESSED.name,
             subject=subject,
             durable=durable_name,
