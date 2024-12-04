@@ -20,6 +20,7 @@
 
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as base64;
@@ -172,7 +173,7 @@ pub struct TelemetrySettings {
 pub struct EnvSettings {
     /// Connection to the metadata database
     /// Mandatory for all components
-    pub metadata: MetadataSettings,
+    pub metadata: Option<MetadataSettings>,
 
     /// Indexing configuration, should match nucliadb
     /// Required by indexer and scheduler
@@ -193,7 +194,10 @@ pub struct EnvSettings {
 
     /// Work path, used by searcher/indexer/worker to create all local files
     /// If not specified, will work with temporary directories inside /tmp
-    pub work_path: Option<String>,
+    pub work_path: Option<PathBuf>,
+
+    /// Path to a UNIX socket to control the nidx process
+    pub control_socket: Option<PathBuf>,
 }
 
 impl EnvSettings {
@@ -234,7 +238,7 @@ impl Settings {
     }
 
     pub async fn from_env_settings(settings: EnvSettings) -> anyhow::Result<Self> {
-        let metadata = NidxMetadata::new(&settings.metadata.database_url).await?;
+        let metadata = NidxMetadata::new(&settings.metadata.as_ref().expect("DB config required").database_url).await?;
         Ok(Self {
             metadata,
             settings,
@@ -258,7 +262,7 @@ mod tests {
             ("MERGE__MIN_NUMBER_OF_SEGMENTS", "1234"),
         ];
         let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
-        assert_eq!(&settings.metadata.database_url, "postgresql://localhost");
+        assert_eq!(&settings.metadata.unwrap().database_url, "postgresql://localhost");
         assert_eq!(&settings.indexer.unwrap().nats_server, "localhost");
         assert_eq!(settings.merge.min_number_of_segments, 1234);
         assert_eq!(settings.merge.max_segment_size, MergeSettings::default().max_segment_size);

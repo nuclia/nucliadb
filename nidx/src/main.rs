@@ -18,7 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx::{api, indexer, metrics, scheduler, searcher, settings::EnvSettings, telemetry, worker, Settings};
+use clap::Parser;
+use nidx::{
+    api,
+    control::{control_client, ControlRequest, ControlServer},
+    indexer, metrics, scheduler, searcher,
+    settings::EnvSettings,
+    telemetry, worker, Settings,
+};
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;
 use std::{collections::HashMap, sync::Arc};
@@ -26,9 +33,36 @@ use tokio::{net::TcpListener, signal, task::JoinSet};
 use tokio_util::sync::CancellationToken;
 use tracing::*;
 
+#[derive(Debug, clap::Parser)]
+struct CommandLine {
+    #[command(subcommand)]
+    cmd: Option<Ctl>,
+    components: Vec<Component>,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum Ctl {
+    #[command(subcommand)]
+    Ctl(ControlRequest),
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum Component {
+    Indexer,
+    Worker,
+    Scheduler,
+    Searcher,
+    Api,
+}
+
 // Main wrapper needed to initialize Sentry before Tokio
 fn main() -> anyhow::Result<()> {
     let env_settings = EnvSettings::from_env();
+    let cmdline = CommandLine::parse();
+
+    if let Some(Ctl::Ctl(cmd_request)) = cmdline.cmd {
+        return control_client(&env_settings, cmd_request);
+    }
 
     let sentry_options = if let Some(sentry) = &env_settings.telemetry.sentry {
         sentry::ClientOptions {
@@ -50,10 +84,14 @@ fn main() -> anyhow::Result<()> {
     };
     let _guard = sentry::init(sentry_options);
 
-    tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(do_main(env_settings))
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(do_main(env_settings, cmdline.components))
 }
 
-async fn do_main(env_settings: EnvSettings) -> anyhow::Result<()> {
+async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyhow::Result<()> {
     telemetry::init(&env_settings.telemetry)?;
 
     let settings = Settings::from_env_settings(env_settings).await?;
@@ -63,25 +101,33 @@ async fn do_main(env_settings: EnvSettings) -> anyhow::Result<()> {
 
     let mut task_ids = HashMap::new();
     let mut tasks = JoinSet::new();
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    args.iter().for_each(|arg| {
-        match arg.as_str() {
-            "indexer" => task_ids.insert(tasks.spawn(indexer::run(settings.clone(), shutdown.clone())).id(), "indexer"),
-            "worker" => task_ids.insert(tasks.spawn(worker::run(settings.clone(), shutdown.clone())).id(), "worker"),
-            "scheduler" => {
+    let mut has_searcher = false;
+    components.iter().for_each(|component| {
+        let task = match component {
+            Component::Indexer => tasks.spawn(indexer::run(settings.clone(), shutdown.clone())),
+            Component::Worker => tasks.spawn(worker::run(settings.clone(), shutdown.clone())),
+            Component::Scheduler => {
                 metrics::scheduler::register(&mut metrics);
-                task_ids.insert(tasks.spawn(scheduler::run(settings.clone(), shutdown.clone())).id(), "scheduler")
+                tasks.spawn(scheduler::run(settings.clone(), shutdown.clone()))
             }
-            "searcher" => {
-                task_ids.insert(tasks.spawn(searcher::run(settings.clone(), shutdown.clone())).id(), "searcher")
+            Component::Searcher => {
+                has_searcher = true;
+                metrics::searcher::register(&mut metrics);
+                metrics::searcher::SYNC_DELAY.set(100_000.0); // Initialize to something large since we don't know yet, but it's not 0
+                tasks.spawn(searcher::run(settings.clone(), shutdown.clone()))
             }
-            "api" => task_ids.insert(tasks.spawn(api::run(settings.clone(), shutdown.clone())).id(), "api"),
-            other => panic!("Unknown component: {other}"),
+            Component::Api => tasks.spawn(api::run(settings.clone(), shutdown.clone())),
         };
+        task_ids.insert(task.id(), component);
     });
 
     // Purposely not tracked, we want metrics until the process finally dies
     tokio::spawn(metrics_server(metrics));
+    if let Some(control_socket) = &settings.control_socket {
+        let control_socket = control_socket.clone();
+        let mut control = ControlServer::new(settings.metadata.clone(), has_searcher);
+        tokio::spawn(async move { control.run(&control_socket).await });
+    }
 
     let termination_listener = async {
         let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
@@ -98,7 +144,7 @@ async fn do_main(env_settings: EnvSettings) -> anyhow::Result<()> {
     tokio::select! {
         Some(join_result) = tasks.join_next_with_id() => {
             let (id, result) = join_result.unwrap();
-            let task_name = task_ids.get(&id).unwrap_or(&"<unknown>");
+            let task_name = task_ids.get(&id).map(|x| format!("{x:?}")).unwrap_or("<unknown>".to_string());
             if let Err(e) = result {
                 panic!("Task {task_name} finished with error, stopping: {e:?}");
             } else {
@@ -114,7 +160,7 @@ async fn do_main(env_settings: EnvSettings) -> anyhow::Result<()> {
 
     while let Some(join_result) = tasks.join_next_with_id().await {
         let (id, task_result) = join_result.unwrap();
-        let task_name = task_ids.get(&id).unwrap_or(&"<unknown>");
+        let task_name = task_ids.get(&id).map(|x| format!("{x:?}")).unwrap_or("<unknown>".to_string());
         if let Err(e) = task_result {
             panic!("Task {task_name} finished with error, stopping: {e:?}");
         } else {

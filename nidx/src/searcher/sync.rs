@@ -19,9 +19,11 @@
 //
 
 use crate::metadata::{Index, IndexId, SegmentId};
+use crate::metrics;
 use crate::{segment_store::download_segment, NidxMetadata};
 use nidx_types::Seq;
 use object_store::DynObjectStore;
+use sqlx::postgres::types::PgInterval;
 use sqlx::types::time::PrimitiveDateTime;
 use sqlx::{Executor, Postgres};
 use std::{cmp::max, sync::Arc, time::Duration};
@@ -38,6 +40,11 @@ pub enum SyncStatus {
     Synced,
 }
 
+pub fn interval_to_duration(interval: PgInterval) -> Duration {
+    let micros = interval.days as u64 * 24 * 3600 * 1_000_000 + interval.microseconds as u64;
+    Duration::from_micros(micros)
+}
+
 pub async fn run_sync(
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
@@ -48,6 +55,17 @@ pub async fn run_sync(
 ) -> anyhow::Result<()> {
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
     while !shutdown.is_cancelled() {
+        let delay = sqlx::query_scalar!(
+            "SELECT NOW() - MIN(updated_at) FROM indexes WHERE updated_at > $1 AND deleted_at IS NULL",
+            last_updated_at
+        )
+        .fetch_one(&meta.pool)
+        .await?;
+
+        // NULL = no indexes to update = 0 delay
+        let delay = delay.map(interval_to_duration).unwrap_or(Duration::ZERO);
+        metrics::searcher::SYNC_DELAY.set(delay.as_secs_f64());
+
         if let Some(ref sync_status) = sync_status {
             sync_status.send(SyncStatus::Syncing)?;
         }
@@ -61,19 +79,25 @@ pub async fn run_sync(
         }
 
         let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
+        let no_updates = indexes.is_empty();
         for index in indexes {
             if shutdown.is_cancelled() {
                 break;
             }
             // TODO: Handle errors
             last_updated_at = max(last_updated_at, index.updated_at);
+
             sync_index(&meta, storage.clone(), Arc::clone(&index_metadata), index, &notifier).await?;
         }
+
         if let Some(ref sync_status) = sync_status {
             sync_status.send(SyncStatus::Synced)?;
         }
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // If we didn't sync anything, wait for a bit
+        if no_updates {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
 
     Ok(())

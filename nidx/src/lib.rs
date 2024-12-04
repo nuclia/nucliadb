@@ -32,5 +32,8 @@ pub mod worker;
 #[cfg(feature = "telemetry")]
 pub mod telemetry;
 
+#[cfg(feature = "telemetry")]
+pub mod control;
+
 pub use metadata::NidxMetadata;
 pub use settings::Settings;

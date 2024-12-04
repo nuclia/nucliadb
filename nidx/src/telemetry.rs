@@ -21,9 +21,14 @@
 mod log_format;
 pub mod middleware;
 
+use std::ops::Deref;
+use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::settings::{LogFormat, TelemetrySettings};
+use arc_swap::ArcSwap;
+use lazy_static::lazy_static;
 use log_format::StructuredFormat;
 use opentelemetry::global::get_text_map_propagator;
 use opentelemetry::propagation::Extractor;
@@ -32,14 +37,36 @@ use opentelemetry::{trace::TracerProvider as _, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{trace::TracerProvider, Resource};
 use tracing_opentelemetry::OpenTelemetrySpanExt as _;
+use tracing_subscriber::layer::Filter;
 use tracing_subscriber::{filter::FilterFn, fmt, prelude::*, EnvFilter};
+
+struct SwappableLogLevelFilter(ArcSwap<EnvFilter>);
+
+impl<S> Filter<S> for &SwappableLogLevelFilter {
+    fn enabled(&self, meta: &tracing::Metadata<'_>, cx: &tracing_subscriber::layer::Context<'_, S>) -> bool {
+        self.0.load().enabled(meta, cx.clone())
+    }
+}
+
+lazy_static! {
+    static ref ENV_FILTER: SwappableLogLevelFilter =
+        SwappableLogLevelFilter(ArcSwap::from_pointee(EnvFilter::from_default_env()));
+}
+
+pub fn set_log_level(log_level: &str) -> anyhow::Result<()> {
+    let env_filter = EnvFilter::from_str(log_level)?;
+    ENV_FILTER.0.store(Arc::new(env_filter));
+
+    Ok(())
+}
 
 pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
     // Configure logging format
-    let env_filter = EnvFilter::from_default_env();
     let log_layer = match settings.log_format {
-        LogFormat::Pretty => fmt::layer().with_filter(env_filter).boxed(),
-        LogFormat::Structured => fmt::layer().json().event_format(StructuredFormat).with_filter(env_filter).boxed(),
+        LogFormat::Pretty => fmt::layer().with_filter(ENV_FILTER.deref()).boxed(),
+        LogFormat::Structured => {
+            fmt::layer().json().event_format(StructuredFormat).with_filter(ENV_FILTER.deref()).boxed()
+        }
     };
 
     // Trace propagation is done in Zipkin format (b3-* headers)

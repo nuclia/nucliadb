@@ -56,11 +56,12 @@ impl NidxFixture {
                     object_store: ObjectStoreConfig::Memory.client(),
                 }),
                 merge: Default::default(),
-                metadata: MetadataSettings {
+                metadata: Some(MetadataSettings {
                     database_url: "ignored".to_string(),
-                },
+                }),
                 telemetry: Default::default(),
                 work_path: None,
+                control_socket: None,
             },
         };
         // API server
