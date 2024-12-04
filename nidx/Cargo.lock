@@ -1765,7 +1765,6 @@ dependencies = [
  "nidx_types",
  "nidx_vector",
  "object_store",
- "once_cell",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-zipkin",
