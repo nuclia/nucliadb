@@ -18,16 +18,50 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx::{api, indexer, metrics, scheduler, searcher, settings::EnvSettings, telemetry, worker, Settings};
+use clap::Parser;
+use nidx::{
+    api,
+    control::{control_client, ControlRequest, ControlServer},
+    indexer, metrics, scheduler, searcher,
+    settings::EnvSettings,
+    telemetry, worker, Settings,
+};
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 use tokio::{net::TcpListener, task::JoinSet};
 use tracing::*;
+
+#[derive(Debug, clap::Parser)]
+struct CommandLine {
+    #[command(subcommand)]
+    cmd: Option<Ctl>,
+    components: Vec<Component>,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum Ctl {
+    #[command(subcommand)]
+    Ctl(ControlRequest),
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum Component {
+    Indexer,
+    Worker,
+    Scheduler,
+    Searcher,
+    Api,
+}
 
 // Main wrapper needed to initialize Sentry before Tokio
 fn main() -> anyhow::Result<()> {
     let env_settings = EnvSettings::from_env();
+    let cmdline = CommandLine::parse();
+
+    if let Some(Ctl::Ctl(cmd_request)) = cmdline.cmd {
+        return control_client(&env_settings, cmd_request);
+    }
 
     let sentry_options = if let Some(sentry) = &env_settings.telemetry.sentry {
         sentry::ClientOptions {
@@ -49,32 +83,41 @@ fn main() -> anyhow::Result<()> {
     };
     let _guard = sentry::init(sentry_options);
 
-    tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(do_main(env_settings))
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(do_main(env_settings, cmdline.components))
 }
 
-async fn do_main(env_settings: EnvSettings) -> anyhow::Result<()> {
+async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyhow::Result<()> {
     telemetry::init(&env_settings.telemetry)?;
 
     let settings = Settings::from_env_settings(env_settings).await?;
     let mut metrics = Registry::with_prefix("nidx");
 
     let mut tasks = JoinSet::new();
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    args.iter().for_each(|arg| {
-        match arg.as_str() {
-            "indexer" => tasks.spawn(indexer::run(settings.clone())),
-            "worker" => tasks.spawn(worker::run(settings.clone())),
-            "scheduler" => {
+    components.iter().for_each(|component| {
+        match component {
+            Component::Indexer => tasks.spawn(indexer::run(settings.clone())),
+            Component::Worker => tasks.spawn(worker::run(settings.clone())),
+            Component::Scheduler => {
                 metrics::scheduler::register(&mut metrics);
                 tasks.spawn(scheduler::run(settings.clone()))
             }
-            "searcher" => tasks.spawn(searcher::run(settings.clone())),
-            "api" => tasks.spawn(api::run(settings.clone())),
-            other => panic!("Unknown component: {other}"),
+            Component::Searcher => {
+                metrics::searcher::register(&mut metrics);
+                tasks.spawn(searcher::run(settings.clone()))
+            }
+            Component::Api => tasks.spawn(api::run(settings.clone())),
         };
     });
 
     tasks.spawn(metrics_server(metrics));
+    let control = ControlServer {
+        meta: settings.metadata.clone(),
+    };
+    tasks.spawn(async move { control.run(Path::new(settings.control_socket.as_ref().unwrap())).await });
 
     while let Some(join_result) = tasks.join_next().await {
         let task_result = join_result?;

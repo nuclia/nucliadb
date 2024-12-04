@@ -19,6 +19,7 @@
 //
 
 use crate::metadata::{Index, IndexId, SegmentId};
+use crate::metrics;
 use crate::{segment_store::download_segment, NidxMetadata};
 use nidx_types::Seq;
 use object_store::DynObjectStore;
@@ -46,6 +47,16 @@ pub async fn run_sync(
 ) -> anyhow::Result<()> {
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
     loop {
+        let delay = sqlx::query_scalar!(
+            "SELECT NOW() + interval '200 month' - MIN(updated_at) FROM indexes WHERE updated_at > $1 AND deleted_at IS NULL",
+            last_updated_at
+        )
+        .fetch_one(&meta.pool)
+        .await?;
+        println!("{delay:?}");
+        let delay_s = delay.map(|x| x.days as f64 * 24.0 * 3600.0 + x.microseconds as f64 / 1_000_000.0).unwrap_or(0.0);
+        metrics::searcher::SYNC_DELAY.set(delay_s);
+
         if let Some(ref sync_status) = sync_status {
             sync_status.send(SyncStatus::Syncing)?;
         }
@@ -56,16 +67,22 @@ pub async fn run_sync(
         }
 
         let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
+        let no_updates = indexes.is_empty();
         for index in indexes {
             // TODO: Handle errors
             last_updated_at = max(last_updated_at, index.updated_at);
+
             sync_index(&meta, storage.clone(), Arc::clone(&index_metadata), index, &notifier).await?;
         }
+
         if let Some(ref sync_status) = sync_status {
             sync_status.send(SyncStatus::Synced)?;
         }
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // If we didn't sync anything, wait for a bit
+        if no_updates {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
 }
 

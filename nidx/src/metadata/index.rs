@@ -159,7 +159,8 @@ impl Index {
             Index,
             r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
                FROM indexes
-               WHERE updated_at > $1 AND deleted_at IS NULL"#,
+               WHERE updated_at > $1 AND deleted_at IS NULL
+               ORDER BY updated_at"#,
             newer_than
         )
         .fetch_all(meta)

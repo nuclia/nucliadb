@@ -103,6 +103,7 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
     let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
     let server = GrpcServer::new("0.0.0.0:10001").await?;
     let api_task = tokio::task::spawn(server.serve(api.into_service()));
+
     let search_task = tokio::task::spawn(async move { searcher.run(storage, None).await });
 
     tokio::select! {
