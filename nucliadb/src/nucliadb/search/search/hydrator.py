@@ -25,9 +25,10 @@ from typing import Optional
 from pydantic import BaseModel
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.search.search import paragraphs
+from nucliadb.search.search import cache, paragraphs
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import (
@@ -36,6 +37,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils import const
+from nucliadb_utils.asyncio_utils import ConcurrentRunner
 from nucliadb_utils.utilities import has_feature
 
 logger = logging.getLogger(__name__)
@@ -65,30 +67,29 @@ class TextBlockHydrationOptions(BaseModel):
     ematches: Optional[list[str]] = None
 
 
-@hydrator_observer.wrap({"type": "text_block"})
-async def hydrate_text_block(
-    kbid: str,
-    text_block: TextBlockMatch,
-    options: TextBlockHydrationOptions,
-    *,
-    concurrency_control: Optional[asyncio.Semaphore] = None,
-) -> TextBlockMatch:
-    """Given a `text_block`, fetch its corresponding text, modify and return the
-    `text_block` object.
+@hydrator_observer.wrap({"type": "resource_text"})
+async def hydrate_resource_text(
+    kbid: str, rid: str, *, max_concurrent_tasks: int
+) -> list[Optional[tuple[FieldId, str]]]:
+    resource = await cache.get_resource(kbid, rid)
+    if resource is None:  # pragma: no cover
+        return []
 
-    """
-    async with AsyncExitStack() as stack:
-        if concurrency_control is not None:
-            await stack.enter_async_context(concurrency_control)
+    # Schedule the extraction of the text of each field in the resource
+    async with get_driver().transaction(read_only=True) as txn:
+        resource.txn = txn
+        runner = ConcurrentRunner(max_tasks=max_concurrent_tasks)
+        for field_type, field_key in await resource.get_fields(force=True):
+            field_id = FieldId.from_pb(rid, field_type, field_key)
+            runner.schedule(hydrate_field_text(kbid, field_id))
 
-        text_block.text = await paragraphs.get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=text_block.paragraph_id,
-            highlight=options.highlight,
-            matches=[],  # TODO: this was never implemented
-            ematches=options.ematches,
-        )
-    return text_block
+        # Include the summary aswell
+        runner.schedule(hydrate_field_text(kbid, FieldId(rid=rid, type="a", key="summary")))
+
+        # Wait for the results
+        field_extracted_texts = await runner.wait()
+
+    return [text for text in field_extracted_texts if text is not None]
 
 
 @hydrator_observer.wrap({"type": "resource_metadata"})
@@ -131,6 +132,43 @@ async def hydrate_resource_metadata(
                     "Resource not found in database", extra={"kbid": kbid, "rid": resource_id}
                 )
     return serialized_resource
+
+
+@hydrator_observer.wrap({"type": "field_text"})
+async def hydrate_field_text(
+    kbid: str,
+    field_id: FieldId,
+) -> Optional[tuple[FieldId, str]]:
+    extracted_text_pb = await cache.get_extracted_text_from_field_id(kbid, field_id)
+    if extracted_text_pb is None:  # pragma: no cover
+        return None
+    return field_id, extracted_text_pb.text
+
+
+@hydrator_observer.wrap({"type": "text_block"})
+async def hydrate_text_block(
+    kbid: str,
+    text_block: TextBlockMatch,
+    options: TextBlockHydrationOptions,
+    *,
+    concurrency_control: Optional[asyncio.Semaphore] = None,
+) -> TextBlockMatch:
+    """Given a `text_block`, fetch its corresponding text, modify and return the
+    `text_block` object.
+
+    """
+    async with AsyncExitStack() as stack:
+        if concurrency_control is not None:
+            await stack.enter_async_context(concurrency_control)
+
+        text_block.text = await paragraphs.get_paragraph_text(
+            kbid=kbid,
+            paragraph_id=text_block.paragraph_id,
+            highlight=options.highlight,
+            matches=[],  # TODO: this was never implemented
+            ematches=options.ematches,
+        )
+    return text_block
 
 
 def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:

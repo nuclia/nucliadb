@@ -182,6 +182,7 @@ async def resources(nucliadb_writer, knowledgebox):
                     "collaborators": [f"collaborator_{i}"],
                     "metadata": {"foo": "bar"},
                 },
+                "usermetadata": {"classifications": [{"labelset": "ls", "label": f"rs-{i}"}]},
             },
         )
         assert resp.status_code in (200, 201)
@@ -226,6 +227,61 @@ async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowl
     assert prompt_context[f"{resource1}/a/title"] == "The title 0"
     assert prompt_context[f"{resource1}/a/summary"] == "The summary 0"
     assert prompt_context[f"{resource1}/t/text_field"] == "The body of the text field"
+    assert prompt_context[f"{resource2}/a/title"] == "The title 1"
+    assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
+    assert prompt_context[f"{resource2}/t/text_field"] == "The body of the text field"
+
+
+@pytest.mark.asyncio()
+async def test_ask_full_resource_rag_strategy_with_exclude(
+    nucliadb_reader: AsyncClient, knowledgebox, resources
+):
+    resource1, resource2 = resources
+
+    predict = get_predict()
+    predict.calls.clear()  # type: ignore
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={
+            "query": "title",
+            "features": ["keyword", "semantic", "relations"],
+            "rag_strategies": [
+                {
+                    "name": "full_resource",
+                    "apply_to": {
+                        "exclude": ["/l/ls/rs-0"],
+                    },
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    ask_response = parse_ask_response(resp)
+    retrieval = None
+    for item in ask_response:
+        if item.item.type == "retrieval":
+            retrieval = item.item.results
+            break
+    assert retrieval is not None
+    paragraphs_ids = set(
+        (
+            paragraph.id
+            for resource in retrieval.resources.values()
+            for field in resource.fields.values()
+            for paragraph in field.paragraphs.values()
+        )
+    )
+    assert paragraphs_ids == set((f"{resource1}/a/title/0-11", f"{resource2}/a/title/0-11"))
+
+    # Make sure the prompt context is properly crafted
+    assert predict.calls[-2][0] == "chat_query_ndjson"  # type: ignore
+    prompt_context = predict.calls[-2][1].query_context  # type: ignore
+
+    # Both titles have matched but resource 1 has been excluded from full
+    # resource, so only the matching paragraph gets in the context
+    assert len(prompt_context) == 4
+    assert prompt_context[f"{resource1}/a/title/0-11"] == "The title 0"
     assert prompt_context[f"{resource2}/a/title"] == "The title 1"
     assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
     assert prompt_context[f"{resource2}/t/text_field"] == "The body of the text field"
