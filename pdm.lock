@@ -5,7 +5,7 @@
 groups = ["default", "dev", "nidx", "sdk", "sidecar"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:7bab3f7385bb318621b804e117005b73c90be34936423ee3b648d5c28a484fb2"
+content_hash = "sha256:1aea0210f27ecd469e751ee24ef7eab2a21b1c50e8642907d8391013834a9a08"
 
 [[metadata.targets]]
 requires_python = ">=3.9"

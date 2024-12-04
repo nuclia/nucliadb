@@ -27,6 +27,7 @@ import pytest
 def nats_manager():
     nats_manager = Mock()
     nats_manager.subscribe = AsyncMock()
+    nats_manager.pull_subscribe = AsyncMock()
     js = Mock()
     js.stream_info = AsyncMock(side_effect=nats.js.errors.NotFoundError)
     js.add_stream = AsyncMock()

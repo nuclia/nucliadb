@@ -30,7 +30,7 @@ class Streams:
 
         name = "nucliadb"
         subject = "ndb.consumer.{partition}"
-        group = "nucliadb-{partition}"
+        group = "nucliadb-pull-{partition}"
 
     class INGEST_PROCESSED:
         """
@@ -40,7 +40,7 @@ class Streams:
 
         name = "nucliadb"
         subject = "ndb.consumer.processed"
-        group = "nucliadb-processed"
+        group = "nucliadb-pull-processed"
 
     class INDEX:
         """
@@ -80,3 +80,4 @@ class Features:
     LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
     NIDX_READS = "nucliadb_nidx_reads"
+    PULL_PROCESSED_CONSUMERS_DEPLOYED = "nucliadb_pull_processed_consumers_deployed"

@@ -117,12 +117,23 @@ class TestNatsConnectionManager:
             subscription_lost_cb=lost_cb,
             flow_control=True,
         )
+        psub = await manager.pull_subscribe(
+            subject="subject",
+            stream="stream",
+            cb=cb,
+            subscription_lost_cb=lost_cb,
+            durable="queue",
+        )
         assert len(manager._subscriptions) == 1
+        assert len(manager._pull_subscriptions) == 1
 
         await manager.unsubscribe(sub)
+        await manager.unsubscribe(psub)
 
         sub.unsubscribe.assert_awaited_once()
+        psub.unsubscribe.assert_awaited_once()
         assert len(manager._subscriptions) == 0
+        assert len(manager._pull_subscriptions) == 0
 
         await manager.finalize()
 

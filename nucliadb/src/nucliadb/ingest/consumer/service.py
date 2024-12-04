@@ -99,6 +99,8 @@ async def start_ingest_consumers(
 
     max_concurrent_processing = asyncio.Semaphore(settings.max_concurrent_ingest_processing)
 
+    consumer_finalizers = []
+
     for partition in settings.partitions:
         consumer = IngestConsumer(
             driver=driver,
@@ -109,8 +111,15 @@ async def start_ingest_consumers(
             lock=max_concurrent_processing,
         )
         await consumer.initialize()
+        consumer_finalizers.append(consumer.finalize)
 
-    return nats_connection_manager.finalize
+    async def _finalize():
+        # Finalize all the consumers and the nats connection manager
+        for consumer_finalize in consumer_finalizers:
+            await consumer_finalize()
+        await nats_connection_manager.finalize()
+
+    return _finalize
 
 
 async def start_ingest_processed_consumer(
