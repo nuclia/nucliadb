@@ -152,9 +152,14 @@ async def create_resource(
 
         writer.source = BrokerMessage.MessageSource.WRITER
 
-        t0 = time()
-        await transaction.commit(writer, partition)
-        txn_time = time() - t0
+        if item.wait_for_commit:
+            t0 = time()
+        await transaction.commit(writer, partition, wait=item.wait_for_commit)
+
+        if item.wait_for_commit:
+            txn_time = time() - t0
+        else:
+            txn_time = None
 
         seqid = await maybe_send_to_process(toprocess, partition)
 
