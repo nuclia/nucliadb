@@ -80,6 +80,13 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile: ...
 
+    async def upload_simple(self, data: bytes) -> None:
+        await self.storage.put_object(
+            self.bucket,
+            self.key,
+            data,
+        )
+
     @abc.abstractmethod
     async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
@@ -208,9 +215,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             txid=reindex_id,
         )
         message_serialized = message.SerializeToString()
-        logger.debug("Starting to upload bytes")
         await self.uploadbytes(self.indexing_bucket, key, message_serialized)
-        logger.debug("Finished to upload bytes")
         return key
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:
@@ -387,23 +392,38 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         filename: str = "payload",
         content_type: str = "",
     ):
-        destination = self.field_klass(storage=self, bucket=bucket, fullkey=key)
+        """
+        Uploads payload bytes to the storage. If the payload is larger than the chunk size, it will
+        be uploaded in chunks (i.e: using the multipart upload). Otherwise, it will be uploaded as a single request.
 
-        cf = CloudFile()
-        cf.filename = filename
-        cf.size = len(payload)
-        cf.content_type = content_type
-        buffer = BytesIO(payload)
+        Parameters:
+        - bucket: the bucket name
+        - key: the storage key where the payload will be stored
+        - payload: the data to be stored
+        - filename: the name of the file
+        """
+        destination: StorageField = self.field_klass(storage=self, bucket=bucket, fullkey=key)
+        if len(payload) > self.chunk_size:
+            cf = CloudFile()
+            cf.filename = filename
+            cf.size = len(payload)
+            cf.content_type = content_type
 
-        async def splitter(alldata: BytesIO):
-            while True:
-                data = alldata.read(CHUNK_SIZE)
-                if data == b"":
-                    break
-                yield data
+            async def splitter(payload: bytes):
+                buffer = BytesIO(payload)
+                while True:
+                    data = buffer.read(self.chunk_size)
+                    if data == b"":
+                        break
+                    yield data
 
-        generator = splitter(buffer)
-        await self.uploaditerator(generator, destination, cf)
+            generator = splitter(payload)
+            await self.uploaditerator(generator, destination, cf)
+        else:
+            await destination.upload_simple(payload)
+
+    @abc.abstractmethod
+    async def put_object(self, bucket_name: str, key: str, data: bytes) -> None: ...
 
     async def uploaditerator(
         self, iterator: AsyncIterator, destination: StorageField, origin: CloudFile

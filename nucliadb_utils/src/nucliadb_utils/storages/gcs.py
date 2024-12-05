@@ -698,6 +698,18 @@ class GCSStorage(Storage):
                     errors.capture_message(msg, "error", scope)
         return deleted, conflict
 
+    @storage_ops_observer.wrap({"type": "put_object"})
+    async def put_object(self, bucket_name: str, key: str, data: bytes) -> None:
+        if self.session is None:  # pragma: no cover
+            raise AttributeError()
+        url = "{}/{}/o/{}".format(self.object_base_url, bucket_name, quote_plus(key))
+        headers = await self.get_access_headers()
+        headers.update({"Content-Type": "application/octet-stream"})
+        async with self.session.put(url, headers=headers, data=data) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                raise GoogleCloudException(f"{resp.status}: {text}")
+
     async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
         if self.session is None:
             raise AttributeError()

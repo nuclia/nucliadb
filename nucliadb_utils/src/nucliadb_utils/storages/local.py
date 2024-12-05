@@ -275,8 +275,12 @@ class LocalStorage(Storage):
         return deleted
 
     async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
-        for key in glob.glob(f"{bucket}/{prefix}*"):
-            yield ObjectInfo(name=key)
+        for key in glob.glob(f"{self.local_testing_files}/{bucket}/{prefix}*"):
+            if key.endswith(".metadata"):
+                # Skip metadata files -- they are internal to the local-storage implementation.
+                continue
+            name = key.split("/")[-1]
+            yield ObjectInfo(name=name)
 
     async def download(self, bucket_name: str, key: str, range: Optional[Range] = None):
         key_path = self.get_file_path(bucket_name, key)
@@ -284,3 +288,8 @@ class LocalStorage(Storage):
             return
         async for chunk in super().download(bucket_name, key, range=range):
             yield chunk
+
+    async def put_object(self, bucket_name: str, key: str, data: bytes) -> None:
+        path = self.get_file_path(bucket_name, key)
+        with open(path, "wb") as file:
+            file.write(data)

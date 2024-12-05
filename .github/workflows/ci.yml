@@ -662,7 +662,6 @@ jobs:
       - nucliadb-tests
       - nucliadb-components-tests
       - python-packages-tests
-      - pre-checks-python-old
     steps:
       - name: CI passed
         run: echo "CI passed"

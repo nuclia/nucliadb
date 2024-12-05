@@ -484,6 +484,14 @@ class S3Storage(Storage):
                     deleted = True
         return deleted, conflict
 
+    @s3_ops_observer.wrap({"type": "put_object"})
+    async def put_object(self, bucket_name: str, key: str, data: bytes) -> None:
+        await self._s3aioclient.put_object(
+            Bucket=bucket_name,
+            Key=key,
+            Body=data,
+        )
+
 
 async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
     exists = True

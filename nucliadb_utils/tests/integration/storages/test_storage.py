@@ -49,9 +49,6 @@ async def test_local_driver(local_storage: LocalStorage):
 
 
 async def storage_test(storage: Storage):
-    example = b"mytestinfo"
-    key1 = "mytest1"
-    key2 = "mytest2"
     kbid1 = uuid4().hex
     kbid2 = uuid4().hex
 
@@ -60,15 +57,41 @@ async def storage_test(storage: Storage):
 
     bucket = storage.get_bucket_name(kbid1)
 
-    await storage.uploadbytes(bucket, key1, example)
-    await storage.uploadbytes(bucket, key2, example)
-    async for data in storage.download(bucket, key1):
-        assert data == example
+    # Upload a small file
+    key0 = "small"
+    smallfile = b"mytestinfo"
+    await storage.uploadbytes(bucket, key0, smallfile)
+    downloaded_data = b""
+    async for chunk in storage.download(bucket, key0):
+        downloaded_data += chunk
+    assert downloaded_data == smallfile
 
+    # Now delete the file
+    await storage.delete_upload(key0, bucket)
+
+    # Add a file with size larger than the chunk size
+    bigfile = b"mytestinfo" * storage.chunk_size
+    key1 = "mytest1"
+    key2 = "mytest2"
+    await storage.uploadbytes(bucket, key1, bigfile)
+    await storage.uploadbytes(bucket, key2, bigfile)
+
+    # Check that the file is there and has the right data
+    for key in (key1, key2):
+        downloaded_data = b""
+        async for chunk in storage.download(bucket, key):
+            downloaded_data += chunk
+        assert downloaded_data == bigfile
+
+    # Delete one of the keys
     await storage.delete_upload(key2, bucket)
 
+    # Check that the downloaded key is not there
+    found = False
     async for object_info in storage.iterate_objects(bucket, ""):
+        found = True
         assert object_info.name == key1
+    assert found
 
     deleted = await storage.schedule_delete_kb(kbid1)
     assert deleted
