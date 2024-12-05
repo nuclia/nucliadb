@@ -45,12 +45,8 @@ from nucliadb_protos.resources_pb2 import (
     Answers,
     Basic,
     Classification,
-    ExtractedTextWrapper,
-    FieldComputedMetadataWrapper,
-    FieldType,
     Metadata,
     PageSelections,
-    Paragraph,
     TokenSplit,
     UserFieldMetadata,
     VisualSelection,
@@ -69,22 +65,8 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
         set_title(bm, toprocess, item.title)
     if item.summary:
         bm.basic.summary = item.summary
-        etw = ExtractedTextWrapper()
-        etw.field.field = "summary"
-        etw.field.field_type = FieldType.GENERIC
-        etw.body.text = item.summary
-        bm.extracted_text.append(etw)
-        fmw = FieldComputedMetadataWrapper()
-        basic_paragraph = Paragraph(
-            start=0, end=len(item.summary), kind=Paragraph.TypeParagraph.DESCRIPTION
-        )
-        fmw.metadata.metadata.paragraphs.append(basic_paragraph)
-        fmw.field.field = "summary"
-        fmw.field.field_type = FieldType.GENERIC
-        bm.field_metadata.append(fmw)
         bm.basic.metadata.useful = True
         bm.basic.metadata.status = Metadata.Status.PENDING
-
         toprocess.genericfield["summary"] = Text(body=item.summary, format=PushTextFormat.PLAIN)
     if item.thumbnail:
         bm.basic.thumbnail = item.thumbnail
