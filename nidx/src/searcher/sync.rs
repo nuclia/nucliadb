@@ -31,9 +31,8 @@ use std::{
     path::PathBuf,
 };
 use std::{sync::Arc, time::Duration};
+use tokio::sync::watch;
 use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
-use tokio::sync::{watch, Semaphore};
-use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
 
@@ -55,9 +54,6 @@ pub async fn run_sync(
     notifier: Sender<IndexId>,
     sync_status: Option<watch::Sender<SyncStatus>>,
 ) -> anyhow::Result<()> {
-    // Limit number of parallel downloads
-    let download_semaphore = Arc::new(Semaphore::const_new(20));
-
     // Keeps track of the `updated_at` date of the most recent synced index, in order
     // to only sync indexes with changes newer than that
     let mut last_updated_at = PrimitiveDateTime::MIN.replace_year(2000)?;
@@ -98,14 +94,14 @@ pub async fn run_sync(
             }
 
             // Update indexes
-            let mut update_tasks = JoinSet::new();
             let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
             let last_index_updated_at = indexes.last().map(|x| x.updated_at);
             let no_updates = indexes.is_empty();
 
             retry_interval = (retry_interval + 1) % 10;
             let retry_indexes = if retry_interval == 0 {
-                let failed_ids: Vec<_> = failed_indexes.keys().collect();
+                let failed_ids: Vec<_> =
+                    failed_indexes.keys().filter(|failed| indexes.iter().all(|i| &&i.id != failed)).collect();
                 Index::get_many(&meta.pool, failed_ids.as_slice()).await?
             } else {
                 vec![]
@@ -117,14 +113,7 @@ pub async fn run_sync(
                 let index_metadata2 = Arc::clone(&index_metadata);
                 let notifier2 = notifier.clone();
                 let storage2 = Arc::clone(&storage);
-                let semaphore = Arc::clone(&download_semaphore);
-                update_tasks.spawn(async move {
-                    (index_id, sync_index(&meta2, storage2, index_metadata2, index, &notifier2, semaphore).await)
-                });
-            }
-            let results = update_tasks.join_all().await;
-            for (index_id, result) in results {
-                if let Err(e) = result {
+                if let Err(e) = sync_index(&meta2, storage2, index_metadata2, index, &notifier2).await {
                     let retries = failed_indexes.entry(index_id).or_default();
                     if *retries > 2 {
                         error!(?index_id, ?e, "Index failed to update multiple times, will keep retrying forever")
@@ -169,40 +158,29 @@ async fn sync_index(
     sync_metadata: Arc<SyncMetadata>,
     index: Index,
     notifier: &Sender<IndexId>,
-    download_semaphore: Arc<Semaphore>,
 ) -> anyhow::Result<()> {
     let operations = Operations::load_for_index(&meta.pool, &index.id).await?;
     let diff = sync_metadata.diff(&index.id, &operations).await;
 
     // Download new segments
-    let mut download_tasks = JoinSet::new();
     for segment_id in diff.added_segments {
-        let semaphore = Arc::clone(&download_semaphore);
         let storage2 = Arc::clone(&storage);
         let location = sync_metadata.segment_location(&index.id, &segment_id);
-        download_tasks.spawn(async move {
-            let _permit = semaphore.acquire().await.unwrap();
-            // Download segment has some built-in retries (in object_store crate)
-            // but failing here is expensive, so we do some extra retries
-            let mut retries = 0;
-            loop {
-                let result = download_segment(storage2.clone(), segment_id, location.clone()).await;
-                if let Err(e) = result {
-                    if retries > 3 {
-                        return Err(e);
-                    }
-                    retries += 1;
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                } else {
-                    return result;
-                }
-            }
-        });
-    }
 
-    let results = download_tasks.join_all().await;
-    for r in results {
-        r?;
+        // Download segment has some built-in retries (in object_store crate)
+        // but failing here is expensive, so we do some extra retries
+        let mut retries = 0;
+        loop {
+            let result = download_segment(storage2.clone(), segment_id, location.clone()).await;
+            if let Err(e) = result {
+                if retries > 3 {
+                    return Err(e);
+                }
+                retries += 1;
+            } else {
+                break;
+            }
+        }
     }
 
     // Switch meta
@@ -373,7 +351,6 @@ mod tests {
     use nidx_vector::config::VectorConfig;
     use object_store::{ObjectStore, PutPayload};
     use tempfile::tempdir;
-    use tokio::sync::Semaphore;
 
     use crate::{
         metadata::{Deletion, Index, Segment, SegmentId, Shard},
@@ -446,7 +423,6 @@ mod tests {
 
     #[sqlx::test]
     async fn test_sync_flow(pool: sqlx::PgPool) -> anyhow::Result<()> {
-        let semaphore = Arc::new(Semaphore::new(100));
         let mut dummy_data = Vec::new();
         tar::Builder::new(BufWriter::new(&mut dummy_data)).finish()?;
 
@@ -466,15 +442,7 @@ mod tests {
         let index_path = work_dir.path().join("1");
 
         // Initial sync with empty data
-        sync_index(
-            &meta,
-            storage.clone(),
-            sync_metadata.clone(),
-            Index::get(&meta.pool, index.id).await?,
-            &tx,
-            Arc::clone(&semaphore),
-        )
-        .await?;
+        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
         // We get a notification even for an empty index (so we don't return errors for empty indexes)
         assert!(rx.try_recv().is_ok());
         // No data yet
@@ -486,15 +454,7 @@ mod tests {
         s1.mark_ready(&meta.pool, 122).await?;
         Deletion::create(&meta.pool, index.id, 1i64.into(), &["k1".to_string()]).await?;
 
-        sync_index(
-            &meta,
-            storage.clone(),
-            sync_metadata.clone(),
-            Index::get(&meta.pool, index.id).await?,
-            &tx,
-            Arc::clone(&semaphore),
-        )
-        .await?;
+        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
         assert_eq!(rx.try_recv()?, index.id);
         assert_eq!(downloaded_segments(&index_path)?, vec![s1.id]);
         {
@@ -509,15 +469,7 @@ mod tests {
         s2.mark_ready(&meta.pool, 122).await?;
         Deletion::create(&meta.pool, index.id, 2i64.into(), &["k2".to_string()]).await?;
 
-        sync_index(
-            &meta,
-            storage.clone(),
-            sync_metadata.clone(),
-            Index::get(&meta.pool, index.id).await?,
-            &tx,
-            Arc::clone(&semaphore),
-        )
-        .await?;
+        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
         assert_eq!(rx.try_recv()?, index.id);
         assert_eq!(downloaded_segments(&index_path)?, vec![s1.id, s2.id]);
         {
@@ -535,15 +487,7 @@ mod tests {
         storage.put(&s3.id.storage_key(), PutPayload::from_iter(dummy_data.iter().cloned())).await?;
         s3.mark_ready(&meta.pool, 122).await?;
 
-        sync_index(
-            &meta,
-            storage.clone(),
-            sync_metadata.clone(),
-            Index::get(&meta.pool, index.id).await?,
-            &tx,
-            Arc::clone(&semaphore),
-        )
-        .await?;
+        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
         assert_eq!(rx.try_recv()?, index.id);
         assert_eq!(downloaded_segments(&index_path)?, vec![s3.id]);
         {
@@ -558,15 +502,7 @@ mod tests {
         // Purge old deletions
         purge_deletions(&meta, 10).await?;
 
-        sync_index(
-            &meta,
-            storage.clone(),
-            sync_metadata.clone(),
-            Index::get(&meta.pool, index.id).await?,
-            &tx,
-            Arc::clone(&semaphore),
-        )
-        .await?;
+        sync_index(&meta, storage.clone(), sync_metadata.clone(), Index::get(&meta.pool, index.id).await?, &tx).await?;
         assert_eq!(rx.try_recv()?, index.id);
         assert_eq!(downloaded_segments(&index_path)?, vec![s3.id]);
         {
