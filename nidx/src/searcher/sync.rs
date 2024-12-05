@@ -182,7 +182,21 @@ async fn sync_index(
         let location = sync_metadata.segment_location(&index.id, &segment_id);
         download_tasks.spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
-            download_segment(storage2, segment_id, location).await
+            // Download segment has some built-in retries (in object_store crate)
+            // but failing here is expensive, so we do some extra retries
+            let mut retries = 0;
+            loop {
+                let result = download_segment(storage2.clone(), segment_id, location.clone()).await;
+                if let Err(e) = result {
+                    if retries > 3 {
+                        return Err(e);
+                    }
+                    retries += 1;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                } else {
+                    return result;
+                }
+            }
         });
     }
 
