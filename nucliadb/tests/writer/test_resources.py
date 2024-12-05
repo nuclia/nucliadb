@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
+from pytest_mock import MockFixture
 
 import nucliadb_models
 from nucliadb.common import datamanagers
@@ -223,6 +224,61 @@ async def test_resource_crud_sync(
         assert (
             await datamanagers.atomic.resources.resource_exists(kbid=knowledgebox_id, rid=rid)
         ) is False
+
+
+@pytest.mark.asyncio
+async def test_create_resource_async(
+    writer_api: Callable[[list[str]], AsyncClient],
+    knowledgebox_writer: str,
+    mocker: MockFixture,
+):
+    """Create a resoure and don't wait for it"""
+    kbid = knowledgebox_writer
+
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
+        from nucliadb.writer.api.v1.resource import transaction
+
+        spy = mocker.spy(transaction, "commit")
+
+        # create and wait for commit
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+            json={
+                "slug": "wait-for-it",
+                "title": "My resource",
+                "texts": {"text1": TEST_TEXT_PAYLOAD},
+                "wait_for_commit": True,
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert "uuid" in data
+        assert "elapsed" in data
+        assert data["elapsed"] is not None
+        rid = data["uuid"]
+        assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
+        assert spy.call_args.kwargs["wait"] is True
+
+        # now without waiting for commit
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+            json={
+                "slug": "no-wait",
+                "title": "My resource",
+                "texts": {"text1": TEST_TEXT_PAYLOAD},
+                "wait_for_commit": False,
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert "uuid" in data
+        assert "elapsed" in data
+        assert data["elapsed"] is None
+        rid = data["uuid"]
+        assert (
+            await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
+        ) is False, "shouldn't be ingest yet"
+        assert spy.call_args.kwargs["wait"] is False
 
 
 @pytest.mark.asyncio

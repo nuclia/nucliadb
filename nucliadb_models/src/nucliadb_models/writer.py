@@ -21,6 +21,7 @@ import json
 from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from nucliadb_models import content_types
 from nucliadb_models.conversation import InputConversationField
@@ -97,6 +98,11 @@ class CreateResourcePayload(BaseModel):
         default=None,
         title="Security",
         description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
+    )
+    wait_for_commit: SkipJsonSchema[bool] = Field(
+        default=True,
+        title="Wait for commit",
+        description="Wait until the new resource have been properly commited to the database (not processed). Setting this to false allow lower latency but new resources may not be accessible right away",  # noqa: E501
     )
 
     @field_validator("icon")
