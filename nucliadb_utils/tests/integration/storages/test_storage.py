@@ -26,6 +26,7 @@ from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.storages.utils import ObjectMetadata
 
 
 @pytest.mark.asyncio
@@ -74,3 +75,30 @@ async def storage_test(storage: Storage):
     assert deleted
 
     await storage.delete_kb(kbid2)
+
+
+@pytest.mark.asyncio
+async def test_put_and_upload(storage: Storage):
+    kbid = uuid4().hex
+    assert await storage.create_kb(kbid)
+    bucket = storage.get_bucket_name(kbid)
+
+    binary = b"mytestinfo"
+    await storage.uploadbytes(bucket, "mytest1", binary, content_type="text/plain", filename="foo.txt")
+    await storage.put_object(
+        bucket,
+        "mytest2",
+        binary,
+        metadata=ObjectMetadata(filename="foo.txt", content_type="text/plain", size=len(binary)),
+    )
+
+    async for data in storage.download(bucket, "mytest1"):
+        assert data == binary
+
+    async for data in storage.download(bucket, "mytest2"):
+        assert data == binary
+
+    expected_names = ["mytest1", "mytest2"]
+    async for item in storage.iterate_objects(bucket, ""):
+        expected_names.remove(item.name)
+    assert len(expected_names) == 0

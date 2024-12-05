@@ -80,6 +80,18 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile: ...
 
+    async def upload_simple(self, data: bytes, origin: CloudFile) -> CloudFile:
+        """
+        By default, this method will upload the data as a single chunk, using
+        the multipart or chunked upload apis. However, specific implementations
+        can override this method to upload the data in a more optimized way.
+        """
+
+        async def simple_iter():
+            yield data
+
+        return await self.upload(simple_iter(), origin)
+
     @abc.abstractmethod
     async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         raise NotImplementedError()
@@ -386,24 +398,31 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         payload: bytes,
         filename: str = "payload",
         content_type: str = "",
+        force_multipart: bool = False,
     ):
-        destination = self.field_klass(storage=self, bucket=bucket, fullkey=key)
+        destination: StorageField = self.field_klass(storage=self, bucket=bucket, fullkey=key)
 
         cf = CloudFile()
         cf.filename = filename
         cf.size = len(payload)
         cf.content_type = content_type
-        buffer = BytesIO(payload)
+        breakpoint()
+        
+        if len(payload) > self.chunk_size or force_multipart:
+            buffer = BytesIO(payload)
 
-        async def splitter(alldata: BytesIO):
-            while True:
-                data = alldata.read(CHUNK_SIZE)
-                if data == b"":
-                    break
-                yield data
+            async def splitter(alldata: BytesIO):
+                while True:
+                    data = alldata.read(CHUNK_SIZE)
+                    if data == b"":
+                        break
+                    yield data
 
-        generator = splitter(buffer)
-        await self.uploaditerator(generator, destination, cf)
+            generator = splitter(buffer)
+            await self.uploaditerator(generator, destination, cf)
+
+        else:
+            await destination.upload_simple(payload, cf)
 
     async def uploaditerator(
         self, iterator: AsyncIterator, destination: StorageField, origin: CloudFile

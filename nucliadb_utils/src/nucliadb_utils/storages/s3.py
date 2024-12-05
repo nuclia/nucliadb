@@ -336,6 +336,24 @@ class S3StorageField(StorageField):
         await self.finish()
         return self.field
 
+    async def upload_simple(self, data: bytes, origin: CloudFile) -> CloudFile:
+        if self.field is not None and self.field.uri != "":
+            raise AttributeError("Field already has a file beeing uploaded")
+        self.field = CloudFile(
+            filename=origin.filename,
+            size=origin.size,
+            md5=origin.md5,
+            content_type=origin.content_type,
+            bucket_name=self.bucket,
+            source=CloudFile.S3,
+        )
+        await self.storage.put_object(
+            self.field.bucket_name,
+            self.key,
+            data,
+        )
+        return self.field
+
     def __repr__(self):
         return f"{self.storage.source}: {self.bucket}/{self.key}"
 
@@ -483,6 +501,22 @@ class S3Storage(Storage):
                 if error_code in (200, 204):
                     deleted = True
         return deleted, conflict
+
+    async def put_object(
+        self, bucket_name: str, uri: str, data: bytes, metadata: Optional[ObjectMetadata] = None
+    ):
+        await self._s3aioclient.put_object(
+            Bucket=bucket_name,
+            Key=uri,
+            Body=data,
+            Metadata={
+                "FILENAME": metadata.filename,
+                "SIZE": str(metadata.size),
+                "CONTENT_TYPE": metadata.content_type,
+            }
+            if metadata
+            else {},
+        )
 
 
 async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
