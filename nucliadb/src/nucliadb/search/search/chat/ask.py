@@ -361,6 +361,7 @@ class AskResult:
                 self.prompt_context, self.prompt_context_order
             )
             response.prompt_context = sorted_prompt_context
+            response.predict_request = self.debug_chat_model
         return response.model_dump_json(exclude_none=True, by_alias=True)
 
     async def get_relations_results(self) -> Relations:
