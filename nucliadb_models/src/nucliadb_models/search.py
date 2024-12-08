@@ -1516,8 +1516,6 @@ If empty, the default strategy is used, which simply adds the text of the matchi
     )
     debug: bool = SearchParamDefaults.debug.to_pydantic_field()
 
-    debug_context: bool = SearchParamDefaults.debug.to_pydantic_field()
-
     generative_model: Optional[str] = Field(
         default=None,
         title="Generative model",
