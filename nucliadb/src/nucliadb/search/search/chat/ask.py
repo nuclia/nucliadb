@@ -37,7 +37,10 @@ from nucliadb.search.predict import (
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
-from nucliadb.search.search.chat.exceptions import AnswerJsonSchemaTooLong, NoRetrievalResultsError
+from nucliadb.search.search.chat.exceptions import (
+    AnswerJsonSchemaTooLong,
+    NoRetrievalResultsError,
+)
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
@@ -127,6 +130,7 @@ class AskResult:
         auditor: ChatAuditor,
         metrics: RAGMetrics,
         best_matches: list[RetrievalMatch],
+        debug_chat_model: Optional[ChatModel],
     ):
         # Initial attributes
         self.kbid = kbid
@@ -136,6 +140,7 @@ class AskResult:
         self.nuclia_learning_id = nuclia_learning_id
         self.predict_answer_stream = predict_answer_stream
         self.prompt_context = prompt_context
+        self.debug_chat_model = debug_chat_model
         self.prompt_context_order = prompt_context_order
         self.auditor: ChatAuditor = auditor
         self.metrics: RAGMetrics = metrics
@@ -181,7 +186,9 @@ class AskResult:
                 f"Unexpected error while generating the answer: {exc}",
                 extra={"kbid": self.kbid},
             )
-            error_message = "Unexpected error while generating the answer. Please try again later."
+            error_message = (
+                "Unexpected error while generating the answer. Please try again later."
+            )
             if self.ask_request_with_debug_flag:
                 error_message += f" Error: {exc}"
             item = ErrorAskResponseItem(error=error_message)
@@ -274,14 +281,17 @@ class AskResult:
                     output=self._metadata.output_tokens,
                 ),
                 timings=AskTimings(
-                    generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
+                    generative_first_chunk=self._metadata.timings.get(
+                        "generative_first_chunk"
+                    ),
                     generative_total=self._metadata.timings.get("generative"),
                 ),
             )
 
         # Stream out the relations results
         should_query_relations = (
-            self.ask_request_with_relations and self.status_code == AnswerStatusCode.SUCCESS
+            self.ask_request_with_relations
+            and self.status_code == AnswerStatusCode.SUCCESS
         )
         if should_query_relations:
             relations = await self.get_relations_results()
@@ -293,7 +303,8 @@ class AskResult:
                 metadata={
                     "prompt_context": sorted_prompt_context_list(
                         self.prompt_context, self.prompt_context_order
-                    )
+                    ),
+                    "chat_model": self.debug_chat_model,
                 }
             )
 
@@ -310,7 +321,9 @@ class AskResult:
                     output=self._metadata.output_tokens,
                 ),
                 timings=AskTimings(
-                    generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
+                    generative_first_chunk=self._metadata.timings.get(
+                        "generative_first_chunk"
+                    ),
                     generative_total=self._metadata.timings.get("generative"),
                 ),
             )
@@ -402,7 +415,9 @@ class NotEnoughContextAskResult(AskResult):
         main_results: Optional[KnowledgeboxFindResults] = None,
         prequeries_results: Optional[list[PreQueryResult]] = None,
     ):
-        self.main_results = main_results or KnowledgeboxFindResults(resources={}, min_score=None)
+        self.main_results = main_results or KnowledgeboxFindResults(
+            resources={}, min_score=None
+        )
         self.prequeries_results = prequeries_results or []
         self.nuclia_learning_id = None
 
@@ -415,7 +430,9 @@ class NotEnoughContextAskResult(AskResult):
         yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
         status = AnswerStatusCode.NO_CONTEXT
-        yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
+        yield self._ndjson_encode(
+            StatusAskResponseItem(code=status.value, status=status.prettify())
+        )
 
     async def json(self) -> str:
         return SyncAskResponse(
@@ -483,7 +500,9 @@ async def ask(
         max_tokens_context = await query_parser.get_max_tokens_context()
         prompt_context_builder = PromptContextBuilder(
             kbid=kbid,
-            ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
+            ordered_paragraphs=[
+                match.paragraph for match in retrieval_results.best_matches
+            ],
             resource=resource,
             user_context=user_context,
             strategies=ask_request.rag_strategies,
@@ -502,7 +521,9 @@ async def ask(
     chat_model = ChatModel(
         user_id=user_id,
         system=custom_prompt.system,
-        user_prompt=UserPrompt(prompt=custom_prompt.user) if custom_prompt.user else None,
+        user_prompt=UserPrompt(prompt=custom_prompt.user)
+        if custom_prompt.user
+        else None,
         query_context=prompt_context,
         query_context_order=prompt_context_order,
         chat_history=chat_history,
@@ -524,6 +545,9 @@ async def ask(
             nuclia_learning_model,
             predict_answer_stream,
         ) = await predict.chat_query_ndjson(kbid, chat_model)
+        debug_chat_model = None
+        if ask_request.debug_context:
+            debug_chat_model = chat_model
 
     auditor = ChatAuditor(
         kbid=kbid,
@@ -550,6 +574,7 @@ async def ask(
         auditor=auditor,
         metrics=metrics,
         best_matches=retrieval_results.best_matches,
+        debug_chat_model=debug_chat_model,
     )
 
 
@@ -668,7 +693,8 @@ async def retrieval_in_kb(
             prequeries_strategy=prequeries,
         )
         if len(main_results.resources) == 0 and all(
-            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+            len(prequery_result.resources) == 0
+            for (_, prequery_result) in prequeries_results or []
         ):
             raise NoRetrievalResultsError(main_results, prequeries_results)
 
@@ -716,7 +742,11 @@ async def retrieval_in_resource(
         )
 
     prequeries = parse_prequeries(ask_request)
-    if prequeries is None and ask_request.answer_json_schema is not None and main_query == "":
+    if (
+        prequeries is None
+        and ask_request.answer_json_schema is not None
+        and main_query == ""
+    ):
         prequeries = calculate_prequeries_for_json_schema(ask_request)
 
     # Make sure the retrieval is scoped to the resource if provided
@@ -742,7 +772,8 @@ async def retrieval_in_resource(
             prequeries_strategy=prequeries,
         )
         if len(main_results.resources) == 0 and all(
-            len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
+            len(prequery_result.resources) == 0
+            for (_, prequery_result) in prequeries_results or []
         ):
             raise NoRetrievalResultsError(main_results, prequeries_results)
     main_query_weight = prequeries.main_query_weight if prequeries is not None else 1.0
@@ -783,7 +814,9 @@ def compute_best_matches(
                 for paragraph in field.paragraphs.values():
                     yield paragraph
 
-    total_weights = main_query_weight + sum(prequery.weight for prequery, _ in prequeries_results or [])
+    total_weights = main_query_weight + sum(
+        prequery.weight for prequery, _ in prequeries_results or []
+    )
     paragraph_id_to_match: dict[str, RetrievalMatch] = {}
     for paragraph in iter_paragraphs(main_results):
         normalized_weight = main_query_weight / total_weights
@@ -808,10 +841,16 @@ def compute_best_matches(
                     weighted_score=weighted_score,
                 )
 
-    return sorted(paragraph_id_to_match.values(), key=lambda match: match.weighted_score, reverse=True)
+    return sorted(
+        paragraph_id_to_match.values(),
+        key=lambda match: match.weighted_score,
+        reverse=True,
+    )
 
 
-def calculate_prequeries_for_json_schema(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
+def calculate_prequeries_for_json_schema(
+    ask_request: AskRequest,
+) -> Optional[PreQueriesStrategy]:
     """
     This function generates a PreQueriesStrategy with a query for each property in the JSON schema
     found in ask_request.answer_json_schema.
