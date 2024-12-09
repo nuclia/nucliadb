@@ -553,28 +553,35 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
+        tasks = []
+
         for question_answers in message.question_answers:
-            await self._apply_question_answers(question_answers)
+            tasks.append(asyncio.create_task(self._apply_question_answers(question_answers)))
 
         for extracted_text in message.extracted_text:
-            await self._apply_extracted_text(extracted_text)
+            tasks.append(asyncio.create_task(self._apply_extracted_text(extracted_text)))
 
         extracted_languages = []
 
         for link_extracted_data in message.link_extracted_data:
-            await self._apply_link_extracted_data(link_extracted_data)
-            await self.maybe_update_resource_title_from_link(link_extracted_data)
+            tasks.append(asyncio.create_task(self._apply_link_extracted_data(link_extracted_data)))
+            tasks.append(
+                asyncio.create_task(self.maybe_update_resource_title_from_link(link_extracted_data))
+            )
             extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
-            await self._apply_file_extracted_data(file_extracted_data)
+            tasks.append(asyncio.create_task(self._apply_file_extracted_data(file_extracted_data)))
             extracted_languages.append(file_extracted_data.language)
+
+        await asyncio.gather(*tasks)
 
         await self.maybe_update_resource_title_from_file_extracted_data(message)
 
         # Metadata should go first
+        tasks = []
         for field_metadata in message.field_metadata:
-            await self._apply_field_computed_metadata(field_metadata)
+            tasks.append(asyncio.create_task(self._apply_field_computed_metadata(field_metadata)))
             extracted_languages.extend(extract_field_metadata_languages(field_metadata))
 
         update_basic_languages(self.basic, extracted_languages)
@@ -583,11 +590,13 @@ class Resource:
         # Vector indexing
         if self.disable_vectors is False:
             for field_vectors in message.field_vectors:
-                await self._apply_extracted_vectors(field_vectors)
+                tasks.append(asyncio.create_task(self._apply_extracted_vectors(field_vectors)))
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
-            await self._apply_field_large_metadata(field_large_metadata)
+            tasks.append(asyncio.create_task(self._apply_field_large_metadata(field_large_metadata)))
+
+        await asyncio.gather(*tasks)
 
         for relation in message.relations:
             self.indexer.brain.relations.append(relation)
