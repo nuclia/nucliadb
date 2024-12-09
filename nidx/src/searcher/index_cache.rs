@@ -32,12 +32,13 @@ use nidx_types::{OpenIndexMetadata, SegmentMetadata, Seq};
 use nidx_vector::VectorSearcher;
 use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore};
+use uuid::Uuid;
 
 use crate::metadata::{IndexId, IndexKind, Segment, SegmentId};
 use crate::metrics::searcher::{IndexKindLabels, INDEX_LOAD_TIME};
 use crate::NidxMetadata;
 
-use super::sync::{Operations, SyncMetadata};
+use super::sync::{Operations, ShardIndexes, SyncMetadata};
 
 pub enum IndexSearcher {
     Paragraph(ParagraphSearcher),
@@ -121,6 +122,10 @@ impl IndexCache {
             sync_metadata: metadata,
             metadb,
         }
+    }
+
+    pub async fn get_shard_indexes(&self, shard_id: &Uuid) -> Option<ShardIndexes> {
+        self.sync_metadata.get_shard_indexes(shard_id).await
     }
 
     pub async fn get(&self, id: &IndexId) -> anyhow::Result<Arc<IndexSearcher>> {

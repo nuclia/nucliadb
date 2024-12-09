@@ -24,24 +24,24 @@ use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{DocumentItem, ParagraphItem, StreamRequest};
 use nidx_text::TextSearcher;
 
-use crate::{
-    errors::{NidxError, NidxResult},
-    metadata::{Index, IndexKind},
-    NidxMetadata,
-};
+use crate::errors::{NidxError, NidxResult};
 
 use super::index_cache::IndexCache;
 
 pub async fn paragraph_iterator(
-    meta: &NidxMetadata,
     index_cache: Arc<IndexCache>,
     request: StreamRequest,
 ) -> NidxResult<impl Iterator<Item = ParagraphItem>> {
     let shard_id = uuid::Uuid::parse_str(&request.shard_id.as_ref().unwrap().id)?;
 
-    // TODO: Avoid querying here, the information can be take from synced metadata
-    let paragraph_index = Index::find(&meta.pool, shard_id, IndexKind::Paragraph, "paragraph").await?;
-    let paragraph_searcher_arc = index_cache.get(&paragraph_index.id).await?;
+    let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
+        return Err(NidxError::NotFound);
+    };
+
+    let Some(paragraph_index) = indexes.paragraph_index() else {
+        return Err(NidxError::NotFound);
+    };
+    let paragraph_searcher_arc = index_cache.get(&paragraph_index).await?;
 
     tokio::task::spawn_blocking(move || {
         let paragraph_searcher: &ParagraphSearcher = paragraph_searcher_arc.as_ref().into();
@@ -52,15 +52,19 @@ pub async fn paragraph_iterator(
 }
 
 pub async fn document_iterator(
-    meta: &NidxMetadata,
     index_cache: Arc<IndexCache>,
     request: StreamRequest,
 ) -> NidxResult<impl Iterator<Item = DocumentItem>> {
     let shard_id = uuid::Uuid::parse_str(&request.shard_id.as_ref().unwrap().id)?;
 
-    // TODO: Avoid querying here, the information can be take from synced metadata
-    let text_index = Index::find(&meta.pool, shard_id, IndexKind::Text, "text").await?;
-    let text_searcher_arc = index_cache.get(&text_index.id).await?;
+    let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
+        return Err(NidxError::NotFound);
+    };
+
+    let Some(text_index) = indexes.text_index() else {
+        return Err(NidxError::NotFound);
+    };
+    let text_searcher_arc = index_cache.get(&text_index).await?;
 
     tokio::task::spawn_blocking(move || {
         let text_searcher: &TextSearcher = text_searcher_arc.as_ref().into();

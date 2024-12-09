@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::metadata::{Index, IndexId, SegmentId};
+use crate::metadata::{Index, IndexId, IndexKind, SegmentId};
 use crate::metrics;
 use crate::{segment_store::download_segment, NidxMetadata};
 use nidx_types::Seq;
@@ -35,6 +35,7 @@ use tokio::sync::watch;
 use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
 use tokio_util::sync::CancellationToken;
 use tracing::*;
+use uuid::Uuid;
 
 pub enum SyncStatus {
     Syncing,
@@ -85,12 +86,13 @@ pub async fn run_sync(
 
             // Remove deleted indexes
             let deleted = Index::marked_to_delete(&meta.pool).await?;
-            for index_id in deleted.into_iter() {
+            for index in deleted.into_iter() {
                 if shutdown.is_cancelled() {
                     break;
                 }
 
-                if let Err(e) = delete_index(index_id, Arc::clone(&index_metadata), &notifier).await {
+                let index_id = index.id;
+                if let Err(e) = delete_index(index, Arc::clone(&index_metadata), &notifier).await {
                     warn!(?e, ?index_id, "Could not delete index, some files will be left behind");
                 }
             }
@@ -210,19 +212,19 @@ async fn sync_index(
 }
 
 async fn delete_index(
-    index_id: IndexId,
+    index: Index,
     sync_metadata: Arc<SyncMetadata>,
     notifier: &Sender<IndexId>,
 ) -> anyhow::Result<()> {
-    if sync_metadata.delete(&index_id).await {
+    if sync_metadata.delete(&index).await {
         // remove directory for the index, effectively deleting all segment data
         // stored locally
-        let index_location = sync_metadata.index_location(&index_id);
+        let index_location = sync_metadata.index_location(&index.id);
         match tokio::fs::remove_dir_all(index_location).await {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
             _ => (),
         }
-        notifier.send(index_id).await?;
+        notifier.send(index.id).await?;
     }
     Ok(())
 }
@@ -278,9 +280,74 @@ pub struct IndexMetadata {
     pub operations: Operations,
 }
 
+#[derive(Clone, Debug)]
+pub struct ShardIndex {
+    id: IndexId,
+    kind: IndexKind,
+    name: String,
+}
+
+impl ShardIndex {
+    fn new(from: &Index) -> Self {
+        Self {
+            id: from.id,
+            kind: from.kind,
+            name: from.name.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct ShardIndexes(Vec<ShardIndex>);
+
+impl ShardIndexes {
+    fn push(&mut self, index: ShardIndex) {
+        if !self.0.iter().any(|i| index.id == i.id) {
+            self.0.push(index);
+        }
+    }
+
+    fn remove(&mut self, index_id: &IndexId) {
+        if let Some(pos) = self.0.iter().position(|i| i.id == *index_id) {
+            self.0.swap_remove(pos);
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn single_index_by_kind(&self, kind: IndexKind) -> Option<IndexId> {
+        let indexes: Vec<_> = self.0.iter().filter(|i| i.kind == kind).collect();
+        if indexes.len() > 2 {
+            error!(?indexes, "Unexpected multiple indexes of the same kind for the same shard");
+            None
+        } else {
+            indexes.first().map(|i| i.id)
+        }
+    }
+
+    pub fn paragraph_index(&self) -> Option<IndexId> {
+        self.single_index_by_kind(IndexKind::Paragraph)
+    }
+
+    pub fn text_index(&self) -> Option<IndexId> {
+        self.single_index_by_kind(IndexKind::Text)
+    }
+
+    pub fn relation_index(&self) -> Option<IndexId> {
+        self.single_index_by_kind(IndexKind::Relation)
+    }
+
+    pub fn vector_index(&self, name: &str) -> Option<IndexId> {
+        self.0.iter().filter(|i| i.kind == IndexKind::Vector && i.name == name).map(|i| i.id).next()
+    }
+}
+
 pub struct SyncMetadata {
     work_dir: PathBuf,
     synced_metadata: Arc<RwLock<HashMap<IndexId, RwLock<IndexMetadata>>>>,
+    shard_metadata: RwLock<HashMap<Uuid, ShardIndexes>>,
 }
 
 impl SyncMetadata {
@@ -288,6 +355,7 @@ impl SyncMetadata {
         SyncMetadata {
             work_dir,
             synced_metadata: Arc::new(RwLock::new(HashMap::new())),
+            shard_metadata: RwLock::new(HashMap::new()),
         }
     }
 
@@ -319,6 +387,8 @@ impl SyncMetadata {
             existing_meta.write().await.operations = operations;
         } else {
             drop(read_meta);
+            let shard_id = index.shard_id;
+            let shard_index = ShardIndex::new(&index);
             self.synced_metadata.write().await.insert(
                 index.id,
                 RwLock::new(IndexMetadata {
@@ -326,6 +396,7 @@ impl SyncMetadata {
                     operations,
                 }),
             );
+            self.shard_metadata.write().await.entry(shard_id).or_default().push(shard_index);
         }
     }
 
@@ -333,8 +404,23 @@ impl SyncMetadata {
         GuardedIndexMetadata::new(self.synced_metadata.clone().read_owned().await, *index_id)
     }
 
-    pub async fn delete(&self, index_id: &IndexId) -> bool {
-        self.synced_metadata.write().await.remove(index_id).is_some()
+    pub async fn delete(&self, index: &Index) -> bool {
+        let removed = self.synced_metadata.write().await.remove(&index.id).is_some();
+
+        let mut write_shard_metadata = self.shard_metadata.write().await;
+        let shard_entry = write_shard_metadata.get_mut(&index.shard_id);
+        if let Some(shard) = shard_entry {
+            shard.remove(&index.id);
+            if shard.is_empty() {
+                write_shard_metadata.remove(&index.shard_id);
+            }
+        }
+
+        removed
+    }
+
+    pub async fn get_shard_indexes(&self, shard_id: &Uuid) -> Option<ShardIndexes> {
+        self.shard_metadata.read().await.get(shard_id).cloned()
     }
 }
 

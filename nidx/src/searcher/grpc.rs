@@ -25,21 +25,17 @@ use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
 use tonic::{service::Routes, Request, Response, Result, Status};
 
-use crate::NidxMetadata;
-
 use super::streams::{document_iterator, paragraph_iterator};
 use super::{index_cache::IndexCache, shard_search, shard_suggest};
 use tracing::*;
 
 pub struct SearchServer {
-    meta: NidxMetadata,
     index_cache: Arc<IndexCache>,
 }
 
 impl SearchServer {
-    pub fn new(meta: NidxMetadata, index_cache: Arc<IndexCache>) -> Self {
+    pub fn new(index_cache: Arc<IndexCache>) -> Self {
         SearchServer {
-            meta,
             index_cache,
         }
     }
@@ -52,7 +48,7 @@ impl SearchServer {
 #[tonic::async_trait]
 impl NidxSearcher for SearchServer {
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        let response = shard_search::search(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
+        let response = shard_search::search(Arc::clone(&self.index_cache), request.into_inner()).await;
         match response {
             Ok(response) => Ok(Response::new(response)),
             Err(e) => {
@@ -63,7 +59,7 @@ impl NidxSearcher for SearchServer {
     }
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
-        let response = shard_suggest::suggest(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
+        let response = shard_suggest::suggest(Arc::clone(&self.index_cache), request.into_inner()).await;
         match response {
             Ok(response) => Ok(Response::new(response)),
             Err(e) => {
@@ -76,7 +72,7 @@ impl NidxSearcher for SearchServer {
     type ParagraphsStream = Pin<Box<dyn Stream<Item = Result<ParagraphItem, Status>> + Send>>;
 
     async fn paragraphs(&self, request: Request<StreamRequest>) -> Result<Response<Self::ParagraphsStream>> {
-        let response = paragraph_iterator(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
+        let response = paragraph_iterator(Arc::clone(&self.index_cache), request.into_inner()).await;
         match response {
             Ok(response) => Ok(Response::new(Box::pin(futures::stream::iter(response.map(Result::Ok))))),
             Err(e) => {
@@ -88,7 +84,7 @@ impl NidxSearcher for SearchServer {
     type DocumentsStream = Pin<Box<dyn Stream<Item = Result<DocumentItem, Status>> + Send>>;
 
     async fn documents(&self, request: Request<StreamRequest>) -> Result<Response<Self::DocumentsStream>> {
-        let response = document_iterator(&self.meta, Arc::clone(&self.index_cache), request.into_inner()).await;
+        let response = document_iterator(Arc::clone(&self.index_cache), request.into_inner()).await;
         match response {
             Ok(response) => Ok(Response::new(Box::pin(futures::stream::iter(response.map(Result::Ok))))),
             Err(e) => {
