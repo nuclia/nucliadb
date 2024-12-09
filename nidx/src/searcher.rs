@@ -46,6 +46,7 @@ use tempfile::tempdir;
 
 use crate::grpc_server::GrpcServer;
 use crate::metadata::IndexId;
+use crate::metrics::searcher::REFRESH_QUEUE_LEN;
 use crate::{NidxMetadata, Settings};
 
 pub use index_cache::IndexSearcher;
@@ -84,6 +85,8 @@ async fn refresher_task(mut rx: Receiver<IndexId>, index_cache: Arc<IndexCache>)
                 }
             }
         }
+        let pending_refreshes = rx.max_capacity() - rx.capacity();
+        REFRESH_QUEUE_LEN.set(pending_refreshes as i64);
     }
 }
 

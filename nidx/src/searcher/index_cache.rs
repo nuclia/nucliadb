@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Weak};
+use std::time::Instant;
 
 use anyhow::anyhow;
 use lru::LruCache;
@@ -33,6 +34,7 @@ use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore};
 
 use crate::metadata::{IndexId, IndexKind, Segment, SegmentId};
+use crate::metrics::searcher::{IndexKindLabels, INDEX_LOAD_TIME};
 use crate::NidxMetadata;
 
 use super::sync::{Operations, SyncMetadata};
@@ -155,6 +157,7 @@ impl IndexCache {
     }
 
     pub async fn load(&self, id: &IndexId) -> anyhow::Result<Arc<IndexSearcher>> {
+        let t = Instant::now();
         let read = self.sync_metadata.get(id).await;
         let read2 = read.get().await;
         let Some(meta) = read2 else {
@@ -180,6 +183,7 @@ impl IndexCache {
             IndexKind::Vector => IndexSearcher::Vector(VectorSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Relation => IndexSearcher::Relation(RelationSearcher::open(open_index)?),
         };
+        INDEX_LOAD_TIME.get_or_create(&IndexKindLabels::new(meta.index.kind)).observe(t.elapsed().as_secs_f64());
 
         Ok(Arc::new(searcher))
     }

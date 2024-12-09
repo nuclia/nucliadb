@@ -20,6 +20,7 @@
 
 use crate::metadata::{Index, IndexId, SegmentId};
 use crate::metrics;
+use crate::metrics::searcher::REFRESH_QUEUE_LEN;
 use crate::{segment_store::download_segment, NidxMetadata};
 use nidx_types::Seq;
 use object_store::DynObjectStore;
@@ -195,6 +196,8 @@ async fn sync_index(
     let index_id = index.id;
     sync_metadata.set(index, operations).await;
     notifier.send(index_id).await?;
+    let pending_refreshes = notifier.max_capacity() - notifier.capacity();
+    REFRESH_QUEUE_LEN.set(pending_refreshes as i64);
 
     // Delete unneeded segments
     for segment_id in diff.removed_segments {
