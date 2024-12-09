@@ -90,6 +90,7 @@ class _PredictTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._En
     DA_ASK: _PredictType.ValueType  # 12
     DA_QA: _PredictType.ValueType  # 13
     DA_GUARD: _PredictType.ValueType  # 14
+    REMI: _PredictType.ValueType  # 15
 
 class PredictType(_PredictType, metaclass=_PredictTypeEnumTypeWrapper): ...
 
@@ -108,6 +109,7 @@ DA_GRAPH: PredictType.ValueType  # 11
 DA_ASK: PredictType.ValueType  # 12
 DA_QA: PredictType.ValueType  # 13
 DA_GUARD: PredictType.ValueType  # 14
+REMI: PredictType.ValueType  # 15
 global___PredictType = PredictType
 
 class _ClientType:
