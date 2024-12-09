@@ -531,9 +531,7 @@ async def ask(
             nuclia_learning_model,
             predict_answer_stream,
         ) = await predict.chat_query_ndjson(kbid, chat_model)
-        debug_chat_model = None
-        if ask_request.debug_context:
-            debug_chat_model = chat_model
+        debug_chat_model = chat_model
 
     auditor = ChatAuditor(
         kbid=kbid,
