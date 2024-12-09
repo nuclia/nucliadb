@@ -149,9 +149,7 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, re
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize("debug", (True, False))
-async def test_sync_ask_returns_debug_mode(
-    nucliadb_reader: AsyncClient, knowledgebox, resource, debug
-):
+async def test_sync_ask_returns_debug_mode(nucliadb_reader: AsyncClient, knowledgebox, resource, debug):
     # Make sure prompt context is returned if debug is True
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
@@ -167,6 +165,7 @@ async def test_sync_ask_returns_debug_mode(
     else:
         assert resp_data.prompt_context is None
         assert resp_data.predict_request is None
+
 
 @pytest.fixture
 async def resources(nucliadb_writer, knowledgebox):
