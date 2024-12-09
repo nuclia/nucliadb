@@ -423,6 +423,7 @@ class GCSStorageField(StorageField):
             else:
                 return None
 
+    @storage_ops_observer.wrap({"type": "upload"})
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
         if self.field is None:

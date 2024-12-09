@@ -330,6 +330,7 @@ class S3StorageField(StorageField):
         await self.copy(origin_uri, destination_uri, origin_bucket_name, destination_bucket_name)
         await self.storage.delete_upload(origin_uri, origin_bucket_name)
 
+    @s3_ops_observer.wrap({"type": "upload"})
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
         await self.append(origin, iterator)
