@@ -19,7 +19,7 @@
 //
 
 macro_rules! metric_definition {
-    ($id:ident: $type:path[$new:expr]* as $name:literal ($description:literal)) => {
+    ($id:ident: $type:path{$new:expr} as $name:literal ($description:literal)) => {
         lazy_static! {
             pub static ref $id: $type = Family::new_with_constructor(|| Histogram::new($new));
         }
@@ -39,14 +39,14 @@ macro_rules! metric_definition {
 macro_rules! metrics {
     {
         $(
-            $id:ident: $type:ty$([$new:expr]$($fam:tt)?)? as $name:literal ($description:literal)
+            $id:ident: $type:ty$([$new:expr])?$({$new_family:expr})? as $name:literal ($description:literal)
         ),*$(,)?
     } => {
         use lazy_static::lazy_static;
         use prometheus_client::registry::Registry;
 
 
-        $(metric_definition!($id: $type$([$new]$($fam)?)? as $name ($description));)*
+        $(metric_definition!($id: $type$([$new])?$({$new_family})? as $name ($description));)*
 
         pub fn register(metrics: &mut Registry) {
             $(metrics.register($name, $description, $id.clone());)*
@@ -123,9 +123,9 @@ pub mod searcher {
     }
 
     metrics! {
-        SYNC_DELAY: Gauge::<f64, AtomicU64> as "searcher_sync_delay_seconds" ("Delay between the time the last index was updated and it was synced by this searcher"),
+        SYNC_DELAY: Gauge::<f64, AtomicU64> as "searcher_sync_delay_seconds" ("Delay between the time the last index was updated and it was synced"),
         SYNC_FAILED_INDEXES: Gauge as "searcher_sync_failed_indexes" ("Number of indexes failing to sync"),
         REFRESH_QUEUE_LEN: Gauge as "searcher_indexes_pending_refresh" ("Number of indexes waiting to be refreshed"),
-        INDEX_LOAD_TIME: Family<IndexKindLabels, Histogram>[exponential_buckets(0.001, 2.0, 12)]* as "searcher_index_load_time_seconds" ("Time to load index searchers"),
+        INDEX_LOAD_TIME: Family<IndexKindLabels, Histogram>{exponential_buckets(0.001, 2.0, 12)} as "searcher_index_load_time_seconds" ("Time to load index searchers"),
     }
 }
