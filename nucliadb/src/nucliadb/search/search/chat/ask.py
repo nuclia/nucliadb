@@ -37,7 +37,10 @@ from nucliadb.search.predict import (
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
-from nucliadb.search.search.chat.exceptions import AnswerJsonSchemaTooLong, NoRetrievalResultsError
+from nucliadb.search.search.chat.exceptions import (
+    AnswerJsonSchemaTooLong,
+    NoRetrievalResultsError,
+)
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
@@ -127,6 +130,7 @@ class AskResult:
         auditor: ChatAuditor,
         metrics: RAGMetrics,
         best_matches: list[RetrievalMatch],
+        debug_chat_model: Optional[ChatModel],
     ):
         # Initial attributes
         self.kbid = kbid
@@ -136,6 +140,7 @@ class AskResult:
         self.nuclia_learning_id = nuclia_learning_id
         self.predict_answer_stream = predict_answer_stream
         self.prompt_context = prompt_context
+        self.debug_chat_model = debug_chat_model
         self.prompt_context_order = prompt_context_order
         self.auditor: ChatAuditor = auditor
         self.metrics: RAGMetrics = metrics
@@ -289,11 +294,15 @@ class AskResult:
 
         # Stream out debug information
         if self.ask_request_with_debug_flag:
+            predict_request = None
+            if self.debug_chat_model:
+                predict_request = self.debug_chat_model.model_dump(mode="json")
             yield DebugAskResponseItem(
                 metadata={
                     "prompt_context": sorted_prompt_context_list(
                         self.prompt_context, self.prompt_context_order
-                    )
+                    ),
+                    "predict_request": predict_request,
                 }
             )
 
@@ -355,6 +364,8 @@ class AskResult:
                 self.prompt_context, self.prompt_context_order
             )
             response.prompt_context = sorted_prompt_context
+            if self.debug_chat_model:
+                response.predict_request = self.debug_chat_model.model_dump(mode="json")
         return response.model_dump_json(exclude_none=True, by_alias=True)
 
     async def get_relations_results(self) -> Relations:
@@ -524,6 +535,7 @@ async def ask(
             nuclia_learning_model,
             predict_answer_stream,
         ) = await predict.chat_query_ndjson(kbid, chat_model)
+        debug_chat_model = chat_model
 
     auditor = ChatAuditor(
         kbid=kbid,
@@ -550,6 +562,7 @@ async def ask(
         auditor=auditor,
         metrics=metrics,
         best_matches=retrieval_results.best_matches,
+        debug_chat_model=debug_chat_model,
     )
 
 
@@ -808,10 +821,16 @@ def compute_best_matches(
                     weighted_score=weighted_score,
                 )
 
-    return sorted(paragraph_id_to_match.values(), key=lambda match: match.weighted_score, reverse=True)
+    return sorted(
+        paragraph_id_to_match.values(),
+        key=lambda match: match.weighted_score,
+        reverse=True,
+    )
 
 
-def calculate_prequeries_for_json_schema(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
+def calculate_prequeries_for_json_schema(
+    ask_request: AskRequest,
+) -> Optional[PreQueriesStrategy]:
     """
     This function generates a PreQueriesStrategy with a query for each property in the JSON schema
     found in ask_request.answer_json_schema.
