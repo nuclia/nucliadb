@@ -64,6 +64,8 @@ pub async fn run_sync(
     // We only retry once every few sync rounds to avoid failing indexes to block other syncs
     let mut retry_interval = 0;
 
+    let mut initial_sync = true;
+
     while !shutdown.is_cancelled() {
         let sync_result: anyhow::Result<()> = async {
             let delay = sqlx::query_scalar!(
@@ -125,14 +127,23 @@ pub async fn run_sync(
                     info!(?index_id, "Index synced");
                     failed_indexes.remove(&index_id);
                 }
+                metrics::searcher::SYNC_FAILED_INDEXES.set(failed_indexes.len() as i64);
             }
 
             if let Some(updated_at) = last_index_updated_at {
                 last_updated_at = updated_at;
             }
 
-            if let Some(ref sync_status) = sync_status {
-                let _ = sync_status.send(SyncStatus::Synced);
+            // Initial sync only finished when we complete a sync without errors
+            if initial_sync && failed_indexes.is_empty() {
+                initial_sync = false;
+            }
+
+            // We do not marked as synced until initial sync has fully finished without error
+            if !initial_sync {
+                if let Some(ref sync_status) = sync_status {
+                    let _ = sync_status.send(SyncStatus::Synced);
+                }
             }
 
             // If we didn't sync anything, wait for a bit
@@ -187,6 +198,8 @@ async fn sync_index(
     let index_id = index.id;
     sync_metadata.set(index, operations).await;
     notifier.send(index_id).await?;
+    let pending_refreshes = notifier.max_capacity() - notifier.capacity();
+    metrics::searcher::REFRESH_QUEUE_LEN.set(pending_refreshes as i64);
 
     // Delete unneeded segments
     for segment_id in diff.removed_segments {

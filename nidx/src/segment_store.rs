@@ -88,14 +88,19 @@ pub async fn pack_and_upload(
     Ok(size)
 }
 
+const BUF_SIZE: usize = 1_000_000;
+
 pub async fn download_segment(
     storage: Arc<DynObjectStore>,
     segment_id: SegmentId,
     output_dir: PathBuf,
 ) -> anyhow::Result<()> {
     let response = storage.get(&segment_id.storage_key()).await?.into_stream();
-    let reader = response.map_err(std::io::Error::from).into_async_read();
-    let reader = SyncIoBridge::new(reader.compat());
+    let reader = response.map_err(std::io::Error::from).into_async_read().compat();
+
+    // Setting a buffer in the async and sync sides of the bridge, since it can be costly to switch contexts
+    let bufreader = tokio::io::BufReader::with_capacity(BUF_SIZE, reader);
+    let reader = std::io::BufReader::with_capacity(BUF_SIZE, SyncIoBridge::new(bufreader));
 
     let mut tar = tar::Archive::new(reader);
     tokio::task::spawn_blocking(move || tar.unpack(output_dir)).await??;

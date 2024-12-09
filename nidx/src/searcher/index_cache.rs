@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Weak};
+use std::time::Instant;
 
 use anyhow::anyhow;
 use lru::LruCache;
@@ -33,6 +34,7 @@ use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore};
 
 use crate::metadata::{IndexId, IndexKind, Segment, SegmentId};
+use crate::metrics::searcher::{IndexKindLabels, INDEX_LOAD_TIME};
 use crate::NidxMetadata;
 
 use super::sync::{Operations, SyncMetadata};
@@ -136,11 +138,26 @@ impl IndexCache {
         }
     }
 
+    /// Reload an index, returns true if it needs to be retried later
+    pub async fn reload(&self, id: &IndexId) -> anyhow::Result<bool> {
+        let cached = { self.cache.lock().await.peek(id) };
+        match cached {
+            CachePeekResult::Cached(_arc) => {
+                let new_searcher = self.load(id).await?;
+                self.cache.lock().await.insert(id, &new_searcher);
+                Ok(false)
+            }
+            CachePeekResult::Loading => Ok(true),
+            CachePeekResult::NotPresent => Ok(false),
+        }
+    }
+
     pub async fn remove(&self, id: &IndexId) {
         self.cache.lock().await.remove(id);
     }
 
     pub async fn load(&self, id: &IndexId) -> anyhow::Result<Arc<IndexSearcher>> {
+        let t = Instant::now();
         let read = self.sync_metadata.get(id).await;
         let read2 = read.get().await;
         let Some(meta) = read2 else {
@@ -166,6 +183,7 @@ impl IndexCache {
             IndexKind::Vector => IndexSearcher::Vector(VectorSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Relation => IndexSearcher::Relation(RelationSearcher::open(open_index)?),
         };
+        INDEX_LOAD_TIME.get_or_create(&IndexKindLabels::new(meta.index.kind)).observe(t.elapsed().as_secs_f64());
 
         Ok(Arc::new(searcher))
     }
@@ -199,6 +217,12 @@ enum CacheResult<K, V> {
     Wait(ResourceWaiter),
 }
 
+enum CachePeekResult<V> {
+    Cached(Arc<V>),
+    Loading,
+    NotPresent,
+}
+
 struct ResourceCache<K, V> {
     live: LruCache<K, Arc<V>>,
     eviction: HashMap<K, Weak<V>>,
@@ -229,12 +253,12 @@ where
         }
     }
 
-    // Try to get an entry from the cache
-    // 1. If it's present, we return Cached(entry). Consumer can use it.
-    // 2. If it's not in the cache, we return Load(guard). Consumer should load it and call
-    //    cache.loaded with the guard.
-    // 3. If it's being loaded concurrently, we return Wait(waiter). Consumer should wait using the
-    //    waiter and then retry the get.
+    /// Try to get an entry from the cache
+    /// 1. If it's present, we return Cached(entry). Consumer can use it.
+    /// 2. If it's not in the cache, we return Load(guard). Consumer should load it and call
+    ///    cache.loaded with the guard.
+    /// 3. If it's being loaded concurrently, we return Wait(waiter). Consumer should wait using the
+    ///    waiter and then retry the get.
     pub fn get(&mut self, id: &K) -> CacheResult<K, V> {
         if let Some(v) = self.get_cached(id) {
             return CacheResult::Cached(v);
@@ -257,6 +281,17 @@ where
             waiter,
             key: id.clone(),
         })
+    }
+
+    /// Check if an entry is present in the cache
+    pub fn peek(&mut self, id: &K) -> CachePeekResult<V> {
+        if let Some(v) = self.get_cached(id) {
+            CachePeekResult::Cached(v)
+        } else if self.loading.contains_key(id) {
+            CachePeekResult::Loading
+        } else {
+            CachePeekResult::NotPresent
+        }
     }
 
     pub fn loaded(&mut self, guard: ResourceLoadGuard<K>, v: &Arc<V>) {
