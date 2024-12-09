@@ -63,6 +63,8 @@ spec:
         command: ["nidx", "scheduler"]
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
+          - name: CONTROL_SOCKET
+            value: "/run/nidx.sock"
         ports:
         - name: metrics
           containerPort: 10010

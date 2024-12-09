@@ -62,6 +62,8 @@ spec:
           {{- include "toEnv" .Values.env | nindent 10 }}
           - name: WORK_PATH
             value: "/data"
+          - name: CONTROL_SOCKET
+            value: "/run/nidx.sock"
         ports:
         {{- with .Values.searcher.resources }}
         resources:

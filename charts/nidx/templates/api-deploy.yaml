@@ -56,6 +56,8 @@ spec:
         command: ["nidx", "api"]
         env:
           {{- include "toEnv" .Values.env | nindent 10 }}
+          - name: CONTROL_SOCKET
+            value: "/run/nidx.sock"
         ports:
         {{- with .Values.searcher.resources }}
         resources:
