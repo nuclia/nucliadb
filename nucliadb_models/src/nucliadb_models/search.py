@@ -1909,6 +1909,11 @@ class SyncAskResponse(BaseModel):
         title="Prompt context",
         description="The prompt context used to generate the answer. Returned only if the debug flag is set to true",
     )
+    predict_request: Optional[dict[str, Any]] = Field(
+        default=None,
+        title="Predict request",
+        description="The internal predict request used to generate the answer. Returned only if the debug flag is set to true",
+    )
     metadata: Optional[SyncAskMetadata] = Field(
         default=None,
         title="Metadata",
