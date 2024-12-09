@@ -68,6 +68,8 @@ pub async fn run_sync(
     // We only retry once every few sync rounds to avoid failing indexes to block other syncs
     let mut retry_interval = 0;
 
+    let mut initial_sync = true;
+
     while !shutdown.is_cancelled() {
         let sync_result: anyhow::Result<()> = async {
             let delay = sqlx::query_scalar!(
@@ -143,8 +145,16 @@ pub async fn run_sync(
                 last_updated_at = updated_at;
             }
 
-            if let Some(ref sync_status) = sync_status {
-                let _ = sync_status.send(SyncStatus::Synced);
+            // Initial sync only finished when we complete a sync without errors
+            if initial_sync && failed_indexes.is_empty() {
+                initial_sync = false;
+            }
+
+            // We do not marked as synced until initial sync has fully finished without error
+            if !initial_sync {
+                if let Some(ref sync_status) = sync_status {
+                    let _ = sync_status.send(SyncStatus::Synced);
+                }
             }
 
             // If we didn't sync anything, wait for a bit
