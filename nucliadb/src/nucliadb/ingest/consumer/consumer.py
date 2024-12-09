@@ -116,7 +116,7 @@ class IngestConsumer:
             self.subscription = None
 
     async def setup_nats_subscription(self):
-        last_seqid = await sequence_manager.get_stream_last_seqid(self.driver, self.partition)
+        last_seqid = await sequence_manager.get_last_seqid(self.driver, self.partition)
         if last_seqid is None:
             last_seqid = 1
         subject = const.Streams.INGEST.subject.format(partition=self.partition)
