@@ -294,12 +294,15 @@ class AskResult:
 
         # Stream out debug information
         if self.ask_request_with_debug_flag:
+            predict_request = None
+            if self.debug_chat_model:
+                predict_request = self.debug_chat_model.model_dump(mode="json")
             yield DebugAskResponseItem(
                 metadata={
                     "prompt_context": sorted_prompt_context_list(
                         self.prompt_context, self.prompt_context_order
                     ),
-                    "predict_request": self.debug_chat_model,
+                    "predict_request": predict_request,
                 }
             )
 
@@ -361,7 +364,8 @@ class AskResult:
                 self.prompt_context, self.prompt_context_order
             )
             response.prompt_context = sorted_prompt_context
-            response.predict_request = self.debug_chat_model
+            if self.debug_chat_model:
+                response.predict_request = self.debug_chat_model.model_dump(mode="json")
         return response.model_dump_json(exclude_none=True, by_alias=True)
 
     async def get_relations_results(self) -> Relations:
