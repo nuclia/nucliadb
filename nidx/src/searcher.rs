@@ -31,11 +31,13 @@ use index_cache::IndexCache;
 use object_store::DynObjectStore;
 use sync::run_sync;
 use sync::SyncMetadata;
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -43,6 +45,7 @@ use std::sync::Arc;
 use tempfile::tempdir;
 
 use crate::grpc_server::GrpcServer;
+use crate::metadata::IndexId;
 use crate::{NidxMetadata, Settings};
 
 pub use index_cache::IndexSearcher;
@@ -52,6 +55,36 @@ pub struct SyncedSearcher {
     index_cache: Arc<IndexCache>,
     sync_metadata: Arc<SyncMetadata>,
     meta: NidxMetadata,
+}
+
+async fn refresher_task(mut rx: Receiver<IndexId>, index_cache: Arc<IndexCache>) -> anyhow::Result<()> {
+    let mut try_later = Vec::new();
+    loop {
+        // Read all available messages to a set in order to deduplicated requests for the same index
+        let mut recv_buf = Vec::new();
+        if rx.recv_many(&mut recv_buf, 100).await == 0 {
+            // Channel closed
+            return Ok(());
+        }
+
+        let unique_indexes: HashSet<IndexId> =
+            HashSet::from_iter(try_later.drain(std::ops::RangeFull).chain(recv_buf.into_iter()));
+        for index_id in unique_indexes {
+            match index_cache.reload(&index_id).await {
+                Ok(true) => {
+                    // Index is currently loading, no need to reload now, nut will enqueue a reload for later
+                    debug!(?index_id, "Index being loaded by cache, will reload it later");
+                    try_later.push(index_id);
+                }
+                Ok(false) => {
+                    debug!(?index_id, "Index reloaded");
+                }
+                Err(e) => {
+                    error!(?index_id, ?e, "Index failed to reload, might become out of date");
+                }
+            }
+        }
+    }
 }
 
 impl SyncedSearcher {
@@ -72,20 +105,10 @@ impl SyncedSearcher {
         shutdown: CancellationToken,
         watcher: Option<watch::Sender<SyncStatus>>,
     ) -> anyhow::Result<()> {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
-        let index_cache_copy = self.index_cache.clone();
+        let (tx, rx) = tokio::sync::mpsc::channel(1000);
 
         let mut tasks = JoinSet::new();
-        let refresher_task = tasks
-            .spawn(async move {
-                while let Some(index_id) = rx.recv().await {
-                    // TODO: Do something smarter
-                    index_cache_copy.remove(&index_id).await;
-                }
-
-                Ok(())
-            })
-            .id();
+        let refresher_task = tasks.spawn(refresher_task(rx, self.index_cache.clone())).id();
 
         let sync_task = tasks.spawn(run_sync(
             self.meta.clone(),
