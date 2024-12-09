@@ -291,9 +291,9 @@ class IngestProcessedConsumer(IngestConsumer):
     other writes are going to be coming from user actions and we don't want to slow them down.
     """
 
-    async def get_last_seqid(self) -> Optional[int]:
+    async def get_stream_last_seqid(self) -> Optional[int]:
         """
-        XXX NOTE: Getting the last sequence id for the processed pull consumer is only needed when the new pull consumer is created.
+        XXX NOTE: Getting the last sequence id of the stream for the processed pull consumer is only needed when the new pull consumer is created.
 
         For environments where we had the previous push consumer, we need to get the last sequence id from the old consumer info so that
         we can start from there.
@@ -322,7 +322,7 @@ class IngestProcessedConsumer(IngestConsumer):
                     f"Nats consumer {push_consumer_info.name} has no ack floor. Starting from scratch."
                 )
                 return 1
-            last_seqid = push_consumer_info.ack_floor.consumer_seq + 1
+            last_seqid = push_consumer_info.ack_floor.stream_seq + 1
             logger.info(
                 f"Starting from last sequence id {last_seqid} for {const.Streams.INGEST_PROCESSED.name}"
             )
@@ -335,7 +335,7 @@ class IngestProcessedConsumer(IngestConsumer):
             return 1
 
     async def setup_nats_subscription(self):
-        last_sequence_id = await self.get_last_seqid()
+        last_sequence_id = await self.get_stream_last_seqid()
         if last_sequence_id is None:
             delivery_policy = nats.js.api.DeliverPolicy.ALL
         else:
