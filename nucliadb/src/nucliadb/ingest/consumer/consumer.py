@@ -25,7 +25,9 @@ from typing import Optional, Union
 import backoff
 import nats
 import nats.js.api
+import nats.js.errors
 from nats.aio.client import Msg
+from nats.js import JetStreamContext
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.maindb.driver import Driver
@@ -84,6 +86,7 @@ class IngestConsumer:
 
         self.lock = lock or asyncio.Lock()
         self.processor = Processor(driver, storage, pubsub, partition)
+        self.subscription: Optional[JetStreamContext.PullSubscription] = None
 
     async def ack_message(self, msg: Msg, kbid: Optional[str] = None):
         context = {}
@@ -98,29 +101,45 @@ class IngestConsumer:
         await self.setup_nats_subscription()
         self.initialized = True
 
+    async def finalize(self):
+        if self.initialized:
+            await self.teardown_nats_subscription()
+            self.initialized = False
+
+    async def teardown_nats_subscription(self):
+        if self.subscription is not None:
+            try:
+                await self.nats_connection_manager.unsubscribe(self.subscription)
+            except nats.errors.ConnectionClosedError:
+                logger.warning("Connection closed while unsubscribing")
+                pass
+            self.subscription = None
+
     async def setup_nats_subscription(self):
         last_seqid = await sequence_manager.get_last_seqid(self.driver, self.partition)
         if last_seqid is None:
             last_seqid = 1
         subject = const.Streams.INGEST.subject.format(partition=self.partition)
-        await self.nats_connection_manager.subscribe(
-            subject=subject,
-            queue=const.Streams.INGEST.group.format(partition=self.partition),
+        durable_name = const.Streams.INGEST.group.format(partition=self.partition)
+        self.subscription = await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST.name,
-            flow_control=True,
+            subject=subject,
+            durable=durable_name,
             cb=self.subscription_worker,
             subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
+                durable_name=durable_name,
                 deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
                 opt_start_seq=last_seqid,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_ack_pending=nats_consumer_settings.nats_max_ack_pending,
+                max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
-        logger.info(f"Subscribed to {subject} on stream {const.Streams.INGEST.name} from {last_seqid}")
+        logger.info(
+            f"Subscribed pull consumer to {subject} on stream {const.Streams.INGEST.name} from {last_seqid}"
+        )
 
     @backoff.on_exception(backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):
@@ -272,24 +291,77 @@ class IngestProcessedConsumer(IngestConsumer):
     other writes are going to be coming from user actions and we don't want to slow them down.
     """
 
+    async def get_last_seqid(self) -> Optional[int]:
+        """
+        XXX NOTE: Getting the last sequence id for the processed pull consumer is only needed when the new pull consumer is created.
+
+        For environments where we had the previous push consumer, we need to get the last sequence id from the old consumer info so that
+        we can start from there.
+
+        This code must be deleted once the new pull consumers are deployed on all environments and all the old push consumers have been deleted.
+        From then on, we will rely on the nats server to keep track of the last sequence id.
+        """
+        if has_feature(const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED):
+            logger.warning(
+                f"Feature flag {const.Features.PULL_PROCESSED_CONSUMERS_DEPLOYED} is enabled. Relying on nats to keep track of the last sequence id."
+            )
+            return None
+
+        try:
+            push_consumer_info: nats.js.api.ConsumerInfo = (
+                await self.nats_connection_manager.js.consumer_info(
+                    stream=const.Streams.INGEST_PROCESSED.name,
+                    # This is the old consumer name
+                    consumer="nucliadb-processed",
+                    timeout=2,
+                )
+            )
+            # Start from the last non-acked message
+            if push_consumer_info.ack_floor is None:
+                logger.warning(
+                    f"Nats consumer {push_consumer_info.name} has no ack floor. Starting from scratch."
+                )
+                return 1
+            last_seqid = push_consumer_info.ack_floor.consumer_seq + 1
+            logger.info(
+                f"Starting from last sequence id {last_seqid} for {const.Streams.INGEST_PROCESSED.name}"
+            )
+            return last_seqid
+        except (nats.js.errors.NotFoundError, nats.errors.TimeoutError):
+            logger.warning(
+                f"Could not get last sequence id for {const.Streams.INGEST_PROCESSED.name}. Starting from scratch."
+            )
+            # Start from scratch
+            return 1
+
     async def setup_nats_subscription(self):
+        last_sequence_id = await self.get_last_seqid()
+        if last_sequence_id is None:
+            delivery_policy = nats.js.api.DeliverPolicy.ALL
+        else:
+            delivery_policy = nats.js.api.DeliverPolicy.BY_START_SEQUENCE
+
         subject = const.Streams.INGEST_PROCESSED.subject
-        await self.nats_connection_manager.subscribe(
-            subject=subject,
-            queue=const.Streams.INGEST_PROCESSED.group,
+        durable_name = const.Streams.INGEST_PROCESSED.group
+        self.subscription = await self.nats_connection_manager.pull_subscribe(
             stream=const.Streams.INGEST_PROCESSED.name,
-            flow_control=True,
+            subject=subject,
+            durable=durable_name,
             cb=self.subscription_worker,
             subscription_lost_cb=self.setup_nats_subscription,
             config=nats.js.api.ConsumerConfig(
+                durable_name=durable_name,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_ack_pending=100,  # custom ack pending here
+                deliver_policy=delivery_policy,
+                opt_start_seq=last_sequence_id,
+                max_ack_pending=1,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
             ),
         )
-        logger.info(f"Subscribed to {subject} on stream {const.Streams.INGEST_PROCESSED.name}")
+        logger.info(
+            f"Subscribed pull consumer to {subject} on stream {const.Streams.INGEST_PROCESSED.name}"
+        )
 
     @backoff.on_exception(backoff.expo, (ConflictError,), jitter=backoff.random_jitter, max_tries=4)
     async def _process(self, pb: BrokerMessage, seqid: int):

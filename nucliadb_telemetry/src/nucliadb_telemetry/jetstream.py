@@ -21,6 +21,7 @@ from datetime import datetime
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional
 
+import nats
 from nats.aio.client import Client
 from nats.aio.msg import Msg
 from nats.js.client import JetStreamContext
@@ -160,8 +161,14 @@ class JetStreamContextTelemetry:
     # Just for convenience, to wrap all we use in the context of
     # telemetry-instrumented stuff using the JetStreamContextTelemetry class
 
-    async def pull_subscribe(self, *args, **kwargs) -> JetStreamContext.PullSubscription:
-        return await self.js.pull_subscribe(*args, **kwargs)
+    async def pull_subscribe(
+        self,
+        subject: str,
+        durable: Optional[str] = None,
+        stream: Optional[str] = None,
+        config: Optional[nats.js.api.ConsumerConfig] = None,
+    ) -> JetStreamContext.PullSubscription:
+        return await self.js.pull_subscribe(subject, durable=durable, stream=stream, config=config)  # type: ignore
 
     async def pull_subscribe_bind(self, *args, **kwargs) -> JetStreamContext.PullSubscription:
         return await self.js.pull_subscribe_bind(*args, **kwargs)
