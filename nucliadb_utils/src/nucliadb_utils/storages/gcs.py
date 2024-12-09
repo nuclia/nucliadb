@@ -702,10 +702,19 @@ class GCSStorage(Storage):
     async def put_object(self, bucket_name: str, key: str, data: bytes) -> None:
         if self.session is None:  # pragma: no cover
             raise AttributeError()
-        url = "{}/{}/o/{}".format(self.object_base_url, bucket_name, quote_plus(key))
+        url = "{base_url}/{bucket_name}/o?name={object_name}&uploadType=media".format(
+            base_url=self.object_base_url,
+            bucket_name=bucket_name,
+            object_name=quote_plus(key),
+        )
         headers = await self.get_access_headers()
-        headers.update({"Content-Type": "application/octet-stream"})
-        async with self.session.put(url, headers=headers, data=data) as resp:
+        headers.update(
+            {
+                "Content-Length": str(len(data)),
+                "Content-Type": "application/octet-stream",
+            }
+        )
+        async with self.session.post(url, headers=headers, data=data) as resp:
             if resp.status != 200:
                 text = await resp.text()
                 raise GoogleCloudException(f"{resp.status}: {text}")

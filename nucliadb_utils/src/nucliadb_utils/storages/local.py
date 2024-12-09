@@ -275,7 +275,7 @@ class LocalStorage(Storage):
         return deleted
 
     async def iterate_objects(self, bucket: str, prefix: str) -> AsyncGenerator[ObjectInfo, None]:
-        for key in glob.glob(f"{self.local_testing_files}/{bucket}/{prefix}*"):
+        for key in glob.glob(f"{self.get_file_path(bucket, prefix)}*"):
             if key.endswith(".metadata"):
                 # Skip metadata files -- they are internal to the local-storage implementation.
                 continue
@@ -291,5 +291,6 @@ class LocalStorage(Storage):
 
     async def put_object(self, bucket_name: str, key: str, data: bytes) -> None:
         path = self.get_file_path(bucket_name, key)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as file:
             file.write(data)

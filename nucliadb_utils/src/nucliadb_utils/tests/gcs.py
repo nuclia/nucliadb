@@ -75,8 +75,8 @@ class GCS(BaseImage):
 @pytest.fixture(scope="session")
 def gcs():
     container = GCS()
-    _, port = container.run()
-    public_api_url = f"http://172.17.0.1:{port}"
+    host, port = container.run()
+    public_api_url = f"http://{host}:{port}"
     yield public_api_url
     container.stop()
 
