@@ -317,10 +317,11 @@ class NatsConnectionManager:
                     continue
                 self._subscriptions.pop(index)
                 return
-            for index, (psub, _, _) in enumerate(self._pull_subscriptions):
+            for index, (psub, task, _) in enumerate(self._pull_subscriptions):
                 if psub is not subscription:
                     continue
                 self._pull_subscriptions.pop(index)
+                task.cancel()
                 return
 
     async def unsubscribe(self, subscription: Union[Subscription, JetStreamContext.PullSubscription]):

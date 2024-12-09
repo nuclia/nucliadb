@@ -104,7 +104,6 @@ class TestNatsConnectionManager:
         assert manager.healthy()
         assert manager._last_unhealthy is not None
 
-    @pytest.mark.skip(reason="For some reason this test gets stuck on fixture shutdown")
     async def test_unsubscribe(self, manager: nats.NatsConnectionManager, nats_conn, js):
         await manager.initialize()
 
