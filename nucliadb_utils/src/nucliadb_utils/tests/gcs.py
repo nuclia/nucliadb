@@ -76,7 +76,10 @@ class GCS(BaseImage):
 def gcs():
     container = GCS()
     host, port = container.run()
-    public_api_url = f"http://{host}:{port}"
+    # TODO: fix this for MAC users
+    public_api_url = f"http://172.17.0.1:{port}"
+    # Uncomment when running locally in a Mac
+    # public_api_url = f"http://{host}:{port}"
     yield public_api_url
     container.stop()
 
