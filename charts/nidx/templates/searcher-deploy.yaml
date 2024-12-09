@@ -65,6 +65,8 @@ spec:
           - name: CONTROL_SOCKET
             value: "/run/nidx.sock"
         ports:
+        - name: metrics
+          containerPort: 10010
         {{- with .Values.searcher.resources }}
         resources:
           {{- toYaml . | nindent 10 }}
