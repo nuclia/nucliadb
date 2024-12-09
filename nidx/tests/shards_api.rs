@@ -89,7 +89,8 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 
     let deleted = Shard::get(&meta.pool, shard.id).await;
     assert!(matches!(deleted, Err(sqlx::Error::RowNotFound)));
-    for index_id in Index::marked_to_delete(&meta.pool).await? {
+    for index in Index::marked_to_delete(&meta.pool).await? {
+        let index_id = index.id;
         for segment in Segment::in_index(&meta.pool, index_id).await? {
             assert!(segment.delete_at.is_some());
         }

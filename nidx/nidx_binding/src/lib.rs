@@ -106,7 +106,7 @@ impl NidxBinding {
         let searcher_work_dir = tempdir()?;
         let (sync_reporter, sync_watcher) = watch::channel(SyncStatus::Syncing);
         let searcher = SyncedSearcher::new(settings.metadata.clone(), searcher_work_dir.path());
-        let searcher_api = SearchServer::new(settings.metadata.clone(), searcher.index_cache());
+        let searcher_api = SearchServer::new(searcher.index_cache());
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
         tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));

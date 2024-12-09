@@ -162,7 +162,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
 
     let searcher = SyncedSearcher::new(meta.clone(), work_path);
 
-    let api = grpc::SearchServer::new(meta.clone(), searcher.index_cache());
+    let api = grpc::SearchServer::new(searcher.index_cache());
     let server = GrpcServer::new("0.0.0.0:10001").await?;
 
     let mut tasks = JoinSet::new();
