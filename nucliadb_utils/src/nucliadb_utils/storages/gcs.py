@@ -700,7 +700,10 @@ class GCSStorage(Storage):
         return deleted, conflict
 
     @storage_ops_observer.wrap({"type": "put_object"})
-    async def put_object(self, bucket_name: str, key: str, data: bytes) -> None:
+    async def put_object(self, bucket_name: str, key: str, data: bytes, content_type: str) -> None:
+        """
+        Put an object in the storage without any metadata.
+        """
         if self.session is None:  # pragma: no cover
             raise AttributeError()
         url = "{base_url}/{bucket_name}/o?name={object_name}&uploadType=media".format(
@@ -712,7 +715,7 @@ class GCSStorage(Storage):
         headers.update(
             {
                 "Content-Length": str(len(data)),
-                "Content-Type": "application/octet-stream",
+                "Content-Type": content_type,
             }
         )
         async with self.session.post(url, headers=headers, data=data) as resp:

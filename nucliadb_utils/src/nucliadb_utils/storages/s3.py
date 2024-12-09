@@ -486,11 +486,12 @@ class S3Storage(Storage):
         return deleted, conflict
 
     @s3_ops_observer.wrap({"type": "put_object"})
-    async def put_object(self, bucket_name: str, key: str, data: bytes) -> None:
+    async def put_object(self, bucket_name: str, key: str, data: bytes, content_type: str) -> None:
         await self._s3aioclient.put_object(
             Bucket=bucket_name,
             Key=key,
             Body=data,
+            ContentType=content_type,
         )
 
 

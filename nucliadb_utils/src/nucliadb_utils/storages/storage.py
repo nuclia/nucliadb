@@ -80,11 +80,12 @@ class StorageField(abc.ABC, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile: ...
 
-    async def upload_simple(self, data: bytes) -> None:
+    async def upload_simple(self, data: bytes, content_type: str) -> None:
         await self.storage.put_object(
             self.bucket,
             self.key,
             data,
+            content_type,
         )
 
     @abc.abstractmethod
@@ -420,10 +421,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             generator = splitter(payload)
             await self.uploaditerator(generator, destination, cf)
         else:
-            await destination.upload_simple(payload)
+            await destination.upload_simple(payload, content_type)
 
     @abc.abstractmethod
-    async def put_object(self, bucket_name: str, key: str, data: bytes) -> None: ...
+    async def put_object(self, bucket_name: str, key: str, data: bytes, content_type: str) -> None: ...
 
     async def uploaditerator(
         self, iterator: AsyncIterator, destination: StorageField, origin: CloudFile

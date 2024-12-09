@@ -215,7 +215,7 @@ class AzureStorage(Storage):
         async for obj in self.object_store.iterate(bucket, prefix):
             yield obj
 
-    async def put_object(self, bucket_name: str, uri: str, data):
+    async def put_object(self, bucket_name: str, uri: str, data: bytes, content_type: str):
         await self.object_store.upload(
             bucket_name,
             uri,
@@ -223,7 +223,7 @@ class AzureStorage(Storage):
             ObjectMetadata(
                 filename=uri.split("/")[-1],
                 size=len(data),
-                content_type="application/octet-stream",
+                content_type=content_type,
             ),
         )
 
