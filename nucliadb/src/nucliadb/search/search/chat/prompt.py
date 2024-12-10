@@ -680,6 +680,7 @@ async def conversation_prompt_context(
             if field_type == "c" and paragraph.score_type in (
                 SCORE_TYPE.VECTOR,
                 SCORE_TYPE.BOTH,
+                SCORE_TYPE.BM25,
             ):
                 field_unique_id = "-".join([rid, field_type, field_id])
                 if field_unique_id in analyzed_fields:
@@ -695,20 +696,31 @@ async def conversation_prompt_context(
 
                 attachments: List[resources_pb2.FieldRef] = []
                 if conversational_strategy.full:
+                    extracted_text = await field_obj.get_extracted_text()
                     for current_page in range(1, cmetadata.pages + 1):
                         conv = await field_obj.db_get_value(current_page)
+
                         for message in conv.messages:
-                            text = message.content.text.strip()
-                            pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
+                            ident = message.ident
+                            if extracted_text is not None:
+                                text = extracted_text.split_text.get(ident, message.content.text.strip())
+                            else:
+                                text = message.content.text.strip()
+                            pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(message.content.text) + 1}"
                             context[pid] = text
                             attachments.extend(message.content.attachments_fields)
                 else:
                     # Add first message
+                    extracted_text = await field_obj.get_extracted_text()
                     first_page = await field_obj.db_get_value()
                     if len(first_page.messages) > 0:
                         message = first_page.messages[0]
-                        text = message.content.text.strip()
-                        pid = f"{rid}/{field_type}/{field_id}/{message.ident}/0-{len(message.content.text) + 1}"
+                        ident = message.ident
+                        if extracted_text is not None:
+                            text = extracted_text.split_text.get(ident, message.content.text.strip())
+                        else:
+                            text = message.content.text.strip()
+                        pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(message.content.text) + 1}"
                         context[pid] = text
                         attachments.extend(message.content.attachments_fields)
 
@@ -746,7 +758,7 @@ async def conversation_prompt_context(
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:
                             pid = f"{rid}/{field_type}/{attachment.field_id}/0-{len(extracted_text.text) + 1}"
-                            context[pid] = extracted_text.text
+                            context[pid] = f"Attachment {attachment.field_id}: {extracted_text.text}\n\n"
 
                 if conversational_strategy.attachments_images and visual_llm:
                     for attachment in attachments:
