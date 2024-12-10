@@ -30,10 +30,7 @@ use nidx_text::{
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator, QueryContext};
 use tracing::{instrument, Span};
 
-use crate::{
-    metadata::{Index, IndexKind},
-    NidxMetadata,
-};
+use crate::errors::{NidxError, NidxResult};
 
 use super::{index_cache::IndexCache, query_language};
 
@@ -49,22 +46,27 @@ const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 /// TODO: review implementation. Timestamps are not used and we are probably
 /// filtering twice in the prefilter and paragraphs filter
 #[instrument(skip_all)]
-pub async fn suggest(
-    meta: &NidxMetadata,
-    index_cache: Arc<IndexCache>,
-    request: SuggestRequest,
-) -> anyhow::Result<SuggestResponse> {
+pub async fn suggest(index_cache: Arc<IndexCache>, request: SuggestRequest) -> NidxResult<SuggestResponse> {
     let shard_id = uuid::Uuid::parse_str(&request.shard)?;
 
-    // TODO: Avoid querying here, the information can be take from synced metadata
-    let text_index = Index::find(&meta.pool, shard_id, IndexKind::Text, "text").await?;
-    let text_searcher_arc = index_cache.get(&text_index.id).await?;
+    let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
+        return Err(NidxError::NotFound);
+    };
 
-    let paragraph_index = Index::find(&meta.pool, shard_id, IndexKind::Paragraph, "paragraph").await?;
-    let paragraph_searcher_arc = index_cache.get(&paragraph_index.id).await?;
+    let Some(text_index) = indexes.text_index() else {
+        return Err(NidxError::NotFound);
+    };
+    let text_searcher_arc = index_cache.get(&text_index).await?;
 
-    let relation_index = Index::find(&meta.pool, shard_id, IndexKind::Relation, "relation").await?;
-    let relation_searcher_arc = index_cache.get(&relation_index.id).await?;
+    let Some(relation_index) = indexes.relation_index() else {
+        return Err(NidxError::NotFound);
+    };
+    let relation_searcher_arc = index_cache.get(&relation_index).await?;
+
+    let Some(paragraph_index) = indexes.paragraph_index() else {
+        return Err(NidxError::NotFound);
+    };
+    let paragraph_searcher_arc = index_cache.get(&paragraph_index).await?;
 
     let current = Span::current();
     let suggest_results = tokio::task::spawn_blocking(move || {

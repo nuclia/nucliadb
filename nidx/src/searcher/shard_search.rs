@@ -27,41 +27,59 @@ use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
 use tracing::{instrument, Span};
 
-use crate::{
-    errors::{NidxError, NidxResult},
-    metadata::{Index, IndexKind},
-    NidxMetadata,
+use crate::errors::{NidxError, NidxResult};
+
+use super::{
+    index_cache::IndexCache,
+    query_planner::{self, QueryPlan},
 };
 
-use super::{index_cache::IndexCache, query_planner};
-
 #[instrument(skip_all)]
-pub async fn search(
-    meta: &NidxMetadata,
-    index_cache: Arc<IndexCache>,
-    search_request: SearchRequest,
-) -> NidxResult<SearchResponse> {
+pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest) -> NidxResult<SearchResponse> {
     let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
 
     let query_plan = query_planner::build_query_plan(search_request.clone())?;
 
-    // TODO: Avoid querying here, the information can be take from synced metadata
-    let paragraph_index = Index::find(&meta.pool, shard_id, IndexKind::Paragraph, "paragraph").await?;
-    let paragraph_searcher_arc = index_cache.get(&paragraph_index.id).await?;
+    let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
+        return Err(NidxError::NotFound);
+    };
 
-    let relation_index = Index::find(&meta.pool, shard_id, IndexKind::Relation, "relation").await?;
-    let relation_searcher_arc = index_cache.get(&relation_index.id).await?;
+    let paragraph_search = if query_plan.index_queries.paragraphs_request.is_some() {
+        let Some(paragraph_index) = indexes.paragraph_index() else {
+            return Err(NidxError::NotFound);
+        };
+        Some(index_cache.get(&paragraph_index).await?)
+    } else {
+        None
+    };
 
-    let text_index = Index::find(&meta.pool, shard_id, IndexKind::Text, "text").await?;
-    let text_searcher_arc = index_cache.get(&text_index.id).await?;
+    let relation_search = if query_plan.index_queries.relations_request.is_some() {
+        let Some(relation_index) = indexes.relation_index() else {
+            return Err(NidxError::NotFound);
+        };
+        Some(index_cache.get(&relation_index).await?)
+    } else {
+        None
+    };
 
-    // TODO: Better way to check this
-    let vector_seacher_arc = if query_plan.index_queries.vectors_request.is_some() {
+    let text_search = if query_plan.prefilter.is_some() || query_plan.index_queries.texts_request.is_some() {
+        let Some(text_index) = indexes.text_index() else {
+            return Err(NidxError::NotFound);
+        };
+        Some(index_cache.get(&text_index).await?)
+    } else {
+        None
+    };
+
+    // Do not require the vectorset parameter if it's not going to be used
+    let vector_seach = if query_plan.index_queries.vectors_request.is_some() {
         if search_request.vectorset.is_empty() {
             return Err(NidxError::invalid("Vectorset is required"));
         }
-        let vector_index = Index::find(&meta.pool, shard_id, IndexKind::Vector, &search_request.vectorset).await?;
-        Some(index_cache.get(&vector_index.id).await?)
+        let Some(vector_index) = indexes.vector_index(&search_request.vectorset) else {
+            return Err(NidxError::NotFound);
+        };
+        Some(index_cache.get(&vector_index).await?)
     } else {
         None
     };
@@ -70,11 +88,11 @@ pub async fn search(
     let search_results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             blocking_search(
-                search_request,
-                paragraph_searcher_arc.as_ref().into(),
-                relation_searcher_arc.as_ref().into(),
-                text_searcher_arc.as_ref().into(),
-                vector_seacher_arc.as_ref().map(|v| v.as_ref().into()),
+                query_plan,
+                paragraph_search.as_ref().map(|v| v.as_ref().into()),
+                relation_search.as_ref().map(|v| v.as_ref().into()),
+                text_search.as_ref().map(|v| v.as_ref().into()),
+                vector_seach.as_ref().map(|v| v.as_ref().into()),
             )
         })
     })
@@ -83,34 +101,34 @@ pub async fn search(
 }
 
 fn blocking_search(
-    search_request: SearchRequest,
-    paragraph_searcher: &ParagraphSearcher,
-    relation_searcher: &RelationSearcher,
-    text_searcher: &TextSearcher,
+    query_plan: QueryPlan,
+    paragraph_searcher: Option<&ParagraphSearcher>,
+    relation_searcher: Option<&RelationSearcher>,
+    text_searcher: Option<&TextSearcher>,
     vector_searcher: Option<&VectorSearcher>,
 ) -> anyhow::Result<SearchResponse> {
     let search_id = uuid::Uuid::new_v4().to_string();
-    let query_plan = query_planner::build_query_plan(search_request)?;
     let mut index_queries = query_plan.index_queries;
 
     // Apply pre-filtering to the query plan
     if let Some(prefilter) = query_plan.prefilter {
-        let prefiltered = text_searcher.prefilter(&prefilter)?;
+        let prefiltered = text_searcher.unwrap().prefilter(&prefilter)?;
         index_queries.apply_prefilter(prefiltered);
     }
 
     // Run the rest of the plan
     let text_task = index_queries.texts_request.map(|mut request| {
         request.id = search_id.clone();
-        move || text_searcher.search(&request, &index_queries.texts_context)
+        move || text_searcher.unwrap().search(&request, &index_queries.texts_context)
     });
 
     let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
         request.id = search_id.clone();
-        move || paragraph_searcher.search(&request, &index_queries.paragraphs_context)
+        move || paragraph_searcher.unwrap().search(&request, &index_queries.paragraphs_context)
     });
 
-    let relation_task = index_queries.relations_request.map(|request| move || relation_searcher.search(&request));
+    let relation_task =
+        index_queries.relations_request.map(|request| move || relation_searcher.unwrap().search(&request));
 
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();

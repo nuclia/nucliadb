@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{any::TypeId, collections::HashSet, path::PathBuf};
+use std::{any::TypeId, path::PathBuf};
 
 use anyhow::anyhow;
 use nidx_vector::config::VectorConfig;
@@ -190,15 +190,15 @@ impl Index {
         Ok(())
     }
 
-    pub async fn marked_to_delete(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<HashSet<IndexId>> {
-        let ids = sqlx::query!(
-            r#"SELECT id as "id: IndexId"
+    pub async fn marked_to_delete(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Index>> {
+        sqlx::query_as!(
+            Index,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
                FROM indexes
                WHERE deleted_at IS NOT NULL"#,
         )
         .fetch_all(meta)
-        .await?;
-        Ok(ids.into_iter().map(|record| record.id).collect())
+        .await
     }
 
     pub async fn segments(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<Segment>> {
