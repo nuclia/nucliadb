@@ -18,11 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import base64
+from io import BytesIO
 from typing import Optional
 
 from nucliadb.common.ids import ParagraphId
+from nucliadb.ingest.fields.file import File
 from nucliadb.search import SERVICE_NAME
 from nucliadb_models.search import Image
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 
@@ -64,14 +67,18 @@ async def get_paragraph_image(kbid: str, paragraph_id: ParagraphId, reference: s
     return image
 
 
-async def get_file_image(kbid: str, rid: str, field_id: str) -> Optional[Image]:
-    storage = await get_storage(service_name=SERVICE_NAME)
-    sf = storage.file_field(kbid, rid, field_id)
-    image_bytes = (await sf.storage.downloadbytes(sf.bucket, sf.key)).read()
-    if not image_bytes:
+async def get_file_thumbnail_image(file: File) -> Optional[Image]:
+    fed = await file.get_file_extracted_data()
+    if fed is None or not fed.HasField("file_thumbnail"):
+        return None
+    storage: Storage = await get_storage(service_name=SERVICE_NAME)
+    image_bytes: BytesIO = await storage.downloadbytescf(fed.file_thumbnail)
+    value = image_bytes.getvalue()
+    if len(value) == 0:
         return None
     image = Image(
-        b64encoded=base64.b64encode(image_bytes).decode(),
-        content_type="image/png",
+        b64encoded=base64.b64encode(value).decode(),
+        # We assume the thumbnail is always generated as jpeg by Nuclia processing
+        content_type="image/jpeg",
     )
     return image
