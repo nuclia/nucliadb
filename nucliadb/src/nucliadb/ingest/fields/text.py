@@ -21,13 +21,17 @@
 import hashlib
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb_protos.resources_pb2 import FieldText
+from nucliadb_protos.resources_pb2 import FieldAuthor, FieldText
 
 
 class Text(Field):
     pbklass = FieldText
     value: FieldText
     type: str = "t"
+
+    async def generated_by(self) -> FieldAuthor.ValueType:
+        value = await self.get_value()
+        return value.generated_by
 
     async def set_value(self, payload: FieldText):
         if payload.md5 == "":

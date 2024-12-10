@@ -31,6 +31,7 @@ from nucliadb_protos.resources_pb2 import (
     CloudFile,
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
+    FieldAuthor,
     FieldComputedMetadata,
     FieldComputedMetadataWrapper,
     FieldQuestionAnswers,
@@ -469,6 +470,9 @@ class Field:
             if payload is not None:
                 self.large_computed_metadata = payload
         return self.large_computed_metadata
+
+    async def generated_by(self) -> FieldAuthor.ValueType:
+        return FieldAuthor.USER
 
     def serialize(self):
         return self.value.SerializeToString()
