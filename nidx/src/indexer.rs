@@ -119,8 +119,6 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
             warn!(?e, "Error acking index message");
             continue;
         }
-
-        // TODO: Delete indexer message on success
     }
 
     Ok(())
