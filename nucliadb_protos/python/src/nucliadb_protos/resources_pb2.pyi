@@ -65,6 +65,22 @@ GENERIC: FieldType.ValueType  # 6
 CONVERSATION: FieldType.ValueType  # 7
 global___FieldType = FieldType
 
+class _FieldAuthor:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _FieldAuthorEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_FieldAuthor.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    USER: _FieldAuthor.ValueType  # 0
+    DATA_AUGMENTATION: _FieldAuthor.ValueType  # 1
+
+class FieldAuthor(_FieldAuthor, metaclass=_FieldAuthorEnumTypeWrapper):
+    """Who is the actor of field creation"""
+
+USER: FieldAuthor.ValueType  # 0
+DATA_AUGMENTATION: FieldAuthor.ValueType  # 1
+global___FieldAuthor = FieldAuthor
+
 @typing.final
 class CloudFile(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1601,17 +1617,20 @@ class FieldText(google.protobuf.message.Message):
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
     MD5_FIELD_NUMBER: builtins.int
+    GENERATED_BY_FIELD_NUMBER: builtins.int
     body: builtins.str
     format: global___FieldText.Format.ValueType
     md5: builtins.str
+    generated_by: global___FieldAuthor.ValueType
     def __init__(
         self,
         *,
         body: builtins.str = ...,
         format: global___FieldText.Format.ValueType = ...,
         md5: builtins.str = ...,
+        generated_by: global___FieldAuthor.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "md5", b"md5"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "generated_by", b"generated_by", "md5", b"md5"]) -> None: ...
 
 global___FieldText = FieldText
 

@@ -362,6 +362,12 @@ message FieldQuestionAnswerWrapper {
     FieldID field = 3;
 }
 
+// Who is the actor of field creation
+enum FieldAuthor {
+    USER = 0;
+    DATA_AUGMENTATION = 1;
+}
+
 message FieldComputedMetadata {
     FieldMetadata metadata = 1;
     map<string, FieldMetadata> split_metadata = 2;
@@ -404,6 +410,8 @@ message FieldText {
     string body = 1;
     Format format = 2;
     string md5 = 3;
+
+    FieldAuthor generated_by = 4;
 }
 
 message Block {
