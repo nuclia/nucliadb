@@ -565,7 +565,7 @@ mod tests {
             let indexes = vec![
                 Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?,
                 Index::create(&meta.pool, shard.id, "english", VectorConfig::default().into()).await?,
-                Index::create(&meta.pool, shard.id, "fulltext", IndexConfig::nex_text()).await?,
+                Index::create(&meta.pool, shard.id, "fulltext", IndexConfig::new_text()).await?,
                 Index::create(&meta.pool, shard.id, "keyword", IndexConfig::new_paragraph()).await?,
                 Index::create(&meta.pool, shard.id, "relation", IndexConfig::new_relation()).await?,
             ];

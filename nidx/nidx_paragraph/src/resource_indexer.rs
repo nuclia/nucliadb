@@ -113,9 +113,6 @@ pub fn index_paragraphs(
             let field_uuid = format!("{}/{}", resource.resource.as_ref().unwrap().uuid, field);
             doc.add_text(schema.field_uuid, field_uuid.clone());
 
-            // TODO: Deletion handling
-            // let paragraph_term = Term::from_field_text(schema.paragraph, paragraph_id);
-            // writer.delete_term(paragraph_term);
             writer.add_document(doc)?;
         }
     }

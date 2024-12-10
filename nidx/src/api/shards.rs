@@ -39,7 +39,7 @@ pub async fn create_shard(
     let mut tx = meta.transaction().await?;
     let shard = Shard::create(&mut *tx, kbid).await?;
     // TODO: Rename to be closer to API naming? Includes changing DB type, Kind enums, etc.
-    Index::create(&mut *tx, shard.id, "text", IndexConfig::nex_text()).await?;
+    Index::create(&mut *tx, shard.id, "text", IndexConfig::new_text()).await?;
     Index::create(&mut *tx, shard.id, "paragraph", IndexConfig::new_paragraph()).await?;
     Index::create(&mut *tx, shard.id, "relation", IndexConfig::new_relation()).await?;
     for (vectorset_id, config) in vector_configs.into_iter() {
@@ -76,9 +76,7 @@ pub async fn delete_shard(meta: &NidxMetadata, shard_id: Uuid) -> NidxResult<()>
 pub async fn delete_vectorset(meta: &NidxMetadata, shard_id: Uuid, vectorset: &str) -> NidxResult<()> {
     let mut tx = meta.transaction().await?;
 
-    // TODO: query to check how many vector indexes we have left
-    let count =
-        Index::for_shard(&mut *tx, shard_id).await?.iter().filter(|index| index.kind == IndexKind::Vector).count();
+    let count = Index::for_shard(&mut *tx, shard_id).await?.iter().filter(|i| i.kind == IndexKind::Vector).count();
     if count <= 1 {
         return Err(NidxError::InvalidRequest("Can't delete the last vectorset".to_string()));
     }

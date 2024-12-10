@@ -263,7 +263,7 @@ impl TryInto<VectorConfig> for IndexConfig {
 }
 
 impl IndexConfig {
-    pub fn nex_text() -> Self {
+    pub fn new_text() -> Self {
         Self::Text(())
     }
 

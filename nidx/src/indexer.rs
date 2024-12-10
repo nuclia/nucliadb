@@ -112,7 +112,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         .instrument(span)
         .await
         {
-            warn!(?e, "Error processing index message");
+            error!(?seq, ?e, "Error processing index message");
             continue;
         }
 
