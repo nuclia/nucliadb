@@ -76,6 +76,7 @@ allow = [
     "OpenSSL",
     "zlib-acknowledgement",
     "MPL-2.0",
+    "Unicode-3.0",
     "Unlicense",
     "ISC",
     "BSD-3-Clause",
