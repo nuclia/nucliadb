@@ -35,7 +35,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.search import logger
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
-    get_file_image,
+    get_file_thumbnail_image,
     get_page_image,
     get_paragraph_image,
 )
@@ -753,14 +753,10 @@ async def conversation_prompt_context(
                         file_field: File = await resource.get_field(
                             attachment.field_id, attachment.field_type, load=True
                         )  # type: ignore
-                        field_metadata = await file_field.get_field_metadata()
-                        if field_metadata is not None and field_metadata.metadata.mime_type.startswith(
-                            "image"
-                        ):
-                            image = await get_file_image(kbid, rid, attachment.field_id)
-                            if image is not None:
-                                pid = f"{rid}/f/{attachment.field_id}/0-0"
-                                context.images[pid] = image
+                        image = await get_file_thumbnail_image(file_field)
+                        if image is not None:
+                            pid = f"{rid}/f/{attachment.field_id}/0-0"
+                            context.images[pid] = image
 
                 analyzed_fields.append(field_unique_id)
 
