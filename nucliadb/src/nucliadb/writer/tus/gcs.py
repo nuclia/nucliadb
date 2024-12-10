@@ -49,7 +49,7 @@ from nucliadb.writer.tus.exceptions import (
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb.writer.tus.utils import to_str
 from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_utils.storages.gcs import CHUNK_SIZE, MIN_UPLOAD_SIZE
+from nucliadb_utils.storages.gcs import CHUNK_SIZE, MIN_UPLOAD_SIZE, TIMEOUT
 
 
 class GoogleCloudException(Exception):
@@ -142,7 +142,7 @@ class GCloudBlobStore(BlobStore):
                 self._credentials = None
 
         loop = asyncio.get_event_loop()
-        self.session = aiohttp.ClientSession(loop=loop)
+        self.session = aiohttp.ClientSession(loop=loop, timeout=TIMEOUT)
 
     async def check_exists(self, bucket_name: str):
         if self.session is None:

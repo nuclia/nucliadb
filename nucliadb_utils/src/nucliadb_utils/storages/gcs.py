@@ -101,6 +101,8 @@ RETRIABLE_EXCEPTIONS = (
     socket.gaierror,
 )
 
+TIMEOUT = aiohttp.ClientTimeout(total=300, connect=30, sock_read=10)
+
 
 class GCSStorageField(StorageField):
     storage: GCSStorage
@@ -507,7 +509,7 @@ class GCSStorage(Storage):
         loop = asyncio.get_event_loop()
 
         self.session = aiohttp.ClientSession(
-            loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5)
+            loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5), timeout=TIMEOUT
         )
 
         try:
