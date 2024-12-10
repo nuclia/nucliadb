@@ -21,7 +21,7 @@
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::anyhow;
@@ -38,6 +38,10 @@ use tracing::*;
 
 use crate::{
     metadata::{Deletion, Index, IndexKind, MergeJob, NewSegment, Segment},
+    metrics::{
+        worker::{MERGE_COUNTER, PER_INDEX_MERGE_TIME},
+        IndexKindLabels, OperationStatusLabels,
+    },
     segment_store::{download_segment, pack_and_upload},
     NidxMetadata, Settings,
 };
@@ -68,8 +72,14 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
             });
 
             match run_job(&meta, &job, storage.clone(), &work_path).instrument(span).await {
-                Ok(_) => info!(job.id, "Job completed"),
-                Err(e) => error!(job.id, ?e, "Merge job failed"),
+                Ok(_) => {
+                    MERGE_COUNTER.get_or_create(&OperationStatusLabels::success()).inc();
+                    info!(job.id, "Job completed")
+                }
+                Err(e) => {
+                    MERGE_COUNTER.get_or_create(&OperationStatusLabels::failure()).inc();
+                    error!(job.id, ?e, "Merge job failed")
+                }
             }
 
             // Stop keep alives
@@ -114,6 +124,7 @@ pub async fn run_job(
     storage: Arc<DynObjectStore>,
     work_path: &Path,
 ) -> anyhow::Result<()> {
+    let t = Instant::now();
     let segments = job.segments(&meta.pool).await?;
     let index = Index::get(&meta.pool, job.index_id).await?;
     for s in &segments {
@@ -176,6 +187,8 @@ pub async fn run_job(
     // Delete task if successful.
     job.finish(&mut *tx).await?;
     tx.commit().await?;
+
+    PER_INDEX_MERGE_TIME.get_or_create(&IndexKindLabels::new(index.kind)).observe(t.elapsed().as_secs_f64());
 
     Ok(())
 }

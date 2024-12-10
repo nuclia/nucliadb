@@ -81,7 +81,7 @@ where
 
         let span = info_span!(
             target: "nidx",
-            "nidx:grpc-call", // placeholder that will be substituted by otel.name
+            "nidx::grpc", // placeholder that will be substituted by otel.name
             otel.name = name,
             rpc.system = "grpc",
             rpc.service = service,

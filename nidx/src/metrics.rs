@@ -45,6 +45,22 @@ macro_rules! metrics {
         use lazy_static::lazy_static;
         use prometheus_client::registry::Registry;
 
+        #[allow(unused_imports)]
+        use std::sync::atomic::AtomicU64;
+
+        #[allow(unused_imports)]
+        use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue};
+
+        #[allow(unused_imports)]
+        use prometheus_client::metrics::{
+            counter::Counter,
+            gauge::Gauge,
+            family::Family,
+            histogram::{exponential_buckets, Histogram},
+        };
+
+        #[allow(unused_imports)]
+        use super::*;
 
         $(metric_definition!($id: $type$([$new])?$({$new_family})? as $name ($description));)*
 
@@ -57,7 +73,7 @@ macro_rules! metrics {
 use std::fmt::Write;
 
 use crate::metadata::IndexKind;
-use prometheus_client::encoding::EncodeLabelValue;
+use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct IndexKindLabel(IndexKind);
@@ -73,10 +89,51 @@ impl EncodeLabelValue for IndexKindLabel {
     }
 }
 
-pub mod scheduler {
-    use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue};
-    use prometheus_client::metrics::{family::Family, gauge::Gauge};
+#[derive(Clone, Debug, EncodeLabelSet, PartialEq, Eq, Hash)]
+pub struct IndexKindLabels {
+    kind: IndexKindLabel,
+}
 
+impl IndexKindLabels {
+    pub fn new(kind: IndexKind) -> Self {
+        Self {
+            kind: IndexKindLabel(kind),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, EncodeLabelValue)]
+enum OperationStatus {
+    Success,
+    Failure,
+}
+
+#[derive(Clone, Debug, EncodeLabelSet, PartialEq, Eq, Hash)]
+pub struct OperationStatusLabels {
+    status: OperationStatus,
+}
+
+impl OperationStatusLabels {
+    pub fn failure() -> Self {
+        Self {
+            status: OperationStatus::Failure,
+        }
+    }
+
+    pub fn success() -> Self {
+        Self {
+            status: OperationStatus::Success,
+        }
+    }
+}
+
+pub mod common {
+    metrics! {
+        SPAN_DURATION: Family<Vec<(String, String)>, Histogram>{exponential_buckets(0.001, 2.0, 20)} as "span_duration_seconds" ("Duration of a tracing span"),
+    }
+}
+
+pub mod scheduler {
     #[derive(Clone, Debug, EncodeLabelValue, PartialEq, Eq, Hash)]
     pub enum JobState {
         Queued,
@@ -94,38 +151,25 @@ pub mod scheduler {
 }
 
 pub mod searcher {
-    use std::sync::atomic::AtomicU64;
-
-    use prometheus_client::{
-        encoding::EncodeLabelSet,
-        metrics::{
-            family::Family,
-            gauge::Gauge,
-            histogram::{exponential_buckets, Histogram},
-        },
-    };
-
-    use crate::metadata::IndexKind;
-
-    use super::IndexKindLabel;
-
-    #[derive(Clone, Debug, EncodeLabelSet, PartialEq, Eq, Hash)]
-    pub struct IndexKindLabels {
-        kind: IndexKindLabel,
-    }
-
-    impl IndexKindLabels {
-        pub fn new(kind: IndexKind) -> Self {
-            Self {
-                kind: IndexKindLabel(kind),
-            }
-        }
-    }
-
     metrics! {
         SYNC_DELAY: Gauge::<f64, AtomicU64> as "searcher_sync_delay_seconds" ("Delay between the time the last index was updated and it was synced"),
         SYNC_FAILED_INDEXES: Gauge as "searcher_sync_failed_indexes" ("Number of indexes failing to sync"),
         REFRESH_QUEUE_LEN: Gauge as "searcher_indexes_pending_refresh" ("Number of indexes waiting to be refreshed"),
         INDEX_LOAD_TIME: Family<IndexKindLabels, Histogram>{exponential_buckets(0.001, 2.0, 12)} as "searcher_index_load_time_seconds" ("Time to load index searchers"),
+    }
+}
+
+pub mod indexer {
+    metrics! {
+        INDEXING_COUNTER: Family<OperationStatusLabels, Counter> as "indexer_message_count" ("Number of indexing operations per status"),
+        TOTAL_INDEXING_TIME: Histogram[exponential_buckets(0.01, 2.0, 12)] as "total_indexing_time_seconds" ("Time it took to process an entire index message"),
+        PER_INDEX_INDEXING_TIME: Family<IndexKindLabels, Histogram>{exponential_buckets(0.01, 2.0, 12)} as "indexing_time_seconds" ("Time it took to index a resource to an index"),
+    }
+}
+
+pub mod worker {
+    metrics! {
+        MERGE_COUNTER: Family<OperationStatusLabels, Counter> as "merge_job_count" ("Number of merge jobs per status"),
+        PER_INDEX_MERGE_TIME: Family<IndexKindLabels, Histogram>{exponential_buckets(1.0, 2.0, 12)} as "merge_time_seconds" ("Time it took to run a merge job"),
     }
 }

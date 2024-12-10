@@ -35,7 +35,8 @@ use tokio::sync::{Mutex, Semaphore};
 use uuid::Uuid;
 
 use crate::metadata::{IndexId, IndexKind, Segment, SegmentId};
-use crate::metrics::searcher::{IndexKindLabels, INDEX_LOAD_TIME};
+use crate::metrics::searcher::INDEX_LOAD_TIME;
+use crate::metrics::IndexKindLabels;
 use crate::NidxMetadata;
 
 use super::sync::{Operations, ShardIndexes, SyncMetadata};

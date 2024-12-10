@@ -96,6 +96,7 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
 
     let settings = Settings::from_env_settings(env_settings).await?;
     let mut metrics = Registry::with_prefix("nidx");
+    metrics::common::register(&mut metrics);
 
     let shutdown = CancellationToken::new();
 
@@ -104,8 +105,14 @@ async fn do_main(env_settings: EnvSettings, components: Vec<Component>) -> anyho
     let mut has_searcher = false;
     components.iter().for_each(|component| {
         let task = match component {
-            Component::Indexer => tasks.spawn(indexer::run(settings.clone(), shutdown.clone())),
-            Component::Worker => tasks.spawn(worker::run(settings.clone(), shutdown.clone())),
+            Component::Indexer => {
+                metrics::indexer::register(&mut metrics);
+                tasks.spawn(indexer::run(settings.clone(), shutdown.clone()))
+            }
+            Component::Worker => {
+                metrics::worker::register(&mut metrics);
+                tasks.spawn(worker::run(settings.clone(), shutdown.clone()))
+            }
             Component::Scheduler => {
                 metrics::scheduler::register(&mut metrics);
                 tasks.spawn(scheduler::run(settings.clone(), shutdown.clone()))

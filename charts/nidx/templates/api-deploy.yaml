@@ -31,6 +31,7 @@ spec:
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
+        nidxMetrics: "enabled"
     spec:
       {{- with .Values.searcher.nodeSelector }}
       nodeSelector:
@@ -60,6 +61,8 @@ spec:
             value: "/run/nidx.sock"
         ports:
         {{- with .Values.searcher.resources }}
+        - name: metrics
+          containerPort: 10010
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
