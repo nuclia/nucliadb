@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os
 import re
 from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -75,10 +76,17 @@ class GCS(BaseImage):
 @pytest.fixture(scope="session")
 def gcs():
     container = GCS()
-    _, port = container.run()
-    public_api_url = f"http://172.17.0.1:{port}"
+    host, port = container.run()
+    if is_mac_machine():
+        public_api_url = f"http://{host}:{port}"
+    else:
+        public_api_url = f"http://172.17.0.1:{port}"
     yield public_api_url
     container.stop()
+
+
+def is_mac_machine():
+    return os.uname().sysname == "Darwin"
 
 
 @pytest.fixture(scope="function")
