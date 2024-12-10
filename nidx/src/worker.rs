@@ -172,7 +172,7 @@ pub async fn run_job(
     let mut tx = meta.transaction().await?;
     segment.mark_ready(&mut *tx, size as i64).await?;
     Segment::mark_many_for_deletion(&mut *tx, &segment_ids).await?;
-    index.updated(&mut *tx).await?;
+    Index::updated(&mut *tx, &index.id).await?;
     // Delete task if successful. TODO: Mark as failed otherwise?
     job.finish(&mut *tx).await?;
     tx.commit().await?;

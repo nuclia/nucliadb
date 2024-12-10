@@ -29,6 +29,7 @@ use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
 use uuid::Uuid;
@@ -149,7 +150,7 @@ pub async fn delete_resource(meta: &NidxMetadata, shard_id: &str, resource: Stri
     let mut tx = meta.transaction().await?;
     for index in indexes {
         Deletion::create(&mut *tx, index.id, seq, &[resource.clone()]).await?;
-        index.updated(&mut *tx).await?;
+        Index::updated(&mut *tx, &index.id).await?;
     }
     tx.commit().await?;
 
@@ -183,37 +184,47 @@ pub async fn index_resource(
     let num_vector_indexes = indexes.iter().filter(|i| matches!(i.kind, IndexKind::Vector)).count();
     let single_vector_index = num_vector_indexes == 1;
 
-    // TODO: Index in parallel
-    // TODO: Save all indexes as a transaction (to avoid issues reprocessing the same message)
+    let mut tasks: JoinSet<anyhow::Result<Option<(Segment, usize, Vec<String>)>>> = JoinSet::new();
     for index in indexes {
-        let output_dir = tempfile::tempdir_in(work_path)?;
-
-        // Index the resource
-        let index = Arc::new(index);
         let resource = Arc::clone(&resource);
-        let path = output_dir.path().to_path_buf();
-        let index_2 = Arc::clone(&index);
-        let span = Span::current();
-        let (new_segment, deletions) = tokio::task::spawn_blocking(move || {
-            span.in_scope(|| index_resource_to_index(&index_2, &resource, &path, single_vector_index))
-        })
-        .await??;
-        let Some(new_segment) = new_segment else {
-            continue;
-        };
+        let meta = meta.clone();
+        let output_dir = tempfile::tempdir_in(work_path)?;
+        let storage = Arc::clone(&storage);
+        tasks.spawn(async move {
+            // Index the resource
+            let path = output_dir.path().to_path_buf();
+            let index_2 = index.clone();
+            let span = Span::current();
+            let (new_segment, deletions) = tokio::task::spawn_blocking(move || {
+                span.in_scope(|| index_resource_to_index(&index_2, &resource, &path, single_vector_index))
+            })
+            .await??;
+            let Some(new_segment) = new_segment else {
+                return Ok(None);
+            };
 
-        // Create the segment first so we can track it if the upload gets interrupted
-        let segment =
-            Segment::create(&meta.pool, index.id, seq, new_segment.records, new_segment.index_metadata).await?;
-        let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
+            // Create the segment first so we can track it if the upload gets interrupted
+            let segment =
+                Segment::create(&meta.pool, index.id, seq, new_segment.records, new_segment.index_metadata).await?;
+            let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
 
-        // Mark the segment as visible and write the deletions at the same time
-        let mut tx = meta.transaction().await?;
-        segment.mark_ready(&mut *tx, size as i64).await?;
-        Deletion::create(&mut *tx, index.id, seq, &deletions).await?;
-        index.updated(&mut *tx).await?;
-        tx.commit().await?;
+            Ok(Some((segment, size, deletions)))
+        });
     }
+
+    let results: anyhow::Result<Vec<_>> = tasks.join_all().await.into_iter().collect();
+
+    // Commit all indexes in a single transaction. In case one fails, no changes will be made
+    // and the index message can be safely reprocessed
+    let mut tx = meta.transaction().await?;
+    for (segment, size, deletions) in results?.into_iter().flatten() {
+        // Mark the segments as visible and write the deletions at the same time
+        segment.mark_ready(&mut *tx, size as i64).await?;
+        Deletion::create(&mut *tx, segment.index_id, seq, &deletions).await?;
+        Index::updated(&mut *tx, &segment.index_id).await?;
+    }
+    tx.commit().await?;
+
     Ok(())
 }
 
