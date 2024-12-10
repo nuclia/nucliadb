@@ -69,7 +69,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
 
             match run_job(&meta, &job, storage.clone(), &work_path).instrument(span).await {
                 Ok(_) => info!(job.id, "Job completed"),
-                Err(e) => warn!(job.id, ?e, "Job failed"),
+                Err(e) => error!(job.id, ?e, "Merge job failed"),
             }
 
             // Stop keep alives
@@ -114,7 +114,6 @@ pub async fn run_job(
     storage: Arc<DynObjectStore>,
     work_path: &Path,
 ) -> anyhow::Result<()> {
-    // TODO: Should jobs be generic or keep the merge_job idea?
     let segments = job.segments(&meta.pool).await?;
     let index = Index::get(&meta.pool, job.index_id).await?;
     for s in &segments {
@@ -172,8 +171,9 @@ pub async fn run_job(
     let mut tx = meta.transaction().await?;
     segment.mark_ready(&mut *tx, size as i64).await?;
     Segment::mark_many_for_deletion(&mut *tx, &segment_ids).await?;
-    index.updated(&mut *tx).await?;
-    // Delete task if successful. TODO: Mark as failed otherwise?
+    Index::updated(&mut *tx, &index.id).await?;
+
+    // Delete task if successful.
     job.finish(&mut *tx).await?;
     tx.commit().await?;
 

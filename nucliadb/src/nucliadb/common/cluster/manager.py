@@ -579,6 +579,13 @@ class StandaloneKBShardManager(KBShardManager):
 
             await nidx.index(indexpb)
 
+            # Delete indexing message (no longer needed)
+            try:
+                if storage.indexing_bucket:
+                    await storage.delete_upload(storage_key, storage.indexing_bucket)
+            except Exception:
+                pass
+
 
 def get_all_shard_nodes(
     shard: writer_pb2.ShardObject,

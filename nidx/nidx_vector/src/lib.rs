@@ -78,8 +78,6 @@ impl VectorIndexer {
         config: VectorConfig,
         open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
-        // TODO: Maybe segments should not get a DTrie of deletions and just a hashset of them, and we can handle building that here?
-        // Wait and see how the Tantivy indexes turn out
         let mut delete_log = data_point_provider::DTrie::new();
         for (key, seq) in open_index.deletions() {
             delete_log.insert(key.as_bytes(), seq);

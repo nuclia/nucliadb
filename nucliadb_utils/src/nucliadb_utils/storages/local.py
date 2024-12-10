@@ -263,6 +263,9 @@ class LocalStorage(Storage):
         file_path = self.get_file_path(bucket_name, uri)
         if os.path.exists(file_path):
             os.remove(file_path)
+        metadata_path = f"{file_path}.metadata"
+        if os.path.exists(metadata_path):
+            os.remove(metadata_path)
 
     async def schedule_delete_kb(self, kbid: str):
         bucket = self.get_bucket_name(kbid)

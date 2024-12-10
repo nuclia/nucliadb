@@ -55,6 +55,7 @@ impl IndexId {
     }
 }
 
+#[derive(Clone)]
 pub struct Index {
     pub id: IndexId,
     pub shard_id: Uuid,
@@ -158,8 +159,8 @@ impl Index {
         .await
     }
 
-    pub async fn updated(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
-        sqlx::query!("UPDATE indexes SET updated_at = NOW() WHERE id = $1", self.id as IndexId).execute(meta).await?;
+    pub async fn updated(meta: impl Executor<'_, Database = Postgres>, index_id: &IndexId) -> sqlx::Result<()> {
+        sqlx::query!("UPDATE indexes SET updated_at = NOW() WHERE id = $1", index_id as &IndexId).execute(meta).await?;
         Ok(())
     }
 
@@ -262,7 +263,7 @@ impl TryInto<VectorConfig> for IndexConfig {
 }
 
 impl IndexConfig {
-    pub fn nex_text() -> Self {
+    pub fn new_text() -> Self {
         Self::Text(())
     }
 
