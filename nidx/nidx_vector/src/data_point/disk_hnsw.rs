@@ -321,15 +321,15 @@ mod tests {
     #[test]
     fn hnsw_deserialize_test() {
         let no_nodes = 3;
-        let cnx0 = vec![vec![(Address(1), 1.0)], vec![(Address(2), 2.0)], vec![(Address(3), 3.0)]];
+        let cnx0 = [vec![(Address(1), 1.0)], vec![(Address(2), 2.0)], vec![(Address(3), 3.0)]];
         let layer0 = RAMLayer {
             out: cnx0.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
         };
-        let cnx1 = vec![vec![(Address(1), 4.0)], vec![(Address(2), 5.0)]];
+        let cnx1 = [vec![(Address(1), 4.0)], vec![(Address(2), 5.0)]];
         let layer1 = RAMLayer {
             out: cnx1.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
         };
-        let cnx2 = vec![vec![(Address(1), 6.0)]];
+        let cnx2 = [vec![(Address(1), 6.0)]];
         let layer2 = RAMLayer {
             out: cnx2.iter().enumerate().map(|(i, c)| (Address(i), c.clone())).collect(),
         };

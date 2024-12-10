@@ -166,6 +166,8 @@ pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -
     Ok(resource)
 }
 
+type IndexingResult = (Segment, usize, Vec<String>);
+
 #[instrument(skip_all)]
 pub async fn index_resource(
     meta: &NidxMetadata,
@@ -184,7 +186,7 @@ pub async fn index_resource(
     let num_vector_indexes = indexes.iter().filter(|i| matches!(i.kind, IndexKind::Vector)).count();
     let single_vector_index = num_vector_indexes == 1;
 
-    let mut tasks: JoinSet<anyhow::Result<Option<(Segment, usize, Vec<String>)>>> = JoinSet::new();
+    let mut tasks: JoinSet<anyhow::Result<Option<IndexingResult>>> = JoinSet::new();
     for index in indexes {
         let resource = Arc::clone(&resource);
         let meta = meta.clone();
