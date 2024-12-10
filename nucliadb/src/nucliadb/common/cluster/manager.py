@@ -581,7 +581,8 @@ class StandaloneKBShardManager(KBShardManager):
 
             # Delete indexing message (no longer needed)
             try:
-                await storage.delete_upload(storage_key, storage.indexing_bucket)
+                if storage.indexing_bucket:
+                    await storage.delete_upload(storage_key, storage.indexing_bucket)
             except Exception:
                 pass
 
