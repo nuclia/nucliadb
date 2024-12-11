@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, MutableMapping, Optional, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, Iterable, MutableMapping, Optional, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -287,10 +287,9 @@ class Resource:
             self.relations = relations
         return self.relations
 
-    async def set_relations(self, payload: list[PBRelation]):
+    async def set_relations(self, payload: Iterable[PBRelation]):
         relations = PBRelations()
-        for relation in payload:
-            relations.relations.append(relation)
+        relations.relations.extend(payload)
         await datamanagers.resources.set_relations(
             self.txn, kbid=self.kb.kbid, rid=self.uuid, relations=relations
         )
@@ -553,45 +552,64 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
+        tasks = []
+
         for question_answers in message.question_answers:
-            await self._apply_question_answers(question_answers)
+            tasks.append(self._apply_question_answers(question_answers))
 
         for extracted_text in message.extracted_text:
-            await self._apply_extracted_text(extracted_text)
+            tasks.append(self._apply_extracted_text(extracted_text))
 
-        extracted_languages = []
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+            tasks = []
+
+        extracted_languages = set()
 
         for link_extracted_data in message.link_extracted_data:
-            await self._apply_link_extracted_data(link_extracted_data)
+            tasks.append(self._apply_link_extracted_data(link_extracted_data))
             await self.maybe_update_resource_title_from_link(link_extracted_data)
-            extracted_languages.append(link_extracted_data.language)
+            extracted_languages.add(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
-            await self._apply_file_extracted_data(file_extracted_data)
-            extracted_languages.append(file_extracted_data.language)
+            tasks.append(self._apply_file_extracted_data(file_extracted_data))
+            extracted_languages.add(file_extracted_data.language)
+
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+            tasks = []
 
         await self.maybe_update_resource_title_from_file_extracted_data(message)
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
-            await self._apply_field_computed_metadata(field_metadata)
-            extracted_languages.extend(extract_field_metadata_languages(field_metadata))
+            tasks.append(self._apply_field_computed_metadata(field_metadata))
+            extracted_languages.update(extract_field_metadata_languages(field_metadata))
+
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+            tasks = []
 
         update_basic_languages(self.basic, extracted_languages)
 
-        # Upload to binary storage
         # Vector indexing
         if self.disable_vectors is False:
             for field_vectors in message.field_vectors:
-                await self._apply_extracted_vectors(field_vectors)
+                tasks.append(self._apply_extracted_vectors(field_vectors))
+
+            if len(tasks) > 0:
+                await asyncio.gather(*tasks)
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
-            await self._apply_field_large_metadata(field_large_metadata)
+            tasks.append(self._apply_field_large_metadata(field_large_metadata))
 
-        for relation in message.relations:
-            self.indexer.brain.relations.append(relation)
-        await self.set_relations(message.relations)  # type: ignore
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+
+        # Relations
+        self.indexer.brain.relations.extend(message.relations)
+        await self.set_relations(message.relations)
 
         # Basic proto may have been modified in some apply functions but we only
         # want to set it once
@@ -729,6 +747,7 @@ class Resource:
 
         add_field_classifications(self.basic, field_metadata)
 
+    @processor_observer.wrap({"type": "apply_extracted_vectors"})
     async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
         # Store vectors in the resource
 
@@ -1219,7 +1238,7 @@ def maybe_update_basic_thumbnail(basic: PBBasic, thumbnail: Optional[CloudFile])
     return True
 
 
-def update_basic_languages(basic: Basic, languages: list[str]) -> bool:
+def update_basic_languages(basic: Basic, languages: set[str]) -> bool:
     if len(languages) == 0:
         return False
 
