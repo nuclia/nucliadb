@@ -161,7 +161,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             logger.error("No Deadletter Bucket defined will not store the error")
             return
         key = DEADLETTER.format(seqid=seqid, seq=seq, partition=partition)
-        await self.upload(self.deadletter_bucket, key, message.SerializeToString())
+        await self.upload_object(self.deadletter_bucket, key, message.SerializeToString())
 
     def get_indexing_storage_key(
         self, *, kb: str, logical_shard: str, resource_uid: str, txid: Union[int, str]
@@ -187,7 +187,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             resource_uid=message.resource.uuid,
             txid=txid,
         )
-        await self.upload(self.indexing_bucket, key, message.SerializeToString())
+        await self.upload_object(self.indexing_bucket, key, message.SerializeToString())
 
         return key
 
@@ -207,7 +207,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             resource_uid=message.resource.uuid,
             txid=reindex_id,
         )
-        await self.upload(self.indexing_bucket, key, message.SerializeToString())
+        await self.upload_object(self.indexing_bucket, key, message.SerializeToString())
         return key
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:
@@ -256,7 +256,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             + ".deleted"
         )
 
-        await self.upload(self.indexing_bucket, key, b"")
+        await self.upload_object(self.indexing_bucket, key, b"")
 
     def needs_move(self, file: CloudFile, kbid: str) -> bool:
         # The cloudfile is valid for our environment
@@ -371,7 +371,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         cf = await self.uploaditerator(generator, sf, cf)
         return cf
 
-    async def uploadbytes(
+    async def chunked_upload_object(
         self,
         bucket: str,
         key: str,
@@ -396,6 +396,9 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
 
         generator = splitter(buffer)
         await self.uploaditerator(generator, destination, cf)
+
+    # For backwards compatibility
+    uploadbytes = chunked_upload_object
 
     async def uploaditerator(
         self, iterator: AsyncIterator, destination: StorageField, origin: CloudFile
@@ -466,7 +469,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
                     yield data
 
     async def upload_pb(self, sf: StorageField, payload: Any):
-        await self.upload(sf.bucket, sf.key, payload.SerializeToString())
+        await self.upload_object(sf.bucket, sf.key, payload.SerializeToString())
 
     async def download_pb(self, sf: StorageField, PBKlass: Type):
         payload = await self.downloadbytes(sf.bucket, sf.key)
@@ -513,7 +516,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def set_stream_message(self, kbid: str, rid: str, data: bytes) -> str:
         key = MESSAGE_KEY.format(kbid=kbid, rid=rid, mid=uuid.uuid4())
         indexing_bucket = cast(str, self.indexing_bucket)
-        await self.upload(indexing_bucket, key, data)
+        await self.upload_object(indexing_bucket, key, data)
         return key
 
     async def get_stream_message(self, key: str) -> bytes:
@@ -532,9 +535,9 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         """
         ...
 
-    async def upload(self, bucket: str, key: str, data: bytes) -> None:
+    async def upload_object(self, bucket: str, key: str, data: bytes) -> None:
         if len(data) > self.chunk_size:
-            await self.uploadbytes(bucket, key, data)
+            await self.chunked_upload_object(bucket, key, data)
         else:
             await self.insert_object(bucket, key, data)
 

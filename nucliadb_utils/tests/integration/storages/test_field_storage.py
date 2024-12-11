@@ -53,7 +53,7 @@ async def storage_field_test(storage: Storage):
     rid = "rid"
     field_id = "field1"
     field_key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field_id)
-    await storage.uploadbytes(
+    await storage.chunked_upload_object(
         bucket, field_key, binary_data, filename="myfile.txt", content_type="text/plain"
     )
 
