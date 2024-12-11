@@ -135,15 +135,69 @@ pub struct StorageSettings {
 #[derive(Clone, Deserialize, Debug)]
 #[serde(default)]
 pub struct MergeSettings {
-    pub min_number_of_segments: u64,
-    pub max_segment_size: usize,
+    pub max_deletions: usize,
+    pub log_merge: LogMergeSettings,
+    pub vector_merge: VectorMergeSettings,
 }
 
 impl Default for MergeSettings {
     fn default() -> Self {
         Self {
+            max_deletions: 100,
+            log_merge: Default::default(),
+            vector_merge: Default::default(),
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct LogMergeSettings {
+    /// Minimum number of segments needed to perform a merge for an index
+    pub min_number_of_segments: usize,
+
+    /// Max number of records for a segment to be in the top bucket, i.e.,
+    /// elegible for merge. Once a segment becomes bigger, it won't be merged
+    /// anymore
+    pub top_bucket_max_records: usize,
+
+    /// Max number of records for a segment to be considered in the bottom
+    /// bucket. Segments with fewer records won't be further splitted in buckets
+    pub bottom_bucket_threshold: usize,
+
+    /// Log value between buckets. Increasing this number implies more segment
+    /// sizes to be grouped in the same merge job.
+    pub bucket_size_log: f64,
+}
+
+impl Default for LogMergeSettings {
+    fn default() -> Self {
+        Self {
             min_number_of_segments: 4,
-            max_segment_size: 100_000,
+            top_bucket_max_records: 10_000_000,
+            bottom_bucket_threshold: 10_000,
+            bucket_size_log: 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct VectorMergeSettings {
+    /// Maximum records in resulting merged segment
+    pub max_segment_size: usize,
+
+    /// Minimum number of segments to consider merging
+    pub min_number_of_segments: usize,
+
+    /// Size (in records) below which segments are considered small
+    pub small_segment_threshold: usize,
+}
+
+impl Default for VectorMergeSettings {
+    fn default() -> Self {
+        Self {
+            min_number_of_segments: 4,
+            max_segment_size: 200_000,
+            small_segment_threshold: 20_000,
         }
     }
 }
@@ -259,12 +313,12 @@ mod tests {
             ("INDEXER__OBJECT_STORE", "file"),
             ("INDEXER__FILE_PATH", "/tmp"),
             ("INDEXER__NATS_SERVER", "localhost"),
-            ("MERGE__MIN_NUMBER_OF_SEGMENTS", "1234"),
+            ("MERGE__MAX_DELETIONS", "1234"),
         ];
         let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
         assert_eq!(&settings.metadata.unwrap().database_url, "postgresql://localhost");
         assert_eq!(&settings.indexer.unwrap().nats_server, "localhost");
-        assert_eq!(settings.merge.min_number_of_segments, 1234);
-        assert_eq!(settings.merge.max_segment_size, MergeSettings::default().max_segment_size);
+        assert_eq!(settings.merge.max_deletions, 1234);
+        assert_eq!(settings.merge.log_merge.min_number_of_segments, LogMergeSettings::default().min_number_of_segments);
     }
 }

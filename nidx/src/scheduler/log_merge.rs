@@ -18,13 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::{metadata::SegmentId, settings::MergeSettings};
-use tracing::*;
+use crate::{metadata::SegmentId, settings::LogMergeSettings};
 
-/// [`LogLogMergeStrategy`] implements a logarithmic merge strategy inspired from
+/// [`LogMergeSettings{
 /// tantivy's log merge policy. The algorithm tries to merge segments with
 /// similar number of records.
-///
+//
 /// It works by splitting up segments in different buckets depending on the
 /// amount of records they contain. Segments within a bucket are then scheduled
 /// to be merged together (if there are more than `min_number_of_segments`).
@@ -62,117 +61,97 @@ use tracing::*;
 ///                              |    to split)    |
 /// ```
 ///
-pub(super) struct LogMergeStrategy {
-    /// Minimum number of segments needed to perform a merge for an index
-    min_number_of_segments: usize,
+pub fn plan_merges(settings: &LogMergeSettings, segments: Vec<(SegmentId, i64, bool)>) -> Vec<Vec<SegmentId>> {
+    let mut buckets = vec![];
+    let mut current_bucket = vec![];
+    let mut current_max_size_log = f64::MAX;
 
-    /// Max number of records for a segment to be in the top bucket, i.e.,
-    /// elegible for merge. Once a segment becomes bigger, it won't be merged
-    /// anymore
-    top_bucket_max_records: usize,
-
-    /// Max number of records for a segment to be considered in the bottom
-    /// bucket. Segments with fewer records won't be further splitted in buckets
-    bottom_bucket_threshold: usize,
-
-    /// Log value between buckets. Increasing this number implies more segment
-    /// sizes to be grouped in the same merge job.
-    bucket_size_log: f64,
-}
-
-impl Default for LogMergeStrategy {
-    fn default() -> Self {
-        Self {
-            min_number_of_segments: 4,
-            top_bucket_max_records: 10_000_000,
-            bottom_bucket_threshold: 10_000,
-            bucket_size_log: 0.75,
-        }
-    }
-}
-
-impl LogMergeStrategy {
-    pub fn from_settings(settings: &MergeSettings) -> Self {
-        Self {
-            min_number_of_segments: settings.min_number_of_segments as usize,
-            top_bucket_max_records: settings.max_segment_size,
-            ..Default::default()
-        }
-    }
-
-    /// Enqueue merge jobs for segments older than `last_indexed_seq` that aren't
-    /// already scheduled for merge or marked to delete.
-    ///
-    /// Merging involves creation of a single segment from multiple ones, combining
-    /// their data and applying deletions. Merge jobs are executed in parallel (in
-    /// multiple workers) and while other segments are being indexed. This restricts
-    /// us to only merge segments whose sequences are less than the smaller sequence
-    /// being indexed.
-    ///
-    /// As an example, if sequences 100 and 102 are indexed but 101 is still being
-    /// indexed, we can only merge segments with sequence <= 100. Otherwise, if we
-    /// merge 100 and 102 (generating a new 102 segment) and segment 101 included
-    /// deletions for 100, we'll never apply them and we'll end in an inconsistent
-    /// state.
-    pub fn plan_merges(&self, segments: Vec<(SegmentId, i64)>) -> Vec<Vec<SegmentId>> {
-        let mut buckets = vec![];
-        let mut current_bucket = vec![];
-        let mut current_max_size_log = f64::MAX;
-
-        for (segment_id, records) in segments {
-            let segment_size_log = f64::from(std::cmp::max(records as u32, self.bottom_bucket_threshold as u32)).log2();
-            if segment_size_log <= (current_max_size_log - self.bucket_size_log) {
-                // traversed to next bucket, store current and continue
-                buckets.push(current_bucket);
-                current_bucket = vec![];
-                current_max_size_log = segment_size_log;
+    let mut merges = Vec::new();
+    for (segment_id, records, force) in segments {
+        // Do not merge large segments except if forced to apply deletions
+        if records as usize > settings.top_bucket_max_records {
+            if force {
+                merges.push(vec![segment_id]);
             }
-
-            current_bucket.push((segment_id, records));
+            continue;
         }
-        buckets.push(current_bucket);
+        let segment_size_log = f64::from(std::cmp::max(records as u32, settings.bottom_bucket_threshold as u32)).log2();
+        if segment_size_log <= (current_max_size_log - settings.bucket_size_log) {
+            // traversed to next bucket, store current and continue
+            buckets.push(current_bucket);
+            current_bucket = vec![];
+            current_max_size_log = segment_size_log;
+        }
 
-        let mut merges = Vec::new();
-        for segments in buckets {
-            // TODO: merge segments with too many deletions
-            if segments.len() >= self.min_number_of_segments {
-                let mut sum_segments = 0;
-                let mut to_merge = Vec::new();
-                for (sid, records) in &segments {
-                    sum_segments += *records as usize;
-                    to_merge.push(*sid);
-                    if sum_segments > self.top_bucket_max_records {
-                        if to_merge.len() >= self.min_number_of_segments {
-                            debug!(?to_merge, "Scheduling merge job for bucket");
-                            merges.push(std::mem::take(&mut to_merge));
-                        }
-                        sum_segments = 0;
-                        to_merge.clear();
+        current_bucket.push((segment_id, records, force));
+    }
+    buckets.push(current_bucket);
+
+    for segments in buckets {
+        // Only merge if we have enough segments or we are forced to purge deletions
+        if segments.len() >= settings.min_number_of_segments || segments.iter().any(|(_, _, force)| *force) {
+            let mut sum_segments = 0;
+            let mut to_merge = Vec::new();
+
+            let mut forced = false;
+            for (sid, records, force) in &segments {
+                forced |= force;
+                sum_segments += *records as usize;
+                to_merge.push(*sid);
+                if sum_segments > settings.top_bucket_max_records {
+                    if to_merge.len() >= settings.min_number_of_segments || forced {
+                        merges.push(std::mem::take(&mut to_merge));
                     }
-                }
-
-                if to_merge.len() >= self.min_number_of_segments {
-                    debug!(?to_merge, "Scheduling merge job for bucket");
-                    merges.push(to_merge);
+                    forced = false;
+                    sum_segments = 0;
+                    to_merge.clear();
                 }
             }
-        }
 
-        merges
+            if to_merge.len() >= settings.min_number_of_segments || forced {
+                merges.push(to_merge);
+            }
+        }
     }
+
+    merges
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{scheduler::log_merge::LogMergeStrategy, settings::MergeSettings};
+    use crate::{scheduler::log_merge::plan_merges, settings::LogMergeSettings};
+
+    #[test]
+    fn test_log_merge_scheduling_forced_merge() -> anyhow::Result<()> {
+        let log_merge = LogMergeSettings {
+            min_number_of_segments: 3,
+            top_bucket_max_records: 1000,
+            bottom_bucket_threshold: 5,
+            bucket_size_log: 1.0,
+        };
+
+        let jobs = plan_merges(&log_merge, vec![(1i64.into(), 50, false), (2i64.into(), 50, false)]);
+        assert_eq!(jobs.len(), 0);
+
+        let jobs = plan_merges(&log_merge, vec![(1i64.into(), 50, false), (2i64.into(), 50, true)]);
+        assert_eq!(jobs.len(), 1);
+
+        let jobs = plan_merges(&log_merge, vec![(1i64.into(), 2000, false)]);
+        assert_eq!(jobs.len(), 0);
+
+        let jobs = plan_merges(&log_merge, vec![(1i64.into(), 2000, true)]);
+        assert_eq!(jobs.len(), 1);
+
+        Ok(())
+    }
 
     #[test]
     fn test_log_merge_scheduling_not_enough_segments_merge() -> anyhow::Result<()> {
-        let log_merge = LogMergeStrategy::from_settings(&MergeSettings {
-            min_number_of_segments: 4,
+        let log_merge = LogMergeSettings {
+            min_number_of_segments: 3,
             ..Default::default()
-        });
-        let jobs = log_merge.plan_merges(vec![(1i64.into(), 50), (2i64.into(), 50), (3i64.into(), 50)]);
+        };
+        let jobs = plan_merges(&log_merge, vec![(1i64.into(), 50, false), (2i64.into(), 50, false)]);
         assert!(jobs.is_empty());
 
         Ok(())
@@ -180,11 +159,12 @@ mod tests {
 
     #[test]
     fn test_log_merge_scheduling_same_size_segments() -> anyhow::Result<()> {
-        let log_merge = LogMergeStrategy::from_settings(&MergeSettings {
+        let log_merge = LogMergeSettings {
             min_number_of_segments: 3,
             ..Default::default()
-        });
-        let jobs = log_merge.plan_merges(vec![(1i64.into(), 50), (2i64.into(), 50), (3i64.into(), 50)]);
+        };
+        let jobs =
+            plan_merges(&log_merge, vec![(1i64.into(), 50, false), (2i64.into(), 50, false), (3i64.into(), 50, false)]);
 
         // all segments have been scheduled for merge in a single job
         assert_eq!(jobs.len(), 1);
@@ -195,28 +175,31 @@ mod tests {
 
     #[test]
     fn test_log_merge_scheduling_all_buckets() -> anyhow::Result<()> {
-        let log_merge = LogMergeStrategy {
+        let log_merge = LogMergeSettings {
             min_number_of_segments: 2,
             top_bucket_max_records: 1000,
             bottom_bucket_threshold: 50,
             bucket_size_log: 1.0,
         };
 
-        let jobs = log_merge.plan_merges(vec![
-            (7i64.into(), 1001), // exceeds the max segment size, won't appear
-            (3i64.into(), 1000), // log2(1000) = ~9.97 -- will mark the top bucket
-            (12i64.into(), 501), // last element in top bucket
-            (13i64.into(), 500), // just below top bucket
-            (11i64.into(), 249), // top - 2
-            (9i64.into(), 125),  // top - 2
-            (5i64.into(), 124),  // bottom + 1
-            (4i64.into(), 63),   // bottom + 1
-            (6i64.into(), 62),   // first in bottom bucket
-            (10i64.into(), 51),  // just above bottom_bucket_threshold
-            (1i64.into(), 50),   // bottom bucket
-            (2i64.into(), 10),   // bottom bucket
-            (8i64.into(), 20),   // bottom bucket
-        ]);
+        let jobs = plan_merges(
+            &log_merge,
+            vec![
+                (7i64.into(), 1001, false), // exceeds the max segment size, won't appear
+                (3i64.into(), 1000, false), // log2(1000) = ~9.97 -- will mark the top bucket
+                (12i64.into(), 501, false), // last element in top bucket
+                (13i64.into(), 500, false), // just below top bucket
+                (11i64.into(), 249, false), // top - 2
+                (9i64.into(), 125, false),  // top - 2
+                (5i64.into(), 124, false),  // bottom + 1
+                (4i64.into(), 63, false),   // bottom + 1
+                (6i64.into(), 62, false),   // first in bottom bucket
+                (10i64.into(), 51, false),  // just above bottom_bucket_threshold
+                (1i64.into(), 50, false),   // bottom bucket
+                (2i64.into(), 10, false),   // bottom bucket
+                (8i64.into(), 20, false),   // bottom bucket
+            ],
+        );
 
         println!("{jobs:?}");
         assert_eq!(jobs.len(), 4);

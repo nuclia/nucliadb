@@ -22,6 +22,7 @@ mod log_merge;
 mod merge_task;
 mod metrics_task;
 mod purge_tasks;
+mod vector_merge;
 
 use crate::{metadata::MergeJob, settings::MergeSettings, NidxMetadata, Settings};
 use async_nats::jetstream::consumer::PullConsumer;
@@ -126,7 +127,7 @@ pub async fn run_tasks(
 
     let meta2 = meta.clone();
     tasks.spawn(async move {
-        let merge_scheduler = MergeScheduler::from_settings(&merge_settings);
+        let merge_scheduler = MergeScheduler::from_settings(merge_settings);
         loop {
             match ack_floor.get().await {
                 Ok(oldest_confirmed_seq) => {

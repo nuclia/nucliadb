@@ -25,41 +25,72 @@ use crate::{
 };
 use nidx_types::Seq;
 
-use super::log_merge::LogMergeStrategy;
+use super::{log_merge, vector_merge};
 
 pub struct MergeScheduler {
-    tantivy: LogMergeStrategy,
+    settings: MergeSettings,
 }
 
 impl MergeScheduler {
-    pub fn from_settings(settings: &MergeSettings) -> Self {
+    pub fn from_settings(settings: MergeSettings) -> Self {
         Self {
-            tantivy: LogMergeStrategy::from_settings(settings),
+            settings,
         }
     }
 
+    /// Enqueue merge jobs for segments older than `last_indexed_seq` that aren't
+    /// already scheduled for merge or marked to delete.
+    ///
+    /// Merging involves creation of a single segment from multiple ones, combining
+    /// their data and applying deletions. Merge jobs are executed in parallel (in
+    /// multiple workers) and while other segments are being indexed. This restricts
+    /// us to only merge segments whose sequences are less than the smaller sequence
+    /// being indexed.
+    ///
+    /// As an example, if sequences 100 and 102 are indexed but 101 is still being
+    /// indexed, we can only merge segments with sequence <= 100. Otherwise, if we
+    /// merge 100 and 102 (generating a new 102 segment) and segment 101 included
+    /// deletions for 100, we'll never apply them and we'll end in an inconsistent
+    /// state.
     pub async fn schedule_merges(&self, meta: &NidxMetadata, last_indexed_seq: Seq) -> anyhow::Result<()> {
         // TODO: Remove vector index split by metadata when removing tags
         let indexes = sqlx::query!(
             r#"
+            -- Only gather deletion information for indexes with many deletions since it's expensive and often not needed
+            WITH indexes_with_many_deletions AS (
+                SELECT index_id FROM deletions GROUP BY index_id HAVING COUNT(*) > $2
+
+            -- Deletions that apply to each segment (so we know which segments we need to merge to allow purging deletions)
+            ), deletions_per_segment AS (
+                SELECT segments.id, COUNT(deletions) AS deletions
+                FROM segments
+                NATURAL JOIN indexes_with_many_deletions
+                LEFT JOIN deletions ON segments.index_id = deletions.index_id AND segments.seq < deletions.seq
+                GROUP BY segments.id
+            )
+
+            -- For each index, a list of mergeable segments with amount of records and deletions
             SELECT
-                index_id as "id: IndexId",
-                indexes.kind as "kind: IndexKind",
+                indexes.id AS "id: IndexId",
+                indexes.kind AS "kind: IndexKind",
                 array_agg(
-                    (segments.id, records)
+                    (segments.id, records, COALESCE(deletions, 0) > $2)
                     ORDER BY records DESC
-                ) AS "segments!: Vec<(SegmentId, i64)>"
+                ) AS "segments!: Vec<(SegmentId, i64, bool)>"
             FROM segments
             JOIN indexes ON segments.index_id = indexes.id
+            LEFT JOIN deletions_per_segment ON segments.id = deletions_per_segment.id
             WHERE
                 delete_at IS NULL AND merge_job_id IS NULL
                 AND seq <= $1
             GROUP BY
-                index_id,
+                indexes.id,
                 indexes.kind,
                 -- Only merge vector segments with same tags
-                CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END"#,
+                CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END
+            "#,
             i64::from(last_indexed_seq),
+            self.settings.max_deletions as i64
         )
         .fetch_all(&meta.pool)
         .await?;
@@ -67,9 +98,9 @@ impl MergeScheduler {
         for index in indexes {
             let merges = match index.kind {
                 IndexKind::Text | IndexKind::Paragraph | IndexKind::Relation => {
-                    self.tantivy.plan_merges(index.segments)
+                    log_merge::plan_merges(&self.settings.log_merge, index.segments)
                 }
-                IndexKind::Vector => self.tantivy.plan_merges(index.segments),
+                IndexKind::Vector => vector_merge::plan_merges(&self.settings.vector_merge, index.segments),
             };
 
             for m in merges {
@@ -95,11 +126,17 @@ mod tests {
 
         use super::*;
 
-        use crate::metadata::{Index, IndexConfig, IndexId, NidxMetadata, Segment, Shard};
+        use crate::{
+            metadata::{Index, IndexConfig, IndexId, NidxMetadata, Segment, Shard},
+            settings::LogMergeSettings,
+        };
 
         fn merge_scheduler() -> MergeScheduler {
-            MergeScheduler::from_settings(&MergeSettings {
-                min_number_of_segments: 3,
+            MergeScheduler::from_settings(MergeSettings {
+                log_merge: LogMergeSettings {
+                    min_number_of_segments: 3,
+                    ..Default::default()
+                },
                 ..Default::default()
             })
         }
@@ -255,8 +292,11 @@ mod tests {
 
         #[sqlx::test]
         async fn test_schedule_merges_with_segment_tags(pool: sqlx::PgPool) -> anyhow::Result<()> {
-            let merge_scheduler = MergeScheduler::from_settings(&MergeSettings {
-                min_number_of_segments: 2,
+            let merge_scheduler = MergeScheduler::from_settings(MergeSettings {
+                log_merge: LogMergeSettings {
+                    min_number_of_segments: 2,
+                    ..Default::default()
+                },
                 ..Default::default()
             });
             let meta = NidxMetadata::new_with_pool(pool).await?;
