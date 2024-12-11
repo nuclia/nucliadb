@@ -260,11 +260,8 @@ class GCSStorageField(StorageField):
                 source=CloudFile.GCS,
             )
             upload_uri = self.key
-
-        init_url = "{}&name={}".format(
-            self.storage._upload_url.format(bucket=self.bucket),
-            quote_plus(upload_uri),
-        )
+        bucket_upload_url = self.storage._upload_url.format(bucket=field.bucket_name)
+        init_url = f"{bucket_upload_url}?uploadType=resumable&name={quote_plus(upload_uri)}"
         metadata = json.dumps(
             {
                 "metadata": {
@@ -284,7 +281,6 @@ class GCSStorageField(StorageField):
                 "Content-Length": str(call_size),
             }
         )
-
         async with self.storage.session.post(
             init_url,
             headers=headers,
@@ -425,6 +421,7 @@ class GCSStorageField(StorageField):
             else:
                 return None
 
+    @storage_ops_observer.wrap({"type": "upload"})
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
         if self.field is None:
@@ -493,7 +490,7 @@ class GCSStorage(Storage):
         # https://cloud.google.com/storage/docs/bucket-locations
         self._bucket_labels = labels or {}
         self._executor = executor
-        self._upload_url = url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
+        self._upload_url = url + "/upload/storage/v1/b/{bucket}/o"
         self.object_base_url = url + "/storage/v1/b"
         self._client = None
 
@@ -511,7 +508,6 @@ class GCSStorage(Storage):
         self.session = aiohttp.ClientSession(
             loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5), timeout=TIMEOUT
         )
-
         try:
             if self.deadletter_bucket is not None and self.deadletter_bucket != "":
                 await self.create_bucket(self.deadletter_bucket)
@@ -689,7 +685,7 @@ class GCSStorage(Storage):
                 logger.info(f"Conflict on deleting bucket {bucket_name}: {details}")
                 conflict = True
             elif resp.status == 404:
-                logger.info(f"Does not exit on deleting: {bucket_name}")
+                logger.info(f"Does not exist on deleting: {bucket_name}")
             else:
                 details = await resp.text()
                 msg = f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
@@ -731,6 +727,27 @@ class GCSStorage(Storage):
                 for item in items:
                     yield ObjectInfo(name=item["name"])
                 page_token = data.get("nextPageToken")
+
+    @storage_ops_observer.wrap({"type": "insert_object"})
+    async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
+        """
+        Put an object in the storage without any metadata.
+        """
+        if self.session is None:  # pragma: no cover
+            raise AttributeError()
+        bucket_upload_url = self._upload_url.format(bucket=bucket_name)
+        url = f"{bucket_upload_url}?uploadType=media&name={quote_plus(key)}"
+        headers = await self.get_access_headers()
+        headers.update(
+            {
+                "Content-Length": str(len(data)),
+                "Content-Type": "application/octet-stream",
+            }
+        )
+        async with self.session.post(url, headers=headers, data=data) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                raise GoogleCloudException(f"{resp.status}: {text}")
 
 
 def parse_object_metadata(object_data: dict[str, Any], key: str) -> ObjectMetadata:

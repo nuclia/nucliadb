@@ -161,7 +161,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             logger.error("No Deadletter Bucket defined will not store the error")
             return
         key = DEADLETTER.format(seqid=seqid, seq=seq, partition=partition)
-        await self.uploadbytes(self.deadletter_bucket, key, message.SerializeToString())
+        await self.upload_object(self.deadletter_bucket, key, message.SerializeToString())
 
     def get_indexing_storage_key(
         self, *, kb: str, logical_shard: str, resource_uid: str, txid: Union[int, str]
@@ -187,7 +187,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             resource_uid=message.resource.uuid,
             txid=txid,
         )
-        await self.uploadbytes(self.indexing_bucket, key, message.SerializeToString())
+        await self.upload_object(self.indexing_bucket, key, message.SerializeToString())
 
         return key
 
@@ -199,7 +199,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         kb: str,
         logical_shard: str,
     ) -> str:
-        if self.indexing_bucket is None:
+        if self.indexing_bucket is None:  # pragma: no cover
             raise AttributeError()
         key = self.get_indexing_storage_key(
             kb=kb,
@@ -207,10 +207,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             resource_uid=message.resource.uuid,
             txid=reindex_id,
         )
-        message_serialized = message.SerializeToString()
-        logger.debug("Starting to upload bytes")
-        await self.uploadbytes(self.indexing_bucket, key, message_serialized)
-        logger.debug("Finished to upload bytes")
+        await self.upload_object(self.indexing_bucket, key, message.SerializeToString())
         return key
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:
@@ -259,7 +256,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             + ".deleted"
         )
 
-        await self.uploadbytes(self.indexing_bucket, key, b"")
+        await self.upload_object(self.indexing_bucket, key, b"")
 
     def needs_move(self, file: CloudFile, kbid: str) -> bool:
         # The cloudfile is valid for our environment
@@ -285,11 +282,9 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         elif file.source == self.source:
             # This is the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
             # The data is already stored in the right place by the processing
-            logger.debug("[Nuclia hosted]")
             return file
         elif file.source == CloudFile.EXPORT:
             # This is for files coming from an export
-            logger.debug(f"[Exported file]: {file.uri}")
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
             new_cf.bucket_name = destination.bucket
@@ -298,18 +293,15 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         elif file.source == CloudFile.FLAPS:
             # NucliaDB On-Prem: the data is stored in NUA, so we need to
             # download it and upload it to NucliaDB's storage
-            logger.debug(f"[NucliaDB OnPrem]: {file.uri}")
             flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.LOCAL:
             # For testing purposes: protobuffer is stored in a file in the local filesystem
-            logger.debug(f"[Local]: {file.uri}")
             local_storage = get_local_storage()
             iterator = local_storage.download(file.bucket_name, file.uri)
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.EMPTY:
-            logger.warning(f"[Empty file]: {file.uri}")
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
         else:
@@ -379,7 +371,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         cf = await self.uploaditerator(generator, sf, cf)
         return cf
 
-    async def uploadbytes(
+    async def chunked_upload_object(
         self,
         bucket: str,
         key: str,
@@ -387,6 +379,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         filename: str = "payload",
         content_type: str = "",
     ):
+        """
+        Upload bytes to the storage in chunks.
+        This is useful for large files that are already loaded in memory.
+        """
         destination = self.field_klass(storage=self, bucket=bucket, fullkey=key)
 
         cf = CloudFile()
@@ -405,9 +401,16 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         generator = splitter(buffer)
         await self.uploaditerator(generator, destination, cf)
 
+    # For backwards compatibility
+    uploadbytes = chunked_upload_object
+
     async def uploaditerator(
         self, iterator: AsyncIterator, destination: StorageField, origin: CloudFile
     ) -> CloudFile:
+        """
+        Upload bytes to the storage in chunks, but the data is coming from an iterator.
+        This is when we want to upload large files without loading them in memory.
+        """
         safe_iterator = iterate_storage_compatible(iterator, self, origin)  # type: ignore
         return await destination.upload(safe_iterator, origin)
 
@@ -474,7 +477,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
                     yield data
 
     async def upload_pb(self, sf: StorageField, payload: Any):
-        await self.uploadbytes(sf.bucket, sf.key, payload.SerializeToString())
+        await self.upload_object(sf.bucket, sf.key, payload.SerializeToString())
 
     async def download_pb(self, sf: StorageField, PBKlass: Type):
         payload = await self.downloadbytes(sf.bucket, sf.key)
@@ -520,7 +523,8 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
 
     async def set_stream_message(self, kbid: str, rid: str, data: bytes) -> str:
         key = MESSAGE_KEY.format(kbid=kbid, rid=rid, mid=uuid.uuid4())
-        await self.uploadbytes(cast(str, self.indexing_bucket), key, data)
+        indexing_bucket = cast(str, self.indexing_bucket)
+        await self.upload_object(indexing_bucket, key, data)
         return key
 
     async def get_stream_message(self, key: str) -> bytes:
@@ -531,6 +535,23 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
 
     async def del_stream_message(self, key: str) -> None:
         await self.delete_upload(key, cast(str, self.indexing_bucket))
+
+    @abc.abstractmethod
+    async def insert_object(self, bucket: str, key: str, data: bytes) -> None:
+        """
+        Put some binary data into the object storage without any object metadata.
+        """
+        ...
+
+    async def upload_object(self, bucket: str, key: str, data: bytes) -> None:
+        """
+        Put some binary data into the object storage without any object metadata.
+        The data will be uploaded in a single request or in chunks if the data is too large.
+        """
+        if len(data) > self.chunk_size:
+            await self.chunked_upload_object(bucket, key, data)
+        else:
+            await self.insert_object(bucket, key, data)
 
 
 async def iter_and_add_size(

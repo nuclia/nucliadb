@@ -62,7 +62,8 @@ class StorageTest(Storage):
         self.deadletter_bucket = "deadletter_bucket"
         self.indexing_bucket = "indexing_bucket"
         self.delete_upload = AsyncMock()
-        self.uploadbytes = AsyncMock()
+        self.chunked_upload_object = AsyncMock()
+        self.upload_object = AsyncMock()
         self.move = AsyncMock()
 
     def get_bucket_name(self, kbid):
@@ -93,6 +94,9 @@ class StorageTest(Storage):
     async def schedule_delete_kb(self, kbid: str) -> bool:
         return True
 
+    async def insert_object(self, bucket, key, data):
+        pass
+
 
 class TestStorage:
     @pytest.fixture
@@ -109,7 +113,7 @@ class TestStorage:
         msg = BrainResource(resource=ResourceID(uuid="uuid"))
         await storage.indexing(msg, 1, "1", "kb", "shard")
 
-        storage.uploadbytes.assert_called_once_with(
+        storage.upload_object.assert_called_once_with(
             "indexing_bucket", "index/kb/shard/uuid/1", msg.SerializeToString()
         )
 
@@ -118,7 +122,7 @@ class TestStorage:
         msg = BrainResource(resource=ResourceID(uuid="uuid"))
         await storage.reindexing(msg, "reindex_id", "1", "kb", "shard")
 
-        storage.uploadbytes.assert_called_once_with(
+        storage.upload_object.assert_called_once_with(
             "indexing_bucket", "index/kb/shard/uuid/reindex_id", msg.SerializeToString()
         )
 
@@ -149,7 +153,7 @@ class TestStorage:
             resource_uid="resource_uid", txid=1, kb="kb", logical_shard="logical_shard"
         )
 
-        storage.uploadbytes.assert_called_once()
+        storage.upload_object.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_download_pb(self, storage: StorageTest):

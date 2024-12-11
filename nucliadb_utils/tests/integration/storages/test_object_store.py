@@ -116,6 +116,14 @@ async def objects_crud_test(object_store: ObjectStore):
     with pytest.raises(ObjectNotFoundError):
         await object_store.delete(bucket_name, object_key)
 
+    # Insert object
+    object_data = BytesIO(b"Hello, world!")
+    object_key = "folder/file.txt"
+    await object_store.insert(bucket_name, object_key, object_data.getvalue())
+
+    # Check object exists by downloading it
+    assert await object_store.download(bucket_name, object_key) == object_data.getvalue()
+
 
 async def objects_upload_download_test(object_store: ObjectStore):
     bucket_name = str(uuid.uuid4())
