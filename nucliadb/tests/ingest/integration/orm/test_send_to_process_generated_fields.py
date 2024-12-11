@@ -17,14 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import base64
+import hashlib
 import uuid
 from typing import AsyncIterator, Iterable
 from unittest.mock import patch
 
 import pytest
+from pytest_mock import MockFixture
 
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import (
     DummyProcessingEngine,
     ProcessingEngine,
@@ -32,7 +34,8 @@ from nucliadb.ingest.processing import (
     start_processing_engine,
     stop_processing_engine,
 )
-from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldID, FieldType
+from nucliadb_protos import noderesources_pb2
+from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldAuthor, FieldID, FieldType
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
@@ -79,11 +82,12 @@ async def test_send_to_process_generated_fields(
     processor: Processor,
     partition_utility: PartitionUtility,
     processing_utility: DummyProcessingEngine,
+    mocker: MockFixture,
 ):
     kbid = knowledgebox_ingest
     rid = uuid.uuid4().hex
 
-    # Resource creation
+    # Resource creation (from writer)
     bm = BrokerMessage()
     bm.kbid = kbid
     bm.uuid = rid
@@ -92,6 +96,7 @@ async def test_send_to_process_generated_fields(
     bm.texts["my-text"].body = "This is my text"
     await processor.process(bm, 1)
 
+    # Processed resource (from processing)
     bm = BrokerMessage()
     bm.kbid = kbid
     bm.uuid = rid
@@ -110,19 +115,18 @@ async def test_send_to_process_generated_fields(
     )
     await processor.process(bm, 2)
 
-    # Data augmentation broker message
+    # Data augmentation broker message, this should be like the ones generated
+    # by ask data augmentation task
     bm = BrokerMessage()
-    # content from learning test for ask data augmentation task
-    bm.ParseFromString(
-        base64.b64decode(
-            "CiRlODJjZTM5YS0wOTNjLTQzNzgtOWQ5OS1lZDc1MTk0NjVkZGQaIGUwMWMxYmYzNWMwNTY1OTFkYzMxYTA3ZjFhNThmMDRhalQKD2RhLWF1dGhvci1mLTAtMBJBCh0iIEZlbGl4IE9icmFkXHUwMGYzIENhcnJpZWRvIhogYWE1YTRkN2EwYjFlNjE3OGY0YzgzMDkxOTRkNTliZTg="
-        )
-    )  # noqa: E501
     bm.kbid = kbid
     bm.uuid = rid
     bm.source = BrokerMessage.MessageSource.PROCESSOR
     da_field = "da-author-f-0-0"
-    assert da_field in bm.texts
+    bm.texts[da_field].body = "Text author"
+    bm.texts[da_field].md5 = hashlib.md5("Text author".encode()).hexdigest()
+    bm.texts[da_field].generated_by = FieldAuthor.DATA_AUGMENTATION
+
+    processor_index_resource_spy = mocker.spy(processor, "index_resource")
     await processor.process(bm, 3)
 
     assert len(processing_utility.calls) == 1
@@ -132,3 +136,33 @@ async def test_send_to_process_generated_fields(
     assert payload.source == Source.INGEST
     assert payload.textfield[da_field].body == bm.texts[da_field].body
     assert partition == 1
+
+    resource: Resource = processor_index_resource_spy.call_args.kwargs["resource"]
+    field = await resource.get_field(da_field, FieldType.TEXT)
+
+    assert (await field.generated_by()) == FieldAuthor.DATA_AUGMENTATION
+
+    # Processed DA resource (from processing)
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.extracted_text.append(
+        ExtractedTextWrapper(
+            body=ExtractedText(
+                text="Extracted text for author",
+            ),
+            field=FieldID(
+                field_type=FieldType.TEXT,
+                field=da_field,
+            ),
+        )
+    )
+
+    index_resource_spy = mocker.spy(processor.index_node_shard_manager, "add_resource")
+    await processor.process(bm, 4)
+
+    index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]
+    assert index_message.resource.uuid == rid
+    # label for generated fields from data augmentation is present
+    assert "/g/da" in index_message.texts[f"t/{da_field}"].labels

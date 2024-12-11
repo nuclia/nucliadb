@@ -820,12 +820,15 @@ class Resource:
                 ):
                     valid_user_field_metadata = user_field_metadata
                     break
+
+            generated_by = await fieldobj.generated_by()
             brain.apply_field_labels(
                 fieldkey,
                 extracted_metadata,
                 self.uuid,
                 basic.usermetadata,
                 valid_user_field_metadata,
+                generated_by,
             )
 
     @processor_observer.wrap({"type": "compute_global_text"})
