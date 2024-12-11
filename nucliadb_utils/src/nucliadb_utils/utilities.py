@@ -239,6 +239,10 @@ def get_ingest() -> WriterStub:
 
 
 def start_partitioning_utility() -> PartitionUtility:
+    util = get_utility(Utility.PARTITION)
+    if util is not None:
+        return util
+
     util = PartitionUtility(
         partitions=nuclia_settings.nuclia_partitions,
         seed=nuclia_settings.nuclia_hash_seed,
