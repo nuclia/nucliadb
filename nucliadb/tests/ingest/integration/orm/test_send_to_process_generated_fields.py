@@ -124,7 +124,8 @@ async def test_send_to_process_generated_fields(
     da_field = "da-author-f-0-0"
     bm.texts[da_field].body = "Text author"
     bm.texts[da_field].md5 = hashlib.md5("Text author".encode()).hexdigest()
-    bm.texts[da_field].generated_by = FieldAuthor.DATA_AUGMENTATION
+    # TODO: add this again when processor sends this to us
+    # bm.texts[da_field].generated_by = FieldAuthor.DATA_AUGMENTATION
 
     processor_index_resource_spy = mocker.spy(processor, "index_resource")
     await processor.process(bm, 3)

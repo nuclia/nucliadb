@@ -300,6 +300,11 @@ class Processor:
                             await send_generated_fields_to_process(
                                 kbid, resource, generated_fields, message
                             )
+                            # TODO: remove this when processor sends the field set
+                            for generated_text in generated_fields.texts:
+                                message.texts[
+                                    generated_text
+                                ].generated_by = writer_pb2.FieldAuthor.DATA_AUGMENTATION
 
                     else:
                         raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
