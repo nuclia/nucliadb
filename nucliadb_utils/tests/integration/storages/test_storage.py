@@ -30,21 +30,25 @@ from nucliadb_utils.storages.storage import Storage
 
 @pytest.mark.asyncio
 async def test_azure_driver(azure_storage: AzureStorage):
+    assert isinstance(azure_storage, AzureStorage)
     await storage_test(azure_storage)
 
 
 @pytest.mark.asyncio
 async def test_s3_driver(s3_storage: S3Storage):
+    assert isinstance(s3_storage, S3Storage)
     await storage_test(s3_storage)
 
 
 @pytest.mark.asyncio
 async def test_gcs_driver(gcs_storage: GCSStorage):
+    assert isinstance(gcs_storage, GCSStorage)
     await storage_test(gcs_storage)
 
 
 @pytest.mark.asyncio
 async def test_local_driver(local_storage: LocalStorage):
+    assert isinstance(local_storage, LocalStorage)
     await storage_test(local_storage)
 
 
@@ -87,11 +91,10 @@ async def storage_test(storage: Storage):
     await storage.delete_upload(key2, bucket)
 
     # Check that the downloaded key is not there
-    found = False
+    names = []
     async for object_info in storage.iterate_objects(bucket, ""):
-        found = True
-        assert object_info.name == key1
-    assert found
+        names.append(object_info.name)
+    assert names == [key1]
 
     # Check insert object
     key = "barbafoo"

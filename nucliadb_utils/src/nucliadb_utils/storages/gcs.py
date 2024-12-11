@@ -261,10 +261,11 @@ class GCSStorageField(StorageField):
             )
             upload_uri = self.key
 
-        init_url = "{}&name={}".format(
-            self.storage._upload_url.format(bucket=self.bucket),
-            quote_plus(upload_uri),
-        )
+        init_url = self.storage._upload_url.format(bucket=self.bucket)
+        params = {
+            "name": quote_plus(upload_uri),
+            "uploadType": "resumable",
+        }
         metadata = json.dumps(
             {
                 "metadata": {
@@ -284,9 +285,9 @@ class GCSStorageField(StorageField):
                 "Content-Length": str(call_size),
             }
         )
-
         async with self.storage.session.post(
             init_url,
+            params=params,
             headers=headers,
             data=metadata,
         ) as call:
@@ -494,7 +495,7 @@ class GCSStorage(Storage):
         # https://cloud.google.com/storage/docs/bucket-locations
         self._bucket_labels = labels or {}
         self._executor = executor
-        self._upload_url = url + "/upload/storage/v1/b/{bucket}/o?uploadType=resumable"  # noqa
+        self._upload_url = url + "/upload/storage/v1/b/{bucket}/o"
         self.object_base_url = url + "/storage/v1/b"
         self._client = None
 
@@ -512,7 +513,6 @@ class GCSStorage(Storage):
         self.session = aiohttp.ClientSession(
             loop=loop, connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5), timeout=TIMEOUT
         )
-
         try:
             if self.deadletter_bucket is not None and self.deadletter_bucket != "":
                 await self.create_bucket(self.deadletter_bucket)
@@ -690,7 +690,7 @@ class GCSStorage(Storage):
                 logger.info(f"Conflict on deleting bucket {bucket_name}: {details}")
                 conflict = True
             elif resp.status == 404:
-                logger.info(f"Does not exit on deleting: {bucket_name}")
+                logger.info(f"Does not exist on deleting: {bucket_name}")
             else:
                 details = await resp.text()
                 msg = f"Delete KB bucket returned an unexpected status {resp.status}: {details}"
@@ -740,11 +740,11 @@ class GCSStorage(Storage):
         """
         if self.session is None:  # pragma: no cover
             raise AttributeError()
-        url = "{base_url}/{bucket_name}/o?name={object_name}&uploadType=media".format(
-            base_url=self.object_base_url,
-            bucket_name=bucket_name,
-            object_name=quote_plus(key),
-        )
+        url = self._upload_url.format(bucket=bucket_name)
+        params = {
+            "uploadType": "media",
+            "name": quote_plus(key),
+        }
         headers = await self.get_access_headers()
         headers.update(
             {
@@ -752,7 +752,7 @@ class GCSStorage(Storage):
                 "Content-Type": "application/octet-stream",
             }
         )
-        async with self.session.post(url, headers=headers, data=data) as resp:
+        async with self.session.post(url, headers=headers, params=params, data=data) as resp:
             if resp.status != 200:
                 text = await resp.text()
                 raise GoogleCloudException(f"{resp.status}: {text}")
