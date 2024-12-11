@@ -98,6 +98,18 @@ class ObjectStore(abc.ABC, metaclass=abc.ABCMeta):
     ) -> None: ...
 
     @abc.abstractmethod
+    async def insert(
+        self,
+        bucket: str,
+        key: str,
+        data: bytes,
+    ) -> None:
+        """
+        Insert data to the object storage without any metadata
+        """
+        ...
+
+    @abc.abstractmethod
     async def download(self, bucket: str, key: str) -> bytes: ...
 
     @abc.abstractmethod

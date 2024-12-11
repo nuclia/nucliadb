@@ -425,6 +425,7 @@ class GCSStorageField(StorageField):
             else:
                 return None
 
+    @storage_ops_observer.wrap({"type": "upload"})
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
         if self.field is None:
@@ -731,6 +732,30 @@ class GCSStorage(Storage):
                 for item in items:
                     yield ObjectInfo(name=item["name"])
                 page_token = data.get("nextPageToken")
+
+    @storage_ops_observer.wrap({"type": "insert_object"})
+    async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
+        """
+        Put an object in the storage without any metadata.
+        """
+        if self.session is None:  # pragma: no cover
+            raise AttributeError()
+        url = "{base_url}/{bucket_name}/o?name={object_name}&uploadType=media".format(
+            base_url=self.object_base_url,
+            bucket_name=bucket_name,
+            object_name=quote_plus(key),
+        )
+        headers = await self.get_access_headers()
+        headers.update(
+            {
+                "Content-Length": str(len(data)),
+                "Content-Type": "application/octet-stream",
+            }
+        )
+        async with self.session.post(url, headers=headers, data=data) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                raise GoogleCloudException(f"{resp.status}: {text}")
 
 
 def parse_object_metadata(object_data: dict[str, Any], key: str) -> ObjectMetadata:

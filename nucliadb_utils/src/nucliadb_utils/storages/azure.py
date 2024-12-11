@@ -215,6 +215,9 @@ class AzureStorage(Storage):
         async for obj in self.object_store.iterate(bucket, prefix):
             yield obj
 
+    async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
+        await self.object_store.insert(bucket_name, key, data)
+
 
 class AzureObjectStore(ObjectStore):
     def __init__(self, account_url: str, connection_string: Optional[str] = None):
@@ -335,6 +338,10 @@ class AzureObjectStore(ObjectStore):
                 content_disposition=f"attachment; filename={metadata.filename}",
             ),
         )
+
+    async def insert(self, bucket: str, key: str, data: bytes) -> None:
+        container_client = self.service_client.get_container_client(bucket)
+        await container_client.upload_blob(name=key, data=data, length=len(data))
 
     async def download(self, bucket: str, key: str) -> bytes:
         container_client = self.service_client.get_container_client(bucket)

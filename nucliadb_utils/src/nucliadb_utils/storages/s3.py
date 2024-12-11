@@ -330,6 +330,7 @@ class S3StorageField(StorageField):
         await self.copy(origin_uri, destination_uri, origin_bucket_name, destination_bucket_name)
         await self.storage.delete_upload(origin_uri, origin_bucket_name)
 
+    @s3_ops_observer.wrap({"type": "upload"})
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
         await self.append(origin, iterator)
@@ -483,6 +484,15 @@ class S3Storage(Storage):
                 if error_code in (200, 204):
                     deleted = True
         return deleted, conflict
+
+    @s3_ops_observer.wrap({"type": "insert_object"})
+    async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
+        await self._s3aioclient.put_object(
+            Bucket=bucket_name,
+            Key=key,
+            Body=data,
+            ContentType="application/octet-stream",
+        )
 
 
 async def bucket_exists(client: AioSession, bucket_name: str) -> bool:

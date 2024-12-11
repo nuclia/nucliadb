@@ -208,9 +208,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             txid=reindex_id,
         )
         message_serialized = message.SerializeToString()
-        logger.debug("Starting to upload bytes")
         await self.uploadbytes(self.indexing_bucket, key, message_serialized)
-        logger.debug("Finished to upload bytes")
         return key
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:
@@ -531,6 +529,13 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
 
     async def del_stream_message(self, key: str) -> None:
         await self.delete_upload(key, cast(str, self.indexing_bucket))
+
+    @abc.abstractmethod
+    async def insert_object(self, bucket: str, key: str, data: bytes) -> None:
+        """
+        Put some binary data into the object storage without any object metadata.
+        """
+        ...
 
 
 async def iter_and_add_size(

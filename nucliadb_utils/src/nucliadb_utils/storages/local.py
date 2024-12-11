@@ -292,3 +292,9 @@ class LocalStorage(Storage):
             return
         async for chunk in super().download(bucket_name, key, range=range):
             yield chunk
+
+    async def insert_object(self, bucket: str, key: str, data: bytes) -> None:
+        path = self.get_file_path(bucket, key)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as file:
+            file.write(data)

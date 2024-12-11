@@ -75,10 +75,18 @@ class GCS(BaseImage):
 @pytest.fixture(scope="session")
 def gcs():
     container = GCS()
-    _, port = container.run()
-    public_api_url = f"http://172.17.0.1:{port}"
+    host, port = container.run()
+    if running_in_mac_os():
+        public_api_url = f"http://{host}:{port}"
+    else:
+        public_api_url = f"http://172.17.0.1:{port}"
     yield public_api_url
     container.stop()
+
+
+def running_in_mac_os() -> bool:
+    import os
+    return os.uname().sysname == "Darwin"
 
 
 @pytest.fixture(scope="function")

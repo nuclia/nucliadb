@@ -93,6 +93,17 @@ async def storage_test(storage: Storage):
         assert object_info.name == key1
     assert found
 
+    # Check insert object
+    key = "barbafoo"
+    data = b"lorem ipsum"
+    await storage.insert_object(bucket, key, data)
+
+    # Check that the inserted object is there and has the right data
+    downloaded_data = b""
+    async for chunk in storage.download(bucket, key):
+        downloaded_data += chunk
+    assert downloaded_data == data
+
     deleted = await storage.schedule_delete_kb(kbid1)
     assert deleted
 
