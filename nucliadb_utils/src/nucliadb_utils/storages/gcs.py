@@ -260,12 +260,8 @@ class GCSStorageField(StorageField):
                 source=CloudFile.GCS,
             )
             upload_uri = self.key
-
-        init_url = self.storage._upload_url.format(bucket=self.bucket)
-        params = {
-            "name": quote_plus(upload_uri),
-            "uploadType": "resumable",
-        }
+        bucket_upload_url = self.storage._upload_url.format(bucket=field.bucket_name)
+        init_url = f"{bucket_upload_url}?uploadType=resumable&name={quote_plus(upload_uri)}"
         metadata = json.dumps(
             {
                 "metadata": {
@@ -287,7 +283,6 @@ class GCSStorageField(StorageField):
         )
         async with self.storage.session.post(
             init_url,
-            params=params,
             headers=headers,
             data=metadata,
         ) as call:
@@ -740,11 +735,8 @@ class GCSStorage(Storage):
         """
         if self.session is None:  # pragma: no cover
             raise AttributeError()
-        url = self._upload_url.format(bucket=bucket_name)
-        params = {
-            "uploadType": "media",
-            "name": quote_plus(key),
-        }
+        bucket_upload_url = self._upload_url.format(bucket=bucket_name)
+        url = f"{bucket_upload_url}?uploadType=media&name={quote_plus(key)}"
         headers = await self.get_access_headers()
         headers.update(
             {
@@ -752,7 +744,7 @@ class GCSStorage(Storage):
                 "Content-Type": "application/octet-stream",
             }
         )
-        async with self.session.post(url, headers=headers, params=params, data=data) as resp:
+        async with self.session.post(url, headers=headers, data=data) as resp:
             if resp.status != 200:
                 text = await resp.text()
                 raise GoogleCloudException(f"{resp.status}: {text}")
