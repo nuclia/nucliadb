@@ -1,0 +1,316 @@
+// Copyright (C) 2021 Bosutech XXI S.L.
+//
+// nucliadb is offered under the AGPL v3.0 and as commercial software.
+// For commercial licensing, contact us at info@nuclia.com.
+//
+// AGPL:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
+
+use crate::{
+    metadata::{IndexId, IndexKind, MergeJob, SegmentId},
+    settings::MergeSettings,
+    NidxMetadata,
+};
+use nidx_types::Seq;
+
+use super::log_merge::LogMergeStrategy;
+
+pub struct MergeScheduler {
+    tantivy: LogMergeStrategy,
+}
+
+impl MergeScheduler {
+    pub fn from_settings(settings: &MergeSettings) -> Self {
+        Self {
+            tantivy: LogMergeStrategy::from_settings(settings),
+        }
+    }
+
+    pub async fn schedule_merges(&self, meta: &NidxMetadata, last_indexed_seq: Seq) -> anyhow::Result<()> {
+        // TODO: Remove vector index split by metadata when removing tags
+        let indexes = sqlx::query!(
+            r#"
+            SELECT
+                index_id as "id: IndexId",
+                indexes.kind as "kind: IndexKind",
+                array_agg(
+                    (segments.id, records)
+                    ORDER BY records DESC
+                ) AS "segments!: Vec<(SegmentId, i64)>"
+            FROM segments
+            JOIN indexes ON segments.index_id = indexes.id
+            WHERE
+                delete_at IS NULL AND merge_job_id IS NULL
+                AND seq <= $1
+            GROUP BY
+                index_id,
+                indexes.kind,
+                -- Only merge vector segments with same tags
+                CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END"#,
+            i64::from(last_indexed_seq),
+        )
+        .fetch_all(&meta.pool)
+        .await?;
+
+        for index in indexes {
+            let merges = match index.kind {
+                IndexKind::Text | IndexKind::Paragraph | IndexKind::Relation => {
+                    self.tantivy.plan_merges(index.segments)
+                }
+                IndexKind::Vector => self.tantivy.plan_merges(index.segments),
+            };
+
+            for m in merges {
+                MergeJob::create(meta, index.id, &m, last_indexed_seq).await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod merge_scheduling {
+        use std::collections::{HashMap, HashSet};
+
+        use nidx_types::Seq;
+        use nidx_vector::config::VectorConfig;
+        use serde_json::json;
+        use uuid::Uuid;
+
+        use super::*;
+
+        use crate::metadata::{Index, IndexConfig, IndexId, NidxMetadata, Segment, Shard};
+
+        fn merge_scheduler() -> MergeScheduler {
+            MergeScheduler::from_settings(&MergeSettings {
+                min_number_of_segments: 3,
+                ..Default::default()
+            })
+        }
+
+        #[sqlx::test]
+        async fn test_schedule_merges_for_shard_with_single_index(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+            let mut seq: i64 = 0;
+
+            for _ in 0..10 {
+                let segment =
+                    Segment::create(&meta.pool, index.id, Seq::from(seq), 50, serde_json::Value::Null).await?;
+                segment.mark_ready(&meta.pool, 1000).await?;
+                seq += 1;
+            }
+
+            let last_seq = Seq::from(seq - 1);
+
+            // creation of shards/indexes/segments don't trigger any merge job
+            assert!(MergeJob::take(&meta.pool).await?.is_none());
+
+            merge_scheduler().schedule_merges(&meta, last_seq).await?;
+
+            // one job has been scheduled for the index
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), 1);
+            assert_eq!(jobs[0].index_id, index.id);
+            assert_eq!(jobs[0].seq, last_seq);
+
+            for segment in index.segments(&meta.pool).await? {
+                assert!(segment.merge_job_id.is_some());
+                assert_eq!(segment.merge_job_id.unwrap(), jobs[0].id);
+            }
+
+            Ok(())
+        }
+
+        #[sqlx::test]
+        async fn test_schedule_merges_for_shard_with_multiple_indexes(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+
+            let indexes = vec![
+                Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?,
+                Index::create(&meta.pool, shard.id, "english", VectorConfig::default().into()).await?,
+                Index::create(&meta.pool, shard.id, "fulltext", IndexConfig::new_text()).await?,
+                Index::create(&meta.pool, shard.id, "keyword", IndexConfig::new_paragraph()).await?,
+                Index::create(&meta.pool, shard.id, "relation", IndexConfig::new_relation()).await?,
+            ];
+            let mut seq: i64 = 0;
+
+            for _ in 0..10 {
+                for index in &indexes {
+                    let segment =
+                        Segment::create(&meta.pool, index.id, Seq::from(seq), 50, serde_json::Value::Null).await?;
+                    segment.mark_ready(&meta.pool, 1000).await?;
+                    seq += 1;
+                }
+            }
+
+            merge_scheduler().schedule_merges(&meta, Seq::from(seq)).await?;
+
+            // scheduled a job per index
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), indexes.len());
+            assert_eq!(
+                indexes.iter().map(|i| i.id).collect::<HashSet<_>>(),
+                jobs.iter().map(|j| j.index_id).collect::<HashSet<_>>(),
+            );
+
+            for job in &jobs {
+                assert_eq!(job.seq, Seq::from(seq));
+            }
+
+            // validate segments are marked with merge job id
+            let jobs_by_index: HashMap<IndexId, _> = jobs.iter().map(|job| (job.index_id, job)).collect();
+            for index in &indexes {
+                let (_, merge_job) = jobs_by_index.get_key_value(&index.id).unwrap();
+
+                let segments = index.segments(&meta.pool).await?;
+                assert_eq!(segments.len(), 10);
+
+                for segment in &segments {
+                    assert!(segment.merge_job_id.is_some());
+                    assert_eq!(segment.merge_job_id.unwrap(), merge_job.id);
+                }
+            }
+
+            Ok(())
+        }
+
+        async fn ongoing_indexing_scenario(pool: sqlx::PgPool) -> anyhow::Result<NidxMetadata> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+
+            for seq in [95, 98, 99, 100, 102i64] {
+                let segment =
+                    Segment::create(&meta.pool, index.id, Seq::from(seq), 50, serde_json::Value::Null).await?;
+                segment.mark_ready(&meta.pool, 1000).await?;
+            }
+
+            // 101 is still indexing
+            Segment::create(&meta.pool, index.id, Seq::from(101i64), 50, serde_json::Value::Null).await?;
+
+            Ok(meta)
+        }
+
+        #[sqlx::test]
+        async fn scheduling_with_smaller_than_existing_sequences(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = ongoing_indexing_scenario(pool).await?;
+
+            merge_scheduler().schedule_merges(&meta, Seq::from(50i64)).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert!(jobs.is_empty());
+
+            Ok(())
+        }
+
+        #[sqlx::test]
+        async fn scheduling_with_ack_floor(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = ongoing_indexing_scenario(pool).await?;
+            let ack_floor = Seq::from(100i64);
+
+            merge_scheduler().schedule_merges(&meta, ack_floor).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), 1);
+
+            let index = Index::get(&meta.pool, jobs[0].index_id).await?;
+            let segments = index.segments(&meta.pool).await?;
+
+            let mut segment_sequences = HashSet::new();
+            for segment in &segments {
+                if segment.seq <= ack_floor {
+                    // should be scheduled to merge
+                    assert!(segment.merge_job_id.is_some());
+                    assert_eq!(segment.merge_job_id.unwrap(), jobs[0].id);
+                    segment_sequences.insert(segment.seq);
+                } else {
+                    assert!(segment.merge_job_id.is_none());
+                }
+            }
+            let expected = [95, 98, 99, 100i64].into_iter().map(Seq::from).collect();
+            assert_eq!(segment_sequences, expected);
+
+            Ok(())
+        }
+
+        #[sqlx::test]
+        async fn test_schedule_merges_with_segment_tags(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let merge_scheduler = MergeScheduler::from_settings(&MergeSettings {
+                min_number_of_segments: 2,
+                ..Default::default()
+            });
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+
+            let hidden_count = 1;
+            let visible_count = 2;
+
+            let segment_hidden =
+                Segment::create(&meta.pool, index.id, 1i64.into(), hidden_count, json!({"tags": ["/q/h"]})).await?;
+            segment_hidden.mark_ready(&meta.pool, 1000).await?;
+
+            let segment_visible =
+                Segment::create(&meta.pool, index.id, 2i64.into(), visible_count, json!({"tags": []})).await?;
+            segment_visible.mark_ready(&meta.pool, 1000).await?;
+
+            // Cannot merge (two segments with different tags)
+            merge_scheduler.schedule_merges(&meta, 6i64.into()).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert!(jobs.is_empty());
+
+            let segment_hidden2 =
+                Segment::create(&meta.pool, index.id, 3i64.into(), hidden_count, json!({"tags": ["/q/h"]})).await?;
+            segment_hidden2.mark_ready(&meta.pool, 1000).await?;
+
+            let segment_visible2 =
+                Segment::create(&meta.pool, index.id, 4i64.into(), visible_count, json!({"tags": []})).await?;
+            segment_visible2.mark_ready(&meta.pool, 1000).await?;
+
+            // Can merge hidden and visible segments pair-wise
+            merge_scheduler.schedule_merges(&meta, 6i64.into()).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), 2);
+
+            for j in jobs {
+                let merged_segments = j.segments(&meta.pool).await?;
+                assert_eq!(merged_segments.len(), 2);
+                // We use different number of records to differentiante hidden/visible segments
+                // because the tags field is private outside the vectors index
+                assert_eq!(merged_segments[0].records, merged_segments[1].records);
+            }
+
+            Ok(())
+        }
+
+        async fn get_all_merge_jobs(meta: &NidxMetadata) -> anyhow::Result<Vec<MergeJob>> {
+            let mut jobs = vec![];
+            while let Some(job) = MergeJob::take(&meta.pool).await? {
+                jobs.push(job);
+            }
+            Ok(jobs)
+        }
+    }
+}
