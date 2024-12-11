@@ -15,6 +15,15 @@ on:
       - main
     paths:
       - 'VERSION'
+
+env:
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+  GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+
 jobs:
   release:
     name: Tag and release
@@ -147,13 +156,16 @@ jobs:
       - name: Install nucliadb
         run: pdm sync -d --clean --no-editable
 
-      - name: Setup gcloud CLI
+      - name: Authenticate to Google Cloud
+        id: gcp-auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          workload_identity_provider: "${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
+          service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
+          token_format: access_token
 
       - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v1'
+        uses: 'google-github-actions/setup-gcloud@v2'
 
       - name: Upload docs
         run: |
@@ -162,9 +174,9 @@ jobs:
           nucliadb-extract-openapi-reader /tmp/openapi/nucliadb-reader.json $API_VERSION $GITHUB_SHA
           nucliadb-extract-openapi-writer /tmp/openapi/nucliadb-writer.json $API_VERSION $GITHUB_SHA
           nucliadb-extract-openapi-search /tmp/openapi/nucliadb-search.json $API_VERSION $GITHUB_SHA
-          gsutil copy /tmp/openapi/nucliadb-reader.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-reader/spec.json
-          gsutil copy /tmp/openapi/nucliadb-writer.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-writer/spec.json
-          gsutil copy /tmp/openapi/nucliadb-search.json gs://stashify-docs/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json
+          gsutil copy /tmp/openapi/nucliadb-reader.json gs://ncl-docs-gcp-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-reader/spec.json
+          gsutil copy /tmp/openapi/nucliadb-writer.json gs://ncl-docs-gcp-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-writer/spec.json
+          gsutil copy /tmp/openapi/nucliadb-search.json gs://ncl-docs-gcp-global-stage-1/api/nucliadb/v$API_VERSION/nucliadb-search/spec.json
 
       - name: Trigger doc update
         uses: peter-evans/repository-dispatch@v3
