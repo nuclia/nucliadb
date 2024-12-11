@@ -92,6 +92,8 @@ def get_utility(ident: Union[Utility, str]):
 
 
 def set_utility(ident: Union[Utility, str], util: Any):
+    if ident in MAIN:
+        logger.warning(f"Overwriting previously set utility {ident}: {MAIN[ident]} with {util}")
     MAIN[ident] = util
 
 
