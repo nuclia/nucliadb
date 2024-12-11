@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+mod duration_layer;
 mod log_format;
 pub mod middleware;
 
@@ -28,6 +29,7 @@ use std::time::Duration;
 
 use crate::settings::{LogFormat, TelemetrySettings};
 use arc_swap::ArcSwap;
+use duration_layer::DurationLayer;
 use lazy_static::lazy_static;
 use log_format::StructuredFormat;
 use opentelemetry::global::get_text_map_propagator;
@@ -36,6 +38,8 @@ use opentelemetry::trace::TraceContextExt;
 use opentelemetry::{trace::TracerProvider as _, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{trace::TracerProvider, Resource};
+use tracing::{Level, Metadata};
+use tracing_core::LevelFilter;
 use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 use tracing_subscriber::layer::Filter;
 use tracing_subscriber::{filter::FilterFn, fmt, prelude::*, EnvFilter};
@@ -58,6 +62,10 @@ pub fn set_log_level(log_level: &str) -> anyhow::Result<()> {
     ENV_FILTER.0.store(Arc::new(env_filter));
 
     Ok(())
+}
+
+fn nidx_filter(meta: &Metadata) -> bool {
+    meta.module_path().is_some_and(|module| module.starts_with("nidx"))
 }
 
 pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
@@ -84,20 +92,26 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
             .with_resource(Resource::new(vec![KeyValue::new("service.name", "nidx")]))
             .build();
         let tracer_otlp = provider.tracer("nidx");
-
-        let span_filter = FilterFn::new(|meta| meta.module_path().is_some_and(|module| module.starts_with("nidx")));
         Some(
             tracing_opentelemetry::layer()
                 .with_tracer(tracer_otlp)
                 .with_filter(EnvFilter::from_default_env())
-                .with_filter(span_filter),
+                .with_filter(FilterFn::new(nidx_filter)),
         )
     } else {
         None
     };
 
+    let metrics_layer =
+        DurationLayer.with_filter(LevelFilter::from_level(Level::INFO)).with_filter(FilterFn::new(nidx_filter));
+
     // Initialize all telemetry layers
-    tracing_subscriber::registry().with(log_layer).with(sentry_tracing::layer()).with(otel_layer).init();
+    tracing_subscriber::registry()
+        .with(log_layer)
+        .with(sentry_tracing::layer())
+        .with(metrics_layer)
+        .with(otel_layer)
+        .init();
 
     Ok(())
 }
