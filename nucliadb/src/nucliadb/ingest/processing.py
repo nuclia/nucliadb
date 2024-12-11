@@ -114,6 +114,10 @@ class PushPayload(BaseModel):
 
 
 async def start_processing_engine():
+    processing_engine = get_utility(Utility.PROCESSING)
+    if processing_engine is not None:
+        return
+
     if nuclia_settings.dummy_processing:
         processing_engine = DummyProcessingEngine()
     else:
