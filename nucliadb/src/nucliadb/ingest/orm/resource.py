@@ -560,10 +560,6 @@ class Resource:
         for extracted_text in message.extracted_text:
             tasks.append(self._apply_extracted_text(extracted_text))
 
-        if len(tasks) > 0:
-            await asyncio.gather(*tasks)
-            tasks = []
-
         extracted_languages = set()
 
         for link_extracted_data in message.link_extracted_data:
@@ -586,10 +582,6 @@ class Resource:
             tasks.append(self._apply_field_computed_metadata(field_metadata))
             extracted_languages.update(extract_field_metadata_languages(field_metadata))
 
-        if len(tasks) > 0:
-            await asyncio.gather(*tasks)
-            tasks = []
-
         update_basic_languages(self.basic, extracted_languages)
 
         # Vector indexing
@@ -597,19 +589,19 @@ class Resource:
             for field_vectors in message.field_vectors:
                 tasks.append(self._apply_extracted_vectors(field_vectors))
 
-            if len(tasks) > 0:
-                await asyncio.gather(*tasks)
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
             tasks.append(self._apply_field_large_metadata(field_large_metadata))
 
-        if len(tasks) > 0:
-            await asyncio.gather(*tasks)
-
         # Relations
         self.indexer.brain.relations.extend(message.relations)
-        await self.set_relations(message.relations)
+        tasks.append(self.set_relations(message.relations))
+
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
 
         # Basic proto may have been modified in some apply functions but we only
         # want to set it once
