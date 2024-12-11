@@ -86,6 +86,7 @@ def gcs():
 
 def running_in_mac_os() -> bool:
     import os
+
     return os.uname().sysname == "Darwin"
 
 
