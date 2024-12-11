@@ -256,7 +256,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             + ".deleted"
         )
 
-        await self.insert_object(self.indexing_bucket, key, b"")
+        await self.upload(self.indexing_bucket, key, b"")
 
     def needs_move(self, file: CloudFile, kbid: str) -> bool:
         # The cloudfile is valid for our environment
