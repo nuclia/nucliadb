@@ -379,6 +379,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         filename: str = "payload",
         content_type: str = "",
     ):
+        """
+        Upload bytes to the storage in chunks.
+        This is useful for large files that are already loaded in memory.
+        """
         destination = self.field_klass(storage=self, bucket=bucket, fullkey=key)
 
         cf = CloudFile()
@@ -403,6 +407,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def uploaditerator(
         self, iterator: AsyncIterator, destination: StorageField, origin: CloudFile
     ) -> CloudFile:
+        """
+        Upload bytes to the storage in chunks, but the data is coming from an iterator.
+        This is when we want to upload large files without loading them in memory.
+        """
         safe_iterator = iterate_storage_compatible(iterator, self, origin)  # type: ignore
         return await destination.upload(safe_iterator, origin)
 
@@ -536,6 +544,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         ...
 
     async def upload_object(self, bucket: str, key: str, data: bytes) -> None:
+        """
+        Put some binary data into the object storage without any object metadata.
+        The data will be uploaded in a single request or in chunks if the data is too large.
+        """
         if len(data) > self.chunk_size:
             await self.chunked_upload_object(bucket, key, data)
         else:
