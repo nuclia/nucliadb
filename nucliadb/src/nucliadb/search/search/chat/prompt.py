@@ -706,7 +706,7 @@ async def conversation_prompt_context(
                                 text = extracted_text.split_text.get(ident, message.content.text.strip())
                             else:
                                 text = message.content.text.strip()
-                            pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(message.content.text) + 1}"
+                            pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                             context[pid] = text
                             attachments.extend(message.content.attachments_fields)
                 else:
@@ -720,7 +720,7 @@ async def conversation_prompt_context(
                             text = extracted_text.split_text.get(ident, message.content.text.strip())
                         else:
                             text = message.content.text.strip()
-                        pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(message.content.text) + 1}"
+                        pid = f"{rid}/{field_type}/{field_id}/{ident}/0-{len(text) + 1}"
                         context[pid] = text
                         attachments.extend(message.content.attachments_fields)
 
