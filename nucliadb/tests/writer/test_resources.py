@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
-from pytest_mock import MockFixture
+from pytest_mock import MockerFixture
 
 import nucliadb_models
 from nucliadb.common import datamanagers
@@ -227,7 +227,7 @@ async def test_resource_crud_sync(
 async def test_create_resource_async(
     writer_api: Callable[[list[str]], AsyncClient],
     knowledgebox_writer: str,
-    mocker: MockFixture,
+    mocker: MockerFixture,
 ):
     """Create a resoure and don't wait for it"""
     kbid = knowledgebox_writer

@@ -23,7 +23,7 @@ from typing import AsyncIterator, Iterable
 from unittest.mock import patch
 
 import pytest
-from pytest_mock import MockFixture
+from pytest_mock import MockerFixture
 
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
@@ -82,7 +82,7 @@ async def test_send_to_process_generated_fields(
     processor: Processor,
     partition_utility: PartitionUtility,
     processing_utility: DummyProcessingEngine,
-    mocker: MockFixture,
+    mocker: MockerFixture,
 ):
     kbid = knowledgebox_ingest
     rid = uuid.uuid4().hex

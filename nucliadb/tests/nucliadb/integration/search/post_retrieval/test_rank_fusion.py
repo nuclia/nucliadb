@@ -21,7 +21,7 @@
 
 import pytest
 from httpx import AsyncClient
-from pytest_mock import MockFixture
+from pytest_mock import MockerFixture
 
 from nucliadb.search.search import find, find_merge
 from nucliadb_models.search import (
@@ -94,7 +94,7 @@ def get_score_types(results: KnowledgeboxFindResults) -> set[SCORE_TYPE]:
 async def test_reciprocal_rank_fusion_requests_more_results(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
-    mocker: MockFixture,
+    mocker: MockerFixture,
 ):
     """Validate predict reranker asks for more results than the user and we send
     them to Predict API.
