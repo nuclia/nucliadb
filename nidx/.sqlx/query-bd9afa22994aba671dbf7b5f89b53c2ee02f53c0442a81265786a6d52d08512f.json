@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "WITH job AS (\n                 SELECT id FROM merge_jobs\n                 WHERE started_at IS NULL ORDER BY id LIMIT 1\n             )\n             UPDATE merge_jobs\n             SET started_at = NOW(), running_at = NOW()\n             FROM job\n             WHERE merge_jobs.id = job.id\n             RETURNING merge_jobs.*",
+  "query": "INSERT INTO merge_jobs (seq, index_id, priority) VALUES ($1, $2, $3) RETURNING *",
   "describe": {
     "columns": [
       {
@@ -37,10 +37,19 @@
         "ordinal": 6,
         "name": "running_at",
         "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 7,
+        "name": "priority",
+        "type_info": "Int4"
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int4"
+      ]
     },
     "nullable": [
       false,
@@ -49,8 +58,9 @@
       false,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "74e308ddcbc528507dc80a4fc32adfb4a735eaa5df7ec4901e2cb5d8ee838931"
+  "hash": "bd9afa22994aba671dbf7b5f89b53c2ee02f53c0442a81265786a6d52d08512f"
 }

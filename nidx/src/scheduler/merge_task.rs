@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashMap;
+
 use crate::{
     metadata::{IndexId, IndexKind, MergeJob, SegmentId},
     settings::MergeSettings,
@@ -96,6 +98,7 @@ impl MergeScheduler {
         .await?;
 
         for index in indexes {
+            let segment_info: HashMap<_, _> = index.segments.iter().map(|(id, rec, f)| (*id, (*rec, *f))).collect();
             let merges = match index.kind {
                 IndexKind::Text | IndexKind::Paragraph | IndexKind::Relation => {
                     log_merge::plan_merges(&self.settings.log_merge, index.segments)
@@ -104,12 +107,30 @@ impl MergeScheduler {
             };
 
             for m in merges {
-                MergeJob::create(meta, index.id, &m, last_indexed_seq).await?;
+                let (records, forced) = m.iter().fold((0, false), |(records, forced), sid| {
+                    let segment = segment_info.get(sid).unwrap();
+                    (records + segment.0, forced || segment.1)
+                });
+                let priority = calculate_priority(m.len(), records, forced);
+                MergeJob::create(meta, index.id, &m, last_indexed_seq, priority).await?;
             }
         }
 
         Ok(())
     }
+}
+
+/// Calculate a priority for the job. We want higher priority when:
+/// - Merging many segments
+/// - Merging small segments (will take short time)
+/// - Merging because of deletions
+fn calculate_priority(segments: usize, records: i64, forced: bool) -> i32 {
+    let forced_score = if forced {
+        5
+    } else {
+        0
+    };
+    segments as i32 + forced_score - records as i32 / 10_000
 }
 
 #[cfg(test)]
