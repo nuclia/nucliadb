@@ -589,17 +589,13 @@ class Resource:
             for field_vectors in message.field_vectors:
                 tasks.append(self._apply_extracted_vectors(field_vectors))
 
-        if len(tasks) > 0:
-            await asyncio.gather(*tasks)
-
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
             tasks.append(self._apply_field_large_metadata(field_large_metadata))
 
         # Relations
-        if len(message.relations) > 0:
-            self.indexer.brain.relations.extend(message.relations)
-            tasks.append(self.set_relations(message.relations))
+        self.indexer.brain.relations.extend(message.relations)
+        tasks.append(self.set_relations(message.relations))
 
         if len(tasks) > 0:
             await asyncio.gather(*tasks)
