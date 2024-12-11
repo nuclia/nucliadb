@@ -127,7 +127,7 @@ mod tests {
         use super::*;
 
         use crate::{
-            metadata::{Index, IndexConfig, IndexId, NidxMetadata, Segment, Shard},
+            metadata::{Deletion, Index, IndexConfig, IndexId, NidxMetadata, Segment, Shard},
             settings::LogMergeSettings,
         };
 
@@ -351,6 +351,41 @@ mod tests {
                 jobs.push(job);
             }
             Ok(jobs)
+        }
+
+        #[sqlx::test]
+        async fn test_schedule_merges_with_many_deletions(pool: sqlx::PgPool) -> anyhow::Result<()> {
+            let meta = NidxMetadata::new_with_pool(pool).await?;
+            let kbid = Uuid::new_v4();
+            let shard = Shard::create(&meta.pool, kbid).await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+
+            let segment = Segment::create(&meta.pool, index.id, 1i64.into(), 50, serde_json::Value::Null).await?;
+            segment.mark_ready(&meta.pool, 1000).await?;
+
+            let merge_scheduler = MergeScheduler::from_settings(MergeSettings {
+                max_deletions: 2,
+                ..Default::default()
+            });
+
+            // Just one segment, no need to merge
+            merge_scheduler.schedule_merges(&meta, 5i64.into()).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), 0);
+
+            // Add some deletions
+            for s in 0i64..5i64 {
+                Deletion::create(&meta.pool, index.id, s.into(), &[]).await?;
+            }
+
+            // one job has been scheduled for the index
+            merge_scheduler.schedule_merges(&meta, 5i64.into()).await?;
+            let jobs = get_all_merge_jobs(&meta).await?;
+            assert_eq!(jobs.len(), 1);
+            assert_eq!(jobs[0].index_id, index.id);
+            assert_eq!(jobs[0].seq, 5i64.into());
+
+            Ok(())
         }
     }
 }
