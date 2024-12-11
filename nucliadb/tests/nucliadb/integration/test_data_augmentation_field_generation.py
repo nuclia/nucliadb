@@ -23,6 +23,7 @@ from typing import AsyncIterator, Iterable
 from unittest.mock import patch
 
 import pytest
+from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
 from nucliadb.ingest.orm.processor import Processor
@@ -34,12 +35,19 @@ from nucliadb.ingest.processing import (
     start_processing_engine,
     stop_processing_engine,
 )
-from nucliadb_protos import noderesources_pb2
-from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldAuthor, FieldID, FieldType
+from nucliadb_protos import noderesources_pb2, resources_pb2
+from nucliadb_protos.resources_pb2 import (
+    ExtractedTextWrapper,
+    FieldAuthor,
+    FieldID,
+    FieldType,
+    Paragraph,
+)
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
 )
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -50,6 +58,7 @@ from nucliadb_utils.utilities import (
     start_partitioning_utility,
     stop_partitioning_utility,
 )
+from tests.utils import inject_message
 
 
 @pytest.fixture(scope="function")
@@ -167,3 +176,117 @@ async def test_send_to_process_generated_fields(
     assert index_message.resource.uuid == rid
     # label for generated fields from data augmentation is present
     assert "/g/da" in index_message.texts[f"t/{da_field}"].labels
+
+
+async def test_data_augmentation_field_generation_and_search(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    kbid = knowledgebox
+    slug = "my-resource"
+    field_id = "my-text"
+
+    # Resource creation (from writer)
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "My resources",
+            "slug": slug,
+            "texts": {
+                field_id: {
+                    "body": "This is my text",
+                    "format": "PLAIN",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Processed resource (from processing)
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.slug = slug
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    field_id_pb = FieldID(
+        field_type=FieldType.TEXT,
+        field=field_id,
+    )
+    bm.extracted_text.append(
+        ExtractedTextWrapper(
+            body=ExtractedText(
+                text="This is an extracted text",
+            ),
+            field=field_id_pb,
+        )
+    )
+    field_metadata = resources_pb2.FieldComputedMetadataWrapper()
+    field_metadata.field.CopyFrom(field_id_pb)
+    field_metadata.metadata.metadata.paragraphs.append(Paragraph(start=0, end=25))
+    bm.field_metadata.append(field_metadata)
+    await inject_message(nucliadb_grpc, bm)
+
+    # Data augmentation broker message
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    da_field_id = "da-author-f-0-0"
+    bm.texts[da_field_id].body = "Text author"
+    bm.texts[da_field_id].md5 = hashlib.md5("Text author".encode()).hexdigest()
+    # TODO: add this again when processor sends this to us
+    # bm.texts[da_field].generated_by = FieldAuthor.DATA_AUGMENTATION
+    await inject_message(nucliadb_grpc, bm)
+
+    # Processed DA resource (from processing)
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.slug = slug
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    da_field_id_pb = FieldID(
+        field_type=FieldType.TEXT,
+        field=da_field_id,
+    )
+    bm.extracted_text.append(
+        ExtractedTextWrapper(
+            body=ExtractedText(
+                text="Extracted text for da author",
+            ),
+            field=da_field_id_pb,
+        )
+    )
+    field_metadata = resources_pb2.FieldComputedMetadataWrapper()
+    field_metadata.field.CopyFrom(da_field_id_pb)
+    field_metadata.metadata.metadata.paragraphs.append(Paragraph(start=0, end=28))
+    bm.field_metadata.append(field_metadata)
+    await inject_message(nucliadb_grpc, bm)
+
+    # Now validate we can search and filter out data augmentation fields
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "text",
+            "min_score": {"bm25": 0.0},
+        },
+    )
+    assert resp.status_code == 200
+    unfiltered = resp.json()
+    assert unfiltered["total"] == 2
+    assert unfiltered["resources"][rid]["fields"].keys() == {f"/t/{field_id}", f"/t/{da_field_id}"}
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "text",
+            "filters": [{"none": ["/g/da"]}],
+            "min_score": {"bm25": 0.0},
+        },
+    )
+    assert resp.status_code == 200
+    filtered_out = resp.json()
+    assert filtered_out["total"] == 1
+    assert filtered_out["resources"][rid]["fields"].keys() == {f"/t/{field_id}"}
