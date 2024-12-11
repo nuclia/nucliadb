@@ -161,7 +161,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             logger.error("No Deadletter Bucket defined will not store the error")
             return
         key = DEADLETTER.format(seqid=seqid, seq=seq, partition=partition)
-        await self.insert_object(self.deadletter_bucket, key, message.SerializeToString())
+        await self.upload(self.deadletter_bucket, key, message.SerializeToString())
 
     def get_indexing_storage_key(
         self, *, kb: str, logical_shard: str, resource_uid: str, txid: Union[int, str]
@@ -187,7 +187,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             resource_uid=message.resource.uuid,
             txid=txid,
         )
-        await self.insert_object(self.indexing_bucket, key, message.SerializeToString())
+        await self.upload(self.indexing_bucket, key, message.SerializeToString())
 
         return key
 
@@ -199,7 +199,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         kb: str,
         logical_shard: str,
     ) -> str:
-        if self.indexing_bucket is None:
+        if self.indexing_bucket is None:  # pragma: no cover
             raise AttributeError()
         key = self.get_indexing_storage_key(
             kb=kb,
@@ -207,8 +207,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             resource_uid=message.resource.uuid,
             txid=reindex_id,
         )
-        message_serialized = message.SerializeToString()
-        await self.insert_object(self.indexing_bucket, key, message_serialized)
+        await self.upload(self.indexing_bucket, key, message.SerializeToString())
         return key
 
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:
@@ -467,7 +466,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
                     yield data
 
     async def upload_pb(self, sf: StorageField, payload: Any):
-        await self.insert_object(sf.bucket, sf.key, payload.SerializeToString())
+        await self.upload(sf.bucket, sf.key, payload.SerializeToString())
 
     async def download_pb(self, sf: StorageField, PBKlass: Type):
         payload = await self.downloadbytes(sf.bucket, sf.key)
@@ -513,7 +512,8 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
 
     async def set_stream_message(self, kbid: str, rid: str, data: bytes) -> str:
         key = MESSAGE_KEY.format(kbid=kbid, rid=rid, mid=uuid.uuid4())
-        await self.uploadbytes(cast(str, self.indexing_bucket), key, data)
+        indexing_bucket = cast(str, self.indexing_bucket)
+        await self.upload(indexing_bucket, key, data)
         return key
 
     async def get_stream_message(self, key: str) -> bytes:
@@ -531,6 +531,12 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         Put some binary data into the object storage without any object metadata.
         """
         ...
+
+    async def upload(self, bucket: str, key: str, data: bytes) -> None:
+        if len(data) > self.chunk_size:
+            await self.uploadbytes(bucket, key, data)
+        else:
+            await self.insert_object(bucket, key, data)
 
 
 async def iter_and_add_size(
