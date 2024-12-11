@@ -29,11 +29,17 @@ use object_store::{DynObjectStore, ObjectStore};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
 use uuid::Uuid;
 
+use crate::metrics::indexer::INDEXING_COUNTER;
+use crate::metrics::indexer::PER_INDEX_INDEXING_TIME;
+use crate::metrics::indexer::TOTAL_INDEXING_TIME;
+use crate::metrics::IndexKindLabels;
+use crate::metrics::OperationStatusLabels;
 use crate::segment_store::pack_and_upload;
 use crate::{metadata::*, Settings};
 
@@ -112,9 +118,11 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         .instrument(span)
         .await
         {
+            INDEXING_COUNTER.get_or_create(&OperationStatusLabels::failure()).inc();
             error!(?seq, ?e, "Error processing index message");
             continue;
         }
+        INDEXING_COUNTER.get_or_create(&OperationStatusLabels::success()).inc();
 
         if let Err(e) = acker.ack().await {
             warn!(?e, "Error acking index message");
@@ -177,6 +185,7 @@ pub async fn index_resource(
     resource: Resource,
     seq: Seq,
 ) -> anyhow::Result<()> {
+    let t = Instant::now();
     let shard_id = Uuid::parse_str(shard_id)?;
     let indexes = Index::for_shard(&meta.pool, shard_id).await?;
     let resource = Arc::new(resource);
@@ -226,6 +235,7 @@ pub async fn index_resource(
         Index::updated(&mut *tx, &segment.index_id).await?;
     }
     tx.commit().await?;
+    TOTAL_INDEXING_TIME.observe(t.elapsed().as_secs_f64());
 
     Ok(())
 }
@@ -236,6 +246,7 @@ fn index_resource_to_index(
     output_dir: &Path,
     single_vector_index: bool,
 ) -> anyhow::Result<(Option<NewSegment>, Vec<String>)> {
+    let t = Instant::now();
     let segment = match index.kind {
         IndexKind::Vector => nidx_vector::VectorIndexer
             .index_resource(output_dir, &index.config()?, resource, &index.name, single_vector_index)?
@@ -253,6 +264,7 @@ fn index_resource_to_index(
         IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.deletions_for_resource(resource),
         IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(resource),
     };
+    PER_INDEX_INDEXING_TIME.get_or_create(&IndexKindLabels::new(index.kind)).observe(t.elapsed().as_secs_f64());
 
     Ok((segment, deletions))
 }
