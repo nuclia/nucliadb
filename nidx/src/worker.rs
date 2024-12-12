@@ -174,13 +174,21 @@ pub async fn run_job(
     })
     .await??;
 
-    // Upload
-    let segment = Segment::create(&meta.pool, job.index_id, job.seq, merged.records, merged.index_metadata).await?;
-    let size = pack_and_upload(storage, work_dir.path(), segment.id.storage_key()).await?;
+    let mut tx = if merged.records == 0 {
+        // If segment empty, do not upload/register it
+        meta.transaction().await?
+    } else {
+        // Upload
+        let segment = Segment::create(&meta.pool, job.index_id, job.seq, merged.records, merged.index_metadata).await?;
+        let size = pack_and_upload(storage, work_dir.path(), segment.id.storage_key()).await?;
 
-    // Record new segment and delete old ones
-    let mut tx = meta.transaction().await?;
-    segment.mark_ready(&mut *tx, size as i64).await?;
+        // Record new segment and delete old ones
+        let mut tx = meta.transaction().await?;
+        segment.mark_ready(&mut *tx, size as i64).await?;
+        tx
+    };
+
+    // Delete old segments
     Segment::mark_many_for_deletion(&mut *tx, &segment_ids).await?;
     Index::updated(&mut *tx, &index.id).await?;
 
@@ -191,4 +199,54 @@ pub async fn run_job(
     PER_INDEX_MERGE_TIME.get_or_create(&IndexKindLabels::new(index.kind)).observe(t.elapsed().as_secs_f64());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::{
+        indexer::{delete_resource, index_resource},
+        metadata::{IndexConfig, NidxMetadata, Shard},
+    };
+    use nidx_tests::*;
+
+    #[sqlx::test]
+    async fn test_merge_deleted_resource(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta.pool, kbid).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "text", IndexConfig::new_text()).await.unwrap();
+
+        let resource = little_prince(shard.id.to_string(), None);
+        let resource_id = resource.resource.clone().unwrap().uuid;
+        let storage = Arc::new(object_store::memory::InMemory::new());
+        index_resource(
+            &meta,
+            storage.clone(),
+            &tempfile::env::temp_dir(),
+            &shard.id.to_string(),
+            resource,
+            1i64.into(),
+        )
+        .await?;
+
+        let segments = index.segments(&meta.pool).await.unwrap();
+        assert_eq!(segments.len(), 1);
+
+        delete_resource(&meta, &shard.id.to_string(), resource_id, 2i64.into()).await?;
+
+        // Run a job to merge the segment
+        let output_dir = tempdir()?;
+        let job = MergeJob::create(&meta, index.id, &[segments[0].id], 2i64.into(), 0).await?;
+        run_job(&meta, &job, storage, output_dir.path()).await?;
+
+        // Results in no segments
+        let segments = index.segments(&meta.pool).await.unwrap();
+        assert_eq!(segments.len(), 0);
+
+        Ok(())
+    }
 }
