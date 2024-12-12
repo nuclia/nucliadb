@@ -1164,6 +1164,9 @@ def add_field_classifications(basic: PBBasic, fcmw: FieldComputedMetadataWrapper
     fcfs = FieldClassifications()
     fcfs.field.CopyFrom(fcmw.field)
     fcfs.classifications.extend(fcmw.metadata.metadata.classifications)
+    for split_id, split in fcmw.metadata.split_metadata.items():
+        if split_id not in fcmw.metadata.deleted_splits:
+            fcfs.classifications.extend(split.classifications)
     basic.computedmetadata.field_classifications.append(fcfs)
     return True
 
