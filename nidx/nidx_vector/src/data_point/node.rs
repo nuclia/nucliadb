@@ -156,7 +156,7 @@ impl Interpreter for Node {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{data_types::trie_ram, vector_types::dense_f32_unaligned};
+    use crate::{data_types::trie_ram, vector_types::dense_f32};
     lazy_static::lazy_static! {
         static ref NO_LABELS_TRIE: Vec<u8> = trie::serialize(trie_ram::create_trie(&NO_LABELS));
         static ref LABELS_TRIE: Vec<u8> = trie::serialize(trie_ram::create_trie(&LABELS));
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn create_test() {
         let key = b"NODE1";
-        let vector = dense_f32_unaligned::encode_vector(&[12.; 1000]);
+        let vector = dense_f32::encode_vector(&[12.; 1000]);
         let mut buf = Vec::new();
         Node::serialize_into(&mut buf, key, &vector, 1, NO_LABELS_TRIE.clone(), NO_METADATA).unwrap();
         let len = usize_from_slice_le(&buf[LEN.0..LEN.1]);
@@ -190,7 +190,7 @@ mod tests {
 
         let key = b"NODE2";
         let metadata = b"THIS ARE THE METADATA CONTENTS";
-        let vector = dense_f32_unaligned::encode_vector(&[13.; 1000]);
+        let vector = dense_f32::encode_vector(&[13.; 1000]);
         let mut buf = Vec::new();
         Node::serialize_into(&mut buf, key, &vector, 1, LABELS_TRIE.clone(), Some(metadata)).unwrap();
         let len = usize_from_slice_le(&buf[LEN.0..LEN.1]);
@@ -217,12 +217,12 @@ mod tests {
         let mut buf = Vec::new();
         let key1 = b"NODE1";
         let metadata1 = b"The node 1 has metadata";
-        let vector1 = dense_f32_unaligned::encode_vector(&[12.; 1000]);
+        let vector1 = dense_f32::encode_vector(&[12.; 1000]);
         let node1 = buf.len();
         Node::serialize_into(&mut buf, key1, &vector1, 1, NO_LABELS_TRIE.clone(), Some(&metadata1)).unwrap();
         let key2 = b"NODE2";
         let metadata2 = b"Tuns out node 2 also has metadata";
-        let vector2 = dense_f32_unaligned::encode_vector(&[15.; 1000]);
+        let vector2 = dense_f32::encode_vector(&[15.; 1000]);
         let node2 = buf.len();
         Node::serialize_into(&mut buf, key2, &vector2, 1, NO_LABELS_TRIE.clone(), Some(&metadata2)).unwrap();
         assert_eq!(Node::key(&buf[node1..]), key1);

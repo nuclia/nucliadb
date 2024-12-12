@@ -458,15 +458,19 @@ mod tests {
         NidxMetadata,
     };
 
+    const VECTOR_CONFIG: VectorConfig = VectorConfig {
+        similarity: nidx_vector::config::Similarity::Cosine,
+        normalize_vectors: false,
+        vector_type: nidx_vector::config::VectorType::DenseF32 {
+            dimension: 3,
+        },
+    };
+
     #[sqlx::test]
     async fn test_load_index_metadata(pool: sqlx::PgPool) -> anyhow::Result<()> {
-        let index = Index::create(
-            &pool,
-            Shard::create(&pool, uuid::Uuid::new_v4()).await?.id,
-            "english",
-            VectorConfig::default().into(),
-        )
-        .await?;
+        let index =
+            Index::create(&pool, Shard::create(&pool, uuid::Uuid::new_v4()).await?.id, "english", VECTOR_CONFIG.into())
+                .await?;
 
         // Seq 1: A segment was created and unmerged
         let s1 = Segment::create(&pool, index.id, 1i64.into(), 4, serde_json::Value::Null).await?;
@@ -534,7 +538,7 @@ mod tests {
             &meta.pool,
             Shard::create(&meta.pool, uuid::Uuid::new_v4()).await?.id,
             "english",
-            VectorConfig::default().into(),
+            VECTOR_CONFIG.into(),
         )
         .await?;
         // Assumes we get index_id=1

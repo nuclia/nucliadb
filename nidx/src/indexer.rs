@@ -275,7 +275,7 @@ fn index_resource_to_index(
 mod tests {
     use std::io::{Seek, Write};
 
-    use nidx_vector::config::VectorConfig;
+    use nidx_vector::config::{Similarity, VectorConfig, VectorType};
     use tempfile::tempfile;
     use uuid::Uuid;
 
@@ -283,12 +283,20 @@ mod tests {
     use crate::metadata::NidxMetadata;
     use nidx_tests::*;
 
+    const VECTOR_CONFIG: VectorConfig = VectorConfig {
+        similarity: Similarity::Cosine,
+        normalize_vectors: false,
+        vector_type: VectorType::DenseF32 {
+            dimension: 3,
+        },
+    };
+
     #[sqlx::test]
     async fn test_index_resource(pool: sqlx::PgPool) {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
-        let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
         index_resource(
@@ -323,7 +331,7 @@ mod tests {
 
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await?;
-        let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
 
         // Resource with no deletions, no `Deletion` is created
         let mut resource = little_prince(shard.id.to_string(), None);

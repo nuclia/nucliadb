@@ -31,7 +31,9 @@ use crate::VectorR;
 const CONFIG: VectorConfig = VectorConfig {
     similarity: Similarity::Cosine,
     normalize_vectors: false,
-    vector_type: crate::config::VectorType::DenseF32Unaligned,
+    vector_type: crate::config::VectorType::DenseF32 {
+        dimension: 178,
+    },
 };
 
 fn create_query() -> Vec<f32> {
@@ -66,13 +68,13 @@ fn simple_flow() {
     let label_dictionary = LabelDictionary::new(labels.clone());
     for i in 0..50 {
         let key = format!("KEY_{}", i);
-        let vector = vec![rand::random::<f32>(); 8];
+        let vector = vec![rand::random::<f32>(); 178];
         let labels = label_dictionary.clone();
         elems.push(Elem::new(key.clone(), vector, labels, None));
         expected_keys.push(key);
     }
     let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
-    let query = vec![rand::random::<f32>(); 8];
+    let query = vec![rand::random::<f32>(); 178];
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
         acc.extend(i.clone());

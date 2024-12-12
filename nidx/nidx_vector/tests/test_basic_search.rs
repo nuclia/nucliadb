@@ -40,7 +40,7 @@ const DIMENSION: usize = 64;
 #[rstest]
 fn test_basic_search(
     #[values(Similarity::Dot, Similarity::Cosine)] similarity: Similarity,
-    #[values(VectorType::DenseF32Unaligned, VectorType::DenseF32 { dimension: DIMENSION })] vector_type: VectorType,
+    #[values(VectorType::DenseF32 { dimension: DIMENSION })] vector_type: VectorType,
 ) -> anyhow::Result<()> {
     use common::{resource, TestOpener};
     use nidx_vector::{VectorIndexer, VectorSearcher};
@@ -48,7 +48,7 @@ fn test_basic_search(
     let config = VectorConfig {
         similarity,
         vector_type,
-        ..Default::default()
+        normalize_vectors: false,
     };
 
     // Creates a resource with some orthogonal vectors, to test search
