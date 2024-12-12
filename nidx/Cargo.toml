@@ -72,3 +72,7 @@ telemetry = [
 itertools = "0.13.0"
 nidx_tests = { path = "nidx_tests" }
 rand = "0.8.5"
+
+[profile.samply]
+inherits = "release"
+debug = true
