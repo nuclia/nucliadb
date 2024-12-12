@@ -1158,7 +1158,7 @@ def add_field_classifications(basic: PBBasic, fcmw: FieldComputedMetadataWrapper
     """
     Returns whether some new field classifications were added
     """
-    if len(fcmw.metadata.metadata.classifications) == 0:
+    if len(fcmw.metadata.metadata.classifications) == 0 and all((split.classifications) == 0 for split in fcmw.metadata.split_metadata.values()):
         return False
     remove_field_classifications(basic, [fcmw.field])
     fcfs = FieldClassifications()
