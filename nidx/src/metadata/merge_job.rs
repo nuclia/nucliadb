@@ -20,6 +20,7 @@
 use super::{IndexId, NidxMetadata, Segment, SegmentId};
 use nidx_types::Seq;
 use sqlx::{types::time::PrimitiveDateTime, Executor, Postgres};
+use tracing::*;
 
 #[derive(Clone)]
 pub struct MergeJob {
@@ -57,7 +58,7 @@ impl MergeJob {
         .await?
         .rows_affected();
         if affected != segment_ids.len() as u64 {
-            println!("Not all segments updated");
+            warn!("Not all segments added to the merge job");
             tx.rollback().await?;
             Err(sqlx::Error::RowNotFound)
         } else {

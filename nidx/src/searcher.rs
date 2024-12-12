@@ -47,6 +47,7 @@ use tempfile::tempdir;
 use crate::grpc_server::GrpcServer;
 use crate::metadata::IndexId;
 use crate::metrics::searcher::REFRESH_QUEUE_LEN;
+use crate::settings::SearcherSettings;
 use crate::{NidxMetadata, Settings};
 
 pub use index_cache::IndexSearcher;
@@ -105,6 +106,7 @@ impl SyncedSearcher {
     pub async fn run(
         &self,
         storage: Arc<DynObjectStore>,
+        settings: SearcherSettings,
         shutdown: CancellationToken,
         watcher: Option<watch::Sender<SyncStatus>>,
     ) -> anyhow::Result<()> {
@@ -117,6 +119,7 @@ impl SyncedSearcher {
             self.meta.clone(),
             storage.clone(),
             self.sync_metadata.clone(),
+            settings,
             shutdown.clone(),
             tx,
             watcher,
@@ -152,6 +155,7 @@ impl SyncedSearcher {
 }
 
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
+    let searcher_settings = settings.searcher.clone().unwrap_or_default();
     let work_dir = tempdir()?;
     let work_path = match &settings.work_path {
         Some(work_path) => &PathBuf::from(&work_path.clone()),
@@ -168,7 +172,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
     let mut tasks = JoinSet::new();
     let api_task = tasks.spawn(server.serve(api.into_service(), shutdown.clone())).id();
     let shutdown2 = shutdown.clone();
-    let search_task = tasks.spawn(async move { searcher.run(storage, shutdown2, None).await }).id();
+    let search_task = tasks.spawn(async move { searcher.run(storage, searcher_settings, shutdown2, None).await }).id();
 
     while let Some(join_result) = tasks.join_next_with_id().await {
         let (id, result) = join_result.unwrap();
