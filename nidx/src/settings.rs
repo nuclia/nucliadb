@@ -174,7 +174,7 @@ pub struct MergeSettings {
 impl Default for MergeSettings {
     fn default() -> Self {
         Self {
-            max_deletions: 100,
+            max_deletions: 500,
             log_merge: Default::default(),
             vector_merge: Default::default(),
         }

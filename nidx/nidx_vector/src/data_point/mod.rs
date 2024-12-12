@@ -41,6 +41,7 @@ use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use std::collections::HashSet;
 use std::path::Path;
+use std::time::Instant;
 use std::{fs, io};
 
 pub use ops_hnsw::DataRetriever;
@@ -126,9 +127,10 @@ where
 
     // Creating the hnsw for the new node store.
     let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
-    let mut ops = HnswOps::new(&tracker);
+    let mut ops = HnswOps::new(&tracker, false);
+    let t = Instant::now();
     for id in start_node_index..no_nodes {
-        ops.insert(Address(id), &mut index)
+        ops.insert(Address(id), &mut index);
     }
 
     {
@@ -193,7 +195,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
     let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
-    let mut ops = HnswOps::new(&tracker);
+    let mut ops = HnswOps::new(&tracker, false);
     for id in 0..no_nodes {
         ops.insert(Address(id), &mut index)
     }
@@ -498,7 +500,7 @@ impl OpenDataPoint {
         let encoded_query = config.vector_type.encode(query);
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
         let filter = FormulaFilter::new(filter);
-        let ops = HnswOps::new(&tracker);
+        let ops = HnswOps::new(&tracker, true);
         let neighbours =
             ops.search(Address(self.metadata.records), self.index.as_ref(), results, filter, with_duplicates);
 

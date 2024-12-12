@@ -18,8 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
-
+use fxhash::FxHashMap;
 use ops_hnsw::{Hnsw, Layer};
 
 use super::*;
@@ -36,7 +35,7 @@ pub type Edge = f32;
 
 #[derive(Default, Clone)]
 pub struct RAMLayer {
-    pub out: HashMap<Address, Vec<(Address, Edge)>>,
+    pub out: FxHashMap<Address, Vec<(Address, Edge)>>,
 }
 
 impl RAMLayer {

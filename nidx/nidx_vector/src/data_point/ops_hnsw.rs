@@ -19,6 +19,7 @@
 //
 
 use bit_set::BitSet;
+use fxhash::FxHashSet;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
 use rand::prelude::*;
@@ -83,7 +84,7 @@ pub type Neighbours = Vec<(Address, f32)>;
 struct NodeFilter<'a, DR> {
     tracker: &'a DR,
     filter: &'a FormulaFilter<'a>,
-    blocked_addresses: &'a HashSet<Address>,
+    blocked_addresses: &'a FxHashSet<Address>,
     vec_counter: RepCounter<'a>,
 }
 
@@ -108,6 +109,7 @@ pub struct HnswOps<'a, DR> {
     distribution: Uniform<f64>,
     layer_rng: SmallRng,
     tracker: &'a DR,
+    preload_nodes: bool,
 }
 
 impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
@@ -212,7 +214,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                     visited_nodes.insert(new_candidate.0);
                     candidates.push_back(new_candidate);
 
-                    if preloaded < MAX_VECTORS_TO_PRELOAD {
+                    if self.preload_nodes && preloaded < MAX_VECTORS_TO_PRELOAD {
                         self.tracker.will_need(new_candidate);
                         preloaded += 1;
                     }
@@ -229,7 +231,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         k_neighbours: usize,
         entry_points: &[Address],
     ) -> Neighbours {
-        let mut visited = HashSet::new();
+        let mut visited = FxHashSet::default();
         let mut candidates = BinaryHeap::new();
         let mut ms_neighbours = BinaryHeap::new();
         for ep in entry_points.iter().copied() {
@@ -244,7 +246,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws => break,
                 (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
                     for (y, _) in layer.get_out_edges(cn) {
-                        if !visited.contains(&y) {
+                        if self.preload_nodes && !visited.contains(&y) {
                             self.tracker.will_need(y);
                         }
                     }
@@ -350,7 +352,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let filter = NodeFilter {
             filter: &with_filter,
             tracker: self.tracker,
-            blocked_addresses: &HashSet::new(),
+            blocked_addresses: &Default::default(),
             vec_counter: RepCounter::new(!with_duplicates),
         };
         let layer_zero = hnsw.get_layer(0);
@@ -362,11 +364,12 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         filtered_result
     }
 
-    pub fn new(tracker: &DR) -> HnswOps<'_, DR> {
+    pub fn new(tracker: &DR, preload_nodes: bool) -> HnswOps<'_, DR> {
         HnswOps {
             tracker,
             distribution: Uniform::new(0.0, 1.0),
             layer_rng: SmallRng::seed_from_u64(2),
+            preload_nodes,
         }
     }
 }
