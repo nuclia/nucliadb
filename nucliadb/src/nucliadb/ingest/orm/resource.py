@@ -571,11 +571,7 @@ class Resource:
             tasks.append(self._apply_file_extracted_data(file_extracted_data))
             extracted_languages.append(file_extracted_data.language)
 
-        if len(tasks) > 0:
-            await asyncio.gather(*tasks)
-            tasks = []
-
-        await self.maybe_update_resource_title_from_file_extracted_data(message)
+        tasks.append(self.maybe_update_resource_title_from_file_extracted_data(message))
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
@@ -584,10 +580,14 @@ class Resource:
 
         update_basic_languages(self.basic, extracted_languages)
 
+        if len(tasks) > 0:
+            await asyncio.gather(*tasks)
+            tasks = []
+
         # Vector indexing
         if self.disable_vectors is False:
             for field_vectors in message.field_vectors:
-                tasks.append(self._apply_extracted_vectors(field_vectors))
+                await self._apply_extracted_vectors(field_vectors)
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
@@ -599,6 +599,7 @@ class Resource:
 
         if len(tasks) > 0:
             await asyncio.gather(*tasks)
+            tasks = []
 
         # Basic proto may have been modified in some apply functions but we only
         # want to set it once
