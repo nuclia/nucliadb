@@ -55,6 +55,7 @@ LABEL_QUERY_ALIASES = {
     "entities": "e",
     "field": "f",
     "field-values": "fg",
+    "generated.data-augmentation": "g/da",
 }
 
 LABEL_QUERY_ALIASES_REVERSED = {v: k for k, v in LABEL_QUERY_ALIASES.items()}
