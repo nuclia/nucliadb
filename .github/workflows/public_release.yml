@@ -9,16 +9,14 @@
 name: Tag and public artifact release
 env:
   API_VERSION: 1
+  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
+  GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 on:
   push:
     branches:
       - main
     paths:
       - 'VERSION'
-
-env:
-  GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
-  GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
 
 permissions:
   id-token: write   # This is required for requesting the JWT
