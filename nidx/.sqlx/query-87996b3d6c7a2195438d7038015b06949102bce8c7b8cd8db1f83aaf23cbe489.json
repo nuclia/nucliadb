@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM segments WHERE index_id = $1",
+  "query": "SELECT * FROM segments WHERE index_id = $1 AND delete_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -60,5 +60,5 @@
       true
     ]
   },
-  "hash": "f39970929b426bf50f68a51999092522453358903d24af3c8a1fceee11133d2c"
+  "hash": "87996b3d6c7a2195438d7038015b06949102bce8c7b8cd8db1f83aaf23cbe489"
 }
