@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use nidx::api::grpc::ApiServer;
@@ -25,11 +26,12 @@ use nidx::grpc_server::GrpcServer;
 use nidx::indexer::index_resource;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::SyncedSearcher;
-use nidx::settings::{EnvSettings, MetadataSettings, ObjectStoreConfig, StorageSettings};
+use nidx::settings::{EnvSettings, MetadataSettings, StorageSettings};
 use nidx::{NidxMetadata, Settings};
 use nidx_protos::nidx::nidx_api_client::NidxApiClient;
 use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::Resource;
+use object_store::memory::InMemory;
 use sqlx::PgPool;
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
@@ -49,11 +51,11 @@ impl NidxFixture {
             metadata: NidxMetadata::new_with_pool(pool).await?,
             settings: EnvSettings {
                 indexer: Some(nidx::settings::IndexerSettings {
-                    object_store: ObjectStoreConfig::Memory.client(),
+                    object_store: Arc::new(InMemory::new()),
                     nats_server: String::new(),
                 }),
                 storage: Some(StorageSettings {
-                    object_store: ObjectStoreConfig::Memory.client(),
+                    object_store: Arc::new(InMemory::new()),
                 }),
                 merge: Default::default(),
                 metadata: Some(MetadataSettings {
@@ -62,6 +64,7 @@ impl NidxFixture {
                 telemetry: Default::default(),
                 work_path: None,
                 control_socket: None,
+                searcher: Default::default(),
             },
         };
         // API server
@@ -79,7 +82,14 @@ impl NidxFixture {
         tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));
         let settings_copy = settings.clone();
         tokio::task::spawn(async move {
-            searcher.run(settings_copy.storage.as_ref().unwrap().object_store.clone(), shutdown.clone(), None).await
+            searcher
+                .run(
+                    settings_copy.storage.as_ref().unwrap().object_store.clone(),
+                    settings_copy.searcher.clone().unwrap_or_default(),
+                    shutdown.clone(),
+                    None,
+                )
+                .await
         });
 
         // Clients

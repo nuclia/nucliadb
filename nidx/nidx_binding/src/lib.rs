@@ -114,7 +114,12 @@ impl NidxBinding {
         let shutdown2 = shutdown.clone();
         tokio::task::spawn(async move {
             searcher
-                .run(settings_copy.storage.as_ref().unwrap().object_store.clone(), shutdown2, Some(sync_reporter))
+                .run(
+                    settings_copy.storage.as_ref().unwrap().object_store.clone(),
+                    settings_copy.searcher.clone().unwrap_or_default(),
+                    shutdown2,
+                    Some(sync_reporter),
+                )
                 .await
         });
 

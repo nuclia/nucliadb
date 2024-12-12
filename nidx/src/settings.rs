@@ -22,13 +22,16 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as base64;
 use base64::Engine;
 use config::{Config, Environment};
 use object_store::aws::AmazonS3Builder;
+use object_store::limit::LimitStore;
 use object_store::local::LocalFileSystem;
 use object_store::memory::InMemory;
+use object_store::ClientOptions;
 use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
 use serde::{Deserialize, Deserializer};
 
@@ -36,7 +39,7 @@ use crate::NidxMetadata;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "object_store", rename_all = "lowercase")]
-pub enum ObjectStoreConfig {
+pub enum ObjectStoreKind {
     Memory,
     File {
         file_path: String,
@@ -55,10 +58,26 @@ pub enum ObjectStoreConfig {
     },
 }
 
+fn deserialize_u64<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+    Ok(Some(String::deserialize(deserializer)?.parse().expect("Expected a number")))
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct ObjectStoreConfig {
+    #[serde(flatten)]
+    kind: ObjectStoreKind,
+
+    #[serde(default, deserialize_with = "deserialize_u64")]
+    max_requests: Option<u64>,
+
+    #[serde(default, deserialize_with = "deserialize_u64")]
+    timeout: Option<u64>,
+}
+
 impl ObjectStoreConfig {
     pub fn client(&self) -> Arc<DynObjectStore> {
-        match self {
-            Self::Gcs {
+        let store: Box<DynObjectStore> = match &self.kind {
+            ObjectStoreKind::Gcs {
                 bucket,
                 base64_creds,
                 endpoint,
@@ -77,9 +96,12 @@ impl ObjectStoreConfig {
                     }
                     _ => {}
                 };
-                Arc::new(builder.build().unwrap())
+                if let Some(t) = self.timeout {
+                    builder = builder.with_client_options(ClientOptions::new().with_timeout(Duration::from_secs(t)));
+                }
+                Box::new(builder.build().unwrap())
             }
-            Self::S3 {
+            ObjectStoreKind::S3 {
                 bucket,
                 client_id,
                 client_secret,
@@ -98,12 +120,21 @@ impl ObjectStoreConfig {
                     // This is needed for minio compatibility
                     builder = builder.with_endpoint(endpoint.clone().unwrap()).with_allow_http(true);
                 }
-                Arc::new(builder.build().unwrap())
+                if let Some(t) = self.timeout {
+                    builder = builder.with_client_options(ClientOptions::new().with_timeout(Duration::from_secs(t)));
+                }
+                Box::new(builder.build().unwrap())
             }
-            Self::File {
+            ObjectStoreKind::File {
                 file_path,
-            } => Arc::new(LocalFileSystem::new_with_prefix(file_path).unwrap()),
-            Self::Memory => Arc::new(InMemory::new()),
+            } => Box::new(LocalFileSystem::new_with_prefix(file_path).unwrap()),
+            ObjectStoreKind::Memory => Box::new(InMemory::new()),
+        };
+
+        if let Some(max_requests) = self.max_requests {
+            Arc::new(LimitStore::new(store, max_requests as usize))
+        } else {
+            Arc::new(store)
         }
     }
 }
@@ -223,6 +254,19 @@ pub struct TelemetrySettings {
     pub sentry: Option<SentryConfig>,
 }
 
+#[derive(Clone, Deserialize, Debug)]
+pub struct SearcherSettings {
+    pub parallel_index_syncs: usize,
+}
+
+impl Default for SearcherSettings {
+    fn default() -> Self {
+        Self {
+            parallel_index_syncs: 2,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct EnvSettings {
     /// Connection to the metadata database
@@ -236,6 +280,9 @@ pub struct EnvSettings {
     /// Storage configuration for our segments
     /// Required by indexer, worker, searcher
     pub storage: Option<StorageSettings>,
+
+    /// Searcher-specific configuration
+    pub searcher: Option<SearcherSettings>,
 
     /// Merge scheduling algorithm configuration
     /// Required by scheduler
