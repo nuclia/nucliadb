@@ -30,6 +30,7 @@ pub struct MergeJob {
     pub enqueued_at: PrimitiveDateTime,
     pub started_at: Option<PrimitiveDateTime>,
     pub running_at: Option<PrimitiveDateTime>,
+    pub priority: i32,
 }
 
 impl MergeJob {
@@ -38,13 +39,15 @@ impl MergeJob {
         index_id: IndexId,
         segment_ids: &[SegmentId],
         seq: Seq,
+        priority: i32,
     ) -> sqlx::Result<MergeJob> {
         let mut tx = meta.transaction().await?;
         let job = sqlx::query_as!(
             MergeJob,
-            "INSERT INTO merge_jobs (seq, index_id) VALUES ($1, $2) RETURNING *",
+            "INSERT INTO merge_jobs (seq, index_id, priority) VALUES ($1, $2, $3) RETURNING *",
             i64::from(seq),
             index_id as IndexId,
+            priority
         )
         .fetch_one(&mut *tx)
         .await?;
@@ -75,7 +78,7 @@ impl MergeJob {
             MergeJob,
             "WITH job AS (
                  SELECT id FROM merge_jobs
-                 WHERE started_at IS NULL ORDER BY id LIMIT 1
+                 WHERE started_at IS NULL ORDER BY priority DESC, id LIMIT 1
              )
              UPDATE merge_jobs
              SET started_at = NOW(), running_at = NOW()
@@ -102,6 +105,36 @@ impl MergeJob {
         index_id: IndexId,
     ) -> sqlx::Result<()> {
         sqlx::query!("DELETE FROM merge_jobs WHERE index_id = $1", index_id as IndexId).execute(meta).await?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nidx_vector::config::VectorConfig;
+    use uuid::Uuid;
+
+    use crate::{
+        metadata::{Index, MergeJob, Shard},
+        NidxMetadata,
+    };
+
+    #[sqlx::test]
+    async fn test_merge_job_priority(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await?;
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta.pool, kbid).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+
+        let job_low = MergeJob::create(&meta, index.id, &[], 1i64.into(), 1).await?;
+        let job_high = MergeJob::create(&meta, index.id, &[], 1i64.into(), 5).await?;
+        let job_low2 = MergeJob::create(&meta, index.id, &[], 1i64.into(), 1).await?;
+
+        assert_eq!(MergeJob::take(&meta.pool).await?.unwrap().id, job_high.id);
+        assert_eq!(MergeJob::take(&meta.pool).await?.unwrap().id, job_low.id);
+        assert_eq!(MergeJob::take(&meta.pool).await?.unwrap().id, job_low2.id);
+        assert!(MergeJob::take(&meta.pool).await?.is_none());
+
         Ok(())
     }
 }
