@@ -594,8 +594,9 @@ class Resource:
             tasks.append(self._apply_field_large_metadata(field_large_metadata))
 
         # Relations
-        self.indexer.brain.relations.extend(message.relations)
-        tasks.append(self.set_relations(message.relations))
+        if message.HasField("relations"):
+            self.indexer.brain.relations.extend(message.relations)
+            tasks.append(self.set_relations(message.relations))
 
         if len(tasks) > 0:
             await asyncio.gather(*tasks)
