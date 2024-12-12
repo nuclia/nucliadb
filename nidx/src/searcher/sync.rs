@@ -208,6 +208,11 @@ async fn sync_index(
         let storage2 = Arc::clone(&storage);
         let location = sync_metadata.segment_location(&index.id, &segment_id);
 
+        // Segment already downloaded (from a previous try)
+        if let Ok(true) = tokio::fs::try_exists(&location).await {
+            continue;
+        }
+
         tasks.spawn(async move {
             // Download segment has some built-in retries (in object_store crate)
             // but failing here is expensive, so we do some extra retries
@@ -215,8 +220,11 @@ async fn sync_index(
             loop {
                 let result = download_segment(storage2.clone(), segment_id, location.clone()).await;
                 if let Err(e) = result {
+                    let _ = tokio::fs::remove_dir_all(&location).await;
                     if retries > 3 {
                         return Err(e);
+                    } else {
+                        warn!(?e, ?segment_id, "Failure to download a segment, will retry");
                     }
                     retries += 1;
                 } else {
