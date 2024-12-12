@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, Iterable, MutableMapping, Optional, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, Iterable, MutableMapping, Optional, Sequence, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -560,16 +560,16 @@ class Resource:
         for extracted_text in message.extracted_text:
             tasks.append(self._apply_extracted_text(extracted_text))
 
-        extracted_languages = set()
+        extracted_languages = []
 
         for link_extracted_data in message.link_extracted_data:
             tasks.append(self._apply_link_extracted_data(link_extracted_data))
             await self.maybe_update_resource_title_from_link(link_extracted_data)
-            extracted_languages.add(link_extracted_data.language)
+            extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
             tasks.append(self._apply_file_extracted_data(file_extracted_data))
-            extracted_languages.add(file_extracted_data.language)
+            extracted_languages.append(file_extracted_data.language)
 
         if len(tasks) > 0:
             await asyncio.gather(*tasks)
@@ -580,7 +580,7 @@ class Resource:
         # Metadata should go first
         for field_metadata in message.field_metadata:
             tasks.append(self._apply_field_computed_metadata(field_metadata))
-            extracted_languages.update(extract_field_metadata_languages(field_metadata))
+            extracted_languages.extend(extract_field_metadata_languages(field_metadata))
 
         update_basic_languages(self.basic, extracted_languages)
 
@@ -1227,7 +1227,7 @@ def maybe_update_basic_thumbnail(basic: PBBasic, thumbnail: Optional[CloudFile])
     return True
 
 
-def update_basic_languages(basic: Basic, languages: set[str]) -> bool:
+def update_basic_languages(basic: Basic, languages: Sequence[str]) -> bool:
     if len(languages) == 0:
         return False
 
