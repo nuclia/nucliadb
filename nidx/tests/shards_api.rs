@@ -37,6 +37,14 @@ use nidx_vector::config::VectorConfig;
 
 use common::metadata::{count_deletions, count_indexes, count_merge_jobs, count_segments, count_shards};
 
+const VECTOR_CONFIG: VectorConfig = VectorConfig {
+    similarity: nidx_vector::config::Similarity::Cosine,
+    normalize_vectors: false,
+    vector_type: nidx_vector::config::VectorType::DenseF32 {
+        dimension: 3,
+    },
+};
+
 #[sqlx::test]
 async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let meta = NidxMetadata::new_with_pool(pool).await?;
@@ -44,10 +52,8 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 
     // Create a new shard for a KB with 2 vectorsets
     let kbid = Uuid::new_v4();
-    let vector_configs = HashMap::from([
-        ("multilingual".to_string(), VectorConfig::default()),
-        ("english".to_string(), VectorConfig::default()),
-    ]);
+    let vector_configs =
+        HashMap::from([("multilingual".to_string(), VECTOR_CONFIG), ("english".to_string(), VECTOR_CONFIG)]);
     let shard = shards::create_shard(&meta, kbid, vector_configs).await?;
 
     let indexes = shard.indexes(&meta.pool).await?;

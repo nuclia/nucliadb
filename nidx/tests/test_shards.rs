@@ -38,7 +38,13 @@ async fn test_create_shard(pool: PgPool) -> anyhow::Result<()> {
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(3),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?;
@@ -155,7 +161,13 @@ async fn create_shards(writer: &mut NidxApiClient<Channel>, n: usize) -> Vec<Str
         let response = writer
             .new_shard(Request::new(NewShardRequest {
                 kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
-                vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+                vectorsets_configs: HashMap::from([(
+                    "english".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                )]),
                 ..Default::default()
             }))
             .await

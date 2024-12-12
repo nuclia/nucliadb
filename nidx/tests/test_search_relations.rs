@@ -345,7 +345,13 @@ async fn test_search_relations_prefixed(pool: PgPool) -> Result<(), Box<dyn std:
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccddeeff11223344556677889900".to_string(),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(3),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?;
@@ -511,7 +517,13 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccddeeff11223344556677889900".to_string(),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(3),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?;

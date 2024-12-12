@@ -279,13 +279,21 @@ mod tests {
         }
     }
 
+    const VECTOR_CONFIG: VectorConfig = VectorConfig {
+        vector_type: VectorType::DenseF32 {
+            dimension: 3,
+        },
+        similarity: crate::config::Similarity::Dot,
+        normalize_vectors: false,
+    };
+
     #[test]
     fn store_test() {
         let interpreter = TElem;
         let elems: [u32; 5] = [0, 1, 2, 3, 4];
         let expected: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
         let mut buf = tempfile::tempfile().unwrap();
-        create_key_value(&mut buf, expected.clone(), &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut buf, expected.clone(), &VECTOR_CONFIG.vector_type).unwrap();
 
         let buf_map = unsafe { memmap2::Mmap::map(&buf).unwrap() };
         let no_values = stored_elements(&buf_map);
@@ -310,9 +318,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v0_store, v0, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v1_store, v1, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v2_store, v2, &VECTOR_CONFIG.vector_type).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -321,7 +329,7 @@ mod tests {
         let mut merge_store = tempfile::tempfile().unwrap();
         let elems = vec![(TElem, v0_map.as_ref()), (TElem, v1_map.as_ref()), (TElem, v2_map.as_ref())];
 
-        merge(&mut merge_store, &elems, &VectorConfig::default()).unwrap();
+        merge(&mut merge_store, &elems, &VECTOR_CONFIG).unwrap();
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
@@ -344,9 +352,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v0_store, v0, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v1_store, v1, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v2_store, v2, &VECTOR_CONFIG.vector_type).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -363,7 +371,7 @@ mod tests {
             (interpreter, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VectorConfig::default()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
@@ -386,9 +394,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v0_store, v0, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v1_store, v1, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v2_store, v2, &VECTOR_CONFIG.vector_type).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -405,7 +413,7 @@ mod tests {
             (interpreter, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VectorConfig::default()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
@@ -428,9 +436,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v0_store, v0, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v1_store, v1, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v2_store, v2, &VECTOR_CONFIG.vector_type).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -446,7 +454,7 @@ mod tests {
             ((GreaterThan(SIX), TElem), v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VectorConfig::default()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![1, 2, 4, 5, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
@@ -469,9 +477,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v0_store, v0, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v1_store, v1, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v2_store, v2, &VECTOR_CONFIG.vector_type).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -488,7 +496,7 @@ mod tests {
             (interpreter, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice(), &VectorConfig::default()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5, 6, 7, 8];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
         let number_of_elements = stored_elements(&merge_store);
@@ -511,9 +519,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v0_store, v0, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v1_store, v1, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v2_store, v2, &VECTOR_CONFIG.vector_type).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -531,7 +539,7 @@ mod tests {
             (greater_than_10, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice(), &VectorConfig::default()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
         let number_of_elements = stored_elements(&merge_store);
@@ -554,9 +562,9 @@ mod tests {
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
 
-        create_key_value(&mut v0_store, v0, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v1_store, v1, &VectorType::DenseF32Unaligned).unwrap();
-        create_key_value(&mut v2_store, v2, &VectorType::DenseF32Unaligned).unwrap();
+        create_key_value(&mut v0_store, v0, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v1_store, v1, &VECTOR_CONFIG.vector_type).unwrap();
+        create_key_value(&mut v2_store, v2, &VECTOR_CONFIG.vector_type).unwrap();
 
         let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
@@ -574,7 +582,7 @@ mod tests {
             (interpreter, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut file, elems.as_slice(), &VectorConfig::default()).unwrap();
+        merge::<(GreaterThan, TElem)>(&mut file, elems.as_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
         let number_of_elements = stored_elements(&merge_store);

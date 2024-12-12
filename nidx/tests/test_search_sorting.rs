@@ -83,7 +83,13 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccddeeff11223344556677889900".to_string(),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(3),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?;

@@ -91,7 +91,13 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccddeeff11223344556677889900".to_string(),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(3),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?;
@@ -182,7 +188,13 @@ async fn test_security_search_public_resource(pool: PgPool) -> Result<(), Box<dy
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccddeeff11223344556677889900".to_string(),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(3),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?;

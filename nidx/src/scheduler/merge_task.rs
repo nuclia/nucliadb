@@ -152,6 +152,14 @@ mod tests {
             settings::LogMergeSettings,
         };
 
+        const VECTOR_CONFIG: VectorConfig = VectorConfig {
+            similarity: nidx_vector::config::Similarity::Cosine,
+            normalize_vectors: false,
+            vector_type: nidx_vector::config::VectorType::DenseF32 {
+                dimension: 3,
+            },
+        };
+
         fn merge_scheduler() -> MergeScheduler {
             MergeScheduler::from_settings(MergeSettings {
                 log_merge: LogMergeSettings {
@@ -167,7 +175,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
             let mut seq: i64 = 0;
 
             for _ in 0..10 {
@@ -205,8 +213,8 @@ mod tests {
             let shard = Shard::create(&meta.pool, kbid).await?;
 
             let indexes = vec![
-                Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?,
-                Index::create(&meta.pool, shard.id, "english", VectorConfig::default().into()).await?,
+                Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?,
+                Index::create(&meta.pool, shard.id, "english", VECTOR_CONFIG.into()).await?,
                 Index::create(&meta.pool, shard.id, "fulltext", IndexConfig::new_text()).await?,
                 Index::create(&meta.pool, shard.id, "keyword", IndexConfig::new_paragraph()).await?,
                 Index::create(&meta.pool, shard.id, "relation", IndexConfig::new_relation()).await?,
@@ -257,7 +265,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
 
             for seq in [95, 98, 99, 100, 102i64] {
                 let segment =
@@ -324,7 +332,7 @@ mod tests {
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
 
-            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
 
             let hidden_count = 1;
             let visible_count = 2;
@@ -379,7 +387,7 @@ mod tests {
             let meta = NidxMetadata::new_with_pool(pool).await?;
             let kbid = Uuid::new_v4();
             let shard = Shard::create(&meta.pool, kbid).await?;
-            let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+            let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
 
             let segment = Segment::create(&meta.pool, index.id, 1i64.into(), 50, serde_json::Value::Null).await?;
             segment.mark_ready(&meta.pool, 1000).await?;

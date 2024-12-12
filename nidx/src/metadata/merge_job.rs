@@ -119,12 +119,20 @@ mod tests {
         NidxMetadata,
     };
 
+    const VECTOR_CONFIG: VectorConfig = VectorConfig {
+        similarity: nidx_vector::config::Similarity::Cosine,
+        normalize_vectors: false,
+        vector_type: nidx_vector::config::VectorType::DenseF32 {
+            dimension: 3,
+        },
+    };
+
     #[sqlx::test]
     async fn test_merge_job_priority(pool: sqlx::PgPool) -> anyhow::Result<()> {
         let meta = NidxMetadata::new_with_pool(pool).await?;
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await?;
-        let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
 
         let job_low = MergeJob::create(&meta, index.id, &[], 1i64.into(), 1).await?;
         let job_high = MergeJob::create(&meta, index.id, &[], 1i64.into(), 5).await?;

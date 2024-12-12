@@ -228,7 +228,13 @@ async fn suggest_shard(pool: PgPool) -> anyhow::Result<(NidxFixture, ShardDetail
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(3),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?;
