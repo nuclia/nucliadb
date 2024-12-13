@@ -100,14 +100,14 @@ async def import_kb_from_blob_storage(context: ApplicationContext, msg: NatsTask
     kbid, import_id = msg.kbid, msg.id
     dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
     metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
-    stream = dm.download_import(kbid, import_id)
 
     retry_handler = TaskRetryHandler("import", dm, metadata)
 
     @retry_handler.wrap
-    async def import_kb_retried(context, kbid, stream, metadata):
+    async def import_kb_retried(context, kbid, metadata):
+        stream = dm.download_import(kbid, import_id)
         await import_kb(context, kbid, stream, metadata)
 
-    await import_kb_retried(context, kbid, stream, metadata)
+    await import_kb_retried(context, kbid, metadata)
 
     await dm.try_delete_from_storage("import", kbid, import_id)
