@@ -37,6 +37,11 @@
         "ordinal": 6,
         "name": "running_at",
         "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 7,
+        "name": "priority",
+        "type_info": "Int4"
       }
     ],
     "parameters": {
@@ -49,7 +54,8 @@
       false,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
   "hash": "4d7a76fa413c9ef0ce2a47ac7bb7e01d3e6a2aabded9487d21010a53efee8852"

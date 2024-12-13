@@ -22,13 +22,16 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as base64;
 use base64::Engine;
 use config::{Config, Environment};
 use object_store::aws::AmazonS3Builder;
+use object_store::limit::LimitStore;
 use object_store::local::LocalFileSystem;
 use object_store::memory::InMemory;
+use object_store::ClientOptions;
 use object_store::{gcp::GoogleCloudStorageBuilder, DynObjectStore};
 use serde::{Deserialize, Deserializer};
 
@@ -36,7 +39,7 @@ use crate::NidxMetadata;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "object_store", rename_all = "lowercase")]
-pub enum ObjectStoreConfig {
+pub enum ObjectStoreKind {
     Memory,
     File {
         file_path: String,
@@ -55,10 +58,26 @@ pub enum ObjectStoreConfig {
     },
 }
 
+fn deserialize_u64<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+    Ok(Some(String::deserialize(deserializer)?.parse().expect("Expected a number")))
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct ObjectStoreConfig {
+    #[serde(flatten)]
+    kind: ObjectStoreKind,
+
+    #[serde(default, deserialize_with = "deserialize_u64")]
+    max_requests: Option<u64>,
+
+    #[serde(default, deserialize_with = "deserialize_u64")]
+    timeout: Option<u64>,
+}
+
 impl ObjectStoreConfig {
     pub fn client(&self) -> Arc<DynObjectStore> {
-        match self {
-            Self::Gcs {
+        let store: Box<DynObjectStore> = match &self.kind {
+            ObjectStoreKind::Gcs {
                 bucket,
                 base64_creds,
                 endpoint,
@@ -77,9 +96,12 @@ impl ObjectStoreConfig {
                     }
                     _ => {}
                 };
-                Arc::new(builder.build().unwrap())
+                if let Some(t) = self.timeout {
+                    builder = builder.with_client_options(ClientOptions::new().with_timeout(Duration::from_secs(t)));
+                }
+                Box::new(builder.build().unwrap())
             }
-            Self::S3 {
+            ObjectStoreKind::S3 {
                 bucket,
                 client_id,
                 client_secret,
@@ -98,12 +120,21 @@ impl ObjectStoreConfig {
                     // This is needed for minio compatibility
                     builder = builder.with_endpoint(endpoint.clone().unwrap()).with_allow_http(true);
                 }
-                Arc::new(builder.build().unwrap())
+                if let Some(t) = self.timeout {
+                    builder = builder.with_client_options(ClientOptions::new().with_timeout(Duration::from_secs(t)));
+                }
+                Box::new(builder.build().unwrap())
             }
-            Self::File {
+            ObjectStoreKind::File {
                 file_path,
-            } => Arc::new(LocalFileSystem::new_with_prefix(file_path).unwrap()),
-            Self::Memory => Arc::new(InMemory::new()),
+            } => Box::new(LocalFileSystem::new_with_prefix(file_path).unwrap()),
+            ObjectStoreKind::Memory => Box::new(InMemory::new()),
+        };
+
+        if let Some(max_requests) = self.max_requests {
+            Arc::new(LimitStore::new(store, max_requests as usize))
+        } else {
+            Arc::new(store)
         }
     }
 }
@@ -135,15 +166,69 @@ pub struct StorageSettings {
 #[derive(Clone, Deserialize, Debug)]
 #[serde(default)]
 pub struct MergeSettings {
-    pub min_number_of_segments: u64,
-    pub max_segment_size: usize,
+    pub max_deletions: usize,
+    pub log_merge: LogMergeSettings,
+    pub vector_merge: VectorMergeSettings,
 }
 
 impl Default for MergeSettings {
     fn default() -> Self {
         Self {
+            max_deletions: 500,
+            log_merge: Default::default(),
+            vector_merge: Default::default(),
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct LogMergeSettings {
+    /// Minimum number of segments needed to perform a merge for an index
+    pub min_number_of_segments: usize,
+
+    /// Max number of records for a segment to be in the top bucket, i.e.,
+    /// elegible for merge. Once a segment becomes bigger, it won't be merged
+    /// anymore
+    pub top_bucket_max_records: usize,
+
+    /// Max number of records for a segment to be considered in the bottom
+    /// bucket. Segments with fewer records won't be further splitted in buckets
+    pub bottom_bucket_threshold: usize,
+
+    /// Log value between buckets. Increasing this number implies more segment
+    /// sizes to be grouped in the same merge job.
+    pub bucket_size_log: f64,
+}
+
+impl Default for LogMergeSettings {
+    fn default() -> Self {
+        Self {
             min_number_of_segments: 4,
-            max_segment_size: 100_000,
+            top_bucket_max_records: 10_000_000,
+            bottom_bucket_threshold: 10_000,
+            bucket_size_log: 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct VectorMergeSettings {
+    /// Maximum records in resulting merged segment
+    pub max_segment_size: usize,
+
+    /// Minimum number of segments to consider merging
+    pub min_number_of_segments: usize,
+
+    /// Size (in records) below which segments are considered small
+    pub small_segment_threshold: usize,
+}
+
+impl Default for VectorMergeSettings {
+    fn default() -> Self {
+        Self {
+            min_number_of_segments: 4,
+            max_segment_size: 200_000,
+            small_segment_threshold: 20_000,
         }
     }
 }
@@ -169,6 +254,19 @@ pub struct TelemetrySettings {
     pub sentry: Option<SentryConfig>,
 }
 
+#[derive(Clone, Deserialize, Debug)]
+pub struct SearcherSettings {
+    pub parallel_index_syncs: usize,
+}
+
+impl Default for SearcherSettings {
+    fn default() -> Self {
+        Self {
+            parallel_index_syncs: 2,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct EnvSettings {
     /// Connection to the metadata database
@@ -182,6 +280,9 @@ pub struct EnvSettings {
     /// Storage configuration for our segments
     /// Required by indexer, worker, searcher
     pub storage: Option<StorageSettings>,
+
+    /// Searcher-specific configuration
+    pub searcher: Option<SearcherSettings>,
 
     /// Merge scheduling algorithm configuration
     /// Required by scheduler
@@ -259,12 +360,12 @@ mod tests {
             ("INDEXER__OBJECT_STORE", "file"),
             ("INDEXER__FILE_PATH", "/tmp"),
             ("INDEXER__NATS_SERVER", "localhost"),
-            ("MERGE__MIN_NUMBER_OF_SEGMENTS", "1234"),
+            ("MERGE__MAX_DELETIONS", "1234"),
         ];
         let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
         assert_eq!(&settings.metadata.unwrap().database_url, "postgresql://localhost");
         assert_eq!(&settings.indexer.unwrap().nats_server, "localhost");
-        assert_eq!(settings.merge.min_number_of_segments, 1234);
-        assert_eq!(settings.merge.max_segment_size, MergeSettings::default().max_segment_size);
+        assert_eq!(settings.merge.max_deletions, 1234);
+        assert_eq!(settings.merge.log_merge.min_number_of_segments, LogMergeSettings::default().min_number_of_segments);
     }
 }

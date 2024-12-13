@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -1040,3 +1041,44 @@ async def test_file_computed_titles_are_set_on_resource_title(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
     assert resp.status_code == 200
     assert resp.json()["title"] == extracted_title
+
+
+async def test_jsonl_text_field(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "texts": {
+                "jsonl": {
+                    "body": "\n".join(
+                        [
+                            json.dumps({"text": "foo"}),
+                            json.dumps({"text": "bar"}),
+                        ]
+                    ),
+                    "format": "JSONL",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"kb/{knowledgebox}/resource/{rid}?show=values&show=basic",
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    text_field_data = data["data"]["texts"]["jsonl"]["value"]
+    assert text_field_data["format"] == "JSONL"
+    assert text_field_data["body"] == "\n".join(
+        [
+            json.dumps({"text": "foo"}),
+            json.dumps({"text": "bar"}),
+        ]
+    )
+    assert data["icon"] == "application/x-ndjson"

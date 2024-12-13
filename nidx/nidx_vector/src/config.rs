@@ -22,7 +22,6 @@ use std::mem::size_of;
 use nidx_protos::VectorIndexConfig;
 use nidx_protos::{VectorSimilarity, VectorType as ProtoVectorType};
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 
 use crate::vector_types::*;
 use crate::VectorErr;
@@ -43,11 +42,9 @@ impl From<VectorSimilarity> for Similarity {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum VectorType {
-    #[default]
-    DenseF32Unaligned,
     DenseF32 {
         dimension: usize,
     },
@@ -56,7 +53,6 @@ pub enum VectorType {
 impl VectorType {
     pub fn encode(&self, vector: &[f32]) -> Vec<u8> {
         match self {
-            VectorType::DenseF32Unaligned => dense_f32_unaligned::encode_vector(vector),
             #[rustfmt::skip]
             VectorType::DenseF32 { .. } => dense_f32::encode_vector(vector),
         }
@@ -64,7 +60,6 @@ impl VectorType {
 
     pub fn vector_alignment(&self) -> usize {
         match self {
-            VectorType::DenseF32Unaligned => 1,
             #[rustfmt::skip]
             VectorType::DenseF32 { .. } => size_of::<f32>(),
         }
@@ -72,43 +67,33 @@ impl VectorType {
 
     pub fn dimension(&self) -> Option<usize> {
         match self {
-            VectorType::DenseF32Unaligned => None,
             #[rustfmt::skip]
             VectorType::DenseF32 { dimension } => Some(*dimension),
         }
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VectorConfig {
     #[serde(default)]
     pub similarity: Similarity,
     #[serde(default)]
     pub normalize_vectors: bool,
-    #[serde(default)]
     pub vector_type: VectorType,
 }
 
 impl VectorConfig {
-    /// Whether the dimensions of this vector are known ahead of time
-    pub fn known_dimensions(&self) -> bool {
-        !matches!(self.vector_type, VectorType::DenseF32Unaligned)
-    }
-
     /// The length of bytes of each vector
-    pub fn vector_len_bytes(&self) -> Option<usize> {
+    pub fn vector_len_bytes(&self) -> usize {
         match self.vector_type {
-            VectorType::DenseF32Unaligned => None,
             VectorType::DenseF32 {
                 dimension,
-            } => Some(dimension * size_of::<f32>()),
+            } => dimension * size_of::<f32>(),
         }
     }
 
     pub fn similarity_function(&self) -> fn(&[u8], &[u8]) -> f32 {
         match (&self.similarity, &self.vector_type) {
-            (Similarity::Dot, VectorType::DenseF32Unaligned) => dense_f32_unaligned::dot_similarity,
-            (Similarity::Cosine, VectorType::DenseF32Unaligned) => dense_f32_unaligned::cosine_similarity,
             #[rustfmt::skip]
             (Similarity::Dot, VectorType::DenseF32 { .. }) => dense_f32::dot_similarity,
             #[rustfmt::skip]
@@ -123,13 +108,14 @@ impl TryFrom<VectorIndexConfig> for VectorConfig {
     fn try_from(proto: VectorIndexConfig) -> Result<Self, Self::Error> {
         let vector_type = match (proto.vector_type(), proto.vector_dimension) {
             (ProtoVectorType::DenseF32, Some(0)) => {
-                warn!("Trying to create a shard with dimension = 0. Falling back to unaligned vectors");
-                VectorType::DenseF32Unaligned
+                return Err(VectorErr::InvalidConfiguration("Vector dimension cannot be 0"));
+            }
+            (ProtoVectorType::DenseF32, None) => {
+                return Err(VectorErr::InvalidConfiguration("Vector dimension required"));
             }
             (ProtoVectorType::DenseF32, Some(dim)) => VectorType::DenseF32 {
                 dimension: dim as usize,
             },
-            (ProtoVectorType::DenseF32, None) => VectorType::DenseF32Unaligned,
         };
         Ok(VectorConfig {
             similarity: proto.similarity().into(),

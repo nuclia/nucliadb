@@ -107,7 +107,6 @@ pub struct Reader {
     config: VectorConfig,
     open_data_points: Vec<(OpenDataPoint, Seq)>,
     delete_log: DTrie,
-    dimension: Option<usize>,
 }
 
 fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
@@ -181,7 +180,6 @@ impl Reader {
         config: VectorConfig,
         delete_log: DTrie,
     ) -> VectorR<Reader> {
-        let mut dimension = None;
         let mut open_data_points = Vec::new();
 
         for (metadata, seq) in segments {
@@ -190,15 +188,10 @@ impl Reader {
             open_data_points.push((open_data_point, seq));
         }
 
-        if let Some(open_data_point) = open_data_points.first() {
-            dimension = open_data_point.0.stored_len();
-        }
-
         Ok(Reader {
             config,
             open_data_points,
             delete_log,
-            dimension,
         })
     }
 
@@ -216,20 +209,15 @@ impl Reader {
         };
 
         // Validate vector dimensions
-        let valid_dims = match self.config.vector_type {
-            crate::config::VectorType::DenseF32Unaligned => {
-                let Some(dimension) = self.dimension else {
-                    return Ok(Vec::with_capacity(0));
-                };
-                dimension == query.len()
-            }
-            crate::config::VectorType::DenseF32 {
-                dimension,
-            } => dimension == query.len(),
-        };
-        if !valid_dims {
-            println!("Inconsistent dimension, stored {:?}, query {}", self.config, query.len());
-            return Err(VectorErr::InconsistentDimensions);
+        let crate::config::VectorType::DenseF32 {
+            dimension,
+        } = self.config.vector_type;
+
+        if dimension != query.len() {
+            return Err(VectorErr::InconsistentDimensions {
+                index_config: dimension,
+                vector: query.len(),
+            });
         }
 
         let filter = request.get_filter();

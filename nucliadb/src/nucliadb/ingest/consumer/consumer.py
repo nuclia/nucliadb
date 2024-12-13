@@ -304,7 +304,9 @@ class IngestProcessedConsumer(IngestConsumer):
                 durable_name=durable_name,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 deliver_policy=nats.js.api.DeliverPolicy.ALL,
-                max_ack_pending=1,
+                # We set it to 20 because we don't care about order here and we want to be able to HPA based
+                # on the number of pending messages in the queue.
+                max_ack_pending=20,
                 max_deliver=nats_consumer_settings.nats_max_deliver,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
             ),

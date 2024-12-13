@@ -19,4 +19,3 @@
 //
 
 pub mod dense_f32;
-pub mod dense_f32_unaligned;

@@ -95,6 +95,12 @@ pub async fn download_segment(
     segment_id: SegmentId,
     output_dir: PathBuf,
 ) -> anyhow::Result<()> {
+    // Create a temp directory to download this segment
+    let temp_dir = PathBuf::from(&format!("{}.tmp", output_dir.to_str().unwrap()));
+    if tokio::fs::try_exists(&temp_dir).await? {
+        tokio::fs::remove_dir_all(&temp_dir).await?;
+    }
+
     let response = storage.get(&segment_id.storage_key()).await?.into_stream();
     let reader = response.map_err(std::io::Error::from).into_async_read().compat();
 
@@ -102,8 +108,16 @@ pub async fn download_segment(
     let bufreader = tokio::io::BufReader::with_capacity(BUF_SIZE, reader);
     let reader = std::io::BufReader::with_capacity(BUF_SIZE, SyncIoBridge::new(bufreader));
 
+    let temp_dir2 = temp_dir.clone();
     let mut tar = tar::Archive::new(reader);
-    tokio::task::spawn_blocking(move || tar.unpack(output_dir)).await??;
+    let result = tokio::task::spawn_blocking(move || tar.unpack(temp_dir2)).await?;
+
+    if let Err(e) = result {
+        let _ = tokio::fs::remove_dir_all(temp_dir).await;
+        return Err(e.into());
+    } else {
+        tokio::fs::rename(temp_dir, output_dir).await?;
+    }
 
     Ok(())
 }

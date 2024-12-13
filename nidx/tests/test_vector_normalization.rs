@@ -51,7 +51,13 @@ async fn test_vector_normalization_shard(pool: PgPool) -> Result<(), Box<dyn std
                 normalize_vectors: true,
                 ..Default::default()
             }),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(VECTOR_DIMENSION as u32),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?

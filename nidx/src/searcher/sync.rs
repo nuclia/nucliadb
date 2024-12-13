@@ -20,7 +20,9 @@
 
 use crate::metadata::{Index, IndexId, IndexKind, SegmentId};
 use crate::metrics;
+use crate::settings::SearcherSettings;
 use crate::{segment_store::download_segment, NidxMetadata};
+use anyhow::anyhow;
 use nidx_types::Seq;
 use object_store::DynObjectStore;
 use sqlx::postgres::types::PgInterval;
@@ -31,8 +33,9 @@ use std::{
     path::PathBuf,
 };
 use std::{sync::Arc, time::Duration};
-use tokio::sync::watch;
 use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
+use tokio::sync::{watch, Semaphore};
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
 use uuid::Uuid;
@@ -51,6 +54,7 @@ pub async fn run_sync(
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
     index_metadata: Arc<SyncMetadata>,
+    settings: SearcherSettings,
     shutdown: CancellationToken,
     notifier: Sender<IndexId>,
     sync_status: Option<watch::Sender<SyncStatus>>,
@@ -111,18 +115,41 @@ pub async fn run_sync(
                 vec![]
             };
 
+            let sync_semaphore = Arc::new(Semaphore::new(settings.parallel_index_syncs));
+            let mut tasks = JoinSet::new();
             for index in indexes.into_iter().chain(retry_indexes.into_iter()) {
                 let index_id = index.id;
                 let meta2 = meta.clone();
                 let index_metadata2 = Arc::clone(&index_metadata);
                 let notifier2 = notifier.clone();
                 let storage2 = Arc::clone(&storage);
-                if let Err(e) = sync_index(&meta2, storage2, index_metadata2, index, &notifier2).await {
+                let sync_semaphore = Arc::clone(&sync_semaphore);
+
+                tasks.spawn(async move {
+                    let Ok(_permit) = sync_semaphore.acquire().await else {
+                        // Semaphore was closed, just exit
+                        return (index_id, Err(anyhow!("Cancelled")));
+                    };
+                    info!(?index_id, "Syncing index");
+                    (index_id, sync_index(&meta2, storage2, index_metadata2, index, &notifier2).await)
+                });
+            }
+
+            while let Some(result) = tasks.join_next().await {
+                if shutdown.is_cancelled() {
+                    sync_semaphore.close();
+                }
+                let (index_id, result) = result.expect("Join error");
+                if let Err(e) = result {
+                    // If shutted down, we are just joining the tasks before exiting
+                    if shutdown.is_cancelled() {
+                        continue;
+                    }
                     let retries = failed_indexes.entry(index_id).or_default();
                     if *retries > 2 {
                         error!(?index_id, ?e, "Index failed to update multiple times, will keep retrying forever")
                     } else {
-                        warn!(?index_id, "Index failed to update, will retry")
+                        warn!(?index_id, ?e, "Index failed to update, will retry")
                     }
                     *retries += 1;
                 } else {
@@ -176,24 +203,41 @@ async fn sync_index(
     let diff = sync_metadata.diff(&index.id, &operations).await;
 
     // Download new segments
+    let mut tasks = JoinSet::new();
     for segment_id in diff.added_segments {
         let storage2 = Arc::clone(&storage);
         let location = sync_metadata.segment_location(&index.id, &segment_id);
 
-        // Download segment has some built-in retries (in object_store crate)
-        // but failing here is expensive, so we do some extra retries
-        let mut retries = 0;
-        loop {
-            let result = download_segment(storage2.clone(), segment_id, location.clone()).await;
-            if let Err(e) = result {
-                if retries > 3 {
-                    return Err(e);
-                }
-                retries += 1;
-            } else {
-                break;
-            }
+        // Segment already downloaded (from a previous try)
+        if let Ok(true) = tokio::fs::try_exists(&location).await {
+            continue;
         }
+
+        tasks.spawn(async move {
+            // Download segment has some built-in retries (in object_store crate)
+            // but failing here is expensive, so we do some extra retries
+            let mut retries = 0;
+            loop {
+                let result = download_segment(storage2.clone(), segment_id, location.clone()).await;
+                if let Err(e) = result {
+                    let _ = tokio::fs::remove_dir_all(&location).await;
+                    if retries > 3 {
+                        return Err(e);
+                    } else {
+                        warn!(?e, ?segment_id, "Failure to download a segment, will retry");
+                    }
+                    retries += 1;
+                } else {
+                    break;
+                }
+            }
+            Ok(())
+        });
+    }
+
+    let results = tasks.join_all().await;
+    if let Some(failure) = results.into_iter().find_map(Result::err) {
+        return Err(failure);
     }
 
     // Switch meta
@@ -458,15 +502,19 @@ mod tests {
         NidxMetadata,
     };
 
+    const VECTOR_CONFIG: VectorConfig = VectorConfig {
+        similarity: nidx_vector::config::Similarity::Cosine,
+        normalize_vectors: false,
+        vector_type: nidx_vector::config::VectorType::DenseF32 {
+            dimension: 3,
+        },
+    };
+
     #[sqlx::test]
     async fn test_load_index_metadata(pool: sqlx::PgPool) -> anyhow::Result<()> {
-        let index = Index::create(
-            &pool,
-            Shard::create(&pool, uuid::Uuid::new_v4()).await?.id,
-            "english",
-            VectorConfig::default().into(),
-        )
-        .await?;
+        let index =
+            Index::create(&pool, Shard::create(&pool, uuid::Uuid::new_v4()).await?.id, "english", VECTOR_CONFIG.into())
+                .await?;
 
         // Seq 1: A segment was created and unmerged
         let s1 = Segment::create(&pool, index.id, 1i64.into(), 4, serde_json::Value::Null).await?;
@@ -534,7 +582,7 @@ mod tests {
             &meta.pool,
             Shard::create(&meta.pool, uuid::Uuid::new_v4()).await?.id,
             "english",
-            VectorConfig::default().into(),
+            VECTOR_CONFIG.into(),
         )
         .await?;
         // Assumes we get index_id=1

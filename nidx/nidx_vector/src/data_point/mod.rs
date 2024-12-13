@@ -30,7 +30,6 @@ mod tests;
 use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
-use crate::vector_types::dense_f32_unaligned;
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
@@ -42,6 +41,7 @@ use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use std::collections::HashSet;
 use std::path::Path;
+use std::time::Instant;
 use std::{fs, io};
 
 pub use ops_hnsw::DataRetriever;
@@ -127,9 +127,10 @@ where
 
     // Creating the hnsw for the new node store.
     let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
-    let mut ops = HnswOps::new(&tracker);
+    let mut ops = HnswOps::new(&tracker, false);
+    let t = Instant::now();
     for id in start_node_index..no_nodes {
-        ops.insert(Address(id), &mut index)
+        ops.insert(Address(id), &mut index);
     }
 
     {
@@ -165,8 +166,11 @@ where
 pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSet<String>) -> VectorR<OpenDataPoint> {
     // Check dimensions
     if let Some(dim) = config.vector_type.dimension() {
-        if elems.iter().any(|elem| elem.vector.len() != dim) {
-            return Err(crate::VectorErr::InconsistentDimensions);
+        if let Some(elem) = elems.iter().find(|elem| elem.vector.len() != dim) {
+            return Err(crate::VectorErr::InconsistentDimensions {
+                index_config: dim,
+                vector: elem.vector.len(),
+            });
         }
     }
 
@@ -191,7 +195,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
     let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
-    let mut ops = HnswOps::new(&tracker);
+    let mut ops = HnswOps::new(&tracker, false);
     for id in 0..no_nodes {
         ops.insert(Address(id), &mut index)
     }
@@ -265,7 +269,7 @@ pub struct Retriever<'a, Dlog> {
     nodes: &'a Mmap,
     delete_log: &'a Dlog,
     min_score: f32,
-    vector_len_bytes: Option<usize>,
+    vector_len_bytes: usize,
 }
 impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
     pub fn new(
@@ -276,14 +280,7 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
         min_score: f32,
     ) -> Retriever<'a, Dlog> {
         let no_nodes = data_store::stored_elements(nodes);
-        let vector_len_bytes = if config.known_dimensions() {
-            config.vector_len_bytes()
-        } else if data_store::stored_elements(nodes) > 0 {
-            let node = data_store::get_value(Node, nodes, 0);
-            Some(dense_f32_unaligned::vector_len(Node::vector(node)) as usize)
-        } else {
-            None
-        };
+        let vector_len_bytes = config.vector_len_bytes();
         Retriever {
             temp,
             nodes,
@@ -314,9 +311,7 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
     }
 
     fn will_need(&self, Address(x): Address) {
-        if let Some(len) = self.vector_len_bytes {
-            data_store::will_need(self.nodes, x, len);
-        }
+        data_store::will_need(self.nodes, x, self.vector_len_bytes);
     }
 
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
@@ -491,14 +486,6 @@ impl OpenDataPoint {
         &self.metadata.index_metadata.tags
     }
 
-    pub fn stored_len(&self) -> Option<usize> {
-        if data_store::stored_elements(&self.nodes) == 0 {
-            return None;
-        }
-        let node = data_store::get_value(Node, &self.nodes, 0);
-        Some(dense_f32_unaligned::vector_len(Node::vector(node)) as usize)
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn search<Dlog: DeleteLog>(
         &self,
@@ -513,7 +500,7 @@ impl OpenDataPoint {
         let encoded_query = config.vector_type.encode(query);
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
         let filter = FormulaFilter::new(filter);
-        let ops = HnswOps::new(&tracker);
+        let ops = HnswOps::new(&tracker, true);
         let neighbours =
             ops.search(Address(self.metadata.records), self.index.as_ref(), results, filter, with_duplicates);
 
@@ -532,7 +519,7 @@ mod test {
     use crate::{
         config::{Similarity, VectorConfig},
         data_types::data_store,
-        vector_types::dense_f32_unaligned::{dot_similarity, encode_vector},
+        vector_types::dense_f32::{dot_similarity, encode_vector},
     };
 
     use super::{create, merge, node::Node, Elem, LabelDictionary, NoDLog};

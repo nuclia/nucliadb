@@ -103,6 +103,8 @@ PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.MARKDOWN: "text/markdown",
     FieldText.Format.JSON: "application/json",
     FieldText.Format.KEEP_MARKDOWN: "text/markdown",
+    FieldText.Format.JSONL: "application/x-ndjson",
+    FieldText.Format.PLAIN_BLANKLINE_SPLIT: "text/plain+blankline",
 }
 
 BASIC_IMMUTABLE_FIELDS = ("icon",)

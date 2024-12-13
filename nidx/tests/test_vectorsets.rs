@@ -71,9 +71,27 @@ async fn test_new_shard_with_multiple_vectorset(pool: PgPool) -> anyhow::Result<
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
             vectorsets_configs: HashMap::from([
-                ("english".to_string(), VectorIndexConfig::default()),
-                ("multilingual".to_string(), VectorIndexConfig::default()),
-                ("spanish".to_string(), VectorIndexConfig::default()),
+                (
+                    "english".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "multilingual".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "spanish".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                ),
             ]),
             ..Default::default()
         }))
@@ -104,7 +122,13 @@ async fn test_add_vectorset_to_shard(pool: PgPool) -> anyhow::Result<()> {
         .api_client
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
-            vectorsets_configs: HashMap::from([("english".to_string(), VectorIndexConfig::default())]),
+            vectorsets_configs: HashMap::from([(
+                "english".to_string(),
+                VectorIndexConfig {
+                    vector_dimension: Some(3),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }))
         .await?;
@@ -122,6 +146,7 @@ async fn test_add_vectorset_to_shard(pool: PgPool) -> anyhow::Result<()> {
             config: Some(VectorIndexConfig {
                 similarity: VectorSimilarity::Dot.into(),
                 normalize_vectors: true,
+                vector_dimension: Some(3),
                 ..Default::default()
             }),
             ..Default::default()
@@ -162,9 +187,27 @@ async fn test_remove_vectorset(pool: PgPool) -> anyhow::Result<()> {
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
             vectorsets_configs: HashMap::from([
-                ("english".to_string(), VectorIndexConfig::default()),
-                ("multilingual".to_string(), VectorIndexConfig::default()),
-                ("spanish".to_string(), VectorIndexConfig::default()),
+                (
+                    "english".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "multilingual".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "spanish".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                ),
             ]),
             ..Default::default()
         }))
@@ -204,8 +247,20 @@ async fn test_cant_remove_all_vectorsets(pool: PgPool) -> anyhow::Result<()> {
         .new_shard(Request::new(NewShardRequest {
             kbid: "aabbccdd-eeff-1122-3344-556677889900".to_string(),
             vectorsets_configs: HashMap::from([
-                ("english".to_string(), VectorIndexConfig::default()),
-                ("multilingual".to_string(), VectorIndexConfig::default()),
+                (
+                    "english".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "multilingual".to_string(),
+                    VectorIndexConfig {
+                        vector_dimension: Some(3),
+                        ..Default::default()
+                    },
+                ),
             ]),
             ..Default::default()
         }))

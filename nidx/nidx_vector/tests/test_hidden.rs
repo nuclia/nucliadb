@@ -29,7 +29,13 @@ use tempfile::tempdir;
 
 #[test]
 fn test_hidden_search() -> anyhow::Result<()> {
-    let config = VectorConfig::default();
+    let config = VectorConfig {
+        normalize_vectors: false,
+        similarity: nidx_vector::config::Similarity::Dot,
+        vector_type: nidx_vector::config::VectorType::DenseF32 {
+            dimension: 4,
+        },
+    };
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];

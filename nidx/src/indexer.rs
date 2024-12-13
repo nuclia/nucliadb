@@ -231,7 +231,9 @@ pub async fn index_resource(
     for (segment, size, deletions) in results?.into_iter().flatten() {
         // Mark the segments as visible and write the deletions at the same time
         segment.mark_ready(&mut *tx, size as i64).await?;
-        Deletion::create(&mut *tx, segment.index_id, seq, &deletions).await?;
+        if !deletions.is_empty() {
+            Deletion::create(&mut *tx, segment.index_id, seq, &deletions).await?;
+        }
         Index::updated(&mut *tx, &segment.index_id).await?;
     }
     tx.commit().await?;
@@ -273,7 +275,7 @@ fn index_resource_to_index(
 mod tests {
     use std::io::{Seek, Write};
 
-    use nidx_vector::config::VectorConfig;
+    use nidx_vector::config::{Similarity, VectorConfig, VectorType};
     use tempfile::tempfile;
     use uuid::Uuid;
 
@@ -281,12 +283,20 @@ mod tests {
     use crate::metadata::NidxMetadata;
     use nidx_tests::*;
 
+    const VECTOR_CONFIG: VectorConfig = VectorConfig {
+        similarity: Similarity::Cosine,
+        normalize_vectors: false,
+        vector_type: VectorType::DenseF32 {
+            dimension: 3,
+        },
+    };
+
     #[sqlx::test]
     async fn test_index_resource(pool: sqlx::PgPool) {
         let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
         let kbid = Uuid::new_v4();
         let shard = Shard::create(&meta.pool, kbid).await.unwrap();
-        let index = Index::create(&meta.pool, shard.id, "multilingual", VectorConfig::default().into()).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await.unwrap();
 
         let storage = Arc::new(object_store::memory::InMemory::new());
         index_resource(
@@ -312,5 +322,51 @@ mod tests {
         out.write_all(&download.bytes().await.unwrap()).unwrap();
         let downloaded_size = out.stream_position().unwrap() as i64;
         assert_eq!(downloaded_size, segment.size_bytes.unwrap());
+    }
+
+    #[sqlx::test]
+    async fn test_index_deletions(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await?;
+        let storage = Arc::new(object_store::memory::InMemory::new());
+
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta.pool, kbid).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
+
+        // Resource with no deletions, no `Deletion` is created
+        let mut resource = little_prince(shard.id.to_string(), None);
+        index_resource(
+            &meta,
+            storage.clone(),
+            &tempfile::env::temp_dir(),
+            &shard.id.to_string(),
+            resource.clone(),
+            1i64.into(),
+        )
+        .await?;
+
+        assert!(Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?.is_empty());
+
+        // Resource with some deletions, a single `Deletion` with multiple keys is created
+        let keys = vec![
+            format!("{}/a/title/0-15", resource.resource.as_ref().unwrap().uuid),
+            format!("{}/a/summary/0-150", resource.resource.as_ref().unwrap().uuid),
+        ];
+        resource.sentences_to_delete.append(&mut keys.clone());
+        index_resource(
+            &meta,
+            storage.clone(),
+            &tempfile::env::temp_dir(),
+            &shard.id.to_string(),
+            resource,
+            2i64.into(),
+        )
+        .await?;
+
+        let deletions = Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?;
+        assert_eq!(deletions.len(), 1);
+        assert_eq!(deletions[0].keys, keys);
+
+        Ok(())
     }
 }
