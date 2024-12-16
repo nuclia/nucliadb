@@ -53,6 +53,12 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 from tests.utils.dirty_index import wait_for_sync
+from tests.writer.test_fields import (
+    TEST_CONVERSATION_PAYLOAD,
+    TEST_FILE_PAYLOAD,
+    TEST_LINK_PAYLOAD,
+    TEST_TEXT_PAYLOAD,
+)
 
 
 async def test_kb_creation_allows_setting_learning_configuration(
@@ -240,7 +246,21 @@ async def test_serialize_errors(
     - Create a bm with errors for every type of field
     - Get the resource and check that error serialization works
     """
-    br = broker_resource(knowledgebox)
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My resource",
+            "texts": {"text": TEST_TEXT_PAYLOAD},
+            "links": {"link": TEST_LINK_PAYLOAD},
+            "files": {"file": TEST_FILE_PAYLOAD},
+            "conversations": {"conversation": TEST_CONVERSATION_PAYLOAD},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    br = broker_resource(knowledgebox, rid=rid)
 
     # Add an error for every field type
     fields_to_test = [
