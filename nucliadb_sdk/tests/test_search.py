@@ -255,7 +255,7 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
         kbid=kb.uuid,
         features=[SearchOptions.FULLTEXT],
         faceted=["/classification.labels"],
-        page_size=0,
+        top_k=0,
     )
     assert results.fulltext.facets == {
         "/classification.labels": {"/classification.labels/emoji": 50 * 2}
@@ -269,7 +269,7 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
         kbid=kb.uuid,
         features=[SearchOptions.FULLTEXT],
         faceted=["/classification.labels/emoji"],
-        page_size=0,
+        top_k=0,
     )
     assert (
         resources.fulltext.facets["/classification.labels/emoji"]["/classification.labels/emoji/0"]
