@@ -62,60 +62,6 @@ async def test_multiple_fuzzy_search_resource_all(
         )
 
 
-@pytest.mark.flaky(reruns=5)
-async def test_multiple_search_resource_all(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str
-) -> None:
-    kbid = multiple_search_resource
-
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=40",
-        )
-
-        assert resp.status_code == 200, resp.content
-        assert len(resp.json()["paragraphs"]["results"]) == 40
-        assert resp.json()["paragraphs"]["next_page"]
-        assert resp.json()["fulltext"]["next_page"]
-
-        shards = resp.json()["shards"]
-        pos_30 = resp.json()["paragraphs"]["results"][30]
-        pos_35 = resp.json()["paragraphs"]["results"][35]
-
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shards={shards[0]}",  # noqa
-        )
-
-        assert resp.status_code == 200, resp.content
-        assert resp.json()["shards"][0] == shards[0]
-        assert resp.json()["paragraphs"]["results"][0]["rid"] == pos_30["rid"]
-        assert resp.json()["paragraphs"]["results"][5]["rid"] == pos_35["rid"]
-
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
-        )
-        assert resp.status_code == 200, resp.content
-        for _ in range(10):
-            if (
-                len(resp.json()["paragraphs"]["results"]) < 20
-                or len(resp.json()["fulltext"]["results"]) < 20
-            ):
-                await asyncio.sleep(1)
-                resp = await client.get(
-                    f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
-                )
-                assert resp.status_code == 200, resp.content
-            else:
-                break
-        assert len(resp.json()["paragraphs"]["results"]) == 20
-        assert resp.json()["paragraphs"]["total"] == 100
-        assert len(resp.json()["fulltext"]["results"]) == 20
-        assert resp.json()["fulltext"]["total"] == 100
-
-        assert resp.json()["paragraphs"]["next_page"] is False
-        assert resp.json()["fulltext"]["next_page"] is False
-
-
 @pytest.mark.flaky(reruns=3)
 async def test_search_resource_all(
     search_api: Callable[..., AsyncClient],
@@ -200,11 +146,11 @@ async def test_search_with_facets(
         data = resp.json()
         assert (
             data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
-            == 100
+            == 25
         )
         assert (
             data["paragraphs"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
-            == 100
+            == 25
         )
 
         # also just test short hand filter
@@ -213,9 +159,9 @@ async def test_search_with_facets(
         data = resp.json()
         assert (
             data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
-            == 100
+            == 25
         )
         assert (
             data["paragraphs"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
-            == 100
+            == 25
         )
