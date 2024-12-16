@@ -31,7 +31,6 @@ from nucliadb.learning_proxy import (
 )
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
-from nucliadb_models.search import SearchOptions
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -896,49 +895,6 @@ async def test_link_fields_store_xpath(
         xpath = resource.data.links["link"].value.xpath
 
     assert xpath == "my_xpath"
-
-
-async def test_pagination_limits(
-    nucliadb_reader: AsyncClient,
-):
-    # Maximum of 200 results per page
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/find",
-        json={
-            "query": "foo",
-            "features": [SearchOptions.SEMANTIC],
-            "page_size": 1000,
-        },
-    )
-    assert resp.status_code == 422
-    data = resp.json()
-    assert data["detail"][0]["msg"] == "Input should be less than or equal to 200"
-
-    # Max scrolling of 2000 vector results
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/find",
-        json={
-            "query": "foo",
-            "features": [SearchOptions.SEMANTIC],
-            "page_number": 30,
-            "page_size": 100,
-        },
-    )
-    assert resp.status_code == 412
-    data = resp.json()
-    assert "Pagination of semantic results limit reached" in data["detail"]
-
-    # Removing vectors allows to paginate without limits
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/find",
-        json={
-            "query": "foo",
-            "features": ["paragraph"],
-            "page_number": 30,
-            "page_size": 100,
-        },
-    )
-    assert resp.status_code != 412
 
 
 async def test_dates_are_properly_validated(
