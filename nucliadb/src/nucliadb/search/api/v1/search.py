@@ -223,8 +223,8 @@ async def catalog_get(
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
     sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
-    page_number: int = fastapi_query(SearchParamDefaults.page_number),
-    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    page_number: int = fastapi_query(SearchParamDefaults.catalog_page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.catalog_page_size),
     shards: list[str] = fastapi_query(SearchParamDefaults.shards, deprecated=True),
     with_status: Optional[ResourceProcessingStatus] = fastapi_query(
         SearchParamDefaults.with_status, deprecated="Use filters instead"
