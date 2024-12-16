@@ -51,8 +51,8 @@ pub enum ObjectStoreKind {
     },
     S3 {
         bucket: String,
-        client_id: String,
-        client_secret: String,
+        client_id: Option<String>,
+        client_secret: Option<String>,
         region_name: String,
         endpoint: Option<String>,
     },
@@ -112,7 +112,7 @@ impl ObjectStoreConfig {
                     AmazonS3Builder::new().with_region(region_name.clone()).with_bucket_name(bucket.clone());
                 // Unless client_id and client_secret are specified, the library will try to use the credentials by looking
                 // at the standard AWS_WEB_IDENTITY_TOKEN_FILE environment variable
-                if !client_id.is_empty() && !client_secret.is_empty() {
+                if let (Some(client_id), Some(client_secret)) = (client_id, client_secret) {
                     builder =
                         builder.with_access_key_id(client_id.clone()).with_secret_access_key(client_secret.clone());
                 }
