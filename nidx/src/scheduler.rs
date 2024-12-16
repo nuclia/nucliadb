@@ -38,7 +38,7 @@ use tracing::*;
 
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let indexer_settings = settings.indexer.as_ref().unwrap();
-    let storage_settings = settings.indexer.as_ref().unwrap();
+    let storage_settings = settings.storage.as_ref().unwrap();
     let merge_settings = settings.merge.clone();
     let meta = settings.metadata.clone();
 
