@@ -12,7 +12,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-
 jobs:
   e2e-k8s-cluster:
     #
@@ -35,8 +34,8 @@ jobs:
 
       - uses: balchua/microk8s-actions@v0.3.2
         with:
-          channel: '1.27/stable'
-          devMode: 'true'
+          channel: "1.27/stable"
+          devMode: "true"
           addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
 
       - name: "Set up Helm"
@@ -44,8 +43,7 @@ jobs:
 
       - name: Install PostgreSQL with Helm
         run: |
-          helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm install my-postgresql bitnami/postgresql --version 12.9.0
+          helm install my-postgresql oci://registry-1.docker.io/bitnamicharts/postgresql --version 12.9.0
 
       - name: Wait for PostgreSQL to be ready
         run: |
