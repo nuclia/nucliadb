@@ -26,7 +26,6 @@ import pytest
 from nucliadb.common import locking
 
 
-@pytest.mark.asyncio
 async def test_distributed_lock(maindb_driver):
     test_lock_key = uuid.uuid4().hex
 
@@ -52,7 +51,6 @@ async def test_distributed_lock(maindb_driver):
     await test_lock(0.0)
 
 
-@pytest.mark.asyncio
 async def test_distributed_lock_in_parallel(maindb_driver):
     """
     This tests that if multiple requests/tasks attempt to get the same lock,

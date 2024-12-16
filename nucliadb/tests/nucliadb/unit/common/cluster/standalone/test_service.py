@@ -29,8 +29,6 @@ from nucliadb_protos import nodereader_pb2, standalone_pb2
 from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.utils_pb2 import RelationNode
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture
 def cluster_settings():

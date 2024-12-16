@@ -95,7 +95,6 @@ class TestApplySynonymsToRequest:
         with patch("nucliadb.search.search.query.get_kb_synonyms", get_synonyms):
             yield qp
 
-    @pytest.mark.asyncio
     async def test_not_applies_if_empty_body(self, query_parser: QueryParser, get_synonyms):
         query_parser.query = ""
         search_request = Mock()
@@ -104,7 +103,6 @@ class TestApplySynonymsToRequest:
         get_synonyms.assert_not_awaited()
         search_request.ClearField.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_not_applies_if_synonyms_object_not_found(
         self, query_parser: QueryParser, get_synonyms
     ):
@@ -117,7 +115,6 @@ class TestApplySynonymsToRequest:
         request.ClearField.assert_not_called()
         get_synonyms.assert_awaited_once_with("kbid")
 
-    @pytest.mark.asyncio
     async def test_not_applies_if_synonyms_not_found_for_query(
         self, query_parser: QueryParser, get_synonyms
     ):
@@ -158,7 +155,6 @@ class TestVectorSetAndMatryoshkaParsing:
             ("vectorset_id", len(Q) - 20, "vectorset_id", len(Q) - 20),
         ],
     )
-    @pytest.mark.asyncio
     async def test_query_without_vectorset_nor_matryoshka(
         self,
         dummy_predict: PredictEngine,

@@ -21,8 +21,6 @@ import random
 import uuid
 from typing import Optional
 
-import pytest
-
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME
@@ -39,7 +37,6 @@ from nucliadb_utils.utilities import get_indexing, get_storage
 from tests.ingest.fixtures import make_extracted_text
 
 
-@pytest.mark.asyncio
 async def test_ingest_broker_message_with_vectorsets(
     fake_node,
     storage,

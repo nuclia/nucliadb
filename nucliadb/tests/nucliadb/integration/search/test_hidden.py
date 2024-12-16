@@ -33,7 +33,6 @@ async def create_resource(kbid, nucliadb_grpc):
     return message.uuid
 
 
-@pytest.mark.asyncio
 async def test_hidden_search(
     app_context,
     nucliadb_reader: AsyncClient,

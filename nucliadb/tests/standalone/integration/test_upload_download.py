@@ -54,7 +54,6 @@ if not NIDX_ENABLED:
     storages.append(lazy_fixture.lf("azure_storage"))
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "storage",
     storages,
@@ -212,7 +211,6 @@ async def test_file_tus_upload_and_download(
     assert resp.status_code == 416
 
 
-@pytest.mark.asyncio
 async def test_tus_upload_handles_unknown_upload_ids(
     configure_redis_dm, nucliadb_writer, nucliadb_reader, knowledgebox_one
 ):
@@ -227,7 +225,6 @@ async def test_tus_upload_handles_unknown_upload_ids(
     assert error_detail == "Resumable URI not found for upload_id: foobarid"
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "storage",
     [

@@ -49,7 +49,6 @@ class TestStorageField:
     def storage_field(self, storage, field):
         yield LocalStorageField(storage, "bucket", "fullkey", field)
 
-    @pytest.mark.asyncio
     async def test_delete(self, storage_field: StorageField, storage):
         await storage_field.delete()
         storage.delete_upload.assert_called_once_with("uri", "bucket")
@@ -103,12 +102,10 @@ class TestStorage:
     def storage(self):
         yield StorageTest()
 
-    @pytest.mark.asyncio
     async def test_delete_resource(self, storage: StorageTest):
         await storage.delete_resource("bucket", "uri")
         storage.delete_upload.assert_called_once_with("uri", "bucket")
 
-    @pytest.mark.asyncio
     async def test_indexing(self, storage: StorageTest):
         msg = BrainResource(resource=ResourceID(uuid="uuid"))
         await storage.indexing(msg, 1, "1", "kb", "shard")
@@ -117,7 +114,6 @@ class TestStorage:
             "indexing_bucket", "index/kb/shard/uuid/1", msg.SerializeToString()
         )
 
-    @pytest.mark.asyncio
     async def test_reindexing(self, storage: StorageTest):
         msg = BrainResource(resource=ResourceID(uuid="uuid"))
         await storage.reindexing(msg, "reindex_id", "1", "kb", "shard")
@@ -126,7 +122,6 @@ class TestStorage:
             "indexing_bucket", "index/kb/shard/uuid/reindex_id", msg.SerializeToString()
         )
 
-    @pytest.mark.asyncio
     async def test_get_indexing(self, storage: StorageTest):
         im = IndexMessage()
         im.node = "node"
@@ -134,7 +129,6 @@ class TestStorage:
         im.txid = 0
         assert isinstance(await storage.get_indexing(im), BrainResource)
 
-    @pytest.mark.asyncio
     async def test_get_indexing_storage_key(self, storage: StorageTest):
         im = IndexMessage()
         im.node = "node"
@@ -143,7 +137,6 @@ class TestStorage:
         im.storage_key = "index/kb/uuid/1"
         assert isinstance(await storage.get_indexing(im), BrainResource)
 
-    @pytest.mark.asyncio
     async def test_delete_indexing(self, storage: StorageTest):
         im = IndexMessage()
         im.node = "node"
@@ -155,14 +148,12 @@ class TestStorage:
 
         storage.upload_object.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_download_pb(self, storage: StorageTest):
         assert isinstance(
             await storage.download_pb(LocalStorageField(storage, "bucket", "fullkey"), BrainResource),
             BrainResource,
         )
 
-    @pytest.mark.asyncio
     async def test_indexing_bucket_none_attributeerrror(self, storage: StorageTest):
         storage.indexing_bucket = None
         msg = BrainResource()

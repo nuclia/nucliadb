@@ -32,8 +32,6 @@ from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 from tests.ingest.fixtures import create_resource
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 def nats():

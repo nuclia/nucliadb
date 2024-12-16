@@ -19,14 +19,11 @@
 #
 
 
-import pytest
-
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
 from tests.ingest.fixtures import IngestFixture
 
 
-@pytest.mark.asyncio
 async def test_list_members(grpc_servicer: IngestFixture):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 

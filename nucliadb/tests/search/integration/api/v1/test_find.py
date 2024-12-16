@@ -19,14 +19,12 @@
 #
 from typing import Callable
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
 
-@pytest.mark.asyncio
 async def test_find(search_api: Callable[..., AsyncClient], multiple_search_resource: str) -> None:
     kbid = multiple_search_resource
 

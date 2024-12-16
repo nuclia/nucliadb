@@ -21,8 +21,6 @@ from os.path import dirname, getsize
 from typing import Optional
 from uuid import uuid4
 
-import pytest
-
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
@@ -35,7 +33,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_extracted(storage: Storage, txn, fake_node, knowledgebox_ingest: str):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
@@ -55,7 +52,6 @@ async def test_create_resource_orm_extracted(storage: Storage, txn, fake_node, k
     assert ex2.text == ex1.body.text
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_extracted_file(
     local_files,
     storage: Storage,
@@ -95,7 +91,6 @@ async def test_create_resource_orm_extracted_file(
     assert ex3.text == ex2.text
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_extracted_delta(
     storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):

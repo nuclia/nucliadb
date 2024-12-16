@@ -39,7 +39,6 @@ from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_purge_deletes_everything_from_maindb(
     maindb_driver: Driver,
     storage: Storage,
@@ -103,7 +102,6 @@ async def test_purge_deletes_everything_from_maindb(
     assert len(keys_after_purge_storage) == 0
 
 
-@pytest.mark.asyncio
 async def test_purge_orphan_shards(
     maindb_driver: Driver,
     storage: Storage,
@@ -163,7 +161,6 @@ async def test_purge_orphan_shards(
     assert len(shards) == 0
 
 
-@pytest.mark.asyncio
 async def test_purge_orphan_shard_detection(
     maindb_driver: Driver,
     storage: Storage,

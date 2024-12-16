@@ -18,14 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pytest
 
 from nucliadb.common.datamanagers import vectorsets
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import knowledgebox_pb2
 
 
-@pytest.mark.asyncio
 async def test_kb_vectorsets(maindb_driver: Driver):
     kbid = "kbid"
     vectorset_id_1 = "gecko"

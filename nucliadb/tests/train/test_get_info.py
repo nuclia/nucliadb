@@ -17,14 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
 from aioresponses import aioresponses
 
 from nucliadb_protos.train_pb2 import GetInfoRequest, TrainInfo
 from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
-@pytest.mark.asyncio
 async def test_get_info(
     train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:

@@ -29,8 +29,6 @@ from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
 from nucliadb_utils import const
 
-pytestmark = pytest.mark.asyncio
-
 
 @contextmanager
 def set_standalone_mode(value: bool):

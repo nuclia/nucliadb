@@ -21,8 +21,6 @@ from os.path import dirname, getsize
 from typing import Optional
 from uuid import uuid4
 
-import pytest
-
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
@@ -35,7 +33,6 @@ from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_vector(
     storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
@@ -57,7 +54,6 @@ async def test_create_resource_orm_vector(
     assert ex2.vectors.vectors[0].vector == ex1.vectors.vectors.vectors[0].vector
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_vector_file(
     local_files, storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
@@ -93,7 +89,6 @@ async def test_create_resource_orm_vector_file(
     assert ex3.vectors.vectors[0].vector == ex2.vectors.vectors[0].vector
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_vector_split(
     storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):

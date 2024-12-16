@@ -21,7 +21,6 @@
 import asyncio
 import dataclasses
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb_models.search import SearchOptions
@@ -39,7 +38,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
 
-@pytest.mark.asyncio
 async def test_paragraph_index_deletions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

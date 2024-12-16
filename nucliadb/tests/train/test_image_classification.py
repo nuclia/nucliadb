@@ -50,7 +50,6 @@ INVOICE_FILENAME = os.path.join(_testdata_dir, "invoice.pdf")
 INVOICE_SELECTIONS_FILENAME = os.path.join(_testdata_dir, "invoice_selections.json")
 
 
-@pytest.mark.asyncio
 async def test_generation_image_classification(
     train_rest_api: aiohttp.ClientSession,
     knowledgebox: str,
@@ -86,7 +85,6 @@ async def test_generation_image_classification(
 
 
 @pytest.fixture
-@pytest.mark.asyncio
 async def image_classification_resource(
     writer_rest_api: aiohttp.ClientSession, nucliadb_grpc: WriterStub, knowledgebox: str
 ):

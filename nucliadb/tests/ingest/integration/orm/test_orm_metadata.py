@@ -21,8 +21,6 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-import pytest
-
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
@@ -39,7 +37,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_metadata(
     storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
@@ -83,7 +80,6 @@ async def test_create_resource_orm_metadata(
     assert ex2.metadata.mime_type == ex1.metadata.metadata.mime_type
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_metadata_split(
     storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):

@@ -54,7 +54,6 @@ def processing_utility(dummy_processing: ProcessingEngine) -> Iterable[Processin
     yield dummy_processing
 
 
-@pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def dummy_processing() -> AsyncIterator[ProcessingEngine]:
     with patch.object(nuclia_settings, "dummy_processing", True):

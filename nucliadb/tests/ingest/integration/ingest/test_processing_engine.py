@@ -37,7 +37,6 @@ from tests.utils.aiohttp_session import get_mocked_session
         {"seqid": 1, "queue": "shared"},
     ],
 )
-@pytest.mark.asyncio
 async def test_send_to_process(onprem, mock_payload):
     """
     Test that send_to_process does not fail
@@ -62,7 +61,6 @@ async def test_send_to_process(onprem, mock_payload):
 
 
 @pytest.mark.parametrize("onprem", [True, False])
-@pytest.mark.asyncio
 async def test_delete_from_processing(onprem):
     """
     Test that send_to_process does not fail

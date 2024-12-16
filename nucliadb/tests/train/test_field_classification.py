@@ -34,7 +34,6 @@ from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
-@pytest.mark.asyncio
 async def test_generator_field_classification(
     train_rest_api: aiohttp.ClientSession,
     knowledgebox_with_labels: str,
@@ -82,7 +81,6 @@ async def test_generator_field_classification(
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.asyncio
 async def knowledgebox_with_labels(
     nucliadb_grpc: WriterStub, nucliadb_writer: AsyncClient, knowledgebox: str
 ):

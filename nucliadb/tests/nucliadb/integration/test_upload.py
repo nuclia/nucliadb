@@ -19,13 +19,11 @@
 #
 import base64
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.writer.tus import UPLOAD
 
 
-@pytest.mark.asyncio
 async def test_upload(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -64,7 +62,6 @@ async def test_upload(
     assert resp.content == content
 
 
-@pytest.mark.asyncio
 async def test_upload_guesses_content_type(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

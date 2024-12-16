@@ -28,8 +28,6 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 async def app_context(natsd, storage, nucliadb):

@@ -33,8 +33,6 @@ from nucliadb.common.cluster.discovery.types import IndexNodeMetadata
 from nucliadb.common.cluster.settings import Settings
 from nucliadb_protos import nodewriter_pb2
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 def writer_stub():

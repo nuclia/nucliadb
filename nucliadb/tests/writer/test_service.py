@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pytest
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
@@ -27,7 +26,6 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_utils.utilities import get_ingest
 
 
-@pytest.mark.asyncio
 async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
@@ -76,7 +74,6 @@ async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
         assert set(result.groups.keys()) == {"0", "1"}
 
 
-@pytest.mark.asyncio
 async def test_entities_custom_field_for_user_defined_groups(writer_api, entities_manager_mock):
     """
     Test description:
@@ -108,7 +105,6 @@ async def test_entities_custom_field_for_user_defined_groups(writer_api, entitie
         assert result.groups["0"].custom is True
 
 
-@pytest.mark.asyncio
 async def test_service_lifecycle_labels(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(

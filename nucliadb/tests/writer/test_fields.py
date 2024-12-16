@@ -90,7 +90,6 @@ TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
 ]
 
 
-@pytest.mark.asyncio
 async def test_resource_field_add(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -161,7 +160,6 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
         assert "seqid" in data
 
 
-@pytest.mark.asyncio
 async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -189,7 +187,6 @@ async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
         assert "seqid" in data
 
 
-@pytest.mark.asyncio
 async def test_resource_field_delete(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -227,7 +224,6 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
         assert resp.status_code == 204
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "endpoint,payload",
     [
@@ -262,7 +258,6 @@ async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
         assert resp.status_code in (201, 200)
 
 
-@pytest.mark.asyncio
 async def test_external_file_field(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -281,7 +276,6 @@ async def test_external_file_field(writer_api, knowledgebox_writer):
         assert resp.status_code == 201
 
 
-@pytest.mark.asyncio
 async def test_file_field_validation(writer_api, knowledgebox_writer):
     knowledgebox_id = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -313,7 +307,6 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
         ["delete", "", None],
     ],
 )
-@pytest.mark.asyncio()
 async def test_field_endpoints_by_slug(
     writer_api,
     knowledgebox_ingest,

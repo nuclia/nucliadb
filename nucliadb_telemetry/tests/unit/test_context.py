@@ -19,12 +19,9 @@
 
 import asyncio
 
-import pytest
-
 from nucliadb_telemetry import context
 
 
-@pytest.mark.asyncio
 async def test_logger_with_context(caplog):
     context_lvl_1 = {}
     context_lvl_1_after = {}

@@ -19,8 +19,6 @@
 #
 from uuid import uuid4
 
-import pytest
-
 from nucliadb_utils.storages.azure import AzureStorage
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
@@ -28,25 +26,21 @@ from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_azure_driver(azure_storage: AzureStorage):
     assert isinstance(azure_storage, AzureStorage)
     await storage_test(azure_storage)
 
 
-@pytest.mark.asyncio
 async def test_s3_driver(s3_storage: S3Storage):
     assert isinstance(s3_storage, S3Storage)
     await storage_test(s3_storage)
 
 
-@pytest.mark.asyncio
 async def test_gcs_driver(gcs_storage: GCSStorage):
     assert isinstance(gcs_storage, GCSStorage)
     await storage_test(gcs_storage)
 
 
-@pytest.mark.asyncio
 async def test_local_driver(local_storage: LocalStorage):
     assert isinstance(local_storage, LocalStorage)
     await storage_test(local_storage)

@@ -18,13 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pytest
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from tests.writer.test_fields import TEST_TEXT_PAYLOAD
 
 
-@pytest.mark.asyncio
 async def test_delete_field(
     knowledgebox_one,
     nucliadb_reader,

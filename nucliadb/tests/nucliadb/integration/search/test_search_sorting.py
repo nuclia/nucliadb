@@ -25,7 +25,6 @@ from httpx import AsyncClient
 from nucliadb_models.search import SearchOptions
 
 
-@pytest.mark.asyncio
 async def test_search_sort_by_score(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -60,7 +59,6 @@ async def test_search_sort_by_score(
         ("modified", "desc", lambda x: list(reversed(sorted(x)))),
     ],
 )
-@pytest.mark.asyncio
 async def test_search_sorted_by_creation_and_modification_dates(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -102,7 +100,6 @@ async def test_search_sorted_by_creation_and_modification_dates(
         ("title", "desc", lambda x: list(reversed(sorted(x)))),
     ],
 )
-@pytest.mark.asyncio
 async def test_limited_sorted_search_of_most_relevant_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -146,7 +143,6 @@ async def test_limited_sorted_search_of_most_relevant_results(
         assert sort_fields == sort_function(sort_fields)
 
 
-@pytest.mark.asyncio
 async def test_empty_query_search_for_ordered_resources_by_creation_date_desc(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -171,7 +167,6 @@ async def test_empty_query_search_for_ordered_resources_by_creation_date_desc(
         assert creation_dates == sorted(creation_dates, reverse=True)
 
 
-@pytest.mark.asyncio
 async def test_list_all_resources_by_creation_and_modification_dates_with_empty_queries(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -231,7 +226,6 @@ async def test_list_all_resources_by_creation_and_modification_dates_with_empty_
             assert sort_fields == sort_function(sort_fields)  # type: ignore
 
 
-@pytest.mark.asyncio
 async def test_search_sorting_most_relevant_results_with_pagination(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

@@ -21,8 +21,6 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-import pytest
-
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -51,7 +49,6 @@ from nucliadb_protos.writer_pb2 import (
 from tests.ingest.fixtures import create_resource
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     basic = PBBasic(
         icon="text/plain",
@@ -105,7 +102,6 @@ async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, kn
     assert o2.source_id == "My Source"
 
 
-@pytest.mark.asyncio
 async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
@@ -150,7 +146,6 @@ async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_i
         assert paragraph.metadata.labels.paragraph[0].label in ("label1", "label2")
 
 
-@pytest.mark.asyncio
 async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
@@ -209,7 +204,6 @@ async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox
             assert metadata.metadata.representation.file == "myfile"
 
 
-@pytest.mark.asyncio
 async def test_vector_duplicate_fields(storage, txn, cache, fake_node, knowledgebox_ingest: str):
     basic = PBBasic(title="My title", summary="My summary")
     basic.metadata.status = PBMetadata.Status.PROCESSED

@@ -20,8 +20,6 @@
 import uuid
 from unittest.mock import Mock
 
-import pytest
-
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import knowledgebox_pb2
@@ -30,7 +28,6 @@ from tests.nucliadb.migrations import get_migration
 migration: Migration = get_migration(21)
 
 
-@pytest.mark.asyncio
 async def test_migration_0021(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver
@@ -59,7 +56,6 @@ async def test_migration_0021(maindb_driver: Driver):
         assert (await txn.get(f"/kbs/{kbid}/other")) == b"other data"
 
 
-@pytest.mark.asyncio
 async def test_migration_0021_kb_without_vectorset_key(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver

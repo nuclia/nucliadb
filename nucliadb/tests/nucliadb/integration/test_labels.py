@@ -20,7 +20,6 @@
 import uuid
 from datetime import datetime
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import (
@@ -164,7 +163,6 @@ async def inject_resource_with_paragraph_labels(knowledgebox, writer):
     return bm.uuid
 
 
-@pytest.mark.asyncio
 async def test_labels_global(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -196,7 +194,6 @@ async def test_labels_global(
     assert resp.status_code == 200
 
 
-@pytest.mark.asyncio
 async def test_classification_labels_cancelled_by_the_user(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -241,7 +238,6 @@ async def test_classification_labels_cancelled_by_the_user(
     assert content["resources"][rid]["usermetadata"]["classifications"][0] == expected_label
 
 
-@pytest.mark.asyncio
 async def test_classification_labels_are_shown_in_resource_basic(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -313,7 +309,6 @@ def test_add_field_classifications():
     )
 
 
-@pytest.mark.asyncio
 async def test_fieldmetadata_classification_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

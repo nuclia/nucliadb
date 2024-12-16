@@ -20,13 +20,10 @@
 
 from uuid import uuid4
 
-import pytest
-
 from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
 from tests.ingest.fixtures import IngestFixture
 
 
-@pytest.mark.asyncio
 async def test_create_entities_group(
     grpc_servicer: IngestFixture, entities_manager_mock, hosted_nucliadb
 ):

@@ -19,8 +19,6 @@
 #
 import uuid
 
-import pytest
-
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
@@ -28,17 +26,14 @@ from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD, Storage, StorageField
 
 
-@pytest.mark.asyncio
 async def test_s3_driver(s3_storage: S3Storage):
     await storage_field_test(s3_storage)
 
 
-@pytest.mark.asyncio
 async def test_gcs_driver(gcs_storage: GCSStorage):
     await storage_field_test(gcs_storage)
 
 
-@pytest.mark.asyncio
 async def test_local_driver(local_storage: LocalStorage):
     await storage_field_test(local_storage)
 

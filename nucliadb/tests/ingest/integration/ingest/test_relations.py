@@ -19,8 +19,6 @@
 #
 import uuid
 
-import pytest
-
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb_protos.resources_pb2 import (
     Classification,
@@ -35,7 +33,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 
-@pytest.mark.asyncio
 async def test_ingest_relations_indexing(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
@@ -64,7 +61,6 @@ async def test_ingest_relations_indexing(
     assert pb.relations[2] == r2
 
 
-@pytest.mark.asyncio
 async def test_ingest_label_relation_extraction(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
@@ -94,7 +90,6 @@ async def test_ingest_label_relation_extraction(
         assert pb.relations[i].to.value == f"{labelset}/{label}"
 
 
-@pytest.mark.asyncio
 async def test_ingest_colab_relation_extraction(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
@@ -117,7 +112,6 @@ async def test_ingest_colab_relation_extraction(
         assert pb.relations[i].to.value == collaborator
 
 
-@pytest.mark.asyncio
 async def test_ingest_field_metadata_relation_extraction(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):
@@ -205,7 +199,6 @@ async def test_ingest_field_metadata_relation_extraction(
         assert generated_relation in pb.relations
 
 
-@pytest.mark.asyncio
 async def test_ingest_field_relations_relation_extraction(
     fake_node, local_files, storage, knowledgebox_ingest, processor
 ):

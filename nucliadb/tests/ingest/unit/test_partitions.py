@@ -20,12 +20,9 @@
 import json
 import os
 
-import pytest
-
 from nucliadb.ingest.partitions import assign_partitions
 
 
-@pytest.mark.asyncio
 async def test_assign_partitions(partition_settings):
     expected_partition_list = []
     part = partition_settings.replica_number

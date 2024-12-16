@@ -53,7 +53,6 @@ def test_get_mapped_roles():
     assert auth.get_mapped_roles(settings=Settings(auth_policy_user_default_roles=[]), data={}) == []
 
 
-@pytest.mark.asyncio
 async def test_auth_header_backend(http_request):
     backend = auth.get_auth_backend(
         Settings(
@@ -74,7 +73,6 @@ async def test_auth_header_backend(http_request):
     assert await backend.authenticate(http_request) is None
 
 
-@pytest.mark.asyncio
 async def test_oauth2_backend(http_request):
     backend = auth.get_auth_backend(
         settings=Settings(
@@ -107,7 +105,6 @@ async def test_oauth2_backend(http_request):
     assert await backend.authenticate(http_request) is None
 
 
-@pytest.mark.asyncio
 async def test_basic_backend(http_request):
     backend = auth.get_auth_backend(
         settings=Settings(
@@ -131,7 +128,6 @@ async def test_basic_backend(http_request):
     assert await backend.authenticate(http_request) is None
 
 
-@pytest.mark.asyncio
 async def test_auth_token_backend(http_request):
     jwk_key = orjson.dumps(jwk.JWK.generate(kty="oct", size=256, kid="dyn")).decode("utf-8")
     backend = auth.get_auth_backend(

@@ -72,7 +72,6 @@ def test_settings_search(storage, natsd, node, maindb_driver):  # type: ignore
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
 
 
-@pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
     original_setting = nuclia_settings.dummy_predict
@@ -93,7 +92,6 @@ async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
         set_utility(Utility.PREDICT, original_predict)
 
 
-@pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def search_api(test_settings_search, transaction_utility, redis):  # type: ignore
     from nucliadb.common.cluster import manager

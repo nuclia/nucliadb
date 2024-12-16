@@ -30,7 +30,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
 
 
-@pytest.mark.asyncio
 async def test_find_with_label_changes(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -101,7 +100,6 @@ async def test_find_with_label_changes(
     assert len(body["resources"]) == 1
 
 
-@pytest.mark.asyncio
 async def test_find_does_not_support_fulltext_search(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -120,7 +118,6 @@ async def test_find_does_not_support_fulltext_search(
     assert "fulltext search not supported" in resp.json()["detail"][0]["msg"]
 
 
-@pytest.mark.asyncio
 async def test_find_resource_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -201,7 +198,6 @@ async def test_find_min_score(
     assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.5}
 
 
-@pytest.mark.asyncio
 async def test_story_7286(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -260,7 +256,6 @@ async def test_story_7286(
     assert len(body["resources"]) == 0
 
 
-@pytest.mark.asyncio
 async def test_find_marks_fuzzy_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -319,7 +314,6 @@ def check_fuzzy_paragraphs(find_response, *, fuzzy_result: bool, n_expected: int
     assert found == n_expected
 
 
-@pytest.mark.asyncio
 async def test_find_returns_best_matches(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb,
@@ -357,7 +351,6 @@ def find_with_limits_exceeded_error():
         yield
 
 
-@pytest.mark.asyncio()
 async def test_find_handles_limits_exceeded_error(
     nucliadb_reader, knowledgebox, find_with_limits_exceeded_error
 ):

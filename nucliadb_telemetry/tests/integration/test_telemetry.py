@@ -20,7 +20,6 @@
 import asyncio
 import json
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb_telemetry import grpc_metrics
@@ -50,7 +49,6 @@ def debug_spans(spans):
     )
 
 
-@pytest.mark.asyncio
 async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
     resp = await http_service.get(
         "http://test/",

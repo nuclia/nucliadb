@@ -99,17 +99,14 @@ async def redis_dm(redis):
     settings.dm_enabled = prev
 
 
-@pytest.mark.asyncio
 async def test_s3_driver(redis_dm, s3_storage_tus: S3BlobStore):
     await storage_test(s3_storage_tus, S3FileStorageManager(s3_storage_tus))
 
 
-@pytest.mark.asyncio
 async def test_gcs_driver(redis_dm, gcs_storage_tus: GCloudBlobStore):
     await storage_test(gcs_storage_tus, GCloudFileStorageManager(gcs_storage_tus))
 
 
-@pytest.mark.asyncio
 async def test_local_driver(local_storage_tus: LocalBlobStore):
     settings.dm_enabled = False
     await storage_test(local_storage_tus, LocalFileStorageManager(local_storage_tus))

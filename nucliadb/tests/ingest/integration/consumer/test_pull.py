@@ -36,8 +36,6 @@ from nucliadb_utils.fastapi.run import start_server
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.tests import free_port
 
-pytestmark = pytest.mark.asyncio
-
 
 def create_broker_message(kbid: str) -> BrokerMessage:
     bm = BrokerMessage()

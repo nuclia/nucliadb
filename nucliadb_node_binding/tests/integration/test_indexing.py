@@ -78,7 +78,6 @@ def data_path(tmp_path):
     del os.environ["DATA_PATH"]
 
 
-@pytest.mark.asyncio
 async def test_set_and_search(data_path):
     return await _test_set_and_search(ReleaseChannel.STABLE)
 

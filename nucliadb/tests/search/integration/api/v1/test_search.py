@@ -39,7 +39,6 @@ RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
 
 @pytest.mark.flaky(reruns=5)
-@pytest.mark.asyncio
 async def test_multiple_fuzzy_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
@@ -64,7 +63,6 @@ async def test_multiple_fuzzy_search_resource_all(
 
 
 @pytest.mark.flaky(reruns=5)
-@pytest.mark.asyncio
 async def test_multiple_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
@@ -118,7 +116,6 @@ async def test_multiple_search_resource_all(
         assert resp.json()["fulltext"]["next_page"] is False
 
 
-@pytest.mark.asyncio
 @pytest.mark.flaky(reruns=3)
 async def test_search_resource_all(
     search_api: Callable[..., AsyncClient],
@@ -191,7 +188,6 @@ async def test_search_resource_all(
                     assert results[2][0].endswith("20-45")
 
 
-@pytest.mark.asyncio
 async def test_search_with_facets(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:

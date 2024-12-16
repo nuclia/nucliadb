@@ -41,11 +41,9 @@ class TestPyPi:
         cl.session.get.return_value = response
         yield cl
 
-    @pytest.mark.asyncio
     async def test_get_latest_version(self, client):
         assert await client.get_latest_version("foo") == "1.0.0"
 
-    @pytest.mark.asyncio
     async def test_context_manager(self, client):
         async with client:
             pass

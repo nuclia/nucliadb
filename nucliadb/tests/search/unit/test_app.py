@@ -20,12 +20,8 @@
 import json
 from unittest.mock import patch
 
-import pytest
-
 from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.search import app
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_alive():

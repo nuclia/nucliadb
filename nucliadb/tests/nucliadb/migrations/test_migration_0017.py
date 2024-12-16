@@ -19,8 +19,6 @@
 #
 from unittest.mock import Mock
 
-import pytest
-
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.migrator.models import Migration
@@ -30,7 +28,6 @@ from tests.nucliadb.migrations import get_migration
 migration: Migration = get_migration(17)
 
 
-@pytest.mark.asyncio
 async def test_migration_0017_kb(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver

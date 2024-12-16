@@ -51,7 +51,6 @@ async def shard_manager(
         set_utility(Utility.SHARD_MANAGER, original)
 
 
-@pytest.mark.asyncio
 async def test_create_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
@@ -83,7 +82,6 @@ async def test_create_knowledgebox(
         assert config.description == description
 
 
-@pytest.mark.asyncio
 async def test_create_knowledgebox_with_multiple_vectorsets(
     storage: Storage,
     maindb_driver: Driver,
@@ -133,7 +131,6 @@ async def test_create_knowledgebox_with_multiple_vectorsets(
         assert set(vs2.matryoshka_dimensions) == {256, 512, 2048}
 
 
-@pytest.mark.asyncio
 async def test_create_knowledgebox_without_vectorsets_is_not_allowed(
     storage: Storage,
     maindb_driver: Driver,
@@ -143,7 +140,6 @@ async def test_create_knowledgebox_without_vectorsets_is_not_allowed(
         await KnowledgeBox.create(maindb_driver, kbid="kbid", slug="slug", semantic_models={})
 
 
-@pytest.mark.asyncio
 async def test_create_knowledgebox_with_same_kbid(
     storage: Storage,
     maindb_driver: Driver,
@@ -168,7 +164,6 @@ async def test_create_knowledgebox_with_same_kbid(
         )
 
 
-@pytest.mark.asyncio
 async def test_create_knowledgebox_with_same_slug(
     storage: Storage,
     maindb_driver: Driver,
@@ -193,7 +188,6 @@ async def test_create_knowledgebox_with_same_slug(
         )
 
 
-@pytest.mark.asyncio
 async def test_delete_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
@@ -215,14 +209,12 @@ async def test_delete_knowledgebox(
     assert exists is False
 
 
-@pytest.mark.asyncio
 async def test_delete_knowledgebox_handles_unexisting_kb(storage: Storage, maindb_driver: Driver):
     idonotexist = uuid.uuid4().hex
     kbid = await KnowledgeBox.delete(maindb_driver, kbid=idonotexist)
     assert kbid is None
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_purge_handles_unexisting_shard_payload(
     storage: Storage, maindb_driver: Driver
 ):
@@ -230,7 +222,6 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
     await KnowledgeBox.purge(maindb_driver, kbid=idonotexist)
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_delete_all_kb_keys(
     storage,
     cache,

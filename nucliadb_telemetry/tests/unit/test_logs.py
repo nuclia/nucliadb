@@ -23,7 +23,6 @@ from unittest.mock import MagicMock, patch
 
 import orjson
 import pydantic
-import pytest
 from opentelemetry.trace import format_span_id, format_trace_id
 
 from nucliadb_telemetry import context, logs
@@ -193,7 +192,6 @@ def test_logger_with_formatter_and_active_span(caplog):
     assert outputted_records[0]["span_id"] == format_span_id(9999999999999999999999)
 
 
-@pytest.mark.asyncio
 async def test_logger_with_context(caplog):
     logger = logging.getLogger("test.logger4")
     formatter = logs.JSONFormatter()

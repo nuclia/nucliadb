@@ -29,8 +29,6 @@ from nucliadb.search.api.v1.summarize import summarize_endpoint
 from nucliadb.search.search.summarize import NoResourcesToSummarize
 from nucliadb_utils.exceptions import LimitsExceededError
 
-pytestmark = pytest.mark.asyncio
-
 
 class DummyTestRequest(Request):
     @property

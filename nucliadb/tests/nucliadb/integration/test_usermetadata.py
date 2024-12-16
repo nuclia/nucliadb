@@ -17,11 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pytest
 from httpx import AsyncClient
 
 
-@pytest.mark.asyncio
 async def test_labels_sc_2053(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
