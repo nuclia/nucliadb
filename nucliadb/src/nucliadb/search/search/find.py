@@ -38,14 +38,12 @@ from nucliadb.search.search.metrics import (
     RAGMetrics,
 )
 from nucliadb.search.search.query import QueryParser
-from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.search.query_parser.parser import parse_find
 from nucliadb.search.search.rank_fusion import (
     RankFusionAlgorithm,
     get_rank_fusion,
 )
 from nucliadb.search.search.rerankers import (
-    NoopReranker,
     Reranker,
     RerankingOptions,
     get_reranker,
@@ -77,9 +75,6 @@ async def find(
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
 ) -> tuple[KnowledgeboxFindResults, bool, QueryParser]:
-    if item.page_number > 0:
-        logger.warning("Someone is still using pagination!", extra={"kbid": kbid, "endpoint": "find"})
-
     external_index_manager = await get_external_index_manager(kbid=kbid)
     if external_index_manager is not None:
         return await _external_index_retrieval(
@@ -127,8 +122,8 @@ async def _index_node_retrieval(
             relation_subgraph_query=pb_query.relations.subgraph,
             min_score_bm25=pb_query.min_score_bm25,
             min_score_semantic=pb_query.min_score_semantic,
-            page_size=item.page_size,
-            page_number=item.page_number,
+            page_size=item.top_k,
+            page_number=0,
             show=item.show,
             extracted=item.extracted,
             field_type_filter=item.field_type_filter,
@@ -232,7 +227,7 @@ async def _external_index_retrieval(
         query=item.query,
         total=0,
         page_number=0,
-        page_size=(item.page_number + 1) * item.page_size,
+        page_size=item.top_k,
         relations=None,  # Not implemented for external indexes yet
         autofilters=[],  # Not implemented for external indexes yet
         min_score=results_min_score,
@@ -268,16 +263,7 @@ async def query_parser_from_find_request(
     parsed = parse_find(item)
 
     rank_fusion = get_rank_fusion(parsed.rank_fusion)
-
-    reranker: Reranker
-    if item.page_number > 0 and isinstance(parsed.reranker, parser_models.Reranker):
-        logger.warning(
-            "Trying to use predict reranker with pagination. Reranker won't be used",
-            extra={"kbid": kbid},
-        )
-        reranker = NoopReranker()
-    else:
-        reranker = get_reranker(parsed.reranker)
+    reranker = get_reranker(parsed.reranker)
 
     query_parser = QueryParser(
         kbid=kbid,
@@ -287,8 +273,8 @@ async def query_parser_from_find_request(
         keyword_filters=item.keyword_filters,
         faceted=None,
         sort=None,
-        page_number=item.page_number,
-        page_size=item.page_size,
+        page_number=0,
+        page_size=item.top_k,
         min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,

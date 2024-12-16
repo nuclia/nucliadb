@@ -64,8 +64,6 @@ async def resource_search(
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort: Optional[SortField] = fastapi_query(SearchParamDefaults.sort_field, alias="sort_field"),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
-    page_number: int = fastapi_query(SearchParamDefaults.page_number),
-    page_size: int = fastapi_query(SearchParamDefaults.page_size),
     top_k: Optional[int] = fastapi_query(SearchParamDefaults.top_k),
     range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
     range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
