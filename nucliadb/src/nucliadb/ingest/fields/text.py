@@ -31,6 +31,8 @@ class Text(Field):
 
     async def generated_by(self) -> FieldAuthor:
         value = await self.get_value()
+        if value is None:
+            raise ValueError("Can't know who generated the field if it has no value!")
         return value.generated_by
 
     async def set_value(self, payload: FieldText):
