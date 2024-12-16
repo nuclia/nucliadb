@@ -105,6 +105,13 @@ async def get_storage(
     if Utility.STORAGE in MAIN:
         return MAIN[Utility.STORAGE]
 
+    storage = await _create_storage(gcs_scopes=gcs_scopes)
+    set_utility(Utility.STORAGE, storage)
+
+    return MAIN[Utility.STORAGE]
+
+
+async def _create_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
     if storage_settings.file_backend == FileBackendConfig.AZURE:
         from nucliadb_utils.storages.azure import AzureStorage
 
@@ -118,7 +125,7 @@ async def get_storage(
 
         logger.info("Configuring Azure Storage")
         await azureutil.initialize()
-        set_utility(Utility.STORAGE, azureutil)
+        return azureutil
 
     elif storage_settings.file_backend == FileBackendConfig.S3:
         from nucliadb_utils.storages.s3 import S3Storage
@@ -136,9 +143,9 @@ async def get_storage(
             bucket=storage_settings.s3_bucket,
             bucket_tags=storage_settings.s3_bucket_tags,
         )
-        set_utility(Utility.STORAGE, s3util)
-        await s3util.initialize()
         logger.info("Configuring S3 Storage")
+        await s3util.initialize()
+        return s3util
 
     elif storage_settings.file_backend == FileBackendConfig.GCS:
         from nucliadb_utils.storages.gcs import GCSStorage
@@ -155,9 +162,9 @@ async def get_storage(
             labels=storage_settings.gcs_bucket_labels,
             scopes=gcs_scopes,
         )
-        set_utility(Utility.STORAGE, gcsutil)
-        await gcsutil.initialize()
         logger.info("Configuring GCS Storage")
+        await gcsutil.initialize()
+        return gcsutil
 
     elif storage_settings.file_backend == FileBackendConfig.LOCAL:
         if storage_settings.local_files is None:
@@ -168,13 +175,11 @@ async def get_storage(
             local_testing_files=storage_settings.local_files,
             indexing_bucket=storage_settings.local_indexing_bucket,
         )
-        set_utility(Utility.STORAGE, localutil)
-        await localutil.initialize()
         logger.info("Configuring Local Storage")
+        await localutil.initialize()
+        return localutil
     else:
         raise ConfigurationError("Invalid storage settings, please configure FILE_BACKEND")
-
-    return MAIN[Utility.STORAGE]
 
 
 async def teardown_storage():

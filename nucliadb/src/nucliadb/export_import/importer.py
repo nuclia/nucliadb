@@ -37,6 +37,7 @@ from nucliadb.export_import.utils import (
 )
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
+from nucliadb_utils.utilities import _create_storage
 
 BinaryStream = AsyncGenerator[bytes, None]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
@@ -97,17 +98,28 @@ async def import_kb_from_blob_storage(context: ApplicationContext, msg: NatsTask
     """
     Imports to a knowledgebox from an export stored in the blob storage service.
     """
-    kbid, import_id = msg.kbid, msg.id
-    dm = ExportImportDataManager(context.kv_driver, context.blob_storage)
-    metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
+    try:
+        # There is an issue when using the same aiobotocore client to download and upload files concurrently.
+        # https://github.com/aio-libs/aiobotocore/issues/1235
+        #
+        # As a workaround, we use a newly created client for the download of the import file, while using
+        # the normally configured storage for the uploads:
+        # - The `ExportImportDataManager` is used for the downloads and gets the new storage
+        # - `import_kb` gets the `context` with the default blob storage to use in uploads
+        download_storage = await _create_storage()
+        kbid, import_id = msg.kbid, msg.id
+        dm = ExportImportDataManager(context.kv_driver, download_storage)
+        metadata = await dm.get_metadata(type="import", kbid=kbid, id=import_id)
 
-    retry_handler = TaskRetryHandler("import", dm, metadata)
+        retry_handler = TaskRetryHandler("import", dm, metadata)
 
-    @retry_handler.wrap
-    async def import_kb_retried(context, kbid, metadata):
-        stream = dm.download_import(kbid, import_id)
-        await import_kb(context, kbid, stream, metadata)
+        @retry_handler.wrap
+        async def import_kb_retried(context, kbid, metadata):
+            stream = dm.download_import(kbid, import_id)
+            await import_kb(context, kbid, stream, metadata)
 
-    await import_kb_retried(context, kbid, metadata)
+        await import_kb_retried(context, kbid, metadata)
 
-    await dm.try_delete_from_storage("import", kbid, import_id)
+        await dm.try_delete_from_storage("import", kbid, import_id)
+    finally:
+        await download_storage.finalize()
