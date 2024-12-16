@@ -19,7 +19,7 @@ nidx_vector = { version = "0.1.0", path = "nidx_vector" }
 object_store = { version = "0.11.0", features = ["gcp", "aws"] }
 serde = "1.0.210"
 serde_json = "1.0.132"
-sqlx = { version = "0.8.2", features = ["postgres", "uuid", "runtime-tokio", "time"] }
+sqlx = { version = "0.8.2", features = ["postgres", "uuid", "runtime-tokio", "time", "tls-rustls"] }
 tar = "0.4.42"
 tempfile = "3.13.0"
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread", "signal"] }
