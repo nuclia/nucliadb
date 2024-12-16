@@ -22,7 +22,7 @@ from typing import Union
 
 import pytest
 from httpx import AsyncClient
-from pytest_mock import MockFixture
+from pytest_mock import MockerFixture
 
 from nucliadb.search.search import find, find_merge
 from nucliadb_models.search import KnowledgeboxFindResults, PredictReranker, RerankerName
@@ -83,7 +83,7 @@ async def test_reranker(
 async def test_predict_reranker_requests_more_results(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
-    mocker: MockFixture,
+    mocker: MockerFixture,
     reranker: Union[RerankerName, PredictReranker],
     extra: int,
 ):
