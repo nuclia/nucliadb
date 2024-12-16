@@ -19,12 +19,13 @@
 #
 
 import hashlib
+from typing import Optional
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb_protos.resources_pb2 import FieldAuthor, FieldText
 
 
-class Text(Field):
+class Text(Field[FieldText]):
     pbklass = FieldText
     value: FieldText
     type: str = "t"
@@ -40,5 +41,5 @@ class Text(Field):
             payload.md5 = hashlib.md5(payload.body.encode()).hexdigest()
         await self.db_set_value(payload)
 
-    async def get_value(self) -> FieldText:
+    async def get_value(self) -> Optional[FieldText]:
         return await self.db_get_value()

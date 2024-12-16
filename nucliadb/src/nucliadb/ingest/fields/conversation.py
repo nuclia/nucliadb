@@ -34,7 +34,7 @@ class PageNotFound(Exception):
     pass
 
 
-class Conversation(Field):
+class Conversation(Field[PBConversation]):
     pbklass = PBConversation
     type: str = "c"
     value: dict[int, PBConversation]
