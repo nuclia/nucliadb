@@ -175,7 +175,7 @@ async def test_send_to_process_generated_fields(
     index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]
     assert index_message.resource.uuid == rid
     # label for generated fields from data augmentation is present
-    assert "/g/da" in index_message.texts[f"t/{da_field}"].labels
+    assert "/g/da/author" in index_message.texts[f"t/{da_field}"].labels
 
 
 async def test_data_augmentation_field_generation_and_search(
@@ -296,6 +296,19 @@ async def test_data_augmentation_field_generation_and_search(
         json={
             "query": "text",
             "filters": [{"none": ["/generated.data-augmentation"]}],
+            "min_score": {"bm25": 0.0},
+        },
+    )
+    assert resp.status_code == 200
+    filtered_out = resp.json()
+    assert filtered_out["total"] == 1
+    assert filtered_out["resources"][rid]["fields"].keys() == {f"/t/{field_id}"}
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "text",
+            "filters": [{"none": ["/generated.data-augmentation/author"]}],
             "min_score": {"bm25": 0.0},
         },
     )
