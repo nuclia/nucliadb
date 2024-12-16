@@ -559,9 +559,9 @@ class ResourceBrain:
         field_key: str,
         metadata: Optional[FieldComputedMetadata],
         uuid: str,
+        generated_by: FieldAuthor,
         basic_user_metadata: Optional[UserMetadata] = None,
         basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
-        generated_by: FieldAuthor.ValueType = FieldAuthor.USER,
     ):
         user_canceled_labels: set[str] = set()
         if basic_user_metadata is not None:
@@ -626,7 +626,7 @@ class ResourceBrain:
                                 paragraph_annotation.key
                             ].labels.append(label)
 
-        if generated_by == FieldAuthor.DATA_AUGMENTATION:
+        if generated_by.WhichOneof("author") == "data_augmentation":
             field_type, field_id = field_key.split("/")
             da_task_id = ids.extract_data_augmentation_id(field_id)
             if da_task_id is None:  # pragma: nocover

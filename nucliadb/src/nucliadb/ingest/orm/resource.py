@@ -826,9 +826,9 @@ class Resource:
                 fieldkey,
                 extracted_metadata,
                 self.uuid,
+                generated_by,
                 basic.usermetadata,
                 valid_user_field_metadata,
-                generated_by,
             )
 
     @processor_observer.wrap({"type": "compute_global_text"})

@@ -363,9 +363,14 @@ message FieldQuestionAnswerWrapper {
 }
 
 // Who is the actor of field creation
-enum FieldAuthor {
-    USER = 0;
-    DATA_AUGMENTATION = 1;
+message FieldAuthor {
+    message User {}
+    message DataAugmentation {}
+
+    oneof author {
+        User user = 1;
+        DataAugmentation data_augmentation = 2;
+    }
 }
 
 message FieldComputedMetadata {

@@ -29,7 +29,7 @@ class Text(Field):
     value: FieldText
     type: str = "t"
 
-    async def generated_by(self) -> FieldAuthor.ValueType:
+    async def generated_by(self) -> FieldAuthor:
         value = await self.get_value()
         return value.generated_by
 

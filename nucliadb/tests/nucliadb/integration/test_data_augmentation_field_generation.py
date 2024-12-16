@@ -38,7 +38,6 @@ from nucliadb.ingest.processing import (
 from nucliadb_protos import noderesources_pb2, resources_pb2
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
-    FieldAuthor,
     FieldID,
     FieldType,
     Paragraph,
@@ -150,7 +149,8 @@ async def test_send_to_process_generated_fields(
     resource: Resource = processor_index_resource_spy.call_args.kwargs["resource"]
     field = await resource.get_field(da_field, FieldType.TEXT)
 
-    assert (await field.generated_by()) == FieldAuthor.DATA_AUGMENTATION
+    generated_by = await field.generated_by()
+    assert generated_by.WhichOneof("author") == "data_augmentation"
 
     # Processed DA resource (from processing)
     bm = BrokerMessage()

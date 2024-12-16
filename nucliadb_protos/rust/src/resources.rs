@@ -834,6 +834,30 @@ pub mod field_question_answer_wrapper {
         File(super::CloudFile),
     }
 }
+/// Who is the actor of field creation
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldAuthor {
+    #[prost(oneof = "field_author::Author", tags = "1, 2")]
+    pub author: ::core::option::Option<field_author::Author>,
+}
+/// Nested message and enum types in `FieldAuthor`.
+pub mod field_author {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct User {}
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct DataAugmentation {}
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Author {
+        #[prost(message, tag = "1")]
+        User(User),
+        #[prost(message, tag = "2")]
+        DataAugmentation(DataAugmentation),
+    }
+}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldComputedMetadata {
@@ -929,8 +953,8 @@ pub struct FieldText {
     pub format: i32,
     #[prost(string, tag = "3")]
     pub md5: ::prost::alloc::string::String,
-    #[prost(enumeration = "FieldAuthor", tag = "4")]
-    pub generated_by: i32,
+    #[prost(message, optional, tag = "4")]
+    pub generated_by: ::core::option::Option<FieldAuthor>,
 }
 /// Nested message and enum types in `FieldText`.
 pub mod field_text {
@@ -1395,33 +1419,6 @@ impl FieldType {
             "TEXT" => Some(Self::Text),
             "GENERIC" => Some(Self::Generic),
             "CONVERSATION" => Some(Self::Conversation),
-            _ => None,
-        }
-    }
-}
-/// Who is the actor of field creation
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum FieldAuthor {
-    User = 0,
-    DataAugmentation = 1,
-}
-impl FieldAuthor {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            FieldAuthor::User => "USER",
-            FieldAuthor::DataAugmentation => "DATA_AUGMENTATION",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "USER" => Some(Self::User),
-            "DATA_AUGMENTATION" => Some(Self::DataAugmentation),
             _ => None,
         }
     }

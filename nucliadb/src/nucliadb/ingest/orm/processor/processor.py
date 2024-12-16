@@ -304,7 +304,7 @@ class Processor:
                             for generated_text in generated_fields.texts:
                                 message.texts[
                                     generated_text
-                                ].generated_by = writer_pb2.FieldAuthor.DATA_AUGMENTATION
+                                ].generated_by.data_augmentation.SetInParent()
 
                     else:
                         raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")

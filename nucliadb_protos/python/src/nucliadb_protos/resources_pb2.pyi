@@ -65,22 +65,6 @@ GENERIC: FieldType.ValueType  # 6
 CONVERSATION: FieldType.ValueType  # 7
 global___FieldType = FieldType
 
-class _FieldAuthor:
-    ValueType = typing.NewType("ValueType", builtins.int)
-    V: typing_extensions.TypeAlias = ValueType
-
-class _FieldAuthorEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_FieldAuthor.ValueType], builtins.type):
-    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    USER: _FieldAuthor.ValueType  # 0
-    DATA_AUGMENTATION: _FieldAuthor.ValueType  # 1
-
-class FieldAuthor(_FieldAuthor, metaclass=_FieldAuthorEnumTypeWrapper):
-    """Who is the actor of field creation"""
-
-USER: FieldAuthor.ValueType  # 0
-DATA_AUGMENTATION: FieldAuthor.ValueType  # 1
-global___FieldAuthor = FieldAuthor
-
 @typing.final
 class CloudFile(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1454,6 +1438,46 @@ class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
 global___FieldQuestionAnswerWrapper = FieldQuestionAnswerWrapper
 
 @typing.final
+class FieldAuthor(google.protobuf.message.Message):
+    """Who is the actor of field creation"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class User(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        def __init__(
+            self,
+        ) -> None: ...
+
+    @typing.final
+    class DataAugmentation(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        def __init__(
+            self,
+        ) -> None: ...
+
+    USER_FIELD_NUMBER: builtins.int
+    DATA_AUGMENTATION_FIELD_NUMBER: builtins.int
+    @property
+    def user(self) -> global___FieldAuthor.User: ...
+    @property
+    def data_augmentation(self) -> global___FieldAuthor.DataAugmentation: ...
+    def __init__(
+        self,
+        *,
+        user: global___FieldAuthor.User | None = ...,
+        data_augmentation: global___FieldAuthor.DataAugmentation | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["author", b"author", "data_augmentation", b"data_augmentation", "user", b"user"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["author", b"author", "data_augmentation", b"data_augmentation", "user", b"user"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["author", b"author"]) -> typing.Literal["user", "data_augmentation"] | None: ...
+
+global___FieldAuthor = FieldAuthor
+
+@typing.final
 class FieldComputedMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1621,15 +1645,17 @@ class FieldText(google.protobuf.message.Message):
     body: builtins.str
     format: global___FieldText.Format.ValueType
     md5: builtins.str
-    generated_by: global___FieldAuthor.ValueType
+    @property
+    def generated_by(self) -> global___FieldAuthor: ...
     def __init__(
         self,
         *,
         body: builtins.str = ...,
         format: global___FieldText.Format.ValueType = ...,
         md5: builtins.str = ...,
-        generated_by: global___FieldAuthor.ValueType = ...,
+        generated_by: global___FieldAuthor | None = ...,
     ) -> None: ...
+    def HasField(self, field_name: typing.Literal["generated_by", b"generated_by"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "generated_by", b"generated_by", "md5", b"md5"]) -> None: ...
 
 global___FieldText = FieldText
