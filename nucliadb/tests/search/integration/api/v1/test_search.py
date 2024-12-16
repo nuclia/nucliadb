@@ -46,7 +46,7 @@ async def test_multiple_fuzzy_search_resource_all(
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&page_number=0&page_size=20',
+            f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&top_k=20',
         )
 
         assert resp.status_code == 200, resp.content
