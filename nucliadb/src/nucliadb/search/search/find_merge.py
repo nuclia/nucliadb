@@ -75,8 +75,7 @@ async def build_find_response(
     kbid: str,
     query: str,
     relation_subgraph_query: EntitiesSubgraphRequest,
-    page_size: int,
-    page_number: int,
+    top_k: int,
     min_score_bm25: float,
     min_score_semantic: float,
     rank_fusion_algorithm: RankFusionAlgorithm,
@@ -106,9 +105,9 @@ async def build_find_response(
     # enforced/validated by the query parsing.
     if reranker.needs_extra_results:
         assert reranker.window is not None, "Reranker definition must enforce this condition"
-        text_blocks_page, next_page = cut_page(merged_text_blocks, reranker.window, 0)
+        text_blocks_page, next_page = cut_page(merged_text_blocks, reranker.window)
     else:
-        text_blocks_page, next_page = cut_page(merged_text_blocks, page_size, page_number)
+        text_blocks_page, next_page = cut_page(merged_text_blocks, top_k)
 
     # hydrate and rerank
     resource_hydration_options = ResourceHydrationOptions(
@@ -126,7 +125,7 @@ async def build_find_response(
         text_block_hydration_options=text_block_hydration_options,
         reranker=reranker,
         reranking_options=reranking_options,
-        top_k=page_size,
+        top_k=top_k,
     )
 
     # build relations graph
@@ -144,8 +143,8 @@ async def build_find_response(
         best_matches=best_matches,
         relations=relations,
         total=total_paragraphs,
-        page_number=page_number,
-        page_size=page_size,
+        page_number=0,  # Bw/c with pagination
+        page_size=top_k,
         next_page=next_page,
         min_score=MinScore(bm25=_round(min_score_bm25), semantic=_round(min_score_semantic)),
     )

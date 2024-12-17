@@ -23,10 +23,8 @@ from typing import TypeVar
 T = TypeVar("T")
 
 
-def cut_page(items: list[T], page_size: int, page_number: int) -> tuple[list[T], bool]:
+def cut_page(items: list[T], top_k: int) -> tuple[list[T], bool]:
     """Return a slice of `items` representing the specified page and a boolean
     indicating whether there is a next page or not"""
-    start = page_size * page_number
-    end = start + page_size
-    next_page = len(items) > end
-    return items[start:end], next_page
+    next_page = len(items) > top_k
+    return items[:top_k], next_page
