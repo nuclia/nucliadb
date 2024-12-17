@@ -23,7 +23,6 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, Weak};
 use std::time::Instant;
 
-use anyhow::anyhow;
 use lru::LruCache;
 use nidx_paragraph::ParagraphSearcher;
 use nidx_relation::RelationSearcher;
@@ -34,6 +33,7 @@ use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore};
 use uuid::Uuid;
 
+use crate::errors::{NidxError, NidxResult};
 use crate::metadata::{IndexId, IndexKind, Segment, SegmentId};
 use crate::metrics::searcher::INDEX_LOAD_TIME;
 use crate::metrics::IndexKindLabels;
@@ -149,9 +149,18 @@ impl IndexCache {
         let cached = { self.cache.lock().await.peek(id) };
         match cached {
             CachePeekResult::Cached(_arc) => {
-                let new_searcher = self.load(id).await?;
-                self.cache.lock().await.insert(id, &new_searcher);
-                Ok(false)
+                match self.load(id).await {
+                    Ok(new_searcher) => {
+                        self.cache.lock().await.insert(id, &new_searcher);
+                        Ok(false)
+                    }
+                    Err(NidxError::NotFound) => {
+                        // Index not found, just take it out of the cache
+                        self.cache.lock().await.remove(id);
+                        Ok(false)
+                    }
+                    Err(e) => Err(e.into()),
+                }
             }
             CachePeekResult::Loading => Ok(true),
             CachePeekResult::NotPresent => Ok(false),
@@ -162,12 +171,12 @@ impl IndexCache {
         self.cache.lock().await.remove(id);
     }
 
-    pub async fn load(&self, id: &IndexId) -> anyhow::Result<Arc<IndexSearcher>> {
+    pub async fn load(&self, id: &IndexId) -> NidxResult<Arc<IndexSearcher>> {
         let t = Instant::now();
         let read = self.sync_metadata.get(id).await;
         let read2 = read.get().await;
         let Some(meta) = read2 else {
-            return Err(anyhow!("Index not found"));
+            return Err(crate::errors::NidxError::NotFound);
         };
 
         let segments = Segment::select_many(&self.metadb.pool, &meta.operations.segments().collect::<Vec<_>>())
