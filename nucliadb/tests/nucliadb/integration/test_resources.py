@@ -29,7 +29,6 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 
-@pytest.mark.asyncio
 async def test_resource_crud(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -70,7 +69,6 @@ async def test_resource_crud(
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_list_resources(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -106,7 +104,6 @@ async def test_list_resources(
     assert got_rids == rids
 
 
-@pytest.mark.asyncio
 async def test_get_resource_field(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -137,7 +134,6 @@ async def test_get_resource_field(
     assert body_by_slug == body_by_rid
 
 
-@pytest.mark.asyncio
 async def test_resource_creation_slug_conflicts(
     nucliadb_writer: AsyncClient,
     knowledgebox,
@@ -174,7 +170,6 @@ async def test_resource_creation_slug_conflicts(
     assert resp.status_code == 201
 
 
-@pytest.mark.asyncio
 async def test_title_is_set_automatically_if_not_provided(
     nucliadb_reader,
     nucliadb_writer,
@@ -195,7 +190,6 @@ async def test_title_is_set_automatically_if_not_provided(
     assert body["title"] == rid
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update_by", ["slug", "uuid"])
 async def test_resource_slug_modification(
     nucliadb_reader,
@@ -247,7 +241,6 @@ async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
         assert body[key] == value
 
 
-@pytest.mark.asyncio
 async def test_resource_slug_modification_rollbacks(
     nucliadb_reader,
     nucliadb_writer,
@@ -284,7 +277,6 @@ async def test_resource_slug_modification_rollbacks(
     await check_resource(nucliadb_reader, knowledgebox, rid, old_slug, title="New title")
 
 
-@pytest.mark.asyncio
 async def test_resource_slug_modification_handles_conflicts(
     nucliadb_writer,
     knowledgebox,
@@ -316,7 +308,6 @@ async def test_resource_slug_modification_handles_conflicts(
     assert resp.status_code == 409
 
 
-@pytest.mark.asyncio
 async def test_resource_slug_modification_handles_unknown_resources(
     nucliadb_writer,
     knowledgebox,
@@ -330,7 +321,6 @@ async def test_resource_slug_modification_handles_unknown_resources(
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_parallel_dup_resource_creation_raises_conflicts(
     nucliadb_writer,
     knowledgebox,

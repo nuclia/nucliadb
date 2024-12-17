@@ -31,7 +31,6 @@ from nucliadb.learning_proxy import (
 )
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
-from nucliadb_models.search import SearchOptions
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -53,9 +52,14 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 from tests.utils.dirty_index import wait_for_sync
+from tests.writer.test_fields import (
+    TEST_CONVERSATION_PAYLOAD,
+    TEST_FILE_PAYLOAD,
+    TEST_LINK_PAYLOAD,
+    TEST_TEXT_PAYLOAD,
+)
 
 
-@pytest.mark.asyncio
 async def test_kb_creation_allows_setting_learning_configuration(
     nucliadb_manager,
     nucliadb_reader,
@@ -95,7 +99,6 @@ async def test_kb_creation_allows_setting_learning_configuration(
         )
 
 
-@pytest.mark.asyncio
 async def test_creation(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -221,7 +224,6 @@ async def test_creation(
     assert len(resp.content) > 0
 
 
-@pytest.mark.asyncio
 async def test_can_create_knowledgebox_with_colon_in_slug(nucliadb_manager: AsyncClient):
     resp = await nucliadb_manager.post("/kbs", json={"slug": "something:else"})
     assert resp.status_code == 201
@@ -231,7 +233,6 @@ async def test_can_create_knowledgebox_with_colon_in_slug(nucliadb_manager: Asyn
     assert resp.json()["kbs"][0]["slug"] == "something:else"
 
 
-@pytest.mark.asyncio
 async def test_serialize_errors(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -244,7 +245,21 @@ async def test_serialize_errors(
     - Create a bm with errors for every type of field
     - Get the resource and check that error serialization works
     """
-    br = broker_resource(knowledgebox)
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My resource",
+            "texts": {"text": TEST_TEXT_PAYLOAD},
+            "links": {"link": TEST_LINK_PAYLOAD},
+            "files": {"file": TEST_FILE_PAYLOAD},
+            "conversations": {"conversation": TEST_CONVERSATION_PAYLOAD},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    br = broker_resource(knowledgebox, rid=rid)
 
     # Add an error for every field type
     fields_to_test = [
@@ -281,7 +296,6 @@ async def test_serialize_errors(
         assert resp_json["data"][ftypestring][fid]["error"]["code"] == 1
 
 
-@pytest.mark.asyncio
 async def test_entitygroups(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -320,7 +334,6 @@ async def test_entitygroups(
     assert resp.status_code == 400
 
 
-@pytest.mark.asyncio
 async def test_extracted_shortened_metadata(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -399,7 +412,6 @@ async def test_extracted_shortened_metadata(
                 assert len(meta[cropped_field]) > 0
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "field_id,error",
     [
@@ -433,7 +445,6 @@ async def test_field_ids_are_validated(
         assert resp.status_code == 201
 
 
-@pytest.mark.asyncio
 async def test_extra(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -510,7 +521,6 @@ async def test_extra(
     assert resp.json()["extra"] == extra
 
 
-@pytest.mark.asyncio
 async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -538,7 +548,6 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     assert resp.json()["icon"] == "application/pdf"
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "slug,valid",
     [
@@ -564,7 +573,6 @@ async def test_resource_slug_validation(nucliadb_writer, nucliadb_reader, knowle
         assert f"Invalid slug: '{slug}'" in detail["msg"]
 
 
-@pytest.mark.asyncio
 async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -596,7 +604,6 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     assert resp.json()["icon"] == "text/plain"
 
 
-@pytest.mark.asyncio
 async def test_language_metadata(
     nucliadb_writer,
     nucliadb_reader,
@@ -668,7 +675,6 @@ async def test_language_metadata(
     assert res["metadata"]["languages"] == []
 
 
-@pytest.mark.asyncio
 async def test_story_7081(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -700,7 +706,6 @@ async def test_story_7081(
     assert data["origin"]["metadata"]["some"] == "data"
 
 
-@pytest.mark.asyncio
 async def test_question_answer(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -780,7 +785,6 @@ async def test_question_answer(
     }
 
 
-@pytest.mark.asyncio
 async def test_question_answer_annotations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -835,7 +839,6 @@ async def test_question_answer_annotations(
     assert resource.fieldmetadata[0].question_answers[0] == qa_annotation  # type: ignore
 
 
-@pytest.mark.asyncio
 async def test_link_fields_store_css_selector(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -875,7 +878,6 @@ async def test_link_fields_store_css_selector(
     assert css_selector == "main"
 
 
-@pytest.mark.asyncio
 async def test_link_fields_store_xpath(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -915,50 +917,6 @@ async def test_link_fields_store_xpath(
     assert xpath == "my_xpath"
 
 
-@pytest.mark.asyncio
-async def test_pagination_limits(
-    nucliadb_reader: AsyncClient,
-):
-    # Maximum of 200 results per page
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/find",
-        json={
-            "query": "foo",
-            "features": [SearchOptions.SEMANTIC],
-            "page_size": 1000,
-        },
-    )
-    assert resp.status_code == 422
-    data = resp.json()
-    assert data["detail"][0]["msg"] == "Input should be less than or equal to 200"
-
-    # Max scrolling of 2000 vector results
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/find",
-        json={
-            "query": "foo",
-            "features": [SearchOptions.SEMANTIC],
-            "page_number": 30,
-            "page_size": 100,
-        },
-    )
-    assert resp.status_code == 412
-    data = resp.json()
-    assert "Pagination of semantic results limit reached" in data["detail"]
-
-    # Removing vectors allows to paginate without limits
-    resp = await nucliadb_reader.post(
-        f"/kb/kbid/find",
-        json={
-            "query": "foo",
-            "features": ["paragraph"],
-            "page_number": 30,
-            "page_size": 100,
-        },
-    )
-    assert resp.status_code != 412
-
-
 async def test_dates_are_properly_validated(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -996,7 +954,6 @@ async def test_dates_are_properly_validated(
     assert resp.json()["origin"]["created"] == "0001-01-01T00:00:00Z"
 
 
-@pytest.mark.asyncio
 async def test_file_computed_titles_are_set_on_resource_title(
     nucliadb_writer,
     nucliadb_grpc,

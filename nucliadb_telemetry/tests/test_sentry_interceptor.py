@@ -70,7 +70,6 @@ async def run_service(telemetry_grpc: GRPCTelemetry, greeter):
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.asyncio
 async def grpc_service(telemetry_grpc: GRPCTelemetry):
     greeter = SimpleGreeter()
     server, port = await run_service(telemetry_grpc, greeter)
@@ -79,7 +78,6 @@ async def grpc_service(telemetry_grpc: GRPCTelemetry):
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.asyncio
 async def faulty_grpc_service(telemetry_grpc: GRPCTelemetry):
     greeter = FaultyGreeter()
     server, port = await run_service(telemetry_grpc, greeter)
@@ -87,7 +85,6 @@ async def faulty_grpc_service(telemetry_grpc: GRPCTelemetry):
     await server.stop(grace=True)
 
 
-@pytest.mark.asyncio
 async def test_sentry_interceptor_without_errors(telemetry_grpc: GRPCTelemetry, grpc_service: int):
     port = grpc_service
     channel = telemetry_grpc.init_client(f"localhost:{port}")
@@ -101,7 +98,6 @@ async def test_sentry_interceptor_without_errors(telemetry_grpc: GRPCTelemetry, 
         assert mock_capture_exception.called is False
 
 
-@pytest.mark.asyncio
 async def test_sentry_interceptor_without_streaming_errors(
     telemetry_grpc: GRPCTelemetry, grpc_service: int
 ):
@@ -117,7 +113,6 @@ async def test_sentry_interceptor_without_streaming_errors(
             assert mock_capture_exception.called is False
 
 
-@pytest.mark.asyncio
 async def test_sentry_interceptor_raises_unhandled_exception(
     telemetry_grpc: GRPCTelemetry, faulty_grpc_service: int
 ):
@@ -135,7 +130,6 @@ async def test_sentry_interceptor_raises_unhandled_exception(
         assert mock_capture_exception.call_count == 1
 
 
-@pytest.mark.asyncio
 async def test_sentry_interceptor_raises_unhandled_exception_stream(
     telemetry_grpc: GRPCTelemetry, faulty_grpc_service: int
 ):

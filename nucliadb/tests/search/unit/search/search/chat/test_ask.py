@@ -71,8 +71,7 @@ def test_calculate_prequeries_for_json_schema():
         assert preq.request.rephrase is False
         assert preq.request.highlight is False
         # Only the top-10 results are requested for each query
-        assert preq.request.page_size == 10
-        assert preq.request.page_number == 0
+        assert preq.request.top_k == 10
         assert preq.request.show == []
         # Min score is propagated from the main query
         assert preq.request.min_score == 0.1

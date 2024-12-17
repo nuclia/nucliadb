@@ -79,7 +79,6 @@ async def test_iter_data_reading_content_error_is_not_retried(storage_field):
     storage_field._inner_iter_data.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_delete_kb_errors():
     kbid = "my-kbid"
     storage = GCSStorage(bucket="bucket")

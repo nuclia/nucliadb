@@ -18,14 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pytest
 
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.settings import settings
 from nucliadb_utils.utilities import clear_global_cache
 
 
-@pytest.mark.asyncio
 async def test_nats_pubsub(natsd):
     settings.cache_pubsub_nats_url = [natsd]
     second_pubsub = NatsPubsub(hosts=[natsd], name="second")

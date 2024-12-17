@@ -286,7 +286,6 @@ async def kbid(
     return knowledgebox
 
 
-@pytest.mark.asyncio
 async def test_filtering_before_and_after_reindexing(
     app_context, nucliadb_reader: AsyncClient, kbid: str
 ):

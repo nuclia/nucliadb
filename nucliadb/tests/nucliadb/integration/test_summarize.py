@@ -17,13 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pytest
 from httpx import AsyncClient
 
 from nucliadb_models.search import SummarizedResponse
 
 
-@pytest.mark.asyncio()
 async def test_summarize(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -63,7 +61,6 @@ async def test_summarize(
     assert set(response.resources.keys()) == set(resources)
 
 
-@pytest.mark.asyncio()
 async def test_summarize_unexisting_kb(
     nucliadb_reader: AsyncClient,
 ):

@@ -23,7 +23,6 @@ import io
 import os
 from typing import Callable
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
@@ -39,7 +38,6 @@ from nucliadb_utils.utilities import get_storage, get_transaction_utility
 ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_file_tus_options(
     writer_api: Callable[[list[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
 ):
@@ -74,7 +72,6 @@ async def test_knowledgebox_file_tus_options(
         assert resp.headers["tus-extension"] == "creation-defer-length"
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         language = base64.b64encode(b"ca").decode()
@@ -163,7 +160,6 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         assert resp.status_code == 409
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_file_upload_root(
     writer_api: Callable[[list[NucliaDBRoles]], AsyncClient],
     knowledgebox_writer: str,
@@ -217,7 +213,6 @@ async def test_knowledgebox_file_upload_root(
             assert resp.status_code == 409
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_file_upload_root_headers(
     writer_api: Callable[[list[NucliaDBRoles]], AsyncClient],
     knowledgebox_writer: str,
@@ -263,7 +258,6 @@ async def test_knowledgebox_file_upload_root_headers(
     assert len(data.read()) == 30472
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_file_tus_upload_field(writer_api, knowledgebox_writer, resource):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         language = base64.b64encode(b"ca").decode()
@@ -353,7 +347,6 @@ async def test_knowledgebox_file_tus_upload_field(writer_api, knowledgebox_write
     assert len(data.read()) == len(raw_bytes)
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_file_upload_field_headers(writer_api, knowledgebox_writer, resource):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         filename = "image.jpg"
@@ -397,7 +390,6 @@ async def test_knowledgebox_file_upload_field_headers(writer_api, knowledgebox_w
     assert len(data.read()) == 30472
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_file_upload_field_sync(writer_api, knowledgebox_writer, resource):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         filename = "image.jpg"
@@ -425,7 +417,6 @@ async def test_knowledgebox_file_upload_field_sync(writer_api, knowledgebox_writ
             ) is True
 
 
-@pytest.mark.asyncio
 async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, resource):
     kb = knowledgebox_writer
     rslug = "resource1"
@@ -515,7 +506,6 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
     assert len(data.read()) == len(raw_bytes)
 
 
-@pytest.mark.asyncio
 async def test_file_tus_upload_urls_field_by_resource_id(writer_api, knowledgebox_writer, resource):
     kb = knowledgebox_writer
 
@@ -554,7 +544,6 @@ async def test_file_tus_upload_urls_field_by_resource_id(writer_api, knowledgebo
         assert resp.headers["Upload-Offset"] == "0"
 
 
-@pytest.mark.asyncio
 async def test_multiple_tus_file_upload_tries(writer_api, knowledgebox_writer, resource):
     kb = knowledgebox_writer
     rslug = "resource1"
@@ -612,7 +601,6 @@ async def test_multiple_tus_file_upload_tries(writer_api, knowledgebox_writer, r
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
 
-@pytest.mark.asyncio
 async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
     kb = knowledgebox_writer
     rslug = "myslug"
@@ -672,7 +660,6 @@ def test_maybe_b64decode():
     assert maybe_b64decode(something) == something
 
 
-@pytest.mark.asyncio
 async def test_tus_validates_intermediate_chunks_length(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         language = base64.b64encode(b"ca").decode()

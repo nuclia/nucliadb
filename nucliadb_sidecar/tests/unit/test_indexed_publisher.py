@@ -28,7 +28,6 @@ from nucliadb_sidecar.signals import SuccessfulIndexingPayload, successful_index
 
 class TestIndexedPublisher:
     @pytest.fixture
-    @pytest.mark.asyncio
     async def indexed_publisher(self):
         ip = IndexedPublisher()
         await ip.initialize()
@@ -44,7 +43,6 @@ class TestIndexedPublisher:
         ):
             yield pubsub
 
-    @pytest.mark.asyncio
     async def test_listener_registration_in_lifecycle_functions(self):
         with patch("nucliadb_sidecar.listeners.indexed_publisher.signals") as signals:
             ip = IndexedPublisher()
@@ -54,7 +52,6 @@ class TestIndexedPublisher:
             await ip.finalize()
             assert signals.successful_indexing.remove_listener.call_count == 1
 
-    @pytest.mark.asyncio
     async def test_successful_indexing_triggers_notification(self, indexed_publisher, pubsub):
         pb = IndexMessage()
         pb.partition = "1"

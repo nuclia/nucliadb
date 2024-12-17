@@ -20,13 +20,9 @@
 
 import asyncio
 
-import pytest
-
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_shard_auto_create(

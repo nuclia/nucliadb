@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import math
 from datetime import datetime, timedelta
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
@@ -51,7 +50,6 @@ from nucliadb_utils.utilities import (
 from tests.utils import broker_resource, inject_message
 
 
-@pytest.mark.asyncio
 async def test_simple_search_sc_2062(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -139,7 +137,6 @@ async def create_resource_with_duplicates(knowledgebox, writer: WriterStub, sent
     return bm.uuid
 
 
-@pytest.mark.asyncio
 async def test_search_filters_out_duplicate_paragraphs(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -171,7 +168,6 @@ async def test_search_filters_out_duplicate_paragraphs(
     assert len(content["paragraphs"]["results"]) == 4
 
 
-@pytest.mark.asyncio
 async def test_search_returns_paragraph_positions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -243,7 +239,6 @@ def broker_resource_with_classifications(knowledgebox):
     return bm
 
 
-@pytest.mark.asyncio
 async def test_search_returns_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -263,7 +258,6 @@ async def test_search_returns_labels(
     assert par["labels"] == ["labelset1/label2", "labelset1/label1"]
 
 
-@pytest.mark.asyncio
 async def test_search_with_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -290,7 +284,6 @@ async def test_search_with_filters(
     assert len(resp.json()["resources"]) == 0
 
 
-@pytest.mark.asyncio
 async def test_paragraph_search_with_filters(
     nucliadb_writer,
     nucliadb_reader,
@@ -328,7 +321,6 @@ async def test_paragraph_search_with_filters(
 
 
 @pytest.mark.skip(reason="Needs sc-5626")
-@pytest.mark.asyncio
 async def test_(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -375,7 +367,6 @@ async def test_(
     assert intro_to_python in resources
 
 
-@pytest.mark.asyncio
 async def test_search_returns_sentence_positions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -445,7 +436,6 @@ async def inject_resource_with_a_sentence(knowledgebox, writer):
     await inject_message(writer, bm)
 
 
-@pytest.mark.asyncio
 async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -566,7 +556,6 @@ async def test_search_relations(
             assert expected_relation in entities[entity]["related_to"]
 
 
-@pytest.mark.asyncio
 async def test_search_automatic_relations(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
 ):
@@ -771,7 +760,6 @@ async def get_audit_messages(sub):
     return auditreq
 
 
-@pytest.mark.asyncio
 async def test_search_sends_audit(
     nucliadb_reader,
     knowledgebox,
@@ -816,139 +804,6 @@ async def test_search_sends_audit(
     clean_utility(Utility.AUDIT)
 
 
-@pytest.mark.asyncio
-async def test_search_pagination(
-    nucliadb_reader: AsyncClient,
-    ten_quick_dummy_resources_kb,
-):
-    kbid = ten_quick_dummy_resources_kb
-
-    total = 20  # 10 titles and 10 summaries
-    page_size = 5
-
-    for feature, result_key in [
-        (SearchOptions.KEYWORD.value, "paragraphs"),
-        (SearchOptions.FULLTEXT.value, "fulltext"),
-    ]:
-        total_pages = math.floor(total / page_size)
-        for page_number in range(0, total_pages):
-            resp = await nucliadb_reader.get(
-                f"/kb/{kbid}/search",
-                params={
-                    "features": [feature],
-                    "page_number": page_number,
-                    "page_size": page_size,
-                },
-            )
-            assert resp.status_code == 200
-            body = resp.json()[result_key]
-            assert body["next_page"] == (page_number != total_pages - 1)
-            assert len(body["results"]) == body["page_size"] == page_size
-
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/search",
-            params={
-                "features": [feature],
-                "page_number": page_number + 1,
-                "page_size": page_size,
-            },
-        )
-        assert resp.status_code == 200
-        body = resp.json()[result_key]
-        assert body["next_page"] is False
-        assert len(body["results"]) == 0
-
-
-@pytest.mark.asyncio
-async def test_resource_search_pagination(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox,
-):
-    kbid = knowledgebox
-
-    n_texts = 20
-    texts = [(f"text-{i}", f"Dummy text field to test ({i})") for i in range(n_texts)]
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={
-            "title": "Resource with ",
-            "slug": "resource-with-texts",
-            "texts": {
-                id: {
-                    "body": text,
-                    "format": "PLAIN",
-                }
-                for id, text in texts
-            },
-        },
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    bm = BrokerMessage()
-    bm.kbid = kbid
-    bm.uuid = rid
-    bm.type = BrokerMessage.AUTOCOMMIT
-    bm.source = BrokerMessage.MessageSource.PROCESSOR
-
-    for id, text in texts:
-        bm.texts[id].body = text
-        bm.texts[id].format = rpb.FieldText.Format.PLAIN
-
-        etw = rpb.ExtractedTextWrapper()
-        etw.field.field = id
-        etw.field.field_type = rpb.FieldType.TEXT
-        etw.body.text = text
-        bm.extracted_text.append(etw)
-
-        fcm = rpb.FieldComputedMetadataWrapper()
-        paragraph = rpb.Paragraph(start=0, end=len(text), kind=rpb.Paragraph.TypeParagraph.TEXT)
-        fcm.metadata.metadata.paragraphs.append(paragraph)
-        fcm.field.field = id
-        fcm.field.field_type = rpb.FieldType.TEXT
-        bm.field_metadata.append(fcm)
-
-    await inject_message(nucliadb_grpc, bm)
-
-    total = n_texts
-    page_size = 5
-    total_pages = math.floor(total / page_size)
-    query = "text"
-
-    for page_number in range(0, total_pages):
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/resource/{rid}/search",
-            params={
-                "query": query,
-                "features": [SearchOptions.KEYWORD],
-                "page_number": page_number,
-                "page_size": page_size,
-            },
-        )
-        assert resp.status_code == 200
-        body = resp.json()["paragraphs"]
-        assert body["next_page"] == (page_number != total_pages - 1)
-        assert len(body["results"]) == body["page_size"] == page_size
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/search",
-        params={
-            "query": query,
-            "features": [SearchOptions.KEYWORD],
-            "page_number": page_number + 1,
-            "page_size": page_size,
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()["paragraphs"]
-    assert body["next_page"] is False
-    assert len(body["results"]) == 0
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize("endpoint", ["search", "find"])
 async def test_search_endpoints_handle_predict_errors(
     nucliadb_reader: AsyncClient,
@@ -1072,7 +927,6 @@ async def kb_with_two_logic_shards(
 
 
 @pytest.mark.flaky(reruns=5)
-@pytest.mark.asyncio
 async def test_search_two_logic_shards(
     nucliadb_reader: AsyncClient,
     nucliadb_manager: AsyncClient,
@@ -1178,7 +1032,6 @@ async def test_facets_validation(
                 assert error_message in resp.json()["detail"][0]["msg"]
 
 
-@pytest.mark.asyncio
 async def test_search_marks_fuzzy_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1235,7 +1088,6 @@ def check_fuzzy_paragraphs(search_response, *, fuzzy_result: bool, n_expected: i
     assert found == n_expected
 
 
-@pytest.mark.asyncio
 async def test_search_by_path_filter(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1282,7 +1134,6 @@ async def test_search_by_path_filter(
     assert len(resp.json()["resources"]) == 1
 
 
-@pytest.mark.asyncio
 async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
     resp = await nucliadb_reader.get(
         "/kb/00000000000000/search?query=own+text",
@@ -1290,7 +1141,6 @@ async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio()
 async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledgebox):
     kb = knowledgebox
     # If query is not present, should not fail
@@ -1303,7 +1153,6 @@ async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledg
         assert resp.status_code == 200
 
 
-@pytest.mark.asyncio()
 async def test_search_with_duplicates(nucliadb_reader, knowledgebox):
     kb = knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/search?with_duplicates=True")
@@ -1322,7 +1171,6 @@ def search_with_limits_exceeded_error():
         yield
 
 
-@pytest.mark.asyncio()
 async def test_search_handles_limits_exceeded_error(
     nucliadb_reader, knowledgebox, search_with_limits_exceeded_error
 ):
@@ -1336,7 +1184,6 @@ async def test_search_handles_limits_exceeded_error(
     assert resp.json() == {"detail": "over the quota"}
 
 
-@pytest.mark.asyncio
 async def test_catalog_post(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1377,7 +1224,6 @@ async def test_api_does_not_show_tracebacks_on_api_errors(not_debug, nucliadb_re
         assert resp.json() == {"detail": "Something went wrong, please contact your administrator"}
 
 
-@pytest.mark.asyncio
 async def test_catalog_pagination(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1429,7 +1275,6 @@ async def test_catalog_pagination(
     assert len(resource_uuids) == n_resources
 
 
-@pytest.mark.asyncio
 async def test_catalog_date_range_filtering(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1471,7 +1316,6 @@ async def test_catalog_date_range_filtering(
     assert len(body["resources"]) == 0
 
 
-@pytest.mark.asyncio
 async def test_catalog_faceted(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1500,7 +1344,6 @@ async def test_catalog_faceted(
         assert count == 1
 
 
-@pytest.mark.asyncio
 async def test_catalog_faceted_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1553,7 +1396,6 @@ async def test_catalog_faceted_labels(
     }
 
 
-@pytest.mark.asyncio
 async def test_catalog_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

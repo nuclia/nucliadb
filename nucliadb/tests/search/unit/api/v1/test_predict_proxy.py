@@ -30,8 +30,6 @@ from nucliadb.search.api.v1.predict_proxy import predict_proxy_endpoint
 from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints
 from nucliadb_utils.exceptions import LimitsExceededError
 
-pytestmark = pytest.mark.asyncio
-
 MODULE = "nucliadb.search.api.v1.predict_proxy"
 
 

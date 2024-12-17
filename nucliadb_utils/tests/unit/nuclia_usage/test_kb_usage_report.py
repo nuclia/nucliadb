@@ -23,8 +23,6 @@ import time
 from functools import partial
 from unittest.mock import AsyncMock, Mock
 
-import pytest
-
 from nucliadb_protos.kb_usage_pb2 import (
     ClientType,
     KBSource,
@@ -63,7 +61,6 @@ async def wait_until(condition, timeout=1):
             raise Exception("TESTING ERROR: Condition was never reached")
 
 
-@pytest.mark.asyncio
 async def test_kb_usage_report():
     nats_stream = Mock(publish=AsyncMock())
     report_util = KbUsageReportUtility(nats_stream=nats_stream, nats_subject="test-stream")

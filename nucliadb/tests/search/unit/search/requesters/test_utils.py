@@ -96,7 +96,6 @@ def faulty_search_methods():
         yield faulty_methods
 
 
-@pytest.mark.asyncio
 async def test_node_query_retries_primary_if_secondary_fails(
     fake_nodes,
     shard_manager,
@@ -127,7 +126,6 @@ def mocked_search_methods():
         yield methods
 
 
-@pytest.mark.asyncio
 async def test_node_dont_retry_if_secondary_succeeds(
     fake_nodes,
     shard_manager,

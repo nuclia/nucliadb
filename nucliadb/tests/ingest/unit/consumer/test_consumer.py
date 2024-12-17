@@ -38,7 +38,6 @@ def consumer(storage):
     yield IngestConsumer(None, "partition", storage, None)
 
 
-@pytest.mark.asyncio
 async def test_get_broker_message(consumer: IngestConsumer, storage):
     bm = BrokerMessage(kbid="kbid")
     msg = Mock(data=bm.SerializeToString(), headers={})
@@ -46,7 +45,6 @@ async def test_get_broker_message(consumer: IngestConsumer, storage):
     storage.get_stream_message.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_get_broker_message_proxied(consumer: IngestConsumer, storage):
     bm = BrokerMessage(kbid="kbid")
     bmr = BrokerMessageBlobReference(kbid="kbid", storage_key="storage_key")
@@ -59,7 +57,6 @@ async def test_get_broker_message_proxied(consumer: IngestConsumer, storage):
     storage.get_stream_message.assert_awaited_once_with("storage_key")
 
 
-@pytest.mark.asyncio
 async def test_clean_broker_message_proxied(consumer: IngestConsumer, storage):
     bmr = BrokerMessageBlobReference(kbid="kbid", storage_key="storage_key")
     msg = Mock(data=bmr.SerializeToString(), headers={"X-MESSAGE-TYPE": "PROXY"})

@@ -25,8 +25,6 @@ from nucliadb.migrator import migrator
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.settings import Settings
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 async def execution_context(natsd, storage, nucliadb):

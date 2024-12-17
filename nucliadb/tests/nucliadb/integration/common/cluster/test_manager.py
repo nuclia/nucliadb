@@ -138,7 +138,6 @@ async def shards(fake_nodes, fake_kbid: str, maindb_driver: Driver):
         (1, {"node-1", "node-2"}),
     ],
 )
-@pytest.mark.asyncio
 async def test_choose_node_always_prefer_the_same_node(shards, shard_index: int, nodes: set):
     shard = shards.shards[shard_index]
     node_ids = set()
@@ -177,7 +176,6 @@ async def test_choose_node_raises_if_no_nodes(shards):
         manager.choose_node(shard, use_nidx=False)
 
 
-@pytest.mark.asyncio
 async def test_apply_for_all_shards(fake_kbid: str, shards, maindb_driver: Driver):
     kbid = fake_kbid
 

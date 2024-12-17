@@ -61,7 +61,6 @@ def resource(txn, storage):
     yield resource
 
 
-@pytest.mark.asyncio
 async def test_get_metadata(resource):
     conv = Conversation("faq", resource)
     assert conv.value == {}
@@ -116,7 +115,6 @@ def get_message(id, who, to, text, attachments=None):
     return msg
 
 
-@pytest.mark.asyncio
 async def test_get_value(resource):
     conv = Conversation("faq", resource)
 

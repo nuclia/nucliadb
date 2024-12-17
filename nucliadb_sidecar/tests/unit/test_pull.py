@@ -53,17 +53,14 @@ class TestIndexedPublisher:
         delpb.kbid = "kbid"
         return delpb
 
-    @pytest.mark.asyncio
     async def test_initialize(self, publisher, pubsub):
         assert publisher.pubsub == pubsub
 
-    @pytest.mark.asyncio
     async def test_finalize(self, publisher, pubsub):
         await publisher.finalize()
 
         pubsub.finalize.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_indexed(self, publisher, index_message, pubsub):
         await publisher.indexed(index_message)
 
@@ -71,7 +68,6 @@ class TestIndexedPublisher:
         pubsub.publish.assert_awaited_once()
         assert pubsub.publish.call_args[0][0] == channel
 
-    @pytest.mark.asyncio
     async def test_indexed_skips_if_no_partition(self, publisher, index_message, pubsub):
         index_message.ClearField("partition")
 

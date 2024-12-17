@@ -19,11 +19,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from nucliadb_sidecar import app
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_main():

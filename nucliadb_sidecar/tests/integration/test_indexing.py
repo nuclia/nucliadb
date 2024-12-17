@@ -43,7 +43,6 @@ from tests.fixtures import Reader
 TEST_PARTITION = "111"
 
 
-@pytest.mark.asyncio
 async def test_indexing(worker, shard: str, reader: Reader):
     node = settings.force_host_id
 
@@ -81,7 +80,6 @@ async def test_indexing(worker, shard: str, reader: Reader):
     assert await storage.get_indexing(index) is not None
 
 
-@pytest.mark.asyncio
 async def test_prioritary_indexing_on_one_shard(
     worker,
     shard: str,
@@ -207,7 +205,6 @@ class TestConcurrentIndexingFailureRecovery:
         worker.writer.delete_resource = original_delete_resource
         settings.indexer_delay_after_error = original_delay
 
-    @pytest.mark.asyncio
     async def test(
         self,
         bunch_of_shards: list[str],
@@ -269,7 +266,6 @@ class TestConcurrentIndexingFailureRecovery:
         assert seqids_by_shard == seqids_log
 
 
-@pytest.mark.asyncio
 async def test_indexing_not_found(worker, reader):
     node = settings.force_host_id
     shard = "fake-shard"
@@ -285,7 +281,6 @@ async def test_indexing_not_found(worker, reader):
     await wait_for_indexed_message("kb")
 
 
-@pytest.mark.asyncio
 async def test_indexing_publishes_to_sidecar_index_stream(worker, shard: str, natsd):
     node_id = settings.force_host_id
     assert node_id

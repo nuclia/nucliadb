@@ -21,7 +21,6 @@ import asyncio
 from typing import AsyncIterator
 
 import aiohttp
-import pytest
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
@@ -50,7 +49,6 @@ async def get_paragraph_streaming_batch_from_response(
         yield pcb
 
 
-@pytest.mark.asyncio
 async def test_generator_paragraph_streaming(
     train_rest_api: aiohttp.ClientSession,
     nucliadb_grpc: WriterStub,

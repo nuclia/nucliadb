@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
-from pytest_mock import MockFixture
+from pytest_mock import MockerFixture
 
 import nucliadb_models
 from nucliadb.common import datamanagers
@@ -45,7 +45,6 @@ from tests.writer.test_fields import (
 )
 
 
-@pytest.mark.asyncio
 async def test_resource_crud(writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str):
     knowledgebox_id = knowledgebox_writer
     async with writer_api([NucliaDBRoles.WRITER]) as client:
@@ -130,7 +129,6 @@ async def test_resource_crud(writer_api: Callable[[list[str]], AsyncClient], kno
         assert resp.status_code == 204
 
 
-@pytest.mark.asyncio
 async def test_resource_crud_sync(
     writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
 ):
@@ -226,11 +224,10 @@ async def test_resource_crud_sync(
         ) is False
 
 
-@pytest.mark.asyncio
 async def test_create_resource_async(
     writer_api: Callable[[list[str]], AsyncClient],
     knowledgebox_writer: str,
-    mocker: MockFixture,
+    mocker: MockerFixture,
 ):
     """Create a resoure and don't wait for it"""
     kbid = knowledgebox_writer
@@ -281,7 +278,6 @@ async def test_create_resource_async(
         assert spy.call_args.kwargs["wait"] is False
 
 
-@pytest.mark.asyncio
 async def test_reprocess_resource(
     writer_api: Callable[..., AsyncClient],
     test_resource: Resource,
@@ -327,7 +323,6 @@ async def test_reprocess_resource(
         )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "method,endpoint,payload",
     [
@@ -371,7 +366,6 @@ async def test_resource_endpoints_by_slug(
         assert resp.status_code in (200, 202, 204)
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "method,endpoint,payload",
     [
@@ -406,7 +400,6 @@ async def test_resource_endpoints_by_slug_404(
         assert resp.json()["detail"] == "Resource does not exist"
 
 
-@pytest.mark.asyncio
 async def test_reindex(writer_api, test_resource):
     rsc = test_resource
     kbid = rsc.kb.kbid
@@ -423,7 +416,6 @@ async def test_reindex(writer_api, test_resource):
         assert resp.status_code == 200
 
 
-@pytest.mark.asyncio
 async def test_paragraph_annotations(writer_api, knowledgebox_writer):
     kbid = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -493,7 +485,6 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         assert body["detail"] == "Paragraph classifications need to be unique"
 
 
-@pytest.mark.asyncio
 async def test_hide_on_creation(
     writer_api: Callable[[list[str]], AsyncClient],
     knowledgebox_writer: str,

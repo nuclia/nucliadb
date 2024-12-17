@@ -26,7 +26,7 @@ from nucliadb_utils.storages.storage import StorageField
 LINK_METADATA = "link_metadata"
 
 
-class Link(Field):
+class Link(Field[FieldLink]):
     pbklass = FieldLink
     value: FieldLink
     type: str = "u"
@@ -45,7 +45,7 @@ class Link(Field):
     async def set_value(self, payload: FieldLink):
         await self.db_set_value(payload)
 
-    async def get_value(self) -> FieldLink:
+    async def get_value(self) -> Optional[FieldLink]:
         return await self.db_get_value()
 
     async def set_link_extracted_data(self, link_extracted_data: LinkExtractedData):

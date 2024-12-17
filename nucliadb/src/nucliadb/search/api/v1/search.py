@@ -113,8 +113,6 @@ async def search_knowledgebox(
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
     sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
-    page_number: int = fastapi_query(SearchParamDefaults.page_number, deprecated=True),
-    page_size: int = fastapi_query(SearchParamDefaults.page_size, deprecated=True),
     top_k: int = fastapi_query(SearchParamDefaults.top_k),
     min_score: Optional[float] = Query(
         default=None,
@@ -178,8 +176,6 @@ async def search_knowledgebox(
                 if sort_field is not None
                 else None
             ),
-            page_number=page_number,
-            page_size=page_size,
             top_k=top_k,
             min_score=min_score_from_query_params(min_score_bm25, min_score_semantic, min_score),
             vectorset=vectorset,
@@ -227,8 +223,8 @@ async def catalog_get(
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
     sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
-    page_number: int = fastapi_query(SearchParamDefaults.page_number),
-    page_size: int = fastapi_query(SearchParamDefaults.page_size),
+    page_number: int = fastapi_query(SearchParamDefaults.catalog_page_number),
+    page_size: int = fastapi_query(SearchParamDefaults.catalog_page_size),
     shards: list[str] = fastapi_query(SearchParamDefaults.shards, deprecated=True),
     with_status: Optional[ResourceProcessingStatus] = fastapi_query(
         SearchParamDefaults.with_status, deprecated="Use filters instead"
@@ -417,9 +413,6 @@ async def search(
     do_audit: bool = True,
     with_status: Optional[ResourceProcessingStatus] = None,
 ) -> tuple[KnowledgeboxSearchResults, bool]:
-    if item.page_number > 0:
-        logger.warning("Someone is still using pagination!", extra={"kbid": kbid, "endpoint": "search"})
-
     audit = get_audit()
     start_time = time()
 
@@ -438,8 +431,8 @@ async def search(
         keyword_filters=[],
         faceted=item.faceted,
         sort=item.sort,
-        page_number=item.page_number,
-        page_size=item.page_size,
+        page_number=0,
+        page_size=item.top_k,
         min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
@@ -468,8 +461,8 @@ async def search(
     # We need to merge
     search_results = await merge_results(
         results,
-        count=item.page_size,
-        page=item.page_number,
+        count=item.top_k,
+        page=0,
         kbid=kbid,
         show=item.show,
         field_type_filter=item.field_type_filter,

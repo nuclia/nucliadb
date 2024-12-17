@@ -20,11 +20,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from nucliadb_utils import run
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_run_until_exit():

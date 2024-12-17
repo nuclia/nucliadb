@@ -38,7 +38,6 @@ async def pubsub(nats_conn):
     yield ps
 
 
-@pytest.mark.asyncio
 async def test_unsubscribe_twice_raises_key_error(pubsub: NatsPubsub):
     key = "foobar"
     await pubsub.subscribe(lambda x: None, key, group="", subscription_id=key)

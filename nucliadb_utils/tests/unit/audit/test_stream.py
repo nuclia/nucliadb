@@ -76,7 +76,6 @@ async def wait_until(condition, timeout=1):
             raise Exception("TESTING ERROR: Condition was never reached")
 
 
-@pytest.mark.asyncio
 async def test_lifecycle(audit_storage: StreamAuditStorage, nats):
     nats.jetstream.assert_called_once()
 
@@ -84,7 +83,6 @@ async def test_lifecycle(audit_storage: StreamAuditStorage, nats):
     nats.close.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_publish(audit_storage: StreamAuditStorage, nats):
     await audit_storage.initialize()
     audit_storage.send(AuditRequest())
@@ -92,14 +90,12 @@ async def test_publish(audit_storage: StreamAuditStorage, nats):
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
-@pytest.mark.asyncio
 async def test_report(audit_storage: StreamAuditStorage, nats):
     audit_storage.report_and_send(kbid="kbid", audit_type=AuditRequest.AuditType.DELETED)
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
-@pytest.mark.asyncio
 async def test_visited(audit_storage: StreamAuditStorage, nats):
     from nucliadb_utils.audit.stream import RequestContext, request_context_var
 
@@ -110,14 +106,12 @@ async def test_visited(audit_storage: StreamAuditStorage, nats):
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
-@pytest.mark.asyncio
 async def test_delete_kb(audit_storage: StreamAuditStorage, nats):
     audit_storage.delete_kb("kbid")
 
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
-@pytest.mark.asyncio
 async def test_search(audit_storage: StreamAuditStorage, nats):
     from nucliadb_utils.audit.stream import RequestContext, request_context_var
 
@@ -128,7 +122,6 @@ async def test_search(audit_storage: StreamAuditStorage, nats):
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 
 
-@pytest.mark.asyncio
 async def test_chat(audit_storage: StreamAuditStorage, nats):
     from nucliadb_utils.audit.stream import RequestContext, request_context_var
 

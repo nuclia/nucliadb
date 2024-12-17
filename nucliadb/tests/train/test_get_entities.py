@@ -41,7 +41,6 @@ async def entities_manager_mock():
     nodes.EntitiesManager = original
 
 
-@pytest.mark.asyncio
 async def test_get_entities(
     train_client: TrainStub,
     knowledgebox_ingest: str,
@@ -59,7 +58,6 @@ async def test_get_entities(
     assert entities.groups["group1"].entities["entity1"].value == "PERSON"
 
 
-@pytest.mark.asyncio
 async def test_get_entities_kb_not_found(train_client: TrainStub) -> None:
     req = GetEntitiesRequest()
     req.kb.uuid = str(uuid.uuid4())
@@ -67,7 +65,6 @@ async def test_get_entities_kb_not_found(train_client: TrainStub) -> None:
     assert entities.status == GetEntitiesResponse.Status.NOTFOUND
 
 
-@pytest.mark.asyncio
 async def test_get_entities_error(
     train_client: TrainStub, knowledgebox_ingest: str, entities_manager_mock
 ) -> None:

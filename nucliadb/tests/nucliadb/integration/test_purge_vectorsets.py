@@ -20,8 +20,6 @@
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KB_VECTORSET_TO_DELETE
 from nucliadb.purge import purge_kb_vectorsets
@@ -31,7 +29,6 @@ from nucliadb_utils.storages.storage import Storage
 from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
 
 
-@pytest.mark.asyncio
 async def test_purge_vectorsets(
     maindb_driver: Driver,
     storage: Storage,

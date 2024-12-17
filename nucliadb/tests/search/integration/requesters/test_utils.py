@@ -33,7 +33,6 @@ from nucliadb_models.search import (
 )
 
 
-@pytest.mark.asyncio
 @pytest.mark.xfail  # pulling start/end position for vectors results needs to be fixed
 async def test_vector_result_metadata(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str

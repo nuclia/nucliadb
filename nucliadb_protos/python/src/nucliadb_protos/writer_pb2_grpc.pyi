@@ -112,6 +112,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper as ExtractedTextWrapper,
     ExtractedVectorsWrapper as ExtractedVectorsWrapper,
     FILE as FILE,
+    FieldAuthor as FieldAuthor,
     FieldClassifications as FieldClassifications,
     FieldComputedMetadata as FieldComputedMetadata,
     FieldComputedMetadataWrapper as FieldComputedMetadataWrapper,

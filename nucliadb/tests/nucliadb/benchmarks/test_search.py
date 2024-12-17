@@ -41,7 +41,6 @@ from tests.utils import inject_message
     disable_gc=True,
     warmup=False,
 )
-@pytest.mark.asyncio
 async def test_search_returns_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -68,7 +67,6 @@ async def test_search_returns_labels(
     disable_gc=True,
     warmup=False,
 )
-@pytest.mark.asyncio
 async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

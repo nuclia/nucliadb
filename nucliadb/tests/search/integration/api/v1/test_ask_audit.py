@@ -20,7 +20,6 @@
 from typing import Callable
 
 import nats
-import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
@@ -37,7 +36,6 @@ async def get_audit_messages(sub):
     return auditreq
 
 
-@pytest.mark.asyncio
 async def test_ask_sends_only_one_audit(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str, stream_audit
 ) -> None:

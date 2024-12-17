@@ -40,8 +40,6 @@ from tests.utils.entities import (
     update_entities_group,
 )
 
-pytestmark = pytest.mark.asyncio
-
 
 class TestEntitiesApi:
     @pytest.fixture

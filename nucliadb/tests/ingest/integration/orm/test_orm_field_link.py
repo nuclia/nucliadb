@@ -20,8 +20,6 @@
 from datetime import datetime
 from uuid import uuid4
 
-import pytest
-
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import FieldLink as PBFieldLink
@@ -29,7 +27,6 @@ from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_field_link(
     storage: Storage, cache, fake_node, knowledgebox_ingest: str, maindb_driver
 ):

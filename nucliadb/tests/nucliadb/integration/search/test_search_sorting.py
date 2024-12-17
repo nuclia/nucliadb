@@ -25,7 +25,6 @@ from httpx import AsyncClient
 from nucliadb_models.search import SearchOptions
 
 
-@pytest.mark.asyncio
 async def test_search_sort_by_score(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -60,7 +59,6 @@ async def test_search_sort_by_score(
         ("modified", "desc", lambda x: list(reversed(sorted(x)))),
     ],
 )
-@pytest.mark.asyncio
 async def test_search_sorted_by_creation_and_modification_dates(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -102,7 +100,6 @@ async def test_search_sorted_by_creation_and_modification_dates(
         ("title", "desc", lambda x: list(reversed(sorted(x)))),
     ],
 )
-@pytest.mark.asyncio
 async def test_limited_sorted_search_of_most_relevant_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -146,7 +143,6 @@ async def test_limited_sorted_search_of_most_relevant_results(
         assert sort_fields == sort_function(sort_fields)
 
 
-@pytest.mark.asyncio
 async def test_empty_query_search_for_ordered_resources_by_creation_date_desc(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -171,7 +167,6 @@ async def test_empty_query_search_for_ordered_resources_by_creation_date_desc(
         assert creation_dates == sorted(creation_dates, reverse=True)
 
 
-@pytest.mark.asyncio
 async def test_list_all_resources_by_creation_and_modification_dates_with_empty_queries(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -229,104 +224,3 @@ async def test_list_all_resources_by_creation_and_modification_dates_with_empty_
                 datetime.fromisoformat(resources[result["rid"]][sort_field]) for result in results
             ]
             assert sort_fields == sort_function(sort_fields)  # type: ignore
-
-
-@pytest.mark.asyncio
-async def test_search_sorting_most_relevant_results_with_pagination(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    philosophy_books_kb,
-):
-    """Test sorting N most relevant results using pagination. Check two
-    pages contain sorted and no repeated elements. Validate asking for
-    a page outside the limit established gives empty results.
-
-    """
-    kbid = philosophy_books_kb
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/search",
-        params={"query": "philosophy", "sort_field": "title", "sort_limit": 100},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["fulltext"]["total"] == 4
-    assert body["paragraphs"]["total"] == 4
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
-        json={
-            "query": "philosophy",
-            "sort": {
-                "field": "title",
-                "limit": 3,
-            },
-        },
-    )
-    assert resp.status_code == 200
-    one_page_response = resp.json()
-
-    resources = {}
-    fulltext = []
-    paragraphs = []
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
-        json={
-            "query": "philosophy",
-            "sort": {
-                "field": "title",
-                "limit": 3,
-            },
-            "page_size": 2,
-            "page_number": 0,
-        },
-    )
-    assert resp.status_code == 200
-
-    body = resp.json()
-    resources.update(body["resources"])
-    fulltext.extend(body["fulltext"]["results"])
-    paragraphs.extend(body["paragraphs"]["results"])
-
-    assert len(fulltext) == len(paragraphs) == 2
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/search",
-        params={
-            "query": "philosophy",
-            "sort_field": "title",
-            "sort_limit": 3,
-            "page_size": 2,
-            "page_number": 1,
-        },
-    )
-    assert resp.status_code == 200
-
-    body = resp.json()
-    resources.update(body["resources"])
-    fulltext.extend(body["fulltext"]["results"])
-    paragraphs.extend(body["paragraphs"]["results"])
-
-    assert len(fulltext) == len(paragraphs) == 3
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/search",
-        json={
-            "query": "philosophy",
-            "sort": {
-                "field": "title",
-                "limit": 3,
-            },
-            "page_size": 2,
-            "page_number": 2,
-        },
-    )
-    assert resp.status_code == 200
-
-    body = resp.json()
-    assert len(body["fulltext"]["results"]) == 0
-    assert len(body["paragraphs"]["results"]) == 0
-
-    assert fulltext == one_page_response["fulltext"]["results"][:3]
-    assert paragraphs == one_page_response["paragraphs"]["results"][:3]

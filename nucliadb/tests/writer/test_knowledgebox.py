@@ -20,7 +20,6 @@
 from typing import Callable
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.learning_proxy import LearningConfiguration, SemanticConfig, SimilarityFunction
@@ -28,7 +27,6 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
 
-@pytest.mark.asyncio
 async def test_knowledgebox_lifecycle(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(

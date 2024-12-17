@@ -56,7 +56,6 @@ def audit():
         yield audit_mock
 
 
-@pytest.mark.asyncio()
 async def test_ask(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -84,7 +83,6 @@ def find_incomplete_results():
         yield
 
 
-@pytest.mark.asyncio()
 async def test_ask_handles_incomplete_find_results(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -112,7 +110,6 @@ async def resource(nucliadb_writer, knowledgebox):
     yield rid
 
 
-@pytest.mark.asyncio()
 async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resource):
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
@@ -126,7 +123,6 @@ async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resou
     assert resp_data.status == AnswerStatusCode.SUCCESS.prettify()
 
 
-@pytest.mark.asyncio()
 async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, resource):
     citations = {"foo": [], "bar": []}  # type: ignore
     citations_gen = CitationsGenerativeResponse(citations=citations)
@@ -147,7 +143,6 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, re
     assert resp_citations == citations
 
 
-@pytest.mark.asyncio()
 @pytest.mark.parametrize("debug", (True, False))
 async def test_sync_ask_returns_debug_mode(nucliadb_reader: AsyncClient, knowledgebox, resource, debug):
     # Make sure prompt context is returned if debug is True
@@ -201,7 +196,6 @@ def parse_ask_response(resp):
     return results
 
 
-@pytest.mark.asyncio()
 async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resource1, resource2 = resources
 
@@ -233,7 +227,6 @@ async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowl
     assert prompt_context[f"{resource2}/t/text_field"] == "The body of the text field"
 
 
-@pytest.mark.asyncio()
 async def test_ask_full_resource_rag_strategy_with_exclude(
     nucliadb_reader: AsyncClient, knowledgebox, resources
 ):
@@ -288,7 +281,6 @@ async def test_ask_full_resource_rag_strategy_with_exclude(
     assert prompt_context[f"{resource2}/t/text_field"] == "The body of the text field"
 
 
-@pytest.mark.asyncio()
 async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, knowledgebox, resources):
     resource1, resource2 = resources
 
@@ -321,7 +313,6 @@ async def test_ask_rag_options_extend_with_fields(nucliadb_reader: AsyncClient, 
     assert prompt_context[f"{resource2}/a/summary"] == "The summary 1"
 
 
-@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     "invalid_payload,expected_error_msg",
     [
@@ -408,7 +399,6 @@ async def test_ask_rag_strategies_validation(nucliadb_reader, invalid_payload, e
         assert expected_error_msg in error_msg
 
 
-@pytest.mark.asyncio()
 async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox, resources):
     # By default, max size is big enough to fit all the prompt context
     resp = await nucliadb_reader.post(
@@ -446,13 +436,11 @@ async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox, re
     assert total_size <= max_size * 3
 
 
-@pytest.mark.asyncio()
 async def test_ask_on_a_kb_not_found(nucliadb_reader):
     resp = await nucliadb_reader.post("/kb/unknown_kb_id/ask", json={"query": "title"})
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio()
 async def test_ask_max_tokens(nucliadb_reader, knowledgebox, resources):
     # As an integer
     resp = await nucliadb_reader.post(
@@ -486,7 +474,6 @@ async def test_ask_max_tokens(nucliadb_reader, knowledgebox, resources):
     assert resp.status_code == 412
 
 
-@pytest.mark.asyncio()
 async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox, resource):
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/resource/{resource}/ask",
@@ -497,7 +484,6 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox, resou
     SyncAskResponse.model_validate_json(resp.content)
 
 
-@pytest.mark.asyncio()
 async def test_ask_handles_stream_errors_on_predict(nucliadb_reader, knowledgebox, resource):
     predict = get_predict()
     prev = predict.ndjson_answer.copy()
@@ -533,7 +519,6 @@ async def test_ask_handles_stream_errors_on_predict(nucliadb_reader, knowledgebo
     predict.ndjson_answer = prev
 
 
-@pytest.mark.asyncio()
 async def test_ask_handles_stream_unexpected_errors_sync(nucliadb_reader, knowledgebox, resource):
     with mock.patch(
         "nucliadb.search.search.chat.ask.AskResult._stream",
@@ -548,7 +533,6 @@ async def test_ask_handles_stream_unexpected_errors_sync(nucliadb_reader, knowle
         assert resp.status_code == 500
 
 
-@pytest.mark.asyncio()
 async def test_ask_handles_stream_unexpected_errors_stream(nucliadb_reader, knowledgebox, resource):
     with mock.patch(
         "nucliadb.search.search.chat.ask.AskResult._stream",
@@ -568,7 +552,6 @@ async def test_ask_handles_stream_unexpected_errors_stream(nucliadb_reader, know
         )
 
 
-@pytest.mark.asyncio()
 async def test_ask_with_json_schema_output(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -602,7 +585,6 @@ async def test_ask_with_json_schema_output(
     assert answer_json["confidence"] == 0.5
 
 
-@pytest.mark.asyncio()
 async def test_ask_assert_audit_retrieval_contexts(
     nucliadb_reader: AsyncClient, knowledgebox, resources, audit
 ):
@@ -615,7 +597,6 @@ async def test_ask_assert_audit_retrieval_contexts(
     }
 
 
-@pytest.mark.asyncio()
 async def test_ask_rag_strategy_neighbouring_paragraphs(
     nucliadb_reader: AsyncClient, knowledgebox, resources
 ):
@@ -631,9 +612,6 @@ async def test_ask_rag_strategy_neighbouring_paragraphs(
     assert resp.status_code == 200
     ask_response = SyncAskResponse.model_validate_json(resp.content)
     assert ask_response.prompt_context is not None
-
-
-pytest.mark.asyncio()
 
 
 async def test_ask_rag_strategy_metadata_extension(

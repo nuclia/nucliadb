@@ -79,7 +79,6 @@ def kb(field_obj):
     yield mock
 
 
-@pytest.mark.asyncio
 async def test_get_next_conversation_messages(field_obj, messages):
     assert (
         len(
@@ -108,7 +107,6 @@ async def test_get_next_conversation_messages(field_obj, messages):
     ) == [messages[3]]
 
 
-@pytest.mark.asyncio
 async def test_find_conversation_message(field_obj, messages):
     assert await chat_prompt.find_conversation_message(field_obj=field_obj, mident="3") == (
         messages[2],
@@ -117,14 +115,12 @@ async def test_find_conversation_message(field_obj, messages):
     )
 
 
-@pytest.mark.asyncio
 async def test_get_expanded_conversation_messages(kb, messages):
     assert await chat_prompt.get_expanded_conversation_messages(
         kb=kb, rid="rid", field_id="field_id", mident="3"
     ) == [messages[3]]
 
 
-@pytest.mark.asyncio
 async def test_get_expanded_conversation_messages_question(kb, messages):
     assert (
         await chat_prompt.get_expanded_conversation_messages(
@@ -137,7 +133,6 @@ async def test_get_expanded_conversation_messages_question(kb, messages):
     kb.get.return_value.get_field.assert_called_with("field_id", FIELD_TYPE_STR_TO_PB["c"], load=True)
 
 
-@pytest.mark.asyncio
 async def test_get_expanded_conversation_messages_missing(kb, messages):
     assert (
         await chat_prompt.get_expanded_conversation_messages(
@@ -174,7 +169,6 @@ def _create_find_result(
     )
 
 
-@pytest.mark.asyncio
 async def test_default_prompt_context(kb):
     result_text = " ".join(["text"] * 10)
     with (
@@ -259,7 +253,6 @@ def find_results():
     )
 
 
-@pytest.mark.asyncio
 async def test_prompt_context_builder_prepends_user_context(
     find_results: KnowledgeboxFindResults,
 ):
@@ -319,7 +312,6 @@ def test_capped_prompt_context():
     assert context.size == 0
 
 
-@pytest.mark.asyncio
 async def test_hierarchy_promp_context(kb):
     with mock.patch(
         "nucliadb.search.search.chat.prompt.get_paragraph_text",
@@ -444,7 +436,6 @@ async def test_extend_prompt_context_with_metadata():
         assert "DOCUMENT EXTRA METADATA" in text_block
 
 
-@pytest.mark.asyncio
 async def test_prompt_context_image_context_builder():
     result_text = " ".join(["text"] * 10)
     find_results = KnowledgeboxFindResults(

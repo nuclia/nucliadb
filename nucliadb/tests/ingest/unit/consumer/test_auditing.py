@@ -27,8 +27,6 @@ from nucliadb.ingest.consumer import auditing
 from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.writer_pb2 import Audit, BrokerMessage, Notification, ShardObject
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 def pubsub():

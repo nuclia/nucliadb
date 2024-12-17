@@ -834,6 +834,30 @@ pub mod field_question_answer_wrapper {
         File(super::CloudFile),
     }
 }
+/// Who is the actor of field creation
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldAuthor {
+    #[prost(oneof = "field_author::Author", tags = "1, 2")]
+    pub author: ::core::option::Option<field_author::Author>,
+}
+/// Nested message and enum types in `FieldAuthor`.
+pub mod field_author {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct User {}
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct DataAugmentation {}
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Author {
+        #[prost(message, tag = "1")]
+        User(User),
+        #[prost(message, tag = "2")]
+        DataAugmentation(DataAugmentation),
+    }
+}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldComputedMetadata {
@@ -929,6 +953,8 @@ pub struct FieldText {
     pub format: i32,
     #[prost(string, tag = "3")]
     pub md5: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "4")]
+    pub generated_by: ::core::option::Option<FieldAuthor>,
 }
 /// Nested message and enum types in `FieldText`.
 pub mod field_text {

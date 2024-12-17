@@ -100,7 +100,6 @@ def hosted_nucliadb():
         yield
 
 
-@pytest.mark.asyncio
 async def test_kb_creation(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,

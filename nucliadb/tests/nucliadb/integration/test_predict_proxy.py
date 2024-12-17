@@ -22,7 +22,6 @@
 import pytest
 
 
-@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     "method,endpoint,params,payload",
     [
@@ -59,7 +58,6 @@ async def test_predict_proxy(nucliadb_reader, knowledgebox, method, endpoint, pa
     assert resp.status_code == 200, resp.text
 
 
-@pytest.mark.asyncio()
 async def test_predict_proxy_not_proxied_returns_422(
     nucliadb_reader,
     knowledgebox,
@@ -72,7 +70,6 @@ async def test_predict_proxy_not_proxied_returns_422(
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio()
 async def test_predict_proxy_returns_404_on_non_existing_kb(
     nucliadb_reader,
 ):

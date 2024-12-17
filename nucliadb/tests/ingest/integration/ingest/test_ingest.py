@@ -112,7 +112,6 @@ def kbid(
     yield knowledgebox_ingest
 
 
-@pytest.mark.asyncio
 async def test_ingest_messages_autocommit(kbid: str, processor):
     rid = str(uuid.uuid4())
     message1: BrokerMessage = BrokerMessage(
@@ -215,7 +214,6 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
     assert pb.texts["a/summary"].text == "My summary"
 
 
-@pytest.mark.asyncio
 async def test_ingest_error_message(kbid: str, storage: Storage, processor, maindb_driver: Driver):
     filename = f"{dirname(__file__)}/assets/resource.pb"
     with open(filename, "r") as f:
@@ -258,7 +256,6 @@ async def test_ingest_error_message(kbid: str, storage: Storage, processor, main
         assert field_obj.value.body == message0.texts["wikipedia_ml"].body
 
 
-@pytest.mark.asyncio
 async def test_ingest_messages_origin(
     local_files,
     storage: Storage,
@@ -353,7 +350,6 @@ async def get_audit_messages(sub):
     return auditreq
 
 
-@pytest.mark.asyncio
 async def test_ingest_audit_stream_files_only(
     local_files,
     storage: Storage,
@@ -485,7 +481,6 @@ async def test_ingest_audit_stream_files_only(
     await client.close()
 
 
-@pytest.mark.asyncio
 async def test_qa(
     local_files,
     storage: Storage,
@@ -543,7 +538,6 @@ async def test_qa(
     await stream_processor.process(message=message, seqid=2)
 
 
-@pytest.mark.asyncio
 async def test_ingest_audit_stream_mixed(
     local_files,
     storage: Storage,
@@ -611,7 +605,6 @@ async def test_ingest_audit_stream_mixed(
     await client.close()
 
 
-@pytest.mark.asyncio
 async def test_ingest_account_seq_stored(
     local_files,
     storage: Storage,
@@ -639,7 +632,6 @@ async def test_ingest_account_seq_stored(
     assert basic.queue == 0
 
 
-@pytest.mark.asyncio
 async def test_ingest_processor_handles_missing_kb(
     local_files,
     storage: Storage,
@@ -654,7 +646,6 @@ async def test_ingest_processor_handles_missing_kb(
     await stream_processor.process(message=message, seqid=1)
 
 
-@pytest.mark.asyncio
 async def test_ingest_autocommit_deadletter_marks_resource(
     kbid: str, processor: Processor, storage, maindb_driver: Driver
 ):
@@ -717,7 +708,6 @@ def message_resource_with_vectors(knowledgebox_ingest, rid):
     return message
 
 
-@pytest.mark.asyncio
 async def test_ingest_delete_field(
     local_files,
     storage: Storage,
@@ -767,7 +757,6 @@ async def test_ingest_delete_field(
         assert brain.sentences_to_delete == [f"{rid}/f/some_text"]
 
 
-@pytest.mark.asyncio
 async def test_ingest_update_labels(
     local_files,
     storage: Storage,
