@@ -69,9 +69,6 @@ class _FindParser:
         )
 
     def _parse_top_k(self) -> int:
-        # while pagination is still there, FindRequest has a validator that converts
-        # top_k to page_number and page_size. To get top_k, we can compute it from
-        # those
         assert self.item.top_k is not None, "top_k must have an int value"
         top_k = self.item.top_k
         return top_k
