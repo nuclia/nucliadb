@@ -82,8 +82,6 @@ async def find_knowledgebox(
     query: str = fastapi_query(SearchParamDefaults.query),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
-    page_number: int = fastapi_query(SearchParamDefaults.page_number),
-    page_size: int = fastapi_query(SearchParamDefaults.page_size),
     top_k: Optional[int] = fastapi_query(SearchParamDefaults.top_k),
     min_score: Optional[float] = Query(
         default=None,
@@ -141,9 +139,7 @@ async def find_knowledgebox(
             query=query,
             fields=fields,
             filters=filters,
-            page_number=page_number,
-            page_size=page_size,
-            top_k=top_k,
+            top_k=top_k,  # type: ignore
             min_score=min_score_from_query_params(min_score_bm25, min_score_semantic, min_score),
             vectorset=vectorset,
             range_creation_end=range_creation_end,

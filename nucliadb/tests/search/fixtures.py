@@ -173,9 +173,9 @@ async def multiple_search_resource(
     knowledgebox_ingest,
 ):
     """
-    Create 100 resources that have every possible bit of information
+    Create 25 resources that have every possible bit of information
     """
-    n_resources = 100
+    n_resources = 25
     fields_per_resource = 3
     for count in range(1, n_resources + 1):
         message = broker_resource(knowledgebox_ingest)
