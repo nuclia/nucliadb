@@ -17,13 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pytest
 
 from nucliadb_protos.train_pb2 import GetSentencesRequest
 from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
-@pytest.mark.asyncio
 async def test_list_sentences(
     train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
@@ -41,7 +39,6 @@ async def test_list_sentences(
     assert count == 40
 
 
-@pytest.mark.asyncio
 async def test_list_sentences_shows_ners_with_positions(
     train_client: TrainStub, knowledgebox: str, test_pagination_resources
 ) -> None:

@@ -28,8 +28,6 @@ from nucliadb.ingest.consumer import shard_creator
 from nucliadb_protos import nodereader_pb2
 from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 def pubsub():

@@ -25,8 +25,6 @@ from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import Basic
 
-pytestmark = pytest.mark.asyncio
-
 
 async def check_slug(driver: Driver, kbid, rid, slug):
     async with driver.transaction() as txn:

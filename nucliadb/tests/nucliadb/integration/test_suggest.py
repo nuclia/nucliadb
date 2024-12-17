@@ -26,7 +26,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
-@pytest.mark.asyncio
 async def test_suggest_paragraphs(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
@@ -149,7 +148,6 @@ async def test_suggest_paragraphs(
     assert len(body["paragraphs"]["results"]) == 0
 
 
-@pytest.mark.asyncio
 async def test_suggest_related_entities(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox, request
 ):
@@ -257,7 +255,6 @@ async def test_suggest_related_entities(
     assert_expected_entities(body, {"Solomon Islands", "Israel"})
 
 
-@pytest.mark.asyncio
 async def test_suggestion_on_link_computed_titles_sc6088(
     nucliadb_writer,
     nucliadb_grpc,
@@ -314,7 +311,6 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     assert suggested["text"] == extracted_title
 
 
-@pytest.mark.asyncio
 async def test_suggest_features(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
@@ -371,7 +367,6 @@ async def test_suggest_features(
     assert len(body["paragraphs"]["results"]) == 0
 
 
-@pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def texts(
     nucliadb_writer: AsyncClient,
@@ -426,7 +421,6 @@ async def texts(
     }
 
 
-@pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def entities(nucliadb_writer: AsyncClient, knowledgebox: str):
     collaborators = ["Irene", "Anastasia"]
@@ -475,7 +469,6 @@ async def entities(nucliadb_writer: AsyncClient, knowledgebox: str):
     assert resp.status_code == 201
 
 
-@pytest.mark.asyncio
 async def test_search_kb_not_found(nucliadb_reader) -> None:
     resp = await nucliadb_reader.get(
         f"/kb/00000000000000/suggest?query=own+text",

@@ -37,7 +37,6 @@ from tests.utils import broker_resource, inject_message
         ),
     ],
 )
-@pytest.mark.asyncio
 async def test_endpoint_set_resource_status_to_pending(
     endpoint,
     expected_status,

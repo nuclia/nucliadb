@@ -50,7 +50,6 @@ async def txn(pubsub):
         await txn.finalize()
 
 
-@pytest.mark.asyncio
 async def test_wait_for_commited(txn: TransactionUtility, pubsub):
     waiting_for = WaitFor(uuid="foo")
     request_id = "request1"
@@ -68,7 +67,6 @@ async def test_wait_for_commited(txn: TransactionUtility, pubsub):
     await (await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)).wait()
 
 
-@pytest.mark.asyncio
 async def test_wait_for_indexed(txn: TransactionUtility, pubsub):
     waiting_for = WaitFor(uuid="foo")
     request_id = "request1"
@@ -87,7 +85,6 @@ async def test_wait_for_indexed(txn: TransactionUtility, pubsub):
         await (await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)).wait()
 
 
-@pytest.mark.asyncio
 async def test_wait_for_commit_stop_waiting(txn: TransactionUtility, pubsub):
     pubsub.unsubscribe.side_effect = [
         "sub_id",
@@ -107,7 +104,6 @@ async def test_wait_for_commit_stop_waiting(txn: TransactionUtility, pubsub):
         await txn.stop_waiting(kbid, request_id=request_id)
 
 
-@pytest.mark.asyncio
 async def test_commit_timeout(txn: TransactionUtility, pubsub):
     txn.js = mock.AsyncMock()
     bm = BrokerMessage()
@@ -119,7 +115,6 @@ async def test_commit_timeout(txn: TransactionUtility, pubsub):
         await txn.commit(bm, 1, wait=True, target_subject="foo")
 
 
-@pytest.mark.asyncio
 async def test_max_payload_error_handled(txn: TransactionUtility, pubsub):
     txn.js = mock.Mock()
     txn.js.publish = mock.AsyncMock(side_effect=nats.errors.MaxPayloadError)

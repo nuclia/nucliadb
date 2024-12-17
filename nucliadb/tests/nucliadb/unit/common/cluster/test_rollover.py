@@ -27,8 +27,6 @@ from nucliadb.common.cluster.index_node import IndexNode
 from nucliadb.common.datamanagers.rollover import RolloverState
 from nucliadb_protos import writer_pb2
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 def available_nodes():

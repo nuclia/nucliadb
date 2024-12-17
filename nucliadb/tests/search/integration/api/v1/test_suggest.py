@@ -32,7 +32,6 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 
 @pytest.mark.flaky(reruns=5)
-@pytest.mark.asyncio
 async def test_suggest_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:

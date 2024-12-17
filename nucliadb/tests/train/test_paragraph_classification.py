@@ -21,7 +21,6 @@ import asyncio
 import uuid
 
 import aiohttp
-import pytest
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
@@ -35,7 +34,6 @@ from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
-@pytest.mark.asyncio
 async def test_generator_paragraph_classification(
     train_rest_api: aiohttp.ClientSession,
     nucliadb_grpc: WriterStub,

@@ -53,7 +53,6 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from tests.utils.aiohttp_session import get_mocked_session
 
 
-@pytest.mark.asyncio
 async def test_dummy_predict_engine():
     pe = DummyPredictEngine()
     await pe.initialize()
@@ -64,7 +63,6 @@ async def test_dummy_predict_engine():
     assert await pe.summarize("kbid", Mock(resources={}))
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "onprem,expected_url,expected_header,expected_header_value",
     [
@@ -111,7 +109,6 @@ async def test_detect_entities_ok(onprem, expected_url, expected_header, expecte
     )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("onprem", [True, False])
 async def test_detect_entities_error(onprem):
     pe = PredictEngine(
@@ -136,7 +133,6 @@ def session_limits_exceeded():
     return session
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "method,args",
     [

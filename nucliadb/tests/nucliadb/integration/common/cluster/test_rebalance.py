@@ -26,8 +26,6 @@ from nucliadb.common.cluster import rebalance
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.context import ApplicationContext
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture()
 async def app_context(natsd, storage, nucliadb):

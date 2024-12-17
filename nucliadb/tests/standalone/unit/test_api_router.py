@@ -26,8 +26,6 @@ from fastapi import Request
 from nucliadb.standalone import api_router
 from nucliadb.standalone.settings import Settings
 
-pytestmark = pytest.mark.asyncio
-
 
 class DummyTestRequest(Request):
     @property

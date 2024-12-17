@@ -19,7 +19,6 @@
 #
 from unittest.mock import patch
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
@@ -35,7 +34,6 @@ from nucliadb_protos.nodewriter_pb2 import VectorType
 MODULE = "nucliadb.writer.vectorsets"
 
 
-@pytest.mark.asyncio
 async def test_add_delete_vectorsets(
     nucliadb_manager: AsyncClient,
     knowledgebox,
@@ -111,7 +109,6 @@ async def test_add_delete_vectorsets(
                 assert vs is None
 
 
-@pytest.mark.asyncio
 async def test_learning_config_errors_are_proxied_correctly(
     nucliadb_manager: AsyncClient,
     knowledgebox,

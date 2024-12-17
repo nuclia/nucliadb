@@ -33,8 +33,6 @@ from nucliadb.search.search.exceptions import (
 )
 from nucliadb_utils.exceptions import LimitsExceededError
 
-pytestmark = pytest.mark.asyncio
-
 
 class DummyTestRequest(Request):
     @property

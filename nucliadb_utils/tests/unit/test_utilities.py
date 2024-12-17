@@ -42,7 +42,6 @@ def test_clean_utility():
     assert utilities.get_utility(utilities.Utility.PUBSUB) is None
 
 
-@pytest.mark.asyncio
 async def test_get_storage_s3():
     s3 = AsyncMock()
     with (
@@ -52,7 +51,6 @@ async def test_get_storage_s3():
         assert await utilities.get_storage() == s3
 
 
-@pytest.mark.asyncio
 async def test_get_storage_gcs():
     gcs = AsyncMock()
     with (
@@ -62,7 +60,6 @@ async def test_get_storage_gcs():
         assert await utilities.get_storage() == gcs
 
 
-@pytest.mark.asyncio
 async def test_get_storage_local():
     local = AsyncMock()
     with (
@@ -73,24 +70,20 @@ async def test_get_storage_local():
         assert await utilities.get_storage() == local
 
 
-@pytest.mark.asyncio
 async def test_get_storage_missing():
     with patch.object(utilities.storage_settings, "file_backend", "missing"):
         with pytest.raises(ConfigurationError):
             await utilities.get_storage()
 
 
-@pytest.mark.asyncio
 async def test_get_local_storage():
     assert utilities.get_local_storage() is not None
 
 
-@pytest.mark.asyncio
 async def test_get_nuclia_storage():
     assert await utilities.get_nuclia_storage() is not None
 
 
-@pytest.mark.asyncio
 async def test_get_pubsub():
     from nucliadb_utils.cache.settings import settings
 
@@ -99,7 +92,6 @@ async def test_get_pubsub():
         assert await utilities.get_pubsub() is not None
 
 
-@pytest.mark.asyncio
 async def test_finalize_utilities():
     util = AsyncMock()
     utilities.MAIN["test"] = util
@@ -110,7 +102,6 @@ async def test_finalize_utilities():
     assert len(utilities.MAIN) == 0
 
 
-@pytest.mark.asyncio
 async def test_start_audit_utility():
     with (
         patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()),
@@ -121,7 +112,6 @@ async def test_start_audit_utility():
         assert "audit" in utilities.MAIN
 
 
-@pytest.mark.asyncio
 async def test_stop_audit_utility():
     with (
         patch("nucliadb_utils.utilities.NatsPubsub", return_value=AsyncMock()),

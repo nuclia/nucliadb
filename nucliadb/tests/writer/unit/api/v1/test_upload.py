@@ -72,7 +72,6 @@ async def kb_config_mock():
         yield mock
 
 
-@pytest.mark.asyncio
 async def test_store_file_on_nucliadb_does_not_store_passwords(
     processing_mock, partitioning_mock, transaction_mock
 ):
@@ -115,7 +114,6 @@ async def test_store_file_on_nucliadb_does_not_store_passwords(
         ("rid", "field", "md5", True, ("rid", "field")),
     ],
 )
-@pytest.mark.asyncio
 async def test_validate_field_upload(rid, field, md5, exists: bool, result):
     mock_uuid = Mock()
     mock_uuid4 = Mock()
@@ -137,7 +135,6 @@ async def test_validate_field_upload(rid, field, md5, exists: bool, result):
                 _, result_rid, result_field = await validate_field_upload("kbid", rid, field, md5)
 
 
-@pytest.mark.asyncio
 async def test_store_file_on_nucliadb_sets_hidden(
     processing_mock, partitioning_mock, transaction_mock, kb_config_mock
 ):

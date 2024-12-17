@@ -18,11 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pytest
 from httpx import AsyncClient
 
 
-@pytest.mark.asyncio
 async def test_selection_labelsets(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

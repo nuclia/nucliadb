@@ -21,8 +21,6 @@ from os.path import dirname, getsize
 from typing import Optional
 from uuid import uuid4
 
-import pytest
-
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
@@ -34,7 +32,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_file_extracted(
     local_files, storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):

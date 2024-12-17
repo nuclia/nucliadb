@@ -24,8 +24,6 @@ import pytest
 from nucliadb import purge
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
 
-pytestmark = pytest.mark.asyncio
-
 
 class DataIterator:
     def __init__(self, data):

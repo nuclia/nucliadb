@@ -18,12 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pytest
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 
 
-@pytest.mark.asyncio
 async def test_entities_service(
     nucliadb_reader,
     nucliadb_writer,
@@ -66,7 +64,6 @@ async def test_entities_service(
     assert len(resp.json()["groups"]) == 0
 
 
-@pytest.mark.asyncio
 async def test_labelsets_service(nucliadb_reader, nucliadb_writer, knowledgebox_one) -> None:
     payload = {
         "title": "labelset1",

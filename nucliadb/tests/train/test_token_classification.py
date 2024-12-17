@@ -20,7 +20,6 @@
 import asyncio
 
 import aiohttp
-import pytest
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
@@ -35,7 +34,6 @@ from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
-@pytest.mark.asyncio
 async def test_generator_token_classification(
     train_rest_api: aiohttp.ClientSession,
     knowledgebox_with_entities: str,

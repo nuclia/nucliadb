@@ -45,7 +45,6 @@ TEST_CLOUD_FILE = CloudFile(
 TEST_ITEM = PushPayload(uuid="foo", kbid="bar", userid="baz", partition=1)
 
 
-@pytest.mark.asyncio
 async def test_dummy_processing_engine():
     engine = DummyProcessingEngine()
     await engine.initialize()

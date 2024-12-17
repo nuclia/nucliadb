@@ -40,7 +40,6 @@ def nuclia_jwt_key():
     yield
 
 
-@pytest.mark.asyncio
 async def test_external_file_field(
     nuclia_jwt_key,
     nucliadb_reader,

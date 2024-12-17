@@ -21,8 +21,6 @@ from datetime import datetime
 from os.path import dirname, getsize
 from uuid import uuid4
 
-import pytest
-
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import CloudFile, FieldType
@@ -30,7 +28,6 @@ from nucliadb_protos.resources_pb2 import FieldFile as PBFieldFile
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_field_file(
     local_files, storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):

@@ -42,7 +42,6 @@ def processing_mock(mocker):
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.asyncio
 async def file_field(writer_api, knowledgebox_writer: str) -> AsyncIterator[tuple[str, str, str]]:
     kbid = knowledgebox_writer
     field_id = "myfile"
@@ -76,7 +75,6 @@ async def file_field(writer_api, knowledgebox_writer: str) -> AsyncIterator[tupl
         assert resp.status_code == 204
 
 
-@pytest.mark.asyncio
 async def test_reprocess_nonexistent_file_field(writer_api, knowledgebox_writer: str, resource: str):
     kbid = knowledgebox_writer
     rid = resource
@@ -89,7 +87,6 @@ async def test_reprocess_nonexistent_file_field(writer_api, knowledgebox_writer:
         assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_reprocess_file_field_with_password(
     writer_api, file_field: tuple[str, str, str], processing_mock
 ):
@@ -108,7 +105,6 @@ async def test_reprocess_file_field_with_password(
     assert processing_mock.send_to_process.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_reprocess_file_field_without_password(
     writer_api, file_field: tuple[str, str, str], processing_mock
 ):

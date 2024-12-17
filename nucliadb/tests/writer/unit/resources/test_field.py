@@ -71,7 +71,6 @@ def storage_mock():
         ),
     ],
 )
-@pytest.mark.asyncio
 async def test_parse_file_field_does_not_store_password(processing_mock, file_field):
     field_key = "key"
     kbid = "kbid"
@@ -105,7 +104,6 @@ def get_message(id, who, to, text, attachments=None):
     return msg
 
 
-@pytest.mark.asyncio
 async def test_parse_conversation_field(storage_mock, processing_mock):
     key = "conv"
     kbid = "kbid"

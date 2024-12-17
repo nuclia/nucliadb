@@ -34,7 +34,6 @@ def reset_driver_utils():
     clean_utility(Utility.MAINDB_DRIVER)
 
 
-@pytest.mark.asyncio
 async def test_setup_driver_pg():
     mock = AsyncMock(initialized=False)
     with (
@@ -46,7 +45,6 @@ async def test_setup_driver_pg():
         mock.initialize.assert_awaited_once()
 
 
-@pytest.mark.asyncio
 async def test_setup_driver_error():
     with (
         patch.object(settings, "driver", DriverConfig("pg")),

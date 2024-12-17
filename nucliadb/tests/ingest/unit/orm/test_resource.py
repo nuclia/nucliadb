@@ -44,7 +44,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
-@pytest.mark.asyncio
 async def test_get_file_page_positions():
     extracted_data = FileExtractedData()
     extracted_data.file_pages_previews.positions.extend(

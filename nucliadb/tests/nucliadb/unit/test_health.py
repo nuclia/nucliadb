@@ -27,8 +27,6 @@ from nucliadb import health
 from nucliadb.common.cluster import manager
 from nucliadb.ingest.settings import DriverConfig, settings
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture(autouse=True)
 def register_checks():

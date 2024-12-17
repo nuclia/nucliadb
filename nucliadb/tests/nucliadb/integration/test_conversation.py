@@ -113,7 +113,6 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
     yield rid
 
 
-@pytest.mark.asyncio
 async def test_conversations(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -152,7 +151,6 @@ async def test_conversations(
     assert msgs[-1]["type"] == MessageType.ANSWER.value
 
 
-@pytest.mark.asyncio
 async def test_extracted_text_is_serialized_properly(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -171,7 +169,6 @@ async def test_extracted_text_is_serialized_properly(
     assert extracted.text.split_text["2"] == "Split text 2"  # type: ignore
 
 
-@pytest.mark.asyncio
 async def test_find_conversations(
     nucliadb_reader: AsyncClient,
     knowledgebox,

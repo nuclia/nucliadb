@@ -36,11 +36,9 @@ class TestNucliaCloudAuthenticationBackend:
     def req(self):
         return Mock(headers={})
 
-    @pytest.mark.asyncio
     async def test_authenticate(self, backend: authentication.NucliaCloudAuthenticationBackend, req):
         assert await backend.authenticate(req) is None
 
-    @pytest.mark.asyncio
     async def test_authenticate_with_user(
         self, backend: authentication.NucliaCloudAuthenticationBackend, req
     ):
@@ -54,7 +52,6 @@ class TestNucliaCloudAuthenticationBackend:
         assert creds.scopes == ["admin"]
         assert user.username == "user"
 
-    @pytest.mark.asyncio
     async def test_authenticate_with_anon(
         self, backend: authentication.NucliaCloudAuthenticationBackend, req
     ):
@@ -94,7 +91,6 @@ class TestRequires:
             resp = authentication.requires(["foobar"], redirect="/foobar")(lambda request: None)(req)
         assert resp.status_code == 303
 
-    @pytest.mark.asyncio
     async def test_requires_async(self):
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
 
@@ -102,7 +98,6 @@ class TestRequires:
 
         assert await authentication.requires(["admin"])(noop)(request=req) is None
 
-    @pytest.mark.asyncio
     async def test_requires_async_returns_status(self):
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
 
@@ -111,7 +106,6 @@ class TestRequires:
         with pytest.raises(HTTPException):
             assert await authentication.requires(["foobar"])(noop)(request=req)
 
-    @pytest.mark.asyncio
     async def test_requires_async_returns_redirect(self):
         req = Request({"type": "http", "auth": Mock(scopes=["admin"])})
 
@@ -121,7 +115,6 @@ class TestRequires:
             resp = await authentication.requires(["foobar"], redirect="/foobar")(noop)(request=req)
         assert resp.status_code == 303
 
-    @pytest.mark.asyncio
     async def test_requires_ws(self):
         ws = AsyncMock()
         req = WebSocket(
@@ -134,7 +127,6 @@ class TestRequires:
 
         assert await authentication.requires(["admin"])(noop)(req) is None
 
-    @pytest.mark.asyncio
     async def test_requires_ws_fail(self):
         req = WebSocket(
             {"type": "websocket", "auth": Mock(scopes=["admin"])},

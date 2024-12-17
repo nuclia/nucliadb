@@ -17,10 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pytest
 
 
-@pytest.mark.asyncio
 async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgebox):
     kbid = knowledgebox
 
@@ -93,7 +91,6 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         assert found_uuids == expected_uuids
 
 
-@pytest.mark.asyncio
 async def test_filtering_expression_validation(nucliadb_reader, nucliadb_writer):
     # Make sure we only allow one operator per filter
     resp = await nucliadb_reader.post(

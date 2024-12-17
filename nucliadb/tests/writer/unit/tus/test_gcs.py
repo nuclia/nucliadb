@@ -19,12 +19,9 @@
 
 from unittest.mock import ANY, MagicMock, patch
 
-import pytest
-
 from nucliadb.writer.tus.gcs import GCloudBlobStore
 
 
-@pytest.mark.asyncio
 @patch("nucliadb.writer.tus.gcs.aiohttp")
 @patch("nucliadb.writer.tus.gcs.ServiceAccountCredentials")
 async def test_tus_gcs(mock_sa, mock_aiohttp):
@@ -51,7 +48,6 @@ async def test_tus_gcs(mock_sa, mock_aiohttp):
     assert await gblobstore.check_exists("test-bucket")
 
 
-@pytest.mark.asyncio
 @patch("nucliadb.writer.tus.gcs.google")
 async def test_tus_gcs_empty_json_credentials(mock_google):
     mock_google.auth.default.return_value = ("credential", "project")

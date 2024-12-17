@@ -315,7 +315,6 @@ def temp_folder():
 
 
 @pytest.fixture
-@pytest.mark.asyncio
 async def ingest_stub(nucliadb) -> AsyncIterator[WriterStub]:
     channel = aio.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
     stub = WriterStub(channel)

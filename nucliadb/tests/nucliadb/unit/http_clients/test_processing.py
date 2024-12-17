@@ -79,7 +79,6 @@ class TestProcessingHTTPClient:
         cl.session.get.return_value = resp_handler
         yield cl
 
-    @pytest.mark.asyncio
     async def test_requests(self, client: processing.ProcessingHTTPClient, response):
         response_data = processing.RequestsResults(results=[], cursor=None)
         response.status = 200
@@ -87,7 +86,6 @@ class TestProcessingHTTPClient:
 
         assert await client.requests() == response_data
 
-    @pytest.mark.asyncio
     async def test_pull(self, client: processing.ProcessingHTTPClient, response):
         response_data = processing.PullResponse(status="ok", payload="foobar", msgid="1")
         response.status = 200
@@ -95,7 +93,6 @@ class TestProcessingHTTPClient:
 
         assert await client.pull(partition="1") == response_data
 
-    @pytest.mark.asyncio
     async def test_stats(self, client: processing.ProcessingHTTPClient, response):
         response_data = processing.StatsResponse(incomplete=1, scheduled=1)
         response.status = 200

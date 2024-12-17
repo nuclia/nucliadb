@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from unittest.mock import patch
 
-import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -32,7 +31,6 @@ def get_kb(kbid: str):
     return {"kbid": kbid}
 
 
-@pytest.mark.asyncio
 async def test_context_injected():
     app.add_middleware(ContextInjectorMiddleware)
 

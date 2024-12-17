@@ -20,11 +20,7 @@
 
 import asyncio
 
-import pytest
-
 from nucliadb.ingest.consumer import utils
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_delay_task_handler():

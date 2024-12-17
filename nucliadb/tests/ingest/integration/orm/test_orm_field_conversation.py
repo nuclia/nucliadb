@@ -21,8 +21,6 @@ from datetime import datetime
 from os.path import dirname, getsize
 from uuid import uuid4
 
-import pytest
-
 from nucliadb.ingest.fields.conversation import PAGE_SIZE, Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import CloudFile, FieldType, Message, MessageContent
@@ -30,7 +28,6 @@ from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import Storage
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_field_conversation(
     storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
@@ -71,7 +68,6 @@ async def test_create_resource_orm_field_conversation(
     assert convfield.value[2].messages[-1].content.text == "299 hello"
 
 
-@pytest.mark.asyncio
 async def test_create_resource_orm_field_conversation_file(
     local_files, storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):

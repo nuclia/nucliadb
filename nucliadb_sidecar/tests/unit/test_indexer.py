@@ -80,7 +80,6 @@ class TestIndexerWorkUnit:
         assert writer_work_unit != processor_work_unit
         assert processor_work_unit == processor_work_unit
 
-    @pytest.mark.asyncio
     async def test_work_units_inside_an_asyncio_priority_queue(self):
         processor_work_unit = WorkUnit.from_msg(gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR))
         writer_work_unit_1 = WorkUnit.from_msg(gen_msg(seqid=2, source=IndexMessageSource.WRITER))
@@ -119,14 +118,12 @@ class TestConcurrentShardIndexer:
         yield writer
 
     @pytest.fixture
-    @pytest.mark.asyncio
     async def csi(self, writer) -> AsyncIterator[ConcurrentShardIndexer]:
         csi = ConcurrentShardIndexer(writer=writer, node_id="node-id")
         await csi.initialize()
         yield csi
         await csi.finalize()
 
-    @pytest.mark.asyncio
     async def test_creates_an_indexer_and_a_task_per_shard(
         self,
         csi: ConcurrentShardIndexer,
@@ -151,7 +148,6 @@ class TestConcurrentShardIndexer:
             # mocks won't finish
             csi.indexers.clear()
 
-    @pytest.mark.asyncio
     async def test_indexing_adds_work_to_priority_indexer(self, csi: ConcurrentShardIndexer):
         with patch("nucliadb_sidecar.indexer.PriorityIndexer.index_soon") as index_soon:
             count = 5
@@ -159,7 +155,6 @@ class TestConcurrentShardIndexer:
                 csi.index_message_soon(gen_msg())
             assert index_soon.call_count == count
 
-    @pytest.mark.asyncio
     async def test_priority_indexing_on_one_shard(self, csi: ConcurrentShardIndexer):
         messages = [
             gen_msg(seqid=1, source=IndexMessageSource.PROCESSOR),
@@ -192,7 +187,6 @@ class TestConcurrentShardIndexer:
 
         assert processed == [3, 4, 1, 2, 5]
 
-    @pytest.mark.asyncio
     async def test_autoremove_finished_indexers(self, csi: ConcurrentShardIndexer):
         messages = [
             gen_msg(seqid=1, shard_id="shard-1"),
@@ -228,7 +222,6 @@ class TestPriorityIndexer:
         yield writer
 
     @pytest.fixture
-    @pytest.mark.asyncio
     async def indexer(self, writer: AsyncMock, storage):
         indexer = PriorityIndexer(writer=writer, storage=storage)
         yield indexer
@@ -241,7 +234,6 @@ class TestPriorityIndexer:
 
     # Tests
 
-    @pytest.mark.asyncio
     async def test_index_soon_inserts_into_queue(
         self,
         indexer: PriorityIndexer,
@@ -251,7 +243,6 @@ class TestPriorityIndexer:
 
         assert indexer.work_queue.qsize() == 2
 
-    @pytest.mark.asyncio
     async def test_work_until_finish_processes_everything(
         self, indexer: PriorityIndexer, successful_indexing, writer: AsyncMock
     ):
@@ -266,7 +257,6 @@ class TestPriorityIndexer:
         assert writer.set_resource_from_storage.await_count == total
         assert successful_indexing.dispatch.await_count == total
 
-    @pytest.mark.asyncio
     async def test_do_work_processes_a_work_unit(
         self, indexer: PriorityIndexer, writer: AsyncMock, successful_indexing
     ):
@@ -278,7 +268,6 @@ class TestPriorityIndexer:
         assert successful_indexing.dispatch.await_count == 1
         assert successful_indexing.dispatch.await_args.args[0].seqid == 10
 
-    @pytest.mark.asyncio
     async def test_node_writer_status_errors_are_handled(
         self, indexer: PriorityIndexer, writer: AsyncMock
     ):
@@ -298,7 +287,6 @@ class TestPriorityIndexer:
             pb.typemessage = TypeMessage.DELETION
             await indexer._index_message(pb)
 
-    @pytest.mark.asyncio
     async def test_node_writer_status_shard_not_found_errors_are_handled(
         self, indexer: PriorityIndexer, writer: AsyncMock
     ):
@@ -311,7 +299,6 @@ class TestPriorityIndexer:
         pb.typemessage = TypeMessage.CREATION
         await indexer._index_message(pb)
 
-    @pytest.mark.asyncio
     async def test_inconsistent_dimension_errors_are_handled(
         self,
         indexer: PriorityIndexer,
@@ -328,7 +315,6 @@ class TestPriorityIndexer:
         pb.typemessage = TypeMessage.CREATION
         await indexer._index_message(pb)
 
-    @pytest.mark.asyncio
     async def test_node_writer_aio_rpc_errors_are_handled(
         self, indexer: PriorityIndexer, writer: AsyncMock
     ):
