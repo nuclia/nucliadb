@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional, Union
+from typing import Optional, Union, cast
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
@@ -78,9 +78,9 @@ async def resource_search(
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     shards: list[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> Union[ResourceSearchResults, HTTPClientError]:
-    if top_k is not None:
-        page_number = 0
-        page_size = top_k
+    top_k = top_k or SearchParamDefaults.top_k  # type: ignore
+    top_k = cast(int, top_k)
+
     with cache.request_caches():
         try:
             pb_query = await paragraph_query_to_pb(
@@ -90,8 +90,8 @@ async def resource_search(
                 fields,
                 filters,
                 faceted,
-                page_number,
-                page_size,
+                0,
+                top_k,
                 range_creation_start,
                 range_creation_end,
                 range_modification_start,
@@ -109,8 +109,8 @@ async def resource_search(
         # We need to merge
         search_results = await merge_paragraphs_results(
             results,
-            count=page_size,
-            page=page_number,
+            count=top_k,
+            page=0,
             kbid=kbid,
             highlight_split=highlight,
             min_score=0.0,
