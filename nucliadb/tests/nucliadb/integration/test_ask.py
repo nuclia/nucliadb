@@ -24,14 +24,14 @@ from unittest import mock
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.search.predict import (
-    AnswerStatusCode,
+from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.utilities import get_predict
+from nucliadb_models.predict.generative_responses import (
     CitationsGenerativeResponse,
     GenerativeChunk,
     JSONGenerativeResponse,
     StatusGenerativeResponse,
 )
-from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AskRequest,
     AskResponseItem,

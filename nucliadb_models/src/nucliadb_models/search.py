@@ -1818,11 +1818,11 @@ def validate_facets(facets):
 
 
 class AskTokens(BaseModel):
-    input: int = Field(
+    input: float = Field(
         title="Input tokens",
         description="Number of LLM tokens used for the context in the query",
     )
-    output: int = Field(
+    output: float = Field(
         title="Output tokens",
         description="Number of LLM tokens used for the answer",
     )
