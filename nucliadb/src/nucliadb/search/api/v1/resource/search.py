@@ -109,8 +109,7 @@ async def resource_search(
         # We need to merge
         search_results = await merge_paragraphs_results(
             results,
-            count=top_k,
-            page=0,
+            top_k=top_k,
             kbid=kbid,
             highlight_split=highlight,
             min_score=0.0,

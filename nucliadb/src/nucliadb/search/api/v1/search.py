@@ -462,7 +462,6 @@ async def search(
     search_results = await merge_results(
         results,
         count=item.top_k,
-        page=0,
         kbid=kbid,
         show=item.show,
         field_type_filter=item.field_type_filter,
