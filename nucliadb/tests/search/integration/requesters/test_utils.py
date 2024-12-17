@@ -46,7 +46,7 @@ async def test_vector_result_metadata(
         label_filters=[],  # type: ignore
         keyword_filters=[],  # type: ignore
         faceted=[],
-        page_size=20,
+        top_k=20,
         min_score=MinScore(bm25=0, semantic=-1),
         sort=SortOptions(
             field=SortField.SCORE,

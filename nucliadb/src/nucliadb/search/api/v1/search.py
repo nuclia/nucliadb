@@ -274,7 +274,7 @@ async def search(
         keyword_filters=[],
         faceted=item.faceted,
         sort=item.sort,
-        page_size=item.top_k,
+        top_k=item.top_k,
         min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,

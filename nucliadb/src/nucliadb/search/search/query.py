@@ -74,7 +74,6 @@ INDEX_SORTABLE_FIELDS = [
     SortField.MODIFIED,
 ]
 
-MAX_VECTOR_RESULTS_ALLOWED = 2000
 DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
 
 
@@ -105,7 +104,7 @@ class QueryParser:
         query: str,
         label_filters: Union[list[str], list[Filter]],
         keyword_filters: Union[list[str], list[Filter]],
-        page_size: int,
+        top_k: int,
         min_score: MinScore,
         faceted: Optional[list[str]] = None,
         sort: Optional[SortOptions] = None,
@@ -144,7 +143,7 @@ class QueryParser:
         self.flat_label_filters: list[str] = []
         self.keyword_filters: dict[str, Any] = convert_to_node_filters(keyword_filters)
         self.faceted = faceted or []
-        self.page_size = page_size
+        self.top_k = top_k
         self.min_score = min_score
         self.sort = sort
         self.range_creation_start = range_creation_start
@@ -387,18 +386,12 @@ class QueryParser:
             # have consistent results, we must limit them
             request.result_per_page = self.sort.limit
         else:
-            request.result_per_page = self.page_size
+            request.result_per_page = self.top_k
 
         sort_field = SortFieldMap[self.sort.field] if self.sort else None
         if sort_field is not None:
             request.order.sort_by = sort_field
             request.order.type = SortOrderMap[self.sort.order]  # type: ignore
-
-        if self.has_vector_search and request.result_per_page > MAX_VECTOR_RESULTS_ALLOWED:
-            raise InvalidQueryError(
-                "page_size",
-                f"Pagination of semantic results limit reached: {MAX_VECTOR_RESULTS_ALLOWED}. If you want to paginate through all results, please disable the vector search feature.",  # noqa: E501
-            )
 
     async def parse_min_score(self, request: nodereader_pb2.SearchRequest, incomplete: bool) -> None:
         semantic_min_score = DEFAULT_GENERIC_SEMANTIC_THRESHOLD

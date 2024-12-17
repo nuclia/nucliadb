@@ -213,7 +213,7 @@ async def _external_index_retrieval(
             kbid=kbid,
             query=search_request.body,
         ),
-        top_k=query_parser.page_size,
+        top_k=query_parser.top_k,
     )
     find_resources = compose_find_resources(text_blocks, resources)
 
@@ -272,7 +272,7 @@ async def query_parser_from_find_request(
         keyword_filters=item.keyword_filters,
         faceted=None,
         sort=None,
-        page_size=item.top_k,
+        top_k=item.top_k,
         min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
