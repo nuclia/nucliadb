@@ -169,11 +169,16 @@ class NatsConnectionManager:
         async with self._lock:
             if self._reconnect_task:
                 self._reconnect_task.cancel()
-                await self._reconnect_task
+                try:
+                    await self._reconnect_task
+                except asyncio.CancelledError:
+                    pass
 
-            if self._expected_subscription_task:
-                self._expected_subscription_task.cancel()
+            self._expected_subscription_task.cancel()
+            try:
                 await self._expected_subscription_task
+            except asyncio.CancelledError:
+                pass
 
             # Finalize push subscriptions
             for sub, _ in self._subscriptions:
