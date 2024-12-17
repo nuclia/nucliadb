@@ -27,21 +27,17 @@ from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.maindb.pg import PGDriver
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.search import logger, predict
+from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
-from nucliadb.search.search.merge import fetch_resources, merge_results
-from nucliadb.search.search.pgcatalog import pgcatalog_search
+from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
-    maybe_log_request_payload,
     min_score_from_payload,
     min_score_from_query_params,
     should_disable_vector_search,
@@ -50,10 +46,7 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
-    CatalogRequest,
-    CatalogResponse,
     KnowledgeboxSearchResults,
-    MinScore,
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
@@ -202,156 +195,6 @@ async def search_knowledgebox(
     return await _search_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/catalog",
-    status_code=200,
-    summary="List resources of a Knowledge Box",
-    description="List resources of a Knowledge Box",
-    response_model=KnowledgeboxSearchResults,
-    response_model_exclude_unset=True,
-    tags=["Search"],
-)
-@requires(NucliaDBRoles.READER)
-@version(1)
-async def catalog_get(
-    request: Request,
-    response: Response,
-    kbid: str,
-    query: str = fastapi_query(SearchParamDefaults.query),
-    filters: list[str] = fastapi_query(SearchParamDefaults.filters),
-    faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
-    sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
-    sort_limit: Optional[int] = fastapi_query(SearchParamDefaults.sort_limit),
-    sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
-    page_number: int = fastapi_query(SearchParamDefaults.catalog_page_number),
-    page_size: int = fastapi_query(SearchParamDefaults.catalog_page_size),
-    shards: list[str] = fastapi_query(SearchParamDefaults.shards, deprecated=True),
-    with_status: Optional[ResourceProcessingStatus] = fastapi_query(
-        SearchParamDefaults.with_status, deprecated="Use filters instead"
-    ),
-    debug: bool = fastapi_query(SearchParamDefaults.debug, include_in_schema=False),
-    range_creation_start: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: Optional[DateTime] = fastapi_query(SearchParamDefaults.range_creation_end),
-    range_modification_start: Optional[DateTime] = fastapi_query(
-        SearchParamDefaults.range_modification_start
-    ),
-    range_modification_end: Optional[DateTime] = fastapi_query(
-        SearchParamDefaults.range_modification_end
-    ),
-    hidden: Optional[bool] = fastapi_query(SearchParamDefaults.hidden),
-) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
-    item = CatalogRequest(
-        query=query,
-        filters=filters,
-        faceted=faceted,
-        page_number=page_number,
-        page_size=page_size,
-        shards=shards,
-        debug=debug,
-        with_status=with_status,
-        range_creation_start=range_creation_start,
-        range_creation_end=range_creation_end,
-        range_modification_start=range_modification_start,
-        range_modification_end=range_modification_end,
-        hidden=hidden,
-    )
-    if sort_field:
-        item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-    return await catalog(kbid, item)
-
-
-@api.post(
-    f"/{KB_PREFIX}/{{kbid}}/catalog",
-    status_code=200,
-    summary="List resources of a Knowledge Box",
-    description="List resources of a Knowledge Box",
-    response_model=KnowledgeboxSearchResults,
-    response_model_exclude_unset=True,
-    tags=["Search"],
-)
-@requires(NucliaDBRoles.READER)
-@version(1)
-async def catalog_post(
-    request: Request,
-    kbid: str,
-    item: CatalogRequest,
-) -> Union[CatalogResponse, HTTPClientError]:
-    return await catalog(kbid, item)
-
-
-async def catalog(
-    kbid: str,
-    item: CatalogRequest,
-):
-    """
-    Catalog endpoint is a simplified version of the search endpoint, it only
-    returns bm25 results on titles and it does not support vector search.
-    It is useful for listing resources in a knowledge box.
-    """
-    if not pgcatalog_enabled():  # pragma: no cover
-        return HTTPClientError(status_code=501, detail="PG driver is needed for catalog search")
-
-    maybe_log_request_payload(kbid, "/catalog", item)
-    start_time = time()
-    try:
-        with cache.request_caches():
-            sort = item.sort
-            if sort is None:
-                # By default we sort by creation date (most recent first)
-                sort = SortOptions(
-                    field=SortField.CREATED,
-                    order=SortOrder.DESC,
-                    limit=None,
-                )
-
-            query_parser = QueryParser(
-                kbid=kbid,
-                features=[SearchOptions.FULLTEXT],
-                query=item.query,
-                label_filters=item.filters,
-                keyword_filters=[],
-                faceted=item.faceted,
-                sort=sort,
-                page_number=item.page_number,
-                page_size=item.page_size,
-                min_score=MinScore(bm25=0, semantic=0),
-                fields=["a/title"],
-                with_status=item.with_status,
-                range_creation_start=item.range_creation_start,
-                range_creation_end=item.range_creation_end,
-                range_modification_start=item.range_modification_start,
-                range_modification_end=item.range_modification_end,
-                hidden=item.hidden,
-            )
-            catalog_results = CatalogResponse()
-            catalog_results.fulltext = await pgcatalog_search(query_parser)
-            catalog_results.resources = await fetch_resources(
-                resources=[r.rid for r in catalog_results.fulltext.results],
-                kbid=kbid,
-                show=[ResourceProperties.BASIC, ResourceProperties.ERRORS],
-                field_type_filter=list(FieldTypeName),
-                extracted=[],
-            )
-            return catalog_results
-    except InvalidQueryError as exc:
-        return HTTPClientError(status_code=412, detail=str(exc))
-    except KnowledgeBoxNotFound:
-        return HTTPClientError(status_code=404, detail="Knowledge Box not found")
-    except LimitsExceededError as exc:
-        return HTTPClientError(status_code=exc.status_code, detail=exc.detail)
-    finally:
-        duration = time() - start_time
-        if duration > 2:  # pragma: no cover
-            logger.warning(
-                "Slow catalog request",
-                extra={
-                    "kbid": kbid,
-                    "duration": duration,
-                    "query": item.model_dump_json(),
-                },
-            )
-
-
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
@@ -431,8 +274,7 @@ async def search(
         keyword_filters=[],
         faceted=item.faceted,
         sort=item.sort,
-        page_number=0,
-        page_size=item.top_k,
+        top_k=item.top_k,
         min_score=item.min_score,
         range_creation_start=item.range_creation_start,
         range_creation_end=item.range_creation_end,
@@ -461,8 +303,7 @@ async def search(
     # We need to merge
     search_results = await merge_results(
         results,
-        count=item.top_k,
-        page=0,
+        top_k=item.top_k,
         kbid=kbid,
         show=item.show,
         field_type_filter=item.field_type_filter,
@@ -491,7 +332,3 @@ async def search(
     search_results.shards = queried_shards
     search_results.autofilters = autofilters
     return search_results, incomplete_results
-
-
-def pgcatalog_enabled():
-    return isinstance(get_driver(), PGDriver)

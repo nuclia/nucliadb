@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from . import ask  # noqa
+from . import catalog  # noqa
 from . import feedback  # noqa
 from . import find  # noqa
 from . import knowledgebox  # noqa
