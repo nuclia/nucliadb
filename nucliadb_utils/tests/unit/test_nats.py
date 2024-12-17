@@ -80,6 +80,9 @@ class TestNatsConnectionManager:
         )
 
         await manager.reconnected_cb()
+
+        # Wait a tiny bit to allow reconnect task to be scheduled
+        await asyncio.sleep(0.01)
         lost_cb.assert_called_once()
 
         await manager.finalize()
@@ -103,6 +106,8 @@ class TestNatsConnectionManager:
         manager._nc.is_connected = False
         assert manager.healthy()
         assert manager._last_unhealthy is not None
+
+        await manager.finalize()
 
     async def test_unsubscribe(self, manager: nats.NatsConnectionManager, nats_conn, js):
         await manager.initialize()
@@ -134,6 +139,54 @@ class TestNatsConnectionManager:
         psub.unsubscribe.assert_awaited_once()
         assert len(manager._subscriptions) == 0
         assert len(manager._pull_subscriptions) == 0
+
+        await manager.finalize()
+
+        nats_conn.drain.assert_called_once()
+        nats_conn.close.assert_called_once()
+
+    async def test_reconnect_multiple_times(self, manager: nats.NatsConnectionManager, nats_conn, js):
+        await manager.initialize()
+
+        cb = AsyncMock()
+
+        async def lost_cb():
+            await asyncio.sleep(0.1)
+            await manager.pull_subscribe(
+                subject="subject",
+                stream="stream",
+                cb=cb,
+                subscription_lost_cb=lost_cb,
+                durable="queue",
+            )
+
+        async def fetch(**kwargs):
+            await asyncio.sleep(0.1)
+            return []
+
+        psub = await manager.pull_subscribe(
+            subject="subject",
+            stream="stream",
+            cb=cb,
+            subscription_lost_cb=lost_cb,
+            durable="queue",
+        )
+        psub.fetch = fetch
+
+        # We start with one subscription
+        assert len(manager._pull_subscriptions) == 1
+
+        # We reconnect two times, emulating nats client as closely as possible, including task cancellation
+        # when a new callback is made
+        task = asyncio.create_task(manager.reconnected_cb())
+        await asyncio.sleep(0.01)
+        task.cancel()
+        task = asyncio.create_task(manager.reconnected_cb())
+        await asyncio.sleep(0.21)
+        await task
+
+        # The lost_cb should have run and re-subscribed
+        assert len(manager._pull_subscriptions) == 1
 
         await manager.finalize()
 
