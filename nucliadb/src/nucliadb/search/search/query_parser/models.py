@@ -75,6 +75,7 @@ class UnitRetrieval:
 ### Catalog
 
 
+# TODO: improve this by grouping filters
 class CatalogQuery(BaseModel):
     kbid: str
     query: str
