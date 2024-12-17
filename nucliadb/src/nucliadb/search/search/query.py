@@ -635,8 +635,7 @@ async def paragraph_query_to_pb(
     fields: list[str],
     filters: list[str],
     faceted: list[str],
-    page_number: int,
-    page_size: int,
+    top_k: int,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
@@ -650,7 +649,7 @@ async def paragraph_query_to_pb(
 
     # We need to ask for all and cut later
     request.page_number = 0
-    request.result_per_page = page_number * page_size + page_size
+    request.result_per_page = top_k
 
     request.body = query
 

@@ -90,7 +90,6 @@ async def resource_search(
                 fields,
                 filters,
                 faceted,
-                0,
                 top_k,
                 range_creation_start,
                 range_creation_end,
