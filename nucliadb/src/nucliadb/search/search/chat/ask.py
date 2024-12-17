@@ -721,7 +721,6 @@ async def retrieval_in_resource(
                 query="",
                 label_filters=ask_request.filters,
                 keyword_filters=ask_request.keyword_filters,
-                page_number=0,
                 page_size=0,
                 min_score=MinScore(),
             ),

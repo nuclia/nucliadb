@@ -272,7 +272,6 @@ async def query_parser_from_find_request(
         keyword_filters=item.keyword_filters,
         faceted=None,
         sort=None,
-        page_number=0,
         page_size=item.top_k,
         min_score=item.min_score,
         range_creation_start=item.range_creation_start,

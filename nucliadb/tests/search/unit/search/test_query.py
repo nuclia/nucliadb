@@ -87,7 +87,6 @@ class TestApplySynonymsToRequest:
             label_filters=[],
             keyword_filters=[],
             faceted=[],
-            page_number=0,
             page_size=10,
             min_score=MinScore(semantic=0.5),
             with_synonyms=True,
@@ -171,7 +170,6 @@ class TestVectorSetAndMatryoshkaParsing:
             query="my query",
             label_filters=[],  # type: ignore
             keyword_filters=[],  # type: ignore
-            page_number=0,
             page_size=20,
             min_score=MinScore(bm25=0, semantic=0),
         )

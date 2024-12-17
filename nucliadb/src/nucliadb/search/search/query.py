@@ -105,7 +105,6 @@ class QueryParser:
         query: str,
         label_filters: Union[list[str], list[Filter]],
         keyword_filters: Union[list[str], list[Filter]],
-        page_number: int,
         page_size: int,
         min_score: MinScore,
         faceted: Optional[list[str]] = None,
@@ -145,7 +144,6 @@ class QueryParser:
         self.flat_label_filters: list[str] = []
         self.keyword_filters: dict[str, Any] = convert_to_node_filters(keyword_filters)
         self.faceted = faceted or []
-        self.page_number = page_number
         self.page_size = page_size
         self.min_score = min_score
         self.sort = sort
@@ -389,7 +387,7 @@ class QueryParser:
             # have consistent results, we must limit them
             request.result_per_page = self.sort.limit
         else:
-            request.result_per_page = self.page_number * self.page_size + self.page_size
+            request.result_per_page = self.page_size
 
         sort_field = SortFieldMap[self.sort.field] if self.sort else None
         if sort_field is not None:
