@@ -151,7 +151,6 @@ class TestNatsConnectionManager:
         cb = AsyncMock()
 
         async def lost_cb():
-            print("lost_cb")
             await asyncio.sleep(0.1)
             await manager.pull_subscribe(
                 subject="subject",
