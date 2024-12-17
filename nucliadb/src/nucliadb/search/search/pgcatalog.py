@@ -92,24 +92,24 @@ def _prepare_query(catalog_query: CatalogQuery):
         )
         filter_params["query"] = catalog_query.query
 
-    if catalog_query.range_creation_start:
+    if catalog_query.filters.creation.after:
         filter_sql.append("created_at > %(created_at_start)s")
-        filter_params["created_at_start"] = catalog_query.range_creation_start
+        filter_params["created_at_start"] = catalog_query.filters.creation.after
 
-    if catalog_query.range_creation_end:
+    if catalog_query.filters.creation.before:
         filter_sql.append("created_at < %(created_at_end)s")
-        filter_params["created_at_end"] = catalog_query.range_creation_end
+        filter_params["created_at_end"] = catalog_query.filters.creation.before
 
-    if catalog_query.range_modification_start:
+    if catalog_query.filters.modification.after:
         filter_sql.append("modified_at > %(modified_at_start)s")
-        filter_params["modified_at_start"] = catalog_query.range_modification_start
+        filter_params["modified_at_start"] = catalog_query.filters.modification.after
 
-    if catalog_query.range_modification_end:
+    if catalog_query.filters.modification.before:
         filter_sql.append("modified_at < %(modified_at_end)s")
-        filter_params["modified_at_end"] = catalog_query.range_modification_end
+        filter_params["modified_at_end"] = catalog_query.filters.modification.before
 
-    if catalog_query.label_filters:
-        filter_sql.append(_convert_filter(catalog_query.label_filters, filter_params))
+    if catalog_query.filters.labels:
+        filter_sql.append(_convert_filter(catalog_query.filters.labels, filter_params))
 
     order_sql = ""
     if catalog_query.sort:
@@ -130,9 +130,9 @@ def _prepare_query(catalog_query: CatalogQuery):
 
         order_sql = f" ORDER BY {order_field} {order_dir}"
 
-    if catalog_query.with_status:
+    if catalog_query.filters.with_status:
         filter_sql.append("labels && %(status)s")
-        if catalog_query.with_status == ResourceProcessingStatus.PROCESSED:
+        if catalog_query.filters.with_status == ResourceProcessingStatus.PROCESSED:
             filter_params["status"] = ["/n/s/PROCESSED", "/n/s/ERROR"]
         else:
             filter_params["status"] = ["/n/s/PENDING"]

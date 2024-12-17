@@ -31,6 +31,13 @@ from nucliadb_models import search as search_models
 
 ### Retrieval
 
+# filters
+
+
+class DateTimeFilter(BaseModel):
+    after: Optional[datetime] = None  # aka, start
+    before: Optional[datetime] = None  # aka, end
+
 
 # rank fusion
 
@@ -75,17 +82,20 @@ class UnitRetrieval:
 ### Catalog
 
 
-# TODO: improve this by grouping filters
+class CatalogFilters(BaseModel):
+    labels: dict[str, Any] = Field(
+        default_factory=dict, description="Labels filter expression, like, `{and: {not: ...}, ...}`"
+    )
+    creation: DateTimeFilter
+    modification: DateTimeFilter
+    with_status: Optional[search_models.ResourceProcessingStatus] = None
+
+
 class CatalogQuery(BaseModel):
     kbid: str
     query: str
-    label_filters: dict[str, Any]
-    range_creation_start: Optional[datetime]
-    range_creation_end: Optional[datetime]
-    range_modification_start: Optional[datetime]
-    range_modification_end: Optional[datetime]
+    filters: CatalogFilters
     sort: search_models.SortOptions
-    with_status: Optional[search_models.ResourceProcessingStatus]
     faceted: list[str]
     page_size: int
     page_number: int

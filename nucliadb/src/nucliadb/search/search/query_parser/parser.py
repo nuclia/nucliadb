@@ -28,7 +28,9 @@ from nucliadb.search.search.filters import (
 )
 from nucliadb.search.search.query_parser.exceptions import ParserError
 from nucliadb.search.search.query_parser.models import (
+    CatalogFilters,
     CatalogQuery,
+    DateTimeFilter,
     MultiMatchBoosterReranker,
     NoopReranker,
     PredictReranker,
@@ -162,13 +164,19 @@ def parse_catalog(kbid: str, item: search_models.CatalogRequest) -> CatalogQuery
     return CatalogQuery(
         kbid=kbid,
         query=item.query,
-        label_filters=label_filters,
-        range_creation_start=item.range_creation_start,
-        range_creation_end=item.range_creation_end,
-        range_modification_start=item.range_modification_start,
-        range_modification_end=item.range_modification_end,
+        filters=CatalogFilters(
+            labels=label_filters,
+            creation=DateTimeFilter(
+                after=item.range_creation_start,
+                before=item.range_creation_end,
+            ),
+            modification=DateTimeFilter(
+                after=item.range_modification_start,
+                before=item.range_modification_end,
+            ),
+            with_status=item.with_status,
+        ),
         sort=sort,
-        with_status=item.with_status,
         faceted=item.faceted,
         page_number=item.page_number,
         page_size=item.page_size,
