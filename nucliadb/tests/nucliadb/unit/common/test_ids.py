@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Optional
+
 import pytest
 
-from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb.common.ids import FieldId, ParagraphId, VectorId, extract_data_augmentation_id
 from nucliadb_protos.resources_pb2 import FieldType
 
 
@@ -101,3 +103,62 @@ def test_vector_ids():
     assert vector_id.index == 1
     assert vector_id.vector_start == 10
     assert vector_id.vector_end == 20
+
+
+@pytest.mark.parametrize(
+    "task_id,field_type,field_id,split",
+    [
+        ("mytask", "t", "mytext", None),
+        ("mytask", "t", "mytext", "mysplit"),
+        ("mytask", "t", "my-text", "my-split"),  # dashes in field ids are valid
+    ],
+)
+def test_valid_data_augmentation_id_extraction(
+    task_id: str,
+    field_type: str,
+    field_id: str,
+    split: Optional[str],
+):
+    if split is not None:
+        gen_field_id = f"da-{task_id}-{field_type}-{field_id}-{split}"
+    else:
+        gen_field_id = f"da-{task_id}-{field_type}-{field_id}"
+
+    assert extract_data_augmentation_id(gen_field_id) == task_id
+
+
+@pytest.mark.parametrize(
+    "task_id,field_type,field_id,split",
+    [
+        ("my-task", "t", "mytext", None),  # task_id can't contain `-`
+        ("", "t", "mytext", None),  # empty task_id
+    ],
+)
+def test_invalid_data_augmentation_id_extraction(
+    task_id: str,
+    field_type: str,
+    field_id: str,
+    split: Optional[str],
+):
+    if split is not None:
+        gen_field_id = f"da-{task_id}-{field_type}-{field_id}-{split}"
+    else:
+        gen_field_id = f"da-{task_id}-{field_type}-{field_id}"
+
+    assert (
+        extract_data_augmentation_id(gen_field_id) is None
+        or extract_data_augmentation_id(gen_field_id) != task_id
+    )
+
+
+@pytest.mark.parametrize(
+    "gen_field_id",
+    [
+        "not-starting-with-da",
+        "da-butnomoredashes",
+    ],
+)
+def test_invalid_data_augmentation_id_extraction_2(
+    gen_field_id: str,
+):
+    assert extract_data_augmentation_id(gen_field_id) is None

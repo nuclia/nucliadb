@@ -26,7 +26,7 @@ from nucliadb_utils.storages.storage import StorageField
 FILE_METADATA = "file_metadata"
 
 
-class File(Field):
+class File(Field[FieldFile]):
     pbklass = FieldFile
     value: FieldFile
     type: str = "f"
@@ -57,7 +57,7 @@ class File(Field):
 
         await self.db_set_value(payload)
 
-    async def get_value(self) -> FieldFile:
+    async def get_value(self) -> Optional[FieldFile]:
         return await self.db_get_value()
 
     async def set_file_extracted_data(self, file_extracted_data: FileExtractedData):

@@ -1438,6 +1438,46 @@ class FieldQuestionAnswerWrapper(google.protobuf.message.Message):
 global___FieldQuestionAnswerWrapper = FieldQuestionAnswerWrapper
 
 @typing.final
+class FieldAuthor(google.protobuf.message.Message):
+    """Who is the actor of field creation"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class User(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        def __init__(
+            self,
+        ) -> None: ...
+
+    @typing.final
+    class DataAugmentation(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        def __init__(
+            self,
+        ) -> None: ...
+
+    USER_FIELD_NUMBER: builtins.int
+    DATA_AUGMENTATION_FIELD_NUMBER: builtins.int
+    @property
+    def user(self) -> global___FieldAuthor.User: ...
+    @property
+    def data_augmentation(self) -> global___FieldAuthor.DataAugmentation: ...
+    def __init__(
+        self,
+        *,
+        user: global___FieldAuthor.User | None = ...,
+        data_augmentation: global___FieldAuthor.DataAugmentation | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["author", b"author", "data_augmentation", b"data_augmentation", "user", b"user"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["author", b"author", "data_augmentation", b"data_augmentation", "user", b"user"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["author", b"author"]) -> typing.Literal["user", "data_augmentation"] | None: ...
+
+global___FieldAuthor = FieldAuthor
+
+@typing.final
 class FieldComputedMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1601,17 +1641,22 @@ class FieldText(google.protobuf.message.Message):
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
     MD5_FIELD_NUMBER: builtins.int
+    GENERATED_BY_FIELD_NUMBER: builtins.int
     body: builtins.str
     format: global___FieldText.Format.ValueType
     md5: builtins.str
+    @property
+    def generated_by(self) -> global___FieldAuthor: ...
     def __init__(
         self,
         *,
         body: builtins.str = ...,
         format: global___FieldText.Format.ValueType = ...,
         md5: builtins.str = ...,
+        generated_by: global___FieldAuthor | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "md5", b"md5"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["generated_by", b"generated_by"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "generated_by", b"generated_by", "md5", b"md5"]) -> None: ...
 
 global___FieldText = FieldText
 

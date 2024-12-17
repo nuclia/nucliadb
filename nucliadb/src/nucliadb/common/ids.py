@@ -215,3 +215,26 @@ class VectorId:
         index = int(parts[-2])
         field_id = FieldId.from_string("/".join(parts[:-2]))
         return cls(field_id=field_id, index=index, vector_start=start, vector_end=end)
+
+
+def extract_data_augmentation_id(generated_field_id: str) -> Optional[str]:
+    """Data augmentation generated fields have a strict id with the following
+    format:
+    `da-{task_id}-{original:field_type}-{original:field_id}[-{original:split}]`
+
+    @return the `task_id`
+
+    ATENTION: we are assuming ids have been properly generated and `-` is not a
+    valid character, otherwise, this extraction would be wrong and a partial id
+    would be returned.
+
+    """
+    parts = generated_field_id.split("-")
+
+    if len(parts) < 4:
+        return None
+
+    if parts[0] != "da":
+        return None
+
+    return parts[1] or None

@@ -21,9 +21,9 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any, Optional, Type
+from typing import Any, Generic, Optional, Type, TypeVar
 
-from google.protobuf.message import DecodeError
+from google.protobuf.message import DecodeError, Message
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
@@ -31,6 +31,7 @@ from nucliadb_protos.resources_pb2 import (
     CloudFile,
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
+    FieldAuthor,
     FieldComputedMetadata,
     FieldComputedMetadataWrapper,
     FieldQuestionAnswers,
@@ -56,8 +57,11 @@ class FieldTypes(str, enum.Enum):
     QUESTION_ANSWERS = "question_answers"
 
 
-class Field:
-    pbklass: Type
+PbType = TypeVar("PbType", bound=Message)
+
+
+class Field(Generic[PbType]):
+    pbklass: Type[PbType]
     type: str = "x"
     value: Optional[Any]
     extracted_text: Optional[ExtractedText]
@@ -122,7 +126,7 @@ class Field:
             key = FieldTypes.FIELD_VECTORS.value
         return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, key)
 
-    async def db_get_value(self):
+    async def db_get_value(self) -> Optional[PbType]:
         if self.value is None:
             payload = await datamanagers.fields.get_raw(
                 self.resource.txn,
@@ -132,7 +136,7 @@ class Field:
                 field_id=self.id,
             )
             if payload is None:
-                return
+                return None
 
             self.value = self.pbklass()
             self.value.ParseFromString(payload)
@@ -469,6 +473,11 @@ class Field:
             if payload is not None:
                 self.large_computed_metadata = payload
         return self.large_computed_metadata
+
+    async def generated_by(self) -> FieldAuthor:
+        author = FieldAuthor()
+        author.user.SetInParent()
+        return author
 
     def serialize(self):
         return self.value.SerializeToString()
