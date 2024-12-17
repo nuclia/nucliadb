@@ -19,6 +19,7 @@
 
 import asyncio
 import logging
+import sys
 import time
 from functools import cached_property
 from typing import Any, Awaitable, Callable, Optional, Union
@@ -126,6 +127,9 @@ class NatsConnectionManager:
         self._lock = asyncio.Lock()
         self._healthy = True
         self._last_unhealthy: Optional[float] = None
+        self._needs_reconnection = False
+        self._reconnect_task: Optional[asyncio.Task] = None
+        self._expected_subscriptions: set[str] = set()
 
     def healthy(self) -> bool:
         if not self._healthy:
@@ -159,8 +163,18 @@ class NatsConnectionManager:
         async with self._lock:
             self._nc = await nats.connect(**options)
 
+        self._expected_subscription_task = asyncio.create_task(self._verify_expected_subscriptions())
+
     async def finalize(self):
         async with self._lock:
+            if self._reconnect_task:
+                self._reconnect_task.cancel()
+                await self._reconnect_task
+
+            if self._expected_subscription_task:
+                self._expected_subscription_task.cancel()
+                await self._expected_subscription_task
+
             # Finalize push subscriptions
             for sub, _ in self._subscriptions:
                 try:
@@ -199,42 +213,75 @@ class NatsConnectionManager:
         logger.warning(
             f"Reconnected to NATS {self._nc.connected_url.netloc}. Attempting to re-subscribe."
         )
-        async with self._lock:
-            existing_subs = self._subscriptions
-            self._subscriptions = []
-            for sub, recon_callback in existing_subs:
-                try:
-                    await sub.drain()
-                    await recon_callback()
-                except Exception:
-                    logger.exception(
-                        f"Error resubscribing to {sub.subject} on {self._nc.connected_url.netloc}"
-                    )
-                    # should force exit here to restart the service
-                    self._healthy = False
-                    raise
+        # This callback may be interrupted by NATS. In order to avoid being interrupted, we spawn our own task to do
+        # the reconnection. If we are interrupted we could lose subscriptions
+        self._needs_reconnection = True
+        if self._reconnect_task is None:
+            self._reconnect_task = asyncio.create_task(self._reconnect())
 
-            existing_pull_subs = self._pull_subscriptions
-            self._pull_subscriptions = []
-            for pull_sub, task, recon_callback, cancelled in existing_pull_subs:
-                cancelled.set()
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-                try:
-                    await pull_sub.unsubscribe()
-                    await recon_callback()
-                except Exception:
-                    logger.exception(
-                        f"Error resubscribing to pull subscription on {self._nc.connected_url.netloc}"
-                    )
-                    # should force exit here to restart the service
-                    self._healthy = False
-                    raise
-        self._healthy = True
-        self._last_unhealthy = None  # reset the last unhealthy time
+    async def _reconnect(self):
+        tries = 0
+        # Loop in case we receive another reconnection request while one is ongoing
+        while self._needs_reconnection:
+            if tries > 5:
+                logger.error(
+                    "Too many consecutive reconnection to NATS. Something might be wrong. Exiting."
+                )
+                sys.exit(1)
+
+            try:
+                self._needs_reconnection = False
+
+                async with self._lock:
+                    existing_subs = self._subscriptions
+                    self._subscriptions = []
+                    for sub, recon_callback in existing_subs:
+                        try:
+                            await sub.drain()
+                            await recon_callback()
+                        except Exception:
+                            logger.exception(
+                                f"Error resubscribing to {sub.subject} on {self._nc.connected_url.netloc}"
+                            )
+                            # should force exit here to restart the service
+                            self._healthy = False
+                            raise
+
+                    existing_pull_subs = self._pull_subscriptions
+                    self._pull_subscriptions = []
+                    for pull_sub, task, recon_callback, cancelled in existing_pull_subs:
+                        cancelled.set()
+                        task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+                        try:
+                            await pull_sub.unsubscribe()
+                            await recon_callback()
+                        except Exception:
+                            logger.exception(
+                                f"Error resubscribing to pull subscription on {self._nc.connected_url.netloc}"
+                            )
+                            # should force exit here to restart the service
+                            self._healthy = False
+                            raise
+                self._healthy = True
+                self._last_unhealthy = None  # reset the last unhealthy time
+            except Exception:
+                if self._needs_reconnection:
+                    logger.warning("Error reconnecting to NATS, will retry")
+                else:
+                    logger.exception("Error reconnecting to NATS. Exiting.")
+                    sys.exit(1)
+
+            if self._needs_reconnection:
+                logger.warning(
+                    "While reconnecting to NATS subscriptions, a reconnect request was received. Reconnecting again.",
+                )
+            tries += 1
+
+        self._reconnect_task = None
 
     async def error_cb(self, e):  # pragma: no cover
         logger.error(f"There was an error on consumer: {e}", exc_info=e)
@@ -314,6 +361,10 @@ class NatsConnectionManager:
 
         task = asyncio.create_task(consume(psub, subject), name=f"pull_subscribe_{subject}")
         self._pull_subscriptions.append((psub, task, subscription_lost_cb, cancelled))
+
+        if durable:
+            self._expected_subscriptions.add(durable)
+
         return psub
 
     async def _remove_subscription(
@@ -340,3 +391,23 @@ class NatsConnectionManager:
     async def unsubscribe(self, subscription: Union[Subscription, JetStreamContext.PullSubscription]):
         await subscription.unsubscribe()
         await self._remove_subscription(subscription)
+
+        if isinstance(subscription, JetStreamContext.PullSubscription):
+            self._expected_subscriptions.remove(subscription._consumer)  # type: ignore
+
+    async def _verify_expected_subscriptions(self):
+        failures = 0
+        while True:
+            await asyncio.sleep(30)
+
+            existing_subs = set(sub._consumer for sub, _, _, _ in self._pull_subscriptions)
+            missing_subs = self._expected_subscriptions - existing_subs
+            if missing_subs:
+                logger.warning(f"Some NATS subscriptions are missing {missing_subs}")
+                failures += 1
+            else:
+                failures = 0
+
+            if failures >= 3:
+                logger.warning("Some NATS subscriptions are missing for too long, exiting")
+                sys.exit(1)
