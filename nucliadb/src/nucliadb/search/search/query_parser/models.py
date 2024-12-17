@@ -19,6 +19,8 @@
 #
 
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Optional
 
 from pydantic import (
     BaseModel,
@@ -26,6 +28,9 @@ from pydantic import (
 )
 
 from nucliadb_models import search as search_models
+
+### Retrieval
+
 
 # rank fusion
 
@@ -65,3 +70,21 @@ class UnitRetrieval:
     top_k: int
     rank_fusion: RankFusion
     reranker: Reranker
+
+
+### Catalog
+
+
+class CatalogQuery(BaseModel):
+    kbid: str
+    query: str
+    label_filters: dict[str, Any]
+    range_creation_start: Optional[datetime]
+    range_creation_end: Optional[datetime]
+    range_modification_start: Optional[datetime]
+    range_modification_end: Optional[datetime]
+    sort: search_models.SortOptions
+    with_status: Optional[search_models.ResourceProcessingStatus]
+    faceted: list[str]
+    page_size: int
+    page_number: int

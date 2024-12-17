@@ -34,7 +34,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import fetch_resources
 from nucliadb.search.search.pgcatalog import pgcatalog_search
-from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.query_parser.parser import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
 )
@@ -45,9 +45,7 @@ from nucliadb_models.search import (
     CatalogRequest,
     CatalogResponse,
     KnowledgeboxSearchResults,
-    MinScore,
     ResourceProperties,
-    SearchOptions,
     SearchParamDefaults,
     SortField,
     SortOptions,
@@ -151,34 +149,8 @@ async def catalog(
     start_time = time()
     try:
         with cache.request_caches():
-            sort = item.sort
-            if sort is None:
-                # By default we sort by creation date (most recent first)
-                sort = SortOptions(
-                    field=SortField.CREATED,
-                    order=SortOrder.DESC,
-                    limit=None,
-                )
+            query_parser = parse_catalog(kbid, item)
 
-            query_parser = QueryParser(
-                kbid=kbid,
-                features=[SearchOptions.FULLTEXT],
-                query=item.query,
-                label_filters=item.filters,
-                keyword_filters=[],
-                faceted=item.faceted,
-                sort=sort,
-                page_number=item.page_number,
-                page_size=item.page_size,
-                min_score=MinScore(bm25=0, semantic=0),
-                fields=["a/title"],
-                with_status=item.with_status,
-                range_creation_start=item.range_creation_start,
-                range_creation_end=item.range_creation_end,
-                range_modification_start=item.range_modification_start,
-                range_modification_end=item.range_modification_end,
-                hidden=item.hidden,
-            )
             catalog_results = CatalogResponse()
             catalog_results.fulltext = await pgcatalog_search(query_parser)
             catalog_results.resources = await fetch_resources(

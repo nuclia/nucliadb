@@ -26,6 +26,7 @@ from psycopg.rows import dict_row
 
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.search.search.query_parser.models import CatalogQuery
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
@@ -37,7 +38,6 @@ from nucliadb_models.search import (
 from nucliadb_telemetry import metrics
 
 from .filters import translate_label
-from .query import QueryParser
 
 observer = metrics.Observer("pg_catalog_search", labels={"op": ""})
 logger = logging.getLogger(__name__)
@@ -79,60 +79,60 @@ def _convert_filter(filter, filter_params):
         raise ValueError(f"Invalid operator {op}")
 
 
-def _prepare_query(query_parser: QueryParser):
+def _prepare_query(catalog_query: CatalogQuery):
     filter_sql = ["kbid = %(kbid)s"]
-    filter_params: dict[str, Any] = {"kbid": query_parser.kbid}
+    filter_params: dict[str, Any] = {"kbid": catalog_query.kbid}
 
-    if query_parser.query:
+    if catalog_query.query:
         # This is doing tokenization inside the SQL server (to keep the index updated). We could move it to
         # the python code at update/query time if it ever becomes a problem but for now, a single regex
         # executed per query is not a problem.
         filter_sql.append(
             "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
         )
-        filter_params["query"] = query_parser.query
+        filter_params["query"] = catalog_query.query
 
-    if query_parser.range_creation_start:
+    if catalog_query.range_creation_start:
         filter_sql.append("created_at > %(created_at_start)s")
-        filter_params["created_at_start"] = query_parser.range_creation_start
+        filter_params["created_at_start"] = catalog_query.range_creation_start
 
-    if query_parser.range_creation_end:
+    if catalog_query.range_creation_end:
         filter_sql.append("created_at < %(created_at_end)s")
-        filter_params["created_at_end"] = query_parser.range_creation_end
+        filter_params["created_at_end"] = catalog_query.range_creation_end
 
-    if query_parser.range_modification_start:
+    if catalog_query.range_modification_start:
         filter_sql.append("modified_at > %(modified_at_start)s")
-        filter_params["modified_at_start"] = query_parser.range_modification_start
+        filter_params["modified_at_start"] = catalog_query.range_modification_start
 
-    if query_parser.range_modification_end:
+    if catalog_query.range_modification_end:
         filter_sql.append("modified_at < %(modified_at_end)s")
-        filter_params["modified_at_end"] = query_parser.range_modification_end
+        filter_params["modified_at_end"] = catalog_query.range_modification_end
 
-    if query_parser.label_filters:
-        filter_sql.append(_convert_filter(query_parser.label_filters, filter_params))
+    if catalog_query.label_filters:
+        filter_sql.append(_convert_filter(catalog_query.label_filters, filter_params))
 
     order_sql = ""
-    if query_parser.sort:
-        if query_parser.sort.field == SortField.CREATED:
+    if catalog_query.sort:
+        if catalog_query.sort.field == SortField.CREATED:
             order_field = "created_at"
-        elif query_parser.sort.field == SortField.MODIFIED:
+        elif catalog_query.sort.field == SortField.MODIFIED:
             order_field = "modified_at"
-        elif query_parser.sort.field == SortField.TITLE:
+        elif catalog_query.sort.field == SortField.TITLE:
             order_field = "title"
         else:
             # Deprecated order by score, use created_at instead
             order_field = "created_at"
 
-        if query_parser.sort.order == SortOrder.ASC:
+        if catalog_query.sort.order == SortOrder.ASC:
             order_dir = "ASC"
         else:
             order_dir = "DESC"
 
         order_sql = f" ORDER BY {order_field} {order_dir}"
 
-    if query_parser.with_status:
+    if catalog_query.with_status:
         filter_sql.append("labels && %(status)s")
-        if query_parser.with_status == ResourceProcessingStatus.PROCESSED:
+        if catalog_query.with_status == ResourceProcessingStatus.PROCESSED:
             filter_params["status"] = ["/n/s/PROCESSED", "/n/s/ERROR"]
         else:
             filter_params["status"] = ["/n/s/PENDING"]
@@ -148,18 +148,18 @@ def _pg_driver() -> PGDriver:
 
 
 @observer.wrap({"op": "search"})
-async def pgcatalog_search(query_parser: QueryParser) -> Resources:
+async def pgcatalog_search(catalog_query: CatalogQuery) -> Resources:
     # Prepare SQL query
-    query, query_params = _prepare_query(query_parser)
+    query, query_params = _prepare_query(catalog_query)
 
     async with _pg_driver()._get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
         facets = {}
 
         # Faceted search
-        if query_parser.faceted:
+        if catalog_query.faceted:
             with observer({"op": "facets"}):
                 tmp_facets: dict[str, dict[str, int]] = {
-                    translate_label(f): defaultdict(int) for f in query_parser.faceted
+                    translate_label(f): defaultdict(int) for f in catalog_query.faceted
                 }
                 facet_filters = " OR ".join(f"label LIKE '{f}/%%'" for f in tmp_facets.keys())
                 for facet in tmp_facets.keys():
@@ -167,7 +167,7 @@ async def pgcatalog_search(query_parser: QueryParser) -> Resources:
                         facet.startswith("/n/s") or facet.startswith("/n/i") or facet.startswith("/l")
                     ):
                         logger.warn(
-                            f"Unexpected facet used at catalog: {facet}, kbid={query_parser.kbid}"
+                            f"Unexpected facet used at catalog: {facet}, kbid={catalog_query.kbid}"
                         )
 
                 await cur.execute(
@@ -201,12 +201,12 @@ async def pgcatalog_search(query_parser: QueryParser) -> Resources:
 
         # Query
         with observer({"op": "query"}):
-            offset = query_parser.page_size * query_parser.page_number
+            offset = catalog_query.page_size * catalog_query.page_number
             await cur.execute(
                 f"{query} LIMIT %(page_size)s OFFSET %(offset)s",
                 {
                     **query_params,
-                    "page_size": query_parser.page_size,
+                    "page_size": catalog_query.page_size,
                     "offset": offset,
                 },
             )
@@ -224,10 +224,10 @@ async def pgcatalog_search(query_parser: QueryParser) -> Resources:
             )
             for r in data
         ],
-        query=query_parser.query,
+        query=catalog_query.query,
         total=total,
-        page_number=query_parser.page_number,
-        page_size=query_parser.page_size,
+        page_number=catalog_query.page_number,
+        page_size=catalog_query.page_size,
         next_page=(offset + len(data) < total),
         min_score=0,
     )
