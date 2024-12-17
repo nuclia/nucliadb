@@ -461,7 +461,7 @@ async def search(
     # We need to merge
     search_results = await merge_results(
         results,
-        count=item.top_k,
+        top_k=item.top_k,
         kbid=kbid,
         show=item.show,
         field_type_filter=item.field_type_filter,
