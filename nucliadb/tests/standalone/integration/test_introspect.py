@@ -22,11 +22,13 @@ import os
 import tarfile
 import tempfile
 
+from httpx import AsyncClient
+
 from nucliadb.standalone.introspect import ClusterInfo
 from nucliadb.standalone.settings import Settings
 
 
-async def test_introspect_endpoint(nucliadb_manager) -> None:
+async def test_introspect_endpoint(nucliadb_manager: AsyncClient) -> None:
     # Generate some traffic to have some logs
     await nucliadb_manager.post("/not/found")
     await nucliadb_manager.delete("/kb/foobar")

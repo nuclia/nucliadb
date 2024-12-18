@@ -32,9 +32,11 @@ DEPLOY_MODE_MARK_NAME = "deploy_modes"
 DEPLOY_MODE_FIXTURES = {
     "nucliadb_reader": [
         "component",
+        "standalone",
     ],
     "nucliadb_writer": [
         "component",
+        "standalone",
     ],
 }
 
@@ -87,9 +89,19 @@ def pytest_generate_tests(metafunc: Metafunc):
 
 @pytest.fixture(scope="function")
 async def nucliadb_reader(request: FixtureRequest):
-    yield request.param
+    try:
+        yield request.param
+    except AttributeError as exc:
+        raise MagicFixturesError(
+            "Are you using a magic fixture without the deploy_modes decorator?"
+        ) from exc
 
 
 @pytest.fixture(scope="function")
 async def nucliadb_writer(request: FixtureRequest):
-    yield request.param
+    try:
+        yield request.param
+    except AttributeError as exc:
+        raise MagicFixturesError(
+            "Are you using a magic fixture without the deploy_modes decorator?"
+        ) from exc

@@ -17,22 +17,338 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
+import logging
+import os
+import tempfile
 import uuid
+from unittest.mock import Mock, patch
 
+import psycopg
 import pytest
+from grpc import aio
+from httpx import AsyncClient
+from pytest_docker_fixtures import images
 
+from nucliadb.common.cluster import manager as cluster_manager
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.exceptions import UnsetUtility
+from nucliadb.common.maindb.pg import PGDriver
+from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.settings import DriverConfig, DriverSettings
+from nucliadb.ingest.settings import settings as ingest_settings
+from nucliadb.migrator.migrator import run_pg_schema_migrations
 from nucliadb.search.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb.standalone.config import config_nucliadb
+from nucliadb.standalone.run import run_async_nucliadb
+from nucliadb.standalone.settings import Settings
+from nucliadb.tests.config import reset_config
+from nucliadb.writer import API_PREFIX
+from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_telemetry.logs import setup_logging
+from nucliadb_telemetry.settings import (
+    LogFormatType,
+    LogLevel,
+    LogOutputType,
+    LogSettings,
+)
+from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.tests import free_port
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    clear_global_cache,
+    get_utility,
+    set_utility,
+)
+from tests.utils.dirty_index import mark_dirty
+
+logger = logging.getLogger(__name__)
+
+# Minimum support PostgreSQL version
+# Reason: We want the btree_gin extension to support uuid's (pg11) and `gen_random_uuid()` (pg13)
+images.settings["postgresql"]["version"] = "13"
+images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_one(nucliadb_manager):
+async def knowledgebox_one(nucliadb_writer_manager: AsyncClient):
     kbslug = str(uuid.uuid4())
     data = {"slug": kbslug}
-    resp = await nucliadb_manager.post(f"/{KBS_PREFIX}", json=data)
+    resp = await nucliadb_writer_manager.post(f"/{KBS_PREFIX}", json=data)
     assert resp.status_code == 201
     kbid = resp.json()["uuid"]
 
     yield kbid
 
-    resp = await nucliadb_manager.delete(f"/{KB_PREFIX}/{kbid}")
+    resp = await nucliadb_writer_manager.delete(f"/{KB_PREFIX}/{kbid}")
     assert resp.status_code == 200
+
+
+@pytest.fixture(scope="function")
+async def dummy_processing():
+    from nucliadb_utils.settings import nuclia_settings
+
+    nuclia_settings.dummy_processing = True
+
+
+@pytest.fixture(scope="function", autouse=True)
+def analytics_disabled():
+    os.environ["NUCLIADB_DISABLE_ANALYTICS"] = "True"
+    yield
+    os.environ.pop("NUCLIADB_DISABLE_ANALYTICS")
+
+
+@pytest.fixture(scope="function")
+def tmpdir():
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield tmpdir
+    except OSError:
+        # Python error on tempfile when tearing down the fixture.
+        # Solved in version 3.11
+        pass
+
+
+@pytest.fixture(scope="function")
+def endecryptor_settings():
+    from nucliadb_utils.encryption.settings import settings
+
+    secret_key = os.urandom(32)
+    encoded_secret_key = base64.b64encode(secret_key).decode("utf-8")
+    settings.encryption_secret_key = encoded_secret_key
+
+    yield
+
+    settings.encryption_secret_key = None
+
+
+@pytest.fixture(scope="function")
+async def nucliadb(
+    endecryptor_settings,
+    dummy_processing,
+    analytics_disabled,
+    maindb_settings,
+    storage: Storage,
+    storage_settings,
+    tmpdir,
+    learning_config,
+):
+    from nucliadb.common.cluster import manager
+
+    manager.INDEX_NODES.clear()
+
+    # we need to force DATA_PATH updates to run every test on the proper
+    # temporary directory
+    data_path = f"{tmpdir}/node"
+    os.environ["DATA_PATH"] = data_path
+    settings = Settings(
+        data_path=data_path,
+        http_port=free_port(),
+        ingest_grpc_port=free_port(),
+        train_grpc_port=free_port(),
+        standalone_node_port=free_port(),
+        log_format_type=LogFormatType.PLAIN,
+        log_output_type=LogOutputType.FILE,
+        **maindb_settings.model_dump(),
+        **storage_settings,
+    )
+
+    config_nucliadb(settings)
+
+    # Make sure tests don't write logs outside of the tmpdir
+    os.environ["ERROR_LOG"] = f"{tmpdir}/logs/error.log"
+    os.environ["ACCESS_LOG"] = f"{tmpdir}/logs/access.log"
+    os.environ["INFO_LOG"] = f"{tmpdir}/logs/info.log"
+
+    setup_logging(
+        settings=LogSettings(
+            log_output_type=LogOutputType.FILE,
+            log_format_type=LogFormatType.PLAIN,
+            debug=False,
+            log_level=LogLevel.WARNING,
+        )
+    )
+    server = await run_async_nucliadb(settings)
+    assert server.started, "Nucliadb server did not start correctly"
+
+    yield settings
+
+    await maybe_cleanup_maindb()
+
+    reset_config()
+    clear_global_cache()
+    await server.shutdown()
+
+
+@pytest.fixture(scope="function")
+async def nucliadb_manager(nucliadb: Settings):
+    async with AsyncClient(
+        headers={"X-NUCLIADB-ROLES": "MANAGER"},
+        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        timeout=None,
+        event_hooks={"request": [mark_dirty]},
+    ) as client:
+        yield client
+
+
+@pytest.fixture(scope="function")
+async def nucliadb_grpc(nucliadb: Settings):
+    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
+    return stub
+
+
+@pytest.fixture(scope="function")
+async def nucliadb_train(nucliadb: Settings):
+    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))
+    return stub
+
+
+@pytest.fixture(scope="function")
+async def stream_audit(natsd: str, mocker):
+    from nucliadb_utils.audit.stream import StreamAuditStorage
+    from nucliadb_utils.settings import audit_settings
+
+    audit = StreamAuditStorage(
+        [natsd],
+        audit_settings.audit_jetstream_target,  # type: ignore
+        audit_settings.audit_partitions,
+        audit_settings.audit_hash_seed,
+    )
+    await audit.initialize()
+
+    mocker.spy(audit, "send")
+    mocker.spy(audit.js, "publish")
+    mocker.spy(audit, "search")
+    mocker.spy(audit, "chat")
+
+    set_utility(Utility.AUDIT, audit)
+    yield audit
+    await audit.finalize()
+
+
+@pytest.fixture(scope="function")
+def predict_mock() -> Mock:  # type: ignore
+    predict = get_utility(Utility.PREDICT)
+    mock = Mock()
+    set_utility(Utility.PREDICT, mock)
+
+    yield mock
+
+    if predict is None:
+        clean_utility(Utility.PREDICT)
+    else:
+        set_utility(Utility.PREDICT, predict)
+
+
+@pytest.fixture(scope="function")
+def metrics_registry():
+    import prometheus_client.registry
+
+    for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
+        if not hasattr(collector, "_metrics"):
+            continue
+        collector._metrics.clear()
+    yield prometheus_client.registry.REGISTRY
+
+
+@pytest.fixture(scope="function")
+async def pg_maindb_settings(pg):
+    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+
+    # We want to be sure schema migrations are always run. As some tests use
+    # this fixture and create their own driver, we need to create one here and
+    # run the migrations, so the maindb_settings fixture can still be generic
+    # and pg migrations are run
+    driver = PGDriver(url=url, connection_pool_min_size=2, connection_pool_max_size=2)
+    await driver.initialize()
+    await run_pg_schema_migrations(driver)
+    await driver.finalize()
+
+    yield DriverSettings(
+        driver=DriverConfig.PG,
+        driver_pg_url=url,
+        driver_pg_connection_pool_min_size=10,
+        driver_pg_connection_pool_max_size=10,
+        driver_pg_connection_pool_acquire_timeout_ms=200,
+    )
+
+
+@pytest.fixture(scope="function")
+async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
+    url = pg_maindb_settings.driver_pg_url
+    assert url is not None
+    with (
+        patch.object(ingest_settings, "driver", DriverConfig.PG),
+        patch.object(ingest_settings, "driver_pg_url", url),
+    ):
+        async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
+            await cur.execute("TRUNCATE table resources")
+            await cur.execute("TRUNCATE table catalog")
+
+        driver = PGDriver(
+            url=url,
+            connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
+            connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
+            acquire_timeout_ms=pg_maindb_settings.driver_pg_connection_pool_acquire_timeout_ms,
+        )
+        await driver.initialize()
+
+        yield driver
+
+        await driver.finalize()
+
+
+@pytest.fixture(scope="function")
+def maindb_settings(pg_maindb_settings):
+    yield pg_maindb_settings
+
+
+@pytest.fixture(scope="function")
+async def maindb_driver(pg_maindb_driver):
+    driver = pg_maindb_driver
+    set_utility(Utility.MAINDB_DRIVER, driver)
+
+    yield driver
+
+    await cleanup_maindb(driver)
+    clean_utility(Utility.MAINDB_DRIVER)
+
+
+async def maybe_cleanup_maindb():
+    try:
+        driver = get_driver()
+    except UnsetUtility:
+        pass
+    else:
+        try:
+            await cleanup_maindb(driver)
+        except Exception:
+            logger.error("Could not cleanup maindb on test teardown")
+            pass
+
+
+async def cleanup_maindb(driver: Driver):
+    if not driver.initialized:
+        return
+    async with driver.transaction() as txn:
+        all_keys = [k async for k in txn.keys("", count=-1)]
+        for key in all_keys:
+            await txn.delete(key)
+        await txn.commit()
+
+
+@pytest.fixture(scope="function")
+async def txn(maindb_driver):
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()
+
+
+@pytest.fixture(scope="function")
+async def shard_manager(storage, maindb_driver):
+    mng = cluster_manager.KBShardManager()
+    set_utility(Utility.SHARD_MANAGER, mng)
+    yield mng
+    clean_utility(Utility.SHARD_MANAGER)

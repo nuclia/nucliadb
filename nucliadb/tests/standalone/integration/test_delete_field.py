@@ -18,15 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
+from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from tests.writer.test_fields import TEST_TEXT_PAYLOAD
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_delete_field(
-    knowledgebox_one,
-    nucliadb_reader,
-    nucliadb_writer,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
 ) -> None:
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox_one}/resources",
