@@ -24,20 +24,14 @@ import tempfile
 import uuid
 from unittest.mock import Mock, patch
 
-import psycopg
 import pytest
 from grpc import aio
 from httpx import AsyncClient
 from pytest_docker_fixtures import images
 
 from nucliadb.common.cluster import manager as cluster_manager
-from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import UnsetUtility
-from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.settings import DriverConfig, DriverSettings
-from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb.migrator.migrator import run_pg_schema_migrations
 from nucliadb.search.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
@@ -64,6 +58,8 @@ from nucliadb_utils.utilities import (
 )
 from tests.utils.dirty_index import mark_dirty
 
+from .maindb import cleanup_maindb
+
 logger = logging.getLogger(__name__)
 
 # Minimum support PostgreSQL version
@@ -86,18 +82,16 @@ async def knowledgebox_one(nucliadb_writer_manager: AsyncClient):
     assert resp.status_code == 200
 
 
-@pytest.fixture(scope="function")
-async def dummy_processing():
-    from nucliadb_utils.settings import nuclia_settings
-
-    nuclia_settings.dummy_processing = True
-
-
 @pytest.fixture(scope="function", autouse=True)
 def analytics_disabled():
-    os.environ["NUCLIADB_DISABLE_ANALYTICS"] = "True"
-    yield
-    os.environ.pop("NUCLIADB_DISABLE_ANALYTICS")
+    with patch.dict(
+        os.environ,
+        {
+            "NUCLIADB_DISABLE_ANALYTICS": "True",
+        },
+        clear=False,
+    ):
+        yield
 
 
 @pytest.fixture(scope="function")
@@ -117,11 +111,9 @@ def endecryptor_settings():
 
     secret_key = os.urandom(32)
     encoded_secret_key = base64.b64encode(secret_key).decode("utf-8")
-    settings.encryption_secret_key = encoded_secret_key
 
-    yield
-
-    settings.encryption_secret_key = None
+    with patch.object(settings, "encryption_secret_key", encoded_secret_key):
+        yield
 
 
 @pytest.fixture(scope="function")
@@ -253,69 +245,6 @@ def metrics_registry():
     yield prometheus_client.registry.REGISTRY
 
 
-@pytest.fixture(scope="function")
-async def pg_maindb_settings(pg):
-    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-
-    # We want to be sure schema migrations are always run. As some tests use
-    # this fixture and create their own driver, we need to create one here and
-    # run the migrations, so the maindb_settings fixture can still be generic
-    # and pg migrations are run
-    driver = PGDriver(url=url, connection_pool_min_size=2, connection_pool_max_size=2)
-    await driver.initialize()
-    await run_pg_schema_migrations(driver)
-    await driver.finalize()
-
-    yield DriverSettings(
-        driver=DriverConfig.PG,
-        driver_pg_url=url,
-        driver_pg_connection_pool_min_size=10,
-        driver_pg_connection_pool_max_size=10,
-        driver_pg_connection_pool_acquire_timeout_ms=200,
-    )
-
-
-@pytest.fixture(scope="function")
-async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
-    url = pg_maindb_settings.driver_pg_url
-    assert url is not None
-    with (
-        patch.object(ingest_settings, "driver", DriverConfig.PG),
-        patch.object(ingest_settings, "driver_pg_url", url),
-    ):
-        async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
-            await cur.execute("TRUNCATE table resources")
-            await cur.execute("TRUNCATE table catalog")
-
-        driver = PGDriver(
-            url=url,
-            connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
-            connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
-            acquire_timeout_ms=pg_maindb_settings.driver_pg_connection_pool_acquire_timeout_ms,
-        )
-        await driver.initialize()
-
-        yield driver
-
-        await driver.finalize()
-
-
-@pytest.fixture(scope="function")
-def maindb_settings(pg_maindb_settings):
-    yield pg_maindb_settings
-
-
-@pytest.fixture(scope="function")
-async def maindb_driver(pg_maindb_driver):
-    driver = pg_maindb_driver
-    set_utility(Utility.MAINDB_DRIVER, driver)
-
-    yield driver
-
-    await cleanup_maindb(driver)
-    clean_utility(Utility.MAINDB_DRIVER)
-
-
 async def maybe_cleanup_maindb():
     try:
         driver = get_driver()
@@ -327,16 +256,6 @@ async def maybe_cleanup_maindb():
         except Exception:
             logger.error("Could not cleanup maindb on test teardown")
             pass
-
-
-async def cleanup_maindb(driver: Driver):
-    if not driver.initialized:
-        return
-    async with driver.transaction() as txn:
-        all_keys = [k async for k in txn.keys("", count=-1)]
-        for key in all_keys:
-            await txn.delete(key)
-        await txn.commit()
 
 
 @pytest.fixture(scope="function")
