@@ -23,6 +23,7 @@ import uuid
 from typing import AsyncIterator
 
 import pytest
+from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import KBShardManager
@@ -31,6 +32,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.tests.vectors import V1
+from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_utils.storages.storage import Storage
@@ -58,6 +60,43 @@ async def knowledgebox(
     # await KnowledgeBox.purge(maindb_driver, kbid)
 
 
+# FIXME: this is a weird situation, we can use a hosted-like nucliadb while this
+# creates a KB as it was onprem. The end result should not change much but still, is
+# something we may want to fix
+@pytest.fixture(scope="function")
+async def knowledgebox_by_api(nucliadb_writer_manager: AsyncClient):
+    kbslug = "slug-" + str(uuid.uuid4())
+    resp = await nucliadb_writer_manager.post(
+        f"/{KBS_PREFIX}",
+        json={
+            "slug": kbslug,
+            "title": "My Test Knowledge Box",
+        },
+    )
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+    assert kbid is not None
+
+    yield kbid
+
+    resp = await nucliadb_writer_manager.delete(
+        f"/{KB_PREFIX}/{kbid}",
+    )
+    assert resp.status_code == 200
+
+
+# Used by: nucliadb standalone tests
+@pytest.fixture(scope="function")
+async def knowledgebox_one(knowledgebox_by_api: str):
+    yield knowledgebox_by_api
+
+
+# Used by: nucliadb writer tests
+@pytest.fixture(scope="function")
+async def knowledgebox_writer(knowledgebox_by_api: str):
+    yield knowledgebox_by_api
+
+
 @pytest.fixture(scope="function")
 async def full_resource(
     storage: Storage,
@@ -80,6 +119,22 @@ async def full_resource(
     )
     yield resource
     resource.clean()
+
+
+# Used by: nucliadb writer tests
+@pytest.fixture(scope="function")
+async def resource(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
+        json={
+            "slug": "resource1",
+            "title": "Resource 1",
+        },
+    )
+    assert resp.status_code == 201
+    uuid = resp.json()["uuid"]
+
+    return uuid
 
 
 @pytest.fixture(scope="function")

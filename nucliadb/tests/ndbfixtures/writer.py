@@ -28,7 +28,6 @@ from redis import asyncio as aioredis
 
 from nucliadb.standalone.settings import Settings
 from nucliadb.writer import API_PREFIX, tus
-from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.writer.app import create_application
 from nucliadb.writer.settings import settings
 from nucliadb_models.resource import NucliaDBRoles
@@ -159,45 +158,6 @@ async def storage_writer(request):
     yield storage_driver
 
     clean_utility(Utility.STORAGE)
-
-
-# FIXME: this is a weird situation, we can use a hosted-like nucliadb while this
-# creates a KB as it was onprem. The end result should not change much but still, is
-# something we may want to fix
-@pytest.fixture(scope="function")
-async def knowledgebox_writer(nucliadb_writer_manager: AsyncClient):
-    resp = await nucliadb_writer_manager.post(
-        f"/{KBS_PREFIX}",
-        json={
-            "slug": "kbid1",
-            "title": "My Knowledge Box",
-        },
-    )
-    assert resp.status_code == 201
-    kbid = resp.json().get("uuid")
-    assert kbid is not None
-
-    yield kbid
-
-    resp = await nucliadb_writer_manager.delete(
-        f"/{KB_PREFIX}/{kbid}",
-    )
-    assert resp.status_code == 200
-
-
-@pytest.fixture(scope="function")
-async def resource(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
-        json={
-            "slug": "resource1",
-            "title": "Resource 1",
-        },
-    )
-    assert resp.status_code == 201
-    uuid = resp.json()["uuid"]
-
-    return uuid
 
 
 @pytest.fixture(scope="function")
