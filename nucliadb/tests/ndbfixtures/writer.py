@@ -180,4 +180,4 @@ async def tus_manager(redis):
         await tus.finalize()
 
         await driver.flushall()
-        await driver.close(close_connection_pool=True)
+        await driver.aclose(close_connection_pool=True)
