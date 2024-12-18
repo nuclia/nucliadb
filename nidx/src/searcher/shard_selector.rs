@@ -179,6 +179,13 @@ impl ShardSelector {
         }
     }
 
+    pub fn new_single() -> Self {
+        Self {
+            nodes: Arc::new(SingleNodeCluster),
+            num_replicas: 1,
+        }
+    }
+
     /// List the shards that should be stored in this node
     pub fn select_shards(&self, all_shards: Vec<Uuid>) -> Vec<Uuid> {
         let this_node = self.nodes.this_node();
