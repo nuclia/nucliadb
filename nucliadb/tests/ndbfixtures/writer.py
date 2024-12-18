@@ -156,7 +156,13 @@ async def knowledgebox_writer(nucliadb_writer_manager: AsyncClient):
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
     assert kbid is not None
+
     yield kbid
+
+    resp = await nucliadb_writer_manager.delete(
+        f"/{KB_PREFIX}/{kbid}",
+    )
+    assert resp.status_code == 200
 
 
 @pytest.fixture(scope="function")
