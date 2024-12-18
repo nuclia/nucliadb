@@ -45,7 +45,7 @@ async def test_file_data_manager_factory(redis):
 
     await factory.finalize()
 
-    redis.close.assert_called_once_with(close_connection_pool=True)
+    redis.aclose.assert_called_once_with(close_connection_pool=True)
 
 
 async def test_get_file_data_manager():
