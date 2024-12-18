@@ -489,6 +489,7 @@ impl SyncMetadata {
     }
 
     pub async fn set_synced_shards(&self, shards: &[Uuid]) -> (Vec<IndexId>, Vec<(Uuid, IndexId)>) {
+        println!("Set synced shards {shards:?}");
         let shards: HashSet<Uuid> = HashSet::from_iter(shards.iter().copied());
 
         let mut shard_metadata = self.shard_metadata.write().await;
@@ -512,7 +513,7 @@ impl SyncMetadata {
                 count_new_shards += 1;
             }
         }
-        if count_new_shards > 0 {
+        if count_new_shards > 0 || count_recovered_shards > 0 {
             info!(new = count_new_shards, recovered = count_recovered_shards, "New shards added to sync");
         }
 
@@ -526,8 +527,8 @@ impl SyncMetadata {
                 for index in &indexes.0 {
                     indexes_to_delete.push((*shard_id, index.id));
                 }
+                count_removed_shards += 1;
             }
-            count_removed_shards += 1;
         }
         for shard in shards_to_delete {
             evicted_shards.remove(&shard);

@@ -21,12 +21,14 @@
 use futures::TryStreamExt as _;
 use k8s_openapi::api::core::v1::Pod;
 use std::{
+    collections::HashSet,
     future::Future,
     hash::{DefaultHasher, Hash as _, Hasher as _},
     pin::pin,
     sync::Arc,
 };
 use tokio_util::sync::CancellationToken;
+use tracing::*;
 use uuid::Uuid;
 
 /// Trait for listing the active nodes in a cluster and identifying ourselves
@@ -67,14 +69,21 @@ impl KubernetesCluster {
         let (store_reader, store_writer) = kube::runtime::reflector::store();
         let stream = kube::runtime::reflector::reflector(store_writer, kube::runtime::watcher(pods, watcher_config));
 
+        let task_reader = store_reader.clone();
         let task = async move {
             // Read the stream continuously in order to keep the store updated
             let mut stream = pin!(stream);
+            let mut prev_pods = HashSet::new();
             loop {
                 tokio::select! {
                     result = stream.try_next() => {
                         if let Err(e) = result {
                             return Err(e.into())
+                        }
+                        let new_pods = task_reader.state().iter().filter_map(|pod| Self::pod_ready(pod).then(|| pod.metadata.name.clone()).flatten()).collect();
+                        if new_pods != prev_pods {
+                            info!(?prev_pods, ?new_pods, "Kubernetes detected cluster topology change");
+                            prev_pods = new_pods;
                         }
                     }
                     _ = shutdown.cancelled() => { return Ok(()) }
