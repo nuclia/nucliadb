@@ -41,7 +41,6 @@ use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use std::collections::HashSet;
 use std::path::Path;
-use std::time::Instant;
 use std::{fs, io};
 
 pub use ops_hnsw::DataRetriever;
