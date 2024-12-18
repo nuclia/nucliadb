@@ -33,7 +33,6 @@ from nucliadb.writer.settings import settings
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import (
     FileBackendConfig,
-    nuclia_settings,
     nucliadb_settings,
     storage_settings,
 )
@@ -76,7 +75,7 @@ async def writer_api_server(
     storage_writer,
     grpc_servicer: IngestFixture,
     transaction_utility,
-    processing_utility,
+    dummy_processing,
     tus_manager,
     dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
@@ -165,16 +164,6 @@ async def resource(redis, nucliadb_writer: AsyncClient, knowledgebox_writer: str
     uuid = resp.json()["uuid"]
 
     return uuid
-
-
-@pytest.fixture(scope="function")
-async def processing_utility():
-    with (
-        patch.object(nuclia_settings, "dummy_processing", True),
-        patch.object(nuclia_settings, "onprem", True),
-        patch.object(nuclia_settings, "nuclia_jwt_key", "foobarkey"),
-    ):
-        yield
 
 
 @pytest.fixture(scope="function")

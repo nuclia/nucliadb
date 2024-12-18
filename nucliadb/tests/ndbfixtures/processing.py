@@ -18,29 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""NucliaDB fixtures
+from unittest.mock import patch
 
-This module should never be imported directly, as it contains a dangerous mix of
-imports. It's done like this to avoid having to import all files in the conftest.
+import pytest
 
-"""
+from nucliadb_utils.settings import (
+    nuclia_settings,
+)
 
-# hacks and magic things with pytest to implement deploy mode parametrization
 
-from .magic import *  # noqa
-
-# components and deployment modes
-
-from .reader import *  # noqa
-from .writer import *  # noqa
-
-# subcomponents
-
-from .common import *  # type: ignore # noqa
-from .maindb import *  # noqa
-from .node import *  # noqa
-from .processing import *  # noqa
-
-# useful resources for tests (KBs...)
-
-from .resources import *  # noqa
+@pytest.fixture(scope="function")
+async def dummy_processing():
+    with (
+        patch.object(nuclia_settings, "dummy_processing", True),
+    ):
+        yield
