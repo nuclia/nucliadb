@@ -97,18 +97,24 @@ def disabled_back_pressure():
 
 @pytest.fixture(scope="function")
 def gcs_storage_writer(gcs):
-    storage_settings.file_backend = FileBackendConfig.GCS
-    storage_settings.gcs_endpoint_url = gcs
-    storage_settings.gcs_bucket = "test_{kbid}"
+    with (
+        patch.object(storage_settings, "file_backend", FileBackendConfig.GCS),
+        patch.object(storage_settings, "gcs_endpoint_url", gcs),
+        patch.object(storage_settings, "gcs_bucket", "test_{kbid}"),
+    ):
+        yield
 
 
 @pytest.fixture(scope="function")
 def s3_storage_writer(s3):
-    storage_settings.file_backend = FileBackendConfig.S3
-    storage_settings.s3_endpoint = s3
-    storage_settings.s3_client_id = ""
-    storage_settings.s3_client_secret = ""
-    storage_settings.s3_bucket = "test-{kbid}"
+    with (
+        patch.object(storage_settings, "file_backend", FileBackendConfig.S3),
+        patch.object(storage_settings, "s3_endpoint", s3),
+        patch.object(storage_settings, "s3_client_id", ""),
+        patch.object(storage_settings, "s3_client_secret", ""),
+        patch.object(storage_settings, "s3_bucket", "test-{kbid}"),
+    ):
+        yield
 
 
 def lazy_storage_writer_fixture():
