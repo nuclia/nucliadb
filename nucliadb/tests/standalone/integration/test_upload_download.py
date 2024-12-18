@@ -138,7 +138,7 @@ async def test_file_tus_upload_and_download(
         # Upload the chunk
         resp = await nucliadb_writer.patch(
             url,
-            data=chunk,
+            content=chunk,
             headers=headers,
         )
         assert resp.status_code == 200
@@ -218,7 +218,7 @@ async def test_tus_upload_handles_unknown_upload_ids(
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/{TUSUPLOAD}/foobarid",
         headers={},
-        data=b"foobar",
+        content=b"foobar",
     )
     assert resp.status_code == 404
     error_detail = resp.json().get("detail")
