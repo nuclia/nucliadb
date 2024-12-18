@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def nucliadb(
+async def standalone_nucliadb(
     endecryptor_settings,
     dummy_processing,
     analytics_disabled,
@@ -141,10 +141,10 @@ def endecryptor_settings():
 
 
 @pytest.fixture(scope="function")
-async def nucliadb_manager(nucliadb: Settings):
+async def nucliadb_manager(standalone_nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
-        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        base_url=f"http://localhost:{standalone_nucliadb.http_port}/{API_PREFIX}/v1",
         timeout=None,
         event_hooks={"request": [mark_dirty]},
     ) as client:
@@ -152,14 +152,14 @@ async def nucliadb_manager(nucliadb: Settings):
 
 
 @pytest.fixture(scope="function")
-async def nucliadb_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
+async def nucliadb_grpc(standalone_nucliadb: Settings):
+    stub = WriterStub(aio.insecure_channel(f"localhost:{standalone_nucliadb.ingest_grpc_port}"))
     return stub
 
 
 @pytest.fixture(scope="function")
-async def nucliadb_train(nucliadb: Settings):
-    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))
+async def nucliadb_train(standalone_nucliadb: Settings):
+    stub = TrainStub(aio.insecure_channel(f"localhost:{standalone_nucliadb.train_grpc_port}"))
     return stub
 
 
