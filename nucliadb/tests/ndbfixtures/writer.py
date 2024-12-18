@@ -154,7 +154,7 @@ async def knowledgebox_writer(nucliadb_writer_manager: AsyncClient):
 
 
 @pytest.fixture(scope="function")
-async def resource(redis, nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+async def resource(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
         json={
