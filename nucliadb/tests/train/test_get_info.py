@@ -17,14 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import pytest
 from aioresponses import aioresponses
 
 from nucliadb_protos.train_pb2 import GetInfoRequest, TrainInfo
 from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
+@pytest.mark.deploy_modes("component")
 async def test_get_info(
-    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetInfoRequest()
     req.kb.uuid = knowledgebox_ingest
@@ -35,7 +37,7 @@ async def test_get_info(
             payload={"resources": 4, "paragraphs": 89, "fields": 4, "sentences": 90},
         )
 
-        labels: TrainInfo = await train_client.GetInfo(req)  # type: ignore
+        labels: TrainInfo = await nucliadb_train_grpc.GetInfo(req)  # type: ignore
     assert labels.fields == 4
     assert labels.resources == 4
     assert labels.paragraphs == 89

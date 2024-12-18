@@ -38,6 +38,12 @@ DEPLOY_MODE_FIXTURES = {
         "component",
         "standalone",
     ],
+    "nucliadb_train": [
+        "standalone",
+    ],
+    "nucliadb_train_grpc": [
+        "component",
+    ],
 }
 
 
@@ -99,6 +105,26 @@ async def nucliadb_reader(request: FixtureRequest):
 
 @pytest.fixture(scope="function")
 async def nucliadb_writer(request: FixtureRequest):
+    try:
+        yield request.param
+    except AttributeError as exc:
+        raise MagicFixturesError(
+            "Are you using a magic fixture without the deploy_modes decorator?"
+        ) from exc
+
+
+@pytest.fixture(scope="function")
+async def nucliadb_train(request: FixtureRequest):
+    try:
+        yield request.param
+    except AttributeError as exc:
+        raise MagicFixturesError(
+            "Are you using a magic fixture without the deploy_modes decorator?"
+        ) from exc
+
+
+@pytest.fixture(scope="function")
+async def nucliadb_train_grpc(request: FixtureRequest):
     try:
         yield request.param
     except AttributeError as exc:

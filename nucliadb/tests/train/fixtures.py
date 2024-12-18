@@ -21,9 +21,7 @@ import asyncio
 import uuid
 from datetime import datetime
 
-import aiohttp
 import pytest
-from grpc import aio
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
@@ -31,8 +29,6 @@ from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.standalone.settings import Settings
-from nucliadb.train.utils import start_shard_manager, stop_shard_manager
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -46,26 +42,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.tests import free_port
-from nucliadb_utils.utilities import clear_global_cache, get_storage
-
-
-@pytest.fixture(scope="function")
-async def train_rest_api(nucliadb: Settings):  # type: ignore
-    async with aiohttp.ClientSession(
-        headers={"X-NUCLIADB-ROLES": "READER"},
-        base_url=f"http://localhost:{nucliadb.http_port}",
-    ) as client:
-        yield client
-
-
-@pytest.fixture(scope="function")
-async def writer_rest_api(nucliadb: Settings):  # type: ignore
-    async with aiohttp.ClientSession(
-        headers={"X-NUCLIADB-ROLES": "WRITER"},
-        base_url=f"http://localhost:{nucliadb.http_port}",
-    ) as client:
-        yield client
+from nucliadb_utils.utilities import get_storage
 
 
 @pytest.fixture(scope="function")
@@ -294,52 +271,3 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest, t
     )
 
     yield knowledgebox_ingest
-
-
-@pytest.fixture(scope="function")
-def test_settings_train(cache, gcs, fake_node, maindb_driver):  # type: ignore
-    from nucliadb.train.settings import settings
-    from nucliadb_utils.settings import (
-        FileBackendConfig,
-        running_settings,
-        storage_settings,
-    )
-
-    running_settings.debug = False
-    print(f"Redis ready at {maindb_driver.url}")
-
-    old_file_backend = storage_settings.file_backend
-    old_gcs_endpoint_url = storage_settings.gcs_endpoint_url
-    old_gcs_bucket = storage_settings.gcs_bucket
-    old_grpc_port = settings.grpc_port
-
-    storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = FileBackendConfig.GCS
-    storage_settings.gcs_bucket = "test_{kbid}"
-    settings.grpc_port = free_port()
-    yield
-    storage_settings.file_backend = old_file_backend
-    storage_settings.gcs_endpoint_url = old_gcs_endpoint_url
-    storage_settings.gcs_bucket = old_gcs_bucket
-    settings.grpc_port = old_grpc_port
-
-
-@pytest.fixture(scope="function")
-async def train_api(test_settings_train: None, local_files):  # type: ignore
-    from nucliadb.train.utils import start_train_grpc, stop_train_grpc
-
-    await start_shard_manager()
-    await start_train_grpc("testing_train")
-    yield
-    await stop_train_grpc()
-    await stop_shard_manager()
-
-
-@pytest.fixture(scope="function")
-async def train_client(train_api):  # type: ignore
-    from nucliadb.train.settings import settings
-    from nucliadb_protos.train_pb2_grpc import TrainStub
-
-    channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
-    yield TrainStub(channel)
-    clear_global_cache()

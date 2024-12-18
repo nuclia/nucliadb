@@ -34,13 +34,14 @@ from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_generator_field_classification(
-    train_rest_api: aiohttp.ClientSession,
+    nucliadb_train: aiohttp.ClientSession,
     knowledgebox_with_labels: str,
 ):
     kbid = knowledgebox_with_labels
 
-    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
+    async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1
@@ -64,7 +65,7 @@ async def test_generator_field_classification(
         trainset.filter.ClearField("labels")
         trainset.filter.labels.extend(labels)
 
-        async with train_rest_api.post(
+        async with nucliadb_train.post(
             f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
             data=trainset.SerializeToString(),
         ) as response:

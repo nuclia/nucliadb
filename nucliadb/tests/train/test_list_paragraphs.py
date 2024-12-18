@@ -17,13 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
 
 from nucliadb_protos.train_pb2 import GetParagraphsRequest
 from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
+@pytest.mark.deploy_modes("component")
 async def test_list_paragraphs(
-    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetParagraphsRequest()
     req.kb.uuid = knowledgebox_ingest
@@ -32,14 +34,15 @@ async def test_list_paragraphs(
     req.metadata.text = True
     req.metadata.vector = True
     count = 0
-    async for _ in train_client.GetParagraphs(req):  # type: ignore
+    async for _ in nucliadb_train_grpc.GetParagraphs(req):  # type: ignore
         count += 1
 
     assert count == 30
 
 
+@pytest.mark.deploy_modes("component")
 async def test_list_paragraphs_shows_ners_with_positions(
-    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetParagraphsRequest()
     req.kb.uuid = knowledgebox_ingest
@@ -49,7 +52,7 @@ async def test_list_paragraphs_shows_ners_with_positions(
     req.metadata.vector = True
 
     found_barcelona = found_manresa = False
-    async for paragraph in train_client.GetParagraphs(req):  # type: ignore
+    async for paragraph in nucliadb_train_grpc.GetParagraphs(req):  # type: ignore
         if "Barcelona" in paragraph.metadata.text:
             found_barcelona = True
             assert paragraph.metadata.entities == {"Barcelona": "CITY"}
