@@ -23,7 +23,7 @@ pytest_plugins = [
     "tests.ingest.fixtures",  # should be refactored out
     # "tests.search.fixtures",
     # "tests.search.node",
-    "tests.standalone.fixtures",
+    "tests.ndbfixtures.standalone",
     "nucliadb_utils.tests.fixtures",
     "nucliadb_utils.tests.nats",
     "nucliadb_utils.tests.gcs",
