@@ -39,6 +39,9 @@ DEPLOY_MODE_FIXTURES = {
 }
 
 
+class MagicFixturesError(Exception): ...
+
+
 def pytest_configure(config):
     """Register the marker"""
     config.addinivalue_line(
@@ -72,7 +75,7 @@ def pytest_generate_tests(metafunc: Metafunc):
                         if deploy_mode in DEPLOY_MODE_FIXTURES[fixture_name]:
                             argvalues.append(lf(f"{deploy_mode}_{fixture_name}"))
                         else:
-                            logger.warning(
+                            raise MagicFixturesError(
                                 f"Requesting fixture {fixture_name} with an unavailable mode: {deploy_mode}"
                             )
                     metafunc.parametrize(fixture_name, argvalues, indirect=True)
