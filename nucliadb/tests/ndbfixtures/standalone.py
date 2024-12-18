@@ -24,8 +24,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from grpc import aio
-from httpx import AsyncClient
 
 from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.common.maindb.utils import get_driver
@@ -34,9 +32,6 @@ from nucliadb.standalone.config import config_nucliadb
 from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
 from nucliadb.tests.config import reset_config
-from nucliadb.writer import API_PREFIX
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.settings import (
     LogFormatType,
@@ -49,7 +44,6 @@ from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     clear_global_cache,
 )
-from tests.utils.dirty_index import mark_dirty
 
 from .maindb import cleanup_maindb
 
@@ -135,32 +129,6 @@ def endecryptor_settings():
 
     with patch.object(settings, "encryption_secret_key", encoded_secret_key):
         yield
-
-
-# Derived
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_manager(standalone_nucliadb: Settings):
-    async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "MANAGER"},
-        base_url=f"http://localhost:{standalone_nucliadb.http_port}/{API_PREFIX}/v1",
-        timeout=None,
-        event_hooks={"request": [mark_dirty]},
-    ) as client:
-        yield client
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_grpc(standalone_nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{standalone_nucliadb.ingest_grpc_port}"))
-    return stub
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_train(standalone_nucliadb: Settings):
-    stub = TrainStub(aio.insecure_channel(f"localhost:{standalone_nucliadb.train_grpc_port}"))
-    return stub
 
 
 # Utils
