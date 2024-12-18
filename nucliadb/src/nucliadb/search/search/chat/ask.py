@@ -279,6 +279,8 @@ class AskResult:
                 tokens=AskTokens(
                     input=self._metadata.input_tokens,
                     output=self._metadata.output_tokens,
+                    input_nuclia_tokens=self._metadata.input_tokens,
+                    output_nuclia_tokens=self._metadata.output_tokens,
                 ),
                 timings=AskTimings(
                     generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
@@ -319,6 +321,8 @@ class AskResult:
                 tokens=AskTokens(
                     input=self._metadata.input_tokens,
                     output=self._metadata.output_tokens,
+                    input_nuclia_tokens=self._metadata.input_tokens,
+                    output_nuclia_tokens=self._metadata.output_tokens,
                 ),
                 timings=AskTimings(
                     generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
