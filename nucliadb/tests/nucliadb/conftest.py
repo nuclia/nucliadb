@@ -20,10 +20,10 @@
 pytest_plugins = [
     "pytest_docker_fixtures",
     "tests.fixtures",
+    "tests.ndbfixtures.maindb",
     "tests.nucliadb.knowledgeboxes",
     "nucliadb_utils.tests.asyncbenchmark",
     "nucliadb_utils.tests.nats",
-    "tests.fixtures",
     "tests.search.node",
     "tests.ingest.fixtures",
     "nucliadb_utils.tests.fixtures",
