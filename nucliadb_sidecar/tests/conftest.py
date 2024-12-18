@@ -29,4 +29,5 @@ pytest_plugins = [
     "tests.fixtures",
     "tests.ndbfixtures.maindb",
     "tests.ndbfixtures.processing",
+    "tests.ndbfixtures.standalone",
 ]

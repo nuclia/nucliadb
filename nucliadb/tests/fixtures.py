@@ -17,45 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import base64
 import logging
-import os
-import tempfile
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from grpc import aio
 from httpx import AsyncClient
-from pytest_docker_fixtures import images
 
 from nucliadb.common.cluster import manager as cluster_manager
-from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.exceptions import UnsetUtility
-from nucliadb.common.maindb.utils import get_driver
-from nucliadb.standalone.config import config_nucliadb
-from nucliadb.standalone.run import run_async_nucliadb
 from nucliadb.standalone.settings import Settings
-from nucliadb.tests.config import reset_config
 from nucliadb.writer import API_PREFIX
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_telemetry.logs import setup_logging
-from nucliadb_telemetry.settings import (
-    LogFormatType,
-    LogLevel,
-    LogOutputType,
-    LogSettings,
-)
 from nucliadb_utils.aiopynecone.models import QueryResponse
-from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     Utility,
     clean_pinecone,
     clean_utility,
-    clear_global_cache,
     get_pinecone,
     get_utility,
     set_utility,
@@ -65,99 +45,10 @@ from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 logger = logging.getLogger(__name__)
 
-# Minimum support PostgreSQL version
-# Reason: We want the btree_gin extension to support uuid's (pg11) and `gen_random_uuid()` (pg13)
-images.settings["postgresql"]["version"] = "13"
-images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
-
-
-@pytest.fixture(scope="function", autouse=True)
-def analytics_disabled():
-    os.environ["NUCLIADB_DISABLE_ANALYTICS"] = "True"
-    yield
-    os.environ.pop("NUCLIADB_DISABLE_ANALYTICS")
-
 
 @pytest.fixture(scope="function")
-def tmpdir():
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield tmpdir
-    except OSError:
-        # Python error on tempfile when tearing down the fixture.
-        # Solved in version 3.11
-        pass
-
-
-@pytest.fixture(scope="function")
-def endecryptor_settings():
-    from nucliadb_utils.encryption.settings import settings
-
-    secret_key = os.urandom(32)
-    encoded_secret_key = base64.b64encode(secret_key).decode("utf-8")
-    settings.encryption_secret_key = encoded_secret_key
-
-    yield
-
-    settings.encryption_secret_key = None
-
-
-@pytest.fixture(scope="function")
-async def nucliadb(
-    endecryptor_settings,
-    dummy_processing,
-    analytics_disabled,
-    maindb_settings,
-    storage: Storage,
-    storage_settings,
-    tmpdir,
-    learning_config,
-):
-    from nucliadb.common.cluster import manager
-
-    manager.INDEX_NODES.clear()
-
-    # we need to force DATA_PATH updates to run every test on the proper
-    # temporary directory
-    data_path = f"{tmpdir}/node"
-    os.environ["DATA_PATH"] = data_path
-    settings = Settings(
-        data_path=data_path,
-        http_port=free_port(),
-        ingest_grpc_port=free_port(),
-        train_grpc_port=free_port(),
-        standalone_node_port=free_port(),
-        log_format_type=LogFormatType.PLAIN,
-        log_output_type=LogOutputType.FILE,
-        **maindb_settings.model_dump(),
-        **storage_settings,
-    )
-
-    config_nucliadb(settings)
-
-    # Make sure tests don't write logs outside of the tmpdir
-    os.environ["ERROR_LOG"] = f"{tmpdir}/logs/error.log"
-    os.environ["ACCESS_LOG"] = f"{tmpdir}/logs/access.log"
-    os.environ["INFO_LOG"] = f"{tmpdir}/logs/info.log"
-
-    setup_logging(
-        settings=LogSettings(
-            log_output_type=LogOutputType.FILE,
-            log_format_type=LogFormatType.PLAIN,
-            debug=False,
-            log_level=LogLevel.WARNING,
-        )
-    )
-    server = await run_async_nucliadb(settings)
-    assert server.started, "Nucliadb server did not start correctly"
-
-    yield settings
-
-    await maybe_cleanup_maindb()
-
-    reset_config()
-    clear_global_cache()
-    await server.shutdown()
+async def nucliadb(standalone_nucliadb: Settings):
+    yield standalone_nucliadb
 
 
 @pytest.fixture(scope="function")
@@ -512,29 +403,6 @@ def metrics_registry():
             continue
         collector._metrics.clear()
     yield prometheus_client.registry.REGISTRY
-
-
-async def maybe_cleanup_maindb():
-    try:
-        driver = get_driver()
-    except UnsetUtility:
-        pass
-    else:
-        try:
-            await cleanup_maindb(driver)
-        except Exception:
-            logger.error("Could not cleanup maindb on test teardown")
-            pass
-
-
-async def cleanup_maindb(driver: Driver):
-    if not driver.initialized:
-        return
-    async with driver.transaction() as txn:
-        all_keys = [k async for k in txn.keys("", count=-1)]
-        for key in all_keys:
-            await txn.delete(key)
-        await txn.commit()
 
 
 @pytest.fixture(scope="function")

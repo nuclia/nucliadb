@@ -23,6 +23,7 @@ pytest_plugins = [
     "tests.fixtures",
     "tests.ndbfixtures.maindb",
     "tests.ndbfixtures.processing",
+    "tests.ndbfixtures.standalone",
     "tests.train.fixtures",
     "nucliadb_utils.tests.nats",
     "nucliadb_utils.tests.fixtures",
