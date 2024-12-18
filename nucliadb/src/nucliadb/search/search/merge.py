@@ -24,6 +24,7 @@ from typing import Any, Optional, Set, Union
 
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.search.search import cache
+from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
@@ -118,8 +119,7 @@ async def get_sort_value(
 async def merge_documents_results(
     document_responses: list[DocumentSearchResponse],
     resources: list[str],
-    count: int,
-    page: int,
+    top_k: int,
     kbid: str,
     sort: SortOptions,
     min_score: float,
@@ -148,15 +148,9 @@ async def merge_documents_results(
                 raw_resource_list.append((result, sort_value))
         total += document_response.total
 
-    skip = page * count
-    end = skip + count
-    length = len(raw_resource_list)
-
-    if length > end:
-        next_page = True
-
-    # We need to cut first and then sort, otherwise pagination will be wrong if the order is DESC
-    raw_resource_list = raw_resource_list[min(skip, length) : min(end, length)]
+    # We need to cut first and then sort, otherwise the page will be wrong if the order is DESC
+    raw_resource_list, has_more = cut_page(raw_resource_list, top_k)
+    next_page = next_page or has_more
     raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
     result_resource_list: list[ResourceResult] = []
@@ -181,8 +175,8 @@ async def merge_documents_results(
         results=result_resource_list,
         query=query,
         total=total,
-        page_number=page,
-        page_size=count,
+        page_number=0,  # Bw/c with pagination
+        page_size=top_k,
         next_page=next_page,
         min_score=min_score,
     )
@@ -258,8 +252,7 @@ async def merge_vectors_results(
     vector_responses: list[VectorSearchResponse],
     resources: list[str],
     kbid: str,
-    count: int,
-    page: int,
+    top_k: int,
     min_score: Optional[float] = None,
 ):
     facets: dict[str, Any] = {}
@@ -276,12 +269,10 @@ async def merge_vectors_results(
     if len(vector_responses) > 1:
         raw_vectors_list.sort(key=lambda x: x.score, reverse=True)
 
-    skip = page * count
-    end_element = skip + count
-    length = len(raw_vectors_list)
+    raw_vectors_list, _ = cut_page(raw_vectors_list, top_k)
 
     result_sentence_list: list[Sentence] = []
-    for result in raw_vectors_list[min(skip, length) : min(end_element, length)]:
+    for result in raw_vectors_list:
         id_count = result.doc_id.id.count("/")
         if id_count == 4:
             rid, field_type, field, index, position = result.doc_id.id.split("/")
@@ -329,8 +320,8 @@ async def merge_vectors_results(
     return Sentences(
         results=result_sentence_list,
         facets=facets,
-        page_number=page,
-        page_size=count,
+        page_number=0,  # Bw/c with pagination
+        page_size=top_k,
         min_score=round(min_score or 0, ndigits=3),
     )
 
@@ -339,8 +330,7 @@ async def merge_paragraph_results(
     paragraph_responses: list[ParagraphSearchResponse],
     resources: list[str],
     kbid: str,
-    count: int,
-    page: int,
+    top_k: int,
     highlight: bool,
     sort: SortOptions,
     min_score: float,
@@ -374,15 +364,11 @@ async def merge_paragraph_results(
 
     raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
-    skip = page * count
-    end = skip + count
-    length = len(raw_paragraph_list)
-
-    if length > end:
-        next_page = True
+    raw_paragraph_list, has_more = cut_page(raw_paragraph_list, top_k)
+    next_page = next_page or has_more
 
     result_paragraph_list: list[Paragraph] = []
-    for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
+    for result, _ in raw_paragraph_list:
         _, field_type, field = result.field.split("/")
         text = await get_paragraph_text(
             kbid=kbid,
@@ -435,8 +421,8 @@ async def merge_paragraph_results(
         facets=facets,
         query=query,
         total=total,
-        page_number=page,
-        page_size=count,
+        page_number=0,  # Bw/c with pagination
+        page_size=top_k,
         next_page=next_page,
         min_score=min_score,
     )
@@ -494,8 +480,7 @@ def _merge_relations_results(
 @merge_observer.wrap({"type": "merge"})
 async def merge_results(
     search_responses: list[SearchResponse],
-    count: int,
-    page: int,
+    top_k: int,
     kbid: str,
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
@@ -520,22 +505,21 @@ async def merge_results(
 
     resources: list[str] = list()
     api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid, sort, min_score=min_score.bm25
+        documents, resources, top_k, kbid, sort, min_score=min_score.bm25
     )
 
     api_results.paragraphs = await merge_paragraph_results(
         paragraphs,
         resources,
         kbid,
-        count,
-        page,
+        top_k,
         highlight,
         sort,
         min_score=min_score.bm25,
     )
 
     api_results.sentences = await merge_vectors_results(
-        vectors, resources, kbid, count, page, min_score=min_score.semantic
+        vectors, resources, kbid, top_k, min_score=min_score.semantic
     )
 
     api_results.relations = await merge_relations_results(relations, requested_relations)
@@ -546,8 +530,7 @@ async def merge_results(
 
 async def merge_paragraphs_results(
     responses: list[SearchResponse],
-    count: int,
-    page: int,
+    top_k: int,
     kbid: str,
     highlight_split: bool,
     min_score: float,
@@ -563,8 +546,7 @@ async def merge_paragraphs_results(
         paragraphs,
         resources,
         kbid,
-        count,
-        page,
+        top_k,
         highlight=highlight_split,
         sort=SortOptions(
             field=SortField.SCORE,
