@@ -12,19 +12,19 @@ requires_python = ">=3.9"
 
 [[package]]
 name = "aiobotocore"
-version = "2.15.2"
+version = "2.16.0"
 requires_python = ">=3.8"
 summary = "Async client for aws services using botocore and aiohttp"
 groups = ["default", "dev", "sidecar"]
 dependencies = [
     "aiohttp<4.0.0,>=3.9.2",
     "aioitertools<1.0.0,>=0.5.1",
-    "botocore<1.35.37,>=1.35.16",
+    "botocore<1.35.82,>=1.35.74",
     "wrapt<2.0.0,>=1.10.10",
 ]
 files = [
-    {file = "aiobotocore-2.15.2-py3-none-any.whl", hash = "sha256:d4d3128b4b558e2b4c369bfa963b022d7e87303adb82eec623cec8aa77ae578a"},
-    {file = "aiobotocore-2.15.2.tar.gz", hash = "sha256:9ac1cfcaccccc80602968174aa032bf978abe36bd4e55e6781d6500909af1375"},
+    {file = "aiobotocore-2.16.0-py3-none-any.whl", hash = "sha256:eb3641a7b9c51113adbc33a029441de6201ebb026c64ff2e149c7fa802c9abfc"},
+    {file = "aiobotocore-2.16.0.tar.gz", hash = "sha256:6d6721961a81570e9b920b98778d95eec3d52a9f83b7844c6c5cfdbf2a2d6a11"},
 ]
 
 [[package]]
@@ -364,7 +364,7 @@ files = [
 
 [[package]]
 name = "botocore"
-version = "1.35.36"
+version = "1.35.81"
 requires_python = ">=3.8"
 summary = "Low-level, data-driven core of boto 3."
 groups = ["default", "dev", "sidecar"]
@@ -375,8 +375,8 @@ dependencies = [
     "urllib3<1.27,>=1.25.4; python_version < \"3.10\"",
 ]
 files = [
-    {file = "botocore-1.35.36-py3-none-any.whl", hash = "sha256:64241c778bf2dc863d93abab159e14024d97a926a5715056ef6411418cb9ead3"},
-    {file = "botocore-1.35.36.tar.gz", hash = "sha256:354ec1b766f0029b5d6ff0c45d1a0f9e5007b7d2f3ec89bcdd755b208c5bc797"},
+    {file = "botocore-1.35.81-py3-none-any.whl", hash = "sha256:a7b13bbd959bf2d6f38f681676aab408be01974c46802ab997617b51399239f7"},
+    {file = "botocore-1.35.81.tar.gz", hash = "sha256:564c2478e50179e0b766e6a87e5e0cdd35e1bc37eb375c1cf15511f5dd13600d"},
 ]
 
 [[package]]
@@ -2097,7 +2097,7 @@ files = [
 
 [[package]]
 name = "nuclia-models"
-version = "0.23.0"
+version = "0.24.1"
 requires_python = ">=3.9"
 summary = ""
 groups = ["default", "dev"]
@@ -2105,8 +2105,8 @@ dependencies = [
     "pydantic[email]>=2.9.2",
 ]
 files = [
-    {file = "nuclia_models-0.23.0-py3-none-any.whl", hash = "sha256:9da8480590a399dcc3b4eeac9186bda939b20f5bf73ebbd96b9e8a79b6cfc49a"},
-    {file = "nuclia_models-0.23.0.tar.gz", hash = "sha256:18674aab8c4f8b50ce35965758b0dad3506ee4d62724ad4f6a524d98522f3721"},
+    {file = "nuclia_models-0.24.1-py3-none-any.whl", hash = "sha256:f3aea811e36bf37f44f129f36b9b7c302aed58abe0b7164e96951dba4799884f"},
+    {file = "nuclia_models-0.24.1.tar.gz", hash = "sha256:acfa250117c16409fc852abc6af2781ab5057cbede33617ac687717f800ab07a"},
 ]
 
 [[package]]
@@ -2150,7 +2150,7 @@ dependencies = [
     "lru-dict>=1.1.7",
     "mmh3>=3.0.0",
     "multidict>=6.0.4",
-    "nuclia-models>=0.23.0",
+    "nuclia-models>=0.24.1",
     "nucliadb-admin-assets>=1.0.0.post1224",
     "nucliadb-models",
     "nucliadb-node-binding>=2.26.0",

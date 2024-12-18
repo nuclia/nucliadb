@@ -5,7 +5,7 @@ nucliadb-protos
 nucliadb-models
 nucliadb-admin-assets>=1.0.0.post1224
 nucliadb-node-binding>=2.26.0
-nuclia-models>=0.23.0
+nuclia-models>=0.24.1
 
 # external dependencies
 uvicorn
