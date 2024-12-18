@@ -26,7 +26,7 @@ from httpx import AsyncClient
 
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.predict.generative_responses import (
+from nuclia_models.predict.generative_responses import (
     CitationsGenerativeResponse,
     GenerativeChunk,
     JSONGenerativeResponse,
