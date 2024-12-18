@@ -139,7 +139,7 @@ class RedisFileDataManagerFactory:
 
     async def finalize(self):
         try:
-            await self.redis.close(close_connection_pool=True)
+            await self.redis.aclose(close_connection_pool=True)
         except Exception:
             logger.warning("Error closing redis connection", exc_info=True)
             pass

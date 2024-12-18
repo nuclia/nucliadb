@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 from unittest.mock import AsyncMock
 
 import pytest
@@ -35,7 +35,6 @@ from nucliadb.writer.api.v1.router import (
     RESOURCES_PREFIX,
     RSLUG_PREFIX,
 )
-from nucliadb_models.resource import NucliaDBRoles
 from tests.writer.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
     TEST_EXTERNAL_FILE_PAYLOAD,
@@ -45,246 +44,242 @@ from tests.writer.test_fields import (
 )
 
 
-async def test_resource_crud(writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        # Test create resource
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource1",
-                "title": "My resource",
-                "summary": "Some summary",
-                "icon": "image/png",
-                "metadata": {
-                    "language": "en",
-                    "metadata": {"key1": "value1", "key2": "value2"},
-                },
-                "fieldmetadata": [
-                    {
-                        "paragraphs": [
-                            {
-                                "key": "paragraph1",
-                                "classifications": [{"labelset": "ls1", "label": "label1"}],
-                            }
-                        ],
-                        "token": [{"token": "token1", "klass": "klass1", "start": 1, "end": 2}],
-                        "field": {"field": "text1", "field_type": "text"},
-                    }
-                ],
-                "usermetadata": {
-                    "classifications": [{"labelset": "ls1", "label": "label1"}],
-                    "relations": [
+@pytest.mark.deploy_modes("component")
+async def test_resource_crud(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    kbid = knowledgebox_writer
+    # Test create resource
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource1",
+            "title": "My resource",
+            "summary": "Some summary",
+            "icon": "image/png",
+            "metadata": {
+                "language": "en",
+                "metadata": {"key1": "value1", "key2": "value2"},
+            },
+            "fieldmetadata": [
+                {
+                    "paragraphs": [
                         {
-                            "relation": "CHILD",
-                            "to": {
-                                "type": "resource",
-                                "value": "resource_uuid",
-                            },
+                            "key": "paragraph1",
+                            "classifications": [{"labelset": "ls1", "label": "label1"}],
                         }
                     ],
-                },
-                "origin": {
-                    "source_id": "source_id",
-                    "url": "http://some_source",
-                    "created": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "modified": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "metadata": {"key1": "value1", "key2": "value2"},
-                    "tags": ["tag1", "tag2"],
-                    "collaborators": ["col1", "col2"],
-                    "filename": "file.pdf",
-                    "related": ["related1"],
-                },
-                "texts": {"text1": TEST_TEXT_PAYLOAD},
-                "links": {"link1": TEST_LINK_PAYLOAD},
-                "files": {
-                    "file1": TEST_FILE_PAYLOAD,
-                    "external1": TEST_EXTERNAL_FILE_PAYLOAD,
-                },
-                "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
-            },
-        )
-
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "uuid" in data
-        assert "seqid" in data
-        rid = data["uuid"]
-
-        # Test update resource
-        resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
-            json={},
-        )
-        assert resp.status_code == 200
-
-        data = resp.json()
-
-        assert "seqid" in data
-
-        # Test delete resource
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
-        )
-        assert resp.status_code == 204
-
-
-async def test_resource_crud_sync(
-    writer_api: Callable[[list[str]], AsyncClient], knowledgebox_writer: str
-):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        # Test create resource
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource1",
-                "title": "My resource",
-                "summary": "Some summary",
-                "icon": "image/png",
-                "metadata": {
-                    "language": "en",
-                    "metadata": {"key1": "value1", "key2": "value2"},
-                },
-                "fieldmetadata": [
+                    "token": [{"token": "token1", "klass": "klass1", "start": 1, "end": 2}],
+                    "field": {"field": "text1", "field_type": "text"},
+                }
+            ],
+            "usermetadata": {
+                "classifications": [{"labelset": "ls1", "label": "label1"}],
+                "relations": [
                     {
-                        "paragraphs": [
-                            {
-                                "key": "paragraph1",
-                                "classifications": [{"labelset": "ls1", "label": "label1"}],
-                            }
-                        ],
-                        "token": [{"token": "token1", "klass": "klass1", "start": 1, "end": 2}],
-                        "field": {"field": "text1", "field_type": "text"},
+                        "relation": "CHILD",
+                        "to": {
+                            "type": "resource",
+                            "value": "resource_uuid",
+                        },
                     }
                 ],
-                "usermetadata": {
-                    "classifications": [{"labelset": "ls1", "label": "label1"}],
-                    "relations": [
+            },
+            "origin": {
+                "source_id": "source_id",
+                "url": "http://some_source",
+                "created": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "modified": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "metadata": {"key1": "value1", "key2": "value2"},
+                "tags": ["tag1", "tag2"],
+                "collaborators": ["col1", "col2"],
+                "filename": "file.pdf",
+                "related": ["related1"],
+            },
+            "texts": {"text1": TEST_TEXT_PAYLOAD},
+            "links": {"link1": TEST_LINK_PAYLOAD},
+            "files": {
+                "file1": TEST_FILE_PAYLOAD,
+                "external1": TEST_EXTERNAL_FILE_PAYLOAD,
+            },
+            "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
+        },
+    )
+
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "uuid" in data
+    assert "seqid" in data
+    rid = data["uuid"]
+
+    # Test update resource
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        json={},
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+
+    assert "seqid" in data
+
+    # Test delete resource
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+    )
+    assert resp.status_code == 204
+
+
+@pytest.mark.deploy_modes("component")
+async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    kbid = knowledgebox_writer
+
+    # Test create resource
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource1",
+            "title": "My resource",
+            "summary": "Some summary",
+            "icon": "image/png",
+            "metadata": {
+                "language": "en",
+                "metadata": {"key1": "value1", "key2": "value2"},
+            },
+            "fieldmetadata": [
+                {
+                    "paragraphs": [
                         {
-                            "relation": "CHILD",
-                            "to": {
-                                "type": "resource",
-                                "value": "resource_uuid",
-                            },
+                            "key": "paragraph1",
+                            "classifications": [{"labelset": "ls1", "label": "label1"}],
                         }
                     ],
-                },
-                "origin": {
-                    "source_id": "source_id",
-                    "url": "http://some_source",
-                    "created": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "modified": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "metadata": {"key1": "value1", "key2": "value2"},
-                    "tags": ["tag1", "tag2"],
-                    "collaborators": ["col1", "col2"],
-                    "filename": "file.pdf",
-                    "related": ["related1"],
-                },
-                "texts": {"text1": TEST_TEXT_PAYLOAD},
-                "links": {"link1": TEST_LINK_PAYLOAD},
-                "files": {"file1": TEST_FILE_PAYLOAD},
-                "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
+                    "token": [{"token": "token1", "klass": "klass1", "start": 1, "end": 2}],
+                    "field": {"field": "text1", "field_type": "text"},
+                }
+            ],
+            "usermetadata": {
+                "classifications": [{"labelset": "ls1", "label": "label1"}],
+                "relations": [
+                    {
+                        "relation": "CHILD",
+                        "to": {
+                            "type": "resource",
+                            "value": "resource_uuid",
+                        },
+                    }
+                ],
             },
-        )
+            "origin": {
+                "source_id": "source_id",
+                "url": "http://some_source",
+                "created": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "modified": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "metadata": {"key1": "value1", "key2": "value2"},
+                "tags": ["tag1", "tag2"],
+                "collaborators": ["col1", "col2"],
+                "filename": "file.pdf",
+                "related": ["related1"],
+            },
+            "texts": {"text1": TEST_TEXT_PAYLOAD},
+            "links": {"link1": TEST_LINK_PAYLOAD},
+            "files": {"file1": TEST_FILE_PAYLOAD},
+            "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
+        },
+    )
 
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "uuid" in data
-        assert "seqid" in data
-        assert "elapsed" in data
-        rid = data["uuid"]
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "uuid" in data
+    assert "seqid" in data
+    assert "elapsed" in data
+    rid = data["uuid"]
 
-        assert (
-            await datamanagers.atomic.resources.resource_exists(kbid=knowledgebox_id, rid=rid)
-        ) is True
+    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
 
-        # Test update resource
-        resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
-            json={},
-        )
-        assert resp.status_code == 200
+    # Test update resource
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        json={},
+    )
+    assert resp.status_code == 200
 
-        # Test delete resource
+    # Test delete resource
 
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/resource1",
-        )
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/resource1",
+    )
 
-        assert resp.status_code == 404
+    assert resp.status_code == 404
 
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
-        )
-        assert resp.status_code == 204
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+    )
+    assert resp.status_code == 204
 
-        assert (
-            await datamanagers.atomic.resources.resource_exists(kbid=knowledgebox_id, rid=rid)
-        ) is False
+    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is False
 
 
+@pytest.mark.deploy_modes("component")
 async def test_create_resource_async(
-    writer_api: Callable[[list[str]], AsyncClient],
+    nucliadb_writer: AsyncClient,
     knowledgebox_writer: str,
     mocker: MockerFixture,
 ):
     """Create a resoure and don't wait for it"""
     kbid = knowledgebox_writer
 
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        from nucliadb.writer.api.v1.resource import transaction
+    from nucliadb.writer.api.v1.resource import transaction
 
-        spy = mocker.spy(transaction, "commit")
+    spy = mocker.spy(transaction, "commit")
 
-        # create and wait for commit
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "wait-for-it",
-                "title": "My resource",
-                "texts": {"text1": TEST_TEXT_PAYLOAD},
-                "wait_for_commit": True,
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "uuid" in data
-        assert "elapsed" in data
-        assert data["elapsed"] is not None
-        rid = data["uuid"]
-        assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
-        assert spy.call_args.kwargs["wait"] is True
+    # create and wait for commit
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "wait-for-it",
+            "title": "My resource",
+            "texts": {"text1": TEST_TEXT_PAYLOAD},
+            "wait_for_commit": True,
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "uuid" in data
+    assert "elapsed" in data
+    assert data["elapsed"] is not None
+    rid = data["uuid"]
+    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
+    assert spy.call_args.kwargs["wait"] is True
 
-        # now without waiting for commit
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "no-wait",
-                "title": "My resource",
-                "texts": {"text1": TEST_TEXT_PAYLOAD},
-                "wait_for_commit": False,
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "uuid" in data
-        assert "elapsed" in data
-        assert data["elapsed"] is None
-        rid = data["uuid"]
-        assert (
-            await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
-        ) is False, "shouldn't be ingest yet"
-        assert spy.call_args.kwargs["wait"] is False
+    # now without waiting for commit
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "no-wait",
+            "title": "My resource",
+            "texts": {"text1": TEST_TEXT_PAYLOAD},
+            "wait_for_commit": False,
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "uuid" in data
+    assert "elapsed" in data
+    assert data["elapsed"] is None
+    rid = data["uuid"]
+    assert (
+        await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
+    ) is False, "shouldn't be ingest yet"
+    assert spy.call_args.kwargs["wait"] is False
 
 
+@pytest.mark.deploy_modes("component")
 async def test_reprocess_resource(
-    writer_api: Callable[..., AsyncClient],
-    test_resource: Resource,
+    nucliadb_writer: AsyncClient,
+    full_resource: Resource,
     mocker,
     maindb_driver,
 ) -> None:
-    rsc = test_resource
+    rsc = full_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
@@ -296,31 +291,30 @@ async def test_reprocess_resource(
     original = processing.send_to_process
     mocker.patch.object(processing, "send_to_process", AsyncMock(side_effect=original))
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reprocess",
-        )
-        assert resp.status_code == 202
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}/reprocess",
+    )
+    assert resp.status_code == 202
 
-        assert processing.send_to_process.call_count == 1  # type: ignore
-        payload = processing.send_to_process.call_args[0][0]  # type: ignore
-        assert isinstance(payload, PushPayload)
-        assert payload.uuid == rid
-        assert payload.kbid == kbid
+    assert processing.send_to_process.call_count == 1  # type: ignore
+    payload = processing.send_to_process.call_args[0][0]  # type: ignore
+    assert isinstance(payload, PushPayload)
+    assert payload.uuid == rid
+    assert payload.kbid == kbid
 
-        assert isinstance(payload.filefield.get("file1"), str)
-        assert payload.filefield["file1"] == "convert_internal_filefield_to_str,0"
-        assert isinstance(payload.linkfield.get("link1"), nucliadb_models.LinkUpload)
-        assert isinstance(payload.textfield.get("text1"), nucliadb_models.Text)
-        assert isinstance(payload.conversationfield.get("conv1"), nucliadb_models.PushConversation)
-        assert (
-            payload.conversationfield["conv1"].messages[33].content.attachments[0]
-            == "convert_internal_cf_to_str,0"
-        )
-        assert (
-            payload.conversationfield["conv1"].messages[33].content.attachments[1]
-            == "convert_internal_cf_to_str,1"
-        )
+    assert isinstance(payload.filefield.get("file1"), str)
+    assert payload.filefield["file1"] == "convert_internal_filefield_to_str,0"
+    assert isinstance(payload.linkfield.get("link1"), nucliadb_models.LinkUpload)
+    assert isinstance(payload.textfield.get("text1"), nucliadb_models.Text)
+    assert isinstance(payload.conversationfield.get("conv1"), nucliadb_models.PushConversation)
+    assert (
+        payload.conversationfield["conv1"].messages[33].content.attachments[0]
+        == "convert_internal_cf_to_str,0"
+    )
+    assert (
+        payload.conversationfield["conv1"].messages[33].content.attachments[1]
+        == "convert_internal_cf_to_str,1"
+    )
 
 
 @pytest.mark.parametrize(
@@ -332,38 +326,39 @@ async def test_reprocess_resource(
         ["delete", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}", None],
     ],
 )
+@pytest.mark.deploy_modes("component")
 async def test_resource_endpoints_by_slug(
-    writer_api: Callable[[list[str]], AsyncClient],
-    knowledgebox_ingest: str,
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
     method: str,
     endpoint: str,
     payload: Optional[dict[Any, Any]],
 ):
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        slug = "my-resource"
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
-            json={
-                "slug": slug,
-                "texts": {"text1": {"body": "test1", "format": "PLAIN"}},
-            },
-        )
-        assert resp.status_code == 201
+    kbid = knowledgebox
+    slug = "my-resource"
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": slug,
+            "texts": {"text1": {"body": "test1", "format": "PLAIN"}},
+        },
+    )
+    assert resp.status_code == 201
 
-        endpoint = endpoint.format(
-            KB_PREFIX=KB_PREFIX,
-            kb=knowledgebox_ingest,
-            RSLUG_PREFIX=RSLUG_PREFIX,
-            slug=slug,
-        )
-        extra_params = {}
-        if payload is not None:
-            extra_params["json"] = payload
+    endpoint = endpoint.format(
+        KB_PREFIX=KB_PREFIX,
+        kb=kbid,
+        RSLUG_PREFIX=RSLUG_PREFIX,
+        slug=slug,
+    )
+    extra_params = {}
+    if payload is not None:
+        extra_params["json"] = payload
 
-        op = getattr(client, method)
-        resp = await op(endpoint, **extra_params)
+    op = getattr(nucliadb_writer, method)
+    resp = await op(endpoint, **extra_params)
 
-        assert resp.status_code in (200, 202, 204)
+    assert resp.status_code in (200, 202, 204)
 
 
 @pytest.mark.parametrize(
@@ -375,162 +370,161 @@ async def test_resource_endpoints_by_slug(
         ["delete", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}", None],
     ],
 )
+@pytest.mark.deploy_modes("component")
 async def test_resource_endpoints_by_slug_404(
-    writer_api,
-    knowledgebox_ingest,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
     method,
     endpoint,
     payload,
 ):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        endpoint = endpoint.format(
-            KB_PREFIX=KB_PREFIX,
-            kb=knowledgebox_ingest,
-            RSLUG_PREFIX=RSLUG_PREFIX,
-            slug="idonotexist",
-        )
-        extra_params = {}
-        if payload is not None:
-            extra_params["json"] = payload
+    endpoint = endpoint.format(
+        KB_PREFIX=KB_PREFIX,
+        kb=knowledgebox,
+        RSLUG_PREFIX=RSLUG_PREFIX,
+        slug="idonotexist",
+    )
+    extra_params = {}
+    if payload is not None:
+        extra_params["json"] = payload
 
-        op = getattr(client, method)
-        resp = await op(endpoint, **extra_params)
+    op = getattr(nucliadb_writer, method)
+    resp = await op(endpoint, **extra_params)
 
-        assert resp.status_code == 404
-        assert resp.json()["detail"] == "Resource does not exist"
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Resource does not exist"
 
 
-async def test_reindex(writer_api, test_resource):
-    rsc = test_resource
+@pytest.mark.deploy_modes("component")
+async def test_reindex(nucliadb_writer: AsyncClient, full_resource: Resource):
+    rsc = full_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex",
+    )
+    assert resp.status_code == 200
 
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex?reindex_vectors=True",
-        )
-        assert resp.status_code == 200
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex?reindex_vectors=True",
+    )
+    assert resp.status_code == 200
 
 
-async def test_paragraph_annotations(writer_api, knowledgebox_writer):
+@pytest.mark.deploy_modes("component")
+async def test_paragraph_annotations(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
     kbid = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        # Must have at least one classification
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resources",
-            json={
-                "texts": {"text1": TEST_TEXT_PAYLOAD},
-                "fieldmetadata": [
-                    {
-                        "paragraphs": [
-                            {
-                                "key": "paragraph1",
-                                "classifications": [],
-                            }
-                        ],
-                        "field": {"field": "text1", "field_type": "text"},
-                    }
-                ],
-            },
-        )
-        assert resp.status_code == 422
-        body = resp.json()
-        assert body["detail"] == "ensure classifications has at least 1 items"
+    # Must have at least one classification
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resources",
+        json={
+            "texts": {"text1": TEST_TEXT_PAYLOAD},
+            "fieldmetadata": [
+                {
+                    "paragraphs": [
+                        {
+                            "key": "paragraph1",
+                            "classifications": [],
+                        }
+                    ],
+                    "field": {"field": "text1", "field_type": "text"},
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["detail"] == "ensure classifications has at least 1 items"
 
-        classification = {"label": "label", "labelset": "ls"}
+    classification = {"label": "label", "labelset": "ls"}
 
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resources",
-            json={
-                "texts": {"text1": TEST_TEXT_PAYLOAD},
-                "fieldmetadata": [
-                    {
-                        "paragraphs": [
-                            {
-                                "key": "paragraph1",
-                                "classifications": [classification],
-                            }
-                        ],
-                        "field": {"field": "text1", "field_type": "text"},
-                    }
-                ],
-            },
-        )
-        assert resp.status_code == 201
-        rid = resp.json()["uuid"]
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resources",
+        json={
+            "texts": {"text1": TEST_TEXT_PAYLOAD},
+            "fieldmetadata": [
+                {
+                    "paragraphs": [
+                        {
+                            "key": "paragraph1",
+                            "classifications": [classification],
+                        }
+                    ],
+                    "field": {"field": "text1", "field_type": "text"},
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
 
-        # Classifications need to be unique
-        resp = await client.patch(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}",
-            json={
-                "fieldmetadata": [
-                    {
-                        "paragraphs": [
-                            {
-                                "key": "paragraph1",
-                                "classifications": [classification, classification],
-                            }
-                        ],
-                        "field": {"field": "text1", "field_type": "text"},
-                    }
-                ],
-            },
-        )
-        assert resp.status_code == 422
-        body = resp.json()
-        assert body["detail"] == "Paragraph classifications need to be unique"
+    # Classifications need to be unique
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{kbid}/resource/{rid}",
+        json={
+            "fieldmetadata": [
+                {
+                    "paragraphs": [
+                        {
+                            "key": "paragraph1",
+                            "classifications": [classification, classification],
+                        }
+                    ],
+                    "field": {"field": "text1", "field_type": "text"},
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["detail"] == "Paragraph classifications need to be unique"
 
 
+@pytest.mark.deploy_modes("component")
 async def test_hide_on_creation(
-    writer_api: Callable[[list[str]], AsyncClient],
+    nucliadb_writer: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     knowledgebox_writer: str,
 ):
     kbid = knowledgebox_writer
 
     # Create new resource (default = visible)
-    async with writer_api([NucliaDBRoles.WRITER, NucliaDBRoles.READER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource1",
-                "title": "My resource",
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        rid = data["uuid"]
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource1",
+            "title": "My resource",
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    rid = data["uuid"]
 
     async with datamanagers.utils.with_ro_transaction() as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic and basic.hidden is False
 
     # Set KB to hide new resources
-    async with writer_api([NucliaDBRoles.MANAGER]) as client:
-        resp = await client.patch(
-            f"/{KB_PREFIX}/{kbid}",
-            json={
-                "hidden_resources_enabled": True,
-                "hidden_resources_hide_on_creation": True,
-            },
-        )
-        assert resp.status_code == 200, resp.text
+    resp = await nucliadb_writer_manager.patch(
+        f"/{KB_PREFIX}/{kbid}",
+        json={
+            "hidden_resources_enabled": True,
+            "hidden_resources_hide_on_creation": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
 
     # Create new resource (hidden because of the previous setting)
-    async with writer_api([NucliaDBRoles.WRITER, NucliaDBRoles.READER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource2",
-                "title": "My resource",
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        rid = data["uuid"]
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource2",
+            "title": "My resource",
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    rid = data["uuid"]
 
     async with datamanagers.utils.with_ro_transaction() as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)

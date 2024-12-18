@@ -17,16 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = [
-    "pytest_mock",
-    "pytest_docker_fixtures",
-    "nucliadb_utils.tests.nats",
-    "tests.fixtures",
-    "tests.ingest.fixtures",  # should be refactored out
-    "tests.writer.fixtures",
-    "nucliadb_utils.tests.fixtures",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.s3",
-    "nucliadb_utils.tests.azure",
-    "nucliadb_utils.tests.local",
-]
+
+from unittest.mock import patch
+
+import pytest
+
+from nucliadb_utils.settings import (
+    nuclia_settings,
+)
+
+
+@pytest.fixture(scope="function")
+async def dummy_processing():
+    with (
+        patch.object(nuclia_settings, "dummy_processing", True),
+    ):
+        yield

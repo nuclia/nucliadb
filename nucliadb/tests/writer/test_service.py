@@ -18,112 +18,86 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+import pytest
+from httpx import AsyncClient
+
+from nucliadb.writer.api.v1.router import KB_PREFIX
 from nucliadb_models.entities import CreateEntitiesGroupPayload, Entity
-from nucliadb_models.labels import Label, LabelSet
-from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.labels import Label, LabelSet, LabelSetKind
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_utils.utilities import get_ingest
 
 
-async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
-    async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
-        resp = await client.post(
-            f"/{KBS_PREFIX}",
-            json={
-                "slug": "kbid1",
-                "title": "My Knowledge Box",
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["slug"] == "kbid1"
-        kbid = data["uuid"]
+@pytest.mark.deploy_modes("component")
+async def test_service_lifecycle_entities(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, entities_manager_mock
+):
+    kbid = knowledgebox_writer
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        eg = CreateEntitiesGroupPayload(
-            group="0",
-            title="My group",
-            color="#0000000",
-            entities={
-                "ent1": Entity(value="asd", merged=False),
-                "ent2": Entity(value="asd", merged=False),
-                "ent3": Entity(value="asd", merged=False),
-            },
-        )
+    eg = CreateEntitiesGroupPayload(
+        group="0",
+        title="My group",
+        color="#0000000",
+        entities={
+            "ent1": Entity(value="asd", merged=False),
+            "ent2": Entity(value="asd", merged=False),
+            "ent3": Entity(value="asd", merged=False),
+        },
+    )
 
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
-        assert resp.status_code == 200
+    resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
+    assert resp.status_code == 200
 
-        ingest = get_ingest()
-        result = await ingest.GetEntities(
-            writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
-        )
-        assert set(result.groups.keys()) == {"0"}
-        assert result.groups["0"].title == eg.title
-        assert result.groups["0"].color == eg.color
-        assert set(result.groups["0"].entities.keys()) == {"ent1", "ent2", "ent3"}
-        assert result.groups["0"].entities["ent1"].value == "asd"
+    ingest = get_ingest()
+    result = await ingest.GetEntities(  # type: ignore
+        writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
+    )
+    assert set(result.groups.keys()) == {"0"}
+    assert result.groups["0"].title == eg.title
+    assert result.groups["0"].color == eg.color
+    assert set(result.groups["0"].entities.keys()) == {"ent1", "ent2", "ent3"}
+    assert result.groups["0"].entities["ent1"].value == "asd"
 
-        eg.group = "1"
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
-        assert resp.status_code == 200
-        result = await ingest.GetEntities(
-            writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
-        )
-        assert set(result.groups.keys()) == {"0", "1"}
+    eg.group = "1"
+    resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
+    assert resp.status_code == 200
+    result = await ingest.GetEntities(  # type: ignore
+        writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
+    )
+    assert set(result.groups.keys()) == {"0", "1"}
 
 
-async def test_entities_custom_field_for_user_defined_groups(writer_api, entities_manager_mock):
+@pytest.mark.deploy_modes("component")
+async def test_entities_custom_field_for_user_defined_groups(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, entities_manager_mock
+):
     """
     Test description:
 
     - Create an entity group and check that the default value for the `custom`
       field is True
     """
-    async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
-        resp = await client.post(
-            f"/{KBS_PREFIX}",
-            json={
-                "slug": "kbid1",
-                "title": "My Knowledge Box",
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        kbid = data["uuid"]
+    kbid = knowledgebox_writer
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        eg = CreateEntitiesGroupPayload(group="0")
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
-        assert resp.status_code == 200
+    eg = CreateEntitiesGroupPayload(group="0")
+    resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/entitiesgroups", json=eg.model_dump())
+    assert resp.status_code == 200
 
-        ingest = get_ingest()
-        result = await ingest.GetEntities(
-            writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
-        )
-        assert result.groups["0"].custom is True
+    ingest = get_ingest()
+    result = await ingest.GetEntities(  # type: ignore
+        writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
+    )
+    assert result.groups["0"].custom is True
 
 
-async def test_service_lifecycle_labels(writer_api):
-    async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
-        resp = await client.post(
-            f"/{KBS_PREFIX}",
-            json={
-                "slug": "kbid1",
-                "title": "My Knowledge Box",
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["slug"] == "kbid1"
-        kbid = data["uuid"]
+@pytest.mark.deploy_modes("component")
+async def test_service_lifecycle_labels(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    kbid = knowledgebox_writer
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        ls = LabelSet(title="My labelset", color="#0000000", multiple=False, kind=["RESOURCES"])
-        ls.labels.append(Label(title="asd"))
-        ls.labels.append(Label(title="asd"))
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/labelset/ls1", json=ls.model_dump())
-        assert resp.status_code == 200
-        resp = await client.post(f"/{KB_PREFIX}/{kbid}/labelset/ls2", json=ls.model_dump())
-        assert resp.status_code == 200
+    ls = LabelSet(title="My labelset", color="#0000000", multiple=False, kind=[LabelSetKind.RESOURCES])
+    ls.labels.append(Label(title="asd"))
+    ls.labels.append(Label(title="asd"))
+    resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/labelset/ls1", json=ls.model_dump())
+    assert resp.status_code == 200
+    resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/labelset/ls2", json=ls.model_dump())
+    assert resp.status_code == 200

@@ -21,15 +21,14 @@ import asyncio
 import base64
 import io
 import os
-from typing import Callable
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_storage_manager
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.resources_pb2 import FieldID, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
@@ -38,84 +37,82 @@ from nucliadb_utils.utilities import get_storage, get_transaction_utility
 ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 
 
-async def test_knowledgebox_file_tus_options(
-    writer_api: Callable[[list[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
-):
-    client: AsyncClient
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        resp = await client.options(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx"
+@pytest.mark.deploy_modes("component")
+async def test_knowledgebox_file_tus_options(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    kbid = knowledgebox_writer
+
+    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx")
+    assert resp.status_code == 204
+    assert resp.headers["tus-resumable"] == "1.0.0"
+    assert resp.headers["tus-version"] == "1.0.0"
+    assert resp.headers["tus-extension"] == "creation-defer-length"
+
+    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/xxx/file/xxx/{TUSUPLOAD}")
+    assert resp.status_code == 204
+    assert resp.headers["tus-resumable"] == "1.0.0"
+    assert resp.headers["tus-version"] == "1.0.0"
+    assert resp.headers["tus-extension"] == "creation-defer-length"
+
+    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}")
+    assert resp.status_code == 204
+    assert resp.headers["tus-resumable"] == "1.0.0"
+    assert resp.headers["tus-version"] == "1.0.0"
+    assert resp.headers["tus-extension"] == "creation-defer-length"
+
+    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}/xxx")
+    assert resp.status_code == 204
+    assert resp.headers["tus-resumable"] == "1.0.0"
+    assert resp.headers["tus-version"] == "1.0.0"
+    assert resp.headers["tus-extension"] == "creation-defer-length"
+
+
+@pytest.mark.deploy_modes("component")
+async def test_knowledgebox_file_tus_upload_root(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    kbid = knowledgebox_writer
+
+    language = base64.b64encode(b"ca").decode()
+    filename = base64.b64encode(b"image.jpg").decode()
+    md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+            "content-type": "image/jpeg",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
+
+    offset = 0
+
+    # We upload a file that spans across more than one chunk
+    min_chunk_size = get_storage_manager().min_upload_size
+    assert min_chunk_size is not None, "File storage not properly set up"
+    raw_bytes = b"x" * min_chunk_size + b"y" * 500
+    io_bytes = io.BytesIO(raw_bytes)
+    data = io_bytes.read(min_chunk_size)
+    while data != b"":
+        resp = await nucliadb_writer.head(url)
+        assert resp.headers["Upload-Length"] == f"0"
+        assert resp.headers["Upload-Offset"] == f"{offset}"
+
+        headers = {
+            "upload-offset": f"{offset}",
+            "content-length": f"{len(data)}",
+        }
+        is_last_chunk = len(data) < min_chunk_size
+        if is_last_chunk:
+            headers["upload-length"] = f"{offset + len(data)}"
+
+        resp = await nucliadb_writer.patch(
+            url,
+            content=data,
+            headers=headers,
         )
-        assert resp.status_code == 204
-        assert resp.headers["tus-resumable"] == "1.0.0"
-        assert resp.headers["tus-version"] == "1.0.0"
-        assert resp.headers["tus-extension"] == "creation-defer-length"
-
-        resp = await client.options(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}"
-        )
-        assert resp.status_code == 204
-        assert resp.headers["tus-resumable"] == "1.0.0"
-        assert resp.headers["tus-version"] == "1.0.0"
-        assert resp.headers["tus-extension"] == "creation-defer-length"
-
-        resp = await client.options(f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}")
-        assert resp.status_code == 204
-        assert resp.headers["tus-resumable"] == "1.0.0"
-        assert resp.headers["tus-version"] == "1.0.0"
-        assert resp.headers["tus-extension"] == "creation-defer-length"
-
-        resp = await client.options(f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}/xxx")
-        assert resp.status_code == 204
-        assert resp.headers["tus-resumable"] == "1.0.0"
-        assert resp.headers["tus-version"] == "1.0.0"
-        assert resp.headers["tus-extension"] == "creation-defer-length"
-
-
-async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        language = base64.b64encode(b"ca").decode()
-        filename = base64.b64encode(b"image.jpg").decode()
-        md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}",
-            headers={
-                "tus-resumable": "1.0.0",
-                "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpeg",
-                "upload-defer-length": "1",
-            },
-        )
-        assert resp.status_code == 201
-        url = resp.headers["location"]
-
-        offset = 0
-
-        # We upload a file that spans across more than one chunk
-        min_chunk_size = get_storage_manager().min_upload_size
-        raw_bytes = b"x" * min_chunk_size + b"y" * 500
-        io_bytes = io.BytesIO(raw_bytes)
+        offset += len(data)
         data = io_bytes.read(min_chunk_size)
-        while data != b"":
-            resp = await client.head(url)
-            assert resp.headers["Upload-Length"] == f"0"
-            assert resp.headers["Upload-Offset"] == f"{offset}"
-
-            headers = {
-                "upload-offset": f"{offset}",
-                "content-length": f"{len(data)}",
-            }
-            is_last_chunk = len(data) < min_chunk_size
-            if is_last_chunk:
-                headers["upload-length"] = f"{offset + len(data)}"
-
-            resp = await client.patch(
-                url,
-                content=data,
-                headers=headers,
-            )
-            offset += len(data)
-            data = io_bytes.read(min_chunk_size)
 
     assert resp.headers["Tus-Upload-Finished"] == "1"
 
@@ -140,41 +137,42 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
     assert writer.files[field].file.md5 == "7af0916dba8b70e29d99e72941923529"
 
     storage = await get_storage()
-    data = await storage.downloadbytes(
+    download_data = await storage.downloadbytes(
         bucket=writer.files[field].file.bucket_name,
         key=writer.files[field].file.uri,
     )
-    assert len(data.read()) == len(raw_bytes)
+    assert len(download_data.read()) == len(raw_bytes)
     await asyncio.sleep(1)
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}",
-            headers={
-                "tus-resumable": "1.0.0",
-                "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpeg",
-                "upload-defer-length": "1",
-            },
-        )
-        assert resp.status_code == 409
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+            "content-type": "image/jpeg",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 409
 
 
+@pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_upload_root(
-    writer_api: Callable[[list[NucliaDBRoles]], AsyncClient],
+    nucliadb_writer: AsyncClient,
     knowledgebox_writer: str,
 ):
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
-                content=f.read(),
-                headers={
-                    "content-type": "image/jpeg",
-                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                },
-            )
-            assert resp.status_code == 201
+    kbid = knowledgebox_writer
+
+    with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{kbid}/{UPLOAD}",
+            content=f.read(),
+            headers={
+                "content-type": "image/jpeg",
+                "X-MD5": "7af0916dba8b70e29d99e72941923529",
+            },
+        )
+        assert resp.status_code == 201
 
     transaction = get_transaction_utility()
 
@@ -193,44 +191,45 @@ async def test_knowledgebox_file_upload_root(
     assert writer.files[field].file.size == 30472
 
     storage = await get_storage()
-    data = await storage.downloadbytes(
+    download_data = await storage.downloadbytes(
         bucket=writer.files[field].file.bucket_name,
         key=writer.files[field].file.uri,
     )
-    assert len(data.read()) == 30472
+    assert len(download_data.read()) == 30472
     await asyncio.sleep(1)
 
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
-                content=f.read(),
-                headers={
-                    "content-type": "image/jpeg",
-                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                },
-            )
-            assert resp.status_code == 409
+    with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{kbid}/{UPLOAD}",
+            content=f.read(),
+            headers={
+                "content-type": "image/jpeg",
+                "X-MD5": "7af0916dba8b70e29d99e72941923529",
+            },
+        )
+        assert resp.status_code == 409
 
 
+@pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_upload_root_headers(
-    writer_api: Callable[[list[NucliaDBRoles]], AsyncClient],
+    nucliadb_writer: AsyncClient,
     knowledgebox_writer: str,
 ):
-    async with writer_api([NucliaDBRoles.WRITER]) as client:
-        filename = base64.b64encode(b"image.jpg").decode()
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
-                content=f.read(),
-                headers={
-                    "X-FILENAME": filename,
-                    "X-LANGUAGE": "ca",
-                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                    "content-type": "image/jpeg",
-                },
-            )
-            assert resp.status_code == 201
+    kbid = knowledgebox_writer
+
+    filename = base64.b64encode(b"image.jpg").decode()
+    with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{kbid}/{UPLOAD}",
+            content=f.read(),
+            headers={
+                "X-FILENAME": filename,
+                "X-LANGUAGE": "ca",
+                "X-MD5": "7af0916dba8b70e29d99e72941923529",
+                "content-type": "image/jpeg",
+            },
+        )
+        assert resp.status_code == 201
 
     transaction = get_transaction_utility()
 
@@ -251,73 +250,78 @@ async def test_knowledgebox_file_upload_root_headers(
     assert writer.files[field].file.size == 30472
 
     storage = await get_storage()
-    data = await storage.downloadbytes(
+    download_data = await storage.downloadbytes(
         bucket=writer.files[field].file.bucket_name,
         key=writer.files[field].file.uri,
     )
-    assert len(data.read()) == 30472
+    assert len(download_data.read()) == 30472
 
 
-async def test_knowledgebox_file_tus_upload_field(writer_api, knowledgebox_writer, resource):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        language = base64.b64encode(b"ca").decode()
-        filename = base64.b64encode(b"image.jpg").decode()
-        md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+@pytest.mark.deploy_modes("component")
+async def test_knowledgebox_file_tus_upload_field(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+):
+    kbid = knowledgebox_writer
 
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/invalidresource/file/field1/{TUSUPLOAD}",
-            headers={
-                "tus-resumable": "1.0.0",
-                "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpeg",
-                "upload-defer-length": "1",
-            },
+    language = base64.b64encode(b"ca").decode()
+    filename = base64.b64encode(b"image.jpg").decode()
+    md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resource/invalidresource/file/field1/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+            "content-type": "image/jpeg",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 404
+    await asyncio.sleep(1)
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resource/{resource}/file/field1/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+            "content-type": "image/jpeg",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
+
+    offset = 0
+    # We upload a file that spans across more than one chunk
+    min_chunk_size = get_storage_manager().min_upload_size
+    assert min_chunk_size is not None, "File storage not properly set up"
+    raw_bytes = b"x" * min_chunk_size + b"y" * 500
+    io_bytes = io.BytesIO(raw_bytes)
+    data = io_bytes.read(min_chunk_size)
+    while data != b"":
+        resp = await nucliadb_writer.head(url)
+
+        assert resp.headers["Upload-Length"] == f"0"
+        assert resp.headers["Upload-Offset"] == f"{offset}"
+
+        headers = {
+            "upload-offset": f"{offset}",
+            "content-length": f"{len(data)}",
+        }
+        is_last_chunk = len(data) < min_chunk_size
+        if is_last_chunk:
+            headers["upload-length"] = f"{offset + len(data)}"
+
+        resp = await nucliadb_writer.patch(
+            url,
+            content=data,
+            headers=headers,
         )
-        assert resp.status_code == 404
-        await asyncio.sleep(1)
-
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{TUSUPLOAD}",
-            headers={
-                "tus-resumable": "1.0.0",
-                "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpeg",
-                "upload-defer-length": "1",
-            },
-        )
-        assert resp.status_code == 201
-        url = resp.headers["location"]
-
-        offset = 0
-        # We upload a file that spans across more than one chunk
-        min_chunk_size = get_storage_manager().min_upload_size
-        raw_bytes = b"x" * min_chunk_size + b"y" * 500
-        io_bytes = io.BytesIO(raw_bytes)
+        assert resp.status_code == 200
+        offset += len(data)
         data = io_bytes.read(min_chunk_size)
-        while data != b"":
-            resp = await client.head(url)
 
-            assert resp.headers["Upload-Length"] == f"0"
-            assert resp.headers["Upload-Offset"] == f"{offset}"
-
-            headers = {
-                "upload-offset": f"{offset}",
-                "content-length": f"{len(data)}",
-            }
-            is_last_chunk = len(data) < min_chunk_size
-            if is_last_chunk:
-                headers["upload-length"] = f"{offset + len(data)}"
-
-            resp = await client.patch(
-                url,
-                content=data,
-                headers=headers,
-            )
-            assert resp.status_code == 200
-            offset += len(data)
-            data = io_bytes.read(min_chunk_size)
-
-        assert resp.headers["Tus-Upload-Finished"] == "1"
+    assert resp.headers["Tus-Upload-Finished"] == "1"
 
     transaction = get_transaction_utility()
 
@@ -340,29 +344,32 @@ async def test_knowledgebox_file_tus_upload_field(writer_api, knowledgebox_write
     assert writer.files[field].file.md5 == "7af0916dba8b70e29d99e72941923529"
 
     storage = await get_storage()
-    data = await storage.downloadbytes(
+    download_data = await storage.downloadbytes(
         bucket=writer.files[field].file.bucket_name,
         key=writer.files[field].file.uri,
     )
-    assert len(data.read()) == len(raw_bytes)
+    assert len(download_data.read()) == len(raw_bytes)
 
 
-async def test_knowledgebox_file_upload_field_headers(writer_api, knowledgebox_writer, resource):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        filename = "image.jpg"
-        encoded_filename = base64.b64encode(filename.encode()).decode()
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
-                content=f.read(),
-                headers={
-                    "X-FILENAME": encoded_filename,
-                    "X-LANGUAGE": "ca",
-                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                    "content-type": "image/jpeg",
-                },
-            )
-            assert resp.status_code == 201
+@pytest.mark.deploy_modes("component")
+async def test_knowledgebox_file_upload_field_headers(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+):
+    kbid = knowledgebox_writer
+    filename = "image.jpg"
+    encoded_filename = base64.b64encode(filename.encode()).decode()
+    with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{kbid}/resource/{resource}/file/field1/{UPLOAD}",
+            content=f.read(),
+            headers={
+                "X-FILENAME": encoded_filename,
+                "X-LANGUAGE": "ca",
+                "X-MD5": "7af0916dba8b70e29d99e72941923529",
+                "content-type": "image/jpeg",
+            },
+        )
+        assert resp.status_code == 201
 
     transaction = get_transaction_utility()
 
@@ -390,93 +397,99 @@ async def test_knowledgebox_file_upload_field_headers(writer_api, knowledgebox_w
     assert len(data.read()) == 30472
 
 
-async def test_knowledgebox_file_upload_field_sync(writer_api, knowledgebox_writer, resource):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        filename = "image.jpg"
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
-                content=f.read(),
-                headers={
-                    "X-FILENAME": filename,
-                    "X-LANGUAGE": "ca",
-                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                    "content-type": "image/jpeg",
-                },
-            )
-            assert resp.status_code == 201
-
-        async with datamanagers.with_ro_transaction() as txn:
-            assert (
-                await datamanagers.resources.has_field(
-                    txn,
-                    kbid=knowledgebox_writer,
-                    rid=resource,
-                    field_id=FieldID(field="field1", field_type=FieldType.FILE),
-                )
-            ) is True
-
-
-async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, resource):
-    kb = knowledgebox_writer
-    rslug = "resource1"
-
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        language = base64.b64encode(b"ca").decode()
-        filename = base64.b64encode(b"image.jpg").decode()
-        md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
-        headers = {
-            "tus-resumable": "1.0.0",
-            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-            "content-type": "image/jpeg",
-            "upload-defer-length": "1",
-        }
-
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/slug/idonotexist/file/field1/{TUSUPLOAD}",
-            headers=headers,
-        )
-        assert resp.status_code == 404
-
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
-            headers=headers,
+@pytest.mark.deploy_modes("component")
+async def test_knowledgebox_file_upload_field_sync(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+):
+    kbid = knowledgebox_writer
+    filename = "image.jpg"
+    with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{kbid}/resource/{resource}/file/field1/{UPLOAD}",
+            content=f.read(),
+            headers={
+                "X-FILENAME": filename,
+                "X-LANGUAGE": "ca",
+                "X-MD5": "7af0916dba8b70e29d99e72941923529",
+                "content-type": "image/jpeg",
+            },
         )
         assert resp.status_code == 201
-        url = resp.headers["location"]
 
-        # Check that we are using the slug for the whole file upload
-        assert f"{RSLUG_PREFIX}/{rslug}" in url
-
-        offset = 0
-        min_chunk_size = get_storage_manager().min_upload_size
-        raw_bytes = b"x" * min_chunk_size + b"y" * 500
-        io_bytes = io.BytesIO(raw_bytes)
-        data = io_bytes.read(min_chunk_size)
-        while data != b"":
-            resp = await client.head(url)
-
-            assert resp.headers["Upload-Length"] == f"0"
-            assert resp.headers["Upload-Offset"] == f"{offset}"
-
-            headers = {
-                "upload-offset": f"{offset}",
-                "content-length": f"{len(data)}",
-            }
-            is_last_chunk = len(data) < min_chunk_size
-            if is_last_chunk:
-                headers["upload-length"] = f"{offset + len(data)}"
-
-            resp = await client.patch(
-                url,
-                content=data,
-                headers=headers,
+    async with datamanagers.with_ro_transaction() as txn:
+        assert (
+            await datamanagers.resources.has_field(
+                txn,
+                kbid=kbid,
+                rid=resource,
+                field_id=FieldID(field="field1", field_type=FieldType.FILE),
             )
-            assert resp.status_code == 200
-            offset += len(data)
-            data = io_bytes.read(min_chunk_size)
+        ) is True
 
-        assert resp.headers["Tus-Upload-Finished"] == "1"
+
+@pytest.mark.deploy_modes("component")
+async def test_file_tus_upload_field_by_slug(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+):
+    kbid = knowledgebox_writer
+    rslug = "resource1"
+
+    language = base64.b64encode(b"ca").decode()
+    filename = base64.b64encode(b"image.jpg").decode()
+    md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+    headers = {
+        "tus-resumable": "1.0.0",
+        "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+        "content-type": "image/jpeg",
+        "upload-defer-length": "1",
+    }
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/slug/idonotexist/file/field1/{TUSUPLOAD}",
+        headers=headers,
+    )
+    assert resp.status_code == 404
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
+
+    # Check that we are using the slug for the whole file upload
+    assert f"{RSLUG_PREFIX}/{rslug}" in url
+
+    offset = 0
+    min_chunk_size = get_storage_manager().min_upload_size
+    assert min_chunk_size is not None, "File storage not properly set up"
+    raw_bytes = b"x" * min_chunk_size + b"y" * 500
+    io_bytes = io.BytesIO(raw_bytes)
+    data = io_bytes.read(min_chunk_size)
+    while data != b"":
+        resp = await nucliadb_writer.head(url)
+
+        assert resp.headers["Upload-Length"] == f"0"
+        assert resp.headers["Upload-Offset"] == f"{offset}"
+
+        headers = {
+            "upload-offset": f"{offset}",
+            "content-length": f"{len(data)}",
+        }
+        is_last_chunk = len(data) < min_chunk_size
+        if is_last_chunk:
+            headers["upload-length"] = f"{offset + len(data)}"
+
+        resp = await nucliadb_writer.patch(
+            url,
+            content=data,
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        offset += len(data)
+        data = io_bytes.read(min_chunk_size)
+
+    assert resp.headers["Tus-Upload-Finished"] == "1"
 
     transaction = get_transaction_utility()
 
@@ -499,133 +512,136 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
     assert writer.files[field].file.md5 == "7af0916dba8b70e29d99e72941923529"
 
     storage = await get_storage()
-    data = await storage.downloadbytes(
+    download_data = await storage.downloadbytes(
         bucket=writer.files[field].file.bucket_name,
         key=writer.files[field].file.uri,
     )
-    assert len(data.read()) == len(raw_bytes)
+    assert len(download_data.read()) == len(raw_bytes)
 
 
-async def test_file_tus_upload_urls_field_by_resource_id(writer_api, knowledgebox_writer, resource):
-    kb = knowledgebox_writer
+@pytest.mark.deploy_modes("component")
+async def test_file_tus_upload_urls_field_by_resource_id(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+):
+    kbid = knowledgebox_writer
+    language = base64.b64encode(b"ca").decode()
+    filename = base64.b64encode(b"image.jpg").decode()
+    md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+    headers = {
+        "tus-resumable": "1.0.0",
+        "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+        "content-type": "image/jpeg",
+        "upload-defer-length": "1",
+    }
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        language = base64.b64encode(b"ca").decode()
-        filename = base64.b64encode(b"image.jpg").decode()
-        md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
-        headers = {
-            "tus-resumable": "1.0.0",
-            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-            "content-type": "image/jpeg",
-            "upload-defer-length": "1",
-        }
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resource/idonotexist/file/field1/{TUSUPLOAD}",
+        headers=headers,
+    )
+    assert resp.status_code == 404
 
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/resource/idonotexist/file/field1/{TUSUPLOAD}",
-            headers=headers,
-        )
-        assert resp.status_code == 404
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resource/{resource}/file/field1/{TUSUPLOAD}",
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
 
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/resource/{resource}/file/field1/{TUSUPLOAD}",
-            headers=headers,
-        )
-        assert resp.status_code == 201
-        url = resp.headers["location"]
+    # Check that we are using the resource for the whole file upload
+    assert f"{RESOURCE_PREFIX}/{resource}" in url
 
-        # Check that we are using the resource for the whole file upload
-        assert f"{RESOURCE_PREFIX}/{resource}" in url
+    # Make sure the returned URL works
+    resp = await nucliadb_writer.head(url)
+    assert resp.status_code == 200
 
-        # Make sure the returned URL works
-        resp = await client.head(url)
-        assert resp.status_code == 200
-
-        assert resp.headers["Upload-Length"] == "0"
-        assert resp.headers["Upload-Offset"] == "0"
+    assert resp.headers["Upload-Length"] == "0"
+    assert resp.headers["Upload-Offset"] == "0"
 
 
-async def test_multiple_tus_file_upload_tries(writer_api, knowledgebox_writer, resource):
-    kb = knowledgebox_writer
+@pytest.mark.deploy_modes("component")
+async def test_multiple_tus_file_upload_tries(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource
+):
+    kbid = knowledgebox_writer
     rslug = "resource1"
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        headers = {
-            "tus-resumable": "1.0.0",
-            "content-type": "image/jpeg",
-            "upload-defer-length": "1",
-        }
+    headers = {
+        "tus-resumable": "1.0.0",
+        "content-type": "image/jpeg",
+        "upload-defer-length": "1",
+    }
 
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
-            headers=headers,
-        )
-        assert resp.status_code == 201
-        url = resp.headers["location"]
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
 
-        # Check that we are using the slug for the whole file upload
-        assert f"{RSLUG_PREFIX}/{rslug}" in url
-        resp = await client.patch(
-            url,
-            content=b"x" * 10000,
-            headers={
-                "upload-offset": "0",
-                "content-length": "10000",
-                "upload-length": "10000",
-            },
-        )
-        assert resp.status_code == 200
+    # Check that we are using the slug for the whole file upload
+    assert f"{RSLUG_PREFIX}/{rslug}" in url
+    resp = await nucliadb_writer.patch(
+        url,
+        content=b"x" * 10000,
+        headers={
+            "upload-offset": "0",
+            "content-length": "10000",
+            "upload-length": "10000",
+        },
+    )
+    assert resp.status_code == 200
 
-        assert resp.headers["Tus-Upload-Finished"] == "1"
+    assert resp.headers["Tus-Upload-Finished"] == "1"
 
-        # next one should work as well
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
-            headers=headers,
-        )
-        assert resp.status_code == 201
-        url = resp.headers["location"]
+    # next one should work as well
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
 
-        # Check that we are using the slug for the whole file upload
-        assert f"{RSLUG_PREFIX}/{rslug}" in url
-        resp = await client.patch(
-            url,
-            content=b"x" * 10000,
-            headers={
-                "upload-offset": "0",
-                "content-length": "10000",
-                "upload-length": "10000",
-            },
-        )
-        assert resp.status_code == 200
+    # Check that we are using the slug for the whole file upload
+    assert f"{RSLUG_PREFIX}/{rslug}" in url
+    resp = await nucliadb_writer.patch(
+        url,
+        content=b"x" * 10000,
+        headers={
+            "upload-offset": "0",
+            "content-length": "10000",
+            "upload-length": "10000",
+        },
+    )
+    assert resp.status_code == 200
 
-        assert resp.headers["Tus-Upload-Finished"] == "1"
+    assert resp.headers["Tus-Upload-Finished"] == "1"
 
 
-async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
-    kb = knowledgebox_writer
+@pytest.mark.deploy_modes("component")
+async def test_file_upload_by_slug(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    kbid = knowledgebox_writer
     rslug = "myslug"
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kb}/resources",
-            json={
-                "slug": rslug,
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resources",
+        json={
+            "slug": rslug,
+        },
+    )
+    assert str(resp.status_code).startswith("2")
+
+    filename = "image.jpg"
+    with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}/file/file1/{UPLOAD}",
+            content=f.read(),
+            headers={
+                "X-FILENAME": filename,
+                "content-type": "image/jpeg",
+                "X-MD5": "7af0916dba8b70e29d99e72941923529",
             },
         )
-        assert str(resp.status_code).startswith("2")
-
-        filename = "image.jpg"
-        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
-            resp = await client.post(
-                f"/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{rslug}/file/file1/{UPLOAD}",
-                content=f.read(),
-                headers={
-                    "X-FILENAME": filename,
-                    "content-type": "image/jpeg",
-                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
-                },
-            )
-            assert resp.status_code == 201
+        assert resp.status_code == 201
 
     transaction = get_transaction_utility()
 
@@ -660,38 +676,42 @@ def test_maybe_b64decode():
     assert maybe_b64decode(something) == something
 
 
-async def test_tus_validates_intermediate_chunks_length(writer_api, knowledgebox_writer):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        language = base64.b64encode(b"ca").decode()
-        filename = base64.b64encode(b"image.jpg").decode()
-        md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}",
-            headers={
-                "tus-resumable": "1.0.0",
-                "upload-metadata": f"filename {filename},language {language},md5 {md5}",
-                "content-type": "image/jpeg",
-                "upload-defer-length": "1",
-            },
-        )
-        assert resp.status_code == 201
-        url = resp.headers["location"]
-        # We upload a chunk that is smaller than the minimum chunk size
-        min_chunk_size = get_storage_manager().min_upload_size
-        raw_bytes = b"x" * min_chunk_size + b"y" * 500
-        io_bytes = io.BytesIO(raw_bytes)
-        chunk = io_bytes.read(min_chunk_size - 10)
+@pytest.mark.deploy_modes("component")
+async def test_tus_validates_intermediate_chunks_length(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str
+):
+    kbid = knowledgebox_writer
+    language = base64.b64encode(b"ca").decode()
+    filename = base64.b64encode(b"image.jpg").decode()
+    md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+            "content-type": "image/jpeg",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
+    # We upload a chunk that is smaller than the minimum chunk size
+    min_chunk_size = get_storage_manager().min_upload_size
+    assert min_chunk_size is not None, "File storage not properly set up"
+    raw_bytes = b"x" * min_chunk_size + b"y" * 500
+    io_bytes = io.BytesIO(raw_bytes)
+    chunk = io_bytes.read(min_chunk_size - 10)
 
-        resp = await client.head(url)
+    resp = await nucliadb_writer.head(url)
 
-        headers = {
-            "upload-offset": f"0",
-            "content-length": f"{len(chunk)}",
-        }
-        resp = await client.patch(
-            url,
-            content=chunk,
-            headers=headers,
-        )
-        assert resp.status_code == 412
-        assert "Intermediate chunks" in resp.json()["detail"]
+    headers = {
+        "upload-offset": f"0",
+        "content-length": f"{len(chunk)}",
+    }
+    resp = await nucliadb_writer.patch(
+        url,
+        content=chunk,
+        headers=headers,
+    )
+    assert resp.status_code == 412
+    assert "Intermediate chunks" in resp.json()["detail"]

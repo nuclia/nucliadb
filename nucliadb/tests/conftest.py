@@ -17,16 +17,53 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = [
-    "pytest_docker_fixtures",
-    "tests.ndbfixtures",
-    "nucliadb_utils.tests.fixtures",
-    "nucliadb_utils.tests.nats",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.s3",
-    "nucliadb_utils.tests.azure",
-    "nucliadb_utils.tests.local",
-    "nucliadb_utils.tests.asyncbenchmark",
-    # XXX we keep needing this for dependent fixtures that haven't been moved yet
-    "tests.ingest.fixtures",
-]
+
+pytest_plugins = []
+
+pytest_plugins.extend(
+    [
+        "pytest_mock",
+        "pytest_docker_fixtures",
+    ]
+)
+
+# NucliaDB fixtures
+pytest_plugins.extend(
+    [
+        # pytest hacks and magic to implement deploy_mode parametrization
+        "tests.ndbfixtures.magic",
+        #
+        # components and its deploy modes
+        "tests.ndbfixtures.reader",
+        "tests.ndbfixtures.writer",
+        #
+        # subcomponents
+        "tests.ndbfixtures.common",
+        "tests.ndbfixtures.maindb",
+        "tests.ndbfixtures.node",
+        "tests.ndbfixtures.processing",
+        # useful resources for tests (KBs, resources, ...)
+        "tests.ndbfixtures.resources",
+    ]
+)
+
+# Fixture from subpackages
+pytest_plugins.extend(
+    [
+        "nucliadb_utils.tests.fixtures",
+        "nucliadb_utils.tests.nats",
+        "nucliadb_utils.tests.gcs",
+        "nucliadb_utils.tests.s3",
+        "nucliadb_utils.tests.azure",
+        "nucliadb_utils.tests.local",
+        "nucliadb_utils.tests.asyncbenchmark",
+    ]
+)
+
+# "Legacy" fixture
+# XXX we keep needing this for dependent fixtures that haven't been moved yet
+pytest_plugins.extend(
+    [
+        "tests.ingest.fixtures",
+    ]
+)

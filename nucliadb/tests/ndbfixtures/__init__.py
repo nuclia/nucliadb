@@ -18,20 +18,4 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-# hacks and magic things with pytest to implement deploy mode parametrization
-
-from .magic import *  # noqa
-
-# components and deployment modes
-
-from .reader import *  # noqa
-
-# subcomponents
-
-from .common import *  # noqa
-from .maindb import *  # noqa
-from .node import *  # noqa
-
-# useful resources for tests (KBs...)
-
-from .resources import *  # noqa
+"""NucliaDB fixtures."""

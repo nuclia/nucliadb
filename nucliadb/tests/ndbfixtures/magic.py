@@ -33,6 +33,9 @@ DEPLOY_MODE_FIXTURES = {
     "nucliadb_reader": [
         "component",
     ],
+    "nucliadb_writer": [
+        "component",
+    ],
 }
 
 
@@ -81,4 +84,9 @@ def pytest_generate_tests(metafunc: Metafunc):
 
 @pytest.fixture(scope="function")
 async def nucliadb_reader(request: FixtureRequest):
+    yield request.param
+
+
+@pytest.fixture(scope="function")
+async def nucliadb_writer(request: FixtureRequest):
     yield request.param
