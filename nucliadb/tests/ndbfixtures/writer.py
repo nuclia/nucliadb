@@ -142,7 +142,7 @@ async def storage_writer(request):
 
 
 # FIXME: this is a weird situation, we can use a hosted-like nucliadb while this
-# creates a KB as it was onprem. The end result should change much but still, is
+# creates a KB as it was onprem. The end result should not change much but still, is
 # something we may want to fix
 @pytest.fixture(scope="function")
 async def knowledgebox_writer(nucliadb_writer_manager: AsyncClient):
