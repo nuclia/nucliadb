@@ -21,12 +21,13 @@ from typing import AsyncIterator
 from unittest.mock import AsyncMock
 
 import pytest
+from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.processing import ProcessingInfo
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.utilities import get_processing
-from nucliadb_models.resource import NucliaDBRoles, QueueType
+from nucliadb_models.resource import QueueType
 from tests.writer.utils import load_file_as_FileB64_payload
 
 
@@ -42,78 +43,80 @@ def processing_mock(mocker):
 
 
 @pytest.fixture(scope="function")
-async def file_field(writer_api, knowledgebox_writer: str) -> AsyncIterator[tuple[str, str, str]]:
+async def file_field(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str
+) -> AsyncIterator[tuple[str, str, str]]:
     kbid = knowledgebox_writer
     field_id = "myfile"
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource",
-                "title": "My resource",
-                "files": {
-                    field_id: {
-                        "language": "en",
-                        "password": "xxxxxx",
-                        "file": load_file_as_FileB64_payload("assets/text001.txt", "text/plain"),
-                    }
-                },
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource",
+            "title": "My resource",
+            "files": {
+                field_id: {
+                    "language": "en",
+                    "password": "xxxxxx",
+                    "file": load_file_as_FileB64_payload("assets/text001.txt", "text/plain"),
+                }
             },
-        )
-        assert resp.status_code == 201
-        rid = resp.json()["uuid"]
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
 
-        assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
+    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
 
     yield kbid, rid, field_id
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
-        )
-        assert resp.status_code == 204
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+    )
+    assert resp.status_code == 204
 
 
-async def test_reprocess_nonexistent_file_field(writer_api, knowledgebox_writer: str, resource: str):
+@pytest.mark.deploy_modes("component")
+async def test_reprocess_nonexistent_file_field(
+    nucliadb_writer: AsyncClient, knowledgebox_writer: str, resource: str
+):
     kbid = knowledgebox_writer
     rid = resource
     field_id = "nonexistent-field"
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
-        )
-        assert resp.status_code == 404
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
+    )
+    assert resp.status_code == 404
 
 
+@pytest.mark.deploy_modes("component")
 async def test_reprocess_file_field_with_password(
-    writer_api, file_field: tuple[str, str, str], processing_mock
+    nucliadb_writer: AsyncClient, file_field: tuple[str, str, str], processing_mock
 ):
     kbid, rid, field_id = file_field
     password = "secret-password"
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
-            headers={
-                "X-FILE-PASSWORD": password,
-            },
-        )
-        assert resp.status_code == 202
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
+        headers={
+            "X-FILE-PASSWORD": password,
+        },
+    )
+    assert resp.status_code == 202
 
     assert processing_mock.send_to_process.await_count == 1
 
 
+@pytest.mark.deploy_modes("component")
 async def test_reprocess_file_field_without_password(
-    writer_api, file_field: tuple[str, str, str], processing_mock
+    nucliadb_writer: AsyncClient, file_field: tuple[str, str, str], processing_mock
 ):
     kbid, rid, field_id = file_field
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
-        )
-        assert resp.status_code == 202
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
+    )
+    assert resp.status_code == 202
 
     assert processing_mock.send_to_process.await_count == 1

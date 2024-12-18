@@ -18,20 +18,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb_models.resource import NucliaDBRoles
+import pytest
+from httpx import AsyncClient
 
 
-async def test_api(writer_api, knowledgebox_ingest):
-    kbid = knowledgebox_ingest
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(f"/kb/{kbid}/import")
-        assert resp.status_code < 500
+@pytest.mark.deploy_modes("component")
+async def test_api(nucliadb_writer: AsyncClient, knowledgebox: str):
+    kbid = knowledgebox
 
-        resp = await client.post(f"/kb/{kbid}/export")
-        assert resp.status_code < 500
+    resp = await nucliadb_writer.post(f"/kb/{kbid}/import")
+    assert resp.status_code < 500
 
-        # Check that for non-existing kbs, endpoints return a 404
-        for endpoint in ("/kb/idonotexist/import", "/kb/idonotexist/export"):
-            resp = await client.post(endpoint)
-            assert resp.status_code == 404
-            assert resp.json()["detail"] == "Knowledge Box not found"
+    resp = await nucliadb_writer.post(f"/kb/{kbid}/export")
+    assert resp.status_code < 500
+
+    # Check that for non-existing kbs, endpoints return a 404
+    for endpoint in ("/kb/idonotexist/import", "/kb/idonotexist/export"):
+        resp = await nucliadb_writer.post(endpoint)
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Knowledge Box not found"

@@ -17,17 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from enum import Enum
-from typing import AsyncIterator, Callable, Optional
-from unittest import mock
+from typing import AsyncIterator
+from unittest.mock import patch
 
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
-from nucliadb.writer import API_PREFIX, tus
+from nucliadb.writer import tus
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb.writer.app import create_application
 from nucliadb.writer.settings import settings
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import (
@@ -40,17 +41,36 @@ from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 from tests.ingest.fixtures import IngestFixture
 
+from .utils import create_api_client_factory
 
-@pytest.fixture(scope="function")
-def disabled_back_pressure():
-    with mock.patch(
-        "nucliadb.writer.back_pressure.is_back_pressure_enabled", return_value=False
-    ) as mocked:
-        yield mocked
+# TODO: replace knowledgebox_ingest for knowledgebox
+
+# Main fixtures
 
 
 @pytest.fixture(scope="function")
-async def writer_api(
+async def component_nucliadb_writer(
+    writer_api_server: FastAPI,
+) -> AsyncIterator[AsyncClient]:
+    client_factory = create_api_client_factory(writer_api_server)
+    async with client_factory(roles=[NucliaDBRoles.WRITER]) as client:
+        yield client
+
+
+@pytest.fixture(scope="function")
+async def nucliadb_writer_manager(
+    nucliadb_writer: AsyncClient,
+) -> AsyncIterator[AsyncClient]:
+    roles = [NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER]
+    nucliadb_writer.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
+    yield nucliadb_writer
+
+
+# Helpers
+
+
+@pytest.fixture(scope="function")
+async def writer_api_server(
     disabled_back_pressure,
     redis,
     storage_writer,
@@ -59,37 +79,21 @@ async def writer_api(
     processing_utility,
     tus_manager,
     dummy_nidx_utility,
-) -> AsyncIterator[Callable[[list[Enum], str, str], AsyncClient]]:
-    nucliadb_settings.nucliadb_ingest = grpc_servicer.host
-    from nucliadb.writer.app import create_application
+) -> AsyncIterator[FastAPI]:
+    with patch.object(nucliadb_settings, "nucliadb_ingest", grpc_servicer.host):
+        application = create_application()
+        async with application.router.lifespan_context(application):
+            yield application
 
-    application = create_application()
 
-    def make_client_fixture(
-        roles: Optional[list[Enum]] = None,
-        user: str = "",
-        version: str = "1",
-    ) -> AsyncClient:
-        roles = roles or []
-        client_base_url = "http://test"
-        client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
+# TODO: review
+# Legacy from writer/fixtures.py
 
-        client = AsyncClient(app=application, base_url=client_base_url)
-        client.headers["X-NUCLIADB-ROLES"] = ";".join(map(lambda role: role.value, roles))
-        client.headers["X-NUCLIADB-USER"] = user
 
-        return client
-
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
-    await driver.flushall()
-
-    async with application.router.lifespan_context(application):
-        yield make_client_fixture
-
-    await tus.finalize()
-
-    await driver.flushall()
-    await driver.close(close_connection_pool=True)
+@pytest.fixture(scope="function")
+def disabled_back_pressure():
+    with patch("nucliadb.writer.back_pressure.is_back_pressure_enabled", return_value=False) as mocked:
+        yield mocked
 
 
 @pytest.fixture(scope="function")
@@ -132,47 +136,59 @@ async def storage_writer(request):
     clean_utility(Utility.STORAGE)
 
 
+# TODO: this should be knowledgebox_onprem
 @pytest.fixture(scope="function")
-async def knowledgebox_writer(writer_api):
-    async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
-        resp = await client.post(
-            f"/{KBS_PREFIX}",
-            json={
-                "slug": "kbid1",
-                "title": "My Knowledge Box",
-            },
-        )
-        assert resp.status_code == 201
+async def knowledgebox_writer(nucliadb_writer_manager: AsyncClient):
+    resp = await nucliadb_writer_manager.post(
+        f"/{KBS_PREFIX}",
+        json={
+            "slug": "kbid1",
+            "title": "My Knowledge Box",
+        },
+    )
+    assert resp.status_code == 201
     kbid = resp.json().get("uuid")
     assert kbid is not None
     yield kbid
 
 
 @pytest.fixture(scope="function")
-async def resource(redis, writer_api, knowledgebox_writer):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
-            json={
-                "slug": "resource1",
-                "title": "Resource 1",
-            },
-        )
-        assert resp.status_code == 201
-        uuid = resp.json()["uuid"]
+async def resource(redis, nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
+        json={
+            "slug": "resource1",
+            "title": "Resource 1",
+        },
+    )
+    assert resp.status_code == 201
+    uuid = resp.json()["uuid"]
 
     return uuid
 
 
 @pytest.fixture(scope="function")
 async def processing_utility():
-    nuclia_settings.dummy_processing = True
-    nuclia_settings.onprem = True
-    nuclia_settings.nuclia_jwt_key = "foobarkey"
+    with (
+        patch.object(nuclia_settings, "dummy_processing", True),
+        patch.object(nuclia_settings, "onprem", True),
+        patch.object(nuclia_settings, "nuclia_jwt_key", "foobarkey"),
+    ):
+        yield
 
 
 @pytest.fixture(scope="function")
 async def tus_manager(redis):
-    settings.dm_redis_host = redis[0]
-    settings.dm_redis_port = redis[1]
-    yield
+    with (
+        patch.object(settings, "dm_redis_host", redis[0]),
+        patch.object(settings, "dm_redis_port", redis[1]),
+    ):
+        driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
+        await driver.flushall()
+
+        yield
+
+        await tus.finalize()
+
+        await driver.flushall()
+        await driver.close(close_connection_pool=True)

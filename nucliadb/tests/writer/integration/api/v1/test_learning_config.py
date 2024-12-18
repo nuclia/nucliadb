@@ -22,8 +22,7 @@ from unittest import mock
 
 import pytest
 from fastapi import Response
-
-from nucliadb_models.resource import NucliaDBRoles
+from httpx import AsyncClient
 
 
 class MockProxy:
@@ -42,17 +41,20 @@ def learning_config_proxy_mock():
         yield proxy
 
 
-async def test_api(writer_api, knowledgebox_ingest, learning_config_proxy_mock):
+@pytest.mark.deploy_modes("component")
+async def test_api(
+    nucliadb_writer: AsyncClient, knowledgebox_ingest: str, learning_config_proxy_mock: MockProxy
+):
     kbid = knowledgebox_ingest
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        # post configuration
-        resp = await client.post(f"/kb/{kbid}/configuration", json={"some": "data"})
-        assert resp.status_code == 204
 
-        assert learning_config_proxy_mock.calls[0][1:] == ("POST", f"/config/{kbid}")
+    # post configuration
+    resp = await nucliadb_writer.post(f"/kb/{kbid}/configuration", json={"some": "data"})
+    assert resp.status_code == 204
 
-        # patch configuration
-        resp = await client.patch(f"/kb/{kbid}/configuration", json={"some": "data"})
-        assert resp.status_code == 204
+    assert learning_config_proxy_mock.calls[0][1:] == ("POST", f"/config/{kbid}")
 
-        assert learning_config_proxy_mock.calls[1][1:] == ("PATCH", f"/config/{kbid}")
+    # patch configuration
+    resp = await nucliadb_writer.patch(f"/kb/{kbid}/configuration", json={"some": "data"})
+    assert resp.status_code == 204
+
+    assert learning_config_proxy_mock.calls[1][1:] == ("PATCH", f"/config/{kbid}")

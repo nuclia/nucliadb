@@ -21,6 +21,7 @@ import uuid
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
 from nucliadb_models.entities import (
@@ -28,7 +29,6 @@ from nucliadb_models.entities import (
     Entity,
     UpdateEntitiesGroupPayload,
 )
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.writer_pb2 import (
     NewEntitiesGroupResponse,
     OpStatusWriter,
@@ -75,9 +75,10 @@ class TestEntitiesApi:
             delete=["domestic-cat"],
         )
 
+    @pytest.mark.deploy_modes("component")
     async def test_create_entities_group(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
         animals_entities_group: CreateEntitiesGroupPayload,
@@ -85,13 +86,13 @@ class TestEntitiesApi:
         ingest_mock.NewEntitiesGroup.return_value = NewEntitiesGroupResponse(
             status=NewEntitiesGroupResponse.Status.OK
         )
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await create_entities_group(client, knowledgebox, animals_entities_group)
-            assert resp.status_code == 200
+        resp = await create_entities_group(nucliadb_writer, knowledgebox, animals_entities_group)
+        assert resp.status_code == 200
 
+    @pytest.mark.deploy_modes("component")
     async def test_create_entities_group_that_already_exists(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
         animals_entities_group: CreateEntitiesGroupPayload,
@@ -99,13 +100,13 @@ class TestEntitiesApi:
         ingest_mock.NewEntitiesGroup.return_value = NewEntitiesGroupResponse(
             status=NewEntitiesGroupResponse.Status.ALREADY_EXISTS
         )
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await create_entities_group(client, knowledgebox, animals_entities_group)
-            assert resp.status_code == 409
+        resp = await create_entities_group(nucliadb_writer, knowledgebox, animals_entities_group)
+        assert resp.status_code == 409
 
+    @pytest.mark.deploy_modes("component")
     async def test_create_entities_group_kb_not_found(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
         animals_entities_group: CreateEntitiesGroupPayload,
@@ -113,13 +114,13 @@ class TestEntitiesApi:
         ingest_mock.NewEntitiesGroup.return_value = NewEntitiesGroupResponse(
             status=NewEntitiesGroupResponse.Status.KB_NOT_FOUND
         )
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await create_entities_group(client, knowledgebox, animals_entities_group)
-            assert resp.status_code == 404
+        resp = await create_entities_group(nucliadb_writer, knowledgebox, animals_entities_group)
+        assert resp.status_code == 404
 
+    @pytest.mark.deploy_modes("component")
     async def test_create_entities_group_ingest_error(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
         animals_entities_group: CreateEntitiesGroupPayload,
@@ -127,13 +128,13 @@ class TestEntitiesApi:
         ingest_mock.NewEntitiesGroup.return_value = NewEntitiesGroupResponse(
             status=NewEntitiesGroupResponse.Status.ERROR
         )
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await create_entities_group(client, knowledgebox, animals_entities_group)
-            assert resp.status_code == 500
+        resp = await create_entities_group(nucliadb_writer, knowledgebox, animals_entities_group)
+        assert resp.status_code == 500
 
+    @pytest.mark.deploy_modes("component")
     async def test_update_entities_group(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
         animals_update: UpdateEntitiesGroupPayload,
@@ -141,13 +142,13 @@ class TestEntitiesApi:
         ingest_mock.UpdateEntitiesGroup.return_value = UpdateEntitiesGroupResponse(
             status=UpdateEntitiesGroupResponse.Status.OK
         )
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await update_entities_group(client, knowledgebox, "ANIMALS", animals_update)
-            assert resp.status_code == 200
+        resp = await update_entities_group(nucliadb_writer, knowledgebox, "ANIMALS", animals_update)
+        assert resp.status_code == 200
 
+    @pytest.mark.deploy_modes("component")
     async def test_update_entities_group_kb_not_found(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
         animals_update: UpdateEntitiesGroupPayload,
@@ -155,13 +156,13 @@ class TestEntitiesApi:
         ingest_mock.UpdateEntitiesGroup.return_value = UpdateEntitiesGroupResponse(
             status=UpdateEntitiesGroupResponse.Status.KB_NOT_FOUND
         )
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await update_entities_group(client, knowledgebox, "ANIMALS", animals_update)
-            assert resp.status_code == 404
+        resp = await update_entities_group(nucliadb_writer, knowledgebox, "ANIMALS", animals_update)
+        assert resp.status_code == 404
 
+    @pytest.mark.deploy_modes("component")
     async def test_update_entities_group_entities_group_not_found(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
         animals_update: UpdateEntitiesGroupPayload,
@@ -169,13 +170,13 @@ class TestEntitiesApi:
         ingest_mock.UpdateEntitiesGroup.return_value = UpdateEntitiesGroupResponse(
             status=UpdateEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
         )
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await update_entities_group(client, knowledgebox, "ANIMALS", animals_update)
-            assert resp.status_code == 404
+        resp = await update_entities_group(nucliadb_writer, knowledgebox, "ANIMALS", animals_update)
+        assert resp.status_code == 404
 
+    @pytest.mark.deploy_modes("component")
     async def test_update_entities_group_ingest_error(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
         animals_update: UpdateEntitiesGroupPayload,
@@ -183,39 +184,38 @@ class TestEntitiesApi:
         ingest_mock.UpdateEntitiesGroup.return_value = UpdateEntitiesGroupResponse(
             status=UpdateEntitiesGroupResponse.Status.ERROR
         )
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await update_entities_group(client, knowledgebox, "ANIMALS", animals_update)
-            assert resp.status_code == 500
+        resp = await update_entities_group(nucliadb_writer, knowledgebox, "ANIMALS", animals_update)
+        assert resp.status_code == 500
 
+    @pytest.mark.deploy_modes("component")
     async def test_delete_entities_group(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
     ):
         ingest_mock.DelEntities.return_value = OpStatusWriter(status=OpStatusWriter.Status.OK)
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await delete_entities_group(client, knowledgebox, "ANIMALS")
-            assert resp.status_code == 200
+        resp = await delete_entities_group(nucliadb_writer, knowledgebox, "ANIMALS")
+        assert resp.status_code == 200
 
+    @pytest.mark.deploy_modes("component")
     async def test_delete_entities_group_kb_not_found(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
     ):
         ingest_mock.DelEntities.return_value = OpStatusWriter(status=OpStatusWriter.Status.NOTFOUND)
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await delete_entities_group(client, knowledgebox, "ANIMALS")
-            assert resp.status_code == 404
+        resp = await delete_entities_group(nucliadb_writer, knowledgebox, "ANIMALS")
+        assert resp.status_code == 404
 
+    @pytest.mark.deploy_modes("component")
     async def test_delete_entities_group_ingest_error(
         self,
-        writer_api,
+        nucliadb_writer: AsyncClient,
         knowledgebox: str,
         ingest_mock: AsyncMock,
     ):
         ingest_mock.DelEntities.return_value = OpStatusWriter(status=OpStatusWriter.Status.ERROR)
-        async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-            resp = await delete_entities_group(client, knowledgebox, "ANIMALS")
-            assert resp.status_code == 500
+        resp = await delete_entities_group(nucliadb_writer, knowledgebox, "ANIMALS")
+        assert resp.status_code == 500

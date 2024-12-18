@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 pytest_plugins = [
+    "pytest_mock",
     "pytest_docker_fixtures",
     "tests.ndbfixtures",
     "nucliadb_utils.tests.fixtures",

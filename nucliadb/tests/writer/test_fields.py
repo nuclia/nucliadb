@@ -23,6 +23,7 @@ from datetime import datetime
 from os.path import dirname
 
 import pytest
+from httpx import AsyncClient
 
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -30,7 +31,6 @@ from nucliadb.writer.api.v1.router import (
     RESOURCES_PREFIX,
     RSLUG_PREFIX,
 )
-from nucliadb_models.resource import NucliaDBRoles
 from tests.writer.utils import load_file_as_FileB64_payload
 
 TEST_FILE = {f"{dirname(__file__)}/orm/"}
@@ -90,138 +90,141 @@ TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
 ]
 
 
-async def test_resource_field_add(writer_api, knowledgebox_writer):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={"slug": "resource1", "title": "My resource"},
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "uuid" in data
-        assert "seqid" in data
-        rid = data["uuid"]
+@pytest.mark.deploy_modes("component")
+async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    kbid = knowledgebox_writer
 
-        # Text
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1",
-            json=TEST_TEXT_PAYLOAD,
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={"slug": "resource1", "title": "My resource"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "uuid" in data
+    assert "seqid" in data
+    rid = data["uuid"]
 
-        # Link
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1",
-            json=TEST_LINK_PAYLOAD,
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
+    # Text
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/text/text1",
+        json=TEST_TEXT_PAYLOAD,
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "seqid" in data
 
-        # Conversation
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1",
-            json=TEST_CONVERSATION_PAYLOAD,
-        )
+    # Link
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/link/link1",
+        json=TEST_LINK_PAYLOAD,
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "seqid" in data
 
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
+    # Conversation
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/conv1",
+        json=TEST_CONVERSATION_PAYLOAD,
+    )
 
-        # File
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
-            json=TEST_FILE_PAYLOAD,
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "seqid" in data
 
-        # File without storing it in the internal BrokerMessage, only send to process
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
-            json=TEST_FILE_PAYLOAD,
-            headers={"x_skip_store": "1"},
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
+    # File
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/file1",
+        json=TEST_FILE_PAYLOAD,
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "seqid" in data
 
-        # File field pointing to an externally hosted file
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
-            json=TEST_EXTERNAL_FILE_PAYLOAD,
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "seqid" in data
+    # File without storing it in the internal BrokerMessage, only send to process
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/file1",
+        json=TEST_FILE_PAYLOAD,
+        headers={"x_skip_store": "1"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "seqid" in data
 
-
-async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource1",
-                "title": "My resource",
-                "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "uuid" in data
-        assert "seqid" in data
-        rid = data["uuid"]
-
-        # Conversation
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1/messages",
-            json=TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD,
-        )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "seqid" in data
+    # File field pointing to an externally hosted file
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
+        json=TEST_EXTERNAL_FILE_PAYLOAD,
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "seqid" in data
 
 
-async def test_resource_field_delete(writer_api, knowledgebox_writer):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource1",
-                "title": "My resource",
-                "texts": {"text1": TEST_TEXT_PAYLOAD},
-                "links": {"link1": TEST_LINK_PAYLOAD},
-                "files": {"file1": TEST_FILE_PAYLOAD},
-                "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
-            },
-        )
+@pytest.mark.deploy_modes("component")
+async def test_resource_field_append_extra(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
+    kbid = knowledgebox_writer
 
-        assert resp.status_code == 201
-        data = resp.json()
-        rid = data["uuid"]
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource1",
+            "title": "My resource",
+            "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "uuid" in data
+    assert "seqid" in data
+    rid = data["uuid"]
 
-        # Text
-        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/text/text1")
-        assert resp.status_code == 204
+    # Conversation
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/conv1/messages",
+        json=TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "seqid" in data
 
-        # Link
-        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/link/link1")
-        assert resp.status_code == 204
 
-        # Conversation
-        resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/conversation/conv1"
-        )
+@pytest.mark.deploy_modes("component")
+async def test_resource_field_delete(nucliadb_writer: AsyncClient, knowledgebox_writer):
+    kbid = knowledgebox_writer
 
-        # File
-        resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1")
-        assert resp.status_code == 204
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource1",
+            "title": "My resource",
+            "texts": {"text1": TEST_TEXT_PAYLOAD},
+            "links": {"link1": TEST_LINK_PAYLOAD},
+            "files": {"file1": TEST_FILE_PAYLOAD},
+            "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
+        },
+    )
+
+    assert resp.status_code == 201
+    data = resp.json()
+    rid = data["uuid"]
+
+    # Text
+    resp = await nucliadb_writer.delete(f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/text/text1")
+    assert resp.status_code == 204
+
+    # Link
+    resp = await nucliadb_writer.delete(f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/link/link1")
+    assert resp.status_code == 204
+
+    # Conversation
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/conv1"
+    )
+
+    # File
+    resp = await nucliadb_writer.delete(f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/file1")
+    assert resp.status_code == 204
 
 
 @pytest.mark.parametrize(
@@ -234,67 +237,70 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
         ("file/file1", TEST_FILE_PAYLOAD),
     ],
 )
-async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        # Create a resource
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={
-                "slug": "resource1",
-                "title": "My resource",
-                "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.json()
-        rid = data["uuid"]
+@pytest.mark.deploy_modes("component")
+async def test_sync_ops(nucliadb_writer: AsyncClient, knowledgebox_writer, endpoint, payload):
+    kbid = knowledgebox_writer
 
-        resource_path = f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}"
-        resp = await client.put(
-            f"{resource_path}/{endpoint}",
-            json=payload,
-        )
-        assert resp.status_code in (201, 200)
+    # Create a resource
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource1",
+            "title": "My resource",
+            "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    rid = data["uuid"]
 
-
-async def test_external_file_field(writer_api, knowledgebox_writer):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={"slug": "resource1", "title": "My resource"},
-        )
-        assert resp.status_code == 201
-        rid = resp.json()["uuid"]
-
-        # File field pointing to an externally hosted file
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
-            json=TEST_EXTERNAL_FILE_PAYLOAD,
-        )
-        assert resp.status_code == 201
+    resource_path = f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}"
+    resp = await nucliadb_writer.put(
+        f"{resource_path}/{endpoint}",
+        json=payload,
+    )
+    assert resp.status_code in (201, 200)
 
 
-async def test_file_field_validation(writer_api, knowledgebox_writer):
-    knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
-            json={"slug": "resource1", "title": "My resource"},
-        )
-        assert resp.status_code == 201
-        rid = resp.json()["uuid"]
+@pytest.mark.deploy_modes("component")
+async def test_external_file_field(nucliadb_writer: AsyncClient, knowledgebox_writer):
+    kbid = knowledgebox_writer
 
-        # Remove a required key from the payload
-        payload = deepcopy(TEST_FILE_PAYLOAD)
-        payload["file"].pop("md5")
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={"slug": "resource1", "title": "My resource"},
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
 
-        resp = await client.put(
-            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
-            json=payload,
-        )
-        assert resp.status_code == 201
+    # File field pointing to an externally hosted file
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
+        json=TEST_EXTERNAL_FILE_PAYLOAD,
+    )
+    assert resp.status_code == 201
+
+
+@pytest.mark.deploy_modes("component")
+async def test_file_field_validation(nucliadb_writer: AsyncClient, knowledgebox_writer):
+    kbid = knowledgebox_writer
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={"slug": "resource1", "title": "My resource"},
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Remove a required key from the payload
+    payload: dict = deepcopy(TEST_FILE_PAYLOAD)
+    payload["file"].pop("md5")
+
+    resp = await nucliadb_writer.put(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/file1",
+        json=payload,
+    )
+    assert resp.status_code == 201
 
 
 @pytest.mark.parametrize(
@@ -307,49 +313,49 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
         ["delete", "", None],
     ],
 )
+@pytest.mark.deploy_modes("component")
 async def test_field_endpoints_by_slug(
-    writer_api,
+    nucliadb_writer: AsyncClient,
     knowledgebox_ingest,
     method,
     endpoint,
     payload,
 ):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        slug = "my-resource"
-        field_id = "myfield"
-        field_type = "text"
+    slug = "my-resource"
+    field_id = "myfield"
+    field_type = "text"
 
-        resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
-            json={"slug": slug},
-        )
-        assert resp.status_code == 201
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
+        json={"slug": slug},
+    )
+    assert resp.status_code == 201
 
-        extra_params = {}
-        if payload is not None:
-            extra_params["json"] = payload
-        op = getattr(client, method)
+    extra_params = {}
+    if payload is not None:
+        extra_params["json"] = payload
+    op = getattr(nucliadb_writer, method)
 
-        # Try first a non-existing slug should return 404
-        url = endpoint.format(
-            field_id=field_id,
-            field_type=field_type,
-        )
+    # Try first a non-existing slug should return 404
+    url = endpoint.format(
+        field_id=field_id,
+        field_type=field_type,
+    )
 
-        resp = await op(
-            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RSLUG_PREFIX}/idonotexist" + url,
-            **extra_params,
-        )
-        assert resp.status_code == 404
-        assert resp.json()["detail"] == "Resource does not exist"
+    resp = await op(
+        f"/{KB_PREFIX}/{knowledgebox_ingest}/{RSLUG_PREFIX}/idonotexist" + url,
+        **extra_params,
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Resource does not exist"
 
-        # Try the happy path now
-        url = endpoint.format(
-            field_id=field_id,
-            field_type=field_type,
-        )
-        resp = await op(
-            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RSLUG_PREFIX}/{slug}" + url,
-            **extra_params,
-        )
-        assert str(resp.status_code).startswith("2")
+    # Try the happy path now
+    url = endpoint.format(
+        field_id=field_id,
+        field_type=field_type,
+    )
+    resp = await op(
+        f"/{KB_PREFIX}/{knowledgebox_ingest}/{RSLUG_PREFIX}/{slug}" + url,
+        **extra_params,
+    )
+    assert str(resp.status_code).startswith("2")
