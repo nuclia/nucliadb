@@ -75,7 +75,12 @@ pub async fn run_sync(
     let mut retry_interval = 0;
 
     let mut initial_sync = true;
-    let shard_selector = ShardSelector::new(OneNode, 1);
+
+    let node_lister = match settings.shard_partitioning.method {
+        crate::settings::ShardPartitioningMethod::Single => OneNode,
+        crate::settings::ShardPartitioningMethod::Kubernetes => unimplemented!(),
+    };
+    let shard_selector = ShardSelector::new(node_lister, settings.shard_partitioning.replicas);
 
     while !shutdown.is_cancelled() {
         let sync_result: anyhow::Result<()> = async {
