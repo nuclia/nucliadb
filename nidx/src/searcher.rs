@@ -30,6 +30,10 @@ mod sync;
 
 use index_cache::IndexCache;
 use object_store::DynObjectStore;
+use shard_selector::KubernetesCluster;
+use shard_selector::ListNodes;
+use shard_selector::ShardSelector;
+use shard_selector::SingleNodeCluster;
 use sync::run_sync;
 use sync::SyncMetadata;
 use tokio::sync::mpsc::Receiver;
@@ -109,6 +113,7 @@ impl SyncedSearcher {
         storage: Arc<DynObjectStore>,
         settings: SearcherSettings,
         shutdown: CancellationToken,
+        shard_selector: ShardSelector,
         watcher: Option<watch::Sender<SyncStatus>>,
     ) -> anyhow::Result<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(1000);
@@ -124,6 +129,7 @@ impl SyncedSearcher {
             shutdown.clone(),
             tx,
             watcher,
+            shard_selector,
         ));
         let sync_task_id = sync_task.id();
 
@@ -165,15 +171,34 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
     let meta = settings.metadata.clone();
     let storage = settings.storage.as_ref().expect("Storage settings needed").object_store.clone();
 
+    let mut tasks = JoinSet::new();
+    let (list_nodes, shard_selector_task_id): (Arc<dyn ListNodes>, _) =
+        match searcher_settings.shard_partitioning.method {
+            crate::settings::ShardPartitioningMethod::Single => (Arc::new(SingleNodeCluster), None),
+            crate::settings::ShardPartitioningMethod::Kubernetes => {
+                let (node_lister, task) = KubernetesCluster::new_cluster_and_task(shutdown.clone()).await?;
+                let task_id = tasks.spawn(task).id();
+                // Now that the reader task is started, we can wait until we are ready
+                info!("Initializing kubernetes API");
+                node_lister.wait_until_ready().await?;
+                let available_nodes = node_lister.list_nodes();
+                info!(?available_nodes, "Kubernetes API initialized");
+                (Arc::new(node_lister), Some(task_id))
+            }
+        };
+
     let searcher = SyncedSearcher::new(meta.clone(), work_path);
 
-    let api = grpc::SearchServer::new(searcher.index_cache());
+    let shard_selector = ShardSelector::new(list_nodes.clone(), searcher_settings.shard_partitioning.replicas);
+    let api = grpc::SearchServer::new(searcher.index_cache(), shard_selector);
     let server = GrpcServer::new("0.0.0.0:10001").await?;
 
-    let mut tasks = JoinSet::new();
     let api_task = tasks.spawn(server.serve(api.into_service(), shutdown.clone())).id();
     let shutdown2 = shutdown.clone();
-    let search_task = tasks.spawn(async move { searcher.run(storage, searcher_settings, shutdown2, None).await }).id();
+    let shard_selector = ShardSelector::new(list_nodes, searcher_settings.shard_partitioning.replicas);
+    let search_task = tasks
+        .spawn(async move { searcher.run(storage, searcher_settings, shutdown2, shard_selector, None).await })
+        .id();
 
     while let Some(join_result) = tasks.join_next_with_id().await {
         let (id, result) = join_result.unwrap();
@@ -181,6 +206,8 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
             "searcher_api"
         } else if id == search_task {
             "synced_searcher"
+        } else if Some(id) == shard_selector_task_id {
+            "shard_selector"
         } else {
             unreachable!()
         };

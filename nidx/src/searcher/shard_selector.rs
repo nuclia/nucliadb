@@ -18,21 +18,27 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::hash::{DefaultHasher, Hash as _, Hasher as _};
+use futures::TryStreamExt as _;
+use k8s_openapi::api::core::v1::Pod;
+use std::{
+    future::Future,
+    hash::{DefaultHasher, Hash as _, Hasher as _},
+    pin::pin,
+    sync::Arc,
+};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-enum SearcherNode {
-    This,
-    Remote(String),
-}
-
-trait ListNodes {
+/// Trait for listing the active nodes in a cluster and identifying ourselves
+pub trait ListNodes: Send + Sync {
     fn list_nodes(&self) -> Vec<String>;
     fn this_node(&self) -> String;
 }
 
-pub struct OneNode;
-impl ListNodes for OneNode {
+/// Implementation of `ListNodes` for single node clusters, e.g: standalone/binding
+#[derive(Clone)]
+pub struct SingleNodeCluster;
+impl ListNodes for SingleNodeCluster {
     fn list_nodes(&self) -> Vec<String> {
         vec![self.this_node()]
     }
@@ -42,9 +48,109 @@ impl ListNodes for OneNode {
     }
 }
 
+/// Implementation of `ListNodes` for kubernetes clusters
+#[derive(Clone)]
+pub struct KubernetesCluster {
+    pods: kube::runtime::reflector::store::Store<Pod>,
+    hostname: String,
+}
+impl KubernetesCluster {
+    pub async fn new_cluster_and_task(
+        shutdown: CancellationToken,
+    ) -> anyhow::Result<(Self, impl Future<Output = anyhow::Result<()>>)> {
+        let hostname = std::env::var("HOSTNAME")?;
+
+        // Create a store that keeps an updated view of `nidx-searcher` pods
+        let client = kube::Client::try_default().await?;
+        let pods: kube::Api<Pod> = kube::Api::namespaced(client, "nucliadb");
+        let watcher_config = kube::runtime::watcher::Config::default().labels("app=nidx-searcher");
+        let (store_reader, store_writer) = kube::runtime::reflector::store();
+        let stream = kube::runtime::reflector::reflector(store_writer, kube::runtime::watcher(pods, watcher_config));
+
+        let task = async move {
+            // Read the stream continuously in order to keep the store updated
+            let mut stream = pin!(stream);
+            loop {
+                tokio::select! {
+                    result = stream.try_next() => {
+                        if let Err(e) = result {
+                            return Err(e.into())
+                        }
+                    }
+                    _ = shutdown.cancelled() => { return Ok(()) }
+                }
+            }
+        };
+
+        Ok((
+            Self {
+                pods: store_reader,
+                hostname,
+            },
+            task,
+        ))
+    }
+
+    fn pod_ready(p: &Pod) -> bool {
+        if p.metadata.deletion_timestamp.is_some() {
+            // Pod is terminating
+            return false;
+        }
+        let Some(status) = p.status.as_ref() else {
+            // Pod doesn't have status
+            return false;
+        };
+        if status.phase.as_deref() != Some("Running") {
+            // Pod is not running
+            return false;
+        }
+        let Some(container_statuses) = status.container_statuses.as_ref() else {
+            // Pod doesn't have container status
+            return false;
+        };
+        if container_statuses.iter().any(|cs| !cs.ready) {
+            // Any container is not ready
+            return false;
+        }
+        // Any condition exists and says it's not ready
+        if let Some(conds) = &p.status.as_ref().unwrap().conditions {
+            if conds.iter().any(|c| c.type_ == "Ready" && c.status == "False") {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub async fn wait_until_ready(&self) -> anyhow::Result<()> {
+        Ok(self.pods.wait_until_ready().await?)
+    }
+}
+impl ListNodes for KubernetesCluster {
+    fn list_nodes(&self) -> Vec<String> {
+        let mut ready_pods: Vec<_> = self
+            .pods
+            .state()
+            .iter()
+            .filter_map(|pod| Self::pod_ready(pod).then(|| pod.metadata.name.clone()).flatten())
+            .collect();
+
+        // Always include ourselves, even if we are not ready
+        if !ready_pods.contains(&self.hostname) {
+            ready_pods.push(self.hostname.clone());
+        }
+
+        ready_pods
+    }
+
+    fn this_node(&self) -> String {
+        self.hostname.clone()
+    }
+}
+
+/// Helper to sort (shard, node) pairs based on rendezvous hashing score
 #[derive(Hash)]
 struct Scored<'a>(&'a Uuid, &'a String);
-
 impl<'a> Scored<'a> {
     fn score(&self) -> u64 {
         let mut s = DefaultHasher::new();
@@ -53,26 +159,39 @@ impl<'a> Scored<'a> {
     }
 }
 
-pub struct ShardSelector<T: ListNodes> {
-    nodes: T,
+#[derive(Debug)]
+pub enum SearcherNode {
+    This,
+    Remote(String),
+}
+
+/// Tool to select which shards should be present in this node
+pub struct ShardSelector {
+    nodes: Arc<dyn ListNodes>,
     num_replicas: usize,
 }
 
-impl<T: ListNodes> ShardSelector<T> {
-    pub fn new(nodes: T, num_replicas: usize) -> Self {
+impl ShardSelector {
+    pub fn new(nodes: Arc<dyn ListNodes>, num_replicas: usize) -> Self {
         Self {
             nodes,
             num_replicas,
         }
     }
 
+    /// List the shards that should be stored in this node
     pub fn select_shards(&self, all_shards: Vec<Uuid>) -> Vec<Uuid> {
         let this_node = self.nodes.this_node();
-        all_shards.into_iter().filter(move |shard| self._nodes_for_shard(shard).contains(&this_node)).collect()
+        let nodes = self.nodes.list_nodes();
+        all_shards
+            .into_iter()
+            .filter(move |shard| self._nodes_for_shard(nodes.clone(), shard).contains(&this_node))
+            .collect()
     }
 
+    /// List the nodes that contain a shard. If the local node is in the list, it will always be returned first
     pub fn nodes_for_shard(&self, shard: &Uuid) -> Vec<SearcherNode> {
-        let nodes = self._nodes_for_shard(shard);
+        let nodes = self._nodes_for_shard(self.nodes.list_nodes(), shard);
         // See if some of this nodes are me, and put them first
         let mut searcher_nodes = Vec::new();
         let mut has_this_node = false;
@@ -89,9 +208,7 @@ impl<T: ListNodes> ShardSelector<T> {
         searcher_nodes
     }
 
-    fn _nodes_for_shard(&self, shard: &Uuid) -> Vec<String> {
-        // Get the nodes that should store this shard
-        let mut nodes = self.nodes.list_nodes();
+    fn _nodes_for_shard(&self, mut nodes: Vec<String>, shard: &Uuid) -> Vec<String> {
         nodes.sort_by_cached_key(|s| Scored(shard, s).score());
         nodes.truncate(self.num_replicas);
 

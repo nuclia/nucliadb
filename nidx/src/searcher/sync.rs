@@ -41,7 +41,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::*;
 use uuid::Uuid;
 
-use super::shard_selector::{OneNode, ShardSelector};
+use super::shard_selector::ShardSelector;
 
 const SHARD_EVICTION_TIME: Duration = Duration::from_secs(120);
 
@@ -55,6 +55,7 @@ pub fn interval_to_duration(interval: PgInterval) -> Duration {
     Duration::from_micros(micros)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_sync(
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
@@ -63,6 +64,7 @@ pub async fn run_sync(
     shutdown: CancellationToken,
     notifier: Sender<IndexId>,
     sync_status: Option<watch::Sender<SyncStatus>>,
+    shard_selector: ShardSelector,
 ) -> anyhow::Result<()> {
     // Keeps track of the `updated_at` date of the most recent synced index, in order
     // to only sync indexes with changes newer than that
@@ -75,12 +77,6 @@ pub async fn run_sync(
     let mut retry_interval = 0;
 
     let mut initial_sync = true;
-
-    let node_lister = match settings.shard_partitioning.method {
-        crate::settings::ShardPartitioningMethod::Single => OneNode,
-        crate::settings::ShardPartitioningMethod::Kubernetes => unimplemented!(),
-    };
-    let shard_selector = ShardSelector::new(node_lister, settings.shard_partitioning.replicas);
 
     while !shutdown.is_cancelled() {
         let sync_result: anyhow::Result<()> = async {
