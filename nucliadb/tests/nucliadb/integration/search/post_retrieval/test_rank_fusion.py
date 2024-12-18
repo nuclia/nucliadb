@@ -143,10 +143,9 @@ async def test_reciprocal_rank_fusion_requests_more_results(
         search_response = search_responses[0]
         assert len(search_response.paragraph.results) == 5
 
-        items, page_size, page_number = cut_page_call.args
+        items, top_k = cut_page_call.args
         assert len(items) == 5
-        assert page_size == 3
-        assert page_number == 0
+        assert top_k == 3
 
     find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
     ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])

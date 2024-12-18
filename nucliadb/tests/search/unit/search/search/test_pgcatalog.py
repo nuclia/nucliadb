@@ -18,8 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb.search.search.pgcatalog import QueryParser, _convert_filter, _prepare_query
+from nucliadb.search.search.pgcatalog import _convert_filter, _prepare_query
+from nucliadb.search.search.query_parser.parser import parse_catalog
 from nucliadb_models.search import (
+    CatalogRequest,
     SortField,
     SortOptions,
     SortOrder,
@@ -90,8 +92,8 @@ def test_catalog_filter():
 
 
 def test_prepare_query_sort():
-    parser = QueryParser(
-        kbid="84ed9257-04ef-41d1-b1d2-26286b92777f",
+    kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
+    request = CatalogRequest(
         features=[],  # Ignored by pgcatalog
         query="",
         label_filters=[],
@@ -101,11 +103,11 @@ def test_prepare_query_sort():
         sort=SortOptions(field=SortField.CREATED, order=SortOrder.ASC),
         min_score=0,  # Ignored by pgcatalog
     )
-    query, params = _prepare_query(parser)
+    parsed = parse_catalog(kbid, request)
+    query, params = _prepare_query(parsed)
     assert "ORDER BY created_at ASC" in query
 
-    parser = QueryParser(
-        kbid="84ed9257-04ef-41d1-b1d2-26286b92777f",
+    request = CatalogRequest(
         features=[],  # Ignored by pgcatalog
         query="",
         label_filters=[],
@@ -115,13 +117,14 @@ def test_prepare_query_sort():
         sort=SortOptions(field=SortField.MODIFIED, order=SortOrder.DESC),
         min_score=0,  # Ignored by pgcatalog
     )
-    query, params = _prepare_query(parser)
+    parsed = parse_catalog(kbid, request)
+    query, params = _prepare_query(parsed)
     assert "ORDER BY modified_at DESC" in query
 
 
 def test_prepare_query_filters_kbid():
-    parser = QueryParser(
-        kbid="84ed9257-04ef-41d1-b1d2-26286b92777f",
+    kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
+    request = CatalogRequest(
         features=[],  # Ignored by pgcatalog
         query="",
         label_filters=[],
@@ -130,14 +133,15 @@ def test_prepare_query_filters_kbid():
         page_size=25,
         min_score=0,  # Ignored by pgcatalog
     )
-    query, params = _prepare_query(parser)
+    parsed = parse_catalog(kbid, request)
+    query, params = _prepare_query(parsed)
     assert "kbid = %(kbid)s" in query
-    assert params["kbid"] == parser.kbid
+    assert params["kbid"] == parsed.kbid
 
 
 def test_prepare_query_fulltext():
-    parser = QueryParser(
-        kbid="84ed9257-04ef-41d1-b1d2-26286b92777f",
+    kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
+    request = CatalogRequest(
         features=[],  # Ignored by pgcatalog
         query="This is my query",
         label_filters=[],
@@ -146,9 +150,10 @@ def test_prepare_query_fulltext():
         page_size=25,
         min_score=0,  # Ignored by pgcatalog
     )
-    query, params = _prepare_query(parser)
+    parsed = parse_catalog(kbid, request)
+    query, params = _prepare_query(parsed)
     assert (
         "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
         in query
     )
-    assert params["query"] == parser.query
+    assert params["query"] == parsed.query

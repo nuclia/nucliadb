@@ -83,7 +83,6 @@ def test_merge_paragraphs_vectors():
             semantic=filter(lambda x: x.score >= min_score_semantic, [*shard1_vectors, *shard2_vectors]),
         ),
         20,
-        0,
     )
     assert not next_page
     assert len(paragraphs) == 10

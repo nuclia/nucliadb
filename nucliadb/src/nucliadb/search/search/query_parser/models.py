@@ -19,6 +19,8 @@
 #
 
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Optional
 
 from pydantic import (
     BaseModel,
@@ -26,6 +28,16 @@ from pydantic import (
 )
 
 from nucliadb_models import search as search_models
+
+### Retrieval
+
+# filters
+
+
+class DateTimeFilter(BaseModel):
+    after: Optional[datetime] = None  # aka, start
+    before: Optional[datetime] = None  # aka, end
+
 
 # rank fusion
 
@@ -65,3 +77,25 @@ class UnitRetrieval:
     top_k: int
     rank_fusion: RankFusion
     reranker: Reranker
+
+
+### Catalog
+
+
+class CatalogFilters(BaseModel):
+    labels: dict[str, Any] = Field(
+        default_factory=dict, description="Labels filter expression, like, `{and: {not: ...}, ...}`"
+    )
+    creation: DateTimeFilter
+    modification: DateTimeFilter
+    with_status: Optional[search_models.ResourceProcessingStatus] = None
+
+
+class CatalogQuery(BaseModel):
+    kbid: str
+    query: str
+    filters: CatalogFilters
+    sort: search_models.SortOptions
+    faceted: list[str]
+    page_size: int
+    page_number: int
