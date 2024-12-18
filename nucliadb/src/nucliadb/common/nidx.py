@@ -167,7 +167,7 @@ async def start_nidx_utility() -> Optional[NidxUtility]:
         return nidx
 
     nidx_utility: NidxUtility
-    if False:
+    if settings.standalone_mode:
         nidx_utility = NidxBindingUtility()
     else:
         nidx_utility = NidxServiceUtility()

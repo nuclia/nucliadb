@@ -119,7 +119,6 @@ async def node_query(
     queried_nodes = []
     incomplete_results = False
 
-    breakpoint()
     for shard_obj in shard_groups:
         try:
             node, shard_id = cluster_manager.choose_node(
