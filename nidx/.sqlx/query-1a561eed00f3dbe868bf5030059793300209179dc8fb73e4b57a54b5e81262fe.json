@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM indexes\n         WHERE (\n             deleted_at IS NOT NULL\n             AND NOT EXISTS(SELECT 1 FROM segments WHERE index_id = indexes.id)\n             AND NOT EXISTS(SELECT 1 FROM deletions where index_id = indexes.id)\n         )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "1a561eed00f3dbe868bf5030059793300209179dc8fb73e4b57a54b5e81262fe"
+}
