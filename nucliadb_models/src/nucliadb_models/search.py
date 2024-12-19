@@ -1819,12 +1819,12 @@ class AskTokens(BaseModel):
     input_nuclia: Optional[float] = Field(
         title="Input Nuclia tokens",
         description="Number of Nuclia LLM tokens used for the context in the query",
-        default=None
+        default=None,
     )
     output_nuclia: Optional[float] = Field(
         title="Output Nuclia tokens",
         description="Number of Nuclia LLM tokens used for the answer",
-        default=None
+        default=None,
     )
 
 
