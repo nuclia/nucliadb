@@ -23,20 +23,22 @@ from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import pytest
+from nuclia_models.predict.generative_responses import (
+    CitationsGenerativeResponse,
+    GenerativeChunk,
+    MetaGenerativeResponse,
+    StatusGenerativeResponse,
+    TextGenerativeResponse,
+)
 from yarl import URL
 
 from nucliadb.search.predict import (
-    CitationsGenerativeResponse,
     DummyPredictEngine,
-    GenerativeChunk,
-    MetaGenerativeResponse,
     PredictEngine,
     ProxiedPredictAPIError,
     RephraseError,
     RephraseMissingContextError,
     SendToPredictError,
-    StatusGenerativeResponse,
-    TextGenerativeResponse,
     _parse_rephrase_response,
     get_answer_generator,
     get_chat_ndjson_generator,

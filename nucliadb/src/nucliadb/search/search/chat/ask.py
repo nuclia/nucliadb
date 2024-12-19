@@ -22,6 +22,14 @@ import functools
 import json
 from typing import AsyncGenerator, Optional, cast
 
+from nuclia_models.predict.generative_responses import (
+    CitationsGenerativeResponse,
+    GenerativeChunk,
+    JSONGenerativeResponse,
+    MetaGenerativeResponse,
+    StatusGenerativeResponse,
+    TextGenerativeResponse,
+)
 from pydantic_core import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -29,13 +37,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger, predict
 from nucliadb.search.predict import (
     AnswerStatusCode,
-    CitationsGenerativeResponse,
-    GenerativeChunk,
-    JSONGenerativeResponse,
-    MetaGenerativeResponse,
     RephraseMissingContextError,
-    StatusGenerativeResponse,
-    TextGenerativeResponse,
 )
 from nucliadb.search.search.chat.exceptions import (
     AnswerJsonSchemaTooLong,
@@ -277,6 +279,8 @@ class AskResult:
                 tokens=AskTokens(
                     input=self._metadata.input_tokens,
                     output=self._metadata.output_tokens,
+                    input_nuclia=self._metadata.input_nuclia_tokens,
+                    output_nuclia=self._metadata.output_nuclia_tokens,
                 ),
                 timings=AskTimings(
                     generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),
@@ -317,6 +321,8 @@ class AskResult:
                 tokens=AskTokens(
                     input=self._metadata.input_tokens,
                     output=self._metadata.output_tokens,
+                    input_nuclia=self._metadata.input_nuclia_tokens,
+                    output_nuclia=self._metadata.output_nuclia_tokens,
                 ),
                 timings=AskTimings(
                     generative_first_chunk=self._metadata.timings.get("generative_first_chunk"),

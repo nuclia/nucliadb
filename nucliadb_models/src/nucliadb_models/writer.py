@@ -54,22 +54,22 @@ class FieldDefaults:
         description="The icon should be a media type string: https://www.iana.org/assignments/media-types/media-types.xhtml",  # noqa
     )
 
-    files = Field(
+    files: Dict[FieldIdString, FileField] = Field(
         {},
         title="Files",
         description=f"Dictionary of file fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
-    links = Field(
+    links: Dict[FieldIdString, LinkField] = Field(
         {},
         title="Links",
         description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
-    texts = Field(
+    texts: Dict[FieldIdString, TextField] = Field(
         {},
         title="Texts",
         description=f"Dictionary of text fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
     )
-    conversations = Field(
+    conversations: Dict[FieldIdString, InputConversationField] = Field(
         {},
         title="Conversations",
         description=f"Dictionary of conversation fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",  # noqa
