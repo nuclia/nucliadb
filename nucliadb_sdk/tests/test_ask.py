@@ -126,7 +126,7 @@ def test_ask_response_parser_stream():
         ),
         RetrievalAskResponseItem(results=KnowledgeboxFindResults(resources={})),
         MetadataAskResponseItem(
-            tokens=AskTokens(input=10, output=5),
+            tokens=AskTokens(input=10, output=5, input_nuclia=0.01, output_nuclia=0.005),
             timings=AskTimings(generative_first_chunk=0.1, generative_total=0.2),
         ),
         CitationsAskResponseItem(citations={"some/paragraph/id": "This is a citation"}),
@@ -149,6 +149,8 @@ def test_ask_response_parser_stream():
     assert ask_response.retrieval_results.resources == {}
     assert ask_response.metadata.tokens.input == 10
     assert ask_response.metadata.tokens.output == 5
+    assert ask_response.metadata.tokens.input_nuclia == 0.01
+    assert ask_response.metadata.tokens.output_nuclia == 0.005
     assert ask_response.metadata.timings.generative_first_chunk == 0.1
     assert ask_response.metadata.timings.generative_total == 0.2
 

@@ -32,11 +32,16 @@ DEPLOY_MODE_MARK_NAME = "deploy_modes"
 DEPLOY_MODE_FIXTURES = {
     "nucliadb_reader": [
         "component",
+        "standalone",
     ],
     "nucliadb_writer": [
         "component",
+        "standalone",
     ],
 }
+
+
+class MagicFixturesError(Exception): ...
 
 
 def pytest_configure(config):
@@ -72,7 +77,7 @@ def pytest_generate_tests(metafunc: Metafunc):
                         if deploy_mode in DEPLOY_MODE_FIXTURES[fixture_name]:
                             argvalues.append(lf(f"{deploy_mode}_{fixture_name}"))
                         else:
-                            logger.warning(
+                            raise MagicFixturesError(
                                 f"Requesting fixture {fixture_name} with an unavailable mode: {deploy_mode}"
                             )
                     metafunc.parametrize(fixture_name, argvalues, indirect=True)
@@ -84,9 +89,19 @@ def pytest_generate_tests(metafunc: Metafunc):
 
 @pytest.fixture(scope="function")
 async def nucliadb_reader(request: FixtureRequest):
-    yield request.param
+    try:
+        yield request.param
+    except AttributeError as exc:
+        raise MagicFixturesError(
+            "Are you using a magic fixture without the deploy_modes decorator?"
+        ) from exc
 
 
 @pytest.fixture(scope="function")
 async def nucliadb_writer(request: FixtureRequest):
-    yield request.param
+    try:
+        yield request.param
+    except AttributeError as exc:
+        raise MagicFixturesError(
+            "Are you using a magic fixture without the deploy_modes decorator?"
+        ) from exc

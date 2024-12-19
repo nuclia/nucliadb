@@ -21,6 +21,7 @@ import base64
 from io import BytesIO
 
 import pytest
+from httpx import AsyncClient
 from pytest_lazy_fixtures import lazy_fixture
 
 from nucliadb.common.nidx import NIDX_ENABLED
@@ -59,12 +60,13 @@ if not NIDX_ENABLED:
     storages,
     indirect=True,
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_file_tus_upload_and_download(
     storage: Storage,
     configure_redis_dm,
-    nucliadb_writer,
-    nucliadb_reader,
-    knowledgebox_one,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
 ):
     language = "ca"
     filename = "image.jpeg"
@@ -138,7 +140,7 @@ async def test_file_tus_upload_and_download(
         # Upload the chunk
         resp = await nucliadb_writer.patch(
             url,
-            data=chunk,
+            content=chunk,
             headers=headers,
         )
         assert resp.status_code == 200
@@ -211,14 +213,18 @@ async def test_file_tus_upload_and_download(
     assert resp.status_code == 416
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_tus_upload_handles_unknown_upload_ids(
-    configure_redis_dm, nucliadb_writer, nucliadb_reader, knowledgebox_one
+    configure_redis_dm,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
 ):
     kbid = knowledgebox_one
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/{TUSUPLOAD}/foobarid",
         headers={},
-        data=b"foobar",
+        content=b"foobar",
     )
     assert resp.status_code == 404
     error_detail = resp.json().get("detail")
@@ -232,12 +238,13 @@ async def test_tus_upload_handles_unknown_upload_ids(
     ],
     indirect=True,
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_content_type_validation(
     storage: Storage,
     configure_redis_dm,
-    nucliadb_writer,
-    nucliadb_reader,
-    knowledgebox_one,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
 ):
     language = "ca"
     filename = "image.jpg"

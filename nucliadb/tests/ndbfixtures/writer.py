@@ -26,8 +26,8 @@ from httpx import AsyncClient
 from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
-from nucliadb.writer import tus
-from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb.standalone.settings import Settings
+from nucliadb.writer import API_PREFIX, tus
 from nucliadb.writer.app import create_application
 from nucliadb.writer.settings import settings
 from nucliadb_models.resource import NucliaDBRoles
@@ -37,8 +37,13 @@ from nucliadb_utils.settings import (
     storage_settings,
 )
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
-from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    set_utility,
+)
 from tests.ingest.fixtures import IngestFixture
+from tests.utils.dirty_index import mark_dirty
 
 from .utils import create_api_client_factory
 
@@ -54,6 +59,20 @@ async def component_nucliadb_writer(
     client_factory = create_api_client_factory(writer_api_server)
     async with client_factory(roles=[NucliaDBRoles.WRITER]) as client:
         yield client
+
+
+@pytest.fixture(scope="function")
+async def standalone_nucliadb_writer(nucliadb: Settings):
+    async with AsyncClient(
+        headers={"X-NUCLIADB-ROLES": "WRITER"},
+        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        timeout=None,
+        event_hooks={"request": [mark_dirty]},
+    ) as client:
+        yield client
+
+
+# Derived
 
 
 @pytest.fixture(scope="function")
@@ -139,45 +158,6 @@ async def storage_writer(request):
     yield storage_driver
 
     clean_utility(Utility.STORAGE)
-
-
-# FIXME: this is a weird situation, we can use a hosted-like nucliadb while this
-# creates a KB as it was onprem. The end result should not change much but still, is
-# something we may want to fix
-@pytest.fixture(scope="function")
-async def knowledgebox_writer(nucliadb_writer_manager: AsyncClient):
-    resp = await nucliadb_writer_manager.post(
-        f"/{KBS_PREFIX}",
-        json={
-            "slug": "kbid1",
-            "title": "My Knowledge Box",
-        },
-    )
-    assert resp.status_code == 201
-    kbid = resp.json().get("uuid")
-    assert kbid is not None
-
-    yield kbid
-
-    resp = await nucliadb_writer_manager.delete(
-        f"/{KB_PREFIX}/{kbid}",
-    )
-    assert resp.status_code == 200
-
-
-@pytest.fixture(scope="function")
-async def resource(nucliadb_writer: AsyncClient, knowledgebox_writer: str):
-    resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox_writer}/resources",
-        json={
-            "slug": "resource1",
-            "title": "Resource 1",
-        },
-    )
-    assert resp.status_code == 201
-    uuid = resp.json()["uuid"]
-
-    return uuid
 
 
 @pytest.fixture(scope="function")

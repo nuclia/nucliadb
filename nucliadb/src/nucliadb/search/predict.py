@@ -21,12 +21,13 @@ import json
 import os
 import random
 from enum import Enum
-from typing import Any, AsyncIterator, Dict, Literal, Optional, Union
+from typing import Any, AsyncIterator, Optional
 from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import backoff
-from pydantic import BaseModel, Field, ValidationError
+from nuclia_models.predict.generative_responses import GenerativeChunk
+from pydantic import ValidationError
 
 from nucliadb.common import datamanagers
 from nucliadb.search import logger
@@ -127,53 +128,6 @@ class AnswerStatusCode(str, Enum):
             AnswerStatusCode.ERROR: "error",
             AnswerStatusCode.NO_CONTEXT: "no_context",
         }[self]
-
-
-class TextGenerativeResponse(BaseModel):
-    type: Literal["text"] = "text"
-    text: str
-
-
-class JSONGenerativeResponse(BaseModel):
-    type: Literal["object"] = "object"
-    object: Dict[str, Any]
-
-
-class MetaGenerativeResponse(BaseModel):
-    type: Literal["meta"] = "meta"
-    input_tokens: int
-    output_tokens: int
-    timings: dict[str, float]
-
-
-class CitationsGenerativeResponse(BaseModel):
-    type: Literal["citations"] = "citations"
-    citations: dict[str, Any]
-
-
-class RerankGenerativeResponse(BaseModel):
-    type: Literal["rerank"] = "rerank"
-    context_scores: Dict[str, float]
-
-
-class StatusGenerativeResponse(BaseModel):
-    type: Literal["status"] = "status"
-    code: str
-    details: Optional[str] = None
-
-
-GenerativeResponse = Union[
-    TextGenerativeResponse,
-    JSONGenerativeResponse,
-    MetaGenerativeResponse,
-    CitationsGenerativeResponse,
-    RerankGenerativeResponse,
-    StatusGenerativeResponse,
-]
-
-
-class GenerativeChunk(BaseModel):
-    chunk: GenerativeResponse = Field(..., discriminator="type")
 
 
 async def start_predict_engine():

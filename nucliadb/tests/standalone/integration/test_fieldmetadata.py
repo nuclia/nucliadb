@@ -17,15 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+import pytest
+from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_fieldmetadata_crud(
-    knowledgebox_one,
-    nucliadb_reader,
-    nucliadb_writer,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
 ) -> None:
     """Test description:
 

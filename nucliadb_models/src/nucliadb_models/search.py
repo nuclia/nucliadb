@@ -1816,6 +1816,14 @@ class AskTokens(BaseModel):
         title="Output tokens",
         description="Number of LLM tokens used for the answer",
     )
+    input_nuclia: Optional[float] = Field(
+        title="Input Nuclia tokens",
+        description="Number of Nuclia LLM tokens used for the context in the query",
+    )
+    output_nuclia: Optional[float] = Field(
+        title="Output Nuclia tokens",
+        description="Number of Nuclia LLM tokens used for the answer",
+    )
 
 
 class AskTimings(BaseModel):

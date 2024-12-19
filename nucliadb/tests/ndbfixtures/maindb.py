@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from typing import AsyncIterator
+from typing import AsyncIterator, Iterator
 from unittest.mock import patch
 
 import psycopg
@@ -39,13 +39,13 @@ from nucliadb_utils.utilities import (
 logger = logging.getLogger("nucliadb.fixtures:maindb")
 
 # Minimum support PostgreSQL version
-# Reason: We want the btree_gin extension to support uuid's
-images.settings["postgresql"]["version"] = "11"
+# Reason: We want the btree_gin extension to support uuid's (pg11) and `gen_random_uuid()` (pg13)
+images.settings["postgresql"]["version"] = "13"
 images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
 
 
 @pytest.fixture(scope="function")
-def maindb_settings(pg_maindb_settings):
+def maindb_settings(pg_maindb_settings) -> Iterator[DriverSettings]:
     yield pg_maindb_settings
 
 
@@ -58,20 +58,24 @@ async def maindb_driver(pg_maindb_driver) -> AsyncIterator[Driver]:
 
     clean_utility(Utility.MAINDB_DRIVER)
 
-    # cleanup maindb
-    if driver.initialized:
-        try:
-            async with driver.transaction() as txn:
-                all_keys = [k async for k in txn.keys("", count=-1)]
-                for key in all_keys:
-                    await txn.delete(key)
-                await txn.commit()
-        except Exception:
-            logger.exception("Could not cleanup maindb on test teardown")
+    try:
+        await cleanup_maindb(driver)
+    except Exception:
+        logger.exception("Could not cleanup maindb on test teardown")
+
+
+async def cleanup_maindb(driver: Driver):
+    if not driver.initialized:
+        return
+    async with driver.transaction() as txn:
+        all_keys = [k async for k in txn.keys("", count=-1)]
+        for key in all_keys:
+            await txn.delete(key)
+        await txn.commit()
 
 
 @pytest.fixture(scope="function")
-async def pg_maindb_settings(pg):
+async def pg_maindb_settings(pg) -> AsyncIterator[DriverSettings]:
     url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
 
     # We want to be sure schema migrations are always run. As some tests use
@@ -93,7 +97,7 @@ async def pg_maindb_settings(pg):
 
 
 @pytest.fixture(scope="function")
-async def pg_maindb_driver(pg_maindb_settings: DriverSettings):
+async def pg_maindb_driver(pg_maindb_settings: DriverSettings) -> AsyncIterator[PGDriver]:
     url = pg_maindb_settings.driver_pg_url
     assert url is not None
     with (
