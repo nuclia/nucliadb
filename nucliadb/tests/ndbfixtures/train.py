@@ -21,7 +21,7 @@
 import asyncio
 import uuid
 from datetime import datetime
-from typing import AsyncIterator, Iterator
+from typing import AsyncIterator
 from unittest.mock import patch
 
 import aiohttp
@@ -121,9 +121,11 @@ async def train_grpc_server(test_settings_train: None, local_files) -> AsyncIter
 
 
 @pytest.fixture(scope="function")
-def train_client(train_grpc_server) -> Iterator[TrainStub]:
+async def train_client(train_grpc_server) -> AsyncIterator[TrainStub]:
     channel = aio.insecure_channel(f"localhost:{train_settings.grpc_port}")
     yield TrainStub(channel)
+    await channel.close(grace=None)
+
     # XXX: no need for this if everyone does things correctly!
     clear_global_cache()
 
