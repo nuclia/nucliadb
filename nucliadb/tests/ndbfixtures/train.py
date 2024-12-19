@@ -99,7 +99,6 @@ async def nucliadb_grpc(nucliadb: Settings):
 
 @pytest.fixture(scope="function")
 def test_settings_train(
-    cache,
     storage_settings,
     fake_node,
     maindb_driver: Driver,
