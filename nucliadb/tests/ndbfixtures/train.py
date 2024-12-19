@@ -18,17 +18,40 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
+import uuid
+from datetime import datetime
+
 import aiohttp
 import pytest
 from grpc import aio
+from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
+from nucliadb.ingest.orm.entities import EntitiesManager
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb.standalone.settings import Settings
 from nucliadb.train.utils import start_shard_manager, stop_shard_manager
+from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
+from nucliadb_protos.resources_pb2 import (
+    ExtractedTextWrapper,
+    FieldComputedMetadataWrapper,
+    FieldEntity,
+    FieldID,
+    FieldType,
+    Paragraph,
+    Position,
+    Sentence,
+)
 from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
     clear_global_cache,
+    get_storage,
 )
 
 # train_rest_api = deploy_mode("standalone") nucliadb_train
@@ -115,3 +138,234 @@ async def train_client(train_api):  # type: ignore
     channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
     yield TrainStub(channel)
     clear_global_cache()
+
+
+# Resources
+
+
+@pytest.fixture(scope="function")
+async def knowledgebox_with_labels(nucliadb_writer: AsyncClient, knowledgebox: str):
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/labelset/labelset_paragraphs",
+        json={
+            "kind": ["PARAGRAPHS"],
+            "labels": [{"title": "label_machine"}, {"title": "label_user"}],
+        },
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/labelset/labelset_resources",
+        json={
+            "kind": ["RESOURCES"],
+            "labels": [{"title": "label_machine"}, {"title": "label_user"}],
+        },
+    )
+    assert resp.status_code == 200
+
+    yield knowledgebox
+
+
+@pytest.fixture(scope="function")
+async def knowledgebox_with_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
+    ser = SetEntitiesRequest()
+    ser.kb.uuid = knowledgebox
+    ser.group = "PERSON"
+    ser.entities.title = "PERSON"
+    ser.entities.entities["Ramon"].value = "Ramon"
+    ser.entities.entities["Eudald Camprubi"].value = "Eudald Camprubi"
+    ser.entities.entities["Carmen Iniesta"].value = "Carmen Iniesta"
+    ser.entities.entities["el Super Fran"].value = "el Super Fran"
+    await nucliadb_grpc.SetEntities(ser)  # type: ignore
+
+    ser = SetEntitiesRequest()
+    ser.kb.uuid = knowledgebox
+    ser.group = "ORG"
+    ser.entities.title = "ORG"
+    ser.entities.entities["Nuclia"].value = "Nuclia"
+    ser.entities.entities["Debian"].value = "Debian"
+    ser.entities.entities["Generalitat de Catalunya"].value = "Generalitat de Catalunya"
+    await nucliadb_grpc.SetEntities(ser)  # type: ignore
+
+    yield knowledgebox
+
+
+def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
+    rid = str(uuid.uuid4())
+    message1: BrokerMessage = BrokerMessage(
+        kbid=knowledgebox,
+        uuid=rid,
+        slug=str(number),
+        type=BrokerMessage.AUTOCOMMIT,
+    )
+
+    message1.basic.slug = str(number)
+    message1.basic.icon = "text/plain"
+    message1.basic.title = f"MY TITLE {number}"
+    message1.basic.summary = "Summary of document"
+    message1.basic.thumbnail = "doc"
+    message1.basic.metadata.useful = True
+    message1.basic.metadata.language = "es"
+    message1.basic.created.FromDatetime(datetime.utcnow())
+    message1.basic.modified.FromDatetime(datetime.utcnow())
+    message1.texts[
+        "field1"
+    ].body = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
+    message1.source = BrokerMessage.MessageSource.WRITER
+    return message1
+
+
+def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
+    message2: BrokerMessage = BrokerMessage(
+        kbid=knowledgebox,
+        uuid=rid,
+        slug=str(number),
+        type=BrokerMessage.AUTOCOMMIT,
+    )
+    message2.basic.metadata.useful = True
+    message2.basic.metadata.language = "es"
+    message2.source = BrokerMessage.MessageSource.PROCESSOR
+
+    field1_if = FieldID()
+    field1_if.field = "field1"
+    field1_if.field_type = FieldType.TEXT
+
+    title_if = FieldID()
+    title_if.field = "title"
+    title_if.field_type = FieldType.GENERIC
+
+    etw = ExtractedTextWrapper()
+    etw.field.CopyFrom(field1_if)
+    etw.body.text = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa. I miss Manresa!"  # noqa
+    message2.extracted_text.append(etw)
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(field1_if)
+    p1 = Paragraph()
+    p1.start = 0
+    p1.end = 82
+    s1 = Sentence()
+    s1.start = 0
+    s1.end = 52
+    p1.sentences.append(s1)
+    s1 = Sentence()
+    s1.start = 53
+    s1.end = 82
+    p1.sentences.append(s1)
+
+    p2 = Paragraph()
+    p2.start = 84
+    p2.end = 130
+
+    s1 = Sentence()
+    s1.start = 84
+    s1.end = 130
+    p2.sentences.append(s1)
+
+    fcmw.metadata.metadata.paragraphs.append(p1)
+    fcmw.metadata.metadata.paragraphs.append(p2)
+
+    # Data Augmentation + Processor entities
+    fcmw.metadata.metadata.entities["my-task-id"].entities.extend(
+        [
+            FieldEntity(text="Barcelona", label="CITY", positions=[Position(start=43, end=52)]),
+            FieldEntity(text="Manresa", label="CITY"),
+        ]
+    )
+    # Legacy processor entities
+    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
+    # Add a ner with positions
+    fcmw.metadata.metadata.ner.update(
+        {
+            "Barcelona": "CITY",
+            "Manresa": "CITY",
+        }
+    )
+    fcmw.metadata.metadata.positions["CITY/Barcelona"].entity = "Barcelona"
+    fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(Position(start=43, end=52))
+
+    message2.field_metadata.append(fcmw)
+
+    etw = ExtractedTextWrapper()
+    etw.field.CopyFrom(title_if)
+    etw.body.text = f"MY TITLE {number}"
+    message2.extracted_text.append(etw)
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(title_if)
+    p1 = Paragraph()
+    p1.start = 0
+    p1.end = len(etw.body.text)
+    s1 = Sentence()
+    s1.start = 0
+    s1.end = len(etw.body.text)
+    p1.sentences.append(s1)
+    fcmw.metadata.metadata.paragraphs.append(p1)
+    message2.field_metadata.append(fcmw)
+    message2.basic.metadata.language = "es"
+
+    return message2
+
+
+# This fixtures should be deleted once grpc train interface is removed
+
+
+@pytest.fixture(scope="function")
+async def test_pagination_resources(processor: Processor, knowledgebox_ingest, test_settings_train):
+    """
+    Create a set of resources with only basic information to test pagination
+    """
+    amount = 10
+
+    # Create resources
+    for i in range(1, amount + 1):
+        message = broker_simple_resource(knowledgebox_ingest, i)
+        await processor.process(message=message, seqid=-1, transaction_check=False)
+
+        message = broker_processed_resource(knowledgebox_ingest, i, message.uuid)
+        await processor.process(message=message, seqid=-1, transaction_check=False)
+        # Give processed data some time to reach the node
+
+    from time import time
+
+    from nucliadb.common.maindb.utils import get_driver
+
+    driver = get_driver()
+
+    t0 = time()
+
+    while time() - t0 < 30:  # wait max 30 seconds for it
+        async with driver.transaction(read_only=True) as txn:
+            count = 0
+            async for key in txn.keys(
+                match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
+            ):
+                count += 1
+
+        if count == amount:
+            break
+        print(f"got {count}, retrying")
+        await asyncio.sleep(2)
+
+    # Add entities
+    storage = await get_storage()
+    async with driver.transaction() as txn:
+        kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+        entities_manager = EntitiesManager(kb, txn)
+        entities = EntitiesGroup()
+        entities.entities["entity1"].value = "PERSON"
+        await entities_manager.set_entities_group_force("group1", entities)
+        await txn.commit()
+
+    # Add ontology
+    labelset = LabelSet()
+    labelset.title = "ls1"
+    label = Label()
+    label_title = "label1"
+    label.title = label_title
+    labelset.labels.append(label)
+    await datamanagers.atomic.labelset.set(
+        kbid=knowledgebox_ingest, labelset_id="ls1", labelset=labelset
+    )
+
+    yield knowledgebox_ingest
