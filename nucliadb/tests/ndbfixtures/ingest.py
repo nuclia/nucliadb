@@ -23,7 +23,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import Iterable, Optional
+from typing import AsyncIterator, Iterable, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -73,16 +73,17 @@ from nucliadb_utils.utilities import (
 
 logger = logging.getLogger(__name__)
 
+INGEST_TESTS_DIR = os.path.abspath(os.path.join(dirname(__file__), "..", "ingest"))
+
 # Main fixtures
 
 
 @pytest.fixture(scope="function")
-async def standalone_nucliadb_ingest_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
-    return stub
-
-
-INGEST_TESTS_DIR = os.path.abspath(os.path.join(dirname(__file__), "..", "ingest"))
+async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[WriterStub]:
+    channel = aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}")
+    stub = WriterStub(channel)
+    yield stub
+    await channel.close(grace=None)
 
 
 ######################################################################
@@ -92,12 +93,6 @@ INGEST_TESTS_DIR = os.path.abspath(os.path.join(dirname(__file__), "..", "ingest
 
 @pytest.fixture(scope="function")
 def processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
-    proc = Processor(maindb_driver, storage, pubsub, partition="1")
-    yield proc
-
-
-@pytest.fixture(scope="function")
-def stream_processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
 
