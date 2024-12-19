@@ -47,11 +47,6 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def nucliadb(standalone_nucliadb: Settings):
-    yield standalone_nucliadb
-
-
-@pytest.fixture(scope="function")
 async def nucliadb_reader(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "READER"},
