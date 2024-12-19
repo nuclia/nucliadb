@@ -791,3 +791,13 @@ async def entities_manager_mock():
             AsyncMock(return_value=[]),
         ):
             yield
+
+
+# from tests/fixtures.py
+
+
+@pytest.fixture(scope="function")
+async def txn(maindb_driver):
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()
