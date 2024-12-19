@@ -35,14 +35,14 @@ use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
 use tonic::Request;
 
-struct ManualListNodes(Arc<Mutex<Vec<String>>>, String);
+struct ManualListNodes(Arc<Mutex<Vec<String>>>, usize);
 impl ListNodes for ManualListNodes {
     fn list_nodes(&self) -> Vec<String> {
         self.0.lock().unwrap().clone()
     }
 
     fn this_node(&self) -> String {
-        self.1.clone()
+        self.list_nodes().get(self.1).cloned().unwrap_or("out_of_cluster".to_string())
     }
 }
 
@@ -71,11 +71,11 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
     // Create a cluster with 3 nodes
     let nodes = Arc::new(Mutex::new(Vec::new()));
     let mut searchers = Vec::new();
-    for _ in 0..3 {
+    for i in 0..3 {
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
         nodes.lock().unwrap().push(format!("localhost:{searcher_port}"));
-        let list_nodes = ManualListNodes(nodes.clone(), format!("localhost:{searcher_port}"));
+        let list_nodes = ManualListNodes(nodes.clone(), i);
         let work_dir = tempdir()?;
         let searcher = SyncedSearcher::new(fixture.settings.metadata.clone(), work_dir.path());
         let arc_list_nodes = Arc::new(list_nodes);
@@ -133,7 +133,7 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
 async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<()> {
     let mut shards = Vec::new();
     let mut fixture = NidxFixture::new(pool).await?;
-    for _ in 0..10 {
+    for _ in 0..30 {
         let response = fixture
             .api_client
             .new_shard(Request::new(NewShardRequest {
@@ -154,11 +154,11 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
     // Create a cluster with 3 nodes, set an invalid entrypoint so they cannot communicate among them
     let nodes = Arc::new(Mutex::new(Vec::new()));
     let mut searchers = Vec::new();
-    for _ in 0..3 {
+    for i in 0..3 {
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
         nodes.lock().unwrap().push(format!("fake_{searcher_port}"));
-        let list_nodes = ManualListNodes(nodes.clone(), format!("fake_{searcher_port}"));
+        let list_nodes = ManualListNodes(nodes.clone(), i);
         let work_dir = tempdir()?;
         let searcher = SyncedSearcher::new(fixture.settings.metadata.clone(), work_dir.path());
         let arc_list_nodes = Arc::new(list_nodes);
@@ -181,10 +181,12 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
     }
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    // All shards are accessible from a single node
+    // Each shard is only accessible from a single node
+    let mut node_for_shard_original = HashMap::new();
+    let mut shards_per_node = vec![0, 0, 0];
     for shard in &shards {
         let mut success = 0;
-        for searcher in &searchers {
+        for (i, searcher) in searchers.iter().enumerate() {
             let result = NidxSearcherClient::connect(format!("http://{searcher}"))
                 .await?
                 .search(Request::new(SearchRequest {
@@ -193,19 +195,25 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
                 }))
                 .await;
             if result.is_ok() {
+                shards_per_node[i] += 1;
+                node_for_shard_original.insert(shard, i);
                 success += 1;
             }
         }
         assert_eq!(success, 1);
+    }
+    for shards_in_node in shards_per_node {
+        assert!(shards_in_node > 0);
     }
 
     // Remove one node from the cluster, we expect shards to rebalance among the remaining nodes
-    let removed_node = nodes.lock().unwrap().remove(2);
+    nodes.lock().unwrap().remove(2);
     tokio::time::sleep(Duration::from_secs_f32(1.2)).await;
 
+    let mut node_for_shard_scale_down = HashMap::new();
     for shard in &shards {
         let mut success = 0;
-        for searcher in &searchers[0..2] {
+        for (i, searcher) in searchers[0..2].iter().enumerate() {
             let result = NidxSearcherClient::connect(format!("http://{searcher}"))
                 .await?
                 .search(Request::new(SearchRequest {
@@ -214,19 +222,33 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
                 }))
                 .await;
             if result.is_ok() {
+                node_for_shard_scale_down.insert(shard, i);
                 success += 1;
             }
         }
         assert_eq!(success, 1);
+    }
+
+    // Only the shards from node 2 should have moved
+    for (shard, &old_node) in &node_for_shard_original {
+        let new_node = node_for_shard_scale_down[shard];
+        if old_node == 2 {
+            assert_ne!(new_node, 2, "All shards from node 2 should have moved");
+        } else {
+            assert_eq!(new_node, old_node, "No shards should be moved between nodes 0 and 1");
+        }
     }
 
     // Add a new node again, shards should split up again
-    nodes.lock().unwrap().push(removed_node);
+    // This node will have a different ID, so shard split
+    // should be different than originally
+    nodes.lock().unwrap().push("fake_new_node".to_string());
     tokio::time::sleep(Duration::from_secs_f32(1.2)).await;
 
+    let mut node_for_shard_scale_up = HashMap::new();
     for shard in &shards {
         let mut success = 0;
-        for searcher in &searchers {
+        for (i, searcher) in searchers.iter().enumerate() {
             let result = NidxSearcherClient::connect(format!("http://{searcher}"))
                 .await?
                 .search(Request::new(SearchRequest {
@@ -235,11 +257,34 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
                 }))
                 .await;
             if result.is_ok() {
+                node_for_shard_scale_up.insert(shard, i);
                 success += 1;
             }
         }
         assert_eq!(success, 1);
     }
+
+    // Some shards should have moved to node 2, but not between 0 and 1
+    let mut moved = 0;
+    for (shard, &old_node) in &node_for_shard_scale_down {
+        let new_node = node_for_shard_scale_up[shard];
+        if new_node == 2 {
+            moved += 1;
+        } else {
+            assert_eq!(new_node, old_node, "No shards should be moved between nodes 0 and 1");
+        }
+    }
+    assert!(moved > 0, "Some shards should be moved to the new node after scale up");
+
+    // Shard distribution should be different that originally
+    let mut different = 0;
+    for (shard, &old_node) in &node_for_shard_original {
+        let new_node = node_for_shard_scale_up[shard];
+        if new_node != old_node {
+            different += 1;
+        }
+    }
+    assert!(different > 0, "Shard distribution after scale down + up should be different than originally");
 
     Ok(())
 }
