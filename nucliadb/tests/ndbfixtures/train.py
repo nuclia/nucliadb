@@ -63,7 +63,6 @@ from nucliadb_utils.settings import (
 )
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
-    clear_global_cache,
     get_storage,
 )
 
@@ -125,9 +124,6 @@ async def train_client(train_grpc_server) -> AsyncIterator[TrainStub]:
     channel = aio.insecure_channel(f"localhost:{train_settings.grpc_port}")
     yield TrainStub(channel)
     await channel.close(grace=None)
-
-    # XXX: no need for this if everyone does things correctly!
-    clear_global_cache()
 
 
 # Resources
