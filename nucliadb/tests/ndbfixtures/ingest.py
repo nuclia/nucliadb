@@ -57,7 +57,7 @@ from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import indexing_settings, transaction_settings
+from nucliadb_utils.settings import audit_settings, indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
@@ -118,6 +118,32 @@ async def nats_manager(natsd) -> AsyncIterator[NatsConnectionManager]:
     ncm = await start_nats_manager("nucliadb_tests", [natsd], None)
     yield ncm
     await stop_nats_manager()
+
+
+@pytest.fixture(scope="function")
+def audit(basic_audit: BasicAuditStorage) -> Iterator[BasicAuditStorage]:
+    yield basic_audit
+
+
+@pytest.fixture(scope="function")
+async def basic_audit() -> AsyncIterator[BasicAuditStorage]:
+    audit = BasicAuditStorage()
+    await audit.initialize()
+    yield audit
+    await audit.finalize()
+
+
+@pytest.fixture(scope="function")
+async def stream_audit(natsd: str) -> AsyncIterator[StreamAuditStorage]:
+    audit = StreamAuditStorage(
+        [natsd],
+        audit_settings.audit_jetstream_target,  # type: ignore
+        audit_settings.audit_partitions,
+        audit_settings.audit_hash_seed,
+    )
+    await audit.initialize()
+    yield audit
+    await audit.finalize()
 
 
 ######################################################################
@@ -268,26 +294,6 @@ async def knowledgebox_with_vectorsets(storage, maindb_driver: Driver, shard_man
     yield kbid
 
     await KnowledgeBox.delete(maindb_driver, kbid)
-
-
-@pytest.fixture(scope="function")
-async def audit():
-    return BasicAuditStorage()
-
-
-@pytest.fixture(scope="function")
-async def stream_audit(natsd: str):
-    from nucliadb_utils.settings import audit_settings
-
-    audit = StreamAuditStorage(
-        [natsd],
-        audit_settings.audit_jetstream_target,  # type: ignore
-        audit_settings.audit_partitions,
-        audit_settings.audit_hash_seed,
-    )
-    await audit.initialize()
-    yield audit
-    await audit.finalize()
 
 
 @pytest.fixture(scope="function")
