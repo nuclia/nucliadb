@@ -57,6 +57,7 @@ from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.indexing import IndexingUtility
+from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
@@ -111,6 +112,13 @@ async def nats_pubsub(natsd) -> AsyncIterator[NatsPubsub]:
     yield pubsub
 
     await pubsub.finalize()
+
+
+@pytest.fixture(scope="function")
+async def nats_manager(natsd) -> AsyncIterator[NatsConnectionManager]:
+    ncm = await start_nats_manager("nucliadb_tests", [natsd], None)
+    yield ncm
+    await stop_nats_manager()
 
 
 ######################################################################
@@ -353,13 +361,6 @@ async def _clean_natsd(natsd):
     indexing_settings.index_jetstream_servers = [natsd]
 
     yield
-
-
-@pytest.fixture(scope="function")
-async def nats_manager(natsd):
-    ncm = await start_nats_manager("service_name", [natsd], None)
-    yield ncm
-    await stop_nats_manager()
 
 
 @pytest.fixture(scope="function")
