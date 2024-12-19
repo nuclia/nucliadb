@@ -79,6 +79,7 @@ class _PredictTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._En
     TOKEN: _PredictType.ValueType  # 1
     QUESTION_ANSWER: _PredictType.ValueType  # 2
     REPHRASE: _PredictType.ValueType  # 3
+    RETRIEVAL_REPHRASE: _PredictType.ValueType  # 16
     SUMMARIZE: _PredictType.ValueType  # 4
     EXTRACT_TABLES: _PredictType.ValueType  # 5
     RERANK: _PredictType.ValueType  # 6
@@ -98,6 +99,7 @@ SENTENCE: PredictType.ValueType  # 0
 TOKEN: PredictType.ValueType  # 1
 QUESTION_ANSWER: PredictType.ValueType  # 2
 REPHRASE: PredictType.ValueType  # 3
+RETRIEVAL_REPHRASE: PredictType.ValueType  # 16
 SUMMARIZE: PredictType.ValueType  # 4
 EXTRACT_TABLES: PredictType.ValueType  # 5
 RERANK: PredictType.ValueType  # 6
