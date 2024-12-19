@@ -27,7 +27,4 @@ pytest_plugins = [
     "nucliadb_utils.tests.local",
     "nucliadb_utils.tests.indexing",
     "tests.fixtures",
-    "tests.ndbfixtures.maindb",
-    "tests.ndbfixtures.processing",
-    "tests.ndbfixtures.standalone",
 ]
