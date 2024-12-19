@@ -76,7 +76,7 @@ fn main() -> anyhow::Result<()> {
         sentry::ClientOptions {
             dsn: "http://disabled:disabled@disabled/disabled".into_dsn()?,
             before_send: Some(Arc::new(|event| {
-                debug!("Sentry error {event:#?}");
+                trace!("Sentry error {event:#?}");
                 None
             })),
             ..Default::default()

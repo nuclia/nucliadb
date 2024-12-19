@@ -1,4 +1,5 @@
 use nidx::scheduler::{self, GetAckFloor};
+use nidx::searcher::shard_selector::ShardSelector;
 use nidx::worker;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -106,7 +107,7 @@ impl NidxBinding {
         let searcher_work_dir = tempdir()?;
         let (sync_reporter, sync_watcher) = watch::channel(SyncStatus::Syncing);
         let searcher = SyncedSearcher::new(settings.metadata.clone(), searcher_work_dir.path());
-        let searcher_api = SearchServer::new(searcher.index_cache());
+        let searcher_api = SearchServer::new(searcher.index_cache(), ShardSelector::new_single());
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
         tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));
@@ -118,6 +119,7 @@ impl NidxBinding {
                     settings_copy.storage.as_ref().unwrap().object_store.clone(),
                     settings_copy.searcher.clone().unwrap_or_default(),
                     shutdown2,
+                    ShardSelector::new_single(),
                     Some(sync_reporter),
                 )
                 .await

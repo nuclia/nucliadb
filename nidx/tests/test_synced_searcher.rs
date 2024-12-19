@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use nidx::indexer::{index_resource, process_index_message};
+use nidx::searcher::shard_selector::ShardSelector;
 use nidx::searcher::SyncedSearcher;
 use nidx::settings::SearcherSettings;
 use nidx::{
@@ -53,7 +54,9 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let index_cache = synced_searcher.index_cache();
     let storage_copy = storage.clone();
     let search_task = tokio::spawn(async move {
-        synced_searcher.run(storage_copy, SearcherSettings::default(), CancellationToken::new(), None).await
+        synced_searcher
+            .run(storage_copy, SearcherSettings::default(), CancellationToken::new(), ShardSelector::new_single(), None)
+            .await
     });
 
     let index = Index::create(

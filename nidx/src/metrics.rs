@@ -156,6 +156,7 @@ pub mod searcher {
         SYNC_FAILED_INDEXES: Gauge as "searcher_sync_failed_indexes" ("Number of indexes failing to sync"),
         REFRESH_QUEUE_LEN: Gauge as "searcher_indexes_pending_refresh" ("Number of indexes waiting to be refreshed"),
         INDEX_LOAD_TIME: Family<IndexKindLabels, Histogram>{exponential_buckets(0.001, 2.0, 12)} as "searcher_index_load_time_seconds" ("Time to load index searchers"),
+        SHARD_SELECTOR_TIME: Histogram[exponential_buckets(0.001, 2.0, 8)] as "searcher_shard_seletor_time_seconds" ("Time to select shards to sync"),
     }
 }
 

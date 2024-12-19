@@ -254,15 +254,44 @@ pub struct TelemetrySettings {
     pub sentry: Option<SentryConfig>,
 }
 
+fn default_parallel_index_syncs() -> usize {
+    2
+}
+
 #[derive(Clone, Deserialize, Debug)]
 pub struct SearcherSettings {
+    #[serde(default = "default_parallel_index_syncs")]
     pub parallel_index_syncs: usize,
+    #[serde(default)]
+    pub shard_partitioning: ShardPartitioningSettings,
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct ShardPartitioningSettings {
+    pub method: ShardPartitioningMethod,
+    pub replicas: usize,
+}
+
+impl Default for ShardPartitioningSettings {
+    fn default() -> Self {
+        Self {
+            method: ShardPartitioningMethod::Single,
+            replicas: 1,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub enum ShardPartitioningMethod {
+    Single,
+    Kubernetes,
 }
 
 impl Default for SearcherSettings {
     fn default() -> Self {
         Self {
-            parallel_index_syncs: 2,
+            parallel_index_syncs: default_parallel_index_syncs(),
+            shard_partitioning: Default::default(),
         }
     }
 }
