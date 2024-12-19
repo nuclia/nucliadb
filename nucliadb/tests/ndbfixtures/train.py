@@ -20,6 +20,7 @@
 
 import asyncio
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import AsyncIterator
 from unittest.mock import patch
@@ -65,8 +66,7 @@ from nucliadb_utils.utilities import (
     get_storage,
 )
 
-# train_rest_api = deploy_mode("standalone") nucliadb_train
-# train_client = deploy_mode("component") nucliadb_train_grpc -> TrainStub
+# Main fixtures
 
 
 @pytest.fixture(scope="function")
@@ -87,41 +87,39 @@ async def standalone_nucliadb_train(
         yield client
 
 
-# TODO: this should be at ndbfixtures.ingest or similar
-@pytest.fixture(scope="function")
-async def nucliadb_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
-    return stub
-
-
 # Utils
 
 
+@dataclass
+class TrainGrpcServer:
+    port: int
+
+
 @pytest.fixture(scope="function")
-def test_settings_train(
+async def train_grpc_server(
     storage_settings,
     fake_node,
     maindb_driver: Driver,
-):
+    local_files,
+) -> AsyncIterator[TrainGrpcServer]:
     with (
         patch.object(running_settings, "debug", False),
-        patch.object(train_settings, "grpc_port", free_port()),
+        patch.object(train_settings, "grpc_port", free_port()) as grpc_port,
     ):
-        yield
+        await start_shard_manager()
+        await start_train_grpc("testing_train")
+
+        yield TrainGrpcServer(
+            port=grpc_port,
+        )
+
+        await stop_train_grpc()
+        await stop_shard_manager()
 
 
 @pytest.fixture(scope="function")
-async def train_grpc_server(test_settings_train: None, local_files) -> AsyncIterator[None]:
-    await start_shard_manager()
-    await start_train_grpc("testing_train")
-    yield
-    await stop_train_grpc()
-    await stop_shard_manager()
-
-
-@pytest.fixture(scope="function")
-async def train_client(train_grpc_server) -> AsyncIterator[TrainStub]:
-    channel = aio.insecure_channel(f"localhost:{train_settings.grpc_port}")
+async def train_client(train_grpc_server: TrainGrpcServer) -> AsyncIterator[TrainStub]:
+    channel = aio.insecure_channel(f"localhost:{train_grpc_server.port}")
     yield TrainStub(channel)
     await channel.close(grace=None)
 
@@ -153,7 +151,7 @@ async def knowledgebox_with_labels(nucliadb_writer: AsyncClient, knowledgebox: s
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_with_entities(nucliadb_grpc: WriterStub, knowledgebox: str):
+async def knowledgebox_with_entities(nucliadb_ingest_grpc: WriterStub, knowledgebox: str):
     ser = SetEntitiesRequest()
     ser.kb.uuid = knowledgebox
     ser.group = "PERSON"
@@ -162,7 +160,7 @@ async def knowledgebox_with_entities(nucliadb_grpc: WriterStub, knowledgebox: st
     ser.entities.entities["Eudald Camprubi"].value = "Eudald Camprubi"
     ser.entities.entities["Carmen Iniesta"].value = "Carmen Iniesta"
     ser.entities.entities["el Super Fran"].value = "el Super Fran"
-    await nucliadb_grpc.SetEntities(ser)  # type: ignore
+    await nucliadb_ingest_grpc.SetEntities(ser)  # type: ignore
 
     ser = SetEntitiesRequest()
     ser.kb.uuid = knowledgebox
@@ -171,7 +169,7 @@ async def knowledgebox_with_entities(nucliadb_grpc: WriterStub, knowledgebox: st
     ser.entities.entities["Nuclia"].value = "Nuclia"
     ser.entities.entities["Debian"].value = "Debian"
     ser.entities.entities["Generalitat de Catalunya"].value = "Generalitat de Catalunya"
-    await nucliadb_grpc.SetEntities(ser)  # type: ignore
+    await nucliadb_ingest_grpc.SetEntities(ser)  # type: ignore
 
     yield knowledgebox
 

@@ -41,12 +41,12 @@ from tests.utils.dirty_index import wait_for_sync
 @pytest.mark.deploy_modes("standalone")
 async def test_generator_field_streaming(
     nucliadb_train: aiohttp.ClientSession,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     kbid = knowledgebox
 
-    await inject_resources_with_paragraphs(kbid, nucliadb_grpc)
+    await inject_resources_with_paragraphs(kbid, nucliadb_ingest_grpc)
 
     async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
@@ -70,8 +70,8 @@ async def test_generator_field_streaming(
         assert len(batches) == 1
 
 
-async def inject_resources_with_paragraphs(kbid: str, nucliadb_grpc: WriterStub):
-    await inject_message(nucliadb_grpc, smb_wonder_bm(kbid))
+async def inject_resources_with_paragraphs(kbid: str, nucliadb_ingest_grpc: WriterStub):
+    await inject_message(nucliadb_ingest_grpc, smb_wonder_bm(kbid))
     await wait_for_sync()
     await asyncio.sleep(0.1)
 

@@ -44,6 +44,9 @@ DEPLOY_MODE_FIXTURES = {
     "nucliadb_train_grpc": [
         "component",
     ],
+    "nucliadb_ingest_grpc": [
+        "standalone",
+    ],
 }
 
 
@@ -93,8 +96,7 @@ def pytest_generate_tests(metafunc: Metafunc):
 # and return the value of the injected lazy fixture
 
 
-@pytest.fixture(scope="function")
-async def nucliadb_reader(request: FixtureRequest):
+async def _generic_injected_fixture(request: FixtureRequest):
     try:
         yield request.param
     except AttributeError as exc:
@@ -103,31 +105,8 @@ async def nucliadb_reader(request: FixtureRequest):
         ) from exc
 
 
-@pytest.fixture(scope="function")
-async def nucliadb_writer(request: FixtureRequest):
-    try:
-        yield request.param
-    except AttributeError as exc:
-        raise MagicFixturesError(
-            "Are you using a magic fixture without the deploy_modes decorator?"
-        ) from exc
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_train(request: FixtureRequest):
-    try:
-        yield request.param
-    except AttributeError as exc:
-        raise MagicFixturesError(
-            "Are you using a magic fixture without the deploy_modes decorator?"
-        ) from exc
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_train_grpc(request: FixtureRequest):
-    try:
-        yield request.param
-    except AttributeError as exc:
-        raise MagicFixturesError(
-            "Are you using a magic fixture without the deploy_modes decorator?"
-        ) from exc
+nucliadb_reader = pytest.fixture(_generic_injected_fixture, scope="function")
+nucliadb_writer = pytest.fixture(_generic_injected_fixture, scope="function")
+nucliadb_train = pytest.fixture(_generic_injected_fixture, scope="function")
+nucliadb_train_grpc = pytest.fixture(_generic_injected_fixture, scope="function")
+nucliadb_ingest_grpc = pytest.fixture(_generic_injected_fixture, scope="function")

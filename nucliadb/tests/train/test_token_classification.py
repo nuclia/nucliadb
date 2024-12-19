@@ -39,11 +39,11 @@ from tests.utils.dirty_index import wait_for_sync
 async def test_generator_token_classification(
     nucliadb_train: aiohttp.ClientSession,
     knowledgebox_with_entities: str,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
 ):
     kbid = knowledgebox_with_entities
 
-    await inject_resource_with_token_classification(kbid, nucliadb_grpc)
+    await inject_resource_with_token_classification(kbid, nucliadb_ingest_grpc)
 
     async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200

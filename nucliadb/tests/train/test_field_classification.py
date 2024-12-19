@@ -83,7 +83,7 @@ async def test_generator_field_classification(
 
 @pytest.fixture(scope="function")
 async def knowledgebox_with_labels(
-    nucliadb_grpc: WriterStub, nucliadb_writer: AsyncClient, knowledgebox: str
+    nucliadb_ingest_grpc: WriterStub, nucliadb_writer: AsyncClient, knowledgebox: str
 ):
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/labelset/labelset_paragraphs",
@@ -116,14 +116,14 @@ async def knowledgebox_with_labels(
     bmb.with_summary("First summary")
     bmb.with_resource_labels("labelset_resources", ["label_user"])
     bm = bmb.build()
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     bmb = BrokerMessageBuilder(kbid=knowledgebox)
     bmb.with_title("Second resource")
     bmb.with_summary("Second summary")
     bmb.with_resource_labels("labelset_resources", ["label_machine"])
     bm = bmb.build()
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 
     await asyncio.sleep(0.1)

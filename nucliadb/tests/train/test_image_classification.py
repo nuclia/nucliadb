@@ -88,7 +88,7 @@ async def test_generation_image_classification(
 
 @pytest.fixture
 async def image_classification_resource(
-    nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, knowledgebox: str
+    nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: WriterStub, knowledgebox: str
 ):
     kbid = knowledgebox
     field_id = "invoice"
@@ -131,7 +131,7 @@ async def image_classification_resource(
         patch("nucliadb.ingest.fields.file.File.set_file_extracted_data", new=mock_set) as _,
         patch("nucliadb.ingest.fields.file.File.get_file_extracted_data", new=mock_get) as _,
     ):
-        response = await nucliadb_grpc.ProcessMessage(  # type: ignore
+        response = await nucliadb_ingest_grpc.ProcessMessage(  # type: ignore
             iter([broker_message]), timeout=10, wait_for_ready=True
         )
         await wait_for_sync()

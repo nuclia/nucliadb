@@ -37,6 +37,7 @@ pytest_plugins.extend(
         "tests.ndbfixtures.reader",
         "tests.ndbfixtures.writer",
         "tests.ndbfixtures.train",
+        "tests.ndbfixtures.ingest",
         # subcomponents
         "tests.ndbfixtures.common",
         "tests.ndbfixtures.maindb",

@@ -56,12 +56,12 @@ async def get_question_answer_streaming_batch_from_response(
 @pytest.mark.deploy_modes("standalone")
 async def test_generator_question_answer_streaming(
     nucliadb_train: aiohttp.ClientSession,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     kbid = knowledgebox
 
-    await inject_resources_with_question_answers(kbid, nucliadb_grpc)
+    await inject_resources_with_question_answers(kbid, nucliadb_ingest_grpc)
 
     async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
@@ -101,8 +101,8 @@ async def test_generator_question_answer_streaming(
         assert answer_paragraphs_count == 4
 
 
-async def inject_resources_with_question_answers(kbid: str, nucliadb_grpc: WriterStub):
-    await inject_message(nucliadb_grpc, smb_wonder_bm(kbid))
+async def inject_resources_with_question_answers(kbid: str, nucliadb_ingest_grpc: WriterStub):
+    await inject_message(nucliadb_ingest_grpc, smb_wonder_bm(kbid))
     await wait_for_sync()
     await asyncio.sleep(0.1)
 
