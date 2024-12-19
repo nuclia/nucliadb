@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def standalone_nucliadb(
+async def nucliadb(
     endecryptor_settings,
     dummy_processing,
     analytics_disabled,
