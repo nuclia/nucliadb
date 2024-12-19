@@ -42,7 +42,6 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
-from nucliadb.ingest.settings import settings
 from nucliadb.standalone.settings import Settings
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
@@ -503,14 +502,6 @@ async def test_resource(storage, maindb_driver, knowledgebox_ingest, fake_node):
     )
     yield resource
     resource.clean()
-
-
-@pytest.fixture(scope="function")
-def partition_settings():
-    settings.replica_number = 1
-    settings.total_replicas = 4
-
-    yield settings
 
 
 def broker_resource(
