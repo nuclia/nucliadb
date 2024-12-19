@@ -91,7 +91,7 @@ pub async fn purge_deleted_shards_and_indexes(meta: &NidxMetadata) -> anyhow::Re
          WHERE (
              deleted_at IS NOT NULL
              AND NOT EXISTS(SELECT 1 FROM segments WHERE index_id = indexes.id)
-             AND NOT EXISTS(SELECT 1 FROM deletions where index_id = deletions.index_id)
+             AND NOT EXISTS(SELECT 1 FROM deletions where index_id = indexes.id)
          )"
     )
     .execute(&meta.pool)

@@ -28,8 +28,8 @@ use object_store::ObjectStore;
 use uuid::Uuid;
 
 use nidx::api::shards;
-use nidx::indexer::index_resource;
-use nidx::metadata::{Index, IndexId, Segment};
+use nidx::indexer::{delete_resource, index_resource};
+use nidx::metadata::{Deletion, Index, IndexId, Segment};
 use nidx::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
 use nidx::{metadata::Shard, NidxMetadata};
 use nidx_tests::*;
@@ -107,17 +107,47 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
             .await?;
     }
 
+    // Create a shard that will survive the purge, with some segments/deletions
+    let kbid = Uuid::new_v4();
+    let vector_configs = HashMap::from([("english".to_string(), VECTOR_CONFIG)]);
+    let surviving_shard = shards::create_shard(&meta, kbid, vector_configs).await?;
+    let resource = people_and_places(surviving_shard.id.to_string());
+    let rid = resource.resource.as_ref().unwrap().uuid.clone();
+    index_resource(
+        &meta,
+        storage.clone(),
+        &tempfile::env::temp_dir(),
+        &surviving_shard.id.to_string(),
+        resource,
+        3i64.into(),
+    )
+    .await?;
+    delete_resource(&meta, &surviving_shard.id.to_string(), rid, 4i64.into()).await?;
+
     // Purge everything
-    // TODO: show better when we remove everything
     purge_segments(&meta, &storage).await?;
     purge_deletions(&meta, 100).await?;
     purge_deleted_shards_and_indexes(&meta).await?;
 
-    assert_eq!(count_shards(&meta.pool).await?, 0);
-    assert_eq!(count_indexes(&meta.pool).await?, 0);
-    assert_eq!(count_segments(&meta.pool).await?, 0);
+    // All is deleted except the surviving shard
+    assert_eq!(count_shards(&meta.pool).await?, 1);
+    assert_eq!(Shard::list_ids(&meta.pool).await?, vec![surviving_shard.id]);
+
+    assert_eq!(count_indexes(&meta.pool).await?, 4);
+    let indexes = Index::for_shard(&meta.pool, surviving_shard.id).await?;
+    assert_eq!(indexes.len(), 4);
+
+    let mut expected_segments = 0;
+    let mut expected_deletions = 0;
+    for index in indexes {
+        expected_segments += index.segments(&meta.pool).await?.len();
+        expected_deletions += Deletion::for_index_and_seq(&meta.pool, index.id, 10i64.into()).await?.len();
+    }
+
+    // Check that only the surviving shard stuff is here
+    assert_eq!(count_segments(&meta.pool).await?, expected_segments);
     assert_eq!(count_merge_jobs(&meta.pool).await?, 0);
-    assert_eq!(count_deletions(&meta.pool).await?, 0);
+    assert_eq!(count_deletions(&meta.pool).await?, expected_deletions);
 
     Ok(())
 }
