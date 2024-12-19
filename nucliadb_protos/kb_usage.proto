@@ -26,6 +26,7 @@ enum PredictType {
     TOKEN = 1;
     QUESTION_ANSWER = 2;
     REPHRASE = 3;
+    RETRIEVAL_REPHRASE = 16;
     SUMMARIZE = 4;
     EXTRACT_TABLES = 5;
     RERANK = 6;
