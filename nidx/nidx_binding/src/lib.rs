@@ -1,4 +1,5 @@
 use nidx::scheduler::{self, GetAckFloor};
+use nidx::searcher::shard_selector::ShardSelector;
 use nidx::worker;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -7,7 +8,7 @@ use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
 use nidx::indexer::process_index_message;
 use nidx::searcher::grpc::SearchServer;
-use nidx::searcher::{ShardSelector, SyncStatus, SyncedSearcher};
+use nidx::searcher::{SyncStatus, SyncedSearcher};
 use nidx::settings::EnvSettings;
 use nidx::Settings;
 use nidx_protos::prost::*;
