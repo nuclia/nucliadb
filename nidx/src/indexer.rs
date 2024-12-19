@@ -228,14 +228,16 @@ pub async fn index_resource(
     // Commit all indexes in a single transaction. In case one fails, no changes will be made
     // and the index message can be safely reprocessed
     let mut tx = meta.transaction().await?;
+    let mut indexes = Vec::new();
     for (segment, size, deletions) in results?.into_iter().flatten() {
         // Mark the segments as visible and write the deletions at the same time
         segment.mark_ready(&mut *tx, size as i64).await?;
         if !deletions.is_empty() {
             Deletion::create(&mut *tx, segment.index_id, seq, &deletions).await?;
         }
-        Index::updated(&mut *tx, &segment.index_id).await?;
+        indexes.push(segment.index_id);
     }
+    Index::updated_many(&mut *tx, &indexes).await?;
     tx.commit().await?;
     TOTAL_INDEXING_TIME.observe(t.elapsed().as_secs_f64());
 
