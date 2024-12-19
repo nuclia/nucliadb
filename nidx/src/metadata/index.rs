@@ -164,6 +164,13 @@ impl Index {
         Ok(())
     }
 
+    pub async fn updated_many(meta: impl Executor<'_, Database = Postgres>, index_id: &[IndexId]) -> sqlx::Result<()> {
+        sqlx::query!("UPDATE indexes SET updated_at = NOW() WHERE id = ANY($1)", index_id as &[IndexId])
+            .execute(meta)
+            .await?;
+        Ok(())
+    }
+
     pub async fn recently_updated(
         meta: impl Executor<'_, Database = Postgres>,
         newer_than: PrimitiveDateTime,
