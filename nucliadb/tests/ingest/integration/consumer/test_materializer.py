@@ -30,7 +30,7 @@ from nucliadb_protos.kb_usage_pb2 import KbUsage, Service
 from nucliadb_utils import const
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
-from tests.ingest.fixtures import create_resource
+from tests.ndbfixtures.ingest import create_resource
 
 
 @pytest.fixture()

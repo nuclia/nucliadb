@@ -42,7 +42,7 @@ from nucliadb_utils.utilities import (
     clean_utility,
     set_utility,
 )
-from tests.ingest.fixtures import IngestFixture
+from tests.ndbfixtures.ingest import IngestFixture
 from tests.utils.dirty_index import mark_dirty
 
 from .utils import create_api_client_factory

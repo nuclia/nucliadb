@@ -60,11 +60,3 @@ pytest_plugins.extend(
         "nucliadb_utils.tests.asyncbenchmark",
     ]
 )
-
-# "Legacy" fixture
-# XXX we keep needing this for dependent fixtures that haven't been moved yet
-pytest_plugins.extend(
-    [
-        "tests.ingest.fixtures",
-    ]
-)

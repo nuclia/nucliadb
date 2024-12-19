@@ -102,7 +102,7 @@ async def train_grpc_server(
     storage_settings,
     fake_node,
     maindb_driver: Driver,
-    local_files,
+    local_files__ndbfixtures,
 ) -> AsyncIterator[TrainGrpcServer]:
     with (
         patch.object(running_settings, "debug", False),

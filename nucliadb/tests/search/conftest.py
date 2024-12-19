@@ -23,7 +23,7 @@ pytest_plugins = [
     "tests.ndbfixtures.maindb",
     "tests.ndbfixtures.processing",
     "tests.ndbfixtures.standalone",
-    "tests.ingest.fixtures",  # should be refactored out
+    "tests.ndbfixtures.ingest",
     "tests.search.node",
     "tests.search.fixtures",
     "nucliadb_utils.tests.fixtures",

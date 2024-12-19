@@ -21,7 +21,7 @@
 
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
-from tests.ingest.fixtures import IngestFixture
+from tests.ndbfixtures.ingest import IngestFixture
 
 
 async def test_list_members(grpc_servicer: IngestFixture):

@@ -43,6 +43,7 @@ async def shard_manager(storage: Storage, maindb_driver: Driver) -> AsyncIterato
     clean_utility(Utility.SHARD_MANAGER)
 
 
+# XXX: renamed as ingest overwrites this and call it from a loot of tests
 @pytest.fixture(scope="function")
-async def local_files():
+async def local_files__ndbfixtures():
     storage_settings.local_testing_files = f"{dirname(__file__)}"

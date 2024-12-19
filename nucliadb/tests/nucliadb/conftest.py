@@ -27,7 +27,7 @@ pytest_plugins = [
     "nucliadb_utils.tests.asyncbenchmark",
     "nucliadb_utils.tests.nats",
     "tests.search.node",
-    "tests.ingest.fixtures",
+    "tests.ndbfixtures.ingest",
     "nucliadb_utils.tests.fixtures",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.azure",

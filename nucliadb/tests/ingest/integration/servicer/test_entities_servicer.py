@@ -21,7 +21,7 @@
 from uuid import uuid4
 
 from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
-from tests.ingest.fixtures import IngestFixture
+from tests.ndbfixtures.ingest import IngestFixture
 
 
 async def test_create_entities_group(

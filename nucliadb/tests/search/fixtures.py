@@ -42,7 +42,7 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
 )
-from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures.ingest import broker_resource
 
 
 @pytest.fixture(scope="function")

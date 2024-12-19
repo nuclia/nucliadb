@@ -43,7 +43,7 @@ async def component_nucliadb_reader(
     # XXX: there's some weird dependency with `local_files` fixtures. Without
     # it, download tests fail only if they are run after a test without using
     # this fixture. This should be fixed or explained
-    local_files,
+    local_files__ndbfixtures,
     dummy_index_node_cluster,
     dummy_nidx_utility,
     reader_api_server: FastAPI,
