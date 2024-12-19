@@ -23,7 +23,7 @@ mod index_cache;
 mod query_language;
 mod query_planner;
 mod shard_search;
-mod shard_selector;
+pub mod shard_selector;
 mod shard_suggest;
 mod streams;
 mod sync;
@@ -31,7 +31,8 @@ mod sync;
 use index_cache::IndexCache;
 use object_store::DynObjectStore;
 use shard_selector::KubernetesCluster;
-use shard_selector::ListNodes;
+pub use shard_selector::ListNodes;
+use shard_selector::ShardSelector;
 use shard_selector::SingleNodeCluster;
 use sync::run_sync;
 use sync::SyncMetadata;
@@ -55,7 +56,6 @@ use crate::settings::SearcherSettings;
 use crate::{NidxMetadata, Settings};
 
 pub use index_cache::IndexSearcher;
-pub use shard_selector::ShardSelector;
 pub use sync::SyncStatus;
 
 pub struct SyncedSearcher {

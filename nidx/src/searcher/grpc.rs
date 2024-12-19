@@ -61,7 +61,7 @@ impl SearchServer {
             return Ok(client.clone());
         }
 
-        let client = NidxSearcherClient::connect(format!("http://{hostname}:10001")).await?;
+        let client = NidxSearcherClient::connect(format!("http://{hostname}")).await?;
         self.clients.write().await.insert(hostname.clone(), client.clone());
         Ok(client)
     }

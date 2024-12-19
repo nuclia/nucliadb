@@ -25,7 +25,8 @@ use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
 use nidx::indexer::index_resource;
 use nidx::searcher::grpc::SearchServer;
-use nidx::searcher::{ShardSelector, SyncedSearcher};
+use nidx::searcher::shard_selector::ShardSelector;
+use nidx::searcher::SyncedSearcher;
 use nidx::settings::{EnvSettings, MetadataSettings, StorageSettings};
 use nidx::{NidxMetadata, Settings};
 use nidx_protos::nidx::nidx_api_client::NidxApiClient;
@@ -40,7 +41,7 @@ use tonic::transport::Channel;
 pub struct NidxFixture {
     pub searcher_client: NidxSearcherClient<Channel>,
     pub api_client: NidxApiClient<Channel>,
-    settings: Settings,
+    pub settings: Settings,
     seq: i64,
 }
 

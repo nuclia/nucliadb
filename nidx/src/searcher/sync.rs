@@ -489,7 +489,6 @@ impl SyncMetadata {
     }
 
     pub async fn set_synced_shards(&self, shards: &[Uuid]) -> (Vec<IndexId>, Vec<(Uuid, IndexId)>) {
-        println!("Set synced shards {shards:?}");
         let shards: HashSet<Uuid> = HashSet::from_iter(shards.iter().copied());
 
         let mut shard_metadata = self.shard_metadata.write().await;

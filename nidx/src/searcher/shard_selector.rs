@@ -80,7 +80,7 @@ impl KubernetesCluster {
                         if let Err(e) = result {
                             return Err(e.into())
                         }
-                        let new_pods = task_reader.state().iter().filter_map(|pod| Self::pod_ready(pod).then(|| pod.metadata.name.clone()).flatten()).collect();
+                        let new_pods = task_reader.state().iter().filter_map(|pod| Self::pod_ready(pod).then(|| pod.metadata.name.as_ref().map(|name| format!("{name}:10001"))).flatten()).collect();
                         if new_pods != prev_pods {
                             info!(?prev_pods, ?new_pods, "Kubernetes detected cluster topology change");
                             prev_pods = new_pods;
