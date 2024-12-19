@@ -22,16 +22,20 @@ import os
 import tarfile
 import tempfile
 
+import pytest
+from httpx import AsyncClient
+
 from nucliadb.standalone.introspect import ClusterInfo
 from nucliadb.standalone.settings import Settings
 
 
-async def test_introspect_endpoint(nucliadb_manager) -> None:
+@pytest.mark.deploy_modes("standalone")
+async def test_introspect_endpoint(nucliadb_writer_manager: AsyncClient) -> None:
     # Generate some traffic to have some logs
-    await nucliadb_manager.post("/not/found")
-    await nucliadb_manager.delete("/kb/foobar")
+    await nucliadb_writer_manager.post("/not/found")
+    await nucliadb_writer_manager.delete("/kb/foobar")
 
-    resp = await nucliadb_manager.get("/introspect", timeout=600)
+    resp = await nucliadb_writer_manager.get("/introspect", timeout=600)
     assert resp.status_code == 200
 
     with tempfile.TemporaryDirectory() as root_dir:

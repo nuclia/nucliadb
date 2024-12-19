@@ -26,9 +26,12 @@ from httpx import AsyncClient
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.reader.app import create_application
+from nucliadb.standalone.settings import Settings
+from nucliadb.writer import API_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.storages.storage import Storage
+from tests.utils.dirty_index import wait_for_sync
 
 from .utils import create_api_client_factory
 
@@ -49,6 +52,20 @@ async def component_nucliadb_reader(
         client_factory = create_api_client_factory(reader_api_server)
         async with client_factory(roles=[NucliaDBRoles.READER]) as client:
             yield client
+
+
+@pytest.fixture(scope="function")
+async def standalone_nucliadb_reader(nucliadb: Settings) -> AsyncIterator[AsyncClient]:
+    async with AsyncClient(
+        headers={"X-NUCLIADB-ROLES": "READER"},
+        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
+        timeout=None,
+        event_hooks={"request": [wait_for_sync]},
+    ) as client:
+        yield client
+
+
+# Derived
 
 
 @pytest.fixture(scope="function")
