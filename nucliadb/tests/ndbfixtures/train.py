@@ -31,6 +31,7 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
@@ -57,9 +58,7 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.settings import (
-    FileBackendConfig,
     running_settings,
-    storage_settings,
 )
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.utilities import (
@@ -99,12 +98,14 @@ async def nucliadb_grpc(nucliadb: Settings):
 
 
 @pytest.fixture(scope="function")
-def test_settings_train(cache, gcs, fake_node, maindb_driver):
+def test_settings_train(
+    cache,
+    storage_settings,
+    fake_node,
+    maindb_driver: Driver,
+):
     with (
         patch.object(running_settings, "debug", False),
-        patch.object(storage_settings, "gcs_endpoint_url", gcs),
-        patch.object(storage_settings, "file_backend", FileBackendConfig.GCS),
-        patch.object(storage_settings, "gcs_bucket", "test_{kbid}"),
         patch.object(train_settings, "grpc_port", free_port()),
     ):
         yield
