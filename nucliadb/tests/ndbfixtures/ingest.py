@@ -23,7 +23,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import AsyncIterator, Iterable, Optional
+from typing import AsyncIterator, Iterable, Iterator, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -55,6 +55,7 @@ from nucliadb_utils import const
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
+from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
@@ -84,6 +85,32 @@ async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[W
     stub = WriterStub(channel)
     yield stub
     await channel.close(grace=None)
+
+
+######################################################################
+# cleaned
+######################################################################
+
+
+@pytest.fixture(scope="function")
+def pubsub(nats_pubsub: NatsPubsub) -> Iterator[PubSubDriver]:
+    pubsub = get_utility(Utility.PUBSUB)
+    assert pubsub is None, "No pubsub is expected to be here"
+    set_utility(Utility.PUBSUB, nats_pubsub)
+
+    yield nats_pubsub
+
+    clean_utility(Utility.PUBSUB)
+
+
+@pytest.fixture(scope="function")
+async def nats_pubsub(natsd) -> AsyncIterator[NatsPubsub]:
+    pubsub = NatsPubsub(hosts=[natsd])
+    await pubsub.initialize()
+
+    yield pubsub
+
+    await pubsub.finalize()
 
 
 ######################################################################
@@ -151,19 +178,6 @@ async def grpc_servicer(maindb_driver, ingest_consumers, ingest_processed_consum
     await servicer.finalize()
     await _channel.close()
     await server.stop(None)
-
-
-@pytest.fixture(scope="function")
-async def pubsub(natsd):
-    pubsub = get_utility(Utility.PUBSUB)
-    if pubsub is None:
-        pubsub = NatsPubsub(hosts=[natsd])
-        await pubsub.initialize()
-        set_utility(Utility.PUBSUB, pubsub)
-
-    yield pubsub
-    clean_utility(Utility.PUBSUB)
-    await pubsub.finalize()
 
 
 @pytest.fixture(scope="function")
