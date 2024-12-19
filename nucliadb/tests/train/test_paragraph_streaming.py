@@ -21,6 +21,7 @@ import asyncio
 from typing import AsyncIterator
 
 import aiohttp
+import pytest
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
@@ -49,16 +50,17 @@ async def get_paragraph_streaming_batch_from_response(
         yield pcb
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_generator_paragraph_streaming(
-    train_rest_api: aiohttp.ClientSession,
-    nucliadb_grpc: WriterStub,
+    nucliadb_train: aiohttp.ClientSession,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     kbid = knowledgebox
 
-    await inject_resources_with_paragraphs(kbid, nucliadb_grpc)
+    await inject_resources_with_paragraphs(kbid, nucliadb_ingest_grpc)
 
-    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
+    async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1
@@ -69,7 +71,7 @@ async def test_generator_paragraph_streaming(
     trainset.batch_size = 5
     trainset.filter.labels.append("labelset_paragraphs")
 
-    async with train_rest_api.post(
+    async with nucliadb_train.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
     ) as response:
@@ -81,8 +83,8 @@ async def test_generator_paragraph_streaming(
         assert len(batches) == 1
 
 
-async def inject_resources_with_paragraphs(kbid: str, nucliadb_grpc: WriterStub):
-    await inject_message(nucliadb_grpc, smb_wonder_bm(kbid))
+async def inject_resources_with_paragraphs(kbid: str, nucliadb_ingest_grpc: WriterStub):
+    await inject_message(nucliadb_ingest_grpc, smb_wonder_bm(kbid))
     await asyncio.sleep(0.1)
     await wait_for_sync()
 

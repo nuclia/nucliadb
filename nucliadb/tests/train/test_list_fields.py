@@ -18,12 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
+
 from nucliadb_protos.train_pb2 import GetFieldsRequest
 from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
+@pytest.mark.deploy_modes("component")
 async def test_list_fields(
-    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetFieldsRequest()
     req.kb.uuid = knowledgebox_ingest
@@ -32,7 +35,7 @@ async def test_list_fields(
     req.metadata.text = True
     req.metadata.vector = True
     count = 0
-    async for _ in train_client.GetParagraphs(req):  # type: ignore
+    async for _ in nucliadb_train_grpc.GetParagraphs(req):  # type: ignore
         count += 1
 
     assert count == 30

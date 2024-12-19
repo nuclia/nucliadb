@@ -18,11 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
+from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 
 
-async def test_basic_patch_thumbnail_sc_2390(knowledgebox_one, nucliadb_reader, nucliadb_writer) -> None:
+@pytest.mark.deploy_modes("standalone")
+async def test_basic_patch_thumbnail_sc_2390(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
+) -> None:
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox_one}/resources",
         json={

@@ -18,14 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
+from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_entities_service(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox_one,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
     entities_manager_mock,
 ) -> None:
     entitygroup = {
@@ -64,7 +67,12 @@ async def test_entities_service(
     assert len(resp.json()["groups"]) == 0
 
 
-async def test_labelsets_service(nucliadb_reader, nucliadb_writer, knowledgebox_one) -> None:
+@pytest.mark.deploy_modes("standalone")
+async def test_labelsets_service(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
+) -> None:
     payload = {
         "title": "labelset1",
         "labels": [{"title": "Label 1", "related": "related 1", "text": "My Text"}],
@@ -87,6 +95,9 @@ async def test_labelsets_service(nucliadb_reader, nucliadb_writer, knowledgebox_
     assert len(resp.json()["labelsets"]) == 0
 
 
-async def test_notifications_service(nucliadb_reader):
+@pytest.mark.deploy_modes("standalone")
+async def test_notifications_service(
+    nucliadb_reader: AsyncClient,
+):
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/foobar/notifications")
     assert resp.status_code == 404

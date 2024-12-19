@@ -17,18 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = [
-    "pytest_docker_fixtures",
-    "tests.fixtures",
-    "tests.ingest.fixtures",  # should be refactored out
-    "tests.search.fixtures",
-    "tests.search.node",
-    "tests.standalone.fixtures",
-    "nucliadb_utils.tests.fixtures",
-    "nucliadb_utils.tests.nats",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.s3",
-    "nucliadb_utils.tests.azure",
-    "nucliadb_utils.tests.local",
-    "nucliadb_utils.tests.indexing",
-]
+
+
+import pytest
+from grpc import aio
+
+from nucliadb.standalone.settings import Settings
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+
+# Main fixtures
+
+
+@pytest.fixture(scope="function")
+async def standalone_nucliadb_ingest_grpc(nucliadb: Settings):
+    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
+    return stub

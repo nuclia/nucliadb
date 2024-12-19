@@ -32,11 +32,25 @@ DEPLOY_MODE_MARK_NAME = "deploy_modes"
 DEPLOY_MODE_FIXTURES = {
     "nucliadb_reader": [
         "component",
+        "standalone",
     ],
     "nucliadb_writer": [
         "component",
+        "standalone",
+    ],
+    "nucliadb_train": [
+        "standalone",
+    ],
+    "nucliadb_train_grpc": [
+        "component",
+    ],
+    "nucliadb_ingest_grpc": [
+        "standalone",
     ],
 }
+
+
+class MagicFixturesError(Exception): ...
 
 
 def pytest_configure(config):
@@ -72,7 +86,7 @@ def pytest_generate_tests(metafunc: Metafunc):
                         if deploy_mode in DEPLOY_MODE_FIXTURES[fixture_name]:
                             argvalues.append(lf(f"{deploy_mode}_{fixture_name}"))
                         else:
-                            logger.warning(
+                            raise MagicFixturesError(
                                 f"Requesting fixture {fixture_name} with an unavailable mode: {deploy_mode}"
                             )
                     metafunc.parametrize(fixture_name, argvalues, indirect=True)
@@ -82,11 +96,17 @@ def pytest_generate_tests(metafunc: Metafunc):
 # and return the value of the injected lazy fixture
 
 
-@pytest.fixture(scope="function")
-async def nucliadb_reader(request: FixtureRequest):
-    yield request.param
+async def _generic_injected_fixture(request: FixtureRequest):
+    try:
+        yield request.param
+    except AttributeError as exc:
+        raise MagicFixturesError(
+            "Are you using a magic fixture without the deploy_modes decorator?"
+        ) from exc
 
 
-@pytest.fixture(scope="function")
-async def nucliadb_writer(request: FixtureRequest):
-    yield request.param
+nucliadb_reader = pytest.fixture(_generic_injected_fixture, scope="function")
+nucliadb_writer = pytest.fixture(_generic_injected_fixture, scope="function")
+nucliadb_train = pytest.fixture(_generic_injected_fixture, scope="function")
+nucliadb_train_grpc = pytest.fixture(_generic_injected_fixture, scope="function")
+nucliadb_ingest_grpc = pytest.fixture(_generic_injected_fixture, scope="function")

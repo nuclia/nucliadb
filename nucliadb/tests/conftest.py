@@ -32,11 +32,12 @@ pytest_plugins.extend(
     [
         # pytest hacks and magic to implement deploy_mode parametrization
         "tests.ndbfixtures.magic",
-        #
         # components and its deploy modes
+        "tests.ndbfixtures.standalone",
         "tests.ndbfixtures.reader",
         "tests.ndbfixtures.writer",
-        #
+        "tests.ndbfixtures.train",
+        "tests.ndbfixtures.ingest",
         # subcomponents
         "tests.ndbfixtures.common",
         "tests.ndbfixtures.maindb",
