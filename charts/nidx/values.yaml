@@ -12,3 +12,4 @@ indexer: {}
 scheduler: {}
 worker: {}
 searcher: {}
+api: {}
