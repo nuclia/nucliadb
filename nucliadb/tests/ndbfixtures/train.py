@@ -35,7 +35,7 @@ from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.standalone.settings import Settings
-from nucliadb.train.settings import settings
+from nucliadb.train.settings import settings as train_settings
 from nucliadb.train.utils import (
     start_shard_manager,
     start_train_grpc,
@@ -106,7 +106,7 @@ def test_settings_train(cache, gcs, fake_node, maindb_driver):
         patch.object(storage_settings, "gcs_endpoint_url", gcs),
         patch.object(storage_settings, "file_backend", FileBackendConfig.GCS),
         patch.object(storage_settings, "gcs_bucket", "test_{kbid}"),
-        patch.object(settings, "grpc_port", free_port()),
+        patch.object(train_settings, "grpc_port", free_port()),
     ):
         yield
 
@@ -122,7 +122,7 @@ async def train_grpc_server(test_settings_train: None, local_files) -> AsyncIter
 
 @pytest.fixture(scope="function")
 def train_client(train_grpc_server) -> Iterator[TrainStub]:
-    channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
+    channel = aio.insecure_channel(f"localhost:{train_settings.grpc_port}")
     yield TrainStub(channel)
     # XXX: no need for this if everyone does things correctly!
     clear_global_cache()
