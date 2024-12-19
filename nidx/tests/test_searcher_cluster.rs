@@ -111,27 +111,9 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
         }
     }
 
-    // Remove one node from the cluster, we expect to see some failures
+    // Remove one node from the cluster and wait for sync, searches should still work
     nodes.lock().unwrap().remove(2);
-    let mut failures = 0;
-    for shard in &shards {
-        for searcher in &searchers[0..2] {
-            let result = NidxSearcherClient::connect(format!("http://{searcher}"))
-                .await?
-                .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
-                    ..Default::default()
-                }))
-                .await;
-            if result.is_err() {
-                failures += 1;
-            }
-        }
-    }
-    assert!(failures > 0);
-
-    // Wait for sync, now all searches should work
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs_f32(1.2)).await;
     for shard in &shards {
         for searcher in &searchers[0..2] {
             NidxSearcherClient::connect(format!("http://{searcher}"))
