@@ -297,7 +297,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
 
 
 @pytest.fixture(scope="function")
-async def test_pagination_resources(processor: Processor, knowledgebox_ingest, test_settings_train):
+async def test_pagination_resources(processor: Processor, knowledgebox_ingest: str):
     """
     Create a set of resources with only basic information to test pagination
     """
