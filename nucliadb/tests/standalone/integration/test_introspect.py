@@ -22,12 +22,14 @@ import os
 import tarfile
 import tempfile
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.standalone.introspect import ClusterInfo
 from nucliadb.standalone.settings import Settings
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_introspect_endpoint(nucliadb_writer_manager: AsyncClient) -> None:
     # Generate some traffic to have some logs
     await nucliadb_writer_manager.post("/not/found")
