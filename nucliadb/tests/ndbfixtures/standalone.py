@@ -41,9 +41,6 @@ from nucliadb_telemetry.settings import (
 )
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
-from nucliadb_utils.utilities import (
-    clear_global_cache,
-)
 
 from .maindb import cleanup_maindb
 
@@ -104,7 +101,6 @@ async def nucliadb(
         await maybe_cleanup_maindb()
 
         reset_config()
-        clear_global_cache()
         await server.shutdown()
 
 
