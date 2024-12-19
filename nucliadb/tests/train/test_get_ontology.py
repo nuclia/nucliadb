@@ -17,17 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
 
 from nucliadb_protos.train_pb2 import GetLabelsRequest
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import GetLabelsResponse
 
 
+@pytest.mark.deploy_modes("component")
 async def test_get_ontology(
-    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetLabelsRequest()
     req.kb.uuid = knowledgebox_ingest
 
-    labels: GetLabelsResponse = await train_client.GetOntology(req)  # type: ignore
+    labels: GetLabelsResponse = await nucliadb_train_grpc.GetOntology(req)  # type: ignore
     assert labels.labels.labelset["ls1"].labels[0].title == "label1"

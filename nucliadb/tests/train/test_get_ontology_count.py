@@ -17,14 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
 from aioresponses import aioresponses
 
 from nucliadb_protos.train_pb2 import GetLabelsetsCountRequest, LabelsetsCount
 from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
+@pytest.mark.deploy_modes("component")
 async def test_get_ontology_count(
-    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
+    nucliadb_train_grpc: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetLabelsetsCountRequest()
     req.kb.uuid = knowledgebox_ingest
@@ -48,5 +50,5 @@ async def test_get_ontology_count(
         )
 
         req.resource_labelsets.append("my-labelset")
-        labels: LabelsetsCount = await train_client.GetOntologyCount(req)  # type: ignore
+        labels: LabelsetsCount = await nucliadb_train_grpc.GetOntologyCount(req)  # type: ignore
     assert labels.labelsets["/l/my-labelset"].paragraphs["Label 1"] == 1

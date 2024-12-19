@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, patch
 
 import aiohttp
 import pytest
+from httpx import AsyncClient
 
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
@@ -50,12 +51,13 @@ INVOICE_FILENAME = os.path.join(_testdata_dir, "invoice.pdf")
 INVOICE_SELECTIONS_FILENAME = os.path.join(_testdata_dir, "invoice_selections.json")
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_generation_image_classification(
-    train_rest_api: aiohttp.ClientSession,
+    nucliadb_train: aiohttp.ClientSession,
     knowledgebox: str,
     image_classification_resource,
 ):
-    async with train_rest_api.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset") as partitions:
+    async with nucliadb_train.get(f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset") as partitions:
         assert partitions.status == 200
         data = await partitions.json()
         assert len(data["partitions"]) == 1
@@ -66,7 +68,7 @@ async def test_generation_image_classification(
     trainset.batch_size = 10
 
     await asyncio.sleep(0.1)
-    async with train_rest_api.post(
+    async with nucliadb_train.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
     ) as response:
@@ -86,7 +88,7 @@ async def test_generation_image_classification(
 
 @pytest.fixture
 async def image_classification_resource(
-    writer_rest_api: aiohttp.ClientSession, nucliadb_grpc: WriterStub, knowledgebox: str
+    nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: WriterStub, knowledgebox: str
 ):
     kbid = knowledgebox
     field_id = "invoice"
@@ -101,8 +103,8 @@ async def image_classification_resource(
     with open(INVOICE_FILENAME, "rb") as f:
         invoice_content = f.read()
 
-    resp = await writer_rest_api.post(
-        f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/resources",
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox}/resources",
         json={
             "title": "My invoice",
             "files": {
@@ -117,8 +119,8 @@ async def image_classification_resource(
             "fieldmetadata": fieldmetadata,
         },
     )
-    assert resp.status == 201
-    body = await resp.json()
+    assert resp.status_code == 201
+    body = resp.json()
     rid = body["uuid"]
 
     broker_message = generate_image_classification_broker_message(selections, kbid, rid, field_id)
@@ -129,11 +131,11 @@ async def image_classification_resource(
         patch("nucliadb.ingest.fields.file.File.set_file_extracted_data", new=mock_set) as _,
         patch("nucliadb.ingest.fields.file.File.get_file_extracted_data", new=mock_get) as _,
     ):
-        resp = await nucliadb_grpc.ProcessMessage(  # type: ignore
+        response = await nucliadb_ingest_grpc.ProcessMessage(  # type: ignore
             iter([broker_message]), timeout=10, wait_for_ready=True
         )
         await wait_for_sync()
-        assert resp.status == OpStatusWriter.Status.OK
+        assert response.status == OpStatusWriter.Status.OK
         yield
 
 
