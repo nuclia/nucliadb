@@ -59,6 +59,7 @@ class AsyncBenchmarkFixture(object):  # pragma: no cover
         disabled,
         cprofile,
         group=None,
+        **kwargs,  # We get called from pytest-benchmark. Ignoring all extra params to be compatible when they add more
     ):
         self.name = node.name
         self.fullname = node._nodeid
