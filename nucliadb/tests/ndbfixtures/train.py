@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from time import time
 from typing import AsyncIterator
 from unittest.mock import patch
 
@@ -33,6 +33,7 @@ from httpx import AsyncClient
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
@@ -309,10 +310,6 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
         message = broker_processed_resource(knowledgebox_ingest, i, message.uuid)
         await processor.process(message=message, seqid=-1, transaction_check=False)
         # Give processed data some time to reach the node
-
-    from time import time
-
-    from nucliadb.common.maindb.utils import get_driver
 
     driver = get_driver()
 
