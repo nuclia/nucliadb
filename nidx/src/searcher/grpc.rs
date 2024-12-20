@@ -26,21 +26,39 @@ use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
 use tokio::sync::RwLock;
+use tonic::service::interceptor::InterceptedService;
+use tonic::service::Interceptor;
 use tonic::transport::Channel;
 use tonic::{service::Routes, Request, Response, Result, Status};
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_selector::SearcherNode;
+use crate::telemetry::middleware::add_telemetry_headers;
 
 use super::shard_selector::ShardSelector;
 use super::streams;
 use super::{index_cache::IndexCache, shard_search, shard_suggest};
 use tracing::*;
 
+#[derive(Clone)]
+struct TelemetryInterceptor;
+#[cfg(feature = "telemetry")]
+impl Interceptor for TelemetryInterceptor {
+    fn call(&mut self, request: tonic::Request<()>) -> std::result::Result<tonic::Request<()>, Status> {
+        add_telemetry_headers(request)
+    }
+}
+#[cfg(not(feature = "telemetry"))]
+impl Interceptor for TelemetryInterceptor {
+    fn call(&mut self, request: tonic::Request<()>) -> std::result::Result<tonic::Request<()>, Status> {}
+}
+
+type SearcherClient = NidxSearcherClient<InterceptedService<Channel, TelemetryInterceptor>>;
+
 pub struct SearchServer {
     index_cache: Arc<IndexCache>,
     shard_selector: ShardSelector,
-    clients: Arc<RwLock<HashMap<String, NidxSearcherClient<Channel>>>>,
+    clients: Arc<RwLock<HashMap<String, SearcherClient>>>,
 }
 
 impl SearchServer {
@@ -56,12 +74,13 @@ impl SearchServer {
         Routes::new(NidxSearcherServer::new(self))
     }
 
-    async fn get_client(&self, hostname: &String) -> NidxResult<NidxSearcherClient<Channel>> {
+    async fn get_client(&self, hostname: &String) -> NidxResult<SearcherClient> {
         if let Some(client) = self.clients.read().await.get(hostname) {
             return Ok(client.clone());
         }
 
-        let client = NidxSearcherClient::connect(format!("http://{hostname}")).await?;
+        let transport = tonic::transport::Endpoint::new(format!("http://{hostname}"))?.connect().await?;
+        let client = NidxSearcherClient::with_interceptor(transport, TelemetryInterceptor);
         self.clients.write().await.insert(hostname.clone(), client.clone());
         Ok(client)
     }
