@@ -95,7 +95,6 @@ async def writer_api_server(
     # XXX we bring all ingest because grpc_servicer was doing so
     ingest_grpc_server: IngestGrpcServer,
     ingest_consumers,
-    ingest_processed_consumer,
     dummy_index,
     #
     transaction_utility,
