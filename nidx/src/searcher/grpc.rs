@@ -125,7 +125,7 @@ macro_rules! shard_request {
             match result {
                 Ok(response) => return Ok(response),
                 Err(e) => {
-                    warn!(?e, ?node, ?$shard_id, concat!("Error in ", $name, ", trying with next node"));
+                    warn!(?node, ?$shard_id, concat!("Error in ", $name, ", trying with next node: {:?}"), e);
                     errors.push(e);
                 }
             }

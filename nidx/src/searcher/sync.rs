@@ -115,7 +115,7 @@ pub async fn run_sync(
                 }
 
                 if let Err(e) = delete_index(shard_id, index_id, Arc::clone(&index_metadata), &notifier).await {
-                    warn!(?e, ?index_id, "Could not delete index, some files will be left behind");
+                    warn!(?index_id, "Could not delete index, some files will be left behind: {e:?}");
                 }
             }
 
@@ -165,9 +165,9 @@ pub async fn run_sync(
                     }
                     let retries = failed_indexes.entry(index_id).or_default();
                     if *retries > 2 {
-                        error!(?index_id, ?e, "Index failed to update multiple times, will keep retrying forever")
+                        error!(?index_id, "Index failed to update multiple times, will keep retrying forever: {e:?}")
                     } else {
-                        warn!(?index_id, ?e, "Index failed to update, will retry")
+                        warn!(?index_id, "Index failed to update, will retry: {e:?}")
                     }
                     *retries += 1;
                 } else {
@@ -202,7 +202,7 @@ pub async fn run_sync(
         }
         .await;
         if let Err(e) = sync_result {
-            error!(?e, "Unexpected error while syncing");
+            error!("Unexpected error while syncing: {e:?}");
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
     }
@@ -242,7 +242,7 @@ async fn sync_index(
                     if retries > 3 {
                         return Err(e);
                     } else {
-                        warn!(?e, ?segment_id, "Failure to download a segment, will retry");
+                        warn!(?segment_id, "Failure to download a segment, will retry: {e:?}");
                     }
                     retries += 1;
                 } else {
