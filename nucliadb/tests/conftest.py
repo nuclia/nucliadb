@@ -41,7 +41,7 @@ pytest_plugins.extend(
         # subcomponents
         "tests.ndbfixtures.common",
         "tests.ndbfixtures.maindb",
-        "tests.ndbfixtures.node",
+        "tests.ndbfixtures.index",
         "tests.ndbfixtures.processing",
         # useful resources for tests (KBs, resources, ...)
         "tests.ndbfixtures.resources",
