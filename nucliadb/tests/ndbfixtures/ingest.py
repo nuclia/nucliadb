@@ -263,7 +263,6 @@ async def ingest_processed_consumer(
     yield
 
     await ingest_consumer_finalizer()
-    clear_global_cache()
 
 
 @pytest.fixture(scope="function")
