@@ -56,10 +56,10 @@ class MigrationsDataManager:
                 await txn.set(MIGRATIONS_KEY.format(kbid=kbid), str(target_version).encode())
             await txn.commit()
 
-    async def get_kb_migrations(self, limit: int = 100) -> list[str]:
+    async def get_kb_migrations(self) -> list[str]:
         keys = []
         async with self.driver.transaction() as txn:
-            async for key in txn.keys(MIGRATIONS_CONTAINER_KEY, count=limit):
+            async for key in txn.keys(MIGRATIONS_CONTAINER_KEY):
                 keys.append(key.split("/")[-1])
 
         return keys

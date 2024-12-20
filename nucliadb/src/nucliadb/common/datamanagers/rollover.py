@@ -93,7 +93,7 @@ async def add_batch_to_index(txn: Transaction, *, kbid: str, batch: list[str]) -
 
 async def get_to_index(txn: Transaction, *, kbid: str) -> Optional[str]:
     key = KB_ROLLOVER_RESOURCES_TO_INDEX.format(kbid=kbid, resource="")
-    found = [key async for key in txn.keys(key)]
+    found = [key async for key in txn.keys(key, count=1)]
     if found:
         return found[0].split("/")[-1]
     return None
