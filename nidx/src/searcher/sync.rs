@@ -20,6 +20,7 @@
 
 use crate::metadata::{Index, IndexId, IndexKind, SegmentId, Shard};
 use crate::metrics;
+use crate::metrics::searcher::{ACTIVE_SHARDS, DESIRED_SHARDS, EVICTED_SHARDS};
 use crate::settings::SearcherSettings;
 use crate::{segment_store::download_segment, NidxMetadata};
 use anyhow::anyhow;
@@ -547,6 +548,10 @@ impl SyncMetadata {
         if count_evicted_shards > 0 {
             info!(count = count_evicted_shards, "Shards marked for eviction");
         }
+
+        DESIRED_SHARDS.set(shards.len() as i64);
+        ACTIVE_SHARDS.set(shard_metadata.values().filter(|v| !v.is_empty()).count() as i64);
+        EVICTED_SHARDS.set(evicted_shards.len() as i64);
 
         (indexes_to_sync, indexes_to_delete)
     }
