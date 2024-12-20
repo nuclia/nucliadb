@@ -25,6 +25,7 @@ import pytest
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.nidx import NIDX_ENABLED, NidxUtility
+from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -33,10 +34,17 @@ from nucliadb_utils.utilities import (
 
 
 @pytest.fixture(scope="function")
-async def dummy_index_node_cluster(
-    # TODO: change this to more explicit dummy indexing utility
-    indexing_utility,
+def dummy_index(
+    dummy_index_node_cluster,
+    dummy_nidx_utility: NidxUtility,
+    indexing_utility: IndexingUtility,
 ):
+    """Dummy/mocked index. Use to avoid usage of index nodes nor nidx"""
+    yield
+
+
+@pytest.fixture(scope="function")
+async def dummy_index_node_cluster():
     with (
         patch.dict(manager.INDEX_NODES, clear=True),
         patch.object(cluster_settings, "standalone_mode", False),

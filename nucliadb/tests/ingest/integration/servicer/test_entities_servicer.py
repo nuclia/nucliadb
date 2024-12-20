@@ -20,18 +20,19 @@
 
 from uuid import uuid4
 
-from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
-from tests.ndbfixtures.ingest import IngestFixture
+import pytest
+
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
+@pytest.mark.deploy_modes("component")
 async def test_create_entities_group(
-    grpc_servicer: IngestFixture, entities_manager_mock, hosted_nucliadb
+    nucliadb_ingest_grpc: WriterStub, entities_manager_mock, hosted_nucliadb
 ):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
-
     kbid = str(uuid4())
     slug = "test"
-    result = await stub.NewKnowledgeBoxV2(  # type: ignore
+    result = await nucliadb_ingest_grpc.NewKnowledgeBoxV2(  # type: ignore
         writer_pb2.NewKnowledgeBoxV2Request(
             kbid=kbid,
             slug=slug,
@@ -56,10 +57,10 @@ async def test_create_entities_group(
             entities={"ent1": knowledgebox_pb2.Entity(value="1", merged=True, represents=[])},
         ),
     )
-    result = await stub.SetEntities(pb_ser)  # type: ignore
+    result = await nucliadb_ingest_grpc.SetEntities(pb_ser)  # type: ignore
     assert result.status == writer_pb2.OpStatusWriter.OK
 
     pb_ger = writer_pb2.GetEntitiesRequest(
         kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid, slug=slug),
     )
-    result = await stub.GetEntities(pb_ger)  # type: ignore
+    result = await nucliadb_ingest_grpc.GetEntities(pb_ger)  # type: ignore

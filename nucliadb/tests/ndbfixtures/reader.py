@@ -44,8 +44,7 @@ async def component_nucliadb_reader(
     # it, download tests fail only if they are run after a test without using
     # this fixture. This should be fixed or explained
     local_files__ndbfixtures,
-    dummy_index_node_cluster,
-    dummy_nidx_utility,
+    dummy_index,
     reader_api_server: FastAPI,
 ) -> AsyncIterator[AsyncClient]:
     with patch.object(running_settings, "debug", False):

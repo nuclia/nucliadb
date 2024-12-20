@@ -19,15 +19,18 @@
 #
 from uuid import uuid4
 
+import pytest
+
 from nucliadb.common import datamanagers
-from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
-async def test_create_cleansup_on_error(grpc_servicer, fake_node, hosted_nucliadb):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+@pytest.mark.deploy_modes("component")
+async def test_create_cleansup_on_error(nucliadb_ingest_grpc: WriterStub, hosted_nucliadb):
     # Create a KB
     kbid = str(uuid4())
-    result = await stub.NewKnowledgeBoxV2(
+    result = await nucliadb_ingest_grpc.NewKnowledgeBoxV2(  # type: ignore
         writer_pb2.NewKnowledgeBoxV2Request(
             kbid=kbid,
             slug="test",

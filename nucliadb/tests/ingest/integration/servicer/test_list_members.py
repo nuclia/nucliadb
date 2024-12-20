@@ -19,15 +19,15 @@
 #
 
 
-from nucliadb_protos import writer_pb2_grpc
+import pytest
+
 from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
-from tests.ndbfixtures.ingest import IngestFixture
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
-async def test_list_members(grpc_servicer: IngestFixture):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
-
-    response = await stub.ListMembers(ListMembersRequest())  # type: ignore
+@pytest.mark.deploy_modes("component")
+async def test_list_members(nucliadb_ingest_grpc: WriterStub):
+    response = await nucliadb_ingest_grpc.ListMembers(ListMembersRequest())  # type: ignore
 
     for member in response.members:
         assert member.type == Member.Type.IO

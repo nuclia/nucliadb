@@ -33,6 +33,7 @@ from grpc import aio
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
+from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
@@ -51,22 +52,40 @@ from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
-from nucliadb_utils.indexing import IndexingUtility
+from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
     clear_global_cache,
-    set_utility,
 )
 
 logger = logging.getLogger(__name__)
 
 INGEST_TESTS_DIR = os.path.abspath(os.path.join(dirname(__file__), "..", "ingest"))
 
+
+@dataclass
+class IngestGrpcServer:
+    host: str
+    port: int
+
+    @property
+    def address(self):
+        return f"{self.host}:{self.port}"
+
+
 # Main fixtures
+
+
+@pytest.fixture(scope="function")
+async def component_nucliadb_ingest_grpc(
+    ingest_grpc_server: IngestGrpcServer,
+) -> AsyncIterator[WriterStub]:
+    channel = aio.insecure_channel(ingest_grpc_server.address)
+    stub = WriterStub(channel)
+    yield stub
+    await channel.close(grace=None)
 
 
 @pytest.fixture(scope="function")
@@ -77,9 +96,53 @@ async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[W
     await channel.close(grace=None)
 
 
+# Utils
+
+
+@pytest.fixture(scope="function")
+async def ingest_grpc_server(ingest_orm) -> AsyncIterator[IngestGrpcServer]:
+    servicer = WriterServicer()
+    await servicer.initialize()
+    server = aio.server()
+    port = server.add_insecure_port("[::]:0")
+    writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
+    await server.start()
+    yield IngestGrpcServer(
+        host="127.0.0.1",
+        port=port,
+    )
+    await servicer.finalize()
+    await server.stop(None)
+
+
+@pytest.fixture(scope="function")
+def ingest_orm(
+    maindb_driver: Driver,
+    storage: Storage,
+    shard_manager: KBShardManager,
+    dummy_index,
+):
+    """Ingest ORM data layer with dummy/mocked index. Use this fixture when you
+    need to use KnowledgeBox, Resource..."""
+    yield
+
+
 ######################################################################
-# cleaned
+# cleaned but wip
 ######################################################################
+
+
+@pytest.fixture(scope="function")
+def processor(
+    maindb_driver: Driver,
+    storage: Storage,
+    pubsub: PubSubDriver,
+    shard_manager: KBShardManager,
+    dummy_index,
+) -> Iterable[Processor]:
+    """Ingest Processor with dummy/mocked index"""
+    proc = Processor(maindb_driver, storage, pubsub, partition="1")
+    yield proc
 
 
 @pytest.fixture(scope="function")
@@ -156,12 +219,6 @@ async def _nats_streams_and_consumers_setup(
 
 
 @pytest.fixture(scope="function")
-def processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
-    proc = Processor(maindb_driver, storage, pubsub, partition="1")
-    yield proc
-
-
-@pytest.fixture(scope="function")
 def local_files():
     storage_settings.local_testing_files = f"{INGEST_TESTS_DIR}"
 
@@ -209,27 +266,6 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def grpc_servicer(maindb_driver, ingest_consumers, ingest_processed_consumer, learning_config):
-    servicer = WriterServicer()
-    await servicer.initialize()
-
-    server = aio.server()
-    port = server.add_insecure_port("[::]:0")
-    writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
-    await server.start()
-    _channel = aio.insecure_channel(f"127.0.0.1:{port}")
-    yield IngestFixture(
-        channel=_channel,
-        serv=server,
-        servicer=servicer,
-        host=f"127.0.0.1:{port}",
-    )
-    await servicer.finalize()
-    await _channel.close()
-    await server.stop(None)
-
-
-@pytest.fixture(scope="function")
 def fake_node(indexing_utility, shard_manager):
     manager.INDEX_NODES.clear()
     manager.add_index_node(
@@ -251,21 +287,6 @@ def fake_node(indexing_utility, shard_manager):
         yield
 
     manager.INDEX_NODES.clear()
-
-
-@pytest.fixture(scope="function")
-async def indexing_utility():
-    """Dummy indexing utility. As it's a dummy, we don't need to provide real
-    nats servers or creds. Ideally, we should have a different utility instead
-    of playing with a parameter.
-
-    """
-    indexing_utility = IndexingUtility(nats_creds=None, nats_servers=[], dummy=True)
-    await indexing_utility.initialize()
-    set_utility(Utility.INDEXING, indexing_utility)
-    yield
-    clean_utility(Utility.INDEXING)
-    await indexing_utility.finalize()
 
 
 @pytest.fixture()

@@ -29,6 +29,7 @@ from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import audit_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
@@ -79,6 +80,24 @@ async def stream_audit(nats_server: str) -> AsyncIterator[StreamAuditStorage]:
     await audit.initialize()
     yield audit
     await audit.finalize()
+
+
+# Indexing utility
+
+
+@pytest.fixture(scope="function")
+async def indexing_utility():
+    """Dummy indexing utility. As it's a dummy, we don't need to provide real
+    nats servers or creds. Ideally, we should have a different utility instead
+    of playing with a parameter.
+
+    """
+    indexing_utility = IndexingUtility(nats_creds=None, nats_servers=[], dummy=True)
+    await indexing_utility.initialize()
+    set_utility(Utility.INDEXING, indexing_utility)
+    yield
+    clean_utility(Utility.INDEXING)
+    await indexing_utility.finalize()
 
 
 # Nats
