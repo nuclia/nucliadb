@@ -312,9 +312,7 @@ async def test_pagination_resources(processor: Processor, knowledgebox_ingest: s
     while time() - t0 < 30:  # wait max 30 seconds for it
         async with driver.transaction(read_only=True) as txn:
             count = 0
-            async for key in txn.keys(
-                match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
-            ):
+            async for key in txn.keys(match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest)):
                 count += 1
 
         if count == amount:
