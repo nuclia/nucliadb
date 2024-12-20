@@ -92,15 +92,12 @@ async def writer_api_server(
     disabled_back_pressure,
     redis,
     storage_writer,
-    # XXX we bring all ingest because grpc_servicer was doing so
     ingest_grpc_server: IngestGrpcServer,
     ingest_consumers,
-    dummy_index,
-    #
     transaction_utility,
     dummy_processing,
     tus_manager,
-    dummy_nidx_utility,
+    dummy_index,
 ) -> AsyncIterator[FastAPI]:
     with patch.object(nucliadb_settings, "nucliadb_ingest", ingest_grpc_server.address):
         application = create_application()
