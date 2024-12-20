@@ -195,7 +195,15 @@ async def _nats_streams_and_consumers_setup(
         except nats.js.errors.NotFoundError:
             await js.add_stream(name=stream, subjects=[subject])
 
+    await nc.close()
+
     yield
+
+    # we close and reopen the connection with nats between yield points to avoid
+    # warnings complaining on tasks being closed and tasks being killed.
+    # Probably some nats invariant is breaking across yield points
+    nc = await nats.connect(servers=[nats_server])
+    js = nc.jetstream()
 
     # delete consumers
     for stream, consumer in consumers:
@@ -210,6 +218,8 @@ async def _nats_streams_and_consumers_setup(
             await js.delete_stream(stream)
         except nats.js.errors.NotFoundError:
             pass
+
+    await nc.close()
 
 
 ######################################################################
