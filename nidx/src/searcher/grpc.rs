@@ -49,7 +49,9 @@ impl Interceptor for TelemetryInterceptor {
 }
 #[cfg(not(feature = "telemetry"))]
 impl Interceptor for TelemetryInterceptor {
-    fn call(&mut self, request: tonic::Request<()>) -> std::result::Result<tonic::Request<()>, Status> {}
+    fn call(&mut self, request: tonic::Request<()>) -> std::result::Result<tonic::Request<()>, Status> {
+        Ok(request)
+    }
 }
 
 type SearcherClient = NidxSearcherClient<InterceptedService<Channel, TelemetryInterceptor>>;
