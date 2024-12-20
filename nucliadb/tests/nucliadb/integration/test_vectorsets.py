@@ -46,7 +46,6 @@ from nucliadb_protos import (
 )
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
@@ -235,7 +234,7 @@ async def test_querying_kb_with_vectorsets(
     maindb_driver: Driver,
     shard_manager,
     learning_config,
-    dummy_indexing_utility,
+    indexing_utility,
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     dummy_predict: DummyPredictEngine,
@@ -450,21 +449,6 @@ def dummy_predict():
 
 
 #
-# TODO: replace for the one in ndbfixtures when it's ready
-@pytest.fixture(scope="function")
-async def dummy_indexing_utility():
-    # as it's a dummy utility, we don't need to provide real nats servers or
-    # creds
-    indexing_utility = IndexingUtility(nats_creds=None, nats_servers=[], dummy=True)
-    await indexing_utility.initialize()
-    set_utility(Utility.INDEXING, indexing_utility)
-
-    yield
-
-    clean_utility(Utility.INDEXING)
-    await indexing_utility.finalize()
-
-
 def create_broker_message_with_vectorsets(
     kbid: str,
     rid: str,

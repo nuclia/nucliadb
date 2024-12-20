@@ -20,10 +20,11 @@
 import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import AsyncIterator, Iterable, Iterator, Optional
+from typing import AsyncIterator, Iterable, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -50,25 +51,15 @@ from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
-from nucliadb_utils.audit.basic import BasicAuditStorage
-from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.cache.nats import NatsPubsub
-from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.indexing import IndexingUtility
-from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import audit_settings, indexing_settings, transaction_settings
+from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
     clear_global_cache,
-    get_utility,
     set_utility,
-    start_nats_manager,
-    start_transaction_utility,
-    stop_nats_manager,
-    stop_transaction_utility,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,57 +83,71 @@ async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[W
 
 
 @pytest.fixture(scope="function")
-def pubsub(nats_pubsub: NatsPubsub) -> Iterator[PubSubDriver]:
-    pubsub = get_utility(Utility.PUBSUB)
-    assert pubsub is None, "No pubsub is expected to be here"
-    set_utility(Utility.PUBSUB, nats_pubsub)
-
-    yield nats_pubsub
-
-    clean_utility(Utility.PUBSUB)
-
-
-@pytest.fixture(scope="function")
-async def nats_pubsub(natsd) -> AsyncIterator[NatsPubsub]:
-    pubsub = NatsPubsub(hosts=[natsd])
-    await pubsub.initialize()
-
-    yield pubsub
-
-    await pubsub.finalize()
+async def nats_ingest_stream(nats_server: str):
+    streams = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
+    ]
+    consumers = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")),
+    ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        yield
 
 
 @pytest.fixture(scope="function")
-async def nats_manager(natsd) -> AsyncIterator[NatsConnectionManager]:
-    ncm = await start_nats_manager("nucliadb_tests", [natsd], None)
-    yield ncm
-    await stop_nats_manager()
+async def nats_ingest_processed_stream(nats_server: str):
+    streams = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
+    ]
+    consumers = [
+        (const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group),
+    ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        yield
 
 
 @pytest.fixture(scope="function")
-def audit(basic_audit: BasicAuditStorage) -> Iterator[BasicAuditStorage]:
-    yield basic_audit
+async def nats_index_stream(nats_server: str):
+    streams = [
+        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
+    ]
+    consumers = [
+        (const.Streams.INDEX.name, const.Streams.INDEX.group.format(node="1")),
+    ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
+            yield
 
 
-@pytest.fixture(scope="function")
-async def basic_audit() -> AsyncIterator[BasicAuditStorage]:
-    audit = BasicAuditStorage()
-    await audit.initialize()
-    yield audit
-    await audit.finalize()
+@asynccontextmanager
+async def _nats_streams_and_consumers_setup(
+    nats_server: str, streams: list[tuple[str, str]], consumers: list[tuple[str, str]]
+):
+    nc = await nats.connect(servers=[nats_server])
+    js = nc.jetstream()
 
+    # create streams
+    for stream, subject in streams:
+        try:
+            await js.stream_info(name=stream)
+        except nats.js.errors.NotFoundError:
+            await js.add_stream(name=stream, subjects=[subject])
 
-@pytest.fixture(scope="function")
-async def stream_audit(natsd: str) -> AsyncIterator[StreamAuditStorage]:
-    audit = StreamAuditStorage(
-        [natsd],
-        audit_settings.audit_jetstream_target,  # type: ignore
-        audit_settings.audit_partitions,
-        audit_settings.audit_hash_seed,
-    )
-    await audit.initialize()
-    yield audit
-    await audit.finalize()
+    yield
+
+    # delete consumers
+    for stream, consumer in consumers:
+        try:
+            await js.delete_consumer(stream, consumer)
+        except nats.js.errors.NotFoundError:
+            pass
+
+    # delete streams
+    for stream, subject in streams:
+        try:
+            await js.delete_stream(stream)
+        except nats.js.errors.NotFoundError:
+            pass
 
 
 ######################################################################
@@ -170,7 +175,14 @@ class IngestFixture:
 
 
 @pytest.fixture(scope="function")
-async def ingest_consumers(maindb_settings, transaction_utility, storage, fake_node, nats_manager):
+async def ingest_consumers(
+    maindb_settings,
+    transaction_utility,
+    storage,
+    fake_node,
+    nats_manager,
+    nats_ingest_stream,
+):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
     yield
@@ -181,7 +193,12 @@ async def ingest_consumers(maindb_settings, transaction_utility, storage, fake_n
 
 @pytest.fixture(scope="function")
 async def ingest_processed_consumer(
-    maindb_settings, transaction_utility, storage, fake_node, nats_manager
+    maindb_settings,
+    transaction_utility,
+    storage,
+    fake_node,
+    nats_manager,
+    nats_ingest_processed_stream,
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
 
@@ -236,6 +253,21 @@ def fake_node(indexing_utility, shard_manager):
     manager.INDEX_NODES.clear()
 
 
+@pytest.fixture(scope="function")
+async def indexing_utility():
+    """Dummy indexing utility. As it's a dummy, we don't need to provide real
+    nats servers or creds. Ideally, we should have a different utility instead
+    of playing with a parameter.
+
+    """
+    indexing_utility = IndexingUtility(nats_creds=None, nats_servers=[], dummy=True)
+    await indexing_utility.initialize()
+    set_utility(Utility.INDEXING, indexing_utility)
+    yield
+    clean_utility(Utility.INDEXING)
+    await indexing_utility.finalize()
+
+
 @pytest.fixture()
 def learning_config():
     from nucliadb_utils.settings import nuclia_settings
@@ -244,6 +276,23 @@ def learning_config():
     nuclia_settings.dummy_learning_services = True
     yield AsyncMock()
     nuclia_settings.dummy_learning_services = original
+
+
+@pytest.fixture(scope="function")
+async def entities_manager_mock():
+    """EntitiesManager mock for ingest gRPC API disabling indexed entities
+    functionality. As tests doesn't startup a node, with this mock we allow
+    testing ingest's gRPC API while the whole entities functionality is properly
+    tested in tests nos using this fixture.
+
+    """
+    klass = "nucliadb.ingest.service.writer.EntitiesManager"
+    with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
+        with patch(
+            "nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
+            AsyncMock(return_value=[]),
+        ):
+            yield
 
 
 @pytest.fixture(scope="function")
@@ -293,66 +342,6 @@ async def knowledgebox_with_vectorsets(storage, maindb_driver: Driver, shard_man
     yield kbid
 
     await KnowledgeBox.delete(maindb_driver, kbid)
-
-
-@pytest.fixture(scope="function")
-async def indexing_utility(natsd, _clean_natsd):
-    indexing_utility = IndexingUtility(
-        nats_creds=indexing_settings.index_jetstream_auth,
-        nats_servers=indexing_settings.index_jetstream_servers,
-        dummy=True,
-    )
-    await indexing_utility.initialize()
-    set_utility(Utility.INDEXING, indexing_utility)
-
-    yield
-
-    clean_utility(Utility.INDEXING)
-    await indexing_utility.finalize()
-
-
-@pytest.fixture(scope="function")
-async def _clean_natsd(natsd):
-    nc = await nats.connect(servers=[natsd])
-    js = nc.jetstream()
-
-    consumers = [
-        (const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")),
-        (const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group),
-        (const.Streams.INDEX.name, const.Streams.INDEX.group.format(node="1")),
-    ]
-    for stream, consumer in consumers:
-        try:
-            await js.delete_consumer(stream, consumer)
-        except nats.js.errors.NotFoundError:
-            pass
-
-    streams = [
-        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
-        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
-    ]
-    for stream, subject in streams:
-        try:
-            await js.delete_stream(stream)
-        except nats.js.errors.NotFoundError:
-            pass
-
-        await js.add_stream(name=stream, subjects=[subject])
-
-    await nc.drain()
-    await nc.close()
-
-    indexing_settings.index_jetstream_servers = [natsd]
-
-    yield
-
-
-@pytest.fixture(scope="function")
-async def transaction_utility(natsd, pubsub):
-    transaction_settings.transaction_jetstream_servers = [natsd]
-    util = await start_transaction_utility()
-    yield util
-    await stop_transaction_utility()
 
 
 THUMBNAIL = rpb.CloudFile(
@@ -779,23 +768,6 @@ async def add_field_id(resource: Resource, field: Field):
     field_type = FIELD_TYPE_STR_TO_PB[field.type]
     field_id = rpb.FieldID(field_type=field_type, field=field.id)
     await resource.update_all_field_ids(updated=[field_id])
-
-
-@pytest.fixture(scope="function")
-async def entities_manager_mock():
-    """EntitiesManager mock for ingest gRPC API disabling indexed entities
-    functionality. As tests doesn't startup a node, with this mock we allow
-    testing ingest's gRPC API while the whole entities functionality is properly
-    tested in tests nos using this fixture.
-
-    """
-    klass = "nucliadb.ingest.service.writer.EntitiesManager"
-    with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
-        with patch(
-            "nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
-            AsyncMock(return_value=[]),
-        ):
-            yield
 
 
 # from tests/fixtures.py
