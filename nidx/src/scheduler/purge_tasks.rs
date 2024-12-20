@@ -41,7 +41,7 @@ pub async fn purge_segments(meta: &NidxMetadata, storage: &Arc<DynObjectStore>) 
             | Err(object_store::Error::NotFound {
                 ..
             }) => deleted.push(segment_id),
-            Err(e) => warn!(?e, "Error deleting segment from storage"),
+            Err(e) => warn!("Error deleting segment from storage: {e:?}"),
         }
     }
     Segment::delete_many(&meta.pool, &deleted).await?;

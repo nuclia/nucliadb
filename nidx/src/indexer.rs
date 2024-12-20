@@ -79,7 +79,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         let info = match msg.info() {
             Ok(info) => info,
             Err(e) => {
-                error!(?e, "Invalid NATS message, skipping");
+                error!("Invalid NATS message, skipping: {e:?}");
                 let _ = msg.ack().await;
                 continue;
             }
@@ -102,7 +102,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         let index_message = match IndexMessage::decode(msg.payload) {
             Ok(index_message) => index_message,
             Err(e) => {
-                warn!(?e, "Error decoding index message");
+                warn!("Error decoding index message: {e:?}");
                 continue;
             }
         };
@@ -119,13 +119,13 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         .await
         {
             INDEXING_COUNTER.get_or_create(&OperationStatusLabels::failure()).inc();
-            error!(?seq, ?e, "Error processing index message");
+            error!(?seq, "Error processing index message: {e:?}");
             continue;
         }
         INDEXING_COUNTER.get_or_create(&OperationStatusLabels::success()).inc();
 
         if let Err(e) = acker.ack().await {
-            warn!(?e, "Error acking index message");
+            warn!("Error acking index message: {e:?}");
             continue;
         }
     }

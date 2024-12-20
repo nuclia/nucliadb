@@ -96,7 +96,7 @@ impl ControlServer {
             match socket.accept().await {
                 Ok((stream, _addr)) => {
                     if let Err(e) = self.run_connection(stream).await {
-                        warn!(?e, "Error processing control socket message")
+                        warn!("Error processing control socket message: {e:?}")
                     }
                 }
                 Err(e) => return Err(e.into()),

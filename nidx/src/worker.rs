@@ -78,7 +78,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
                 }
                 Err(e) => {
                     MERGE_COUNTER.get_or_create(&OperationStatusLabels::failure()).inc();
-                    error!(job.id, ?e, "Merge job failed")
+                    error!(job.id, "Merge job failed: {e:?}")
                 }
             }
 

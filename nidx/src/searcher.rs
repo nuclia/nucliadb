@@ -87,7 +87,7 @@ async fn refresher_task(mut rx: Receiver<IndexId>, index_cache: Arc<IndexCache>)
                     debug!(?index_id, "Index reloaded");
                 }
                 Err(e) => {
-                    error!(?index_id, ?e, "Index failed to reload, might become out of date");
+                    error!(?index_id, "Index failed to reload, might become out of date: {e:?}");
                 }
             }
         }

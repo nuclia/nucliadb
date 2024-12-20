@@ -79,7 +79,7 @@ pub async fn run_tasks(
     tasks.spawn(async move {
         loop {
             if let Err(e) = retry_jobs(&meta2).await {
-                warn!(?e, "Error in retry_jobs task");
+                warn!("Error in retry_jobs task: {e:?}");
             }
             sleep(Duration::from_secs(30)).await;
         }
@@ -90,7 +90,7 @@ pub async fn run_tasks(
     tasks.spawn(async move {
         loop {
             if let Err(e) = purge_segments(&meta2, &storage).await {
-                warn!(?e, "Error in purge_segments task");
+                warn!("Error in purge_segments task: {e:?}");
             }
             sleep(Duration::from_secs(60)).await;
         }
@@ -100,7 +100,7 @@ pub async fn run_tasks(
     tasks.spawn(async move {
         loop {
             if let Err(e) = purge_deleted_shards_and_indexes(&meta2).await {
-                warn!(?e, "Error purging deleted shards and indexes");
+                warn!("Error purging deleted shards and indexes: {e:?}");
             }
             sleep(Duration::from_secs(60)).await;
         }
@@ -114,11 +114,11 @@ pub async fn run_tasks(
                 Ok(oldest_confirmed_seq) => {
                     let oldest_pending_seq = oldest_confirmed_seq + 1;
                     if let Err(e) = purge_deletions(&meta2, oldest_pending_seq).await {
-                        warn!(?e, "Error in purge_deletions task");
+                        warn!("Error in purge_deletions task: {e:?}");
                     }
                 }
                 Err(e) => {
-                    warn!(?e, "Error while getting consumer information");
+                    warn!("Error while getting consumer information: {e:?}");
                 }
             }
             sleep(Duration::from_secs(15)).await;
@@ -132,11 +132,11 @@ pub async fn run_tasks(
             match ack_floor.get().await {
                 Ok(oldest_confirmed_seq) => {
                     if let Err(e) = merge_scheduler.schedule_merges(&meta2, Seq::from(oldest_confirmed_seq)).await {
-                        warn!(?e, "Error in schedule_merges task");
+                        warn!("Error in schedule_merges task: {e:?}");
                     }
                 }
                 Err(e) => {
-                    warn!(?e, "Error while getting consumer information");
+                    warn!("Error while getting consumer information: {e:?}");
                 }
             }
             sleep(Duration::from_secs(15)).await;
@@ -147,7 +147,7 @@ pub async fn run_tasks(
     tasks.spawn(async move {
         loop {
             if let Err(e) = metrics_task::update_metrics(&meta2).await {
-                info!(?e, "Error updating scheduler metrics");
+                info!("Error updating scheduler metrics: {e:?}");
             }
             sleep(Duration::from_secs(15)).await;
         }

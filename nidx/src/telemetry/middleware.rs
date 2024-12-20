@@ -21,7 +21,8 @@ use std::task::{Context, Poll};
 
 use axum::{body::Body, extract::Request, http, response::Response};
 use futures::future::BoxFuture;
-use opentelemetry::propagation::Extractor;
+use opentelemetry::propagation::{Extractor, Injector};
+use tonic::metadata::MetadataKey;
 use tower::{Layer, Service};
 use tracing::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt as _;
@@ -111,5 +112,25 @@ impl<'a> Extractor for HeaderMapWrapper<'a> {
 
     fn keys(&self) -> Vec<&str> {
         self.inner.keys().map(|key| key.as_str()).collect()
+    }
+}
+
+pub fn add_telemetry_headers(mut req: tonic::Request<()>) -> tonic::Result<tonic::Request<()>> {
+    opentelemetry::global::get_text_map_propagator(|propagator| {
+        propagator.inject(&mut MetadataMapWrapper {
+            inner: req.metadata_mut(),
+        })
+    });
+
+    Ok(req)
+}
+
+struct MetadataMapWrapper<'a> {
+    inner: &'a mut tonic::metadata::MetadataMap,
+}
+
+impl<'a> Injector for MetadataMapWrapper<'a> {
+    fn set(&mut self, key: &str, value: String) {
+        self.inner.insert(MetadataKey::from_bytes(key.to_lowercase().as_bytes()).unwrap(), value.parse().unwrap());
     }
 }
