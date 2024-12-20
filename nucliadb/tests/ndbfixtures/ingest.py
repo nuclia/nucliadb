@@ -81,6 +81,9 @@ class IngestGrpcServer:
 @pytest.fixture(scope="function")
 async def component_nucliadb_ingest_grpc(
     ingest_grpc_server: IngestGrpcServer,
+    # Our component ingest grpc uses a dummy/mocked version of the index so only
+    # ingest is tested
+    dummy_index,
 ) -> AsyncIterator[WriterStub]:
     channel = aio.insecure_channel(ingest_grpc_server.address)
     stub = WriterStub(channel)
@@ -100,7 +103,15 @@ async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[W
 
 
 @pytest.fixture(scope="function")
-async def ingest_grpc_server(ingest_orm) -> AsyncIterator[IngestGrpcServer]:
+async def ingest_grpc_server(
+    maindb_driver: Driver,
+    storage: Storage,
+    shard_manager: KBShardManager,
+    learning_config,
+    # XXX: this is not really needed for ingest tests but writer depends on this
+    # stream to exist
+    nats_index_stream,
+) -> AsyncIterator[IngestGrpcServer]:
     servicer = WriterServicer()
     await servicer.initialize()
     server = aio.server()
@@ -113,18 +124,6 @@ async def ingest_grpc_server(ingest_orm) -> AsyncIterator[IngestGrpcServer]:
     )
     await servicer.finalize()
     await server.stop(None)
-
-
-@pytest.fixture(scope="function")
-def ingest_orm(
-    maindb_driver: Driver,
-    storage: Storage,
-    shard_manager: KBShardManager,
-    dummy_index,
-):
-    """Ingest ORM data layer with dummy/mocked index. Use this fixture when you
-    need to use KnowledgeBox, Resource..."""
-    yield
 
 
 ######################################################################
@@ -221,14 +220,6 @@ async def _nats_streams_and_consumers_setup(
 @pytest.fixture(scope="function")
 def local_files():
     storage_settings.local_testing_files = f"{INGEST_TESTS_DIR}"
-
-
-@dataclass
-class IngestFixture:
-    servicer: WriterServicer
-    channel: aio.Channel
-    host: str
-    serv: aio.Server
 
 
 @pytest.fixture(scope="function")

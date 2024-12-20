@@ -42,7 +42,7 @@ from nucliadb_utils.utilities import (
     clean_utility,
     set_utility,
 )
-from tests.ndbfixtures.ingest import IngestFixture
+from tests.ndbfixtures.ingest import IngestGrpcServer
 from tests.utils.dirty_index import mark_dirty
 
 from .utils import create_api_client_factory
@@ -92,13 +92,18 @@ async def writer_api_server(
     disabled_back_pressure,
     redis,
     storage_writer,
-    grpc_servicer: IngestFixture,
+    # XXX we bring all ingest because grpc_servicer was doing so
+    ingest_grpc_server: IngestGrpcServer,
+    ingest_consumers,
+    ingest_processed_consumer,
+    dummy_index,
+    #
     transaction_utility,
     dummy_processing,
     tus_manager,
     dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
-    with patch.object(nucliadb_settings, "nucliadb_ingest", grpc_servicer.host):
+    with patch.object(nucliadb_settings, "nucliadb_ingest", ingest_grpc_server.address):
         application = create_application()
         async with application.router.lifespan_context(application):
             yield application
