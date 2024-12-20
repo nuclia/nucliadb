@@ -119,6 +119,7 @@ class NatsConnectionManager:
         nats_servers: list[str],
         nats_creds: Optional[str] = None,
     ):
+        self._initialized = False
         self._service_name = service_name
         self._nats_servers = nats_servers
         self._nats_creds = nats_creds
@@ -147,6 +148,9 @@ class NatsConnectionManager:
         return True
 
     async def initialize(self) -> None:
+        if self._initialized:
+            return
+
         options: dict[str, Any] = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
@@ -165,7 +169,12 @@ class NatsConnectionManager:
 
         self._expected_subscription_task = asyncio.create_task(self._verify_expected_subscriptions())
 
+        self._initialized = True
+
     async def finalize(self):
+        if not self._initialized:
+            return
+
         async with self._lock:
             if self._reconnect_task:
                 self._reconnect_task.cancel()
@@ -173,12 +182,14 @@ class NatsConnectionManager:
                     await self._reconnect_task
                 except asyncio.CancelledError:
                     pass
+                self._reconnect_task = None
 
             self._expected_subscription_task.cancel()
             try:
                 await self._expected_subscription_task
             except asyncio.CancelledError:
                 pass
+            self._expected_subscription_task = None
 
             # Finalize push subscriptions
             for sub, _ in self._subscriptions:
@@ -208,6 +219,8 @@ class NatsConnectionManager:
             ):  # pragma: no cover
                 pass
             await self._nc.close()
+
+        self._initialized = False
 
     async def disconnected_cb(self) -> None:
         logger.info("Disconnected from NATS!")
