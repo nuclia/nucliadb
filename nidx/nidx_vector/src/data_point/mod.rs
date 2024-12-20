@@ -41,7 +41,6 @@ use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use std::collections::HashSet;
 use std::path::Path;
-use std::time::Instant;
 use std::{fs, io};
 
 pub use ops_hnsw::DataRetriever;
@@ -128,7 +127,6 @@ where
     // Creating the hnsw for the new node store.
     let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
     let mut ops = HnswOps::new(&tracker, false);
-    let t = Instant::now();
     for id in start_node_index..no_nodes {
         ops.insert(Address(id), &mut index);
     }

@@ -53,6 +53,8 @@ jobs:
           workspaces: nidx
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: clippy
         run: cd nidx && cargo clippy
 
@@ -124,6 +126,8 @@ jobs:
       # Needed for nidx_protos (rust)
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install venv
         run: pdm sync -d --clean --no-editable -G nidx
@@ -215,6 +219,8 @@ jobs:
           workspaces: nidx
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Compile
         run: cd nidx && cargo build --release
       - name: Upload binaries to cache
@@ -241,6 +247,8 @@ jobs:
       # Needed for nidx_protos (rust)
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install venv
         run: pdm sync -d --clean --no-editable -G nidx
@@ -492,6 +500,8 @@ jobs:
           workspaces: nidx
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost/postgres

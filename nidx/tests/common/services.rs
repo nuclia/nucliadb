@@ -25,6 +25,7 @@ use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
 use nidx::indexer::index_resource;
 use nidx::searcher::grpc::SearchServer;
+use nidx::searcher::shard_selector::ShardSelector;
 use nidx::searcher::SyncedSearcher;
 use nidx::settings::{EnvSettings, MetadataSettings, StorageSettings};
 use nidx::{NidxMetadata, Settings};
@@ -40,7 +41,7 @@ use tonic::transport::Channel;
 pub struct NidxFixture {
     pub searcher_client: NidxSearcherClient<Channel>,
     pub api_client: NidxApiClient<Channel>,
-    settings: Settings,
+    pub settings: Settings,
     seq: i64,
 }
 
@@ -76,7 +77,7 @@ impl NidxFixture {
         // Searcher API
         let work_dir = tempdir()?;
         let searcher = SyncedSearcher::new(settings.metadata.clone(), work_dir.path());
-        let searcher_api = SearchServer::new(searcher.index_cache());
+        let searcher_api = SearchServer::new(searcher.index_cache(), ShardSelector::new_single());
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
         tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));
@@ -87,6 +88,7 @@ impl NidxFixture {
                     settings_copy.storage.as_ref().unwrap().object_store.clone(),
                     settings_copy.searcher.clone().unwrap_or_default(),
                     shutdown.clone(),
+                    ShardSelector::new_single(),
                     None,
                 )
                 .await

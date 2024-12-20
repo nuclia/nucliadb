@@ -173,14 +173,18 @@ impl Index {
 
     pub async fn recently_updated(
         meta: impl Executor<'_, Database = Postgres>,
+        shards: &Vec<Uuid>,
         newer_than: PrimitiveDateTime,
     ) -> sqlx::Result<Vec<Index>> {
         sqlx::query_as!(
             Index,
             r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
                FROM indexes
-               WHERE updated_at > $1 AND deleted_at IS NULL
+               WHERE shard_id = ANY($1)
+               AND updated_at > $2
+               AND deleted_at IS NULL
                ORDER BY updated_at"#,
+            shards,
             newer_than
         )
         .fetch_all(meta)

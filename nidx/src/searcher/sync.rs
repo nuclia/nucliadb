@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::metadata::{Index, IndexId, IndexKind, SegmentId};
+use crate::metadata::{Index, IndexId, IndexKind, SegmentId, Shard};
 use crate::metrics;
 use crate::settings::SearcherSettings;
 use crate::{segment_store::download_segment, NidxMetadata};
@@ -28,6 +28,7 @@ use object_store::DynObjectStore;
 use sqlx::postgres::types::PgInterval;
 use sqlx::types::time::PrimitiveDateTime;
 use sqlx::{Executor, Postgres};
+use std::time::Instant;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -40,6 +41,10 @@ use tokio_util::sync::CancellationToken;
 use tracing::*;
 use uuid::Uuid;
 
+use super::shard_selector::ShardSelector;
+
+const SHARD_EVICTION_TIME: Duration = Duration::from_secs(120);
+
 pub enum SyncStatus {
     Syncing,
     Synced,
@@ -50,6 +55,7 @@ pub fn interval_to_duration(interval: PgInterval) -> Duration {
     Duration::from_micros(micros)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_sync(
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
@@ -58,6 +64,7 @@ pub async fn run_sync(
     shutdown: CancellationToken,
     notifier: Sender<IndexId>,
     sync_status: Option<watch::Sender<SyncStatus>>,
+    shard_selector: ShardSelector,
 ) -> anyhow::Result<()> {
     // Keeps track of the `updated_at` date of the most recent synced index, in order
     // to only sync indexes with changes newer than that
@@ -73,8 +80,20 @@ pub async fn run_sync(
 
     while !shutdown.is_cancelled() {
         let sync_result: anyhow::Result<()> = async {
+            let t = Instant::now();
+            let all_shards = Shard::list_ids(&meta.pool).await?;
+            let selected_shards: Vec<_> = shard_selector.select_shards(all_shards);
+            let (index_ids_to_sync, indexes_to_delete) = index_metadata.set_synced_shards(&selected_shards).await;
+            let indexes_to_sync = if !index_ids_to_sync.is_empty() {
+                Index::get_many(&meta.pool, &index_ids_to_sync.iter().collect::<Vec<_>>()).await?
+            } else {
+                Vec::new()
+            };
+            metrics::searcher::SHARD_SELECTOR_TIME.observe(t.elapsed().as_secs_f64());
+
             let delay = sqlx::query_scalar!(
-                "SELECT NOW() - MIN(updated_at) FROM indexes WHERE updated_at > $1 AND deleted_at IS NULL",
+                "SELECT NOW() - MIN(updated_at) FROM indexes WHERE shard_id = ANY($1) AND updated_at > $2 AND deleted_at IS NULL",
+                &selected_shards,
                 last_updated_at
             )
             .fetch_one(&meta.pool)
@@ -90,19 +109,18 @@ pub async fn run_sync(
 
             // Remove deleted indexes
             let deleted = Index::marked_to_delete(&meta.pool).await?;
-            for index in deleted.into_iter() {
+            for (shard_id, index_id) in deleted.into_iter().map(|i| (i.shard_id, i.id)).chain(indexes_to_delete.into_iter()) {
                 if shutdown.is_cancelled() {
                     break;
                 }
 
-                let index_id = index.id;
-                if let Err(e) = delete_index(index, Arc::clone(&index_metadata), &notifier).await {
+                if let Err(e) = delete_index(shard_id, index_id, Arc::clone(&index_metadata), &notifier).await {
                     warn!(?e, ?index_id, "Could not delete index, some files will be left behind");
                 }
             }
 
             // Update indexes
-            let indexes = Index::recently_updated(&meta.pool, last_updated_at).await?;
+            let indexes = Index::recently_updated(&meta.pool, &selected_shards, last_updated_at).await?;
             let last_index_updated_at = indexes.last().map(|x| x.updated_at);
             let no_updates = indexes.is_empty();
 
@@ -117,7 +135,7 @@ pub async fn run_sync(
 
             let sync_semaphore = Arc::new(Semaphore::new(settings.parallel_index_syncs));
             let mut tasks = JoinSet::new();
-            for index in indexes.into_iter().chain(retry_indexes.into_iter()) {
+            for index in indexes.into_iter().chain(retry_indexes.into_iter()).chain(indexes_to_sync.into_iter()) {
                 let index_id = index.id;
                 let meta2 = meta.clone();
                 let index_metadata2 = Arc::clone(&index_metadata);
@@ -256,19 +274,20 @@ async fn sync_index(
 }
 
 async fn delete_index(
-    index: Index,
+    shard_id: Uuid,
+    index_id: IndexId,
     sync_metadata: Arc<SyncMetadata>,
     notifier: &Sender<IndexId>,
 ) -> anyhow::Result<()> {
-    if sync_metadata.delete(&index).await {
+    if sync_metadata.delete(&shard_id, &index_id).await {
+        notifier.send(index_id).await?;
         // remove directory for the index, effectively deleting all segment data
         // stored locally
-        let index_location = sync_metadata.index_location(&index.id);
+        let index_location = sync_metadata.index_location(&index_id);
         match tokio::fs::remove_dir_all(index_location).await {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
             _ => (),
         }
-        notifier.send(index.id).await?;
     }
     Ok(())
 }
@@ -392,6 +411,7 @@ pub struct SyncMetadata {
     work_dir: PathBuf,
     synced_metadata: Arc<RwLock<HashMap<IndexId, RwLock<IndexMetadata>>>>,
     shard_metadata: RwLock<HashMap<Uuid, ShardIndexes>>,
+    evicted_shards: RwLock<HashMap<Uuid, (Instant, ShardIndexes)>>,
 }
 
 impl SyncMetadata {
@@ -400,6 +420,7 @@ impl SyncMetadata {
             work_dir,
             synced_metadata: Arc::new(RwLock::new(HashMap::new())),
             shard_metadata: RwLock::new(HashMap::new()),
+            evicted_shards: RwLock::new(HashMap::new()),
         }
     }
 
@@ -448,15 +469,15 @@ impl SyncMetadata {
         GuardedIndexMetadata::new(self.synced_metadata.clone().read_owned().await, *index_id)
     }
 
-    pub async fn delete(&self, index: &Index) -> bool {
-        let removed = self.synced_metadata.write().await.remove(&index.id).is_some();
+    pub async fn delete(&self, shard_id: &Uuid, index_id: &IndexId) -> bool {
+        let removed = self.synced_metadata.write().await.remove(index_id).is_some();
 
         let mut write_shard_metadata = self.shard_metadata.write().await;
-        let shard_entry = write_shard_metadata.get_mut(&index.shard_id);
+        let shard_entry = write_shard_metadata.get_mut(shard_id);
         if let Some(shard) = shard_entry {
-            shard.remove(&index.id);
+            shard.remove(index_id);
             if shard.is_empty() {
-                write_shard_metadata.remove(&index.shard_id);
+                write_shard_metadata.remove(shard_id);
             }
         }
 
@@ -465,6 +486,69 @@ impl SyncMetadata {
 
     pub async fn get_shard_indexes(&self, shard_id: &Uuid) -> Option<ShardIndexes> {
         self.shard_metadata.read().await.get(shard_id).cloned()
+    }
+
+    pub async fn set_synced_shards(&self, shards: &[Uuid]) -> (Vec<IndexId>, Vec<(Uuid, IndexId)>) {
+        let shards: HashSet<Uuid> = HashSet::from_iter(shards.iter().copied());
+
+        let mut shard_metadata = self.shard_metadata.write().await;
+        let mut evicted_shards = self.evicted_shards.write().await;
+        let synced_shards = shard_metadata.keys().copied().collect();
+
+        // New shards to sync
+        let mut indexes_to_sync = Vec::new();
+        let mut count_new_shards = 0;
+        let mut count_recovered_shards = 0;
+        for new_shard in shards.difference(&synced_shards) {
+            // If the shard was being evicted, recover it and force sync its indexes
+            if let Some((_, evicted_indexes)) = evicted_shards.remove(new_shard) {
+                for index in &evicted_indexes.0 {
+                    indexes_to_sync.push(index.id);
+                }
+                shard_metadata.insert(*new_shard, evicted_indexes);
+                count_recovered_shards += 1;
+            } else {
+                shard_metadata.insert(*new_shard, ShardIndexes(Vec::new()));
+                count_new_shards += 1;
+            }
+        }
+        if count_new_shards > 0 || count_recovered_shards > 0 {
+            info!(new = count_new_shards, recovered = count_recovered_shards, "New shards added to sync");
+        }
+
+        // Completely purge evicted and expired shards
+        let mut indexes_to_delete = Vec::new();
+        let mut shards_to_delete = Vec::new();
+        let mut count_removed_shards = 0;
+        for (shard_id, (evicted_at, indexes)) in evicted_shards.iter() {
+            if evicted_at.elapsed() > SHARD_EVICTION_TIME {
+                shards_to_delete.push(*shard_id);
+                for index in &indexes.0 {
+                    indexes_to_delete.push((*shard_id, index.id));
+                }
+                count_removed_shards += 1;
+            }
+        }
+        for shard in shards_to_delete {
+            evicted_shards.remove(&shard);
+        }
+        if count_removed_shards > 0 {
+            info!(count = count_removed_shards, "Shards removed after eviction");
+        }
+
+        // Shards that have just been removed, move to the eviction zone
+        let mut count_evicted_shards = 0;
+        for shard_to_evict in synced_shards.difference(&shards) {
+            if let Some(indexes) = shard_metadata.remove(shard_to_evict) {
+                evicted_shards.insert(*shard_to_evict, (Instant::now(), indexes));
+            }
+            count_evicted_shards += 1;
+        }
+        if count_evicted_shards > 0 {
+            info!(count = count_evicted_shards, "Shards marked for eviction");
+        }
+
+        (indexes_to_sync, indexes_to_delete)
     }
 }
 

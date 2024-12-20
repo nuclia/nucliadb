@@ -322,7 +322,6 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
     relation_nodes
 }
 
-// TODO: In the off-change we keep relation_search grpc method, change this to use it instead of the general one
 async fn relation_search(
     fixture: &mut NidxFixture,
     request: RelationSearchRequest,
