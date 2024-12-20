@@ -77,7 +77,7 @@ async def run_all_kb_migrations(context: ExecutionContext, target_version: int) 
     Schedule all KB migrations to run in parallel. Only a certain number of migrations will run at the same time.
     If any of the migrations fail, the whole process will fail.
     """
-    to_migrate = await context.data_manager.get_kb_migrations(limit=-1)
+    to_migrate = await context.data_manager.get_kb_migrations()
 
     if len(to_migrate) == 0:
         return

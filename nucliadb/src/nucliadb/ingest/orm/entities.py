@@ -286,7 +286,7 @@ class EntitiesManager:
 
         # stored groups
         entities_key = KB_ENTITIES.format(kbid=self.kbid)
-        async for key in self.txn.keys(entities_key, count=-1):
+        async for key in self.txn.keys(entities_key):
             group = key.split("/")[-1]
             if exclude_deleted and group in deleted_groups:
                 continue

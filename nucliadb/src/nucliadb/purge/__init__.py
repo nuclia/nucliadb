@@ -42,7 +42,7 @@ from nucliadb_utils.utilities import get_storage
 
 async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
     async with driver.transaction(read_only=True) as keys_txn:
-        async for key in keys_txn.keys(match=match, count=-1):
+        async for key in keys_txn.keys(match=match):
             yield key
 
 

@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 async def migrate(context: ExecutionContext) -> None:
     async with context.kv_driver.transaction() as txn:
-        async for key in txn.keys(KB_SLUGS_BASE, count=-1):
+        async for key in txn.keys(KB_SLUGS_BASE):
             slug = key.replace(KB_SLUGS_BASE, "")
             value = await txn.get(key, for_update=False)
             if value is None:

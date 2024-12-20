@@ -145,7 +145,7 @@ async def iter_indexed_keys(*, kbid: str) -> AsyncGenerator[str, None]:
     """
     start_key = KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource="")
     async with with_ro_transaction() as txn:
-        async for key in txn.keys(match=start_key, count=-1):
+        async for key in txn.keys(match=start_key):
             yield key.split("/")[-1]
 
 

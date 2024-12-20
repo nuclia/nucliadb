@@ -202,7 +202,7 @@ class LocalTransaction(Transaction):
 
     async def count(self, match: str) -> int:
         value = 0
-        async for _ in self.keys(match, count=-1):
+        async for _ in self.keys(match):
             value += 1
         return value
 
