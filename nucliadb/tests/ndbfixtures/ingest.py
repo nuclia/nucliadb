@@ -35,7 +35,6 @@ from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NIDX_ENABLED, NidxUtility
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -310,26 +309,6 @@ async def indexing_utility(natsd, _clean_natsd):
 
     clean_utility(Utility.INDEXING)
     await indexing_utility.finalize()
-
-
-@pytest.fixture(scope="function")
-async def dummy_nidx_utility():
-    class DummyNidxUtility(NidxUtility):
-        async def initialize(self):
-            pass
-
-        async def finalize(self):
-            pass
-
-        async def index(self, msg):
-            pass
-
-    if NIDX_ENABLED:
-        set_utility(Utility.NIDX, DummyNidxUtility())
-
-    yield
-
-    clean_utility(Utility.NIDX)
 
 
 @pytest.fixture(scope="function")

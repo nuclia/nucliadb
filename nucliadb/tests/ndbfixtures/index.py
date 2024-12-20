@@ -24,6 +24,12 @@ import pytest
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.nidx import NIDX_ENABLED, NidxUtility
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    set_utility,
+)
 
 
 @pytest.fixture(scope="function")
@@ -50,3 +56,23 @@ async def dummy_index_node_cluster(
             dummy=True,
         )
         yield
+
+
+@pytest.fixture(scope="function")
+async def dummy_nidx_utility():
+    class DummyNidxUtility(NidxUtility):
+        async def initialize(self):
+            pass
+
+        async def finalize(self):
+            pass
+
+        async def index(self, msg):
+            pass
+
+    if NIDX_ENABLED:
+        set_utility(Utility.NIDX, DummyNidxUtility())
+
+    yield
+
+    clean_utility(Utility.NIDX)
