@@ -33,7 +33,6 @@ use tonic::{service::Routes, Request, Response, Result, Status};
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_selector::SearcherNode;
-use crate::telemetry::middleware::add_telemetry_headers;
 
 use super::shard_selector::ShardSelector;
 use super::streams;
@@ -45,7 +44,7 @@ struct TelemetryInterceptor;
 #[cfg(feature = "telemetry")]
 impl Interceptor for TelemetryInterceptor {
     fn call(&mut self, request: tonic::Request<()>) -> std::result::Result<tonic::Request<()>, Status> {
-        add_telemetry_headers(request)
+        crate::telemetry::middleware::add_telemetry_headers(request)
     }
 }
 #[cfg(not(feature = "telemetry"))]
