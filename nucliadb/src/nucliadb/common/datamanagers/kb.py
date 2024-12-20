@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 async def get_kbs(txn: Transaction, *, prefix: str = "") -> AsyncIterator[tuple[str, str]]:
-    async for key in txn.keys(KB_SLUGS.format(slug=prefix), count=-1):
+    async for key in txn.keys(KB_SLUGS.format(slug=prefix)):
         slug = key.replace(KB_SLUGS_BASE, "")
         uuid = await get_kb_uuid(txn, slug=slug)
         if uuid is None:

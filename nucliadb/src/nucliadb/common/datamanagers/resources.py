@@ -227,7 +227,7 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncGenerator[str, None]:
 @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
 async def _iter_resource_slugs(*, kbid: str) -> AsyncGenerator[str, None]:
     async with with_ro_transaction() as txn:
-        async for key in txn.keys(match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1):
+        async for key in txn.keys(match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid)):
             yield key.split("/")[-1]
 
 

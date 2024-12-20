@@ -87,7 +87,7 @@ async def set_entities_group(
 
 async def iterate_entities_groups(txn: Transaction, *, kbid: str) -> AsyncGenerator[str, None]:
     entities_key = KB_ENTITIES.format(kbid=kbid)
-    async for key in txn.keys(entities_key, count=-1):
+    async for key in txn.keys(entities_key):
         group = key.split("/")[-1]
         yield group
 

@@ -462,7 +462,7 @@ class KnowledgeBox:
 
     async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
         base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
-        async for key in self.txn.keys(match=base, count=-1):
+        async for key in self.txn.keys(match=base):
             slug = key.split("/")[-1]
             uuid = await self.get_resource_uuid_by_slug(slug)
             if uuid is not None:

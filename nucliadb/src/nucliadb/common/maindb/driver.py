@@ -23,7 +23,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
 
-DEFAULT_SCAN_LIMIT = 10
+DEFAULT_SCAN_LIMIT = -1
 DEFAULT_BATCH_SCAN_LIMIT = 500
 
 

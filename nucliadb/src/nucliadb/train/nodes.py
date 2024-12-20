@@ -126,7 +126,7 @@ class TrainShardManager(manager.KBShardManager):
         async with self.driver.transaction() as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
-            async for key in txn.keys(match=base, count=-1):
+            async for key in txn.keys(match=base):
                 # Fetch and Add wanted item
                 rid = await txn.get(key, for_update=False)
                 if rid is not None:

@@ -68,7 +68,7 @@ async def cleanup_maindb(driver: Driver):
     if not driver.initialized:
         return
     async with driver.transaction() as txn:
-        all_keys = [k async for k in txn.keys("", count=-1)]
+        all_keys = [k async for k in txn.keys("")]
         for key in all_keys:
             await txn.delete(key)
         await txn.commit()
