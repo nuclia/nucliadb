@@ -39,10 +39,9 @@ from nucliadb_utils.settings import (
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
 from nucliadb_utils.utilities import (
     Utility,
-    clean_utility,
-    set_utility,
 )
 from tests.ndbfixtures.ingest import IngestGrpcServer
+from tests.ndbfixtures.utils import global_utility
 from tests.utils.dirty_index import mark_dirty
 
 from .utils import create_api_client_factory
@@ -154,11 +153,8 @@ async def storage_writer(request):
     Generic storage fixture that allows us to run the same tests for different storage backends.
     """
     storage_driver = request.param
-    set_utility(Utility.STORAGE, storage_driver)
-
-    yield storage_driver
-
-    clean_utility(Utility.STORAGE)
+    with global_utility(Utility.STORAGE, storage_driver):
+        yield storage_driver
 
 
 @pytest.fixture(scope="function")

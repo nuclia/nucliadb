@@ -32,9 +32,8 @@ from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.migrator.migrator import run_pg_schema_migrations
 from nucliadb_utils.utilities import (
     Utility,
-    clean_utility,
-    set_utility,
 )
+from tests.ndbfixtures.utils import global_utility
 
 logger = logging.getLogger("nucliadb.fixtures:maindb")
 
@@ -52,11 +51,9 @@ def maindb_settings(pg_maindb_settings) -> Iterator[DriverSettings]:
 @pytest.fixture(scope="function")
 async def maindb_driver(pg_maindb_driver) -> AsyncIterator[Driver]:
     driver: Driver = pg_maindb_driver
-    set_utility(Utility.MAINDB_DRIVER, driver)
 
-    yield driver
-
-    clean_utility(Utility.MAINDB_DRIVER)
+    with global_utility(Utility.MAINDB_DRIVER, driver):
+        yield driver
 
     try:
         await cleanup_maindb(driver)

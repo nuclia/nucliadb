@@ -28,9 +28,8 @@ from nucliadb.common.nidx import NIDX_ENABLED, NidxUtility
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.utilities import (
     Utility,
-    clean_utility,
-    set_utility,
 )
+from tests.ndbfixtures.utils import global_utility
 
 
 @pytest.fixture(scope="function")
@@ -79,8 +78,7 @@ async def dummy_nidx_utility():
             pass
 
     if NIDX_ENABLED:
-        set_utility(Utility.NIDX, DummyNidxUtility())
-
-    yield
-
-    clean_utility(Utility.NIDX)
+        with global_utility(Utility.NIDX, DummyNidxUtility()):
+            yield
+    else:
+        yield

@@ -37,14 +37,13 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
-    clean_utility,
     get_utility,
-    set_utility,
     start_nats_manager,
     start_transaction_utility,
     stop_nats_manager,
     stop_transaction_utility,
 )
+from tests.ndbfixtures.utils import global_utility
 
 
 # XXX: renamed as ingest overwrites this and call it from a loot of tests
@@ -94,9 +93,8 @@ async def indexing_utility():
     """
     indexing_utility = IndexingUtility(nats_creds=None, nats_servers=[], dummy=True)
     await indexing_utility.initialize()
-    set_utility(Utility.INDEXING, indexing_utility)
-    yield
-    clean_utility(Utility.INDEXING)
+    with global_utility(Utility.INDEXING, indexing_utility):
+        yield
     await indexing_utility.finalize()
 
 
@@ -127,11 +125,9 @@ async def nats_manager(nats_server: str) -> AsyncIterator[NatsConnectionManager]
 def pubsub(nats_pubsub: NatsPubsub) -> Iterator[PubSubDriver]:
     pubsub = get_utility(Utility.PUBSUB)
     assert pubsub is None, "No pubsub is expected to be here"
-    set_utility(Utility.PUBSUB, nats_pubsub)
 
-    yield nats_pubsub
-
-    clean_utility(Utility.PUBSUB)
+    with global_utility(Utility.PUBSUB, nats_pubsub):
+        yield nats_pubsub
 
 
 @pytest.fixture(scope="function")
@@ -150,11 +146,8 @@ async def nats_pubsub(nats_server: str) -> AsyncIterator[NatsPubsub]:
 @pytest.fixture(scope="function")
 async def shard_manager(storage: Storage, maindb_driver: Driver) -> AsyncIterator[KBShardManager]:
     sm = KBShardManager()
-    set_utility(Utility.SHARD_MANAGER, sm)
-
-    yield sm
-
-    clean_utility(Utility.SHARD_MANAGER)
+    with global_utility(Utility.SHARD_MANAGER, sm):
+        yield sm
 
 
 # Transaction utility
