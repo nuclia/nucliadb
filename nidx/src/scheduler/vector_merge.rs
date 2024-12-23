@@ -40,13 +40,13 @@ pub fn plan_merges(settings: &VectorMergeSettings, segments: Vec<(SegmentId, i64
     let mut forced = false;
     let mut buffer_records = 0;
     let mut merge_buffer = Vec::new();
-    for (segment_id, records, force) in big.iter().rev() {
+    for (segment_id, records, force) in big.iter() {
         forced |= force;
         buffer_records += records;
         merge_buffer.push(*segment_id);
 
         if buffer_records > settings.max_segment_size as i64 {
-            if merge_buffer.len() > settings.min_number_of_segments || forced {
+            if merge_buffer.len() >= settings.min_number_of_segments || forced {
                 merges.push(std::mem::take(&mut merge_buffer));
             }
             merge_buffer.clear();
@@ -54,7 +54,7 @@ pub fn plan_merges(settings: &VectorMergeSettings, segments: Vec<(SegmentId, i64
             buffer_records = 0;
         }
     }
-    if merge_buffer.len() > settings.min_number_of_segments || forced {
+    if merge_buffer.len() >= settings.min_number_of_segments || forced {
         merges.push(merge_buffer);
     }
 
@@ -138,9 +138,9 @@ mod tests {
             &settings,
             vec![
                 (1i64.into(), 10001, false), // Too big to merge
-                (2i64.into(), 7000, false),  // Big merged together
-                (3i64.into(), 4000, false),
-                (4i64.into(), 1000, false),
+                (2i64.into(), 5500, false),  // Big merged together up to merge size
+                (3i64.into(), 3000, false),
+                (4i64.into(), 2000, false),
                 (5i64.into(), 1000, false),
                 (6i64.into(), 40, false), // All smalls merged in batches of small_segment_threshold
                 (7i64.into(), 38, false),
@@ -159,7 +159,7 @@ mod tests {
         // changes
 
         // Big segments
-        assert_eq!(jobs[0], vec![5i64.into(), 4i64.into(), 3i64.into(), 2i64.into()]);
+        assert_eq!(jobs[0], vec![2i64.into(), 3i64.into(), 4i64.into()]);
         // First batch of small segments
         assert_eq!(jobs[1], vec![12i64.into(), 11i64.into(), 10i64.into(), 9i64.into(), 8i64.into()]);
         // Second batch of small segments

@@ -20,6 +20,7 @@
 
 use crate::metadata::{Index, IndexId, IndexKind, SegmentId, Shard};
 use crate::metrics;
+use crate::metrics::searcher::{ACTIVE_SHARDS, DESIRED_SHARDS, EVICTED_SHARDS};
 use crate::settings::SearcherSettings;
 use crate::{segment_store::download_segment, NidxMetadata};
 use anyhow::anyhow;
@@ -115,7 +116,7 @@ pub async fn run_sync(
                 }
 
                 if let Err(e) = delete_index(shard_id, index_id, Arc::clone(&index_metadata), &notifier).await {
-                    warn!(?e, ?index_id, "Could not delete index, some files will be left behind");
+                    warn!(?index_id, "Could not delete index, some files will be left behind: {e:?}");
                 }
             }
 
@@ -165,9 +166,9 @@ pub async fn run_sync(
                     }
                     let retries = failed_indexes.entry(index_id).or_default();
                     if *retries > 2 {
-                        error!(?index_id, ?e, "Index failed to update multiple times, will keep retrying forever")
+                        error!(?index_id, "Index failed to update multiple times, will keep retrying forever: {e:?}")
                     } else {
-                        warn!(?index_id, ?e, "Index failed to update, will retry")
+                        warn!(?index_id, "Index failed to update, will retry: {e:?}")
                     }
                     *retries += 1;
                 } else {
@@ -202,7 +203,7 @@ pub async fn run_sync(
         }
         .await;
         if let Err(e) = sync_result {
-            error!(?e, "Unexpected error while syncing");
+            error!("Unexpected error while syncing: {e:?}");
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
     }
@@ -242,7 +243,7 @@ async fn sync_index(
                     if retries > 3 {
                         return Err(e);
                     } else {
-                        warn!(?e, ?segment_id, "Failure to download a segment, will retry");
+                        warn!(?segment_id, "Failure to download a segment, will retry: {e:?}");
                     }
                     retries += 1;
                 } else {
@@ -547,6 +548,10 @@ impl SyncMetadata {
         if count_evicted_shards > 0 {
             info!(count = count_evicted_shards, "Shards marked for eviction");
         }
+
+        DESIRED_SHARDS.set(shards.len() as i64);
+        ACTIVE_SHARDS.set(shard_metadata.values().filter(|v| !v.is_empty()).count() as i64);
+        EVICTED_SHARDS.set(evicted_shards.len() as i64);
 
         (indexes_to_sync, indexes_to_delete)
     }
