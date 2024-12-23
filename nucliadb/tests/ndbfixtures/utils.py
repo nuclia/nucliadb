@@ -66,7 +66,8 @@ def create_api_client_factory(application: FastAPI) -> Callable[..., AsyncClient
 
 @contextmanager
 def global_utility(name: str, util: Any):
-    """Hacky set_utility used in tests to provide proper setup/cleanup of utilities.
+    """Hacky version of `set_utility` used in tests to provide proper
+    setup/cleanup of utilities.
 
     Tests can sometimes mess with global state. While fixtures add/remove global
     utilities, component lifecycles do the same. Sometimes, we can left
