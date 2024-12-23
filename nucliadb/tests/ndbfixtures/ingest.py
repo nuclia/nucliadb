@@ -56,9 +56,6 @@ from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import (
-    clear_global_cache,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +243,6 @@ async def ingest_consumers(
     yield
 
     await ingest_consumers_finalizer()
-    clear_global_cache()
 
 
 @pytest.fixture(scope="function")
