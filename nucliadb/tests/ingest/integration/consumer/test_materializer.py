@@ -29,8 +29,9 @@ from nucliadb_protos import writer_pb2
 from nucliadb_protos.kb_usage_pb2 import KbUsage, Service
 from nucliadb_utils import const
 from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from nucliadb_utils.utilities import Utility
 from tests.ndbfixtures.ingest import create_resource
+from tests.ndbfixtures.utils import global_utility
 
 
 @pytest.fixture()
@@ -51,9 +52,8 @@ async def audit_storage(nats):
             nats_creds="nats_creds",
         )
         await aud.initialize()
-        set_utility(Utility.AUDIT, aud)
-        yield aud
-        clean_utility(Utility.AUDIT)
+        with global_utility(Utility.AUDIT, aud):
+            yield aud
         await aud.finalize()
 
 
