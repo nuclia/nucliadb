@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+from contextlib import ExitStack
 from typing import AsyncIterator, Iterator
 from unittest.mock import patch
 
@@ -84,36 +85,38 @@ async def pg_maindb_settings(pg) -> AsyncIterator[DriverSettings]:
     await run_pg_schema_migrations(driver)
     await driver.finalize()
 
-    yield DriverSettings(
-        driver=DriverConfig.PG,
-        driver_pg_url=url,
-        driver_pg_connection_pool_min_size=10,
-        driver_pg_connection_pool_max_size=10,
-        driver_pg_connection_pool_acquire_timeout_ms=200,
-    )
+    settings = {
+        "driver": DriverConfig.PG,
+        "driver_pg_url": url,
+        "driver_pg_connection_pool_min_size": 10,
+        "driver_pg_connection_pool_max_size": 10,
+        "driver_pg_connection_pool_acquire_timeout_ms": 200,
+    }
+    with ExitStack() as stack:
+        for key, value in settings.items():
+            context = patch.object(ingest_settings, key, value)
+            stack.enter_context(context)
+
+        yield DriverSettings.model_validate(settings)
 
 
 @pytest.fixture(scope="function")
 async def pg_maindb_driver(pg_maindb_settings: DriverSettings) -> AsyncIterator[PGDriver]:
     url = pg_maindb_settings.driver_pg_url
     assert url is not None
-    with (
-        patch.object(ingest_settings, "driver", DriverConfig.PG),
-        patch.object(ingest_settings, "driver_pg_url", url),
-    ):
-        async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
-            await cur.execute("TRUNCATE table resources")
-            await cur.execute("TRUNCATE table catalog")
+    async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
+        await cur.execute("TRUNCATE table resources")
+        await cur.execute("TRUNCATE table catalog")
 
-        driver = PGDriver(
-            url=url,
-            connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
-            connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
-            acquire_timeout_ms=pg_maindb_settings.driver_pg_connection_pool_acquire_timeout_ms,
-        )
-        await driver.initialize()
-        await run_pg_schema_migrations(driver)
+    driver = PGDriver(
+        url=url,
+        connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
+        connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
+        acquire_timeout_ms=pg_maindb_settings.driver_pg_connection_pool_acquire_timeout_ms,
+    )
+    await driver.initialize()
+    await run_pg_schema_migrations(driver)
 
-        yield driver
+    yield driver
 
-        await driver.finalize()
+    await driver.finalize()
