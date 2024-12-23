@@ -37,9 +37,11 @@ def dummy_index(
     dummy_index_node_cluster,
     dummy_nidx_utility: NidxUtility,
     indexing_utility: IndexingUtility,
+    shard_manager,
 ):
     """Dummy/mocked index. Use to avoid usage of index nodes nor nidx"""
-    yield
+    with patch.object(cluster_settings, "standalone_mode", False):
+        yield
 
 
 @pytest.fixture(scope="function")

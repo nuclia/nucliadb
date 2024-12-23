@@ -32,9 +32,7 @@ import pytest
 from grpc import aio
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.consumer import service as consumer_service
@@ -43,6 +41,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
+from nucliadb.ingest.settings import DriverSettings
 from nucliadb.standalone.settings import Settings
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
@@ -53,9 +52,11 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.settings import indexing_settings
+from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.settings import indexing_settings, nuclia_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.transaction import TransactionUtility
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,43 @@ async def ingest_grpc_server(
 ######################################################################
 # cleaned but wip
 ######################################################################
+
+
+@pytest.fixture(scope="function")
+async def ingest_consumers(
+    maindb_settings: DriverSettings,
+    transaction_utility: TransactionUtility,
+    storage: Storage,
+    dummy_index,
+    nats_manager: NatsConnectionManager,
+    nats_ingest_stream,
+):
+    """Multiple ingest consumers with dummy/mocked index, including: ingestion
+    consumers (for writer), exports/imports consumers, auditor, shard creator
+    and materializer.
+
+    """
+    ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
+    yield
+    await ingest_consumers_finalizer()
+
+
+@pytest.fixture(scope="function")
+async def ingest_processed_consumer(
+    maindb_settings: DriverSettings,
+    transaction_utility: TransactionUtility,
+    storage: Storage,
+    dummy_index,
+    nats_manager: NatsConnectionManager,
+    nats_ingest_processed_stream,
+):
+    """Ingest processed consumer with dummy/mocked index. Receives nats messages
+    and ingest messages from processor.
+
+    """
+    ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
+    yield
+    await ingest_consumer_finalizer()
 
 
 @pytest.fixture(scope="function")
@@ -229,70 +267,16 @@ def local_files():
     storage_settings.local_testing_files = f"{INGEST_TESTS_DIR}"
 
 
+# TODO: remove after all tests have been migrated
 @pytest.fixture(scope="function")
-async def ingest_consumers(
-    maindb_settings,
-    transaction_utility,
-    storage,
-    fake_node,
-    nats_manager,
-    nats_ingest_stream,
-):
-    ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
-
+def fake_node(dummy_index):
     yield
-
-    await ingest_consumers_finalizer()
-
-
-@pytest.fixture(scope="function")
-async def ingest_processed_consumer(
-    maindb_settings,
-    transaction_utility,
-    storage,
-    fake_node,
-    nats_manager,
-    nats_ingest_processed_stream,
-):
-    ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
-
-    yield
-
-    await ingest_consumer_finalizer()
-
-
-@pytest.fixture(scope="function")
-def fake_node(indexing_utility, shard_manager):
-    manager.INDEX_NODES.clear()
-    manager.add_index_node(
-        id=str(uuid.uuid4()),
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-    )
-    manager.add_index_node(
-        id=str(uuid.uuid4()),
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-    )
-
-    with patch.object(cluster_settings, "standalone_mode", False):
-        yield
-
-    manager.INDEX_NODES.clear()
 
 
 @pytest.fixture()
 def learning_config():
-    from nucliadb_utils.settings import nuclia_settings
-
-    original = nuclia_settings.dummy_learning_services
-    nuclia_settings.dummy_learning_services = True
-    yield AsyncMock()
-    nuclia_settings.dummy_learning_services = original
+    with patch.object(nuclia_settings, "dummy_learning_services", True):
+        yield
 
 
 @pytest.fixture(scope="function")
@@ -304,12 +288,14 @@ async def entities_manager_mock():
 
     """
     klass = "nucliadb.ingest.service.writer.EntitiesManager"
-    with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
-        with patch(
+    with (
+        patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)),
+        patch(
             "nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
             AsyncMock(return_value=[]),
-        ):
-            yield
+        ),
+    ):
+        yield
 
 
 @pytest.fixture(scope="function")
