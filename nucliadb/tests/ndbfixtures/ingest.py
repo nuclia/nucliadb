@@ -47,7 +47,6 @@ from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils import const
@@ -95,38 +94,6 @@ async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[W
     stub = WriterStub(channel)
     yield stub
     await channel.close(grace=None)
-
-
-# Utils
-
-
-@pytest.fixture(scope="function")
-async def ingest_grpc_server(
-    maindb_driver: Driver,
-    storage: Storage,
-    shard_manager: KBShardManager,
-    learning_config,
-    # XXX: this is not really needed for ingest tests but writer depends on this
-    # stream to exist
-    nats_index_stream,
-) -> AsyncIterator[IngestGrpcServer]:
-    servicer = WriterServicer()
-    await servicer.initialize()
-    server = aio.server()
-    port = server.add_insecure_port("[::]:0")
-    writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
-    await server.start()
-    yield IngestGrpcServer(
-        host="127.0.0.1",
-        port=port,
-    )
-    await servicer.finalize()
-    await server.stop(None)
-
-
-######################################################################
-# cleaned but wip
-######################################################################
 
 
 @pytest.fixture(scope="function")
@@ -177,6 +144,33 @@ def processor(
     """Ingest Processor with dummy/mocked index"""
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
+
+
+# Utils
+
+
+@pytest.fixture(scope="function")
+async def ingest_grpc_server(
+    maindb_driver: Driver,
+    storage: Storage,
+    shard_manager: KBShardManager,
+    learning_config,
+    # XXX: this is not really needed for ingest tests but writer depends on this
+    # stream to exist
+    nats_index_stream,
+) -> AsyncIterator[IngestGrpcServer]:
+    servicer = WriterServicer()
+    await servicer.initialize()
+    server = aio.server()
+    port = server.add_insecure_port("[::]:0")
+    writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
+    await server.start()
+    yield IngestGrpcServer(
+        host="127.0.0.1",
+        port=port,
+    )
+    await servicer.finalize()
+    await server.stop(None)
 
 
 @pytest.fixture(scope="function")
@@ -257,11 +251,6 @@ async def _nats_streams_and_consumers_setup(
     await nc.close()
 
 
-######################################################################
-# from ingest/fixtures.py
-######################################################################
-
-
 @pytest.fixture(scope="function")
 def local_files():
     storage_settings.local_testing_files = f"{INGEST_TESTS_DIR}"
@@ -280,7 +269,19 @@ def learning_config():
 
 
 @pytest.fixture(scope="function")
-async def entities_manager_mock():
+async def txn(maindb_driver: Driver):
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()
+
+
+################################################################################
+# TODO: keep working on cleanup (those were originally from ingest/fixtures.py)
+################################################################################
+
+
+@pytest.fixture(scope="function")
+async def entities_manager_mock(dummy_index):
     """EntitiesManager mock for ingest gRPC API disabling indexed entities
     functionality. As tests doesn't startup a node, with this mock we allow
     testing ingest's gRPC API while the whole entities functionality is properly
@@ -296,55 +297,6 @@ async def entities_manager_mock():
         ),
     ):
         yield
-
-
-@pytest.fixture(scope="function")
-async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, learning_config):
-    kbid = KnowledgeBox.new_unique_kbid()
-    kbslug = "slug-" + str(uuid.uuid4())
-    model = SemanticModelMetadata(
-        similarity_function=upb.VectorSimilarity.COSINE, vector_dimension=len(V1)
-    )
-    await KnowledgeBox.create(
-        maindb_driver,
-        kbid=kbid,
-        slug=kbslug,
-        semantic_models={"my-semantic-model": model},
-    )
-
-    yield kbid
-
-    await KnowledgeBox.delete(maindb_driver, kbid)
-
-
-@pytest.fixture(scope="function")
-async def knowledgebox_with_vectorsets(storage, maindb_driver: Driver, shard_manager, learning_config):
-    kbid = KnowledgeBox.new_unique_kbid()
-    kbslug = "slug-" + str(uuid.uuid4())
-    await KnowledgeBox.create(
-        maindb_driver,
-        kbid=kbid,
-        slug=kbslug,
-        semantic_models={
-            "my-semantic-model-A": SemanticModelMetadata(
-                similarity_function=upb.VectorSimilarity.COSINE,
-                vector_dimension=len(V1),
-            ),
-            "my-semantic-model-B": SemanticModelMetadata(
-                similarity_function=upb.VectorSimilarity.COSINE,
-                vector_dimension=512,
-                matryoshka_dimensions=[3072, 512, 128],
-            ),
-            "my-semantic-model-C": SemanticModelMetadata(
-                similarity_function=upb.VectorSimilarity.DOT,
-                vector_dimension=1024,
-            ),
-        },
-    )
-
-    yield kbid
-
-    await KnowledgeBox.delete(maindb_driver, kbid)
 
 
 THUMBNAIL = rpb.CloudFile(
@@ -771,13 +723,3 @@ async def add_field_id(resource: Resource, field: Field):
     field_type = FIELD_TYPE_STR_TO_PB[field.type]
     field_id = rpb.FieldID(field_type=field_type, field=field.id)
     await resource.update_all_field_ids(updated=[field_id])
-
-
-# from tests/fixtures.py
-
-
-@pytest.fixture(scope="function")
-async def txn(maindb_driver):
-    async with maindb_driver.transaction() as txn:
-        yield txn
-        await txn.abort()

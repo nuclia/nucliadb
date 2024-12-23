@@ -60,6 +60,38 @@ async def knowledgebox(
     # await KnowledgeBox.purge(maindb_driver, kbid)
 
 
+@pytest.fixture(scope="function")
+async def knowledgebox_with_vectorsets(
+    storage: Storage, maindb_driver: Driver, shard_manager: KBShardManager
+):
+    kbid = KnowledgeBox.new_unique_kbid()
+    kbslug = "slug-" + str(uuid.uuid4())
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=kbslug,
+        semantic_models={
+            "my-semantic-model-A": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.COSINE,
+                vector_dimension=len(V1),
+            ),
+            "my-semantic-model-B": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.COSINE,
+                vector_dimension=512,
+                matryoshka_dimensions=[3072, 512, 128],
+            ),
+            "my-semantic-model-C": SemanticModelMetadata(
+                similarity_function=upb.VectorSimilarity.DOT,
+                vector_dimension=1024,
+            ),
+        },
+    )
+
+    yield kbid
+
+    await KnowledgeBox.delete(maindb_driver, kbid)
+
+
 # FIXME: this is a weird situation, we can use a hosted-like nucliadb while this
 # creates a KB as it was onprem. The end result should not change much but still, is
 # something we may want to fix
@@ -85,16 +117,22 @@ async def knowledgebox_by_api(nucliadb_writer_manager: AsyncClient):
     assert resp.status_code == 200
 
 
-# Used by: nucliadb standalone tests
+# Alias used by: nucliadb standalone tests
 @pytest.fixture(scope="function")
 async def knowledgebox_one(knowledgebox_by_api: str):
     yield knowledgebox_by_api
 
 
-# Used by: nucliadb writer tests
+# Alias used by: nucliadb writer tests
 @pytest.fixture(scope="function")
 async def knowledgebox_writer(knowledgebox_by_api: str):
     yield knowledgebox_by_api
+
+
+# Alias used by: ingest, train and nucliadb tests
+@pytest.fixture(scope="function")
+async def knowledgebox_ingest(knowledgebox):
+    yield knowledgebox
 
 
 @pytest.fixture(scope="function")
