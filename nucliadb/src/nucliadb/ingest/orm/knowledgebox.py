@@ -49,7 +49,6 @@ from nucliadb.ingest.orm.exceptions import (
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
-from nucliadb.ingest.settings import settings
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import knowledgebox_pb2, noderesources_pb2, nodewriter_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -60,6 +59,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     StoredExternalIndexProviderMetadata,
 )
 from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
@@ -73,6 +73,9 @@ KB_KEYS = "/kbs/{kbid}/"
 
 KB_TO_DELETE_BASE = "/kbtodelete/"
 KB_TO_DELETE_STORAGE_BASE = "/storagetodelete/"
+
+RESOURCE_TO_DELETE_STORAGE_BASE = "/resourcestoragetodelete"
+RESOURCE_TO_DELETE_STORAGE = f"{RESOURCE_TO_DELETE_STORAGE_BASE}/{{kbid}}/{{uuid}}"
 
 KB_TO_DELETE = f"{KB_TO_DELETE_BASE}{{kbid}}"
 KB_TO_DELETE_STORAGE = f"{KB_TO_DELETE_STORAGE_BASE}{{kbid}}"
@@ -415,9 +418,16 @@ class KnowledgeBox:
                 logger.exception("Error deleting slug")
 
     async def storage_delete_resource(self, uuid: str):
-        await self.storage.delete_resource(
-            self.kbid, uuid, max_parallel=settings.ingest_delete_resource_storage_max_parallel
-        )
+        if is_onprem_nucliadb():
+            await self.storage.delete_resource(self.kbid, uuid)
+        else:
+            # Deleting from storage can be slow, so we schedule its deletion and the purge cronjob
+            # will take care of it
+            await self.schedule_delete_resource(self.kbid, uuid)
+
+    async def schedule_delete_resource(self, kbid: str, uuid: str):
+        key = RESOURCE_TO_DELETE_STORAGE.format(kbid=kbid, uuid=uuid)
+        await self.txn.set(key, b"")
 
     async def delete_resource(self, uuid: str):
         with processor_observer({"type": "delete_resource_maindb"}):
