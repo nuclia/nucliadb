@@ -134,7 +134,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     cached_buckets: List[str] = []
     chunk_size = CHUNK_SIZE
 
-    async def delete_resource(self, kbid: str, uuid: str, max_parallel: int = 1):
+    async def delete_resource(self, kbid: str, uuid: str):
         """
         Delete all storage keys related to a resource
 
@@ -145,7 +145,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         """
         bucket = self.get_bucket_name(kbid)
         resource_storage_base_path = STORAGE_RESOURCE.format(kbid=kbid, uuid=uuid)
-        semaphore = asyncio.Semaphore(max_parallel)
+        semaphore = asyncio.Semaphore(20)
 
         async def _delete_object(object_info: ObjectInfo):
             async with semaphore:
