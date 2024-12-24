@@ -138,8 +138,6 @@ def processor(
     maindb_driver: Driver,
     storage: Storage,
     pubsub: PubSubDriver,
-    shard_manager: KBShardManager,
-    dummy_index,
 ) -> Iterable[Processor]:
     """Ingest Processor with dummy/mocked index"""
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
