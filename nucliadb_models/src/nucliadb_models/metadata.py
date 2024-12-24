@@ -336,15 +336,31 @@ class Basic(BaseModel):
 class InputOrigin(BaseModel):
     source_id: Optional[str] = None
     url: Optional[str] = None
-    created: Optional[DateTime] = None
-    modified: Optional[DateTime] = None
-    metadata: Dict[str, str] = {}
-    tags: List[str] = []
+    created: Optional[DateTime] = Field(
+        default=None,
+        description="Creation date of the resource at the origin system. This can be later used for date range filtering on search endpoints. Have a look at the advanced search documentation page: https://docs.nuclia.dev/docs/rag/advanced/search/#date-filtering",
+    )
+    modified: Optional[DateTime] = Field(
+        default=None,
+        description="Modification date of the resource at the origin system. This can be later used for date range filtering on search endpoints.  Have a look at the advanced search documentation page: https://docs.nuclia.dev/docs/rag/advanced/search/#date-filtering",
+    )
+    metadata: Dict[str, str] = Field(
+        default={},
+        title="Metadata",
+        description="Generic metadata from the resource at the origin system. It can later be used for filtering on search endpoints with '/origin.metadata/{key}/{value}'",
+    )
+    tags: List[str] = Field(
+        default=[],
+        title="Tags",
+        description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
+    )
     collaborators: List[str] = []
-    # old field was "colaborators"
     filename: Optional[str] = None
     related: List[str] = []
-    path: Optional[str] = None
+    path: Optional[str] = Field(
+        default=None,
+        description="Path of the original resource. Typically used to store folder structure information of the resource at the origin system. It can be later used for filtering on search endpoints with '/origin.path/{path}'",
+    )
 
 
 class Origin(InputOrigin):

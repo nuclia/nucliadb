@@ -82,10 +82,18 @@ class CreateResourcePayload(BaseModel):
     slug: Optional[SlugString] = FieldDefaults.slug
     icon: Optional[str] = FieldDefaults.icon
     thumbnail: Optional[str] = None
-    metadata: Optional[InputMetadata] = None
+    metadata: Optional[InputMetadata] = Field(
+        default=None,
+        title="Metadata",
+        description="Generic metadata for the resource. It can be used to store structured information about the resource that later is serialized on retrieval results, however this metadata can not be used for searching or filtering.",
+    )
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
-    origin: Optional[InputOrigin] = None
+    origin: Optional[InputOrigin] = Field(
+        default=None,
+        title="Origin",
+        description="Origin metadata for the resource. Used to store information about the resource on the origin system. Most of its fields can later be used to filter at search time.",  # noqa
+    )
     extra: Optional[Extra] = None
     hidden: Optional[bool] = None
 
