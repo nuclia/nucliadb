@@ -28,7 +28,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from nucliadb.search import API_PREFIX
-from nucliadb_utils.utilities import MAIN
+from nucliadb_utils.utilities import MAIN, Utility
 
 logger = logging.getLogger("fixtures.utils")
 
@@ -65,7 +65,7 @@ def create_api_client_factory(application: FastAPI) -> Callable[..., AsyncClient
 
 
 @contextmanager
-def global_utility(name: str, util: Any):
+def global_utility(name: Utility, util: Any):
     """Hacky version of `set_utility` used in tests to provide proper
     setup/cleanup of utilities.
 
