@@ -146,7 +146,7 @@ async def purge_deleted_resource_storage(driver: Driver, storage: Storage) -> No
             purged = await _purge_resources_storage_batch(driver, storage, batch_size=100)
             if not purged:
                 logger.info("No more resources to purge found")
-                await asyncio.sleep(5)
+                return
             logger.info(f"Purged {purged} resources")
 
         except asyncio.CancelledError:
