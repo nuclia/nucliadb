@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import random
+import unittest
 import uuid
 from typing import cast
 from unittest.mock import AsyncMock
@@ -33,7 +34,12 @@ from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
 )
-from nucliadb.purge import purge_kb, purge_kb_storage
+from nucliadb.purge import (
+    _count_resources_storage_to_purge,
+    _purge_resources_storage_batch,
+    purge_kb,
+    purge_kb_storage,
+)
 from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
 from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
@@ -232,3 +238,45 @@ async def kb_catalog_entries_count(driver: Driver, kbid: str) -> int:
             if count is None:
                 return 0
             return count[0]
+
+
+async def test_purge_resources_deleted_storage(
+    maindb_driver: Driver,
+    storage: Storage,
+    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
+):
+    # Create a KB
+    kb_slug = str(uuid.uuid4())
+    resp = await nucliadb_manager.post("/kbs", json={"slug": kb_slug})
+    assert resp.status_code == 201
+    kbid = resp.json().get("uuid")
+
+    # Create some resources
+    resources = []
+    for i in range(10):
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resources",
+            json={
+                "title": f"Resource {i}",
+                "slug": f"resource-{i}",
+                "texts": {"text1": {"body": "My text"}},
+            },
+        )
+        assert resp.status_code == 201
+        resources.append(resp.json().get("uuid"))
+
+    # Delete the resource
+    # Test the case where resources are scheduled to be deleted
+    with unittest.mock.patch("nucliadb.ingest.orm.knowledgebox.is_onprem_nucliadb", return_value=False):
+        # Delete the resources
+        for rid in resources:
+            resp = await nucliadb_writer.delete(f"/kb/{kbid}/resource/{rid}")
+            assert resp.status_code == 204
+
+    to_purge = await _count_resources_storage_to_purge(maindb_driver)
+    assert to_purge == 10
+    purged = await _purge_resources_storage_batch(maindb_driver, storage, batch_size=5)
+    assert purged == 5
+    purged = await _purge_resources_storage_batch(maindb_driver, storage, batch_size=10)
+    assert purged == 5

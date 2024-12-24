@@ -132,46 +132,65 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
     logger.info("FINISH PURGING KB STORAGE")
 
 
-async def purge_deleted_resource_storage(driver: Driver, storage: Storage):
+async def purge_deleted_resource_storage(driver: Driver, storage: Storage) -> None:
     """
     Remove from storage all resources marked as deleted.
+
+    Returns the number of resources purged.
     """
     logger.info("Starting purge of deleted resource storage")
+    to_purge = await _count_resources_storage_to_purge(driver)
+    logger.info(f"Found {to_purge} resources to purge")
     while True:
         try:
-            # Sleep for a while to avoid hammering the storage
-            await asyncio.sleep(10)
-
-            to_delete_batch = []
-            async with driver.transaction(read_only=True) as txn:
-                async for key in txn.keys(match=RESOURCE_TO_DELETE_STORAGE_BASE, count=100):
-                    to_delete_batch.append(key)
-
-            if not to_delete_batch:
-                logger.info("No deleted resources to purge found")
-                continue
-
-            # Delete the resources blobs from storage
-            logger.info(f"Purging {len(to_delete_batch)} deleted resources")
-            tasks = []
-            for key in to_delete_batch:
-                kbid, resource_id = key.split("/")[-2:]
-                tasks.append(asyncio.create_task(storage.delete_resource(kbid, resource_id)))
-            await asyncio.gather(*tasks)
-
-            # Delete the keys
-            async with driver.transaction() as txn:
-                for key in to_delete_batch:
-                    await txn.delete(key)
-                await txn.commit()
+            purged = _purge_resources_storage_batch(driver, storage, batch_size=100)
+            if not purged:
+                logger.info("No more resources to purge found")
+                return
+            logger.info(f"Purged {purged} resources")
 
         except asyncio.CancelledError:
             logger.info("Purge of deleted resource storage was cancelled")
             return
 
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.error(f"Error while purging deleted resource storage: {exc}")
+
+async def _count_resources_storage_to_purge(driver: Driver) -> int:
+    """
+    Count the number of resources marked as deleted in storage.
+    """
+    async with driver.transaction(read_only=True) as txn:
+        return await txn.count(match=RESOURCE_TO_DELETE_STORAGE_BASE)
+
+
+async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch_size: int = 100) -> int:
+    """
+    Remove from storage a batch of resources marked as deleted. Returns the
+    number of resources purged.
+    """
+    # Get the keys of the resources to delete in batches of 100
+    to_delete_batch = []
+    async with driver.transaction(read_only=True) as txn:
+        async for key in txn.keys(match=RESOURCE_TO_DELETE_STORAGE_BASE, count=batch_size):
+            to_delete_batch.append(key)
+
+    if not to_delete_batch:
+        return 0
+
+    # Delete the resources blobs from storage
+    logger.info(f"Purging {len(to_delete_batch)} deleted resources")
+    tasks = []
+    for key in to_delete_batch:
+        kbid, resource_id = key.split("/")[-2:]
+        tasks.append(asyncio.create_task(storage.delete_resource(kbid, resource_id)))
+    await asyncio.gather(*tasks)
+
+    # Delete the schedule-to-delete keys
+    async with driver.transaction() as txn:
+        for key in to_delete_batch:
+            await txn.delete(key)
+        await txn.commit()
+
+    return len(to_delete_batch)
 
 
 async def purge_kb_vectorsets(driver: Driver, storage: Storage):
@@ -241,6 +260,7 @@ async def main():
         errors.capture_exception(ex)
     finally:
         try:
+            purge_resources_storage_task.cancel()
             await storage.finalize()
             await teardown_driver()
             await teardown_cluster()
