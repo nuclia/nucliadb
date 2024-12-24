@@ -215,13 +215,6 @@ async def test_purge_orphan_shard_detection(
     assert orphan_shard_id in orphan_shards
 
 
-@pytest.fixture(scope="function")
-def storage():
-    storage = AsyncMock()
-    storage.delete_kb = AsyncMock(return_value=(True, False))
-    yield storage
-
-
 async def list_all_keys(driver: Driver) -> list[str]:
     async with driver.transaction() as txn:
         keys = [key async for key in txn.keys(match="")]
@@ -288,3 +281,7 @@ async def test_purge_resources_deleted_storage(
     await asyncio.sleep(0.1)
     task.cancel()
     await task
+
+
+async def test_storage_dummy(maindb_driver, storage):
+    assert await _count_resources_storage_to_purge(maindb_driver) == 0
