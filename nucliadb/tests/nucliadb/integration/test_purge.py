@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import random
 import unittest
 import uuid
@@ -37,6 +38,7 @@ from nucliadb.ingest.orm.knowledgebox import (
 from nucliadb.purge import (
     _count_resources_storage_to_purge,
     _purge_resources_storage_batch,
+    purge_deleted_resource_storage,
     purge_kb,
     purge_kb_storage,
 )
@@ -280,3 +282,9 @@ async def test_purge_resources_deleted_storage(
     assert purged == 5
     purged = await _purge_resources_storage_batch(maindb_driver, storage, batch_size=10)
     assert purged == 5
+
+    # Check task cancellation
+    task = asyncio.create_task(purge_deleted_resource_storage(maindb_driver, storage))
+    await asyncio.sleep(0.1)
+    task.cancel()
+    await task
