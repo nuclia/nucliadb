@@ -281,7 +281,7 @@ async def txn(maindb_driver: Driver):
 
 
 @pytest.fixture(scope="function")
-async def entities_manager_mock(dummy_index):
+async def entities_manager_mock():
     """EntitiesManager mock for ingest gRPC API disabling indexed entities
     functionality. As tests doesn't startup a node, with this mock we allow
     testing ingest's gRPC API while the whole entities functionality is properly
