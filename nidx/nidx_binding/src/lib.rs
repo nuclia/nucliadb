@@ -41,6 +41,7 @@ pub struct NidxBinding {
     seq: SeqSource,
     runtime: Option<Runtime>,
     sync_watcher: watch::Receiver<SyncStatus>,
+    shutdown: CancellationToken,
     _searcher_work_dir: TempDir,
 }
 
@@ -92,10 +93,19 @@ impl NidxBinding {
     }
 }
 
+impl Drop for NidxBinding {
+    fn drop(&mut self) {
+        self.shutdown.cancel();
+    }
+}
+
 impl NidxBinding {
     pub async fn new(binding_settings: HashMap<String, String>) -> anyhow::Result<Self> {
         let settings = Settings::from_env_settings(EnvSettings::from_map(binding_settings)).await?;
         let shutdown = CancellationToken::new();
+
+        // We are setting the global subscriber, so it will only take the settings (RUST_LOG) of the first initialization
+        let _ = tracing_subscriber::fmt::try_init();
 
         // API server
         let api_service = ApiServer::new(settings.metadata.clone()).into_service();
@@ -145,6 +155,7 @@ impl NidxBinding {
             seq,
             runtime: None,
             sync_watcher,
+            shutdown,
             _searcher_work_dir: searcher_work_dir,
         })
     }
