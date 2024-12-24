@@ -85,8 +85,5 @@ class Settings(DriverSettings):
 
     max_concurrent_ingest_processing: int = 5
 
-    # Ingest processor settings
-    ingest_delete_resource_storage_max_parallel: int = 20
-
 
 settings = Settings()

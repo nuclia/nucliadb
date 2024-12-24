@@ -32,6 +32,7 @@ from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_STORAGE_BASE,
     KB_VECTORSET_TO_DELETE,
     KB_VECTORSET_TO_DELETE_BASE,
+    RESOURCE_TO_DELETE_STORAGE_BASE,
     KnowledgeBox,
 )
 from nucliadb_telemetry import errors
@@ -131,6 +132,48 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
     logger.info("FINISH PURGING KB STORAGE")
 
 
+async def purge_deleted_resource_storage(driver: Driver, storage: Storage):
+    """
+    Remove from storage all resources marked as deleted.
+    """
+    logger.info("Starting purge of deleted resource storage")
+    while True:
+        try:
+            # Sleep for a while to avoid hammering the storage
+            await asyncio.sleep(10)
+
+            to_delete_batch = []
+            async with driver.transaction(read_only=True) as txn:
+                async for key in txn.keys(match=RESOURCE_TO_DELETE_STORAGE_BASE, count=100):
+                    to_delete_batch.append(key)
+
+            if not to_delete_batch:
+                logger.info("No deleted resources to purge found")
+                continue
+
+            # Delete the resources blobs from storage
+            logger.info(f"Purging {len(to_delete_batch)} deleted resources")
+            tasks = []
+            for key in to_delete_batch:
+                kbid, resource_id = key.split("/")[-2:]
+                tasks.append(asyncio.create_task(storage.delete_resource(kbid, resource_id)))
+            await asyncio.gather(*tasks)
+
+            # Delete the keys
+            async with driver.transaction() as txn:
+                for key in to_delete_batch:
+                    await txn.delete(key)
+                await txn.commit()
+
+        except asyncio.CancelledError:
+            logger.info("Purge of deleted resource storage was cancelled")
+            return
+
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.error(f"Error while purging deleted resource storage: {exc}")
+
+
 async def purge_kb_vectorsets(driver: Driver, storage: Storage):
     """Vectors for a vectorset are stored in a key inside each resource. Iterate
     through all resources of the KB and remove any storage object containing
@@ -186,9 +229,13 @@ async def main():
         service_name=SERVICE_NAME,
     )
     try:
+        purge_resources_storage_task = asyncio.create_task(
+            purge_deleted_resource_storage(driver, storage)
+        )
         await purge_kb(driver)
         await purge_kb_storage(driver, storage)
         await purge_kb_vectorsets(driver, storage)
+        await purge_resources_storage_task
     except Exception as ex:  # pragma: no cover
         logger.exception("Unhandled exception on purge command")
         errors.capture_exception(ex)
