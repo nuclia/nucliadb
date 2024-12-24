@@ -312,6 +312,10 @@ async def stop_transaction_utility() -> None:
 
 
 async def start_indexing_utility(service_name: Optional[str] = None) -> IndexingUtility:
+    indexing_utility = get_utility(Utility.INDEXING)
+    if indexing_utility is not None:
+        return indexing_utility
+
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,
