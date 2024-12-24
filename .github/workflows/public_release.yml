@@ -20,7 +20,7 @@ on:
 
 permissions:
   id-token: write   # This is required for requesting the JWT
-  contents: read    # This is required for actions/checkout
+  contents: write   # This is required to create the release
 
 jobs:
   release:
@@ -150,6 +150,12 @@ jobs:
         with:
           python-version: "3.12.5"
           cache: "true"
+
+      # Needed for nidx_protos (rust)
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install nucliadb
         run: pdm sync -d --clean --no-editable
