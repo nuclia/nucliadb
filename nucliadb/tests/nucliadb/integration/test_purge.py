@@ -22,9 +22,7 @@ import random
 import unittest
 import uuid
 from typing import cast
-from unittest.mock import AsyncMock
 
-import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
@@ -45,6 +43,7 @@ from nucliadb.purge import (
 from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
 from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
+from tests.utils.dirty_index import wait_for_sync
 
 
 async def test_purge_deletes_everything_from_maindb(
@@ -260,6 +259,8 @@ async def test_purge_resources_deleted_storage(
         )
         assert resp.status_code == 201
         resources.append(resp.json().get("uuid"))
+
+    await wait_for_sync()
 
     # Delete the resource
     # Test the case where resources are scheduled to be deleted
