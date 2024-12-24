@@ -20,6 +20,7 @@
 import http.client
 import os
 import platform
+import shutil
 import signal
 import socket
 import subprocess
@@ -191,12 +192,27 @@ def start_gnatsd(gnatsd: Gnatsd):  # pragma: no cover
 
 @pytest.fixture(scope="session")
 def natsd_server():  # pragma: no cover
-    # Create a persistent temporary directory
-    tmpdir = tempfile.mkdtemp()
-    nats_server_path = os.path.join(tmpdir, "nats-server")
+    version = "v2.10.12"
+    nats_server_name = "nats-server"
 
-    if not os.path.isfile(nats_server_path):
-        version = "v2.10.12"
+    DOWNLOAD_NATS = False
+    STORE_NATS_SERVER_EXECUTABLE = True
+
+    # first check if we have the version locally
+    stored_nats_server_path = os.path.abspath(os.path.join(os.path.curdir, nats_server_name))
+    if os.path.isfile(stored_nats_server_path):
+        output = subprocess.check_output([stored_nats_server_path, "--version"])
+        output = output.decode().strip()  # nats-server: vX.Y.Z
+        current_version = output.split()[1]  # vX.Y.Z
+
+        DOWNLOAD_NATS = current_version != version
+
+    if DOWNLOAD_NATS:
+        print("Downloading nats server")
+        # Create a persistent temporary directory
+        tmpdir = tempfile.mkdtemp()
+        download_path = os.path.join(tmpdir, nats_server_name)
+
         arch = platform.machine()
         if arch == "x86_64":
             arch = "amd64"
@@ -209,14 +225,26 @@ def natsd_server():  # pragma: no cover
 
         file = zipfile.open(f"nats-server-{version}-{system}-{arch}/nats-server")
         content = file.read()
-        with open(nats_server_path, "wb") as f:
+        with open(download_path, "wb") as f:
             f.write(content)
-        os.chmod(nats_server_path, 0o755)
+        os.chmod(download_path, 0o755)
+
+        if STORE_NATS_SERVER_EXECUTABLE:
+            os.path.rename(download_path, stored_nats_server_path)
+            nats_server_path = stored_nats_server_path
+        else:
+            nats_server_path = download_path
+    else:
+        nats_server_path = stored_nats_server_path
 
     server = Gnatsd(port=4222)
     server.bin_name = "nats-server"
-    server.path = tmpdir
-    return server
+    server.path = os.path.dirname(nats_server_path)
+
+    yield server
+
+    if DOWNLOAD_NATS:
+        shutil.rmtree(tmpdir)
 
 
 @pytest.fixture(scope="session")
