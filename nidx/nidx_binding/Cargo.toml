@@ -15,3 +15,4 @@ pyo3 = "0.22.0"
 tempfile = "3.14.0"
 tokio = "1.41.1"
 tokio-util = { version = "0.7.12", features = ["io", "io-util", "compat"] }
+tracing-subscriber = "0.3.19"
