@@ -46,7 +46,6 @@ from nucliadb.ingest.settings import DriverSettings
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
-from nucliadb_protos import writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
@@ -125,30 +124,6 @@ async def ingest_processed_consumer(
 
     await ingest_consumer_finalizer()
     clear_global_cache()
-
-
-# DEPRECATED: only used by writer ndbfixtures
-@pytest.fixture(scope="function")
-async def grpc_servicer(
-    maindb_driver: Driver, ingest_consumers, ingest_processed_consumer, learning_config
-):
-    servicer = WriterServicer()
-    await servicer.initialize()
-
-    server = aio.server()
-    port = server.add_insecure_port("[::]:0")
-    writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
-    await server.start()
-    _channel = aio.insecure_channel(f"127.0.0.1:{port}")
-    yield IngestFixture(
-        channel=_channel,
-        serv=server,
-        servicer=servicer,
-        host=f"127.0.0.1:{port}",
-    )
-    await servicer.finalize()
-    await _channel.close(grace=None)
-    await server.stop(None)
 
 
 @pytest.fixture(scope="function")
