@@ -101,6 +101,9 @@ async def ingest_consumers(
     storage: Storage,
     fake_node,
     nats_manager: NatsConnectionManager,
+    # TODO: remove this, we are adding this fixture here because we depend on it
+    # and was previously used by indexing_utility, but never needed by it
+    _clean_natsd,
 ):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
@@ -117,6 +120,9 @@ async def ingest_processed_consumer(
     storage: Storage,
     fake_node,
     nats_manager: NatsConnectionManager,
+    # TODO: remove this, we are adding this fixture here because we depend on it
+    # and was previously used by indexing_utility, but never needed by it
+    _clean_natsd,
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
 
@@ -276,11 +282,34 @@ async def stream_audit(natsd: str) -> AsyncIterator[StreamAuditStorage]:
 
 
 @pytest.fixture(scope="function")
-async def indexing_utility(natsd: str, _clean_natsd) -> AsyncIterator[IndexingUtility]:
+async def indexing_utility(dummy_indexing_utility) -> AsyncIterator[IndexingUtility]:
+    yield dummy_indexing_utility
+
+
+@pytest.fixture(scope="function")
+async def dummy_indexing_utility() -> AsyncIterator[IndexingUtility]:
+    # as it's a dummy utility, we don't need to provide real nats servers or
+    # creds. Anyway, this should be a different class instead of a parameter
+    indexing_utility = IndexingUtility(
+        nats_creds=None,
+        nats_servers=[],
+        dummy=True,
+    )
+    await indexing_utility.initialize()
+    set_utility(Utility.INDEXING, indexing_utility)
+
+    yield indexing_utility
+
+    clean_utility(Utility.INDEXING)
+    await indexing_utility.finalize()
+
+
+@pytest.fixture(scope="function")
+async def nats_indexing_utility(natsd: str, _clean_natsd) -> AsyncIterator[IndexingUtility]:
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,
-        dummy=True,
+        dummy=False,
     )
     await indexing_utility.initialize()
     set_utility(Utility.INDEXING, indexing_utility)
