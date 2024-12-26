@@ -101,9 +101,6 @@ async def ingest_consumers(
     storage: Storage,
     fake_node,
     nats_manager: NatsConnectionManager,
-    # TODO: remove this, we are adding this fixture here because we depend on it
-    # and was previously used by indexing_utility, but never needed by it
-    _clean_natsd,
 ):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
@@ -120,9 +117,6 @@ async def ingest_processed_consumer(
     storage: Storage,
     fake_node,
     nats_manager: NatsConnectionManager,
-    # TODO: remove this, we are adding this fixture here because we depend on it
-    # and was previously used by indexing_utility, but never needed by it
-    _clean_natsd,
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
 
@@ -282,7 +276,13 @@ async def stream_audit(natsd: str) -> AsyncIterator[StreamAuditStorage]:
 
 
 @pytest.fixture(scope="function")
-async def indexing_utility(dummy_indexing_utility) -> AsyncIterator[IndexingUtility]:
+async def indexing_utility(
+    dummy_indexing_utility: IndexingUtility,
+    # TODO: too many tests depend on this to be true.
+    # Remove when everyone asks for what they really need
+    natsd: str,
+    _clean_natsd,
+) -> AsyncIterator[IndexingUtility]:
     yield dummy_indexing_utility
 
 
