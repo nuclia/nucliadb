@@ -19,6 +19,7 @@
 #
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
@@ -150,10 +151,10 @@ async def grpc_servicer(
 
 
 @pytest.fixture(scope="function")
-async def pubsub(natsd: str) -> AsyncIterator[PubSubDriver]:
+async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
     pubsub = get_utility(Utility.PUBSUB)
     assert pubsub is None, "No pubsub is expected to be already set"
-    pubsub = NatsPubsub(hosts=[natsd])
+    pubsub = NatsPubsub(hosts=[nats_server])
     await pubsub.initialize()
     set_utility(Utility.PUBSUB, pubsub)
 
@@ -263,9 +264,9 @@ async def basic_audit() -> AsyncIterator[BasicAuditStorage]:
 
 
 @pytest.fixture(scope="function")
-async def stream_audit(natsd: str) -> AsyncIterator[StreamAuditStorage]:
+async def stream_audit(nats_server: str) -> AsyncIterator[StreamAuditStorage]:
     audit = StreamAuditStorage(
-        [natsd],
+        [nats_server],
         audit_settings.audit_jetstream_target,  # type: ignore
         audit_settings.audit_partitions,
         audit_settings.audit_hash_seed,
@@ -305,7 +306,7 @@ async def dummy_indexing_utility() -> AsyncIterator[IndexingUtility]:
 
 
 @pytest.fixture(scope="function")
-async def nats_indexing_utility(natsd: str, _clean_natsd) -> AsyncIterator[IndexingUtility]:
+async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator[IndexingUtility]:
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,
@@ -341,51 +342,105 @@ async def dummy_nidx_utility():
 
 
 @pytest.fixture(scope="function")
-async def _clean_natsd(natsd: str):
-    nc = await nats.connect(servers=[natsd])
-    js = nc.jetstream()
+async def nats_manager(nats_server: str) -> AsyncIterator[NatsConnectionManager]:
+    ncm = await start_nats_manager("nucliadb_tests", [nats_server], None)
+    yield ncm
+    await stop_nats_manager()
 
+
+@pytest.fixture(scope="function")
+async def _clean_natsd(nats_ingest_stream, nats_ingest_processed_stream, nats_index_stream):
+    # XXX Legacy fixture that should be replaced.
+    #
+    # Although the name was clean, it in fact was deleting and recreating
+    # streams/consumers used in nucliadb. So, in fact, this fixture was
+    # responsible of streams/consumers creation
+    yield
+
+
+@pytest.fixture(scope="function")
+async def nats_ingest_stream(nats_server: str):
+    streams = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
+    ]
     consumers = [
         (const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")),
+    ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        yield
+
+
+@pytest.fixture(scope="function")
+async def nats_ingest_processed_stream(nats_server: str):
+    streams = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
+    ]
+    consumers = [
         (const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group),
+    ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        yield
+
+
+@pytest.fixture(scope="function")
+async def nats_index_stream(nats_server: str):
+    streams = [
+        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
+    ]
+    consumers = [
         (const.Streams.INDEX.name, const.Streams.INDEX.group.format(node="1")),
     ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
+            yield
+
+
+@asynccontextmanager
+async def _nats_streams_and_consumers_setup(
+    nats_server: str, streams: list[tuple[str, str]], consumers: list[tuple[str, str]]
+):
+    nc = await nats.connect(servers=[nats_server])
+    js = nc.jetstream()
+
+    # create streams
+    for stream, subject in streams:
+        try:
+            await js.stream_info(name=stream)
+        except nats.js.errors.NotFoundError:
+            await js.add_stream(name=stream, subjects=[subject])
+
+    await nc.close()
+
+    yield
+
+    # we close and reopen the connection with nats between yield points to avoid
+    # warnings complaining on tasks being closed and tasks being killed.
+    # Probably some nats invariant is breaking across yield points
+    nc = await nats.connect(servers=[nats_server])
+    js = nc.jetstream()
+
+    # delete consumers
     for stream, consumer in consumers:
         try:
             await js.delete_consumer(stream, consumer)
         except nats.js.errors.NotFoundError:
             pass
 
-    streams = [
-        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
-        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
-    ]
+    # delete streams
     for stream, subject in streams:
         try:
             await js.delete_stream(stream)
         except nats.js.errors.NotFoundError:
             pass
 
-        await js.add_stream(name=stream, subjects=[subject])
-
-    await nc.drain()
     await nc.close()
 
-    indexing_settings.index_jetstream_servers = [natsd]
-
-    yield
-
 
 @pytest.fixture(scope="function")
-async def nats_manager(natsd: str) -> AsyncIterator[NatsConnectionManager]:
-    ncm = await start_nats_manager("nucliadb_tests", [natsd], None)
-    yield ncm
-    await stop_nats_manager()
-
-
-@pytest.fixture(scope="function")
-async def transaction_utility(natsd: str, pubsub: PubSubDriver) -> AsyncIterator[TransactionUtility]:
-    transaction_settings.transaction_jetstream_servers = [natsd]
+async def transaction_utility(
+    nats_server: str, pubsub: PubSubDriver
+) -> AsyncIterator[TransactionUtility]:
+    transaction_settings.transaction_jetstream_servers = [nats_server]
     util = await start_transaction_utility()
     yield util
     await stop_transaction_utility()
