@@ -490,34 +490,30 @@ class ResourceBrain:
     ):
         if metadata.mime_type != "":
             labels["mt"].add(metadata.mime_type)
-        base_classif_rel = Relation(
+
+        base_classification_relation = Relation(
             relation=Relation.ABOUT,
             source=relation_node_document,
             to=RelationNode(
                 ntype=RelationNode.NodeType.LABEL,
             ),
         )
-        classif_relations = []
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
                 labels["l"].add(label)
-                rel = Relation()
-                rel.CopyFrom(base_classif_rel)
-                rel.to.value = label
-                classif_relations.append(rel)
-        self.brain.relations.extend(classif_relations)
+                relation = Relation()
+                relation.CopyFrom(base_classification_relation)
+                relation.to.value = label
+                self.brain.relations.append(relation)
 
         # Data Augmentation + Processor entities
-        use_legacy_entities = True
-        base_entity_rel = Relation(
+        base_entity_relation = Relation(
             relation=Relation.ENTITY,
             source=relation_node_document,
-            to=RelationNode(
-                ntype=RelationNode.NodeType.ENTITY,
-            ),
+            to=RelationNode(ntype=RelationNode.NodeType.ENTITY),
         )
-        entity_relations = []
+        use_legacy_entities = True
         for data_augmentation_task_id, entities in metadata.entities.items():
             # If we recieved the entities from the processor here, we don't want to use the legacy entities
             # TODO: Remove this when processor doesn't use this anymore
@@ -532,33 +528,30 @@ class ResourceBrain:
                 labels["e"].add(
                     f"{entity_label}/{entity_text}"
                 )  # Add data_augmentation_task_id as a prefix?
-                rel = Relation()
-                rel.CopyFrom(base_entity_rel)
-                rel.to.value = entity_text
-                rel.to.subtype = entity_label
-                entity_relations.append(rel)
+                relation = Relation()
+                relation.CopyFrom(base_entity_relation)
+                relation.to.value = entity_text
+                relation.to.subtype = entity_label
+                self.brain.relations.append(relation)
 
         # Legacy processor entities
         # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
+        def _parse_entity(klass_entity: str) -> tuple[str, str]:
+            try:
+                klass, entity = klass_entity.split("/", 1)
+                return klass, entity
+            except ValueError:
+                raise AttributeError(f"Entity should be with type {klass_entity}")
+
         if use_legacy_entities:
-
-            def _parse_entity(entity: str):
-                try:
-                    entity_array = entity.split("/", 1)
-                    return entity_array[0], entity_array[1]
-                except IndexError:
-                    raise AttributeError(f"Entity should be with type {entity}")
-
             for klass_entity in metadata.positions.keys():
                 labels["e"].add(klass_entity)
                 klass, entity = _parse_entity(klass_entity)
-                rel = Relation()
-                rel.CopyFrom(base_entity_rel)
-                rel.to.value = entity
-                rel.to.subtype = klass
-                entity_relations.append(rel)
-
-        self.brain.relations.extend(entity_relations)
+                relation = Relation()
+                relation.CopyFrom(base_entity_relation)
+                relation.to.value = entity
+                relation.to.subtype = klass
+                self.brain.relations.append(relation)
 
     def apply_field_labels(
         self,
