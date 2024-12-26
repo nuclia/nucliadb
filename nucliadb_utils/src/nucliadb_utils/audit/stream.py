@@ -58,7 +58,7 @@ class RequestContext:
     def __init__(self):
         self.audit_request: AuditRequest = AuditRequest()
         self.start_time: float = time.monotonic()
-        self.path = None
+        self.path: str = ""
 
 
 request_context_var = contextvars.ContextVar[Optional[RequestContext]]("request_context", default=None)
