@@ -39,15 +39,7 @@ from .utils import create_api_client_factory
 
 
 @pytest.fixture(scope="function")
-async def component_nucliadb_reader(
-    # XXX: there's some weird dependency with `local_files` fixtures. Without
-    # it, download tests fail only if they are run after a test without using
-    # this fixture. This should be fixed or explained
-    local_files,
-    dummy_index_node_cluster,
-    dummy_nidx_utility,
-    reader_api_server: FastAPI,
-) -> AsyncIterator[AsyncClient]:
+async def component_nucliadb_reader(reader_api_server: FastAPI) -> AsyncIterator[AsyncClient]:
     with patch.object(running_settings, "debug", False):
         client_factory = create_api_client_factory(reader_api_server)
         async with client_factory(roles=[NucliaDBRoles.READER]) as client:
@@ -84,6 +76,12 @@ async def nucliadb_reader_manager(
 async def reader_api_server(
     storage: Storage,
     maindb_driver: Driver,
+    # XXX: there's some weird dependency with `local_files` fixtures. Without
+    # it, download tests fail only if they are run after a test without using
+    # this fixture. This should be fixed or explained
+    local_files,
+    dummy_index_node_cluster,
+    dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
     application = create_application()
     async with application.router.lifespan_context(application):
