@@ -45,6 +45,7 @@ DEPLOY_MODE_FIXTURES = {
         "component",
     ],
     "nucliadb_ingest_grpc": [
+        "component",
         "standalone",
     ],
 }

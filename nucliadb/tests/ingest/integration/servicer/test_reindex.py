@@ -19,18 +19,20 @@
 #
 from uuid import uuid4
 
-from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
+import pytest
+
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
-async def test_reindex_resource(grpc_servicer, fake_node, hosted_nucliadb):
-    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
-
+@pytest.mark.deploy_modes("component")
+async def test_reindex_resource(dummy_index, nucliadb_ingest_grpc: WriterStub, hosted_nucliadb):
     # Create a kb
     kbid = str(uuid4())
-    result = await stub.NewKnowledgeBoxV2(
+    result = await nucliadb_ingest_grpc.NewKnowledgeBoxV2(  # type: ignore
         writer_pb2.NewKnowledgeBoxV2Request(
             kbid=kbid,
             slug="test",
@@ -63,8 +65,8 @@ async def test_reindex_resource(grpc_servicer, fake_node, hosted_nucliadb):
     evw.field.field_type = field_type
     bm.field_vectors.append(evw)
 
-    await stub.ProcessMessage([bm])  # type: ignore
+    await nucliadb_ingest_grpc.ProcessMessage([bm])  # type: ignore
 
     # Reindex it along with its vectors
     req = IndexResource(kbid=kbid, rid=rid, reindex_vectors=True)
-    result = await stub.ReIndex(req)
+    result = await nucliadb_ingest_grpc.ReIndex(req)  # type: ignore

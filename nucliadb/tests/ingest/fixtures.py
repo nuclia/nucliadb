@@ -127,6 +127,7 @@ async def ingest_processed_consumer(
     clear_global_cache()
 
 
+# DEPRECATED: only used by writer ndbfixtures
 @pytest.fixture(scope="function")
 async def grpc_servicer(
     maindb_driver: Driver, ingest_consumers, ingest_processed_consumer, learning_config
