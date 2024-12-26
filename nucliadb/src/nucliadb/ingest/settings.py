@@ -77,7 +77,7 @@ class Settings(DriverSettings):
     total_replicas: int = 1  # number of ingest processor replicas in the cluster
     nuclia_partitions: int = 50
 
-    max_receive_message_length: int = 4
+    max_receive_message_length: int = 500  # In MB
 
     # Search query timeouts
     relation_search_timeout: float = 10.0

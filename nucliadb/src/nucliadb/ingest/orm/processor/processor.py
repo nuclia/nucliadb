@@ -455,6 +455,7 @@ class Processor:
         kb: KnowledgeBox,
         source: nodewriter_pb2.IndexMessageSource.ValueType,
     ) -> None:
+        return
         validate_indexable_resource(resource.indexer.brain)
         shard = await self.get_or_assign_resource_shard(txn, kb, uuid)
         index_message = resource.indexer.brain
