@@ -61,6 +61,7 @@ class Observer:
         labels: Optional[Dict[str, str]] = None,
         buckets: Optional[List[float]] = None,
     ):
+        self.name = name
         self.error_mappings = error_mappings or {}
         self.labels = labels or {}
 
@@ -150,7 +151,10 @@ class ObserverRecorder:
             self.observer.histogram.labels(**self.labels).observe(finished - self.start)
         else:
             self.observer.histogram.observe(finished - self.start)
-
+        if self.observer.name == "nucliadb_ingest_processor":
+            optype = self.labels["type"]
+            if optype == "apply_field_labels":
+                print(f"{self.observer.name} {(finished - self.start)*1000:.2f} ms {optype} ")
         self.observer.counter.labels(status=status, **self.labels).inc()
 
     def __enter__(self):

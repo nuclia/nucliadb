@@ -822,14 +822,15 @@ class Resource:
                     break
 
             generated_by = await fieldobj.generated_by()
-            brain.apply_field_labels(
-                fieldkey,
-                extracted_metadata,
-                self.uuid,
-                generated_by,
-                basic.usermetadata,
-                valid_user_field_metadata,
-            )
+            with processor_observer({"type": "apply_field_labels"}):
+                brain.apply_field_labels(
+                    fieldkey,
+                    extracted_metadata,
+                    self.uuid,
+                    generated_by,
+                    basic.usermetadata,
+                    valid_user_field_metadata,
+                )
 
     @processor_observer.wrap({"type": "compute_global_text"})
     async def compute_global_text(self):

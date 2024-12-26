@@ -20,6 +20,7 @@
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
+import time
 from typing import Optional
 
 from nucliadb.common import ids
@@ -49,6 +50,8 @@ from nucliadb_protos.resources_pb2 import (
     UserMetadata,
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
+from nucliadb.ingest.orm.metrics import processor_observer
+
 
 FilePagePositions = dict[int, tuple[int, int]]
 
@@ -480,6 +483,7 @@ class ResourceBrain:
         self.brain.ClearField("labels")
         self.brain.labels.extend(flatten_resource_labels(self.labels))
 
+    @processor_observer.wrap({"type": "process_field_metadata"})
     def process_field_metadata(
         self,
         field_key: str,
@@ -490,6 +494,8 @@ class ResourceBrain:
     ):
         if metadata.mime_type != "":
             labels["mt"].add(metadata.mime_type)
+
+        classif_relations = []
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
@@ -498,14 +504,17 @@ class ResourceBrain:
                     value=label,
                     ntype=RelationNode.NodeType.LABEL,
                 )
-                self.brain.relations.append(
+                classif_relations.append(
                     Relation(
                         relation=Relation.ABOUT,
                         source=relation_node_document,
                         to=relation_node_label,
                     )
                 )
+        self.brain.relations.extend(classif_relations)
+
         # Data Augmentation + Processor entities
+        entity_relations = []
         use_legacy_entities = True
         for data_augmentation_task_id, entities in metadata.entities.items():
             # If we recieved the entities from the processor here, we don't want to use the legacy entities
@@ -531,28 +540,48 @@ class ResourceBrain:
                     source=relation_node_document,
                     to=relation_node_entity,
                 )
-                self.brain.relations.append(rel)
+                entity_relations.append(rel)
 
         # Legacy processor entities
         # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
+        rel_time = 0
+        parse_rel_time = 0
+        append_time = 0
         if use_legacy_entities:
-            for klass_entity, _ in metadata.positions.items():
+
+            def parse_entity(entity: str) -> tuple[str, str]:
+                entity_array = entity.split("/", 1)
+                try:
+                    klass, entity = entity_array[0], entity_array[1]
+                except IndexError:
+                    raise AttributeError(f"Entity should be with type {entity}")
+                return klass, entity
+
+            print(f"Positions length: {len(metadata.positions)}")
+            base_relation = Relation(
+                relation=Relation.ENTITY,
+                source=relation_node_document,
+                to=RelationNode(ntype=RelationNode.NodeType.ENTITY),
+            )
+            for klass_entity in metadata.positions.keys():
                 labels["e"].add(klass_entity)
-                entity_array = klass_entity.split("/")
-                if len(entity_array) == 1:
-                    raise AttributeError(f"Entity should be with type {klass_entity}")
-                elif len(entity_array) > 1:
-                    klass = entity_array[0]
-                    entity = "/".join(entity_array[1:])
-                relation_node_entity = RelationNode(
-                    value=entity, ntype=RelationNode.NodeType.ENTITY, subtype=klass
-                )
-                rel = Relation(
-                    relation=Relation.ENTITY,
-                    source=relation_node_document,
-                    to=relation_node_entity,
-                )
-                self.brain.relations.append(rel)
+                start = time.time()
+                klass, entity = parse_entity(klass_entity)
+                parse_rel_time += time.time() - start
+                start = time.time()
+                rel = Relation()
+                rel.CopyFrom(base_relation)
+                rel.to.value = entity
+                rel.to.subtype = klass
+                rel_time += time.time() - start
+                start = time.time()
+                entity_relations.append(rel)
+                append_time += time.time() - start
+
+        print(f"Relation entity time: {rel_time * 1000:.2f} ms")
+        print(f"Parse entity time: {parse_rel_time * 1000:.2f} ms")
+        print(f"Append entity time: {append_time * 1000:.2f} ms")
+        self.brain.relations.extend(entity_relations)
 
     def apply_field_labels(
         self,

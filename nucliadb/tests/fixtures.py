@@ -144,7 +144,13 @@ async def pinecone_knowledgebox(nucliadb_manager: AsyncClient, pinecone_mock):
 
 @pytest.fixture(scope="function")
 async def nucliadb_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
+    stub = WriterStub(aio.insecure_channel(
+        f"localhost:{nucliadb.ingest_grpc_port}",
+        options=[
+            ("grpc.max_receive_message_length", 500 * 1024 * 1024),
+            ("grpc.max_send_message_length", 500 * 1024 * 1024),
+        ],
+    ))
     return stub
 
 

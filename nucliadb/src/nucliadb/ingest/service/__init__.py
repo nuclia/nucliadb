@@ -32,11 +32,10 @@ from nucliadb_utils.grpc import get_traced_grpc_server
 
 async def start_grpc(service_name: Optional[str] = None):
     aio.init_grpc_aio()  # type: ignore
-
     await setup_telemetry(service_name or "ingest")
     server = get_traced_grpc_server(
         service_name or "ingest",
-        max_receive_message=settings.max_receive_message_length,
+        max_receive_message=500,
     )
 
     servicer = WriterServicer()

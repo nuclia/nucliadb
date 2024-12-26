@@ -131,6 +131,7 @@ class Processor:
         partition: Optional[str] = None,
         transaction_check: bool = True,
     ) -> None:
+        print("-----------------------")
         partition = partition if self.partition is None else self.partition
         if partition is None:
             raise AttributeError("Can't process message from unknown partition")
