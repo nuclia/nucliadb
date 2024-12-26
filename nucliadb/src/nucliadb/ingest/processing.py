@@ -406,13 +406,13 @@ class ProcessingEngine:
                 # Upload the payload
                 item.partition = partition
                 resp = await self.session.post(
-                    url=self.nuclia_internal_push, data=item.json(), headers=headers
+                    url=self.nuclia_internal_push, data=item.model_dump_json(), headers=headers
                 )
             else:
                 headers.update({"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"})
                 # Upload the payload
                 resp = await self.session.post(
-                    url=self.nuclia_external_push_v2, data=item.json(), headers=headers
+                    url=self.nuclia_external_push_v2, data=item.model_dump_json(), headers=headers
                 )
             if resp.status == 200:
                 data = await resp.json()
