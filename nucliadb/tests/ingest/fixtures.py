@@ -78,12 +78,6 @@ def processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
 
 
 @pytest.fixture(scope="function")
-def stream_processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
-    proc = Processor(maindb_driver, storage, pubsub, partition="1")
-    yield proc
-
-
-@pytest.fixture(scope="function")
 def local_files():
     storage_settings.local_testing_files = f"{dirname(__file__)}"
 
