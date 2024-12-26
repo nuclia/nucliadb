@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import Iterable, Optional
+from typing import AsyncIterator, Iterable, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -52,6 +52,7 @@ from nucliadb_utils import const
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
+from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
@@ -134,14 +135,15 @@ async def grpc_servicer(maindb_driver, ingest_consumers, ingest_processed_consum
 
 
 @pytest.fixture(scope="function")
-async def pubsub(natsd):
+async def pubsub(natsd) -> AsyncIterator[PubSubDriver]:
     pubsub = get_utility(Utility.PUBSUB)
-    if pubsub is None:
-        pubsub = NatsPubsub(hosts=[natsd])
-        await pubsub.initialize()
-        set_utility(Utility.PUBSUB, pubsub)
+    assert pubsub is None, "No pubsub is expected to be already set"
+    pubsub = NatsPubsub(hosts=[natsd])
+    await pubsub.initialize()
+    set_utility(Utility.PUBSUB, pubsub)
 
     yield pubsub
+
     clean_utility(Utility.PUBSUB)
     await pubsub.finalize()
 
