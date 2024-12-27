@@ -18,16 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import datetime
 from typing import AsyncIterable
 from unittest.mock import patch
 
 import pytest
 
+from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.ingest.settings import settings as ingest_settings
+from nucliadb.search.app import application
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
@@ -76,27 +79,26 @@ async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
 
 @pytest.fixture(scope="function")
 async def search_api(test_settings_search, transaction_utility):  # type: ignore
-    from nucliadb.common.cluster import manager
-    from nucliadb.search.app import application
+    with patch.dict(manager.INDEX_NODES, clear=True):
+        async with application.router.lifespan_context(application):
+            # Make sure is clean
+            delay = 0.1
+            timeout = datetime.timedelta(seconds=30)
+            start = datetime.datetime.now()
 
-    async with application.router.lifespan_context(application):
-        # Make sure is clean
-        await asyncio.sleep(1)
-        count = 0
-        while len(manager.INDEX_NODES) < 2:
-            print("awaiting cluster nodes - search fixtures.py")
-            await asyncio.sleep(1)
-            if count == 40:
-                raise Exception("No cluster")
-            count += 1
+            await asyncio.sleep(delay)
+            while len(manager.INDEX_NODES) < 2:
+                print("awaiting cluster nodes - search fixtures.py")
+                await asyncio.sleep(delay)
+                if (datetime.datetime.now() - start) > timeout:
+                    raise Exception("No cluster")
 
-        yield create_api_client_factory(application)
+            yield create_api_client_factory(application)
 
-    # Make sure nodes can sync
-    await asyncio.sleep(1)
-    clear_ingest_cache()
-    clear_global_cache()
-    manager.INDEX_NODES.clear()
+        # Make sure nodes can sync
+        await asyncio.sleep(delay)
+        clear_ingest_cache()
+        clear_global_cache()
 
 
 @pytest.fixture(scope="function")
