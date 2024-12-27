@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Callable
 
 import pytest
 from httpx import AsyncClient
@@ -26,24 +25,22 @@ from nucliadb.common.cluster.manager import INDEX_NODES
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import SuggestFeatures, SuggestRequest
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 
 @pytest.mark.flaky(reruns=5)
 async def test_suggest_resource_all(
-    search_api: Callable[..., AsyncClient], test_search_resource: str
+    cluster_nucliadb_search: AsyncClient, test_search_resource: str
 ) -> None:
     kbid = test_search_resource
 
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/suggest?query=own+text",
-        )
-        assert resp.status_code == 200
-        paragraph_results = resp.json()["paragraphs"]["results"]
-        assert len(paragraph_results) == 1
+    resp = await cluster_nucliadb_search.get(
+        f"/{KB_PREFIX}/{kbid}/suggest?query=own+text",
+    )
+    assert resp.status_code == 200
+    paragraph_results = resp.json()["paragraphs"]["results"]
+    assert len(paragraph_results) == 1
 
     # get shards ids
 

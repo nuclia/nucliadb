@@ -17,35 +17,32 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Callable
 
 from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 
 
-async def test_find(search_api: Callable[..., AsyncClient], multiple_search_resource: str) -> None:
+async def test_find(cluster_nucliadb_search: AsyncClient, multiple_search_resource: str) -> None:
     kbid = multiple_search_resource
 
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/find?query=own+text",
-        )
-        assert resp.status_code == 200
+    resp = await cluster_nucliadb_search.get(
+        f"/{KB_PREFIX}/{kbid}/find?query=own+text",
+    )
+    assert resp.status_code == 200
 
-        data = resp.json()
+    data = resp.json()
 
-        # TODO: uncomment when we have the total stable in tests
-        # assert data["total"] == 65
+    # TODO: uncomment when we have the total stable in tests
+    # assert data["total"] == 65
 
-        res = next(iter(data["resources"].values()))
-        para = next(iter(res["fields"]["/f/file"]["paragraphs"].values()))
-        assert para["position"] == {
-            "page_number": 0,
-            "index": 0,
-            "start": 0,
-            "end": 45,
-            "start_seconds": [0],
-            "end_seconds": [10],
-        }
+    res = next(iter(data["resources"].values()))
+    para = next(iter(res["fields"]["/f/file"]["paragraphs"].values()))
+    assert para["position"] == {
+        "page_number": 0,
+        "index": 0,
+        "start": 0,
+        "end": 45,
+        "start_seconds": [0],
+        "end_seconds": [10],
+    }

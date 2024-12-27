@@ -18,13 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import logging
+from contextlib import contextmanager
 from enum import Enum
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
+from unittest.mock import patch
 
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from nucliadb.search import API_PREFIX
+from nucliadb_utils.utilities import MAIN
+
+logger = logging.getLogger("fixtures.utils")
 
 
 def create_api_client_factory(application: FastAPI) -> Callable[..., AsyncClient]:
@@ -56,3 +62,21 @@ def create_api_client_factory(application: FastAPI) -> Callable[..., AsyncClient
         return client
 
     return _make_client_fixture
+
+
+@contextmanager
+def global_utility(name: str, util: Any):
+    """Hacky set_utility used in tests to provide proper setup/cleanup of utilities.
+
+    Tests can sometimes mess with global state. While fixtures add/remove global
+    utilities, component lifecycles do the same. Sometimes, we can left
+    utilities unclean or overwrite utilities. This context manager allows tests
+    to remove utilities letting the previously set one.
+
+    """
+
+    if name in MAIN:
+        logger.warning(f"Overwriting previously set utility {name}: {MAIN[name]} with {util}")
+
+    with patch.dict(MAIN, values={name: util}, clear=False):
+        yield util

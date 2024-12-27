@@ -352,6 +352,8 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStu
     return (nodes, edges)
 
 
+# TODO: remove after migrating tests/nucliadb/ to ndbfixtures. fixture already
+# moved to ndbfixtures.common
 @pytest.fixture(scope="function")
 async def stream_audit(natsd: str, mocker):
     from nucliadb_utils.audit.stream import StreamAuditStorage

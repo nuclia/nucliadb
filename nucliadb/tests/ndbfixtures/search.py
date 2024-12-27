@@ -18,134 +18,100 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from enum import Enum
-from typing import AsyncIterable, Optional
+import datetime
+from typing import AsyncIterable
+from unittest.mock import patch
 
 import pytest
-from httpx import AsyncClient
-from redis import asyncio as aioredis
 
+from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.cache import clear_ingest_cache
-from nucliadb.search import API_PREFIX
+from nucliadb.ingest.settings import settings as ingest_settings
+from nucliadb.search.app import application
 from nucliadb.search.predict import DummyPredictEngine
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
-from nucliadb_utils.settings import nuclia_settings
+from nucliadb_utils.cache.settings import settings as cache_settings
+from nucliadb_utils.settings import (
+    nuclia_settings,
+    nucliadb_settings,
+    running_settings,
+)
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
+from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
-    clean_utility,
     clear_global_cache,
-    get_utility,
-    set_utility,
 )
 from tests.ingest.fixtures import broker_resource
+from tests.ndbfixtures.utils import create_api_client_factory, global_utility
+
+# Main fixtures
 
 
 @pytest.fixture(scope="function")
-def test_settings_search(storage, natsd, node, maindb_driver):  # type: ignore
-    from nucliadb.ingest.settings import settings as ingest_settings
-    from nucliadb_utils.cache.settings import settings as cache_settings
-    from nucliadb_utils.settings import (
-        nuclia_settings,
-        nucliadb_settings,
-        running_settings,
-    )
+async def cluster_nucliadb_search(
+    storage: Storage,
+    nats_server: str,
+    node,
+    maindb_driver: Driver,
+    transaction_utility: TransactionUtility,
+):
+    with (
+        patch.object(cache_settings, "cache_pubsub_nats_url", [nats_server]),
+        patch.object(running_settings, "debug", False),
+        patch.object(ingest_settings, "disable_pull_worker", True),
+        patch.object(ingest_settings, "nuclia_partitions", 1),
+        patch.object(nuclia_settings, "dummy_processing", True),
+        patch.object(nuclia_settings, "dummy_predict", True),
+        patch.object(nuclia_settings, "dummy_learning_services", True),
+        patch.object(ingest_settings, "grpc_port", free_port()),
+        patch.object(nucliadb_settings, "nucliadb_ingest", f"localhost:{ingest_settings.grpc_port}"),
+        patch.dict(manager.INDEX_NODES, clear=True),
+    ):
+        async with application.router.lifespan_context(application):
+            # Make sure is clean
+            delay = 0.1
+            timeout = datetime.timedelta(seconds=30)
+            start = datetime.datetime.now()
 
-    cache_settings.cache_pubsub_nats_url = [natsd]
+            await asyncio.sleep(delay)
+            while len(manager.INDEX_NODES) < 2:
+                print("awaiting cluster nodes - search fixtures.py")
+                await asyncio.sleep(delay)
+                if (datetime.datetime.now() - start) > timeout:
+                    raise Exception("No cluster")
 
-    running_settings.debug = False
+            client_factory = create_api_client_factory(application)
+            async with client_factory(roles=[NucliaDBRoles.READER]) as client:
+                yield client
 
-    ingest_settings.disable_pull_worker = True
+        # Make sure nodes can sync
+        await asyncio.sleep(delay)
+        # TODO: fix this awful global state manipulation
+        clear_ingest_cache()
+        clear_global_cache()
 
-    ingest_settings.nuclia_partitions = 1
 
-    nuclia_settings.dummy_processing = True
-    nuclia_settings.dummy_predict = True
-    nuclia_settings.dummy_learning_services = True
-
-    ingest_settings.grpc_port = free_port()
-
-    nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
+# Rest, TODO keep cleaning
 
 
 @pytest.fixture(scope="function")
 async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
-    original_setting = nuclia_settings.dummy_predict
-    nuclia_settings.dummy_predict = True
+    with (
+        patch.object(nuclia_settings, "dummy_predict", True),
+    ):
+        predict_util = DummyPredictEngine()
+        await predict_util.initialize()
 
-    predict_util = DummyPredictEngine()
-    await predict_util.initialize()
-    original_predict = get_utility(Utility.PREDICT)
-    set_utility(Utility.PREDICT, predict_util)
-
-    yield predict_util
-
-    nuclia_settings.dummy_predict = original_setting
-
-    if original_predict is None:
-        clean_utility(Utility.PREDICT)
-    else:
-        set_utility(Utility.PREDICT, original_predict)
-
-
-@pytest.fixture(scope="function")
-async def search_api(test_settings_search, transaction_utility, redis):  # type: ignore
-    from nucliadb.common.cluster import manager
-    from nucliadb.search.app import application
-
-    def make_client_fixture(
-        roles: Optional[list[Enum]] = None,
-        user: str = "",
-        version: str = "1",
-        root: bool = False,
-        extra_headers: Optional[dict[str, str]] = None,
-    ) -> AsyncClient:
-        roles = roles or []
-        client_base_url = "http://test"
-
-        if root is False:
-            client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
-
-        client = AsyncClient(app=application, base_url=client_base_url)
-        client.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
-        client.headers["X-NUCLIADB-USER"] = user
-
-        extra_headers = extra_headers or {}
-        if len(extra_headers) == 0:
-            return client
-
-        for header, value in extra_headers.items():
-            client.headers[f"{header}"] = value
-
-        return client
-
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
-    await driver.flushall()
-
-    async with application.router.lifespan_context(application):
-        # Make sure is clean
-        await asyncio.sleep(1)
-        count = 0
-        while len(manager.INDEX_NODES) < 2:
-            print("awaiting cluster nodes - search fixtures.py")
-            await asyncio.sleep(1)
-            if count == 40:
-                raise Exception("No cluster")
-            count += 1
-
-        yield make_client_fixture
-
-    # Make sure nodes can sync
-    await asyncio.sleep(1)
-    await driver.flushall()
-    await driver.close(close_connection_pool=True)
-    clear_ingest_cache()
-    clear_global_cache()
-    manager.INDEX_NODES.clear()
+        with global_utility(Utility.PREDICT, predict_util):
+            yield predict_util
 
 
 @pytest.fixture(scope="function")
@@ -238,3 +204,13 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Wait an extra couple of seconds for reader/searcher to catch up
     await asyncio.sleep(2)
     return knowledgebox_ingest
+
+
+# Dependencies from tests/fixtures.py
+
+
+@pytest.fixture(scope="function")
+async def txn(maindb_driver):
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()

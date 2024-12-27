@@ -19,7 +19,6 @@
 #
 import asyncio
 import os
-from typing import Callable
 
 import pytest
 from httpx import AsyncClient
@@ -29,7 +28,6 @@ from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tests.vectors import Q
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import (
     SearchRequest,
 )
@@ -40,50 +38,48 @@ RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
 @pytest.mark.flaky(reruns=5)
 async def test_multiple_fuzzy_search_resource_all(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str
+    cluster_nucliadb_search: AsyncClient, multiple_search_resource: str
 ) -> None:
     kbid = multiple_search_resource
 
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&top_k=20',
-        )
+    resp = await cluster_nucliadb_search.get(
+        f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&top_k=20',
+    )
 
-        assert resp.status_code == 200, resp.content
-        assert len(resp.json()["paragraphs"]["results"]) == 20
+    assert resp.status_code == 200, resp.content
+    assert len(resp.json()["paragraphs"]["results"]) == 20
 
-        # Expected results:
-        # - 'text' should not be highlighted as we are searching by 'test' in the query
-        # - 'This is great' should be highlighted because it is an exact query search
-        # - 'own' should not be highlighted because it is considered as a stop-word
-        assert (
-            resp.json()["paragraphs"]["results"][0]["text"]
-            == "My own text Ramon. <mark>This is great</mark> to be here. "
-        )
+    # Expected results:
+    # - 'text' should not be highlighted as we are searching by 'test' in the query
+    # - 'This is great' should be highlighted because it is an exact query search
+    # - 'own' should not be highlighted because it is considered as a stop-word
+    assert (
+        resp.json()["paragraphs"]["results"][0]["text"]
+        == "My own text Ramon. <mark>This is great</mark> to be here. "
+    )
 
 
 @pytest.mark.flaky(reruns=3)
 async def test_search_resource_all(
-    search_api: Callable[..., AsyncClient],
+    cluster_nucliadb_search: AsyncClient,
     test_search_resource: str,
 ) -> None:
     kbid = test_search_resource
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        await asyncio.sleep(1)
-        resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&text_resource=true",
-        )
-        assert resp.status_code == 200
-        assert resp.json()["fulltext"]["query"] == "own text"
-        assert resp.json()["paragraphs"]["query"] == "own text"
-        assert resp.json()["paragraphs"]["results"][0]["start_seconds"] == [0]
-        assert resp.json()["paragraphs"]["results"][0]["end_seconds"] == [10]
-        assert (
-            resp.json()["paragraphs"]["results"][0]["text"]
-            == "My own <mark>text</mark> Ramon. This is great to be here. "
-        )
-        assert len(resp.json()["resources"]) == 1
-        assert len(resp.json()["sentences"]["results"]) == 1
+    await asyncio.sleep(1)
+    resp = await cluster_nucliadb_search.get(
+        f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&text_resource=true",
+    )
+    assert resp.status_code == 200
+    assert resp.json()["fulltext"]["query"] == "own text"
+    assert resp.json()["paragraphs"]["query"] == "own text"
+    assert resp.json()["paragraphs"]["results"][0]["start_seconds"] == [0]
+    assert resp.json()["paragraphs"]["results"][0]["end_seconds"] == [10]
+    assert (
+        resp.json()["paragraphs"]["results"][0]["text"]
+        == "My own <mark>text</mark> Ramon. This is great to be here. "
+    )
+    assert len(resp.json()["resources"]) == 1
+    assert len(resp.json()["sentences"]["results"]) == 1
 
     # get shards ids
 
@@ -135,33 +131,24 @@ async def test_search_resource_all(
 
 
 async def test_search_with_facets(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str
+    cluster_nucliadb_search: AsyncClient, multiple_search_resource: str
 ) -> None:
     kbid = multiple_search_resource
 
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/classification.labels"
+    url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/classification.labels"
 
-        resp = await client.get(url)
-        data = resp.json()
-        assert (
-            data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
-            == 25
-        )
-        assert (
-            data["paragraphs"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
-            == 25
-        )
+    resp = await cluster_nucliadb_search.get(url)
+    data = resp.json()
+    assert data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"] == 25
+    assert (
+        data["paragraphs"]["facets"]["/classification.labels"]["/classification.labels/labelset1"] == 25
+    )
 
-        # also just test short hand filter
-        url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/l"
-        resp = await client.get(url)
-        data = resp.json()
-        assert (
-            data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
-            == 25
-        )
-        assert (
-            data["paragraphs"]["facets"]["/classification.labels"]["/classification.labels/labelset1"]
-            == 25
-        )
+    # also just test short hand filter
+    url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&faceted=/l"
+    resp = await cluster_nucliadb_search.get(url)
+    data = resp.json()
+    assert data["fulltext"]["facets"]["/classification.labels"]["/classification.labels/labelset1"] == 25
+    assert (
+        data["paragraphs"]["facets"]["/classification.labels"]["/classification.labels/labelset1"] == 25
+    )
