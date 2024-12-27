@@ -490,22 +490,29 @@ class ResourceBrain:
     ):
         if metadata.mime_type != "":
             labels["mt"].add(metadata.mime_type)
+
+        base_classification_relation = Relation(
+            relation=Relation.ABOUT,
+            source=relation_node_document,
+            to=RelationNode(
+                ntype=RelationNode.NodeType.LABEL,
+            ),
+        )
         for classification in metadata.classifications:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
                 labels["l"].add(label)
-                relation_node_label = RelationNode(
-                    value=label,
-                    ntype=RelationNode.NodeType.LABEL,
-                )
-                self.brain.relations.append(
-                    Relation(
-                        relation=Relation.ABOUT,
-                        source=relation_node_document,
-                        to=relation_node_label,
-                    )
-                )
+                relation = Relation()
+                relation.CopyFrom(base_classification_relation)
+                relation.to.value = label
+                self.brain.relations.append(relation)
+
         # Data Augmentation + Processor entities
+        base_entity_relation = Relation(
+            relation=Relation.ENTITY,
+            source=relation_node_document,
+            to=RelationNode(ntype=RelationNode.NodeType.ENTITY),
+        )
         use_legacy_entities = True
         for data_augmentation_task_id, entities in metadata.entities.items():
             # If we recieved the entities from the processor here, we don't want to use the legacy entities
@@ -521,38 +528,30 @@ class ResourceBrain:
                 labels["e"].add(
                     f"{entity_label}/{entity_text}"
                 )  # Add data_augmentation_task_id as a prefix?
-                relation_node_entity = RelationNode(
-                    value=entity_text,
-                    ntype=RelationNode.NodeType.ENTITY,
-                    subtype=entity_label,
-                )
-                rel = Relation(
-                    relation=Relation.ENTITY,
-                    source=relation_node_document,
-                    to=relation_node_entity,
-                )
-                self.brain.relations.append(rel)
+                relation = Relation()
+                relation.CopyFrom(base_entity_relation)
+                relation.to.value = entity_text
+                relation.to.subtype = entity_label
+                self.brain.relations.append(relation)
 
         # Legacy processor entities
         # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
+        def _parse_entity(klass_entity: str) -> tuple[str, str]:
+            try:
+                klass, entity = klass_entity.split("/", 1)
+                return klass, entity
+            except ValueError:
+                raise AttributeError(f"Entity should be with type {klass_entity}")
+
         if use_legacy_entities:
-            for klass_entity, _ in metadata.positions.items():
+            for klass_entity in metadata.positions.keys():
                 labels["e"].add(klass_entity)
-                entity_array = klass_entity.split("/")
-                if len(entity_array) == 1:
-                    raise AttributeError(f"Entity should be with type {klass_entity}")
-                elif len(entity_array) > 1:
-                    klass = entity_array[0]
-                    entity = "/".join(entity_array[1:])
-                relation_node_entity = RelationNode(
-                    value=entity, ntype=RelationNode.NodeType.ENTITY, subtype=klass
-                )
-                rel = Relation(
-                    relation=Relation.ENTITY,
-                    source=relation_node_document,
-                    to=relation_node_entity,
-                )
-                self.brain.relations.append(rel)
+                klass, entity = _parse_entity(klass_entity)
+                relation = Relation()
+                relation.CopyFrom(base_entity_relation)
+                relation.to.value = entity
+                relation.to.subtype = klass
+                self.brain.relations.append(relation)
 
     def apply_field_labels(
         self,
