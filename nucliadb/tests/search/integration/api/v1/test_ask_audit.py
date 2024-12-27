@@ -37,11 +37,11 @@ async def get_audit_messages(sub):
 
 
 async def test_ask_sends_only_one_audit(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str, stream_audit
+    search_api: Callable[..., AsyncClient], test_search_resource: str, stream_audit
 ) -> None:
     from nucliadb_utils.settings import audit_settings
 
-    kbid = multiple_search_resource
+    kbid = test_search_resource
 
     # Prepare a test audit stream to receive our messages
     partition = stream_audit.get_partition(kbid)
