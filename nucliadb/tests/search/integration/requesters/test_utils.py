@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable
 
 import pytest
 from httpx import AsyncClient
@@ -35,7 +34,7 @@ from nucliadb_models.search import (
 
 @pytest.mark.xfail  # pulling start/end position for vectors results needs to be fixed
 async def test_vector_result_metadata(
-    search_api: Callable[..., AsyncClient], test_search_resource: str
+    cluster_nucliadb_search: AsyncClient, test_search_resource: str
 ) -> None:
     kbid = test_search_resource
 

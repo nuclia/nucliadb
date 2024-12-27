@@ -26,12 +26,14 @@ import pytest
 
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.search.app import application
 from nucliadb.search.predict import DummyPredictEngine
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_utils.cache.settings import settings as cache_settings
@@ -40,7 +42,9 @@ from nucliadb_utils.settings import (
     nucliadb_settings,
     running_settings,
 )
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
+from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
     clear_global_cache,
@@ -48,11 +52,19 @@ from nucliadb_utils.utilities import (
 from tests.ingest.fixtures import broker_resource
 from tests.ndbfixtures.utils import create_api_client_factory, global_utility
 
+# Main fixtures
+
 
 @pytest.fixture(scope="function")
-def test_settings_search(storage, natsd, node, maindb_driver):  # type: ignore
+async def cluster_nucliadb_search(
+    storage: Storage,
+    nats_server: str,
+    node,
+    maindb_driver: Driver,
+    transaction_utility: TransactionUtility,
+):
     with (
-        patch.object(cache_settings, "cache_pubsub_nats_url", [natsd]),
+        patch.object(cache_settings, "cache_pubsub_nats_url", [nats_server]),
         patch.object(running_settings, "debug", False),
         patch.object(ingest_settings, "disable_pull_worker", True),
         patch.object(ingest_settings, "nuclia_partitions", 1),
@@ -61,25 +73,8 @@ def test_settings_search(storage, natsd, node, maindb_driver):  # type: ignore
         patch.object(nuclia_settings, "dummy_learning_services", True),
         patch.object(ingest_settings, "grpc_port", free_port()),
         patch.object(nucliadb_settings, "nucliadb_ingest", f"localhost:{ingest_settings.grpc_port}"),
+        patch.dict(manager.INDEX_NODES, clear=True),
     ):
-        yield
-
-
-@pytest.fixture(scope="function")
-async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
-    with (
-        patch.object(nuclia_settings, "dummy_predict", True),
-    ):
-        predict_util = DummyPredictEngine()
-        await predict_util.initialize()
-
-        with global_utility(Utility.PREDICT, predict_util):
-            yield predict_util
-
-
-@pytest.fixture(scope="function")
-async def search_api(test_settings_search, transaction_utility):  # type: ignore
-    with patch.dict(manager.INDEX_NODES, clear=True):
         async with application.router.lifespan_context(application):
             # Make sure is clean
             delay = 0.1
@@ -93,12 +88,30 @@ async def search_api(test_settings_search, transaction_utility):  # type: ignore
                 if (datetime.datetime.now() - start) > timeout:
                     raise Exception("No cluster")
 
-            yield create_api_client_factory(application)
+            client_factory = create_api_client_factory(application)
+            async with client_factory(roles=[NucliaDBRoles.READER]) as client:
+                yield client
 
         # Make sure nodes can sync
         await asyncio.sleep(delay)
+        # TODO: fix this awful global state manipulation
         clear_ingest_cache()
         clear_global_cache()
+
+
+# Rest, TODO keep cleaning
+
+
+@pytest.fixture(scope="function")
+async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
+    with (
+        patch.object(nuclia_settings, "dummy_predict", True),
+    ):
+        predict_util = DummyPredictEngine()
+        await predict_util.initialize()
+
+        with global_utility(Utility.PREDICT, predict_util):
+            yield predict_util
 
 
 @pytest.fixture(scope="function")
