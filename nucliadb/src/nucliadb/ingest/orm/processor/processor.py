@@ -314,9 +314,6 @@ class Processor:
 
                 # index message
                 if resource:
-                    await resource.compute_global_text()
-                    await resource.compute_global_tags(resource.indexer)
-                    await resource.compute_security(resource.indexer)
                     if message.reindex:
                         # when reindexing, let's just generate full new index message
                         # TODO - This should be improved in the future as it's not optimal for very large resources:
