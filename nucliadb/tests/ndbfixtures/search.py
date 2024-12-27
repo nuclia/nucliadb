@@ -22,7 +22,6 @@ from typing import AsyncIterable
 from unittest.mock import patch
 
 import pytest
-from redis import asyncio as aioredis
 
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
 from nucliadb.common.maindb.utils import get_driver
@@ -76,12 +75,9 @@ async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
 
 
 @pytest.fixture(scope="function")
-async def search_api(test_settings_search, transaction_utility, redis):  # type: ignore
+async def search_api(test_settings_search, transaction_utility):  # type: ignore
     from nucliadb.common.cluster import manager
     from nucliadb.search.app import application
-
-    driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
-    await driver.flushall()
 
     async with application.router.lifespan_context(application):
         # Make sure is clean
@@ -98,8 +94,6 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
 
     # Make sure nodes can sync
     await asyncio.sleep(1)
-    await driver.flushall()
-    await driver.close(close_connection_pool=True)
     clear_ingest_cache()
     clear_global_cache()
     manager.INDEX_NODES.clear()
