@@ -18,19 +18,69 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from os.path import dirname
-from typing import AsyncIterator
+from typing import AsyncIterator, Iterator
 
 import pytest
+from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
+from nucliadb_utils.audit.audit import AuditStorage
+from nucliadb_utils.audit.basic import BasicAuditStorage
+from nucliadb_utils.audit.stream import StreamAuditStorage
+from nucliadb_utils.settings import audit_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
-    set_utility,
-)
+from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from tests.ndbfixtures.utils import global_utility
+
+# Audit
+
+
+@pytest.fixture(scope="function")
+def audit(basic_audit: BasicAuditStorage) -> Iterator[AuditStorage]:
+    yield basic_audit
+
+
+@pytest.fixture(scope="function")
+async def basic_audit() -> AsyncIterator[BasicAuditStorage]:
+    audit = BasicAuditStorage()
+    await audit.initialize()
+    with global_utility(Utility.AUDIT, audit):
+        yield audit
+    await audit.finalize()
+
+
+@pytest.fixture(scope="function")
+async def stream_audit(nats_server: str, mocker: MockerFixture) -> AsyncIterator[StreamAuditStorage]:
+    audit = StreamAuditStorage(
+        [nats_server],
+        audit_settings.audit_jetstream_target,  # type: ignore
+        audit_settings.audit_partitions,
+        audit_settings.audit_hash_seed,
+    )
+    await audit.initialize()
+
+    mocker.spy(audit, "send")
+    mocker.spy(audit.js, "publish")
+    mocker.spy(audit, "search")
+    mocker.spy(audit, "chat")
+
+    with global_utility(Utility.AUDIT, audit):
+        yield audit
+
+    await audit.finalize()
+
+
+# Local files
+
+
+@pytest.fixture(scope="function")
+async def local_files():
+    storage_settings.local_testing_files = f"{dirname(__file__)}"
+
+
+# Shard manager
 
 
 @pytest.fixture(scope="function")
@@ -41,8 +91,3 @@ async def shard_manager(storage: Storage, maindb_driver: Driver) -> AsyncIterato
     yield sm
 
     clean_utility(Utility.SHARD_MANAGER)
-
-
-@pytest.fixture(scope="function")
-async def local_files():
-    storage_settings.local_testing_files = f"{dirname(__file__)}"

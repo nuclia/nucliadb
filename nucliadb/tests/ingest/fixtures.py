@@ -23,7 +23,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import AsyncIterator, Iterable, Iterator, Optional
+from typing import AsyncIterator, Iterable, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -49,14 +49,11 @@ from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
-from nucliadb_utils.audit.audit import AuditStorage
-from nucliadb_utils.audit.basic import BasicAuditStorage
-from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import audit_settings, indexing_settings, transaction_settings
+from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
@@ -223,33 +220,6 @@ async def knowledgebox_with_vectorsets(
     yield kbid
 
     await KnowledgeBox.delete(maindb_driver, kbid)
-
-
-@pytest.fixture(scope="function")
-def audit(basic_audit: BasicAuditStorage) -> Iterator[AuditStorage]:
-    # XXX: why aren't we settings the utility?
-    yield basic_audit
-
-
-@pytest.fixture(scope="function")
-async def basic_audit() -> AsyncIterator[BasicAuditStorage]:
-    audit = BasicAuditStorage()
-    await audit.initialize()
-    yield audit
-    await audit.finalize()
-
-
-@pytest.fixture(scope="function")
-async def stream_audit(nats_server: str) -> AsyncIterator[StreamAuditStorage]:
-    audit = StreamAuditStorage(
-        [nats_server],
-        audit_settings.audit_jetstream_target,  # type: ignore
-        audit_settings.audit_partitions,
-        audit_settings.audit_hash_seed,
-    )
-    await audit.initialize()
-    yield audit
-    await audit.finalize()
 
 
 @pytest.fixture(scope="function")

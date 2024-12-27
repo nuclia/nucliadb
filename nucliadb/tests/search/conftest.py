@@ -19,7 +19,6 @@
 #
 pytest_plugins = [
     "pytest_docker_fixtures",
-    "tests.fixtures",
     "tests.ndbfixtures.maindb",
     "tests.ndbfixtures.processing",
     "tests.ndbfixtures.standalone",

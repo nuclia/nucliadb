@@ -238,3 +238,13 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Wait an extra couple of seconds for reader/searcher to catch up
     await asyncio.sleep(2)
     return knowledgebox_ingest
+
+
+# Dependencies from tests/fixtures.py
+
+
+@pytest.fixture(scope="function")
+async def txn(maindb_driver):
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()
