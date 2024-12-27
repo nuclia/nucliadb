@@ -18,12 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from enum import Enum
-from typing import AsyncIterable, Optional
+from typing import AsyncIterable
 from unittest.mock import patch
 
 import pytest
-from httpx import AsyncClient
 from redis import asyncio as aioredis
 
 from nucliadb.common.cluster.manager import KBShardManager, get_index_node
@@ -31,7 +29,6 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb.search import API_PREFIX
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
@@ -47,7 +44,7 @@ from nucliadb_utils.utilities import (
     clear_global_cache,
 )
 from tests.ingest.fixtures import broker_resource
-from tests.ndbfixtures.utils import global_utility
+from tests.ndbfixtures.utils import create_api_client_factory, global_utility
 
 
 @pytest.fixture(scope="function")
@@ -83,32 +80,6 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
     from nucliadb.common.cluster import manager
     from nucliadb.search.app import application
 
-    def make_client_fixture(
-        roles: Optional[list[Enum]] = None,
-        user: str = "",
-        version: str = "1",
-        root: bool = False,
-        extra_headers: Optional[dict[str, str]] = None,
-    ) -> AsyncClient:
-        roles = roles or []
-        client_base_url = "http://test"
-
-        if root is False:
-            client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
-
-        client = AsyncClient(app=application, base_url=client_base_url)
-        client.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
-        client.headers["X-NUCLIADB-USER"] = user
-
-        extra_headers = extra_headers or {}
-        if len(extra_headers) == 0:
-            return client
-
-        for header, value in extra_headers.items():
-            client.headers[f"{header}"] = value
-
-        return client
-
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
 
@@ -123,7 +94,7 @@ async def search_api(test_settings_search, transaction_utility, redis):  # type:
                 raise Exception("No cluster")
             count += 1
 
-        yield make_client_fixture
+        yield create_api_client_factory(application)
 
     # Make sure nodes can sync
     await asyncio.sleep(1)
