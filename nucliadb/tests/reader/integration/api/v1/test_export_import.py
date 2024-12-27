@@ -22,7 +22,7 @@ from httpx import AsyncClient
 
 
 @pytest.mark.deploy_modes("component", "standalone")
-async def test_api(nucliadb_reader: AsyncClient, knowledgebox: str):
+async def test_api(nucliadb_reader: AsyncClient, natsd: str, knowledgebox: str):
     kbid = knowledgebox
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/export/foo")

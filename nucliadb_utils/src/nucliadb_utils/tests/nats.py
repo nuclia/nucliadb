@@ -29,6 +29,7 @@ from io import BytesIO
 from urllib.request import urlopen
 from zipfile import ZipFile
 
+import nats
 import pytest
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
@@ -256,3 +257,13 @@ def natsdocker():  # pragma: no cover
     print("Started natsd docker")
     yield f"nats://{nats_host}:{nats_port}"
     nats_image.stop()
+
+
+@pytest.fixture(scope="function")
+async def nats_server(natsd: str):
+    yield natsd
+
+    # cleanup nats
+    nc = await nats.connect(servers=[natsd])
+    await nc.drain()
+    await nc.close()

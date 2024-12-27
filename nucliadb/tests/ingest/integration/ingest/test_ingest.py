@@ -357,7 +357,7 @@ async def test_ingest_audit_stream_files_only(
     cache,
     fake_node,
     knowledgebox_ingest,
-    stream_processor,
+    processor,
     stream_audit: StreamAuditStorage,
     maindb_driver: Driver,
 ):
@@ -392,7 +392,7 @@ async def test_ingest_audit_stream_files_only(
         message,
         [("file_1", "file.png"), ("file_2", "text.pb"), ("file_3", "vectors.pb")],
     )
-    await stream_processor.process(message=message, seqid=1)
+    await processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
 
@@ -425,7 +425,7 @@ async def test_ingest_audit_stream_files_only(
     fieldid = FieldID(field="file_1", field_type=FieldType.FILE)
     message.delete_fields.append(fieldid)
 
-    await stream_processor.process(message=message, seqid=2)
+    await processor.process(message=message, seqid=2)
     auditreq = await get_audit_messages(psub)
 
     # Minimal assert to make sure we get the information from the node on the audit
@@ -445,7 +445,7 @@ async def test_ingest_audit_stream_files_only(
     fieldid = FieldID(field="file_3", field_type=FieldType.FILE)
     message.delete_fields.append(fieldid)
 
-    await stream_processor.process(message=message, seqid=3)
+    await processor.process(message=message, seqid=3)
     auditreq = await get_audit_messages(psub)
 
     # Minimal assert to make sure we get the information from the node on the audit
@@ -469,7 +469,7 @@ async def test_ingest_audit_stream_files_only(
     #
 
     message = make_message(knowledgebox_ingest, rid, message_type=BrokerMessage.MessageType.DELETE)
-    await stream_processor.process(message=message, seqid=4)
+    await processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
 
     assert auditreq.type == AuditRequest.AuditType.DELETED
@@ -486,7 +486,7 @@ async def test_qa(
     storage: Storage,
     cache,
     fake_node,
-    stream_processor,
+    processor,
     stream_audit: StreamAuditStorage,
     test_resource: Resource,
 ):
@@ -495,7 +495,7 @@ async def test_qa(
 
     kbid = test_resource.kb.kbid
     rid = test_resource.uuid
-    driver = stream_processor.driver
+    driver = processor.driver
     message = make_message(kbid, rid)
     message.account_seq = 2
     message.files["qa"].file.uri = "http://something"
@@ -522,7 +522,7 @@ async def test_qa(
 
     message.question_answers.append(qaw)
 
-    await stream_processor.process(message=message, seqid=1)
+    await processor.process(message=message, seqid=1)
 
     async with driver.transaction() as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
@@ -535,7 +535,7 @@ async def test_qa(
 
     # delete op
     message = make_message(kbid, rid, message_type=BrokerMessage.MessageType.DELETE)
-    await stream_processor.process(message=message, seqid=2)
+    await processor.process(message=message, seqid=2)
 
 
 async def test_ingest_audit_stream_mixed(
@@ -543,7 +543,7 @@ async def test_ingest_audit_stream_mixed(
     storage: Storage,
     cache,
     fake_node,
-    stream_processor,
+    processor,
     stream_audit: StreamAuditStorage,
     test_resource: Resource,
 ):
@@ -573,7 +573,7 @@ async def test_ingest_audit_stream_mixed(
     add_textfields(message, ["text1"])
     fieldid = FieldID(field="conv1", field_type=FieldType.CONVERSATION)
     message.delete_fields.append(fieldid)
-    await stream_processor.process(message=message, seqid=1)
+    await processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
 
@@ -596,7 +596,7 @@ async def test_ingest_audit_stream_mixed(
     #
 
     message = make_message(kbid, rid, message_type=BrokerMessage.MessageType.DELETE)
-    await stream_processor.process(message=message, seqid=2)
+    await processor.process(message=message, seqid=2)
     auditreq = await get_audit_messages(psub)
 
     assert auditreq.type == AuditRequest.AuditType.DELETED
@@ -609,17 +609,17 @@ async def test_ingest_account_seq_stored(
     local_files,
     storage: Storage,
     fake_node,
-    stream_processor,
+    processor,
     test_resource: Resource,
 ):
-    driver = stream_processor.driver
+    driver = processor.driver
     kbid = test_resource.kb.kbid
     rid = test_resource.uuid
 
     message = make_message(kbid, rid)
     message.account_seq = 2
     add_filefields(message, [("file_1", "file.png")])
-    await stream_processor.process(message=message, seqid=1)
+    await processor.process(message=message, seqid=1)
 
     async with driver.transaction() as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
@@ -636,14 +636,14 @@ async def test_ingest_processor_handles_missing_kb(
     local_files,
     storage: Storage,
     fake_node,
-    stream_processor,
+    processor,
     test_resource: Resource,
 ):
     kbid = str(uuid4())
     rid = str(uuid4())
     message = make_message(kbid, rid)
     message.account_seq = 1
-    await stream_processor.process(message=message, seqid=1)
+    await processor.process(message=message, seqid=1)
 
 
 async def test_ingest_autocommit_deadletter_marks_resource(
@@ -715,7 +715,7 @@ async def test_ingest_delete_field(
     cache,
     fake_node,
     knowledgebox_ingest,
-    stream_processor,
+    processor,
     stream_audit: StreamAuditStorage,
     maindb_driver: Driver,
 ):
@@ -732,23 +732,23 @@ async def test_ingest_delete_field(
     rid = str(uuid.uuid4())
 
     # Create a resource
-    with patch.object(stream_processor, "index_resource") as mock_index_resource:
+    with patch.object(processor, "index_resource") as mock_index_resource:
         brain_mock = brain_extractor_mock(mock_index_resource)
 
         message = message_resource_with_vectors(knowledgebox_ingest, rid)
-        await stream_processor.process(message=message, seqid=1)
+        await processor.process(message=message, seqid=1)
 
         brain_mock.assert_called_once()
         brain = brain_mock.call_args[0][0]
         assert len(brain.paragraphs["f/some_text"].paragraphs) == 1
 
     # Delete the field
-    with patch.object(stream_processor, "index_resource") as mock_index_resource:
+    with patch.object(processor, "index_resource") as mock_index_resource:
         brain_mock = brain_extractor_mock(mock_index_resource)
 
         message = make_message(knowledgebox_ingest, rid)
         message.delete_fields.append(FieldID(field="some_text"))
-        await stream_processor.process(message=message, seqid=2)
+        await processor.process(message=message, seqid=2)
 
         # Field is deleted
         brain_mock.assert_called_once()
@@ -764,7 +764,7 @@ async def test_ingest_update_labels(
     cache,
     fake_node,
     knowledgebox_ingest,
-    stream_processor,
+    processor,
     stream_audit: StreamAuditStorage,
     maindb_driver: Driver,
 ):
@@ -781,24 +781,24 @@ async def test_ingest_update_labels(
     rid = str(uuid.uuid4())
 
     # Create a resource
-    with patch.object(stream_processor, "index_resource") as mock_index_resource:
+    with patch.object(processor, "index_resource") as mock_index_resource:
         brain_mock = brain_extractor_mock(mock_index_resource)
 
         message = message_resource_with_vectors(knowledgebox_ingest, rid)
-        await stream_processor.process(message=message, seqid=1)
+        await processor.process(message=message, seqid=1)
 
         brain_mock.assert_called_once()
         brain = brain_mock.call_args[0][0]
         assert len(brain.paragraphs["f/some_text"].paragraphs) == 1
 
     # Apply labels
-    with patch.object(stream_processor, "index_resource") as mock_index_resource:
+    with patch.object(processor, "index_resource") as mock_index_resource:
         brain_mock = brain_extractor_mock(mock_index_resource)
 
         message = make_message(knowledgebox_ingest, rid)
         message.basic.usermetadata.classifications.append(Classification(labelset="names", label="john"))
         message.reindex = True
-        await stream_processor.process(message=message, seqid=2)
+        await processor.process(message=message, seqid=2)
 
         # Field is reindexed
         brain_mock.assert_called_once()

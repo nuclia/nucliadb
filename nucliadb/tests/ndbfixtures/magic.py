@@ -45,6 +45,7 @@ DEPLOY_MODE_FIXTURES = {
         "component",
     ],
     "nucliadb_ingest_grpc": [
+        "component",
         "standalone",
     ],
 }
@@ -87,7 +88,8 @@ def pytest_generate_tests(metafunc: Metafunc):
                             argvalues.append(lf(f"{deploy_mode}_{fixture_name}"))
                         else:
                             raise MagicFixturesError(
-                                f"Requesting fixture {fixture_name} with an unavailable mode: {deploy_mode}"
+                                f"Requesting fixture {fixture_name} with an unavailable mode: {deploy_mode}. "
+                                "Did you forgot to add it in the list of magic fixtures?"
                             )
                     metafunc.parametrize(fixture_name, argvalues, indirect=True)
 

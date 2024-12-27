@@ -17,18 +17,83 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+import logging
+import os
+from dataclasses import dataclass
+from os.path import dirname
+from typing import AsyncIterator
 
 import pytest
 from grpc import aio
 
+from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.standalone.settings import Settings
+from nucliadb_protos import writer_pb2_grpc
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.storages.storage import Storage
+
+logger = logging.getLogger(__name__)
+
+INGEST_TESTS_DIR = os.path.abspath(os.path.join(dirname(__file__), "..", "ingest"))
+
+
+@dataclass
+class IngestGrpcServer:
+    host: str
+    port: int
+
+    @property
+    def address(self):
+        return f"{self.host}:{self.port}"
+
 
 # Main fixtures
 
 
 @pytest.fixture(scope="function")
-async def standalone_nucliadb_ingest_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
-    return stub
+async def component_nucliadb_ingest_grpc(
+    ingest_grpc_server: IngestGrpcServer,
+) -> AsyncIterator[WriterStub]:
+    channel = aio.insecure_channel(ingest_grpc_server.address)
+    stub = WriterStub(channel)
+    yield stub
+    await channel.close(grace=None)
+
+
+@pytest.fixture(scope="function")
+async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[WriterStub]:
+    channel = aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}")
+    stub = WriterStub(channel)
+    yield stub
+    await channel.close(grace=None)
+
+
+# Utils
+
+
+@pytest.fixture(scope="function")
+async def ingest_grpc_server(
+    maindb_driver: Driver,
+    storage: Storage,
+    shard_manager: KBShardManager,
+) -> AsyncIterator[IngestGrpcServer]:
+    """Ingest ORM gRPC server with dummy/mocked index."""
+    servicer = WriterServicer()
+    await servicer.initialize()
+    server = aio.server()
+    port = server.add_insecure_port("[::]:0")
+    writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
+    await server.start()
+    yield IngestGrpcServer(
+        host="127.0.0.1",
+        port=port,
+    )
+    await servicer.finalize()
+    await server.stop(None)
+
+
+@pytest.fixture(scope="function")
+def dummy_index(fake_node, dummy_nidx_utility):
+    yield

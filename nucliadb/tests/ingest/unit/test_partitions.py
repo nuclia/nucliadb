@@ -19,11 +19,25 @@
 #
 import json
 import os
+from typing import Iterable
+from unittest.mock import patch
+
+import pytest
 
 from nucliadb.ingest.partitions import assign_partitions
+from nucliadb.ingest.settings import Settings, settings
 
 
-async def test_assign_partitions(partition_settings):
+@pytest.fixture(scope="function")
+def partition_settings() -> Iterable[Settings]:
+    with (
+        patch.object(settings, "replica_number", 1),
+        patch.object(settings, "total_replicas", 4),
+    ):
+        yield settings
+
+
+async def test_assign_partitions(partition_settings: Settings):
     expected_partition_list = []
     part = partition_settings.replica_number
 

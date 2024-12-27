@@ -130,6 +130,7 @@ class NatsConnectionManager:
         self._needs_reconnection = False
         self._reconnect_task: Optional[asyncio.Task] = None
         self._expected_subscriptions: set[str] = set()
+        self._initialized = False
 
     def healthy(self) -> bool:
         if not self._healthy:
@@ -147,6 +148,9 @@ class NatsConnectionManager:
         return True
 
     async def initialize(self) -> None:
+        if self._initialized:
+            return
+
         options: dict[str, Any] = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
@@ -165,7 +169,12 @@ class NatsConnectionManager:
 
         self._expected_subscription_task = asyncio.create_task(self._verify_expected_subscriptions())
 
+        self._initialized = True
+
     async def finalize(self):
+        if not self._initialized:
+            return
+
         async with self._lock:
             if self._reconnect_task:
                 self._reconnect_task.cancel()
@@ -208,6 +217,8 @@ class NatsConnectionManager:
             ):  # pragma: no cover
                 pass
             await self._nc.close()
+
+        self._initialized = False
 
     async def disconnected_cb(self) -> None:
         logger.info("Disconnected from NATS!")
