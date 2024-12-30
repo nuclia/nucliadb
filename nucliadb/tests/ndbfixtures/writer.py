@@ -23,7 +23,6 @@ from unittest.mock import patch
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
-from pytest_lazy_fixtures import lazy_fixture
 from redis import asyncio as aioredis
 
 from nucliadb.standalone.settings import Settings
@@ -32,17 +31,9 @@ from nucliadb.writer.app import create_application
 from nucliadb.writer.settings import settings
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import (
-    FileBackendConfig,
     nucliadb_settings,
-    storage_settings,
 )
-from nucliadb_utils.tests.fixtures import get_testing_storage_backend
-from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
-    set_utility,
-)
-from tests.ingest.fixtures import IngestFixture
+from nucliadb_utils.storages.storage import Storage
 from tests.utils.dirty_index import mark_dirty
 
 from .utils import create_api_client_factory
@@ -91,14 +82,17 @@ async def nucliadb_writer_manager(
 async def writer_api_server(
     disabled_back_pressure,
     redis,
-    storage_writer,
-    grpc_servicer: IngestFixture,
+    storage: Storage,
+    ingest_grpc_server,  # component fixture, shouldn't be used in other modes
+    ingest_consumers,
+    ingest_processed_consumer,
+    learning_config,
     transaction_utility,
     dummy_processing,
     tus_manager,
     dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
-    with patch.object(nucliadb_settings, "nucliadb_ingest", grpc_servicer.host):
+    with patch.object(nucliadb_settings, "nucliadb_ingest", ingest_grpc_server.address):
         application = create_application()
         async with application.router.lifespan_context(application):
             yield application
@@ -112,52 +106,6 @@ async def writer_api_server(
 def disabled_back_pressure():
     with patch("nucliadb.writer.back_pressure.is_back_pressure_enabled", return_value=False) as mocked:
         yield mocked
-
-
-@pytest.fixture(scope="function")
-def gcs_storage_writer(gcs):
-    with (
-        patch.object(storage_settings, "file_backend", FileBackendConfig.GCS),
-        patch.object(storage_settings, "gcs_endpoint_url", gcs),
-        patch.object(storage_settings, "gcs_bucket", "test_{kbid}"),
-    ):
-        yield
-
-
-@pytest.fixture(scope="function")
-def s3_storage_writer(s3):
-    with (
-        patch.object(storage_settings, "file_backend", FileBackendConfig.S3),
-        patch.object(storage_settings, "s3_endpoint", s3),
-        patch.object(storage_settings, "s3_client_id", ""),
-        patch.object(storage_settings, "s3_client_secret", ""),
-        patch.object(storage_settings, "s3_bucket", "test-{kbid}"),
-    ):
-        yield
-
-
-def lazy_storage_writer_fixture():
-    backend = get_testing_storage_backend()
-    if backend == "gcs":
-        return [lazy_fixture.lf("gcs_storage_writer")]
-    elif backend == "s3":
-        return [lazy_fixture.lf("s3_storage_writer")]
-    else:
-        print(f"Unknown storage backend {backend}, using gcs")
-        return [lazy_fixture.lf("gcs_storage_writer")]
-
-
-@pytest.fixture(scope="function", params=lazy_storage_writer_fixture())
-async def storage_writer(request):
-    """
-    Generic storage fixture that allows us to run the same tests for different storage backends.
-    """
-    storage_driver = request.param
-    set_utility(Utility.STORAGE, storage_driver)
-
-    yield storage_driver
-
-    clean_utility(Utility.STORAGE)
 
 
 @pytest.fixture(scope="function")

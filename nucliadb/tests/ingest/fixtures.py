@@ -19,10 +19,11 @@
 #
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import Iterable, Optional
+from typing import AsyncIterator, Iterable, Iterator, Optional
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -41,21 +42,24 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
-from nucliadb.ingest.settings import settings
+from nucliadb.ingest.settings import DriverSettings
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
-from nucliadb_protos import writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
+from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
+from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.indexing import IndexingUtility
-from nucliadb_utils.settings import indexing_settings, transaction_settings
+from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.settings import audit_settings, indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -72,13 +76,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-def processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
-    proc = Processor(maindb_driver, storage, pubsub, partition="1")
-    yield proc
-
-
-@pytest.fixture(scope="function")
-def stream_processor(maindb_driver, storage, pubsub) -> Iterable[Processor]:
+def processor(maindb_driver: Driver, storage: Storage, pubsub: PubSubDriver) -> Iterable[Processor]:
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
 
@@ -97,7 +95,13 @@ class IngestFixture:
 
 
 @pytest.fixture(scope="function")
-async def ingest_consumers(maindb_settings, transaction_utility, storage, fake_node, nats_manager):
+async def ingest_consumers(
+    maindb_settings: DriverSettings,
+    transaction_utility: TransactionUtility,
+    storage: Storage,
+    fake_node,
+    nats_manager: NatsConnectionManager,
+):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
 
     yield
@@ -108,7 +112,11 @@ async def ingest_consumers(maindb_settings, transaction_utility, storage, fake_n
 
 @pytest.fixture(scope="function")
 async def ingest_processed_consumer(
-    maindb_settings, transaction_utility, storage, fake_node, nats_manager
+    maindb_settings: DriverSettings,
+    transaction_utility: TransactionUtility,
+    storage: Storage,
+    fake_node,
+    nats_manager: NatsConnectionManager,
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
 
@@ -119,41 +127,21 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def grpc_servicer(maindb_driver, ingest_consumers, ingest_processed_consumer, learning_config):
-    servicer = WriterServicer()
-    await servicer.initialize()
-
-    server = aio.server()
-    port = server.add_insecure_port("[::]:0")
-    writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
-    await server.start()
-    _channel = aio.insecure_channel(f"127.0.0.1:{port}")
-    yield IngestFixture(
-        channel=_channel,
-        serv=server,
-        servicer=servicer,
-        host=f"127.0.0.1:{port}",
-    )
-    await servicer.finalize()
-    await _channel.close()
-    await server.stop(None)
-
-
-@pytest.fixture(scope="function")
-async def pubsub(natsd):
+async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
     pubsub = get_utility(Utility.PUBSUB)
-    if pubsub is None:
-        pubsub = NatsPubsub(hosts=[natsd])
-        await pubsub.initialize()
-        set_utility(Utility.PUBSUB, pubsub)
+    assert pubsub is None, "No pubsub is expected to be already set"
+    pubsub = NatsPubsub(hosts=[nats_server])
+    await pubsub.initialize()
+    set_utility(Utility.PUBSUB, pubsub)
 
     yield pubsub
+
     clean_utility(Utility.PUBSUB)
     await pubsub.finalize()
 
 
 @pytest.fixture(scope="function")
-def fake_node(indexing_utility, shard_manager):
+def fake_node(indexing_utility: IndexingUtility, shard_manager):
     manager.INDEX_NODES.clear()
     manager.add_index_node(
         id=str(uuid.uuid4()),
@@ -187,7 +175,7 @@ def learning_config():
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, learning_config):
+async def knowledgebox_ingest(storage: Storage, maindb_driver: Driver, shard_manager, learning_config):
     kbid = KnowledgeBox.new_unique_kbid()
     kbslug = "slug-" + str(uuid.uuid4())
     model = SemanticModelMetadata(
@@ -206,7 +194,9 @@ async def knowledgebox_ingest(storage, maindb_driver: Driver, shard_manager, lea
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_with_vectorsets(storage, maindb_driver: Driver, shard_manager, learning_config):
+async def knowledgebox_with_vectorsets(
+    storage: Storage, maindb_driver: Driver, shard_manager, learning_config
+):
     kbid = KnowledgeBox.new_unique_kbid()
     kbslug = "slug-" + str(uuid.uuid4())
     await KnowledgeBox.create(
@@ -236,16 +226,23 @@ async def knowledgebox_with_vectorsets(storage, maindb_driver: Driver, shard_man
 
 
 @pytest.fixture(scope="function")
-async def audit():
-    return BasicAuditStorage()
+def audit(basic_audit: BasicAuditStorage) -> Iterator[AuditStorage]:
+    # XXX: why aren't we settings the utility?
+    yield basic_audit
 
 
 @pytest.fixture(scope="function")
-async def stream_audit(natsd: str):
-    from nucliadb_utils.settings import audit_settings
+async def basic_audit() -> AsyncIterator[BasicAuditStorage]:
+    audit = BasicAuditStorage()
+    await audit.initialize()
+    yield audit
+    await audit.finalize()
 
+
+@pytest.fixture(scope="function")
+async def stream_audit(nats_server: str) -> AsyncIterator[StreamAuditStorage]:
     audit = StreamAuditStorage(
-        [natsd],
+        [nats_server],
         audit_settings.audit_jetstream_target,  # type: ignore
         audit_settings.audit_partitions,
         audit_settings.audit_hash_seed,
@@ -256,16 +253,45 @@ async def stream_audit(natsd: str):
 
 
 @pytest.fixture(scope="function")
-async def indexing_utility(natsd, _clean_natsd):
+async def indexing_utility(
+    dummy_indexing_utility: IndexingUtility,
+    # TODO: too many tests depend on this to be true.
+    # Remove when everyone asks for what they really need
+    natsd: str,
+    _clean_natsd,
+) -> AsyncIterator[IndexingUtility]:
+    yield dummy_indexing_utility
+
+
+@pytest.fixture(scope="function")
+async def dummy_indexing_utility() -> AsyncIterator[IndexingUtility]:
+    # as it's a dummy utility, we don't need to provide real nats servers or
+    # creds. Anyway, this should be a different class instead of a parameter
     indexing_utility = IndexingUtility(
-        nats_creds=indexing_settings.index_jetstream_auth,
-        nats_servers=indexing_settings.index_jetstream_servers,
+        nats_creds=None,
+        nats_servers=[],
         dummy=True,
     )
     await indexing_utility.initialize()
     set_utility(Utility.INDEXING, indexing_utility)
 
-    yield
+    yield indexing_utility
+
+    clean_utility(Utility.INDEXING)
+    await indexing_utility.finalize()
+
+
+@pytest.fixture(scope="function")
+async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator[IndexingUtility]:
+    indexing_utility = IndexingUtility(
+        nats_creds=indexing_settings.index_jetstream_auth,
+        nats_servers=indexing_settings.index_jetstream_servers,
+        dummy=False,
+    )
+    await indexing_utility.initialize()
+    set_utility(Utility.INDEXING, indexing_utility)
+
+    yield indexing_utility
 
     clean_utility(Utility.INDEXING)
     await indexing_utility.finalize()
@@ -292,51 +318,105 @@ async def dummy_nidx_utility():
 
 
 @pytest.fixture(scope="function")
-async def _clean_natsd(natsd):
-    nc = await nats.connect(servers=[natsd])
-    js = nc.jetstream()
+async def nats_manager(nats_server: str) -> AsyncIterator[NatsConnectionManager]:
+    ncm = await start_nats_manager("nucliadb_tests", [nats_server], None)
+    yield ncm
+    await stop_nats_manager()
 
+
+@pytest.fixture(scope="function")
+async def _clean_natsd(nats_ingest_stream, nats_ingest_processed_stream, nats_index_stream):
+    # XXX Legacy fixture that should be replaced.
+    #
+    # Although the name was clean, it in fact was deleting and recreating
+    # streams/consumers used in nucliadb. So, in fact, this fixture was
+    # responsible of streams/consumers creation
+    yield
+
+
+@pytest.fixture(scope="function")
+async def nats_ingest_stream(nats_server: str):
+    streams = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
+    ]
     consumers = [
         (const.Streams.INGEST.name, const.Streams.INGEST.group.format(partition="1")),
+    ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        yield
+
+
+@pytest.fixture(scope="function")
+async def nats_ingest_processed_stream(nats_server: str):
+    streams = [
+        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
+    ]
+    consumers = [
         (const.Streams.INGEST_PROCESSED.name, const.Streams.INGEST_PROCESSED.group),
+    ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        yield
+
+
+@pytest.fixture(scope="function")
+async def nats_index_stream(nats_server: str):
+    streams = [
+        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
+    ]
+    consumers = [
         (const.Streams.INDEX.name, const.Streams.INDEX.group.format(node="1")),
     ]
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+        with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
+            yield
+
+
+@asynccontextmanager
+async def _nats_streams_and_consumers_setup(
+    nats_server: str, streams: list[tuple[str, str]], consumers: list[tuple[str, str]]
+):
+    nc = await nats.connect(servers=[nats_server])
+    js = nc.jetstream()
+
+    # create streams
+    for stream, subject in streams:
+        try:
+            await js.stream_info(name=stream)
+        except nats.js.errors.NotFoundError:
+            await js.add_stream(name=stream, subjects=[subject])
+
+    await nc.close()
+
+    yield
+
+    # we close and reopen the connection with nats between yield points to avoid
+    # warnings complaining on tasks being closed and tasks being killed.
+    # Probably some nats invariant is breaking across yield points
+    nc = await nats.connect(servers=[nats_server])
+    js = nc.jetstream()
+
+    # delete consumers
     for stream, consumer in consumers:
         try:
             await js.delete_consumer(stream, consumer)
         except nats.js.errors.NotFoundError:
             pass
 
-    streams = [
-        (const.Streams.INGEST.name, const.Streams.INGEST.subject.format(partition=">")),
-        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
-    ]
+    # delete streams
     for stream, subject in streams:
         try:
             await js.delete_stream(stream)
         except nats.js.errors.NotFoundError:
             pass
 
-        await js.add_stream(name=stream, subjects=[subject])
-
-    await nc.drain()
     await nc.close()
 
-    indexing_settings.index_jetstream_servers = [natsd]
-
-    yield
-
 
 @pytest.fixture(scope="function")
-async def nats_manager(natsd):
-    ncm = await start_nats_manager("service_name", [natsd], None)
-    yield ncm
-    await stop_nats_manager()
-
-
-@pytest.fixture(scope="function")
-async def transaction_utility(natsd, pubsub):
-    transaction_settings.transaction_jetstream_servers = [natsd]
+async def transaction_utility(
+    nats_server: str, pubsub: PubSubDriver
+) -> AsyncIterator[TransactionUtility]:
+    transaction_settings.transaction_jetstream_servers = [nats_server]
     util = await start_transaction_utility()
     yield util
     await stop_transaction_utility()
@@ -463,7 +543,7 @@ def make_extracted_vectors(field_id, vectorset=None, vectorset_idx=None):
 
 
 @pytest.fixture(scope="function")
-async def test_resource(storage, maindb_driver, knowledgebox_ingest, fake_node):
+async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox_ingest: str, fake_node):
     """
     Create a resource that has every possible bit of information
     """
@@ -474,14 +554,6 @@ async def test_resource(storage, maindb_driver, knowledgebox_ingest, fake_node):
     )
     yield resource
     resource.clean()
-
-
-@pytest.fixture(scope="function")
-def partition_settings():
-    settings.replica_number = 1
-    settings.total_replicas = 4
-
-    yield settings
 
 
 def broker_resource(
