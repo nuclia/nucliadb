@@ -58,6 +58,7 @@ class RequestContext:
     def __init__(self):
         self.audit_request: AuditRequest = AuditRequest()
         self.start_time: float = time.monotonic()
+        self.path: str = ""
 
 
 request_context_var = contextvars.ContextVar[Optional[RequestContext]]("request_context", default=None)
@@ -88,6 +89,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         token = request_context_var.set(context)
         context.audit_request.time.FromDatetime(datetime.now(tz=timezone.utc))
         context.audit_request.trace_id = get_trace_id()
+        context.path = request.url.path
 
         if request.url.path.split("/")[-1] in ("ask", "search", "find"):
             if request.method == "POST":
@@ -341,7 +343,10 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.search.CopyFrom(search)
         auditrequest.retrieval_time = timeit
         auditrequest.resources = resources
-        auditrequest.type = AuditRequest.SEARCH
+        if "/ask" in context.path:
+            auditrequest.type = AuditRequest.CHAT
+        else:
+            auditrequest.type = AuditRequest.SEARCH
 
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,

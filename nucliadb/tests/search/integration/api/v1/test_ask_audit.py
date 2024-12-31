@@ -76,6 +76,7 @@ async def test_ask_sends_only_one_audit(
     stream_audit.send.assert_called_once()
 
     auditreq = await get_audit_messages(psub)
+    assert auditreq.type == AuditRequest.AuditType.CHAT
     assert auditreq.kbid == kbid
     assert auditreq.HasField("chat")
     assert auditreq.HasField("search")
