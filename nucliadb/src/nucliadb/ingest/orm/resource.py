@@ -453,9 +453,7 @@ class Resource:
 
         await field_obj.delete()
 
-    async def has_field(self, type: FieldType.ValueType, field: str) -> bool:
-        if len(self.fields) == 0:
-            await self.get_fields(force=True)
+    def has_field(self, type: FieldType.ValueType, field: str) -> bool:
         return (type, field) in self.fields
 
     async def get_all_field_ids(self, *, for_update: bool) -> Optional[PBAllFieldIDs]:
@@ -586,6 +584,7 @@ class Resource:
         # Upload to binary storage
         # Vector indexing
         if self.disable_vectors is False:
+            await self.get_fields(force=True)
             for field_vectors in message.field_vectors:
                 await self._apply_extracted_vectors(field_vectors)
 
@@ -736,7 +735,7 @@ class Resource:
     async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
         # Store vectors in the resource
 
-        if not await self.has_field(field_vectors.field.field_type, field_vectors.field.field):
+        if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
             # skipping because field does not exist
             logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
             return
