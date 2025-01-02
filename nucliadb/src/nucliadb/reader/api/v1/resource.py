@@ -33,7 +33,7 @@ from nucliadb.ingest.serialize import (
     serialize,
     set_resource_field_extracted_data,
 )
-from nucliadb.reader import SERVICE_NAME
+from nucliadb.reader import SERVICE_NAME, logger
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
     FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP,
@@ -72,6 +72,10 @@ async def list_resources(
     kbid: str,
     page: int = Query(0, description="Requested page number (0-based)"),
     size: int = Query(DEFAULT_RESOURCE_LIST_PAGE_SIZE, description="Page size"),
+    show: Optional[list[ResourceProperties]] = Query(
+        default=None,
+        description="List of properties to show in the response. Only `basic` and `security` are supported, the rest are ignored.",
+    ),
 ) -> ResourceList:
     # Get all resource id's fast by scanning all existing slugs
 
@@ -79,7 +83,7 @@ async def list_resources(
     driver = get_driver()
     async with driver.transaction(read_only=True) as txn:
         # Filter parameters for serializer
-        show: list[ResourceProperties] = [ResourceProperties.BASIC]
+        parsed_show = _parse_show(show)
         field_types: list[FieldTypeName] = []
         extracted: list[ExtractedDataTypeName] = []
 
@@ -113,13 +117,22 @@ async def list_resources(
                         txn,
                         kbid,
                         rid.decode(),
-                        show,
+                        parsed_show,
                         field_types,
                         extracted,
                         service_name=SERVICE_NAME,
                     )
                     if result is not None:
                         resources.append(result)
+                    else:
+                        logger.warning(
+                            "Resource basic not found for key on list_resources",
+                            extra={"kbid": kbid, "key": key},
+                        )
+                else:
+                    logger.warning(
+                        "Resource id found for slug on list_resources", extra={"kbid": kbid, "key": key}
+                    )
 
             is_last_page = current_key_index <= max_items_to_iterate
 
@@ -131,6 +144,18 @@ async def list_resources(
         resources=resources,
         pagination=ResourcePagination(page=page, size=size, last=is_last_page),
     )
+
+
+def _parse_show(query_param: Optional[list[ResourceProperties]]) -> list[ResourceProperties]:
+    if query_param is None:
+        query_param = []
+
+    if ResourceProperties.BASIC not in query_param:
+        # Basic is always required
+        query_param.append(ResourceProperties.BASIC)
+
+    allowed = {ResourceProperties.BASIC, ResourceProperties.SECURITY}
+    return [x for x in query_param if x in allowed]
 
 
 @api.get(
