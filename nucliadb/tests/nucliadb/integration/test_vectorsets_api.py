@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Optional
 from unittest.mock import patch
 
 from httpx import AsyncClient
@@ -219,17 +220,7 @@ async def test_vectorset_migration(
     assert resp.status == OpStatusWriter.Status.OK  # type: ignore
 
     # Make a search and check that the document is found
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "features": ["semantic"],
-            "min_score": -1,
-            "vector": [2.0 for _ in range(1024)],
-        },
-    )
-    assert resp.status_code == 200, resp.text
-    results = resp.json()
-    assert len(results["resources"]) == 1
+    await _check_semantic_search(nucliadb_reader, kbid)
 
     # Now add a new vectorset
     async with datamanagers.with_transaction() as txn:
@@ -279,15 +270,23 @@ async def test_vectorset_migration(
     assert resp.status == OpStatusWriter.Status.OK  # type: ignore
 
     # Make a search with the new vectorset and check that the document is found
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "features": ["semantic"],
-            "min_score": -1,
-            "vector": [2.0 for _ in range(1024)],
-            "vectorset": "en-2024-05-06",
-        },
-    )
+    await _check_semantic_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
+
+    # With the default vectorset the document should also be found
+    await _check_semantic_search(nucliadb_reader, kbid)
+
+
+async def _check_semantic_search(
+    nucliadb_reader: AsyncClient, kbid: str, vectorset: Optional[str] = None
+):
+    payload = {
+        "features": ["semantic"],
+        "min_score": -1,
+        "vector": [1.0 for _ in range(1024)],
+    }
+    if vectorset:
+        payload["vectorset"] = vectorset
+    resp = await nucliadb_reader.post(f"/kb/{kbid}/find", json=payload)
     assert resp.status_code == 200, resp.text
     results = resp.json()
     assert len(results["resources"]) == 1
