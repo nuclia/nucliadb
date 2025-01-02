@@ -69,3 +69,20 @@ async def test_list_resources(
     assert pagination["last"] == expected_is_last_page
     assert pagination["page"] == query_params.get("page", 0)
     assert pagination["size"] == query_params.get("size", DEFAULT_RESOURCE_LIST_PAGE_SIZE)
+
+
+@pytest.mark.deploy_modes("component")
+async def test_list_resources_show_param(
+    nucliadb_reader: AsyncClient,
+    simple_resources: tuple[str, list[str]],
+) -> None:
+    kbid, expected_resources = simple_resources
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/resources", params={"size": 1000, "show": ["security"]}
+    )
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    assert len(expected_resources) > 0
+    assert len(resources) == len(expected_resources)
+    for resource in resources:
+        assert resource["security"] is not None
