@@ -584,6 +584,7 @@ class Resource:
         # Upload to binary storage
         # Vector indexing
         if self.disable_vectors is False:
+            await self.get_fields(force=True)
             for field_vectors in message.field_vectors:
                 await self._apply_extracted_vectors(field_vectors)
 
