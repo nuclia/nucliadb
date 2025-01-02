@@ -29,7 +29,18 @@ from nucliadb.learning_proxy import (
     SimilarityFunction,
 )
 from nucliadb_protos import utils_pb2
-from nucliadb_protos.nodewriter_pb2 import VectorType
+from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
+from nucliadb_protos.nodewriter_pb2 import VectorIndexConfig, VectorType
+from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    ExtractedTextWrapper,
+    FieldID,
+    NewVectorSetRequest,
+    NewVectorSetResponse,
+    OpStatusWriter,
+)
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 MODULE = "nucliadb.writer.vectorsets"
 
@@ -127,3 +138,156 @@ async def test_learning_config_errors_are_proxied_correctly(
         resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
         assert resp.text == "Learning Internal Server Error"
+
+
+async def test_vectorset_migration(
+    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+):
+    # Create a KB
+    resp = await nucliadb_manager.post(
+        "/kbs",
+        json={
+            "title": "migrationexamples",
+            "description": "",
+            "zone": "",
+            "slug": "migrationexamples",
+            "learning_configuration": {
+                "semantic_vector_similarity": "cosine",
+                "anonymization_model": "disabled",
+                "semantic_models": ["multilingual-2024-05-06"],
+                "semantic_model_configs": {
+                    "multilingual-2024-05-06": {
+                        "similarity": 0,
+                        "size": 1024,
+                        "threshold": 0.5,
+                    }
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    kbid = resp.json()["uuid"]
+
+    # Create a link resource
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "link",
+            "description": "link",
+            "links": {
+                "link": {
+                    "uri": "https://en.wikipedia.org/wiki/Lionel_Messi",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Ingest a processing broker message
+    bm = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        type=BrokerMessage.MessageType.AUTOCOMMIT,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    field = FieldID(field_type=FieldType.LINK, field="link")
+
+    text = "Lionel Messi is a football player."
+    et = ExtractedTextWrapper()
+    et.body.text = text
+    et.field.CopyFrom(field)
+    bm.extracted_text.append(et)
+
+    ev = ExtractedVectorsWrapper()
+    ev.field.CopyFrom(field)
+    ev.vectorset_id = "multilingual-2024-05-06"
+    vector = utils_pb2.Vector(
+        start=0,
+        end=len(text),
+        start_paragraph=0,
+        end_paragraph=len(text),
+    )
+    vector.vector.extend([1.0 for _ in range(1024)])
+    ev.vectors.vectors.vectors.append(vector)
+    bm.field_vectors.append(ev)
+
+    resp = await nucliadb_grpc.ProcessMessage([bm], timeout=None)  # type: ignore
+    assert resp.status == OpStatusWriter.Status.OK  # type: ignore
+
+    # Make a search and check that the document is found
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "features": ["semantic"],
+            "min_score": -1,
+            "vector": [2.0 for _ in range(1024)],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    results = resp.json()
+    assert len(results["resources"]) == 1
+
+    # Now add a new vectorset
+    async with datamanagers.with_transaction() as txn:
+        await datamanagers.vectorsets.set(
+            txn,
+            kbid=kbid,
+            config=VectorSetConfig(
+                vectorset_id="en-2024-05-06",
+                vectorset_index_config=VectorIndexConfig(
+                    similarity=utils_pb2.VectorSimilarity.COSINE,
+                    vector_dimension=1024,
+                ),
+            ),
+        )
+    request = NewVectorSetRequest(
+        kbid=kbid,
+        vectorset_id="en-2024-05-06",
+        similarity=utils_pb2.VectorSimilarity.COSINE,
+        vector_dimension=1024,
+    )
+    resp: NewVectorSetResponse = await nucliadb_grpc.NewVectorSet(request)  # type: ignore
+    assert resp.status == NewVectorSetResponse.Status.OK  # type: ignore
+
+    # Ingest a new broker message as if it was coming from the migration
+    bm2 = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        type=BrokerMessage.MessageType.AUTOCOMMIT,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    field = FieldID(field_type=FieldType.LINK, field="link")
+
+    ev = ExtractedVectorsWrapper()
+    ev.field.CopyFrom(field)
+    ev.vectorset_id = "en-2024-05-06"
+    vector = utils_pb2.Vector(
+        start=0,
+        end=len(text),
+        start_paragraph=0,
+        end_paragraph=len(text),
+    )
+    vector.vector.extend([2.0 for _ in range(1024)])
+    ev.vectors.vectors.vectors.append(vector)
+    bm2.field_vectors.append(ev)
+
+    resp = await nucliadb_grpc.ProcessMessage([bm2], timeout=None)  # type: ignore
+    assert resp.status == OpStatusWriter.Status.OK  # type: ignore
+
+    # Make a search with the new vectorset and check that the document is found
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "features": ["semantic"],
+            "min_score": -1,
+            "vector": [2.0 for _ in range(1024)],
+            "vectorset": "en-2024-05-06",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    results = resp.json()
+    assert len(results["resources"]) == 1

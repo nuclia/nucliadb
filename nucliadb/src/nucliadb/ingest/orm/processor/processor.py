@@ -275,7 +275,6 @@ class Processor:
 
                     if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
                         resource = await kb.get(uuid)
-
                         if resource is None:
                             # It's a new resource
                             resource = await kb.add_resource(uuid, message.slug, message.basic)
