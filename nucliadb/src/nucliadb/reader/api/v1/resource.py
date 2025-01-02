@@ -147,6 +147,11 @@ async def list_resources(
 
 
 def _parse_show(query_param: Optional[list[ResourceProperties]]) -> list[ResourceProperties]:
+    """
+    While listing resources, we don't want to support showing all the resources properties.
+    Make sure only `basic` and `security` are supported, and ignore the rest.
+    `basic` is always required.
+    """
     if query_param is None:
         query_param = []
 
