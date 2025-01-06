@@ -81,7 +81,7 @@ impl AtomClause {
                         let ftype_str = std::str::from_utf8(ftype).unwrap();
                         let ftype_matches = ftype_str == field_type;
                         if field_name.is_none() {
-                            // Matches only on field_type are allowed
+                            // field_type-only matches are allowed
                             return ftype_matches;
                         }
                         if let Some(fname) = key_parts.next() {
