@@ -26,6 +26,14 @@ from httpx import AsyncClient
 
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb_models.search import SearchOptions
+from nucliadb_protos.resources_pb2 import (
+    ExtractedTextWrapper,
+    ExtractedVectorsWrapper,
+    FieldID,
+    FieldType,
+)
+from nucliadb_protos.utils_pb2 import Vector
+from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
 
@@ -485,3 +493,62 @@ async def test_find_highlight(
     assert match["order"] == 0
     assert match["score_type"] == "BM25"
     assert "<mark>Marcus</mark> Aurelius" in match["text"]
+
+
+async def test_find_fields_parameter(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    text = "This is a text"
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "slug": "myresource",
+            "title": "My Title",
+            "summary": "My summary",
+            "icon": "text/plain",
+            "texts": {
+                "text1": {
+                    "body": text,
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    bm = BrokerMessage()
+    bm.kbid = knowledgebox
+    bm.uuid = rid
+
+    field = FieldID(field_type=FieldType.TEXT, field="text1")
+    etw = ExtractedTextWrapper()
+    etw.body.text = text
+    etw.field.CopyFrom(field)
+    bm.extracted_text.append(etw)
+
+    evw = ExtractedVectorsWrapper()
+    evw.field.CopyFrom(field)
+    vector = Vector(start=0, end=len(text), start_paragraph=0, end_paragraph=0)
+    vector.vector.extend([1] * 512)
+    evw.vectors.vectors.vectors.append(vector)
+    bm.field_vectors.append(evw)
+
+    resp = await nucliadb_grpc.ProcessMessage([bm])
+    assert resp.status == OpStatusWriter.Status.OK
+
+    # Semantic search only on text fields should work
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": text,
+            "features": ["semantic"],
+            "min_score": {"semantic": -1},
+            "fields": ["t"],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 1
