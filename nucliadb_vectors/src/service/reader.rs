@@ -99,7 +99,7 @@ impl VectorReader for VectorReaderService {
                 // split "a/title" into "a" and "title"
                 let parts = field.split('/').collect::<Vec<&str>>();
                 let field_type = parts.first().unwrap_or(&"").to_string();
-                let field_name = parts.get(1).unwrap_or(&"").to_string();
+                let field_name = parts.get(1).map(|s| s.to_string());
                 let atom_clause = Clause::Atom(AtomClause::key_field(field_type, field_name));
                 field_atoms.push(atom_clause);
             }

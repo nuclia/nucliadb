@@ -33,9 +33,10 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
 )
 from nucliadb_protos.utils_pb2 import Vector
-from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
+from tests.utils import inject_message
 
 
 async def test_find_with_label_changes(
@@ -536,19 +537,23 @@ async def test_find_fields_parameter(
     evw.vectors.vectors.vectors.append(vector)
     bm.field_vectors.append(evw)
 
-    resp = await nucliadb_grpc.ProcessMessage([bm])
-    assert resp.status == OpStatusWriter.Status.OK
+    await inject_message(nucliadb_grpc, bm)
 
     # Semantic search only on text fields should work
-    resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
-        json={
-            "query": text,
-            "features": ["semantic"],
-            "min_score": {"semantic": -1},
-            "fields": ["t"],
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 1
+    for fields_param, expected_n_resources in [
+        (["t"], 1),  # Searching on all text fields is supported
+        (["t/text1"], 1),  # Searching on a specific text field is supported too
+        (["u"], 0),
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/find",
+            json={
+                "query": text,
+                "features": ["semantic"],
+                "min_score": {"semantic": -1},
+                "fields": fields_param,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["resources"]) == expected_n_resources
