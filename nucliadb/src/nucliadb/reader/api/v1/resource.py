@@ -33,7 +33,7 @@ from nucliadb.ingest.serialize import (
     serialize,
     set_resource_field_extracted_data,
 )
-from nucliadb.reader import SERVICE_NAME
+from nucliadb.reader import SERVICE_NAME, logger
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
     FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP,
@@ -47,6 +47,7 @@ from nucliadb_models.resource import (
     ExtractedDataTypeName,
     NucliaDBRoles,
     Resource,
+    ResourceBasic,
     ResourceFieldProperties,
     ResourceList,
     ResourcePagination,
@@ -84,7 +85,7 @@ async def list_resources(
         extracted: list[ExtractedDataTypeName] = []
 
         try:
-            resources: list[Resource] = []
+            resources: list[ResourceBasic] = []
             max_items_to_iterate = (page + 1) * size
             first_wanted_item_index = (page * size) + 1  # 1-based index
             current_key_index = 0
@@ -119,7 +120,18 @@ async def list_resources(
                         service_name=SERVICE_NAME,
                     )
                     if result is not None:
-                        resources.append(result)
+                        rbasic = ResourceBasic(**result.model_dump())
+                        resources.append(rbasic)
+                    else:
+                        logger.warning(
+                            "Resource id exists but basic info couldn't be found",
+                            extra={"kbid": kbid, "key": key, "rid": rid},
+                        )
+                else:
+                    logger.warning(
+                        "Resource slug key exists but no resource id found",
+                        extra={"kbid": kbid, "key": key},
+                    )
 
             is_last_page = current_key_index <= max_items_to_iterate
 
