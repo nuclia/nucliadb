@@ -18,10 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.common.models_utils.to_proto import client_type_to_proto, feedback_task_to_proto
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -56,11 +56,11 @@ async def send_feedback_endpoint(
             audit.feedback(
                 kbid=kbid,
                 user=x_nucliadb_user,
-                client_type=x_ndb_client.to_proto(),
+                client_type=client_type_to_proto(x_ndb_client),
                 origin=x_forwarded_for,
                 learning_id=item.ident,
                 good=item.good,
-                task=item.task.to_proto(),
+                task=feedback_task_to_proto(item.task),
                 feedback=item.feedback,
                 text_block_id=item.text_block_id,
             )

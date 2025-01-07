@@ -38,6 +38,7 @@ from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
     EntitySubgraph,
+    EntityType,
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     MinScore,
@@ -46,7 +47,6 @@ from nucliadb_models.search import (
     RelatedEntities,
     RelatedEntity,
     RelationDirection,
-    RelationNodeTypeMap,
     Relations,
     ResourceProperties,
     ResourceResult,
@@ -71,6 +71,7 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestResponse,
     VectorSearchResponse,
 )
+from nucliadb_protos.utils_pb2 import RelationNode
 
 from .metrics import merge_observer
 from .paragraphs import get_paragraph_text, get_text_sentence
@@ -79,6 +80,15 @@ Bm25Score = tuple[float, float]
 TimestampScore = datetime.datetime
 TitleScore = str
 SortValue = Union[Bm25Score, TimestampScore, TitleScore]
+
+
+def relation_node_type_to_entity_type(node_type: RelationNode.NodeType.ValueType) -> EntityType:
+    return {
+        RelationNode.NodeType.ENTITY: EntityType.ENTITY,
+        RelationNode.NodeType.LABEL: EntityType.LABEL,
+        RelationNode.NodeType.RESOURCE: EntityType.RESOURCE,
+        RelationNode.NodeType.USER: EntityType.USER,
+    }[node_type]
 
 
 def sort_results_by_score(results: Union[list[ParagraphResult], list[DocumentResult]]):
@@ -457,7 +467,7 @@ def _merge_relations_results(
                 relations.entities[origin.value].related_to.append(
                     DirectionalRelation(
                         entity=destination.value,
-                        entity_type=RelationNodeTypeMap[destination.ntype],
+                        entity_type=relation_node_type_to_entity_type(destination.ntype),
                         relation=relation_type,
                         relation_label=relation_label,
                         direction=RelationDirection.OUT,
@@ -467,7 +477,7 @@ def _merge_relations_results(
                 relations.entities[destination.value].related_to.append(
                     DirectionalRelation(
                         entity=origin.value,
-                        entity_type=RelationNodeTypeMap[origin.ntype],
+                        entity_type=relation_node_type_to_entity_type(origin.ntype),
                         relation=relation_type,
                         relation_label=relation_label,
                         direction=RelationDirection.IN,
