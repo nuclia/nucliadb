@@ -85,14 +85,16 @@ impl AtomClause {
                     if let Some(ftype) = key_parts.next() {
                         let ftype_str = std::str::from_utf8(ftype).unwrap();
                         let ftype_matches = ftype_str == field_type;
-                        if field_name.is_none() {
+
+                        if let Some(field_name) = field_name {
+                            if let Some(fname) = key_parts.next() {
+                                let fname_str = std::str::from_utf8(fname).unwrap();
+                                let fname_matches = fname_str == field_name;
+                                return ftype_matches && fname_matches;
+                            }
+                        } else {
                             // field_type-only matches are allowed
                             return ftype_matches;
-                        }
-                        if let Some(fname) = key_parts.next() {
-                            let fname_str = std::str::from_utf8(fname).unwrap();
-                            let fname_matches = fname_str == field_name.as_ref().unwrap();
-                            return ftype_matches && fname_matches;
                         }
                     }
                 }
