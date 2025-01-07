@@ -23,13 +23,17 @@ from typing import Optional
 import nucliadb_models as models
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils.from_proto import (
+    field_type_name_from_proto,
+    user_field_metadata_from_proto,
+)
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
-from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import (
     ConversationFieldData,
     ConversationFieldExtractedData,
@@ -177,7 +181,7 @@ async def managed_serialize(
             resource.metadata = models.Metadata.from_message(orm_resource.basic.metadata)
             resource.usermetadata = models.UserMetadata.from_message(orm_resource.basic.usermetadata)
             resource.fieldmetadata = [
-                models.UserFieldMetadata.from_message(fm) for fm in orm_resource.basic.fieldmetadata
+                user_field_metadata_from_proto(fm) for fm in orm_resource.basic.fieldmetadata
             ]
             resource.computedmetadata = models.ComputedMetadata.from_message(
                 orm_resource.basic.computedmetadata
@@ -221,7 +225,7 @@ async def managed_serialize(
         await orm_resource.get_fields()
         resource.data = ResourceData()
         for (field_type, _), field in orm_resource.fields.items():
-            field_type_name = FIELD_TYPES_MAP[field_type]
+            field_type_name = field_type_name_from_proto(field_type)
             if field_type_name not in field_type_filter:
                 continue
 

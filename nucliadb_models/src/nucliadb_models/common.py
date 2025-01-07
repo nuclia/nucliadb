@@ -33,7 +33,6 @@ from pydantic import (
 from typing_extensions import Self
 
 from nucliadb_models import content_types
-from nucliadb_protos import resources_pb2
 
 FIELD_TYPE_CHAR_MAP = {
     "c": "conversation",
@@ -256,19 +255,6 @@ class Paragraph(BaseModel):
 
 class Shards(BaseModel):
     shards: Optional[List[str]] = None
-
-
-FIELD_TYPES_MAP: Dict[resources_pb2.FieldType.ValueType, FieldTypeName] = {
-    resources_pb2.FieldType.LINK: FieldTypeName.LINK,
-    resources_pb2.FieldType.FILE: FieldTypeName.FILE,
-    resources_pb2.FieldType.TEXT: FieldTypeName.TEXT,
-    resources_pb2.FieldType.GENERIC: FieldTypeName.GENERIC,
-    resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
-}
-
-FIELD_TYPES_MAP_REVERSE: Dict[str, resources_pb2.FieldType.ValueType] = {
-    y.value: x for x, y in FIELD_TYPES_MAP.items()
-}
 
 
 class Question(BaseModel):

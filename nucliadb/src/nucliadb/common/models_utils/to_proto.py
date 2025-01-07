@@ -18,7 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from nucliadb_models.common import FieldID, FieldTypeName
 from nucliadb_models.search import FeedbackTasks, NucliaDBClientType
+from nucliadb_protos import resources_pb2
 from nucliadb_protos.audit_pb2 import ClientType, TaskType
 
 
@@ -28,3 +30,23 @@ def client_type_to_proto(obj: NucliaDBClientType) -> ClientType.ValueType:
 
 def feedback_task_to_proto(obj: FeedbackTasks) -> TaskType.ValueType:
     return TaskType.Value(obj.name)
+
+
+def field_type_name_to_proto(field_type_name: FieldTypeName) -> resources_pb2.FieldType.ValueType:
+    return {
+        FieldTypeName.LINK: resources_pb2.FieldType.LINK,
+        FieldTypeName.FILE: resources_pb2.FieldType.FILE,
+        FieldTypeName.TEXT: resources_pb2.FieldType.TEXT,
+        FieldTypeName.GENERIC: resources_pb2.FieldType.GENERIC,
+        FieldTypeName.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
+    }[field_type_name]
+
+
+def field_type_to_proto(field_type: FieldID.FieldType) -> resources_pb2.FieldType.ValueType:
+    return {
+        FieldID.FieldType.LINK: resources_pb2.FieldType.LINK,
+        FieldID.FieldType.FILE: resources_pb2.FieldType.FILE,
+        FieldID.FieldType.TEXT: resources_pb2.FieldType.TEXT,
+        FieldID.FieldType.GENERIC: resources_pb2.FieldType.GENERIC,
+        FieldID.FieldType.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
+    }[field_type]

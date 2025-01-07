@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from pydantic import BaseModel
 
 import nucliadb_models as models
-from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import (
     ConversationFieldExtractedData,
     Error,
@@ -53,8 +53,6 @@ class ResourceField(BaseModel):
     extracted: Optional[ExtractedDataType] = None
     error: Optional[Error] = None
 
-
-FIELD_NAMES_TO_PB_TYPE_MAP = {v: k for k, v in FIELD_TYPES_MAP.items()}
 
 FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP: dict[FieldTypeName, Any] = {
     FieldTypeName.TEXT: TextFieldExtractedData,

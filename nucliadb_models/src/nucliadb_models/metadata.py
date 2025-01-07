@@ -25,7 +25,7 @@ from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
-from nucliadb_models.common import FIELD_TYPES_MAP
+from nucliadb.common.models_utils.from_proto import field_type_from_proto
 from nucliadb_models.utils import DateTime
 from nucliadb_protos import resources_pb2, utils_pb2
 
@@ -227,7 +227,7 @@ class ComputedMetadata(BaseModel):
                 FieldClassification(
                     field=FieldID(
                         field=fc.field.field,
-                        field_type=FIELD_TYPES_MAP[fc.field.field_type].value,  # type: ignore
+                        field_type=field_type_from_proto(fc.field.field_type),
                     ),
                     classifications=[
                         Classification(label=c.label, labelset=c.labelset) for c in fc.classifications
@@ -294,27 +294,6 @@ class UserFieldMetadata(BaseModel):
     selections: List[PageSelections] = []
     question_answers: List[QuestionAnswerAnnotation] = []
     field: FieldID
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.UserFieldMetadata) -> _T:
-        value = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-            use_integers_for_enums=True,
-        )
-        value["selections"] = [
-            MessageToDict(
-                selections,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-                use_integers_for_enums=True,
-            )
-            for selections in message.page_selections
-        ]
-
-        value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]].value
-        return cls(**value)
 
 
 class Basic(BaseModel):

@@ -25,6 +25,7 @@ from fastapi_versioning import version
 import nucliadb_models as models
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils.to_proto import field_type_name_to_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
@@ -37,7 +38,6 @@ from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
     FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP,
-    FIELD_NAMES_TO_PB_TYPE_MAP,
     ResourceField,
 )
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
@@ -334,9 +334,7 @@ async def _get_resource_field(
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
-
-    pb_field_id = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
-
+    pb_field_id = field_type_name_to_proto(field_type)
     async with driver.transaction() as txn:
         kb = ORMKnowledgeBox(txn, storage, kbid)
 

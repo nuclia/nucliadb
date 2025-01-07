@@ -22,9 +22,9 @@ from typing import Optional
 
 from fastapi import HTTPException
 
+from nucliadb.common.models_utils.to_proto import field_type_to_proto
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload
-from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
@@ -144,9 +144,8 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
                 userfieldmetadata.question_answers.append(qa_annotation_pb)
 
             userfieldmetadata.field.field = fieldmetadata.field.field
-            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[
-                fieldmetadata.field.field_type.value
-            ]
+
+            userfieldmetadata.field.field_type = field_type_to_proto(fieldmetadata.field.field_type)
 
             bm.basic.fieldmetadata.append(userfieldmetadata)
 
