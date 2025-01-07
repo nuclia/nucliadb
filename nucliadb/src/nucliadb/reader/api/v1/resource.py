@@ -79,11 +79,6 @@ async def list_resources(
     # Get counters from maindb
     driver = get_driver()
     async with driver.transaction(read_only=True) as txn:
-        # Filter parameters for serializer
-        show: list[ResourceProperties] = [ResourceProperties.BASIC]
-        field_types: list[FieldTypeName] = []
-        extracted: list[ExtractedDataTypeName] = []
-
         try:
             resources: list[ResourceBasic] = []
             max_items_to_iterate = (page + 1) * size
@@ -114,9 +109,10 @@ async def list_resources(
                         txn,
                         kbid,
                         rid.decode(),
-                        show,
-                        field_types,
-                        extracted,
+                        # We only need basic info for the list of resources
+                        show=[ResourceProperties.BASIC],
+                        field_type_filter=[],
+                        extracted=[],
                         service_name=SERVICE_NAME,
                     )
                     if result is not None:
