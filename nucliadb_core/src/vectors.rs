@@ -169,6 +169,12 @@ impl<'a> ResourceWrapper<'a> {
     }
 
     pub fn sentences_to_delete(&self) -> impl Iterator<Item = &str> {
+        if let Some(vectorset) = &self.vectorset {
+            if let Some(prefixes) = self.resource.vector_prefixes_to_delete.get(vectorset) {
+                return prefixes.items.iter().map(String::as_str)
+            }
+        }
+        #[allow(deprecated)]
         self.resource.sentences_to_delete.iter().map(String::as_str)
     }
 }
