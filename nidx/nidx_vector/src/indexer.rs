@@ -22,7 +22,7 @@ use crate::data_point::{self, Elem, LabelDictionary};
 use crate::{utils, VectorSegmentMetadata};
 use anyhow::anyhow;
 use nidx_protos::{noderesources, prost::*};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
 use tracing::*;
@@ -110,7 +110,6 @@ pub fn index_resource(
     let v = time.elapsed().as_millis();
     debug!("{id:?} - Creating elements for the main index: starts {v} ms");
 
-    let mut vector_lengths: HashSet<usize> = HashSet::with_capacity(1);
     let mut elems = Vec::new();
     let normalize_vectors = config.normalize_vectors;
     for (field_id, field_paragraphs) in resource.fields() {
@@ -128,7 +127,6 @@ pub fn index_resource(
                     sentence.vector.clone()
                 };
                 let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
-                vector_lengths.insert(vector.len());
                 elems.push(Elem::new(key, vector, labels, metadata));
             }
         }
@@ -138,11 +136,6 @@ pub fn index_resource(
 
     let v = time.elapsed().as_millis();
     debug!("{id:?} - Main index set resource: starts {v} ms");
-
-    // TODO: Remove when deprecating unaligned dense vectors
-    if vector_lengths.len() > 1 {
-        return Err(anyhow!("Inconsistent dimensions on insert"));
-    }
 
     if elems.is_empty() {
         return Ok(None);
