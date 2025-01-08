@@ -26,7 +26,7 @@ pytest_plugins = [
     "tests.nucliadb.knowledgeboxes",
     "nucliadb_utils.tests.asyncbenchmark",
     "nucliadb_utils.tests.nats",
-    "tests.search.node",
+    "tests.ndbfixtures.node",
     "tests.ingest.fixtures",
     "nucliadb_utils.tests.fixtures",
     "nucliadb_utils.tests.gcs",

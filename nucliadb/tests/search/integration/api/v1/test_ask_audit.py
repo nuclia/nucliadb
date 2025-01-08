@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Callable
 
 import nats
 from httpx import AsyncClient
@@ -25,7 +24,6 @@ from nats.aio.client import Client
 from nats.js import JetStreamContext
 
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.audit_pb2 import AuditRequest
 
 
@@ -37,11 +35,11 @@ async def get_audit_messages(sub):
 
 
 async def test_ask_sends_only_one_audit(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str, stream_audit
+    cluster_nucliadb_search: AsyncClient, test_search_resource: str, stream_audit
 ) -> None:
     from nucliadb_utils.settings import audit_settings
 
-    kbid = multiple_search_resource
+    kbid = test_search_resource
 
     # Prepare a test audit stream to receive our messages
     partition = stream_audit.get_partition(kbid)
@@ -61,12 +59,11 @@ async def test_ask_sends_only_one_audit(
 
     psub = await jetstream.pull_subscribe(subject, "psub")
 
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/ask",
-            json={"query": "title"},
-        )
-        assert resp.status_code == 200
+    resp = await cluster_nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/ask",
+        json={"query": "title"},
+    )
+    assert resp.status_code == 200
 
     # Testing the middleware integration where it collects audit calls and sends a single message
     # at requests ends. In this case we expect one seach and one chat sent once

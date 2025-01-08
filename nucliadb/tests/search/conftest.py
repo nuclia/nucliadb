@@ -19,13 +19,12 @@
 #
 pytest_plugins = [
     "pytest_docker_fixtures",
-    "tests.fixtures",
     "tests.ndbfixtures.maindb",
     "tests.ndbfixtures.processing",
     "tests.ndbfixtures.standalone",
     "tests.ingest.fixtures",  # should be refactored out
-    "tests.search.node",
-    "tests.search.fixtures",
+    "tests.ndbfixtures.node",
+    "tests.ndbfixtures.search",
     "nucliadb_utils.tests.fixtures",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
