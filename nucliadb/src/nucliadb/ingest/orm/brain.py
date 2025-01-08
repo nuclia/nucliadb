@@ -301,7 +301,11 @@ class ResourceBrain:
 
         if replace_field:
             full_field_id = ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
-            self.brain.sentences_to_delete.append(full_field_id)
+            if vectorset is None:
+                # DEPRECATED
+                self.brain.sentences_to_delete.append(full_field_id)
+            else:
+                self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
             self.brain.paragraphs_to_delete.append(full_field_id)
 
     def _apply_field_vector(
