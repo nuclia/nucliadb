@@ -30,8 +30,7 @@ from nucliadb.learning_proxy import (
     SimilarityFunction,
 )
 from nucliadb_protos import utils_pb2
-from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
-from nucliadb_protos.nodewriter_pb2 import VectorIndexConfig, VectorType
+from nucliadb_protos.nodewriter_pb2 import VectorType
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
@@ -223,18 +222,6 @@ async def test_vectorset_migration(
     await _check_semantic_search(nucliadb_reader, kbid)
 
     # Now add a new vectorset
-    async with datamanagers.with_transaction() as txn:
-        await datamanagers.vectorsets.set(
-            txn,
-            kbid=kbid,
-            config=VectorSetConfig(
-                vectorset_id="en-2024-05-06",
-                vectorset_index_config=VectorIndexConfig(
-                    similarity=utils_pb2.VectorSimilarity.COSINE,
-                    vector_dimension=1024,
-                ),
-            ),
-        )
     request = NewVectorSetRequest(
         kbid=kbid,
         vectorset_id="en-2024-05-06",
