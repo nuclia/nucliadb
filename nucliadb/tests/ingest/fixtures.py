@@ -57,6 +57,7 @@ from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
+    MAIN,
     Utility,
     clean_utility,
     clear_global_cache,
@@ -137,28 +138,17 @@ async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
 
 
 @pytest.fixture(scope="function")
-def fake_node(indexing_utility: IndexingUtility, shard_manager):
-    raise Exception("Don't use this fixture")
-    # manager.INDEX_NODES.clear()
-    # manager.add_index_node(
-    #     id=str(uuid.uuid4()),
-    #     address="nohost",
-    #     shard_count=0,
-    #     available_disk=100,
-    #     dummy=True,
-    # )
-    # manager.add_index_node(
-    #     id=str(uuid.uuid4()),
-    #     address="nohost",
-    #     shard_count=0,
-    #     available_disk=100,
-    #     dummy=True,
-    # )
+def fake_nidx(indexing_utility: IndexingUtility, shard_manager):
+    class FakeNidx:
+        api_client = AsyncMock()
+        searcher_client = AsyncMock()
+        index = AsyncMock()
 
-    with patch.object(cluster_settings, "standalone_mode", False):
+    fake = FakeNidx()
+    fake.api_client.NewShard.return_value.id = "00000"
+
+    with patch.dict(MAIN, values={Utility.NIDX: fake}, clear=False):
         yield
-
-    # manager.INDEX_NODES.clear()
 
 
 @pytest.fixture()

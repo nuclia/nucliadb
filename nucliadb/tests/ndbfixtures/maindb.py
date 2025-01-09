@@ -73,9 +73,12 @@ async def cleanup_maindb(driver: Driver):
             await txn.delete(key)
         await txn.commit()
 
-        if isinstance(txn, PGTransaction):
-            async with txn.connection.cursor() as cur:
-                await cur.execute("TRUNCATE shards CASCADE")
+        try:
+            if isinstance(txn, PGTransaction):
+                async with txn.connection.cursor() as cur:
+                    await cur.execute("TRUNCATE shards CASCADE")
+        except Exception:
+            pass
 
 
 @pytest.fixture(scope="function")
