@@ -54,18 +54,11 @@ READ_REPLICA_INDEX_NODES: dict[str, set[str]] = {}
 
 
 def get_index_nodes(include_secondary: bool = False) -> list[AbstractIndexNode]:
-    all_nodes = [inode for inode in INDEX_NODES.values()]
-    if not include_secondary:
-        return [inode for inode in all_nodes if inode.primary_id is None]
-    return all_nodes
+    return [get_nidx_fake_node()]
 
 
 def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
-    return INDEX_NODES.get(node_id)
-
-
-def get_read_replica_node_ids(node_id: str) -> list[str]:
-    return list(READ_REPLICA_INDEX_NODES.get(node_id, set()))
+    return get_nidx_fake_node()
 
 
 class KBShardManager:
@@ -365,33 +358,6 @@ class StandaloneKBShardManager(KBShardManager):
                     await storage.delete_upload(storage_key, storage.indexing_bucket)
             except Exception:
                 pass
-
-
-def get_all_shard_nodes(
-    shard: writer_pb2.ShardObject,
-    *,
-    use_read_replicas: bool,
-) -> list[tuple[AbstractIndexNode, str]]:
-    """Return a list of all nodes containing `shard` with the shard replica id.
-    If `use_read_replicas`, read replica nodes will be returned too.
-
-    """
-    nodes = []
-    for shard_replica_pb in shard.replicas:
-        node_id = shard_replica_pb.node
-        shard_replica_id = shard_replica_pb.shard.id
-
-        node = get_index_node(node_id)
-        if node is not None:
-            nodes.append((node, shard_replica_id))
-
-        if use_read_replicas:
-            for read_replica_node_id in get_read_replica_node_ids(node_id):
-                read_replica_node = get_index_node(read_replica_node_id)
-                if read_replica_node is not None:
-                    nodes.append((read_replica_node, shard_replica_id))
-
-    return nodes
 
 
 def choose_node(

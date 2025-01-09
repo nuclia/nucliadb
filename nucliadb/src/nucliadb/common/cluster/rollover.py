@@ -24,7 +24,6 @@ from datetime import datetime
 from typing import Optional
 
 from nucliadb.common import datamanagers, locking
-from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.rollover import RolloverState, RolloverStateNotFoundError
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
@@ -32,11 +31,9 @@ from nucliadb.common.external_index_providers.manager import (
     get_external_index_manager,
 )
 from nucliadb.common.nidx import get_nidx_fake_node
-from nucliadb_protos import nodewriter_pb2, writer_pb2
+from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
 
-from .manager import get_index_node
-from .settings import settings
 from .utils import (
     delete_resource_from_shard,
     get_resource,
@@ -150,6 +147,7 @@ async def create_rollover_shards(
                 vectorsets_configs=vectorsets,
             )
             shard.nidx_shard_id = nidx_shard.id
+            created_shards.append(shard)
 
     except Exception as e:
         errors.capture_exception(e)

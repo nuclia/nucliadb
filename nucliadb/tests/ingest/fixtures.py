@@ -31,7 +31,6 @@ import pytest
 from grpc import aio
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.nidx import NidxUtility

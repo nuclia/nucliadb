@@ -135,10 +135,9 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
                 continue
             else:
                 for shard_object_pb in kb_shards:
-                    for shard_replica_pb in shard_object_pb.replicas:
-                        shard_replica_id = shard_replica_pb.shard.id
-                        node_id = shard_replica_pb.node
-                        stored_shards[shard_replica_id] = ShardLocation(kbid=kbid, node_id=node_id)
+                    stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(
+                        kbid=kbid, node_id="nidx"
+                    )
     return stored_shards
 
 
