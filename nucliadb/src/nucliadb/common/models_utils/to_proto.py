@@ -33,28 +33,28 @@ def feedback_task(obj: FeedbackTasks) -> TaskType.ValueType:
     return TaskType.Value(obj.name)
 
 
-def field_type_name(field_type_name: FieldTypeName) -> resources_pb2.FieldType.ValueType:
+def field_type_name(obj: FieldTypeName) -> resources_pb2.FieldType.ValueType:
     return {
         FieldTypeName.LINK: resources_pb2.FieldType.LINK,
         FieldTypeName.FILE: resources_pb2.FieldType.FILE,
         FieldTypeName.TEXT: resources_pb2.FieldType.TEXT,
         FieldTypeName.GENERIC: resources_pb2.FieldType.GENERIC,
         FieldTypeName.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
-    }[field_type_name]
+    }[obj]
 
 
-def field_type(field_type: FieldID.FieldType) -> resources_pb2.FieldType.ValueType:
+def field_type(obj: FieldID.FieldType) -> resources_pb2.FieldType.ValueType:
     return {
         FieldID.FieldType.LINK: resources_pb2.FieldType.LINK,
         FieldID.FieldType.FILE: resources_pb2.FieldType.FILE,
         FieldID.FieldType.TEXT: resources_pb2.FieldType.TEXT,
         FieldID.FieldType.GENERIC: resources_pb2.FieldType.GENERIC,
         FieldID.FieldType.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
-    }[field_type]
+    }[obj]
 
 
-def kb_synonyms(synonyms: KnowledgeBoxSynonyms) -> knowledgebox_pb2.Synonyms:
+def kb_synonyms(obj: KnowledgeBoxSynonyms) -> knowledgebox_pb2.Synonyms:
     pbsyn = knowledgebox_pb2.Synonyms()
-    for term, term_synonyms in synonyms.synonyms.items():
+    for term, term_synonyms in obj.synonyms.items():
         pbsyn.terms[term].synonyms.extend(term_synonyms)
     return pbsyn
