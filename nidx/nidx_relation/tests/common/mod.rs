@@ -49,3 +49,19 @@ pub fn create_relation(
         }),
     }
 }
+
+pub fn create_relation_with_metadata(
+    source: String,
+    source_node_type: NodeType,
+    source_subtype: String,
+    to: String,
+    to_node_type: NodeType,
+    to_subtype: String,
+    rel_type: RelationType,
+    metadata: RelationMetadata,
+) -> Relation {
+    let mut relation =
+        create_relation(source, source_node_type, source_subtype, to, to_node_type, to_subtype, rel_type);
+    relation.metadata = Some(metadata);
+    relation
+}
