@@ -171,7 +171,7 @@ impl RelationsWriterService {
             let source = relation.source.as_ref().expect("Missing source");
             let source_value = source.value.as_str();
             let source_type = io_maps::node_type_to_u64(source.ntype());
-            let soruce_subtype = source.subtype.as_str();
+            let source_subtype = source.subtype.as_str();
 
             let target = relation.to.as_ref().expect("Missing target");
             let target_value = target.value.as_str();
@@ -189,7 +189,7 @@ impl RelationsWriterService {
                 self.schema.resource_id => resource_id,
                 self.schema.source_value => source_value,
                 self.schema.source_type => source_type,
-                self.schema.source_subtype => soruce_subtype,
+                self.schema.source_subtype => source_subtype,
                 self.schema.target_value => target_value,
                 self.schema.target_type => target_type,
                 self.schema.target_subtype => target_subtype,
@@ -199,7 +199,7 @@ impl RelationsWriterService {
 
             if let Some(metadata) = relation.metadata.as_ref() {
                 let encoded_metadata = metadata.encode_to_vec();
-                new_doc.add_bytes(self.schema.label, encoded_metadata);
+                new_doc.add_bytes(self.schema.metadata, encoded_metadata);
             }
 
             self.writer.add_document(new_doc)?;
