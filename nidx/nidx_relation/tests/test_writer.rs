@@ -19,7 +19,7 @@
 //
 mod common;
 
-use nidx_protos::{relation::RelationType, relation_node::NodeType, Resource, ResourceId};
+use nidx_protos::{relation::RelationType, relation_node::NodeType, RelationMetadata, Resource, ResourceId};
 use nidx_relation::RelationIndexer;
 use tempfile::TempDir;
 
@@ -42,7 +42,7 @@ fn test_index_docs() -> anyhow::Result<()> {
                 "ANIMALS".to_string(),
                 RelationType::Entity,
             ),
-            common::create_relation(
+            common::create_relation_with_metadata(
                 "01808bbd8e784552967a4fb0d8b6e584".to_string(),
                 NodeType::Resource,
                 "".to_string(),
@@ -50,6 +50,15 @@ fn test_index_docs() -> anyhow::Result<()> {
                 NodeType::Entity,
                 "ANIMALS".to_string(),
                 RelationType::Entity,
+                RelationMetadata {
+                    paragraph_id: Some("myresource/0/myresource/100-200".to_string()),
+                    source_start: Some(0),
+                    source_end: Some(10),
+                    to_start: Some(11),
+                    to_end: Some(20),
+                    data_augmentation_task_id: Some("mytask".to_string()),
+                    ..Default::default()
+                },
             ),
         ],
         ..Default::default()
