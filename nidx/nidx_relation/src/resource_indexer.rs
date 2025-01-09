@@ -37,7 +37,7 @@ pub fn index_relations(
         let source = relation.source.as_ref().expect("Missing source");
         let source_value = source.value.as_str();
         let source_type = io_maps::node_type_to_u64(source.ntype());
-        let soruce_subtype = source.subtype.as_str();
+        let source_subtype = source.subtype.as_str();
 
         let target = relation.to.as_ref().expect("Missing target");
         let target_value = target.value.as_str();
@@ -55,7 +55,7 @@ pub fn index_relations(
             schema.resource_id => resource_id,
             schema.source_value => source_value,
             schema.source_type => source_type,
-            schema.source_subtype => soruce_subtype,
+            schema.source_subtype => source_subtype,
             schema.target_value => target_value,
             schema.target_type => target_type,
             schema.target_subtype => target_subtype,
@@ -65,7 +65,7 @@ pub fn index_relations(
 
         if let Some(metadata) = relation.metadata.as_ref() {
             let encoded_metadata = metadata.encode_to_vec();
-            new_doc.add_bytes(schema.label, encoded_metadata);
+            new_doc.add_bytes(schema.metadata, encoded_metadata);
         }
 
         writer.add_document(new_doc)?;
