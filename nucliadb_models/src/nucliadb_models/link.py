@@ -18,15 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Dict, Optional, Type, TypeVar
+from typing import Dict, Optional
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
-
-from nucliadb_protos import resources_pb2
-
-_T = TypeVar("_T")
-
 
 # Shared classes
 
@@ -44,16 +38,6 @@ class FieldLink(BaseModel):
     localstorage: Optional[Dict[str, str]] = None
     css_selector: Optional[str] = None
     xpath: Optional[str] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.FieldLink) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
 
 
 # Creation and update classes (Those used on writer endpoints)

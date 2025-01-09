@@ -21,9 +21,8 @@
 import string
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Union
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from nucliadb_models.conversation import FieldConversation
@@ -52,9 +51,6 @@ from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
 from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
-
-_T = TypeVar("_T")
 
 
 class NucliaDBRoles(str, Enum):
@@ -144,20 +140,6 @@ class KnowledgeBoxConfig(BaseModel):
             if char in "&@ /\\ ":
                 raise ValueError("Invalid chars")
         return v
-
-    @classmethod
-    def from_message(cls: Type[_T], message: PBKnowledgeBoxConfig) -> _T:
-        as_dict = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        # Calculate external index provider metadata
-        # that is shown on read requests
-        eip = as_dict.pop("external_index_provider", None)
-        if eip:
-            as_dict["configured_external_index_provider"] = {"type": eip["type"].lower()}
-        return cls(**as_dict)
 
     @model_validator(mode="after")
     def check_hidden_resources(self) -> "KnowledgeBoxConfig":

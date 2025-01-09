@@ -22,17 +22,19 @@ from typing import Optional
 
 from fastapi import HTTPException
 
+from nucliadb.common.models_utils import to_proto
+from nucliadb.common.models_utils.from_proto import (
+    RelationNodeTypeMap,
+    RelationTypeMap,
+)
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload
-from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     ParagraphAnnotation,
     QuestionAnswerAnnotation,
-    RelationNodeTypeMap,
-    RelationTypeMap,
 )
 from nucliadb_models.text import TEXT_FORMAT_TO_MIMETYPE, PushTextFormat, Text
 from nucliadb_models.writer import (
@@ -144,9 +146,8 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
                 userfieldmetadata.question_answers.append(qa_annotation_pb)
 
             userfieldmetadata.field.field = fieldmetadata.field.field
-            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[
-                fieldmetadata.field.field_type.value
-            ]
+
+            userfieldmetadata.field.field_type = to_proto.field_type(fieldmetadata.field.field_type)
 
             bm.basic.fieldmetadata.append(userfieldmetadata)
 
