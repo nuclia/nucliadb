@@ -20,7 +20,8 @@
 
 from nucliadb_models.common import FieldID, FieldTypeName
 from nucliadb_models.search import FeedbackTasks, NucliaDBClientType
-from nucliadb_protos import resources_pb2
+from nucliadb_models.synonyms import KnowledgeBoxSynonyms
+from nucliadb_protos import knowledgebox_pb2, resources_pb2
 from nucliadb_protos.audit_pb2 import ClientType, TaskType
 
 
@@ -50,3 +51,10 @@ def field_type_to_proto(field_type: FieldID.FieldType) -> resources_pb2.FieldTyp
         FieldID.FieldType.GENERIC: resources_pb2.FieldType.GENERIC,
         FieldID.FieldType.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
     }[field_type]
+
+
+def kb_synonyms_to_proto(synonyms: KnowledgeBoxSynonyms) -> knowledgebox_pb2.Synonyms:
+    pbsyn = knowledgebox_pb2.Synonyms()
+    for term, term_synonyms in synonyms.synonyms.items():
+        pbsyn.terms[term].synonyms.extend(term_synonyms)
+    return pbsyn

@@ -23,6 +23,7 @@ from starlette.requests import Request
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.models_utils.to_proto import kb_synonyms_to_proto
 from nucliadb.models.responses import (
     HTTPConflict,
     HTTPInternalServerError,
@@ -240,7 +241,7 @@ async def delete_labelset(kbid: str, labelset_id: str):
 async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    synonyms = item.to_message()
+    synonyms = kb_synonyms_to_proto(item)
     await datamanagers.atomic.synonyms.set(kbid=kbid, synonyms=synonyms)
     return Response(status_code=204)
 

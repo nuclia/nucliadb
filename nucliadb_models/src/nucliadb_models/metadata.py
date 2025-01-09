@@ -19,19 +19,14 @@
 #
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import Any, Dict, List, Optional
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
-from nucliadb.common.models_utils.from_proto import field_type_from_proto
 from nucliadb_models.utils import DateTime
-from nucliadb_protos import resources_pb2, utils_pb2
 
 from .common import Classification, FieldID, QuestionAnswer, UserClassification
-
-_T = TypeVar("_T")
 
 
 class EntityRelation(BaseModel):
@@ -48,45 +43,11 @@ class RelationType(Enum):
     SYNONYM = "SYNONYM"
 
 
-RelationTypePbMap: Dict[utils_pb2.Relation.RelationType.ValueType, RelationType] = {
-    utils_pb2.Relation.RelationType.ABOUT: RelationType.ABOUT,
-    utils_pb2.Relation.RelationType.CHILD: RelationType.CHILD,
-    utils_pb2.Relation.RelationType.COLAB: RelationType.COLAB,
-    utils_pb2.Relation.RelationType.ENTITY: RelationType.ENTITY,
-    utils_pb2.Relation.RelationType.OTHER: RelationType.OTHER,
-    utils_pb2.Relation.RelationType.SYNONYM: RelationType.SYNONYM,
-}
-
-RelationTypeMap: Dict[RelationType, utils_pb2.Relation.RelationType.ValueType] = {
-    RelationType.ABOUT: utils_pb2.Relation.RelationType.ABOUT,
-    RelationType.CHILD: utils_pb2.Relation.RelationType.CHILD,
-    RelationType.COLAB: utils_pb2.Relation.RelationType.COLAB,
-    RelationType.ENTITY: utils_pb2.Relation.RelationType.ENTITY,
-    RelationType.OTHER: utils_pb2.Relation.RelationType.OTHER,
-    RelationType.SYNONYM: utils_pb2.Relation.RelationType.SYNONYM,
-}
-
-
 class RelationNodeType(str, Enum):
     ENTITY = "entity"
     LABEL = "label"
     RESOURCE = "resource"
     USER = "user"
-
-
-RelationNodeTypeMap: Dict[RelationNodeType, utils_pb2.RelationNode.NodeType.ValueType] = {
-    RelationNodeType.ENTITY: utils_pb2.RelationNode.NodeType.ENTITY,
-    RelationNodeType.LABEL: utils_pb2.RelationNode.NodeType.LABEL,
-    RelationNodeType.RESOURCE: utils_pb2.RelationNode.NodeType.RESOURCE,
-    RelationNodeType.USER: utils_pb2.RelationNode.NodeType.USER,
-}
-
-RelationNodeTypePbMap: Dict[utils_pb2.RelationNode.NodeType.ValueType, RelationNodeType] = {
-    utils_pb2.RelationNode.NodeType.ENTITY: RelationNodeType.ENTITY,
-    utils_pb2.RelationNode.NodeType.LABEL: RelationNodeType.LABEL,
-    utils_pb2.RelationNode.NodeType.RESOURCE: RelationNodeType.RESOURCE,
-    utils_pb2.RelationNode.NodeType.USER: RelationNodeType.USER,
-}
 
 
 class RelationEntity(BaseModel):
@@ -109,16 +70,6 @@ class RelationMetadata(BaseModel):
     to_start: Optional[int] = None
     to_end: Optional[int] = None
     data_augmentation_task_id: Optional[str] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: utils_pb2.RelationMetadata) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
 
 
 class Relation(BaseModel):
@@ -151,11 +102,6 @@ class Relation(BaseModel):
                 )
         return self
 
-    @classmethod
-    def from_message(cls: Type[_T], message: utils_pb2.Relation) -> _T:
-        value = convert_pb_relation_to_api(message)
-        return cls(**value)
-
 
 class InputMetadata(BaseModel):
     metadata: Dict[str, str] = {}
@@ -175,36 +121,6 @@ class ResourceProcessingStatus(Enum):
 class Metadata(InputMetadata):
     status: ResourceProcessingStatus
 
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.Metadata) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-
-
-def convert_pb_relation_node_to_api(
-    relation_node: utils_pb2.RelationNode,
-) -> Dict[str, Any]:
-    return {
-        "type": RelationNodeTypePbMap[relation_node.ntype],
-        "value": relation_node.value,
-        "group": relation_node.subtype,
-    }
-
-
-def convert_pb_relation_to_api(relation: utils_pb2.Relation) -> Dict[str, Any]:
-    return {
-        "relation": RelationTypePbMap[relation.relation],
-        "from": convert_pb_relation_node_to_api(relation.source),
-        "to": convert_pb_relation_node_to_api(relation.to),
-        "label": relation.relation_label,
-        "metadata": RelationMetadata.from_message(relation.metadata),
-    }
-
 
 class FieldClassification(BaseModel):
     field: FieldID
@@ -219,37 +135,10 @@ class ComputedMetadata(BaseModel):
 
     field_classifications: List[FieldClassification] = []
 
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.ComputedMetadata) -> _T:
-        values: Dict[str, List[FieldClassification]] = {"field_classifications": []}
-        for fc in message.field_classifications:
-            values["field_classifications"].append(
-                FieldClassification(
-                    field=FieldID(
-                        field=fc.field.field,
-                        field_type=field_type_from_proto(fc.field.field_type),
-                    ),
-                    classifications=[
-                        Classification(label=c.label, labelset=c.labelset) for c in fc.classifications
-                    ],
-                )
-            )
-        return cls(**values)
-
 
 class UserMetadata(BaseModel):
     classifications: List[UserClassification] = []
     relations: List[Relation] = []
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.UserMetadata) -> _T:
-        value = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        value["relations"] = [convert_pb_relation_to_api(relation) for relation in message.relations]
-        return cls(**value)
 
 
 class TokenSplit(BaseModel):
@@ -356,18 +245,6 @@ class Origin(InputOrigin):
 
     source: Optional[Source] = Source.API
 
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.Origin) -> _T:
-        data = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        # old field was "colaborators" and we want to keep pb field name
-        # to avoid migration
-        data["collaborators"] = data.pop("colaborators", [])
-        return cls(**data)
-
 
 class Extra(BaseModel):
     metadata: Dict[Any, Any] = Field(
@@ -375,16 +252,6 @@ class Extra(BaseModel):
         title="Metadata",
         description="Arbitrary JSON metadata provided by the user that is not meant to be searchable, but can be serialized on results.",  # noqa
     )
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.Extra) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=False,
-            )
-        )
 
 
 class Relations(BaseModel):

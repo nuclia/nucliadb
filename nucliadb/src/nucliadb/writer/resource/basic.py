@@ -22,6 +22,10 @@ from typing import Optional
 
 from fastapi import HTTPException
 
+from nucliadb.common.models_utils.from_proto import (
+    RelationNodeTypeMap,
+    RelationTypeMap,
+)
 from nucliadb.common.models_utils.to_proto import field_type_to_proto
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload
@@ -31,8 +35,6 @@ from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     ParagraphAnnotation,
     QuestionAnswerAnnotation,
-    RelationNodeTypeMap,
-    RelationTypeMap,
 )
 from nucliadb_models.text import TEXT_FORMAT_TO_MIMETYPE, PushTextFormat, Text
 from nucliadb_models.writer import (

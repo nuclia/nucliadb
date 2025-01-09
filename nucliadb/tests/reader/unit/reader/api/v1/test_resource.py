@@ -21,8 +21,8 @@
 
 import datetime
 
+from nucliadb.common.models_utils.from_proto import conversation_from_proto
 from nucliadb.reader.api.models import ResourceField
-from nucliadb_models import Conversation
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import FieldRef, FieldType, Message
@@ -35,7 +35,7 @@ def test_serialize_conversation_field():
     m1.content.attachments_fields.append(FieldRef(field_type=FieldType.LINK, field_id="mylink"))
     pb.messages.append(m1)
     resource_field = ResourceField(field_id="conv", field_type=FieldTypeName.CONVERSATION)
-    resource_field.value = Conversation.from_message(pb)
+    resource_field.value = conversation_from_proto(pb)
     assert resource_field.value.messages[0].content.attachments_fields[0].field_id == "mylink"
     assert (
         resource_field.value.messages[0].content.attachments_fields[0].field_type == FieldTypeName.LINK

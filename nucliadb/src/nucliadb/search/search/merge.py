@@ -23,6 +23,7 @@ import math
 from typing import Any, Optional, Set, Union
 
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.models_utils.from_proto import RelationTypePbMap
 from nucliadb.search.search import cache
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
@@ -33,7 +34,6 @@ from nucliadb.search.search.fetch import (
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
-from nucliadb_models.metadata import RelationTypePbMap
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,

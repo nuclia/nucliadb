@@ -19,7 +19,7 @@
 #
 import json
 from enum import Enum
-from typing import Any, Literal, Optional, TypeVar, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -45,8 +45,6 @@ from nucliadb_models.internal.shards import (  # noqa isort: skip
     KnowledgeboxShards,
 )
 
-
-_T = TypeVar("_T")
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
     "name": "structred_response",
