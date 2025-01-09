@@ -67,11 +67,7 @@ impl VectorIndexer {
         index_resource(vectorset_resource, output_dir, config)
     }
 
-    pub fn deletions_for_resource(
-        &self,
-        resource: &Resource,
-        index_name: &str
-    ) -> Vec<String> {
+    pub fn deletions_for_resource(&self, resource: &Resource, index_name: &str) -> Vec<String> {
         if let Some(prefixes) = resource.vector_prefixes_to_delete.get(index_name) {
             prefixes.items.clone()
         } else {

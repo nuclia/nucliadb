@@ -355,7 +355,12 @@ mod tests {
             format!("{}/a/title/0-15", resource.resource.as_ref().unwrap().uuid),
             format!("{}/a/summary/0-150", resource.resource.as_ref().unwrap().uuid),
         ];
-        resource.vector_prefixes_to_delete.insert(index.name, StringList { items: keys.clone() } );
+        resource.vector_prefixes_to_delete.insert(
+            index.name,
+            StringList {
+                items: keys.clone(),
+            },
+        );
         index_resource(
             &meta,
             storage.clone(),
