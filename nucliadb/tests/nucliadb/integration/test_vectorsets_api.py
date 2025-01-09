@@ -31,16 +31,16 @@ from nucliadb.learning_proxy import (
 )
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.nodewriter_pb2 import VectorType
-from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
+from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType, Paragraph
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
-    ExtractedTextWrapper,
     FieldID,
     NewVectorSetRequest,
     NewVectorSetResponse,
 )
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 
 MODULE = "nucliadb.writer.vectorsets"
 
@@ -188,37 +188,35 @@ async def test_vectorset_migration(
     rid = resp.json()["uuid"]
 
     # Ingest a processing broker message
-    bm = BrokerMessage(
+    bmb = BrokerMessageBuilder(
         kbid=kbid,
-        uuid=rid,
-        type=BrokerMessage.MessageType.AUTOCOMMIT,
+        rid=rid,
         source=BrokerMessage.MessageSource.PROCESSOR,
     )
-    field = FieldID(field_type=FieldType.LINK, field="link")
 
+    link_field = FieldBuilder("link", FieldType.LINK)
     text = "Lionel Messi is a football player."
-    et = ExtractedTextWrapper()
-    et.body.text = text
-    et.field.CopyFrom(field)
-    bm.extracted_text.append(et)
-
-    ev = ExtractedVectorsWrapper()
-    ev.field.CopyFrom(field)
-    ev.vectorset_id = "multilingual-2024-05-06"
-    vector = utils_pb2.Vector(
-        start=0,
-        end=len(text),
-        start_paragraph=0,
-        end_paragraph=len(text),
+    link_field.with_extracted_text(text)
+    link_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
+    link_field.with_extracted_vectors(
+        [
+            utils_pb2.Vector(
+                start=0,
+                end=len(text),
+                start_paragraph=0,
+                end_paragraph=len(text),
+                vector=[1.0 for _ in range(1024)],
+            )
+        ],
+        vectorset="multilingual-2024-05-06",
     )
-    vector.vector.extend([1.0 for _ in range(1024)])
-    ev.vectors.vectors.vectors.append(vector)
-    bm.field_vectors.append(ev)
+    bmb.add_field_builder(link_field)
+    bm = bmb.build()
 
     await inject_message(nucliadb_grpc, bm)
 
     # Make a search and check that the document is found
-    await _check_semantic_search(nucliadb_reader, kbid)
+    await _check_search(nucliadb_reader, kbid)
 
     # Now add a new vectorset
     request = NewVectorSetRequest(
@@ -255,15 +253,14 @@ async def test_vectorset_migration(
     await inject_message(nucliadb_grpc, bm2)
 
     # Make a search with the new vectorset and check that the document is found
-    await _check_semantic_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
+    await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
 
     # With the default vectorset the document should also be found
-    await _check_semantic_search(nucliadb_reader, kbid)
+    await _check_search(nucliadb_reader, kbid)
 
 
-async def _check_semantic_search(
-    nucliadb_reader: AsyncClient, kbid: str, vectorset: Optional[str] = None
-):
+async def _check_search(nucliadb_reader: AsyncClient, kbid: str, vectorset: Optional[str] = None):
+    # check semantic search
     payload = {
         "features": ["semantic"],
         "min_score": -1,
@@ -271,6 +268,17 @@ async def _check_semantic_search(
     }
     if vectorset:
         payload["vectorset"] = vectorset
+    resp = await nucliadb_reader.post(f"/kb/{kbid}/find", json=payload)
+    assert resp.status_code == 200, resp.text
+    results = resp.json()
+    assert len(results["resources"]) == 1
+
+    # check keyword search
+    payload = {
+        "query": "football",
+        "features": ["keyword"],
+        "min_score": {"bm25": 0},
+    }
     resp = await nucliadb_reader.post(f"/kb/{kbid}/find", json=payload)
     assert resp.status_code == 200, resp.text
     results = resp.json()
