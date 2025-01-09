@@ -23,10 +23,6 @@ from typing import TYPE_CHECKING, Optional, Union
 import backoff
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.discovery.utils import (
-    setup_cluster_discovery,
-    teardown_cluster_discovery,
-)
 from nucliadb.common.cluster.manager import (
     KBShardManager,
     StandaloneKBShardManager,
@@ -62,7 +58,6 @@ async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
             # already setup
             return get_utility(Utility.SHARD_MANAGER)
 
-        await setup_cluster_discovery()
         mng: Union[KBShardManager, StandaloneKBShardManager]
         if settings.standalone_mode:
             if is_index_node():
@@ -76,7 +71,6 @@ async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
 
 
 async def teardown_cluster():
-    await teardown_cluster_discovery()
     if get_utility(Utility.SHARD_MANAGER):
         clean_utility(Utility.SHARD_MANAGER)
 
