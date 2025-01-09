@@ -33,15 +33,15 @@ use crate::formula::Formula;
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
-use fs::{File, OpenOptions};
 use io::{BufWriter, Write};
 use memmap2::Mmap;
 use node::Node;
 use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use std::collections::HashSet;
+use std::fs::File;
+use std::io;
 use std::path::Path;
-use std::{fs, io};
 
 pub use ops_hnsw::DataRetriever;
 
@@ -81,18 +81,10 @@ where
     Dlog: DeleteLog,
 {
     let nodes_path = data_point_path.join(file_names::NODES);
-    let mut nodes_file_options = OpenOptions::new();
-    nodes_file_options.read(true);
-    nodes_file_options.write(true);
-    nodes_file_options.create(true);
-    let mut nodes_file = nodes_file_options.open(nodes_path)?;
+    let mut nodes_file = File::options().read(true).write(true).create(true).open(nodes_path)?;
 
     let hnsw_path = data_point_path.join(file_names::HNSW);
-    let mut hnsw_file_options = OpenOptions::new();
-    hnsw_file_options.read(true);
-    hnsw_file_options.write(true);
-    hnsw_file_options.create(true);
-    let mut hnsw_file = hnsw_file_options.open(hnsw_path)?;
+    let mut hnsw_file = File::options().read(true).write(true).create(true).open(hnsw_path)?;
 
     // Sort largest operant first so we reuse as much of the HNSW as possible
     let mut operants = operants.iter().collect::<Vec<_>>();
@@ -172,22 +164,14 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         }
     }
 
-    let mut nodes_file_options = OpenOptions::new();
-    nodes_file_options.read(true);
-    nodes_file_options.write(true);
-    nodes_file_options.create(true);
-    let mut nodesf = nodes_file_options.open(path.join(file_names::NODES))?;
+    let mut nodes_file = File::options().read(true).write(true).create(true).open(path.join(file_names::NODES))?;
 
-    let mut hnsw_file_options = OpenOptions::new();
-    hnsw_file_options.read(true);
-    hnsw_file_options.write(true);
-    hnsw_file_options.create(true);
-    let mut hnswf = hnsw_file_options.open(path.join(file_names::HNSW))?;
+    let mut hnsw_file = File::options().read(true).write(true).create(true).open(path.join(file_names::HNSW))?;
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.
-    data_store::create_key_value(&mut nodesf, elems, &config.vector_type)?;
-    let nodes = unsafe { Mmap::map(&nodesf)? };
+    data_store::create_key_value(&mut nodes_file, elems, &config.vector_type)?;
+    let nodes = unsafe { Mmap::map(&nodes_file)? };
     let no_nodes = data_store::stored_elements(&nodes);
 
     // Creating the HNSW using the mmaped nodes
@@ -201,11 +185,11 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     {
         // The HNSW is on RAM
         // Serializing the HNSW into disk
-        let mut hnswf_buffer = BufWriter::new(&mut hnswf);
-        DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
-        hnswf_buffer.flush()?;
+        let mut hnsw_file_buffer = BufWriter::new(&mut hnsw_file);
+        DiskHnsw::serialize_into(&mut hnsw_file_buffer, no_nodes, index)?;
+        hnsw_file_buffer.flush()?;
     }
-    let index = unsafe { Mmap::map(&hnswf)? };
+    let index = unsafe { Mmap::map(&hnsw_file)? };
 
     // Telling the OS our expected access pattern
     #[cfg(not(target_os = "windows"))]
