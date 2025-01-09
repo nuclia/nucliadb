@@ -38,9 +38,9 @@ from nucliadb_protos.writer_pb2 import (
     FieldID,
     NewVectorSetRequest,
     NewVectorSetResponse,
-    OpStatusWriter,
 )
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 
 MODULE = "nucliadb.writer.vectorsets"
 
@@ -215,8 +215,7 @@ async def test_vectorset_migration(
     ev.vectors.vectors.vectors.append(vector)
     bm.field_vectors.append(ev)
 
-    resp = await nucliadb_grpc.ProcessMessage([bm], timeout=None)  # type: ignore
-    assert resp.status == OpStatusWriter.Status.OK  # type: ignore
+    await inject_message(nucliadb_grpc, bm)
 
     # Make a search and check that the document is found
     await _check_semantic_search(nucliadb_reader, kbid)
@@ -253,8 +252,7 @@ async def test_vectorset_migration(
     ev.vectors.vectors.vectors.append(vector)
     bm2.field_vectors.append(ev)
 
-    resp = await nucliadb_grpc.ProcessMessage([bm2], timeout=None)  # type: ignore
-    assert resp.status == OpStatusWriter.Status.OK  # type: ignore
+    await inject_message(nucliadb_grpc, bm2)
 
     # Make a search with the new vectorset and check that the document is found
     await _check_semantic_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
