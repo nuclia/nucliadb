@@ -24,13 +24,7 @@ from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.models_utils.from_proto import (
-    conversation_from_proto,
-    field_file_from_proto,
-    field_link_from_proto,
-    field_text_from_proto,
-)
-from nucliadb.common.models_utils.to_proto import field_type_name_to_proto
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
@@ -339,7 +333,7 @@ async def _get_resource_field(
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
-    pb_field_id = field_type_name_to_proto(field_type)
+    pb_field_id = to_proto.field_type_name(field_type)
     async with driver.transaction() as txn:
         kb = ORMKnowledgeBox(txn, storage, kbid)
 
@@ -361,15 +355,15 @@ async def _get_resource_field(
 
             if isinstance(value, resources_pb2.FieldText):
                 value = await field.get_value()
-                resource_field.value = field_text_from_proto(value)
+                resource_field.value = from_proto.field_text(value)
 
             if isinstance(value, resources_pb2.FieldFile):
                 value = await field.get_value()
-                resource_field.value = field_file_from_proto(value)
+                resource_field.value = from_proto.field_file(value)
 
             if isinstance(value, resources_pb2.FieldLink):
                 value = await field.get_value()
-                resource_field.value = field_link_from_proto(value)
+                resource_field.value = from_proto.field_link(value)
 
             if isinstance(field, Conversation):
                 if page == "first":
@@ -382,7 +376,7 @@ async def _get_resource_field(
 
                 value = await field.get_value(page=page_to_fetch)
                 if value is not None:
-                    resource_field.value = conversation_from_proto(value)
+                    resource_field.value = from_proto.conversation(value)
 
         if ResourceFieldProperties.EXTRACTED in show and extracted:
             resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()

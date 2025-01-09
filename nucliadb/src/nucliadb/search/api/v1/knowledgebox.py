@@ -32,7 +32,7 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
 from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
-from nucliadb.common.models_utils.from_proto import kb_shards_from_proto
+from nucliadb.common.models_utils import from_proto
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
@@ -74,7 +74,7 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
             status_code=404,
             detail="The knowledgebox or its shards configuration is missing",
         )
-    return kb_shards_from_proto(shards)
+    return from_proto.kb_shards(shards)
 
 
 @api.get(

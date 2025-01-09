@@ -24,7 +24,7 @@ from typing import Optional
 
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
-from nucliadb.common.models_utils.to_proto import client_type_to_proto
+from nucliadb.common.models_utils import to_proto
 from nucliadb.search.requesters.utils import Method, debug_nodes_info, node_query
 from nucliadb.search.search.find_merge import (
     build_find_response,
@@ -137,7 +137,7 @@ async def _index_node_retrieval(
         audit.search(
             kbid,
             x_nucliadb_user,
-            client_type_to_proto(x_ndb_client),
+            to_proto.client_type(x_ndb_client),
             x_forwarded_for,
             pb_query,
             search_time,

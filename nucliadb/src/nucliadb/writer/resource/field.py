@@ -23,8 +23,7 @@ from typing import Optional, Union
 from google.protobuf.json_format import MessageToDict
 
 import nucliadb_models as models
-from nucliadb.common.models_utils.from_proto import field_type_name_from_proto
-from nucliadb.common.models_utils.to_proto import field_type_name_to_proto
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.processing import PushPayload
@@ -81,7 +80,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
     storage = await get_storage(service_name=SERVICE_NAME)
     await resource.get_fields()
     for (field_type, field_id), field in resource.fields.items():
-        field_type_name = field_type_name_from_proto(field_type)
+        field_type_name = from_proto.field_type_name(field_type)
 
         if field_type_name not in {
             FieldTypeName.TEXT,
@@ -336,7 +335,7 @@ async def parse_conversation_field(
         cm.content.attachments_fields.extend(
             [
                 resources_pb2.FieldRef(
-                    field_type=field_type_name_to_proto(attachment.field_type),
+                    field_type=to_proto.field_type_name(attachment.field_type),
                     field_id=attachment.field_id,
                     split=attachment.split if attachment.split is not None else "",
                 )

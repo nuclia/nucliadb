@@ -27,7 +27,7 @@ from fastapi_versioning import version
 from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.models_utils.to_proto import client_type_to_proto
+from nucliadb.common.models_utils import to_proto
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -319,7 +319,7 @@ async def search(
         audit.search(
             kbid,
             x_nucliadb_user,
-            client_type_to_proto(x_ndb_client),
+            to_proto.client_type(x_ndb_client),
             x_forwarded_for,
             pb_query,
             time() - start_time,

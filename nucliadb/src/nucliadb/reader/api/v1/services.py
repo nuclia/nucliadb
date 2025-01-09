@@ -32,11 +32,7 @@ from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.http_clients import processing
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.models_utils.from_proto import (
-    entities_group_from_proto,
-    entities_group_summary_from_proto,
-    kb_synonyms_from_proto,
-)
+from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
@@ -90,7 +86,7 @@ async def list_entities_groups(kbid: str):
     if entities_groups.status == ListEntitiesGroupsResponse.Status.OK:
         response = KnowledgeBoxEntities(uuid=kbid)
         for key, eg_summary in entities_groups.groups.items():
-            entities_group = entities_group_summary_from_proto(eg_summary)
+            entities_group = from_proto.entities_group_summary(eg_summary)
             response.groups[key] = entities_group
         return response
     elif entities_groups.status == ListEntitiesGroupsResponse.Status.NOTFOUND:
@@ -118,7 +114,7 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
 
     kbobj: GetEntitiesGroupResponse = await ingest.GetEntitiesGroup(l_request)  # type: ignore
     if kbobj.status == GetEntitiesGroupResponse.Status.OK:
-        response = entities_group_from_proto(kbobj.group)
+        response = from_proto.entities_group(kbobj.group)
         return response
     elif kbobj.status == GetEntitiesGroupResponse.Status.KB_NOT_FOUND:
         raise HTTPException(status_code=404, detail=f"Knowledge Box '{kbid}' does not exist")
@@ -212,7 +208,7 @@ async def get_custom_synonyms(request: Request, kbid: str):
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     synonyms = await datamanagers.atomic.synonyms.get(kbid=kbid) or Synonyms()
-    return kb_synonyms_from_proto(synonyms)
+    return from_proto.kb_synonyms(synonyms)
 
 
 @api.get(

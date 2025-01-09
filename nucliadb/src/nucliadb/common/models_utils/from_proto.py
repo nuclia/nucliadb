@@ -57,7 +57,7 @@ from nucliadb_models.text import FieldText
 from nucliadb_protos import knowledgebox_pb2, resources_pb2, utils_pb2, writer_pb2
 
 
-def field_type_name_from_proto(field_type: resources_pb2.FieldType.ValueType) -> FieldTypeName:
+def field_type_name(field_type: resources_pb2.FieldType.ValueType) -> FieldTypeName:
     return {
         resources_pb2.FieldType.LINK: FieldTypeName.LINK,
         resources_pb2.FieldType.FILE: FieldTypeName.FILE,
@@ -67,7 +67,7 @@ def field_type_name_from_proto(field_type: resources_pb2.FieldType.ValueType) ->
     }[field_type]
 
 
-def field_type_from_proto(field_type: resources_pb2.FieldType.ValueType) -> FieldID.FieldType:
+def field_type(field_type: resources_pb2.FieldType.ValueType) -> FieldID.FieldType:
     return {
         resources_pb2.FieldType.LINK: FieldID.FieldType.LINK,
         resources_pb2.FieldType.FILE: FieldID.FieldType.FILE,
@@ -77,7 +77,7 @@ def field_type_from_proto(field_type: resources_pb2.FieldType.ValueType) -> Fiel
     }[field_type]
 
 
-def user_field_metadata_from_proto(message: resources_pb2.UserFieldMetadata) -> UserFieldMetadata:
+def user_field_metadata(message: resources_pb2.UserFieldMetadata) -> UserFieldMetadata:
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
@@ -93,18 +93,18 @@ def user_field_metadata_from_proto(message: resources_pb2.UserFieldMetadata) -> 
         )
         for selections in message.page_selections
     ]
-    value["field"]["field_type"] = field_type_name_from_proto(value["field"]["field_type"]).value
+    value["field"]["field_type"] = field_type_name(value["field"]["field_type"]).value
     return UserFieldMetadata(**value)
 
 
-def computed_metadata_from_proto(message: resources_pb2.ComputedMetadata) -> ComputedMetadata:
+def computed_metadata(message: resources_pb2.ComputedMetadata) -> ComputedMetadata:
     values: dict[str, list[FieldClassification]] = {"field_classifications": []}
     for fc in message.field_classifications:
         values["field_classifications"].append(
             FieldClassification(
                 field=FieldID(
                     field=fc.field.field,
-                    field_type=field_type_from_proto(fc.field.field_type),
+                    field_type=field_type(fc.field.field_type),
                 ),
                 classifications=[
                     Classification(label=c.label, labelset=c.labelset) for c in fc.classifications
@@ -114,13 +114,13 @@ def computed_metadata_from_proto(message: resources_pb2.ComputedMetadata) -> Com
     return ComputedMetadata(**values)
 
 
-def user_metadata_from_proto(message: resources_pb2.UserMetadata) -> UserMetadata:
+def user_metadata(message: resources_pb2.UserMetadata) -> UserMetadata:
     value = MessageToDict(
         message,
         preserving_proto_field_name=True,
         including_default_value_fields=True,
     )
-    value["relations"] = [convert_pb_relation_to_api(relation) for relation in message.relations]
+    value["relations"] = [convert_pb_relation_to_api(rel) for rel in message.relations]
     return UserMetadata(**value)
 
 
@@ -158,13 +158,13 @@ RelationTypeMap: dict[RelationType, utils_pb2.Relation.RelationType.ValueType] =
 }
 
 
-def convert_pb_relation_to_api(relation: utils_pb2.Relation) -> dict[str, Any]:
+def convert_pb_relation_to_api(rel: utils_pb2.Relation) -> dict[str, Any]:
     return {
-        "relation": RelationTypePbMap[relation.relation],
-        "from": convert_pb_relation_node_to_api(relation.source),
-        "to": convert_pb_relation_node_to_api(relation.to),
-        "label": relation.relation_label,
-        "metadata": relation_metadata_from_proto(relation.metadata),
+        "relation": RelationTypePbMap[rel.relation],
+        "from": convert_pb_relation_node_to_api(rel.source),
+        "to": convert_pb_relation_node_to_api(rel.to),
+        "label": rel.relation_label,
+        "metadata": relation_metadata(rel.metadata),
     }
 
 
@@ -178,7 +178,7 @@ def convert_pb_relation_node_to_api(
     }
 
 
-def relation_metadata_from_proto(message: utils_pb2.RelationMetadata) -> RelationMetadata:
+def relation_metadata(message: utils_pb2.RelationMetadata) -> RelationMetadata:
     return RelationMetadata(
         **MessageToDict(
             message,
@@ -188,12 +188,12 @@ def relation_metadata_from_proto(message: utils_pb2.RelationMetadata) -> Relatio
     )
 
 
-def relation_from_proto(message: utils_pb2.Relation) -> Relation:
+def relation(message: utils_pb2.Relation) -> Relation:
     value = convert_pb_relation_to_api(message)
     return Relation(**value)
 
 
-def origin_from_proto(message: resources_pb2.Origin) -> Origin:
+def origin(message: resources_pb2.Origin) -> Origin:
     data = MessageToDict(
         message,
         preserving_proto_field_name=True,
@@ -205,7 +205,7 @@ def origin_from_proto(message: resources_pb2.Origin) -> Origin:
     return Origin(**data)
 
 
-def extra_from_proto(message: resources_pb2.Extra) -> Extra:
+def extra(message: resources_pb2.Extra) -> Extra:
     return Extra(
         **MessageToDict(
             message,
@@ -215,7 +215,7 @@ def extra_from_proto(message: resources_pb2.Extra) -> Extra:
     )
 
 
-def metadata_from_proto(message: resources_pb2.Metadata) -> Metadata:
+def metadata(message: resources_pb2.Metadata) -> Metadata:
     return Metadata(
         **MessageToDict(
             message,
@@ -225,7 +225,7 @@ def metadata_from_proto(message: resources_pb2.Metadata) -> Metadata:
     )
 
 
-def field_question_answers_from_proto(
+def field_question_answers(
     message: resources_pb2.FieldQuestionAnswers,
 ) -> FieldQuestionAnswers:
     value = MessageToDict(
@@ -236,7 +236,7 @@ def field_question_answers_from_proto(
     return FieldQuestionAnswers(**value)
 
 
-def extracted_text_from_proto(message: resources_pb2.ExtractedText) -> ExtractedText:
+def extracted_text(message: resources_pb2.ExtractedText) -> ExtractedText:
     return ExtractedText(
         **MessageToDict(
             message,
@@ -246,7 +246,7 @@ def extracted_text_from_proto(message: resources_pb2.ExtractedText) -> Extracted
     )
 
 
-def vector_object_from_proto(message: resources_pb2.VectorObject) -> VectorObject:
+def vector_object(message: resources_pb2.VectorObject) -> VectorObject:
     return VectorObject(
         **MessageToDict(
             message,
@@ -256,7 +256,7 @@ def vector_object_from_proto(message: resources_pb2.VectorObject) -> VectorObjec
     )
 
 
-def large_computed_metadata_from_proto(
+def large_computed_metadata(
     message: resources_pb2.LargeComputedMetadata,
 ) -> LargeComputedMetadata:
     return LargeComputedMetadata(
@@ -268,7 +268,7 @@ def large_computed_metadata_from_proto(
     )
 
 
-def link_extracted_data_from_proto(message: resources_pb2.LinkExtractedData) -> LinkExtractedData:
+def link_extracted_data(message: resources_pb2.LinkExtractedData) -> LinkExtractedData:
     return LinkExtractedData(
         **MessageToDict(
             message,
@@ -278,7 +278,7 @@ def link_extracted_data_from_proto(message: resources_pb2.LinkExtractedData) -> 
     )
 
 
-def file_extracted_data_from_proto(message: resources_pb2.FileExtractedData) -> FileExtractedData:
+def file_extracted_data(message: resources_pb2.FileExtractedData) -> FileExtractedData:
     return FileExtractedData(
         **MessageToDict(
             message,
@@ -299,7 +299,7 @@ def shorten_fieldmetadata(
             metadata.ClearField(field)  # type: ignore
 
 
-def field_computed_metadata_from_proto(
+def field_computed_metadata(
     message: resources_pb2.FieldComputedMetadata, shortened: bool = False
 ) -> FieldComputedMetadata:
     if shortened:
@@ -326,18 +326,16 @@ def convert_fieldmetadata_pb_to_dict(
     # TODO: Remove once deprecated fields are removed
     # If we recieved processor entities in the new field and the old field is empty, we copy them to the old field
     if "processor" in message.entities and len(message.positions) == 0 and len(message.ner) == 0:
-        message.ner.update(
-            {entity.text: entity.label for entity in message.entities["processor"].entities}
-        )
-        for entity in message.entities["processor"].entities:
-            message.positions[entity.label + "/" + entity.text].entity = entity.text
-            message.positions[entity.label + "/" + entity.text].position.extend(
+        message.ner.update({ent.text: ent.label for ent in message.entities["processor"].entities})
+        for ent in message.entities["processor"].entities:
+            message.positions[ent.label + "/" + ent.text].entity = ent.text
+            message.positions[ent.label + "/" + ent.text].position.extend(
                 [
                     resources_pb2.Position(
                         start=position.start,
                         end=position.end,
                     )
-                    for position in entity.positions
+                    for position in ent.positions
                 ]
             )
 
@@ -347,14 +345,12 @@ def convert_fieldmetadata_pb_to_dict(
         including_default_value_fields=True,
     )
     value["relations"] = [
-        convert_pb_relation_to_api(relation)
-        for relations in message.relations
-        for relation in relations.relations
+        convert_pb_relation_to_api(rel) for relations in message.relations for rel in relations.relations
     ]
     return value
 
 
-def conversation_from_proto(message: resources_pb2.Conversation) -> Conversation:
+def conversation(message: resources_pb2.Conversation) -> Conversation:
     as_dict = MessageToDict(
         message,
         preserving_proto_field_name=True,
@@ -366,7 +362,7 @@ def conversation_from_proto(message: resources_pb2.Conversation) -> Conversation
     return Conversation(**as_dict)
 
 
-def field_conversation_from_proto(message: resources_pb2.FieldConversation) -> FieldConversation:
+def field_conversation(message: resources_pb2.FieldConversation) -> FieldConversation:
     return FieldConversation(
         **MessageToDict(
             message,
@@ -376,7 +372,7 @@ def field_conversation_from_proto(message: resources_pb2.FieldConversation) -> F
     )
 
 
-def entity_from_proto(message: knowledgebox_pb2.Entity) -> Entity:
+def entity(message: knowledgebox_pb2.Entity) -> Entity:
     return Entity(
         **MessageToDict(
             message,
@@ -386,7 +382,7 @@ def entity_from_proto(message: knowledgebox_pb2.Entity) -> Entity:
     )
 
 
-def entities_group_from_proto(
+def entities_group(
     message: knowledgebox_pb2.EntitiesGroup,
 ) -> EntitiesGroup:
     entities_group = MessageToDict(
@@ -396,14 +392,14 @@ def entities_group_from_proto(
     )
     entities_group["entities"] = {}
 
-    for name, entity in message.entities.items():
-        if not entity.deleted:
-            entities_group["entities"][name] = entity_from_proto(entity)
+    for name, ent in message.entities.items():
+        if not ent.deleted:
+            entities_group["entities"][name] = entity(ent)
 
     return EntitiesGroup(**entities_group)
 
 
-def entities_group_summary_from_proto(
+def entities_group_summary(
     message: knowledgebox_pb2.EntitiesGroupSummary,
 ) -> EntitiesGroupSummary:
     return EntitiesGroupSummary(
@@ -415,7 +411,7 @@ def entities_group_summary_from_proto(
     )
 
 
-def field_file_from_proto(message: resources_pb2.FieldFile) -> FieldFile:
+def field_file(message: resources_pb2.FieldFile) -> FieldFile:
     instance = FieldFile(
         **MessageToDict(
             message,
@@ -429,7 +425,7 @@ def field_file_from_proto(message: resources_pb2.FieldFile) -> FieldFile:
     return instance
 
 
-def field_link_from_proto(message: resources_pb2.FieldLink) -> FieldLink:
+def field_link(message: resources_pb2.FieldLink) -> FieldLink:
     return FieldLink(
         **MessageToDict(
             message,
@@ -439,7 +435,7 @@ def field_link_from_proto(message: resources_pb2.FieldLink) -> FieldLink:
     )
 
 
-def field_text_from_proto(message: resources_pb2.FieldText) -> FieldText:
+def field_text(message: resources_pb2.FieldText) -> FieldText:
     return FieldText(
         **MessageToDict(
             message,
@@ -449,7 +445,7 @@ def field_text_from_proto(message: resources_pb2.FieldText) -> FieldText:
     )
 
 
-def knowledgebox_config_from_proto(message: knowledgebox_pb2.KnowledgeBoxConfig) -> KnowledgeBoxConfig:
+def knowledgebox_config(message: knowledgebox_pb2.KnowledgeBoxConfig) -> KnowledgeBoxConfig:
     as_dict = MessageToDict(
         message,
         preserving_proto_field_name=True,
@@ -463,7 +459,7 @@ def knowledgebox_config_from_proto(message: knowledgebox_pb2.KnowledgeBoxConfig)
     return KnowledgeBoxConfig(**as_dict)
 
 
-def kb_synonyms_from_proto(message: knowledgebox_pb2.Synonyms) -> KnowledgeBoxSynonyms:
+def kb_synonyms(message: knowledgebox_pb2.Synonyms) -> KnowledgeBoxSynonyms:
     return KnowledgeBoxSynonyms(
         **dict(
             synonyms={
@@ -473,7 +469,7 @@ def kb_synonyms_from_proto(message: knowledgebox_pb2.Synonyms) -> KnowledgeBoxSy
     )
 
 
-def kb_shards_from_proto(message: writer_pb2.Shards) -> KnowledgeboxShards:
+def kb_shards(message: writer_pb2.Shards) -> KnowledgeboxShards:
     return KnowledgeboxShards(
         **MessageToDict(
             message,

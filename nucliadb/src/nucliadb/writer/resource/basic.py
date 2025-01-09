@@ -22,11 +22,11 @@ from typing import Optional
 
 from fastapi import HTTPException
 
+from nucliadb.common.models_utils import to_proto
 from nucliadb.common.models_utils.from_proto import (
     RelationNodeTypeMap,
     RelationTypeMap,
 )
-from nucliadb.common.models_utils.to_proto import field_type_to_proto
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
@@ -147,7 +147,7 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
 
             userfieldmetadata.field.field = fieldmetadata.field.field
 
-            userfieldmetadata.field.field_type = field_type_to_proto(fieldmetadata.field.field_type)
+            userfieldmetadata.field.field_type = to_proto.field_type(fieldmetadata.field.field_type)
 
             bm.basic.fieldmetadata.append(userfieldmetadata)
 
