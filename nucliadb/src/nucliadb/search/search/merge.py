@@ -33,7 +33,7 @@ from nucliadb.search.search.fetch import (
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
-from nucliadb_models.metadata import RelationTypePbMap
+from nucliadb_models.metadata import RelationMetadata, RelationTypePbMap
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
@@ -432,14 +432,18 @@ async def merge_paragraph_results(
 async def merge_relations_results(
     relations_responses: list[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
+    only_with_metadata: bool = False,
 ) -> Relations:
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _merge_relations_results, relations_responses, query)
+    return await loop.run_in_executor(
+        None, _merge_relations_results, relations_responses, query, only_with_metadata
+    )
 
 
 def _merge_relations_results(
     relations_responses: list[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
+    only_with_metadata: bool,
 ) -> Relations:
     relations = Relations(entities={})
 
@@ -452,8 +456,9 @@ def _merge_relations_results(
             destination = relation.to
             relation_type = RelationTypePbMap[relation.relation]
             relation_label = relation.relation_label
+            metadata = relation.metadata if relation.HasField("metadata") else None
 
-            if origin.value in relations.entities:
+            if (not only_with_metadata or metadata) and origin.value in relations.entities:
                 relations.entities[origin.value].related_to.append(
                     DirectionalRelation(
                         entity=destination.value,
@@ -461,9 +466,10 @@ def _merge_relations_results(
                         relation=relation_type,
                         relation_label=relation_label,
                         direction=RelationDirection.OUT,
+                        metadata=RelationMetadata.from_message(metadata) if metadata else None,
                     )
                 )
-            elif destination.value in relations.entities:
+            elif (not only_with_metadata or metadata) and destination.value in relations.entities:
                 relations.entities[destination.value].related_to.append(
                     DirectionalRelation(
                         entity=origin.value,
@@ -471,6 +477,7 @@ def _merge_relations_results(
                         relation=relation_type,
                         relation_label=relation_label,
                         direction=RelationDirection.IN,
+                        metadata=RelationMetadata.from_message(metadata) if metadata else None,
                     )
                 )
 

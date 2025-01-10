@@ -226,6 +226,39 @@ def merge_shards_relation_responses(
     return merged
 
 
+def paragraph_id_to_text_block_match(paragraph_id: str) -> TextBlockMatch:
+    """
+    Given a paragraph_id, return a TextBlockMatch with the bare minimum fields
+    This is required by the Graph Strategy to get text blocks from the relevant paragraphs
+    """
+    parsed_paragraph_id = ParagraphId.from_string(paragraph_id)
+    return TextBlockMatch(
+        paragraph_id=parsed_paragraph_id,
+        score=0,
+        score_type=SCORE_TYPE.BM25,
+        order=0,  # NOTE: this will be filled later
+        text="",  # NOTE: this will be filled later too
+        position=TextPosition(
+            page_number=0,
+            index=0,
+            start=parsed_paragraph_id.paragraph_start,
+            end=parsed_paragraph_id.paragraph_end,
+            start_seconds=[],
+            end_seconds=[],
+        ),
+        field_labels=[],
+        paragraph_labels=[],
+        fuzzy_search=False,
+        is_a_table=False,
+        representation_file="",
+        page_with_visual=False,
+    )
+
+
+def paragraph_id_to_text_block_matches(paragraph_ids: Iterable[str]) -> list[TextBlockMatch]:
+    return [paragraph_id_to_text_block_match(item) for item in paragraph_ids]
+
+
 def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
     fuzzy_result = len(item.matches) > 0
     return TextBlockMatch(

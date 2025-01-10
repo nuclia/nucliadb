@@ -25,7 +25,8 @@ from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
-from nucliadb.search.search.find import find
+from nucliadb.search.search.find import find, query_parser_from_find_request
+from nucliadb.search.search.graph_strategy import build_graph_response, rank_relations
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
@@ -36,6 +37,7 @@ from nucliadb_models.search import (
     ChatContextMessage,
     ChatOptions,
     FindRequest,
+    GraphStrategy,
     KnowledgeboxFindResults,
     NucliaDBClientType,
     PreQueriesStrategy,
@@ -73,6 +75,81 @@ async def rephrase_query(
         generative_model=generative_model,
     )
     return await predict.rephrase_query(kbid, req)
+
+
+async def get_graph_results(
+    *,
+    kbid: str,
+    query: str,
+    item: AskRequest,
+    ndb_client: NucliaDBClientType,
+    user: str,
+    origin: str,
+    graph_strategy: GraphStrategy,
+    generative_model: Optional[str] = None,
+    metrics: RAGMetrics = RAGMetrics(),
+    shards: Optional[list[str]] = None,
+) -> tuple[KnowledgeboxFindResults, QueryParser]:
+    # TODO: Multi hop
+
+    # 1. Get relations from entities in query
+    # TODO: Send flag to predict entities to use DA entities once available
+    relations = await get_relations_results(
+        kbid=kbid,
+        text_answer=query,
+        timeout=5.0,
+        target_shard_replicas=shards,
+        only_with_metadata=True,
+        # use_da_entities=True,
+    )
+    """
+    Relations(entities={'Ministry of Environment': EntitySubgraph(related_to=[DirectionalRelation(entity='Ordesa National Park', entity_type=<EntityType.ENTITY: 'entity'>, relation=<RelationType.OTHER: 'OTHER'>, relation_label='subsidiary', direction=<RelationDirection.OUT: 'out'>), DirectionalRelation(entity='National_parks_of_Spain', entity_type=<EntityType.ENTITY: 'entity'>, relation=<RelationType.OTHER: 'OTHER'>, relation_label='subsidiary', direction=<RelationDirection.OUT: 'out'>), DirectionalRelation(entity='cfcde433fc2a4e388360d3d32b03729f', entity_type=<EntityType.RESOURCE: 'resource'>, relation=<RelationType.ENTITY: 'ENTITY'>, relation_label='', direction=<RelationDirection.IN: 'in'>)])})
+    """
+    import pdb
+
+    pdb.set_trace()
+
+    #
+    # 2. Rank the relations and get the top_k
+    # TODO: Evaluate using suggest
+    pruned_relations = await rank_relations(
+        relations, query, kbid, user, top_k=graph_strategy.top_k, generative_model=generative_model
+    )
+
+    import pdb
+
+    pdb.set_trace()
+
+    # 3. Get the text for the top_k relations
+    # XXX: We could use the location of head entity and tail entity to get the text instead
+    # that would result in way less text to retrieve
+    paragraph_ids = {
+        r.metadata.paragraph_id
+        for r in pruned_relations.entities.values()
+        for r in r.related_to
+        if r.metadata and r.metadata.paragraph_id
+    }
+    find_request = find_request_from_ask_request(item, query)
+    query_parser, rank_fusion, reranker = await query_parser_from_find_request(
+        kbid, find_request, generative_model=generative_model
+    )
+    find_results = await build_graph_response(
+        paragraph_ids,
+        kbid=kbid,
+        query=query,
+        final_relations=pruned_relations,
+        top_k=graph_strategy.top_k,
+        reranker=reranker,
+        show=find_request.show,
+        extracted=find_request.extracted,
+        field_type_filter=find_request.field_type_filter,
+    )
+    import pdb
+
+    pdb.set_trace()
+    # TODO: Report using RAGMetrics
+
+    return find_results, query_parser
 
 
 async def get_find_results(
@@ -144,15 +221,7 @@ async def get_find_results(
     return main_results, prequeries_results, query_parser
 
 
-async def run_main_query(
-    kbid: str,
-    query: str,
-    item: AskRequest,
-    ndb_client: NucliaDBClientType,
-    user: str,
-    origin: str,
-    metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, QueryParser]:
+def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     find_request = FindRequest()
     find_request.resource_filters = item.resource_filters
     find_request.features = []
@@ -188,7 +257,19 @@ async def run_main_query(
     find_request.show_hidden = item.show_hidden
 
     # this executes the model validators, that can tweak some fields
-    FindRequest.model_validate(find_request)
+    return FindRequest.model_validate(find_request)
+
+
+async def run_main_query(
+    kbid: str,
+    query: str,
+    item: AskRequest,
+    ndb_client: NucliaDBClientType,
+    user: str,
+    origin: str,
+    metrics: RAGMetrics = RAGMetrics(),
+) -> tuple[KnowledgeboxFindResults, QueryParser]:
+    find_request = find_request_from_ask_request(item, query)
 
     find_results, incomplete, query_parser = await find(
         kbid,
@@ -210,6 +291,7 @@ async def get_relations_results(
     text_answer: str,
     target_shard_replicas: Optional[list[str]],
     timeout: Optional[float] = None,
+    only_with_metadata: bool = False,
 ) -> Relations:
     try:
         predict = get_predict()
@@ -233,7 +315,9 @@ async def get_relations_results(
             retry_on_primary=False,
         )
         relations_results: list[RelationSearchResponse] = [result.relation for result in results]
-        return await merge_relations_results(relations_results, request.relation_subgraph)
+        return await merge_relations_results(
+            relations_results, request.relation_subgraph, only_with_metadata
+        )
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error getting relations results")
