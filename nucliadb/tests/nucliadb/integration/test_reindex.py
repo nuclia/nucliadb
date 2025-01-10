@@ -79,9 +79,7 @@ async def _test_reindex(
         )
 
     shard_manager = KBShardManager()
-    results = await shard_manager.apply_for_all_shards(
-        kbid, partial(clean_shard, [rid]), timeout=5, use_nidx=False
-    )
+    results = await shard_manager.apply_for_all_shards(kbid, partial(clean_shard, [rid]), timeout=5)
     for result in results:
         assert not isinstance(result, Exception)
 
@@ -135,7 +133,7 @@ async def test_reindex_vector_duplication(
     shard_manager = KBShardManager()
     shards = await shard_manager.get_shards_by_kbid(kbid)
     assert len(shards) == 1
-    node, shard_replica_id = manager.choose_node(shards[0], use_nidx=False)
+    node, shard_replica_id = manager.choose_node(shards[0])
 
     ids_before = {}
     async with datamanagers.with_ro_transaction() as txn:

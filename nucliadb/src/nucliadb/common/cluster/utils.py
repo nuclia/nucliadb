@@ -26,13 +26,8 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import (
     KBShardManager,
     StandaloneKBShardManager,
-    clear_index_nodes,
 )
 from nucliadb.common.cluster.settings import settings
-from nucliadb.common.cluster.standalone.service import (
-    start_grpc as start_standalone_grpc,
-)
-from nucliadb.common.cluster.standalone.utils import is_index_node
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import nodereader_pb2, writer_pb2
 from nucliadb_utils import const
@@ -60,9 +55,6 @@ async def setup_cluster() -> Union[KBShardManager, StandaloneKBShardManager]:
 
         mng: Union[KBShardManager, StandaloneKBShardManager]
         if settings.standalone_mode:
-            if is_index_node():
-                server = await start_standalone_grpc()
-                set_utility(_STANDALONE_SERVER, server)
             mng = StandaloneKBShardManager()
         else:
             mng = KBShardManager()
@@ -78,8 +70,6 @@ async def teardown_cluster():
     if std_server is not None:
         await std_server.stop(None)
         clean_utility(_STANDALONE_SERVER)
-
-    clear_index_nodes()
 
 
 def get_shard_manager() -> KBShardManager:

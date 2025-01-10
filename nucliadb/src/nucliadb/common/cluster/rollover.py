@@ -138,63 +138,18 @@ async def create_rollover_shards(
     # create new shards
     created_shards = []
     try:
-        nodes = cluster_manager.sorted_primary_nodes(ignore_nodes=drain_nodes)
         for shard in kb_shards.shards:
             shard.ClearField("replicas")
-            # Attempt to create configured number of replicas
-            replicas_created = 0
-            while replicas_created < settings.node_replicas:
-                if len(nodes) == 0:
-                    # could have multiple shards on single node
-                    nodes = cluster_manager.sorted_primary_nodes(ignore_nodes=drain_nodes)
-                node_id = nodes.pop(0)
+            vectorsets = {
+                vectorset_id: vectorset_config.vectorset_index_config
+                async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
+            }
 
-                node = get_index_node(node_id)
-                if node is None:
-                    logger.error(f"Node {node_id} is not found or not available")
-                    continue
-
-                vectorsets = {
-                    vectorset_id: vectorset_config.vectorset_index_config
-                    async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
-                        txn, kbid=kbid
-                    )
-                }
-                try:
-                    if not vectorsets:
-                        is_matryoshka = len(kb_shards.model.matryoshka_dimensions) > 0
-                        vector_index_config = nodewriter_pb2.VectorIndexConfig(
-                            similarity=kb_shards.similarity,
-                            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-                            vector_dimension=kb_shards.model.vector_dimension,
-                            normalize_vectors=is_matryoshka,
-                        )
-                        shard_created = await node.new_shard(
-                            kbid,
-                            vector_index_config=vector_index_config,
-                        )
-                    else:
-                        shard_created = await node.new_shard_with_vectorsets(
-                            kbid,
-                            vectorsets_configs=vectorsets,
-                        )
-                except Exception as e:
-                    errors.capture_exception(e)
-                    logger.exception(f"Error creating new shard at {node}")
-                    continue
-
-                replica = writer_pb2.ShardReplica(node=str(node_id))
-                replica.shard.CopyFrom(shard_created)
-                shard.replicas.append(replica)
-                created_shards.append(shard)
-                replicas_created += 1
-
-            if nidx_node:
-                nidx_shard = await nidx_node.new_shard_with_vectorsets(
-                    kbid,
-                    vectorsets_configs=vectorsets,
-                )
-                shard.nidx_shard_id = nidx_shard.id
+            nidx_shard = await nidx_node.new_shard_with_vectorsets(
+                kbid,
+                vectorsets_configs=vectorsets,
+            )
+            shard.nidx_shard_id = nidx_shard.id
 
     except Exception as e:
         errors.capture_exception(e)
@@ -621,16 +576,6 @@ async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> N
         await txn.commit()
 
 
-async def wait_for_cluster_ready() -> None:
-    node_ready_checks = 0
-    while len(cluster_manager.INDEX_NODES) == 0:
-        if node_ready_checks > 10:
-            raise Exception("No index nodes available")
-        logger.info("Waiting for index nodes to be available")
-        await asyncio.sleep(1)
-        node_ready_checks += 1
-
-
 async def rollover_kb_index(
     app_context: ApplicationContext, kbid: str, drain_nodes: Optional[list[str]] = None
 ) -> None:
@@ -654,8 +599,6 @@ async def rollover_kb_index(
     - Validate that all resources are in the new kb index
     - Clean up indexed data
     """
-    await wait_for_cluster_ready()
-
     extra = {"kbid": kbid, "external_index_provider": None}
     external = await get_external_index_manager(kbid, for_rollover=True)
     if external is not None:

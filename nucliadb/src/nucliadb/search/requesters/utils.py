@@ -123,7 +123,6 @@ async def node_query(
         try:
             node, shard_id = cluster_manager.choose_node(
                 shard_obj,
-                use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": kbid}),
                 use_read_replica_nodes=use_read_replica_nodes,
                 target_shard_replicas=target_shard_replicas,
             )

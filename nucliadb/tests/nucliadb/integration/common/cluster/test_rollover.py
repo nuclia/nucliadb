@@ -93,10 +93,7 @@ async def _test_rollover_kb_index(
     assert resp.status_code == 200, resp.text
     shards_body2 = resp.json()
     # check that shards have changed
-    assert (
-        shards_body1["shards"][0]["replicas"][0]["shard"]["id"]
-        != shards_body2["shards"][0]["replicas"][0]["shard"]["id"]
-    )
+    assert shards_body1["shards"][0]["nidx_shard_id"] != shards_body2["shards"][0]["nidx_shard_id"]
 
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",

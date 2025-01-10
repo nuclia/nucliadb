@@ -31,11 +31,10 @@ import pytest
 from grpc import aio
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NIDX_ENABLED, NidxUtility
+from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -139,26 +138,27 @@ async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
 
 @pytest.fixture(scope="function")
 def fake_node(indexing_utility: IndexingUtility, shard_manager):
-    manager.INDEX_NODES.clear()
-    manager.add_index_node(
-        id=str(uuid.uuid4()),
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-    )
-    manager.add_index_node(
-        id=str(uuid.uuid4()),
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-    )
+    raise Exception("Don't use this fixture")
+    # manager.INDEX_NODES.clear()
+    # manager.add_index_node(
+    #     id=str(uuid.uuid4()),
+    #     address="nohost",
+    #     shard_count=0,
+    #     available_disk=100,
+    #     dummy=True,
+    # )
+    # manager.add_index_node(
+    #     id=str(uuid.uuid4()),
+    #     address="nohost",
+    #     shard_count=0,
+    #     available_disk=100,
+    #     dummy=True,
+    # )
 
     with patch.object(cluster_settings, "standalone_mode", False):
         yield
 
-    manager.INDEX_NODES.clear()
+    # manager.INDEX_NODES.clear()
 
 
 @pytest.fixture()
@@ -279,8 +279,7 @@ async def dummy_nidx_utility():
         async def index(self, msg):
             pass
 
-    if NIDX_ENABLED:
-        set_utility(Utility.NIDX, DummyNidxUtility())
+    set_utility(Utility.NIDX, DummyNidxUtility())
 
     yield
 
