@@ -4,7 +4,6 @@ nucliadb-utils[storages,fastapi,cache]
 nucliadb-protos
 nucliadb-models
 nucliadb-admin-assets>=1.0.0.post1224
-nucliadb-node-binding>=2.26.0
 nuclia-models>=0.24.2
 
 # external dependencies
