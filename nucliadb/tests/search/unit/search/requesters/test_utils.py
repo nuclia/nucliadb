@@ -31,34 +31,6 @@ from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_ut
 
 
 @pytest.fixture
-def fake_nodes():
-    from nucliadb.common.cluster import manager
-
-    original = manager.INDEX_NODES
-    manager.INDEX_NODES.clear()
-
-    manager.add_index_node(
-        id="node-0",
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-    )
-    manager.add_index_node(
-        id="node-replica-0",
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-        primary_id="node-0",
-    )
-
-    yield (["node-0"], ["node-replica-0"])
-
-    manager.INDEX_NODES = original
-
-
-@pytest.fixture
 def shard_manager():
     original = get_utility(Utility.SHARD_MANAGER)
 
@@ -96,72 +68,11 @@ def faulty_search_methods():
         yield faulty_methods
 
 
-async def test_node_query_retries_primary_if_secondary_fails(
-    fake_nodes,
-    shard_manager,
-    faulty_search_methods,
-):
-    """Setting up a node and a faulty replica, validate primary is queried if
-    secondary fails.
-
-    """
-    pb_query = nodereader_pb2.SearchRequest(shard="shard-id", body="question")
-    results, incomplete_results, queried_nodes = await utils.node_query(
-        kbid="my-kbid",
-        method=utils.Method.SEARCH,
-        pb_query=pb_query,
-        use_read_replica_nodes=True,
-    )
-    # secondary fails, primary is called
-    assert faulty_search_methods[utils.Method.SEARCH].await_count == 2
-    assert len(queried_nodes) == 2
-    assert queried_nodes[0][0].is_read_replica()
-    assert not queried_nodes[1][0].is_read_replica()
-
-
 @pytest.fixture()
 def mocked_search_methods():
     methods = {utils.Method.SEARCH: AsyncMock()}
     with patch.dict(utils.METHODS, methods, clear=True):
         yield methods
-
-
-async def test_node_dont_retry_if_secondary_succeeds(
-    fake_nodes,
-    shard_manager,
-    mocked_search_methods,
-):
-    results, incomplete_results, queried_nodes = await utils.node_query(
-        kbid="my-kbid",
-        method=utils.Method.SEARCH,
-        pb_query=Mock(),
-        use_read_replica_nodes=True,
-    )
-    # secondary succeeds, no fallback call to primary
-    assert mocked_search_methods[utils.Method.SEARCH].await_count == 1
-    assert len(queried_nodes) == 1
-    assert queried_nodes[0][0].is_read_replica()
-
-
-def test_debug_nodes_info(fake_nodes: tuple[list[str], list[str]]):
-    from nucliadb.common.cluster import manager
-
-    primary = manager.get_index_node(fake_nodes[0][0])
-    assert primary is not None
-    secondary = manager.get_index_node(fake_nodes[1][0])
-    assert secondary is not None
-
-    info = utils.debug_nodes_info([(primary, "shard-a"), (secondary, "shard-b")])
-    assert len(info) == 2
-
-    primary_keys = ["id", "shard_id", "address"]
-    secondary_keys = primary_keys + ["primary_id"]
-
-    for key in primary_keys:
-        assert key in info[0]
-
-    for key in secondary_keys:
-        assert key in info[1]
 
 
 def test_validate_node_query_results():

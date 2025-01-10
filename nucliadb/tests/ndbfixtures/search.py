@@ -59,7 +59,7 @@ from tests.ndbfixtures.utils import create_api_client_factory, global_utility
 async def cluster_nucliadb_search(
     storage: Storage,
     nats_server: str,
-    node,
+    nidx,
     maindb_driver: Driver,
     transaction_utility: TransactionUtility,
 ):
@@ -76,24 +76,10 @@ async def cluster_nucliadb_search(
         patch.dict(manager.INDEX_NODES, clear=True),
     ):
         async with application.router.lifespan_context(application):
-            # Make sure is clean
-            delay = 0.1
-            timeout = datetime.timedelta(seconds=30)
-            start = datetime.datetime.now()
-
-            await asyncio.sleep(delay)
-            while len(manager.INDEX_NODES) < 2:
-                print("awaiting cluster nodes - search fixtures.py")
-                await asyncio.sleep(delay)
-                if (datetime.datetime.now() - start) > timeout:
-                    raise Exception("No cluster")
-
             client_factory = create_api_client_factory(application)
             async with client_factory(roles=[NucliaDBRoles.READER]) as client:
                 yield client
 
-        # Make sure nodes can sync
-        await asyncio.sleep(delay)
         # TODO: fix this awful global state manipulation
         clear_ingest_cache()
         clear_global_cache()
