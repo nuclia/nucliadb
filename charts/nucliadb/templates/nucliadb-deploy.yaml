@@ -1,18 +1,15 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: nucliadb
   labels:
     app: nucliadb
-    appType: node
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
   replicas: {{ .Values.replicas }}
-  podManagementPolicy: Parallel
-  serviceName: nucliadb
   selector:
     matchLabels:
       app: nucliadb
@@ -84,6 +81,8 @@ spec:
           {{- if .Values.envSecrets }}
 {{ toYaml .Values.envSecrets | indent 10 }}
           {{- end }}
+          - name: NIDX_ENABLED
+            value: "1"
           - name: DATA_PATH
             value: "/data"
           - name: standalone_node_role
@@ -107,17 +106,3 @@ spec:
           containerPort: 10009
         resources:
 {{ toYaml .Values.resources | indent 10 }}
-        volumeMounts:
-        - name: ndb-pv
-          mountPath: /data
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: ndb-pv
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: {{ .Values.storage.class }}
-      resources:
-        requests:
-          storage: {{ .Values.storage.size }}

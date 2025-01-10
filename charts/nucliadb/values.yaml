@@ -21,12 +21,16 @@ env:
   cluster_discovery_mode: kubernetes
   cluster_discovery_kubernetes_namespace: nucliadb
   cluster_discovery_kubernetes_selector: "app.kubernetes.io/name=node"
-  # when we're k8s, we want structured logs to 
+  nidx_api_address: nidx:10000
+  nidx_searcher_address: nidx:10001
+  nidx_indexer_address: nidx:10002
+  # when we're k8s, we want structured logs to
   # stdout so they can be scraped by log exporters
   log_output_type: stdout
   log_format_type: structured
 
-envFrom: # Additonal configmaps and secrets to mount into the environment
+# Additional configmaps and secrets to mount into the environment
+envFrom:
   # - configMapRef:
   #     name: configMapName
   # - secretRef:
@@ -61,3 +65,11 @@ service:
   # Tune this to have the k8s service expose a different port. By default is 8080
   #   http_port: 80
   http_port: 8080
+
+# Configuration for the index node
+nidx:
+  image: nuclia/nidx
+  imageVersion:
+  env: {}
+  envSecrets: {}
+  envFrom: {}
