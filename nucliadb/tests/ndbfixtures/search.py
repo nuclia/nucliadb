@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-import datetime
 from typing import AsyncIterable
 from unittest.mock import patch
 

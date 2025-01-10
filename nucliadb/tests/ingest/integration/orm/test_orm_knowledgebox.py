@@ -226,7 +226,7 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
 async def test_knowledgebox_delete_all_kb_keys(
     storage,
     cache,
-    fake_node,
+    dummy_nidx_utility,
     maindb_driver,
     knowledgebox_ingest: str,
 ):

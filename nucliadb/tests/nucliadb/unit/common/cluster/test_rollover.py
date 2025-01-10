@@ -22,8 +22,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
-from nucliadb.common.cluster import manager, rollover
-from nucliadb.common.cluster.index_node import IndexNode
+from nucliadb.common.cluster import rollover
 from nucliadb.common.datamanagers.rollover import RolloverState
 from nucliadb_protos import writer_pb2
 

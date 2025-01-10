@@ -33,14 +33,12 @@ from grpc import aio
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
-from nucliadb.ingest.settings import DriverSettings
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
@@ -92,7 +90,7 @@ class IngestFixture:
 
 @pytest.fixture(scope="function")
 async def ingest_consumers(
-    maindb_settings: DriverSettings,
+    maindb_driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
     dummy_nidx_utility,
@@ -109,7 +107,7 @@ async def ingest_consumers(
 
 @pytest.fixture(scope="function")
 async def ingest_processed_consumer(
-    maindb_settings: DriverSettings,
+    maindb_driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
     dummy_nidx_utility,

@@ -32,7 +32,6 @@ from nats.aio.client import Client
 from nats.js import JetStreamContext
 from nats.js.api import StreamConfig
 
-from nucliadb.common.nidx import get_nidx
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer.auditing import (
@@ -114,7 +113,7 @@ def kbid(
     yield knowledgebox_ingest
 
 
-async def test_ingest_messages_autocommit(kbid: str, processor):
+async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utility):
     rid = str(uuid.uuid4())
     message1: BrokerMessage = BrokerMessage(
         kbid=kbid,
@@ -206,10 +205,9 @@ async def test_ingest_messages_autocommit(kbid: str, processor):
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=1)
 
-    index = get_nidx()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(index.index.mock_calls[0][1][0])
+    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
     assert pb.texts["a/summary"].text == "My summary"
 
 

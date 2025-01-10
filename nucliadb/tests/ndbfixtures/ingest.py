@@ -92,8 +92,3 @@ async def ingest_grpc_server(
     )
     await servicer.finalize()
     await server.stop(None)
-
-
-@pytest.fixture(scope="function")
-def dummy_index(dummy_nidx_utility):
-    yield
