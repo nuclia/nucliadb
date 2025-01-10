@@ -95,7 +95,8 @@ async def ingest_consumers(
     maindb_settings: DriverSettings,
     transaction_utility: TransactionUtility,
     storage: Storage,
-    fake_node,
+    dummy_nidx_utility,
+    indexing_utility,
     nats_manager: NatsConnectionManager,
 ):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
@@ -111,7 +112,8 @@ async def ingest_processed_consumer(
     maindb_settings: DriverSettings,
     transaction_utility: TransactionUtility,
     storage: Storage,
-    fake_node,
+    dummy_nidx_utility,
+    indexing_utility,
     nats_manager: NatsConnectionManager,
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
