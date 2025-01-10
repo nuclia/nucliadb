@@ -28,6 +28,7 @@ from pydantic import BaseModel
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -346,7 +347,7 @@ async def extend_prompt_context_with_origin_metadata(context, kbid, text_block_i
         if resource is not None:
             pb_origin = await resource.get_origin()
             if pb_origin is not None:
-                origin = Origin.from_message(pb_origin)
+                origin = from_proto.origin(pb_origin)
         return rid, origin
 
     rids = {tb_id.rid for tb_id in text_block_ids}
@@ -433,7 +434,7 @@ async def extend_prompt_context_with_extra_metadata(context, kbid, text_block_id
         if resource is not None:
             pb_extra = await resource.get_extra()
             if pb_extra is not None:
-                extra = Extra.from_message(pb_extra)
+                extra = from_proto.extra(pb_extra)
         return rid, extra
 
     rids = {tb_id.rid for tb_id in text_block_ids}

@@ -18,29 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Dict, List, Optional, Type, TypeVar
+from typing import Dict, List, Optional
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
-
-from nucliadb_protos import knowledgebox_pb2
-
-_T = TypeVar("_T")
 
 
 class Entity(BaseModel):
     value: str
     merged: bool = False
     represents: List[str] = []
-
-    @classmethod
-    def from_message(cls: Type[_T], message: knowledgebox_pb2.Entity) -> _T:
-        entity = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        return cls(**entity)
 
 
 class EntitiesGroupSummary(BaseModel):
@@ -57,18 +43,6 @@ class EntitiesGroupSummary(BaseModel):
         description="This field is deprecated and will be removed in future versions. It will always be empty. Use the /api/v1/kb/{kbid}/entitiesgroup/{group} endpoint to get the entities of a group.",  # noqa: E501
     )
 
-    @classmethod
-    def from_message(
-        cls: Type[_T],
-        message: knowledgebox_pb2.EntitiesGroupSummary,
-    ) -> _T:
-        entitiesgroup = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        return cls(**entitiesgroup)
-
 
 class EntitiesGroup(BaseModel):
     title: Optional[str] = Field(default=None, description="Title of the entities group")
@@ -78,24 +52,6 @@ class EntitiesGroup(BaseModel):
     )
     custom: bool = Field(default=False, description="Denotes if it has been created by the user")
     entities: Dict[str, Entity] = {}
-
-    @classmethod
-    def from_message(
-        cls: Type[_T],
-        message: knowledgebox_pb2.EntitiesGroup,
-    ) -> _T:
-        entities_group = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        entities_group["entities"] = {}
-
-        for name, entity in message.entities.items():
-            if not entity.deleted:
-                entities_group["entities"][name] = Entity.from_message(entity)
-
-        return cls(**entities_group)
 
 
 class KnowledgeBoxEntities(BaseModel):

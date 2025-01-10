@@ -67,8 +67,14 @@ impl VectorIndexer {
         index_resource(vectorset_resource, output_dir, config)
     }
 
-    pub fn deletions_for_resource(&self, resource: &Resource) -> Vec<String> {
-        resource.sentences_to_delete.clone()
+    pub fn deletions_for_resource(&self, resource: &Resource, index_name: &str) -> Vec<String> {
+        if let Some(prefixes) = resource.vector_prefixes_to_delete.get(index_name) {
+            prefixes.items.clone()
+        } else {
+            // DEPRECATED: Bw/c while moving from sentences_to_delete to vector_prefixes_to_delete
+            #[allow(deprecated)]
+            resource.sentences_to_delete.clone()
+        }
     }
 
     #[instrument(name = "vector::merge", skip_all)]

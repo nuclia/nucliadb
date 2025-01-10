@@ -23,13 +23,14 @@ from typing import Optional
 import nucliadb_models as models
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
-from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import (
     ConversationFieldData,
     ConversationFieldExtractedData,
@@ -64,7 +65,7 @@ async def set_resource_field_extracted_data(
     if ExtractedDataTypeName.TEXT in wanted_extracted_data:
         data_et = await field.get_extracted_text()
         if data_et is not None:
-            field_data.text = models.ExtractedText.from_message(data_et)
+            field_data.text = from_proto.extracted_text(data_et)
 
     metadata_wanted = ExtractedDataTypeName.METADATA in wanted_extracted_data
     shortened_metadata_wanted = ExtractedDataTypeName.SHORTENED_METADATA in wanted_extracted_data
@@ -72,24 +73,24 @@ async def set_resource_field_extracted_data(
         data_fcm = await field.get_field_metadata()
 
         if data_fcm is not None:
-            field_data.metadata = models.FieldComputedMetadata.from_message(
+            field_data.metadata = from_proto.field_computed_metadata(
                 data_fcm, shortened=shortened_metadata_wanted and not metadata_wanted
             )
 
     if ExtractedDataTypeName.LARGE_METADATA in wanted_extracted_data:
         data_lcm = await field.get_large_field_metadata()
         if data_lcm is not None:
-            field_data.large_metadata = models.LargeComputedMetadata.from_message(data_lcm)
+            field_data.large_metadata = from_proto.large_computed_metadata(data_lcm)
 
     if ExtractedDataTypeName.VECTOR in wanted_extracted_data:
         data_vec = await field.get_vectors()
         if data_vec is not None:
-            field_data.vectors = models.VectorObject.from_message(data_vec)
+            field_data.vectors = from_proto.vector_object(data_vec)
 
     if ExtractedDataTypeName.QA in wanted_extracted_data:
         qa = await field.get_question_answers()
         if qa is not None:
-            field_data.question_answers = models.FieldQuestionAnswers.from_message(qa)
+            field_data.question_answers = from_proto.field_question_answers(qa)
 
     if (
         isinstance(field, File)
@@ -98,7 +99,7 @@ async def set_resource_field_extracted_data(
     ):
         data_fed = await field.get_file_extracted_data()
         if data_fed is not None:
-            field_data.file = models.FileExtractedData.from_message(data_fed)
+            field_data.file = from_proto.file_extracted_data(data_fed)
 
     if (
         isinstance(field, Link)
@@ -107,7 +108,7 @@ async def set_resource_field_extracted_data(
     ):
         data_led = await field.get_link_extracted_data()
         if data_led is not None:
-            field_data.link = models.LinkExtractedData.from_message(data_led)
+            field_data.link = from_proto.link_extracted_data(data_led)
 
 
 async def serialize(
@@ -174,14 +175,12 @@ async def managed_serialize(
                 else None
             )
 
-            resource.metadata = models.Metadata.from_message(orm_resource.basic.metadata)
-            resource.usermetadata = models.UserMetadata.from_message(orm_resource.basic.usermetadata)
+            resource.metadata = from_proto.metadata(orm_resource.basic.metadata)
+            resource.usermetadata = from_proto.user_metadata(orm_resource.basic.usermetadata)
             resource.fieldmetadata = [
-                models.UserFieldMetadata.from_message(fm) for fm in orm_resource.basic.fieldmetadata
+                from_proto.user_field_metadata(fm) for fm in orm_resource.basic.fieldmetadata
             ]
-            resource.computedmetadata = models.ComputedMetadata.from_message(
-                orm_resource.basic.computedmetadata
-            )
+            resource.computedmetadata = from_proto.computed_metadata(orm_resource.basic.computedmetadata)
 
             resource.last_seqid = orm_resource.basic.last_seqid
 
@@ -195,18 +194,18 @@ async def managed_serialize(
         await orm_resource.get_relations()
         if orm_resource.relations is not None:
             resource.relations = [
-                models.Relation.from_message(relation) for relation in orm_resource.relations.relations
+                from_proto.relation(relation) for relation in orm_resource.relations.relations
             ]
 
     if ResourceProperties.ORIGIN in show:
         await orm_resource.get_origin()
         if orm_resource.origin is not None:
-            resource.origin = models.Origin.from_message(orm_resource.origin)
+            resource.origin = from_proto.origin(orm_resource.origin)
 
     if ResourceProperties.EXTRA in show:
         await orm_resource.get_extra()
         if orm_resource.extra is not None:
-            resource.extra = models.Extra.from_message(orm_resource.extra)
+            resource.extra = from_proto.extra(orm_resource.extra)
 
     include_errors = ResourceProperties.ERRORS in show
 
@@ -221,7 +220,7 @@ async def managed_serialize(
         await orm_resource.get_fields()
         resource.data = ResourceData()
         for (field_type, _), field in orm_resource.fields.items():
-            field_type_name = FIELD_TYPES_MAP[field_type]
+            field_type_name = from_proto.field_type_name(field_type)
             if field_type_name not in field_type_filter:
                 continue
 
@@ -236,9 +235,7 @@ async def managed_serialize(
                 if field.id not in resource.data.texts:
                     resource.data.texts[field.id] = TextFieldData()
                 if include_value:
-                    serialized_value = (
-                        models.FieldText.from_message(value) if value is not None else None
-                    )
+                    serialized_value = from_proto.field_text(value) if value is not None else None
                     resource.data.texts[field.id].value = serialized_value
                 if include_errors:
                     error = await field.get_error()
@@ -259,7 +256,7 @@ async def managed_serialize(
                     resource.data.files[field.id] = FileFieldData()
                 if include_value:
                     if value is not None:
-                        resource.data.files[field.id].value = models.FieldFile.from_message(value)
+                        resource.data.files[field.id].value = from_proto.field_file(value)
                     else:
                         resource.data.files[field.id].value = None
 
@@ -282,7 +279,7 @@ async def managed_serialize(
                 if field.id not in resource.data.links:
                     resource.data.links[field.id] = LinkFieldData()
                 if include_value and value is not None:
-                    resource.data.links[field.id].value = models.FieldLink.from_message(value)
+                    resource.data.links[field.id].value = from_proto.field_link(value)
 
                 if include_errors:
                     error = await field.get_error()
@@ -310,9 +307,7 @@ async def managed_serialize(
                         )
                 if include_value and isinstance(field, Conversation):
                     value = await field.get_metadata()
-                    resource.data.conversations[field.id].value = models.FieldConversation.from_message(
-                        value
-                    )
+                    resource.data.conversations[field.id].value = from_proto.field_conversation(value)
                 if include_extracted_data:
                     resource.data.conversations[field.id].extracted = ConversationFieldExtractedData()
                     await set_resource_field_extracted_data(

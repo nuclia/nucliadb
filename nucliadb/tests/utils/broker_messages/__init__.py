@@ -42,6 +42,7 @@ class BrokerMessageBuilder:
         kbid: str,
         rid: Optional[str] = None,
         slug: Optional[str] = None,
+        source: Optional[wpb.BrokerMessage.MessageSource.ValueType] = None,
     ):
         self.bm = wpb.BrokerMessage()
         self.fields: dict[tuple[str, rpb.FieldType.ValueType], FieldBuilder] = {}
@@ -49,8 +50,11 @@ class BrokerMessageBuilder:
         self.bm.kbid = kbid
         self.bm.type = wpb.BrokerMessage.AUTOCOMMIT
 
-        # if first BM comes from PROCESSOR, it'll be ignored as it's out of order
-        self.bm.source = wpb.BrokerMessage.MessageSource.WRITER
+        if source is not None:
+            self.bm.source = source
+        else:
+            # if first BM comes from PROCESSOR, it'll be ignored as it's out of order
+            self.bm.source = wpb.BrokerMessage.MessageSource.WRITER
 
         if rid is None:
             rid = str(uuid4())
@@ -141,6 +145,12 @@ class BrokerMessageBuilder:
                 file_field = self.bm.files[field.id.field]
                 file_field.added.FromDatetime(datetime.now())
                 file_field.file.source = rpb.CloudFile.Source.EXTERNAL
+            elif (
+                field.id.field_type == rpb.FieldType.LINK
+                and self.bm.source == wpb.BrokerMessage.MessageSource.PROCESSOR
+            ):
+                # we don't need to do anything else
+                pass
             else:
                 raise Exception("Unsupported field type")
 

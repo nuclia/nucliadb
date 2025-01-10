@@ -23,9 +23,9 @@ from starlette.requests import Request
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils import from_proto
 from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_models.resource import (
-    KnowledgeBoxConfig,
     KnowledgeBoxList,
     KnowledgeBoxObj,
     KnowledgeBoxObjSummary,
@@ -72,7 +72,7 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
         return KnowledgeBoxObj(
             uuid=kbid,
             slug=kb_config.slug,
-            config=KnowledgeBoxConfig.from_message(kb_config),
+            config=from_proto.knowledgebox_config(kb_config),
         )
 
 
@@ -99,5 +99,5 @@ async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
         return KnowledgeBoxObj(
             uuid=kbid,
             slug=kb_config.slug,
-            config=KnowledgeBoxConfig.from_message(kb_config),
+            config=from_proto.knowledgebox_config(kb_config),
         )

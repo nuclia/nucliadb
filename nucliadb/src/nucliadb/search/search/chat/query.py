@@ -20,6 +20,7 @@
 import asyncio
 from typing import Optional
 
+from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
 from nucliadb.search.predict import AnswerStatusCode
 from nucliadb.search.requesters.utils import Method, node_query
@@ -362,7 +363,7 @@ def maybe_audit_chat(
     audit.chat(
         kbid,
         user_id,
-        client_type.to_proto(),
+        to_proto.client_type(client_type),
         origin,
         question=user_query,
         generative_answer_time=generative_answer_time,

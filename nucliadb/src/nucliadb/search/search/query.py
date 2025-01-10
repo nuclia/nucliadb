@@ -57,7 +57,6 @@ from nucliadb_models.search import (
     MinScore,
     SearchOptions,
     SortField,
-    SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
@@ -388,7 +387,7 @@ class QueryParser:
         else:
             request.result_per_page = self.top_k
 
-        sort_field = SortFieldMap[self.sort.field] if self.sort else None
+        sort_field = get_sort_field_proto(self.sort.field) if self.sort else None
         if sort_field is not None:
             request.order.sort_by = sort_field
             request.order.type = SortOrderMap[self.sort.order]  # type: ignore
@@ -910,3 +909,12 @@ async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optio
                 matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
 
         return matryoshka_dimension
+
+
+def get_sort_field_proto(obj: SortField) -> Optional[nodereader_pb2.OrderBy.OrderField.ValueType]:
+    return {
+        SortField.SCORE: None,
+        SortField.CREATED: nodereader_pb2.OrderBy.OrderField.CREATED,
+        SortField.MODIFIED: nodereader_pb2.OrderBy.OrderField.MODIFIED,
+        SortField.TITLE: None,
+    }[obj]

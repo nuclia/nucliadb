@@ -392,8 +392,17 @@ pub struct Resource {
     >,
     #[prost(string, repeated, tag = "7")]
     pub paragraphs_to_delete: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// DEPRECATED: replaced by vector_prefixes_to_delete in order to support
+    /// updates on a subset of the available vectorsets
+    #[deprecated]
     #[prost(string, repeated, tag = "8")]
     pub sentences_to_delete: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// vectorset_id -> \[vector_key_prefix, ...\]
+    #[prost(map = "string, message", tag = "15")]
+    pub vector_prefixes_to_delete: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        StringList,
+    >,
     /// Relations
     #[prost(message, repeated, tag = "9")]
     pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,
@@ -509,4 +518,10 @@ pub mod node_metadata {
         #[prost(float, tag = "2")]
         pub load_score: f32,
     }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StringList {
+    #[prost(string, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }

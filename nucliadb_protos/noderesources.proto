@@ -165,7 +165,12 @@ message Resource {
     map<string, IndexParagraphs> paragraphs = 6; // Paragraphs by field
 
     repeated string paragraphs_to_delete = 7;
-    repeated string sentences_to_delete = 8;
+    // DEPRECATED: replaced by vector_prefixes_to_delete in order to support
+    // updates on a subset of the available vectorsets
+    repeated string sentences_to_delete = 8 [deprecated = true];
+    // vectorset_id -> [vector_key_prefix, ...]
+    map<string, StringList> vector_prefixes_to_delete = 15;
+
 
     // Relations
     repeated utils.Relation relations = 9;
@@ -195,4 +200,8 @@ message NodeMetadata {
     optional string primary_node_id = 5;
     uint64 available_disk = 6;
     uint64 total_disk = 7;
+}
+
+message StringList {
+    repeated string items = 1;
 }

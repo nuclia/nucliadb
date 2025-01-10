@@ -19,23 +19,12 @@
 #
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, List, Optional, Type, TypeVar
+from typing import List, Optional
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
 
 from nucliadb_models import CloudLink, FieldRef, FileB64
 from nucliadb_models.utils import DateTime
-from nucliadb_protos import resources_pb2
-
-_T = TypeVar("_T")
-
-
-if TYPE_CHECKING:  # pragma: no cover
-    MessageFormatValue = resources_pb2.MessageContent.Format.V
-else:
-    MessageFormatValue = int
-
 
 # Shared classes
 
@@ -81,18 +70,6 @@ class Conversation(BaseModel):
 
     messages: Optional[List[Message]] = []
 
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.Conversation) -> _T:
-        as_dict = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        for conv_message in as_dict.get("messages", []):
-            for attachment_field in conv_message.get("content", {}).get("attachments_fields", []):
-                attachment_field["field_type"] = attachment_field["field_type"].lower()
-        return cls(**as_dict)
-
 
 class FieldConversation(BaseModel):
     """
@@ -105,16 +82,6 @@ class FieldConversation(BaseModel):
     pages: Optional[int] = None
     size: Optional[int] = None
     total: Optional[int] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.FieldConversation) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
 
 
 # Creation and update classes (Those used on writer endpoints)
@@ -143,7 +110,7 @@ class InputConversationField(BaseModel):
 # Processing classes (Those used to sent to push endpoints)
 
 
-class PushMessageFormat(MessageFormatValue, Enum):  # type: ignore
+class PushMessageFormat(int, Enum):
     PLAIN = 0
     HTML = 1
     MARKDOWN = 2
