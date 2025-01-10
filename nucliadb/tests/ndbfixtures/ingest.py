@@ -95,5 +95,5 @@ async def ingest_grpc_server(
 
 
 @pytest.fixture(scope="function")
-def dummy_index(fake_node, dummy_nidx_utility):
+def dummy_index(dummy_nidx_utility):
     yield
