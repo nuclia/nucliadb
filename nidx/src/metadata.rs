@@ -20,6 +20,7 @@
 
 mod deletion;
 mod index;
+mod index_request;
 mod merge_job;
 mod segment;
 mod shard;
@@ -28,6 +29,7 @@ use std::time::Duration;
 
 pub use deletion::*;
 pub use index::*;
+pub use index_request::*;
 pub use merge_job::*;
 pub use segment::*;
 pub use shard::*;
