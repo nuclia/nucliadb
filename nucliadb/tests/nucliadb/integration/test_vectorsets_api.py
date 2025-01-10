@@ -146,6 +146,11 @@ async def test_vectorset_migration(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
 ):
+    """Test workflow for adding a vectorset to an existing KB and ingesting
+    partial updates (only for the new vectors).
+
+    """
+
     # Create a KB
     resp = await nucliadb_manager.post(
         "/kbs",
