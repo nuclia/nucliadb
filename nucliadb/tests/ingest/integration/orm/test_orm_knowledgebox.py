@@ -192,6 +192,7 @@ async def test_delete_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
     shard_manager: cluster_manager.KBShardManager,
+    dummy_nidx_utility,
 ):
     kbid, _ = await KnowledgeBox.create(
         maindb_driver,

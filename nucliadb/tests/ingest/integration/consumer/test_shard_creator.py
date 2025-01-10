@@ -29,7 +29,7 @@ async def test_shard_auto_create(
     maindb_driver,
     pubsub,
     storage,
-    fake_node,
+    dummy_nidx_utility,
     knowledgebox_ingest,
 ):
     from nucliadb.common.cluster.settings import settings
