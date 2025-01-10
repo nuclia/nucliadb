@@ -137,7 +137,7 @@ async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
 
 
 @pytest.fixture(scope="function")
-def fake_nidx(indexing_utility: IndexingUtility, shard_manager):
+def fake_nidx():
     class FakeNidx:
         api_client = AsyncMock()
         searcher_client = AsyncMock()
@@ -147,7 +147,7 @@ def fake_nidx(indexing_utility: IndexingUtility, shard_manager):
     fake.api_client.NewShard.return_value.id = "00000"
 
     with patch.dict(MAIN, values={Utility.NIDX: fake}, clear=False):
-        yield
+        yield fake
 
 
 @pytest.fixture()

@@ -43,47 +43,13 @@ def test_should_create_new_shard():
     assert sm.should_create_new_shard(**high_para_counter) is True
 
 
-@pytest.fixture(scope="function")
-async def fake_node():
-    manager.INDEX_NODES.clear()
-    yield manager.add_index_node(
-        id="node-0",
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-    )
-    manager.INDEX_NODES.clear()
-
-
-async def test_standalone_node_garbage_collects(fake_node):
-    mng = manager.StandaloneKBShardManager()
-
-    mng.max_ops_before_checks = 0
-
-    await mng.add_resource(
-        writer_pb2.ShardObject(
-            shard="123",
-            replicas=[writer_pb2.ShardReplica(shard=writer_pb2.ShardCreated(id="123"), node="node-0")],
-        ),
-        resource=MagicMock(),
-        txid=-1,
-        partition=0,
-        kb="kb",
-    )
-
-    await asyncio.sleep(0.05)
-    assert len(fake_node.writer.calls["GC"]) == 1
-
-
-async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
+async def test_shard_creation(fake_nidx, txn: Transaction):
     """Given a cluster of index nodes, validate shard creation logic.
 
     Every logic shard should create a configured amount of indexing replicas and
     update the information about writable shards.
 
     """
-    index_nodes = set(fake_index_nodes)
     kbid = f"kbid:{test_shard_creation.__name__}"
     sm = manager.KBShardManager()
 
@@ -106,7 +72,6 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     assert shards.shards[0].read_only is False
     # B/c with Shards.actual
     assert shards.actual == 0
-    assert set((replica.node for replica in shards.shards[0].replicas)) == index_nodes
 
     # adding a second shard will mark the first as read only
     await sm.create_shard_by_kbid(txn, kbid)
@@ -118,7 +83,6 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     assert shards.shards[1].read_only is False
     # B/c with Shards.actual
     assert shards.actual == 1
-    assert set((replica.node for replica in shards.shards[1].replicas)) == index_nodes
 
     # adding a third one will be equivalent
     await sm.create_shard_by_kbid(txn, kbid)
@@ -131,7 +95,6 @@ async def test_shard_creation(fake_index_nodes: list[str], txn: Transaction):
     assert shards.shards[2].read_only is False
     # B/c with Shards.actual
     assert shards.actual == 2
-    assert set((replica.node for replica in shards.shards[1].replicas)) == index_nodes
 
 
 @pytest.fixture
@@ -147,23 +110,3 @@ def txn():
             self.store[key] = value
 
     yield MockTransaction()
-
-
-@pytest.fixture(scope="function")
-def fake_index_nodes():
-    assert len(manager.INDEX_NODES) == 0, "Some test isn't cleaning global state!"
-
-    nodes = [f"node-{i}" for i in range(settings.node_replicas)]
-    for node_id in nodes:
-        manager.add_index_node(
-            id=node_id,
-            address=f"nohost-{str(uuid.uuid4())}:1234",
-            shard_count=0,
-            available_disk=100,
-            dummy=True,
-        )
-
-    yield nodes
-
-    for node_id in nodes:
-        manager.remove_index_node(node_id)
