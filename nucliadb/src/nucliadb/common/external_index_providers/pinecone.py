@@ -441,6 +441,7 @@ class PineconeIndexManager(ExternalIndexManager):
 
     def get_prefixes_to_delete(self, index_data: Resource) -> set[str]:
         prefixes_to_delete = set()
+        # TODO: migrate to vector_prefixes_to_delete
         for field_id in index_data.sentences_to_delete:
             try:
                 delete_vid = VectorId.from_string(field_id)

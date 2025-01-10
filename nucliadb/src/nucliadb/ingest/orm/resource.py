@@ -226,6 +226,7 @@ class Resource:
                             page_positions=page_positions,
                             extracted_text=await field_obj.get_extracted_text(),
                             basic_user_field_metadata=user_field_metadata,
+                            replace_field=True,
                         )
 
         # Some basic fields are computed off field metadata.
@@ -336,6 +337,7 @@ class Resource:
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
                     basic_user_field_metadata=user_field_metadata,
+                    replace_field=reindex,
                 )
 
             if self.disable_vectors is False:
@@ -584,6 +586,7 @@ class Resource:
         # Upload to binary storage
         # Vector indexing
         if self.disable_vectors is False:
+            await self.get_fields(force=True)
             for field_vectors in message.field_vectors:
                 await self._apply_extracted_vectors(field_vectors)
 
@@ -723,6 +726,7 @@ class Resource:
             page_positions=page_positions,
             extracted_text=extracted_text,
             basic_user_field_metadata=user_field_metadata,
+            replace_field=True,
         )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(_executor, apply_field_metadata)

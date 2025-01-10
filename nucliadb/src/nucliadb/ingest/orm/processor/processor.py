@@ -275,7 +275,6 @@ class Processor:
 
                     if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
                         resource = await kb.get(uuid)
-
                         if resource is None:
                             # It's a new resource
                             resource = await kb.add_resource(uuid, message.slug, message.basic)
@@ -737,7 +736,11 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
     """
     Returns True if the index message has any vectors to index or to delete.
     """
-    if len(index_message.sentences_to_delete) > 0 or len(index_message.paragraphs_to_delete) > 0:
+    if (
+        len(index_message.sentences_to_delete) > 0
+        or len(index_message.paragraphs_to_delete) > 0
+        or any([len(deletions.items) for deletions in index_message.vector_prefixes_to_delete.values()])
+    ):
         return True
     for field_paragraphs in index_message.paragraphs.values():
         for paragraph in field_paragraphs.paragraphs.values():

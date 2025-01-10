@@ -28,6 +28,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardId as ShardId,
     ShardIds as ShardIds,
     ShardMetadata as ShardMetadata,
+    StringList as StringList,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
     VectorSetID as VectorSetID,

@@ -100,6 +100,8 @@ class ResourceBrain:
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
         basic_user_field_metadata: Optional[UserFieldMetadata] = None,
+        *,
+        replace_field: bool = False,
     ):
         # To check for duplicate paragraphs
         unique_paragraphs: set[str] = set()
@@ -224,6 +226,11 @@ class ResourceBrain:
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
+        if replace_field:
+            field_type, field_name = field_key.split("/")
+            full_field_id = ids.FieldId(rid=self.rid, type=field_type, key=field_name).full()
+            self.brain.paragraphs_to_delete.append(full_field_id)
+
         for relations in metadata.metadata.relations:
             for relation in relations.relations:
                 self.brain.relations.append(relation)
@@ -301,8 +308,11 @@ class ResourceBrain:
 
         if replace_field:
             full_field_id = ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
-            self.brain.sentences_to_delete.append(full_field_id)
-            self.brain.paragraphs_to_delete.append(full_field_id)
+            if vectorset is None:
+                # DEPRECATED
+                self.brain.sentences_to_delete.append(full_field_id)
+            else:
+                self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
 
     def _apply_field_vector(
         self,
