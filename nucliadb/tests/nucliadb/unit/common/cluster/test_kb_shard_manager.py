@@ -43,7 +43,7 @@ def test_should_create_new_shard():
     assert sm.should_create_new_shard(**high_para_counter) is True
 
 
-async def test_shard_creation(fake_nidx, txn: Transaction):
+async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     """Given a cluster of index nodes, validate shard creation logic.
 
     Every logic shard should create a configured amount of indexing replicas and

@@ -136,20 +136,6 @@ async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
     await pubsub.finalize()
 
 
-@pytest.fixture(scope="function")
-def fake_nidx():
-    class FakeNidx:
-        api_client = AsyncMock()
-        searcher_client = AsyncMock()
-        index = AsyncMock()
-
-    fake = FakeNidx()
-    fake.api_client.NewShard.return_value.id = "00000"
-
-    with patch.dict(MAIN, values={Utility.NIDX: fake}, clear=False):
-        yield fake
-
-
 @pytest.fixture()
 def learning_config():
     from nucliadb_utils.settings import nuclia_settings
@@ -258,21 +244,17 @@ async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator
 
 @pytest.fixture(scope="function")
 async def dummy_nidx_utility():
-    class DummyNidxUtility(NidxUtility):
-        async def initialize(self):
-            pass
+    class FakeNidx:
+        api_client = AsyncMock()
+        searcher_client = AsyncMock()
+        index = AsyncMock()
+        finalize = AsyncMock()
 
-        async def finalize(self):
-            pass
+    fake = FakeNidx()
+    fake.api_client.NewShard.return_value.id = "00000"
 
-        async def index(self, msg):
-            pass
-
-    set_utility(Utility.NIDX, DummyNidxUtility())
-
-    yield
-
-    clean_utility(Utility.NIDX)
+    with patch.dict(MAIN, values={Utility.NIDX: fake}, clear=False):
+        yield fake
 
 
 @pytest.fixture(scope="function")
@@ -501,7 +483,7 @@ def make_extracted_vectors(field_id, vectorset=None, vectorset_idx=None):
 
 
 @pytest.fixture(scope="function")
-async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox_ingest: str, fake_node):
+async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox_ingest: str):
     """
     Create a resource that has every possible bit of information
     """

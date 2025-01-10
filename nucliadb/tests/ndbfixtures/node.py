@@ -138,32 +138,6 @@ images.settings["nidx"] = {
 }
 
 
-@pytest.fixture(scope="function")
-async def dummy_index_node_cluster(
-    # TODO: change this to more explicit dummy indexing utility
-    indexing_utility,
-):
-    with (
-        patch.dict(manager.INDEX_NODES, clear=True),
-        patch.object(cluster_settings, "standalone_mode", False),
-    ):
-        manager.add_index_node(
-            id=str(uuid.uuid4()),
-            address="nohost",
-            shard_count=0,
-            available_disk=100,
-            dummy=True,
-        )
-        manager.add_index_node(
-            id=str(uuid.uuid4()),
-            address="nohost",
-            shard_count=0,
-            available_disk=100,
-            dummy=True,
-        )
-        yield
-
-
 def get_container_host(container_obj):
     return container_obj.attrs["NetworkSettings"]["IPAddress"]
 

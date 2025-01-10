@@ -101,7 +101,6 @@ async def knowledgebox_writer(knowledgebox_by_api: str):
 async def full_resource(
     storage: Storage,
     maindb_driver: Driver,
-    dummy_index_node_cluster,
     knowledgebox: str,
 ) -> AsyncIterator[Resource]:
     """Create a resource in `knowledgebox` that has every possible bit of information.

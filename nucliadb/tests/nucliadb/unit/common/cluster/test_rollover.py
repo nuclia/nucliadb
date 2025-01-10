@@ -169,19 +169,19 @@ def app_context(rollover_datamanager, resources_datamanager):
 
 
 async def test_create_rollover_shards(
-    app_context, shards: writer_pb2.Shards, rollover_datamanager, fake_nidx
+    app_context, shards: writer_pb2.Shards, rollover_datamanager, dummy_nidx_utility
 ):
     new_shards = await rollover.create_rollover_shards(app_context, "kbid")
 
     assert new_shards.kbid == "kbid"
-    assert fake_nidx.api_client.NewShard.call_count == len(shards.shards)
+    assert dummy_nidx_utility.api_client.NewShard.call_count == len(shards.shards)
     rollover_datamanager.update_kb_rollover_shards.assert_called_with(
         ANY, kbid="kbid", kb_shards=new_shards
     )
 
 
 async def test_create_rollover_index_does_not_recreate(
-    app_context, shards: writer_pb2.Shards, rollover_datamanager, fake_nidx
+    app_context, shards: writer_pb2.Shards, rollover_datamanager, dummy_nidx_utility
 ):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
     rollover_datamanager.get_rollover_state.return_value = RolloverState(
