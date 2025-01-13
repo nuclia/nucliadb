@@ -53,12 +53,12 @@ RUN set -eux; \
 # are updated. The generated requirements.txt does not, so it is
 # more cacheable.
 FROM python:3.12 AS requirements
-RUN pip install pdm
+RUN pip install pdm==2.22.1
 COPY pdm.lock pyproject.toml .
 RUN pdm export --prod --no-hashes | grep -v ^-e | grep -v nidx_protos > requirements.lock.txt
 
 FROM python:3.12
-RUN pip install pdm
+RUN pip install pdm==2.22.1
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
