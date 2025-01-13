@@ -685,9 +685,8 @@ class Resource:
 
     async def _should_update_resource_title_from_file_metadata(self) -> bool:
         """
-        We only want to update resource title from file metadata if the
-        title is empty, equal to the resource uuid or equal to the filename of the single
-        file in the resource.
+        We only want to update resource title from file metadata if the title is empty,
+        equal to the resource uuid or equal to any of the file filenames in the resource.
         """
         basic = await self.get_basic()
         if basic is None:
@@ -699,19 +698,16 @@ class Resource:
         if current_title == self.uuid:
             # If the title is the same as the resource uuid, we should update it
             return True
-        single_file_filename = None
         fields = await self.get_fields(force=True)
-        file_fields = [
-            field_obj for (field_type, _), field_obj in fields.items() if field_type == FieldType.FILE
-        ]
-        if len(file_fields) == 1:
-            # Update the title if there is only one file field in the resource
-            field_obj = file_fields[0]
-            field_value: Optional[FieldFile] = await field_obj.get_value()
-            if field_value is not None:
-                single_file_filename = field_value.file.filename
-        if single_file_filename is not None and current_title == single_file_filename:
-            # If the title is the same as the single file filename, we should update it.
+        filenames = set()
+        for (field_type, _), field_obj in fields.items():
+            if field_type == FieldType.FILE:
+                field_value: Optional[FieldFile] = await field_obj.get_value()
+                if field_value is not None:
+                    if field_value.file.filename not in ("", None):
+                        filenames.add(field_value.file.filename)
+        if current_title in filenames:
+            # If the title is equal to any of the file filenames, we should update it
             return True
         return False
 
