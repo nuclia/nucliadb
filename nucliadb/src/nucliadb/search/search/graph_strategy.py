@@ -31,6 +31,11 @@ from nuclia_models.predict.generative_responses import (
 )
 
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.chat.query import (
+    find_request_from_ask_request,
+    get_relations_results_from_entities,
+)
+from nucliadb.search.search.find import query_parser_from_find_request
 from nucliadb.search.search.find_merge import (
     compose_find_resources,
     hydrate_and_rerank,
@@ -38,22 +43,28 @@ from nucliadb.search.search.find_merge import (
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.merge import merge_suggest_results
+from nucliadb.search.search.metrics import RAGMetrics
+from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.rerankers import Reranker, RerankingOptions
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
+    AskRequest,
     ChatModel,
     DirectionalRelation,
     EntitySubgraph,
+    GraphStrategy,
     KnowledgeboxFindResults,
     KnowledgeboxSuggestResults,
+    NucliaDBClientType,
     RelationDirection,
     Relations,
     ResourceProperties,
     UserPrompt,
 )
 from nucliadb_protos import nodereader_pb2
+from nucliadb_protos.utils_pb2 import RelationNode
 
 SCHEMA = {
     "title": "score_triplets",
@@ -266,6 +277,141 @@ Now, let's get started! Here are the triplets you need to score:
 **Input**
 
 """
+
+
+async def get_graph_results(
+    *,
+    kbid: str,
+    query: str,
+    item: AskRequest,
+    ndb_client: NucliaDBClientType,
+    user: str,
+    origin: str,
+    graph_strategy: GraphStrategy,
+    generative_model: Optional[str] = None,
+    metrics: RAGMetrics = RAGMetrics(),
+    shards: Optional[list[str]] = None,
+) -> tuple[KnowledgeboxFindResults, QueryParser]:
+    # TODO: Timing using RAGMetrics
+    # TODO: Exception handling
+    # 1. Get relations from entities in query
+    # TODO: Send flag to predict entities to use DA entities once available
+    # TODO: Set this as an optional mode
+    # relations = await get_relations_results(
+    #     kbid=kbid,
+    #     text_answer=query,
+    #     timeout=5.0,
+    #     target_shard_replicas=shards,
+    #     only_with_metadata=True,
+    #     # use_da_entities=True,
+    # )
+    suggest_result = await fuzzy_search_entities(
+        kbid=kbid,
+        query=query,
+        show=[],
+        field_type_filter=item.field_type_filter,
+        range_creation_start=item.range_creation_start,
+        range_creation_end=item.range_creation_end,
+        range_modification_start=item.range_modification_start,
+        range_modification_end=item.range_modification_end,
+        target_shard_replicas=shards,
+    )
+
+    # Convert them to RelationNode in order to perform a relations query
+    if suggest_result.entities is not None:
+        relation_nodes = (
+            RelationNode(ntype=RelationNode.NodeType.ENTITY, value=result.value, subtype=result.family)
+            for result in suggest_result.entities.entities
+        )
+        relations = await get_relations_results_from_entities(
+            kbid=kbid,
+            entities=relation_nodes,
+            target_shard_replicas=shards,
+            timeout=5.0,
+            only_with_metadata=True,
+        )
+    else:
+        relations = Relations(entities={})
+    # TODO: Apply process_subgraph to the relations
+
+    explored_entities = set(relations.entities.keys())
+
+    # 2. Rank the relations and get the top_k
+    # TODO: Add upper bound to the number of entities to explore for safety
+    relations = await rank_relations(
+        relations, query, kbid, user, top_k=graph_strategy.top_k, generative_model=generative_model
+    )
+
+    for hop in range(graph_strategy.hops - 1):
+        entities_to_explore: list[RelationNode] = []
+        # Find neighbors of the pruned relations and remove the ones already explored
+        for subgraph in relations.entities.values():
+            for relation in subgraph.related_to:
+                if relation.entity not in explored_entities:
+                    entities_to_explore.append(
+                        RelationNode(
+                            ntype=RelationNode.NodeType.ENTITY,
+                            value=relation.entity,
+                            subtype=relation.entity_subtype,
+                        )
+                    )
+
+        # Get the relations for the new entities
+        new_relations = await get_relations_results_from_entities(
+            kbid=kbid,
+            entities=entities_to_explore,
+            target_shard_replicas=shards,
+            timeout=5.0,
+            only_with_metadata=True,
+        )
+
+        # Removing the relations connected to the entities that were already explored
+        # XXX: This could be optimized by implementing a filter in the index
+        # so we don't have to remove them after
+        new_subgraphs = {
+            entity: filter_subgraph(subgraph, explored_entities)
+            for entity, subgraph in new_relations.entities.items()
+        }
+        if not new_subgraphs or any(not subgraph.related_to for subgraph in new_subgraphs.values()):
+            break
+
+        explored_entities.update(new_subgraphs.keys())
+        relations.entities.update(new_subgraphs)
+
+        # Rank the new relations
+        relations = await rank_relations(
+            relations,
+            query,
+            kbid,
+            user,
+            top_k=graph_strategy.top_k,
+            generative_model=generative_model,
+        )
+
+    # 3. Get the text for the top_k relations
+    paragraph_ids = {
+        r.metadata.paragraph_id
+        for rel in relations.entities.values()
+        for r in rel.related_to
+        if r.metadata and r.metadata.paragraph_id
+    }
+    find_request = find_request_from_ask_request(item, query)
+    query_parser, rank_fusion, reranker = await query_parser_from_find_request(
+        kbid, find_request, generative_model=generative_model
+    )
+    find_results = await build_graph_response(
+        paragraph_ids,
+        kbid=kbid,
+        query=query,
+        final_relations=relations,
+        top_k=graph_strategy.top_k,
+        reranker=reranker,
+        show=find_request.show,
+        extracted=find_request.extracted,
+        field_type_filter=find_request.field_type_filter,
+    )
+
+    return find_results, query_parser
 
 
 async def fuzzy_search_entities(

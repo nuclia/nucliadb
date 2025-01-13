@@ -48,7 +48,6 @@ from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
     get_find_results,
-    get_graph_results,
     get_relations_results,
     rephrase_query,
     sorted_prompt_context_list,
@@ -58,6 +57,7 @@ from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
 )
+from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict

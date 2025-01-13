@@ -471,6 +471,8 @@ async def test_search_relations(
                     "relation": "ENTITY",
                     "relation_label": "write",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "Poetry",
@@ -478,6 +480,8 @@ async def test_search_relations(
                     "relation": "ENTITY",
                     "relation_label": "like",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "Joan Antoni",
@@ -485,6 +489,8 @@ async def test_search_relations(
                     "relation": "ENTITY",
                     "relation_label": "read",
                     "direction": "in",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
             ]
         },
@@ -496,6 +502,8 @@ async def test_search_relations(
                     "relation": "ENTITY",
                     "relation_label": "formulate",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "Physics",
@@ -503,6 +511,8 @@ async def test_search_relations(
                     "relation": "ENTITY",
                     "relation_label": "study",
                     "direction": "out",
+                    "entity_subtype": "science",
+                    "metadata": None,
                 },
             ]
         },
@@ -536,6 +546,8 @@ async def test_search_relations(
                     "relation": "ENTITY",
                     "relation_label": "species",
                     "direction": "in",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "Swallow",
@@ -543,6 +555,8 @@ async def test_search_relations(
                     "relation": "ENTITY",
                     "relation_label": "species",
                     "direction": "in",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
             ]
         },
@@ -644,6 +658,8 @@ async def test_search_automatic_relations(
                     "relation": "COLAB",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "PERSON",
+                    "metadata": None,
                 },
                 {
                     "entity": "Anne",
@@ -651,6 +667,8 @@ async def test_search_automatic_relations(
                     "relation": "COLAB",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "John",
@@ -658,6 +676,8 @@ async def test_search_automatic_relations(
                     "relation": "COLAB",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "cat",
@@ -665,6 +685,8 @@ async def test_search_automatic_relations(
                     "relation": "ENTITY",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "ANIMAL",
+                    "metadata": None,
                 },
                 {
                     "entity": "label",
@@ -672,6 +694,8 @@ async def test_search_automatic_relations(
                     "relation": "ABOUT",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "animals/cat",
@@ -679,6 +703,8 @@ async def test_search_automatic_relations(
                     "relation": "ABOUT",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "food/cookie",
@@ -686,6 +712,8 @@ async def test_search_automatic_relations(
                     "relation": "ABOUT",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "sub-document",
@@ -693,6 +721,8 @@ async def test_search_automatic_relations(
                     "relation": "CHILD",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "",
+                    "metadata": None,
                 },
                 {
                     "entity": "other",
@@ -700,6 +730,8 @@ async def test_search_automatic_relations(
                     "relation": "OTHER",
                     "relation_label": "",
                     "direction": "out",
+                    "entity_subtype": "things",
+                    "metadata": None,
                 },
             ]
         }
@@ -709,7 +741,7 @@ async def test_search_automatic_relations(
         assert entity in entities
         assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
 
-        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(
+        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(  # type: ignore
             entities[entity]["related_to"], key=lambda x: x["entity"]
         )
 
@@ -739,6 +771,8 @@ async def test_search_automatic_relations(
                     "relation": "COLAB",
                     "relation_label": "",
                     "direction": "in",
+                    "entity_subtype": "",
+                    "metadata": None,
                 }
             ]
         }
@@ -748,7 +782,7 @@ async def test_search_automatic_relations(
         assert entity in entities
         assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
 
-        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(
+        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(  # type: ignore
             entities[entity]["related_to"], key=lambda x: x["entity"]
         )
 
