@@ -29,6 +29,7 @@ from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find, query_parser_from_find_request
 from nucliadb.search.search.graph_strategy import (
     build_graph_response,
+    filter_subgraph,
     fuzzy_search_entities,
     rank_relations,
 )
@@ -96,7 +97,6 @@ async def get_graph_results(
     metrics: RAGMetrics = RAGMetrics(),
     shards: Optional[list[str]] = None,
 ) -> tuple[KnowledgeboxFindResults, QueryParser]:
-    # TODO: Multi hop
     # TODO: Timing using RAGMetrics
     # TODO: Exception handling
     # 1. Get relations from entities in query
@@ -119,6 +119,7 @@ async def get_graph_results(
         range_creation_end=item.range_creation_end,
         range_modification_start=item.range_modification_start,
         range_modification_end=item.range_modification_end,
+        target_shard_replicas=shards,
     )
     # Convert them to RelationNode in order to perform a relations query
     if suggest_result.entities is not None:
@@ -135,22 +136,67 @@ async def get_graph_results(
         )
     else:
         relations = Relations(entities={})
+    # TODO: Apply process_subgraph to the relations
+
+    explored_entities = set(relations.entities.keys())
 
     # 2. Rank the relations and get the top_k
-    explored_entities = {}
-    pruned_relations = await rank_relations(
+    # TODO: Add upper bound to the number of entities to explore for safety
+    relations = await rank_relations(
         relations, query, kbid, user, top_k=graph_strategy.top_k, generative_model=generative_model
     )
 
-    import pdb
+    for hop in range(graph_strategy.hops - 1):
+        entities_to_explore: list[RelationNode] = []
+        # Find neighbors of the pruned relations and remove the ones already explored
+        for subgraph in relations.entities.values():
+            for relation in subgraph.related_to:
+                if relation.entity not in explored_entities:
+                    entities_to_explore.append(
+                        RelationNode(
+                            ntype=RelationNode.NodeType.ENTITY,
+                            value=relation.entity,
+                            subtype=relation.entity_subtype,
+                        )
+                    )
 
-    pdb.set_trace()
+        # Get the relations for the new entities
+        new_relations = await get_relations_results_from_entities(
+            kbid=kbid,
+            entities=entities_to_explore,
+            target_shard_replicas=shards,
+            timeout=5.0,
+            only_with_metadata=True,
+        )
+
+        # Removing the relations connected to the entities that were already explored
+        # XXX: This could be optimized by implementing a filter in the index
+        # so we don't have to remove them after
+        new_subgraphs = {
+            entity: filter_subgraph(subgraph, explored_entities)
+            for entity, subgraph in new_relations.entities.items()
+        }
+        if not new_subgraphs or any(not subgraph.related_to for subgraph in new_subgraphs.values()):
+            break
+
+        explored_entities.update(new_subgraphs.keys())
+        relations.entities.update(new_subgraphs)
+
+        # Rank the new relations
+        relations = await rank_relations(
+            relations,
+            query,
+            kbid,
+            user,
+            top_k=graph_strategy.top_k,
+            generative_model=generative_model,
+        )
 
     # 3. Get the text for the top_k relations
     paragraph_ids = {
         r.metadata.paragraph_id
-        for r in pruned_relations.entities.values()
-        for r in r.related_to
+        for rel in relations.entities.values()
+        for r in rel.related_to
         if r.metadata and r.metadata.paragraph_id
     }
     find_request = find_request_from_ask_request(item, query)
@@ -161,16 +207,13 @@ async def get_graph_results(
         paragraph_ids,
         kbid=kbid,
         query=query,
-        final_relations=pruned_relations,
+        final_relations=relations,
         top_k=graph_strategy.top_k,
         reranker=reranker,
         show=find_request.show,
         extracted=find_request.extracted,
         field_type_filter=find_request.field_type_filter,
     )
-    import pdb
-
-    pdb.set_trace()
 
     return find_results, query_parser
 

@@ -22,7 +22,7 @@ import heapq
 import json
 from collections import defaultdict
 from datetime import datetime
-from typing import Iterable, Optional
+from typing import Any, Collection, Iterable, Optional, Union
 
 from nuclia_models.predict.generative_responses import (
     JSONGenerativeResponse,
@@ -90,7 +90,7 @@ SCHEMA = {
 }
 
 PROMPT = """\
-You are an advanced language model assisting in scoring relationships (edges) between two entities in a knowledge graph, given a user’s question. 
+You are an advanced language model assisting in scoring relationships (edges) between two entities in a knowledge graph, given a user’s question.
 
 For each provided **(head_entity, relationship, tail_entity)**, you must:
 1. Assign a **relevance score** between **0** and **10**.
@@ -98,7 +98,7 @@ For each provided **(head_entity, relationship, tail_entity)**, you must:
 3. **10** means “this relationship is extremely relevant to the question.”
 4. You may use **any integer** between 0 and 10 (e.g., 3, 7, etc.) based on how relevant you deem the relationship to be.
 5. **Language Agnosticism**: The question and the relationships may be in different languages. The relevance scoring should still work and be agnostic of the language.
-6. Relationships that may not answer the question directly but expand knowledge in a relevant way, should also be scored positively. 
+6. Relationships that may not answer the question directly but expand knowledge in a relevant way, should also be scored positively.
 
 Once you have decided the best score for each triplet, return these results **using a function call** in JSON format with the following rules:
 
@@ -277,6 +277,7 @@ async def fuzzy_search_entities(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
+    target_shard_replicas: Optional[list[str]] = None,
 ) -> KnowledgeboxSuggestResults:
     """Fuzzy find entities in KB given a query using the same methodology as /suggest, but split by words."""
 
@@ -300,7 +301,9 @@ async def fuzzy_search_entities(
         request = nodereader_pb2.SuggestRequest()
         request.CopyFrom(base_request)
         request.body = word
-        tasks.append(node_query(kbid, Method.SUGGEST, request))
+        tasks.append(
+            node_query(kbid, Method.SUGGEST, request, target_shard_replicas=target_shard_replicas)
+        )
 
     # Gather
     # TODO: What do I do with `incomplete_results`?
@@ -320,6 +323,7 @@ async def rank_relations(
     user: str,
     top_k: int,
     generative_model: Optional[str] = None,
+    score_threshold: int = 0,
 ) -> Relations:
     # Store the index for keeping track after scoring
     flat_rels: list[tuple[str, int, DirectionalRelation]] = [
@@ -341,14 +345,25 @@ async def rank_relations(
         }
         for (ent, _, rel) in flat_rels
     ]
+    # Dedupe triplets so that they get evaluated once, we will re-associate the scores later
+    triplet_to_orig_indices: dict[tuple[str, str, str], list[int]] = {}
+    unique_triplets = []
+
+    for i, t in enumerate(triplets):
+        key = (t["head_entity"], t["relationship"], t["tail_entity"])
+        if key not in triplet_to_orig_indices:
+            triplet_to_orig_indices[key] = []
+            unique_triplets.append(t)
+        triplet_to_orig_indices[key].append(i)
+
     data = {
         "question": query,
-        "triplets": triplets,
+        "triplets": unique_triplets,
     }
     prompt = PROMPT + json.dumps(data, indent=4)
 
     predict = get_predict()
-    item = ChatModel(
+    chat_model = ChatModel(
         question=prompt,
         user_id=user,
         json_schema=SCHEMA,
@@ -360,10 +375,10 @@ async def rank_relations(
         generative_model=generative_model,
     )
     # TODO: Enclose this in a try-except block
-    ident, model, answer_stream = await predict.chat_query_ndjson(kbid, item)
+    ident, model, answer_stream = await predict.chat_query_ndjson(kbid, chat_model)
     response_json = None
     status = None
-    meta = None
+    _ = None
 
     async for generative_chunk in answer_stream:
         item = generative_chunk.chunk
@@ -372,7 +387,7 @@ async def rank_relations(
         elif isinstance(item, StatusGenerativeResponse):
             status = item
         elif isinstance(item, MetaGenerativeResponse):
-            meta = item
+            _ = item
         else:
             # TODO: Improve for logging
             raise ValueError(f"Unknown generative chunk type: {item}")
@@ -382,17 +397,37 @@ async def rank_relations(
     if response_json is None or status is None or status.code != "0":
         raise ValueError("No JSON response found")
 
-    scored_triplets = response_json.object["triplets"]
+    scored_unique_triplets: list[dict[str, Union[str, Any]]] = response_json.object["triplets"]
+
+    if len(scored_unique_triplets) != len(unique_triplets):
+        raise ValueError("Mismatch between input and output triplets")
+
+    # Re-expand model scores to the original triplets
+    scored_triplets: list[Optional[dict[str, Any]]] = [None] * len(triplets)
+    for unique_idx, scored_t in enumerate(scored_unique_triplets):
+        h, r, ta = (
+            scored_t["head_entity"],
+            scored_t["relationship"],
+            scored_t["tail_entity"],
+        )
+        for orig_idx in triplet_to_orig_indices[(h, r, ta)]:
+            scored_triplets[orig_idx] = scored_t
+
+    if any(st is None for st in scored_triplets):
+        raise ValueError("Some triplets did not get a score assigned")
 
     if len(scored_triplets) != len(flat_rels):
-        raise ValueError("Mismatch between input and output triplets")
-    scores = ((idx, scored_triplet["score"]) for (idx, scored_triplet) in enumerate(scored_triplets))
+        raise ValueError("Mismatch between input and output triplets after expansion")
+
+    scores = ((idx, t["score"]) for (idx, t) in enumerate(scored_triplets) if t is not None)
+
     top_k_scores = heapq.nlargest(top_k, scores, key=lambda x: x[1])
-    top_k_rels = defaultdict(lambda: EntitySubgraph(related_to=[]))
-    for idx_flat, _ in top_k_scores:
+    top_k_rels: dict[str, EntitySubgraph] = defaultdict(lambda: EntitySubgraph(related_to=[]))
+    for idx_flat, score in top_k_scores:
         (ent, idx, _) = flat_rels[idx_flat]
         rel = relations.entities[ent].related_to[idx]
-        top_k_rels[ent].related_to.append(rel)
+        if score > score_threshold:
+            top_k_rels[ent].related_to.append(rel)
 
     return Relations(entities=top_k_rels)
 
@@ -437,4 +472,14 @@ async def build_graph_response(
         best_matches=best_matches,
         relations=final_relations,
         total=len(text_blocks),
+    )
+
+
+def filter_subgraph(subgraph: EntitySubgraph, entities_to_remove: Collection[str]) -> EntitySubgraph:
+    """
+    Removes the relationships with entities in `entities_to_remove` from the subgraph.
+    """
+    return EntitySubgraph(
+        # TODO: Limit to 150 is temporary, remove it and add a reranker scoring?
+        related_to=[rel for rel in subgraph.related_to if rel.entity not in entities_to_remove][:150]
     )

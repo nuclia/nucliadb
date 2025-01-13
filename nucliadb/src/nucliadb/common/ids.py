@@ -132,7 +132,7 @@ class FieldId:
             # XXX: This is to support field types that are integer values of FieldType
             # Which is how legacy processor relations reported the paragraph_id
             try:
-                type_pb = FieldType.ValueType(_type)
+                type_pb = FieldType.ValueType(int(_type))
             except ValueError:
                 raise ValueError(f"Invalid FieldId: {_type}")
             if type_pb in FIELD_TYPE_PB_TO_STR:

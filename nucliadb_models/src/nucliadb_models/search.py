@@ -238,6 +238,7 @@ class EntityType(str, Enum):
 class DirectionalRelation(BaseModel):
     entity: str
     entity_type: EntityType
+    entity_subtype: str
     relation: RelationType
     relation_label: str
     direction: RelationDirection
@@ -1221,10 +1222,15 @@ class GraphStrategy(RagStrategy):
     """
 
     name: Literal["graph"] = "graph"
-    n_hops: int = Field(
+    hops: int = Field(
         default=1,
         title="Number of hops",
-        description="Number of hops to take when exploring the graph for relevant context. Biggers values will take more time to compute .",
+        description="""Number of hops to take when exploring the graph for relevant context.
+For example,
+- hops=1 will explore the neighbors of the starting entities.
+- hops=2 will explore the neighbors of the neighbors of the starting entities.
+And so on.
+Bigger values will discover more intricate relationships but will also take more time to compute.""",
         ge=1,
     )
     top_k: int = Field(

@@ -468,12 +468,12 @@ def _merge_relations_results(
             relation_type = RelationTypePbMap[relation.relation]
             relation_label = relation.relation_label
             metadata = relation.metadata if relation.HasField("metadata") else None
-
             if (not only_with_metadata or metadata) and origin.value in relations.entities:
                 relations.entities[origin.value].related_to.append(
                     DirectionalRelation(
                         entity=destination.value,
                         entity_type=relation_node_type_to_entity_type(destination.ntype),
+                        entity_subtype=destination.subtype,
                         relation=relation_type,
                         relation_label=relation_label,
                         direction=RelationDirection.OUT,
@@ -485,6 +485,7 @@ def _merge_relations_results(
                     DirectionalRelation(
                         entity=origin.value,
                         entity_type=relation_node_type_to_entity_type(origin.ntype),
+                        entity_subtype=origin.subtype,
                         relation=relation_type,
                         relation_label=relation_label,
                         direction=RelationDirection.IN,
