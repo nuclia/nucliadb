@@ -709,7 +709,7 @@ class Resource:
                 if field_value is not None:
                     single_file_filename = field_value.file.filename
         if single_file_filename is not None and current_title == single_file_filename:
-            # If the title is the same as the single file filename, we should update it
+            # If the title is the same as the single file filename, we should update it.
             return True
         return False
 
@@ -717,8 +717,7 @@ class Resource:
         """
         Update the resource title with the first file that has a title extracted.
         """
-        update = await self._should_update_resource_title_from_file_metadata()
-        if not update:
+        if not await self._should_update_resource_title_from_file_metadata():
             return
         for fed in message.file_extracted_data:
             if fed.title == "":
