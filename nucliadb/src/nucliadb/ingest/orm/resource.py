@@ -701,13 +701,15 @@ class Resource:
             return True
         single_file_filename = None
         fields = await self.get_fields(force=True)
-        if len(fields) == 1:
+        file_fields = [
+            field_obj for (field_type, _), field_obj in fields.items() if field_type == FieldType.FILE
+        ]
+        if len(file_fields) == 1:
             # Update the title if there is only one file field in the resource
-            ((field_type, _), field_obj) = fields.popitem()
-            if field_type == FieldType.FILE:
-                field_value: Optional[FieldFile] = await field_obj.get_value()
-                if field_value is not None:
-                    single_file_filename = field_value.file.filename
+            field_obj = file_fields[0]
+            field_value: Optional[FieldFile] = await field_obj.get_value()
+            if field_value is not None:
+                single_file_filename = field_value.file.filename
         if single_file_filename is not None and current_title == single_file_filename:
             # If the title is the same as the single file filename, we should update it.
             return True
