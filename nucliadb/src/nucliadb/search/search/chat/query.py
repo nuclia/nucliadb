@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional
+from typing import Iterable, Optional
 
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
@@ -27,7 +27,11 @@ from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.exceptions import NoRetrievalResultsError
 from nucliadb.search.search.exceptions import IncompleteFindResultsError
 from nucliadb.search.search.find import find, query_parser_from_find_request
-from nucliadb.search.search.graph_strategy import build_graph_response, rank_relations
+from nucliadb.search.search.graph_strategy import (
+    build_graph_response,
+    fuzzy_search_entities,
+    rank_relations,
+)
 from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
@@ -53,6 +57,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.nodereader_pb2 import RelationSearchResponse, SearchRequest, SearchResponse
+from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.utilities import get_audit
 
@@ -92,27 +97,47 @@ async def get_graph_results(
     shards: Optional[list[str]] = None,
 ) -> tuple[KnowledgeboxFindResults, QueryParser]:
     # TODO: Multi hop
-
+    # TODO: Timing using RAGMetrics
+    # TODO: Exception handling
     # 1. Get relations from entities in query
     # TODO: Send flag to predict entities to use DA entities once available
-    relations = await get_relations_results(
+    # TODO: Set this as an optional mode
+    # relations = await get_relations_results(
+    #     kbid=kbid,
+    #     text_answer=query,
+    #     timeout=5.0,
+    #     target_shard_replicas=shards,
+    #     only_with_metadata=True,
+    #     # use_da_entities=True,
+    # )
+    suggest_result = await fuzzy_search_entities(
         kbid=kbid,
-        text_answer=query,
-        timeout=5.0,
-        target_shard_replicas=shards,
-        only_with_metadata=True,
-        # use_da_entities=True,
+        query=query,
+        show=item.show,  # This show might need to be manually set
+        field_type_filter=item.field_type_filter,
+        range_creation_start=item.range_creation_start,
+        range_creation_end=item.range_creation_end,
+        range_modification_start=item.range_modification_start,
+        range_modification_end=item.range_modification_end,
     )
-    """
-    Relations(entities={'Ministry of Environment': EntitySubgraph(related_to=[DirectionalRelation(entity='Ordesa National Park', entity_type=<EntityType.ENTITY: 'entity'>, relation=<RelationType.OTHER: 'OTHER'>, relation_label='subsidiary', direction=<RelationDirection.OUT: 'out'>), DirectionalRelation(entity='National_parks_of_Spain', entity_type=<EntityType.ENTITY: 'entity'>, relation=<RelationType.OTHER: 'OTHER'>, relation_label='subsidiary', direction=<RelationDirection.OUT: 'out'>), DirectionalRelation(entity='cfcde433fc2a4e388360d3d32b03729f', entity_type=<EntityType.RESOURCE: 'resource'>, relation=<RelationType.ENTITY: 'ENTITY'>, relation_label='', direction=<RelationDirection.IN: 'in'>)])})
-    """
-    import pdb
+    # Convert them to RelationNode in order to perform a relations query
+    if suggest_result.entities is not None:
+        relation_nodes = (
+            RelationNode(ntype=RelationNode.NodeType.ENTITY, value=result.value, subtype=result.family)
+            for result in suggest_result.entities.entities
+        )
+        relations = await get_relations_results_from_entities(
+            kbid=kbid,
+            entities=relation_nodes,
+            target_shard_replicas=suggest_result.shards,
+            timeout=5.0,
+            only_with_metadata=True,
+        )
+    else:
+        relations = Relations(entities={})
 
-    pdb.set_trace()
-
-    #
     # 2. Rank the relations and get the top_k
-    # TODO: Evaluate using suggest
+    explored_entities = {}
     pruned_relations = await rank_relations(
         relations, query, kbid, user, top_k=graph_strategy.top_k, generative_model=generative_model
     )
@@ -122,8 +147,6 @@ async def get_graph_results(
     pdb.set_trace()
 
     # 3. Get the text for the top_k relations
-    # XXX: We could use the location of head entity and tail entity to get the text instead
-    # that would result in way less text to retrieve
     paragraph_ids = {
         r.metadata.paragraph_id
         for r in pruned_relations.entities.values()
@@ -148,7 +171,6 @@ async def get_graph_results(
     import pdb
 
     pdb.set_trace()
-    # TODO: Report using RAGMetrics
 
     return find_results, query_parser
 
@@ -297,32 +319,49 @@ async def get_relations_results(
     try:
         predict = get_predict()
         detected_entities = await predict.detect_entities(kbid, text_answer)
-        request = SearchRequest()
-        request.relation_subgraph.entry_points.extend(detected_entities)
-        request.relation_subgraph.depth = 1
 
-        results: list[SearchResponse]
-        (
-            results,
-            _,
-            _,
-        ) = await node_query(
-            kbid,
-            Method.SEARCH,
-            request,
+        return await get_relations_results_from_entities(
+            kbid=kbid,
+            entities=detected_entities,
             target_shard_replicas=target_shard_replicas,
             timeout=timeout,
-            use_read_replica_nodes=True,
-            retry_on_primary=False,
-        )
-        relations_results: list[RelationSearchResponse] = [result.relation for result in results]
-        return await merge_relations_results(
-            relations_results, request.relation_subgraph, only_with_metadata
+            only_with_metadata=only_with_metadata,
         )
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error getting relations results")
         return Relations(entities={})
+
+
+async def get_relations_results_from_entities(
+    *,
+    kbid: str,
+    entities: Iterable[RelationNode],
+    target_shard_replicas: Optional[list[str]],
+    timeout: Optional[float] = None,
+    only_with_metadata: bool = False,
+) -> Relations:
+    request = SearchRequest()
+    request.relation_subgraph.entry_points.extend(entities)
+    request.relation_subgraph.depth = 1
+    results: list[SearchResponse]
+    (
+        results,
+        _,
+        _,
+    ) = await node_query(
+        kbid,
+        Method.SEARCH,
+        request,
+        target_shard_replicas=target_shard_replicas,
+        timeout=timeout,
+        use_read_replica_nodes=True,
+        retry_on_primary=False,
+    )
+    relations_results: list[RelationSearchResponse] = [result.relation for result in results]
+    return await merge_relations_results(
+        relations_results, request.relation_subgraph, only_with_metadata
+    )
 
 
 def maybe_audit_chat(

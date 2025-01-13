@@ -1,6 +1,27 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+import asyncio
 import heapq
 import json
 from collections import defaultdict
+from datetime import datetime
 from typing import Iterable, Optional
 
 from nuclia_models.predict.generative_responses import (
@@ -9,12 +30,14 @@ from nuclia_models.predict.generative_responses import (
     StatusGenerativeResponse,
 )
 
+from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.find_merge import (
     compose_find_resources,
     hydrate_and_rerank,
     paragraph_id_to_text_block_matches,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
+from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.rerankers import Reranker, RerankingOptions
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
@@ -24,11 +47,13 @@ from nucliadb_models.search import (
     DirectionalRelation,
     EntitySubgraph,
     KnowledgeboxFindResults,
+    KnowledgeboxSuggestResults,
     RelationDirection,
     Relations,
     ResourceProperties,
     UserPrompt,
 )
+from nucliadb_protos import nodereader_pb2
 
 SCHEMA = {
     "title": "score_triplets",
@@ -241,6 +266,51 @@ Now, let's get started! Here are the triplets you need to score:
 **Input**
 
 """
+
+
+async def fuzzy_search_entities(
+    kbid: str,
+    query: str,
+    show: list[ResourceProperties],
+    field_type_filter: list[FieldTypeName],
+    range_creation_start: Optional[datetime] = None,
+    range_creation_end: Optional[datetime] = None,
+    range_modification_start: Optional[datetime] = None,
+    range_modification_end: Optional[datetime] = None,
+) -> KnowledgeboxSuggestResults:
+    """Fuzzy find entities in KB given a query using the same methodology as /suggest, but split by words."""
+
+    base_request = nodereader_pb2.SuggestRequest(
+        body="", features=[nodereader_pb2.SuggestFeatures.ENTITIES]
+    )
+    if range_creation_start is not None:
+        base_request.timestamps.from_created.FromDatetime(range_creation_start)
+    if range_creation_end is not None:
+        base_request.timestamps.to_created.FromDatetime(range_creation_end)
+    if range_modification_start is not None:
+        base_request.timestamps.from_modified.FromDatetime(range_modification_start)
+    if range_modification_end is not None:
+        base_request.timestamps.to_modified.FromDatetime(range_modification_end)
+
+    tasks = []
+    # XXX: Splitting by words is not ideal, in the future, modify suggest to better handle this
+    for word in query.split():
+        if len(word) <= 3:
+            continue
+        request = nodereader_pb2.SuggestRequest()
+        request.CopyFrom(base_request)
+        request.body = word
+        tasks.append(node_query(kbid, Method.SUGGEST, request))
+
+    # Gather
+    # TODO: What do I do with `incomplete_results`?
+    results_raw = await asyncio.gather(*tasks)
+    return await merge_suggest_results(
+        [item for r in results_raw for item in r[0]],
+        kbid=kbid,
+        show=show,
+        field_type_filter=field_type_filter,
+    )
 
 
 async def rank_relations(

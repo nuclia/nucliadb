@@ -23,6 +23,7 @@ import math
 from typing import Any, Optional, Set, Union
 
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import RelationTypePbMap
 from nucliadb.search.search import cache
 from nucliadb.search.search.cut import cut_page
@@ -34,7 +35,6 @@ from nucliadb.search.search.fetch import (
 )
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
-from nucliadb_models.metadata import RelationMetadata
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
@@ -477,7 +477,7 @@ def _merge_relations_results(
                         relation=relation_type,
                         relation_label=relation_label,
                         direction=RelationDirection.OUT,
-                        metadata=RelationMetadata.from_message(metadata) if metadata else None,
+                        metadata=from_proto.relation_metadata(metadata) if metadata else None,
                     )
                 )
             elif (not only_with_metadata or metadata) and destination.value in relations.entities:
@@ -488,7 +488,7 @@ def _merge_relations_results(
                         relation=relation_type,
                         relation_label=relation_label,
                         direction=RelationDirection.IN,
-                        metadata=RelationMetadata.from_message(metadata) if metadata else None,
+                        metadata=from_proto.relation_metadata(metadata) if metadata else None,
                     )
                 )
 
