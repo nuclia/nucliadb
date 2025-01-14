@@ -263,6 +263,44 @@ class Audit(google.protobuf.message.Message):
 global___Audit = Audit
 
 @typing.final
+class Generator(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class Processor(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        def __init__(
+            self,
+        ) -> None: ...
+
+    @typing.final
+    class DataAugmentation(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        def __init__(
+            self,
+        ) -> None: ...
+
+    PROCESSOR_FIELD_NUMBER: builtins.int
+    DATA_AUGMENTATION_FIELD_NUMBER: builtins.int
+    @property
+    def processor(self) -> global___Generator.Processor: ...
+    @property
+    def data_augmentation(self) -> global___Generator.DataAugmentation: ...
+    def __init__(
+        self,
+        *,
+        processor: global___Generator.Processor | None = ...,
+        data_augmentation: global___Generator.DataAugmentation | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["data_augmentation", b"data_augmentation", "generator", b"generator", "processor", b"processor"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["data_augmentation", b"data_augmentation", "generator", b"generator", "processor", b"processor"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["generator", b"generator"]) -> typing.Literal["processor", "data_augmentation"] | None: ...
+
+global___Generator = Generator
+
+@typing.final
 class Error(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -287,10 +325,13 @@ class Error(google.protobuf.message.Message):
     FIELD_TYPE_FIELD_NUMBER: builtins.int
     ERROR_FIELD_NUMBER: builtins.int
     CODE_FIELD_NUMBER: builtins.int
+    GENERATED_BY_FIELD_NUMBER: builtins.int
     field: builtins.str
     field_type: nucliadb_protos.resources_pb2.FieldType.ValueType
     error: builtins.str
     code: global___Error.ErrorCode.ValueType
+    @property
+    def generated_by(self) -> global___Generator: ...
     def __init__(
         self,
         *,
@@ -298,8 +339,10 @@ class Error(google.protobuf.message.Message):
         field_type: nucliadb_protos.resources_pb2.FieldType.ValueType = ...,
         error: builtins.str = ...,
         code: global___Error.ErrorCode.ValueType = ...,
+        generated_by: global___Generator | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["code", b"code", "error", b"error", "field", b"field", "field_type", b"field_type"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["generated_by", b"generated_by"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["code", b"code", "error", b"error", "field", b"field", "field_type", b"field_type", "generated_by", b"generated_by"]) -> None: ...
 
 global___Error = Error
 
@@ -445,6 +488,7 @@ class BrokerMessage(google.protobuf.message.Message):
     EXTRA_FIELD_NUMBER: builtins.int
     QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
     SECURITY_FIELD_NUMBER: builtins.int
+    GENERATED_BY_FIELD_NUMBER: builtins.int
     kbid: builtins.str
     uuid: builtins.str
     slug: builtins.str
@@ -518,6 +562,8 @@ class BrokerMessage(google.protobuf.message.Message):
     def question_answers(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.FieldQuestionAnswerWrapper]: ...
     @property
     def security(self) -> nucliadb_protos.utils_pb2.Security: ...
+    @property
+    def generated_by(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Generator]: ...
     def __init__(
         self,
         *,
@@ -555,9 +601,10 @@ class BrokerMessage(google.protobuf.message.Message):
         extra: nucliadb_protos.resources_pb2.Extra | None = ...,
         question_answers: collections.abc.Iterable[nucliadb_protos.resources_pb2.FieldQuestionAnswerWrapper] | None = ...,
         security: nucliadb_protos.utils_pb2.Security | None = ...,
+        generated_by: collections.abc.Iterable[global___Generator] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "extra", b"extra", "origin", b"origin", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "security", b"security", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "generated_by", b"generated_by", "kbid", b"kbid", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "security", b"security", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
 
 global___BrokerMessage = BrokerMessage
 
@@ -1749,3 +1796,58 @@ class NewKnowledgeBoxV2Response(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["error_message", b"error_message", "status", b"status"]) -> None: ...
 
 global___NewKnowledgeBoxV2Response = NewKnowledgeBoxV2Response
+
+@typing.final
+class FieldError(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_ERROR_FIELD_NUMBER: builtins.int
+    CREATED_FIELD_NUMBER: builtins.int
+    @property
+    def source_error(self) -> global___Error: ...
+    @property
+    def created(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    def __init__(
+        self,
+        *,
+        source_error: global___Error | None = ...,
+        created: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["created", b"created", "source_error", b"source_error"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["created", b"created", "source_error", b"source_error"]) -> None: ...
+
+global___FieldError = FieldError
+
+@typing.final
+class FieldStatus(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldStatus._Status.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        PROCESSING: FieldStatus._Status.ValueType  # 0
+        PROCESSED: FieldStatus._Status.ValueType  # 1
+        ERROR: FieldStatus._Status.ValueType  # 2
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    PROCESSING: FieldStatus.Status.ValueType  # 0
+    PROCESSED: FieldStatus.Status.ValueType  # 1
+    ERROR: FieldStatus.Status.ValueType  # 2
+
+    STATUS_FIELD_NUMBER: builtins.int
+    ERRORS_FIELD_NUMBER: builtins.int
+    status: global___FieldStatus.Status.ValueType
+    @property
+    def errors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldError]: ...
+    def __init__(
+        self,
+        *,
+        status: global___FieldStatus.Status.ValueType = ...,
+        errors: collections.abc.Iterable[global___FieldError] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["errors", b"errors", "status", b"status"]) -> None: ...
+
+global___FieldStatus = FieldStatus
