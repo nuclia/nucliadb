@@ -366,7 +366,6 @@ async def get_graph_results(
             relations.entities.update(new_subgraphs)
 
         # Rank the relevance of the relations
-        # TODO: Add upper bound to the number of entities to explore for safety
         with metrics.time("graph_strat_rank_relations"):
             try:
                 relations = await rank_relations(
@@ -446,8 +445,6 @@ async def fuzzy_search_entities(
             node_query(kbid, Method.SUGGEST, request, target_shard_replicas=target_shard_replicas)
         )
 
-    # Gather
-    # TODO: What do I do with `incomplete_results`?
     try:
         results_raw = await asyncio.gather(*tasks)
         return await merge_suggest_results(
@@ -473,13 +470,19 @@ async def rank_relations(
     max_rels_to_eval: int = 300,
 ) -> Relations:
     # Store the index for keeping track after scoring
-    # XXX: Here we set a hard limit on the number of relations to evaluate for safety and performance
-    # In the future we could to several iterations of scoring
     flat_rels: list[tuple[str, int, DirectionalRelation]] = [
         (ent, idx, rel)
         for (ent, rels) in relations.entities.items()
         for (idx, rel) in enumerate(rels.related_to)
-    ][:max_rels_to_eval]
+    ]
+
+    # XXX: Here we set a hard limit on the number of relations to evaluate for safety and performance
+    # In the future we could to several iterations of scoring
+    if len(flat_rels) > max_rels_to_eval:
+        logger.warning(
+            f"Too many relations to evaluate ({len(flat_rels)}), truncating to {max_rels_to_eval}"
+        )
+        flat_rels = flat_rels[:max_rels_to_eval]
     triplets: list[dict[str, str]] = [
         {
             "head_entity": ent,
@@ -523,7 +526,7 @@ async def rank_relations(
         max_tokens=4096,
         generative_model=generative_model,
     )
-    # TODO: Enclose this in a try-except block
+
     ident, model, answer_stream = await predict.chat_query_ndjson(kbid, chat_model)
     response_json = None
     status = None
@@ -538,10 +541,7 @@ async def rank_relations(
         elif isinstance(item, MetaGenerativeResponse):
             _ = item
         else:
-            # TODO: Improve for logging
             raise ValueError(f"Unknown generative chunk type: {item}")
-
-    # TODO: Report tokens using meta?
 
     if response_json is None or status is None or status.code != "0":
         raise ValueError("No JSON response found")
