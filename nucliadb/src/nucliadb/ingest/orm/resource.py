@@ -528,8 +528,6 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
 
-        await self.apply_fields_status(message, message_updated_fields)
-
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(
                 updated=message_updated_fields,
@@ -539,25 +537,24 @@ class Resource:
 
     @processor_observer.wrap({"type": "apply_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
-        breakpoint()
         # Dictionary of all errors per field (we may have several due to DA tasks)
         errors_by_field = defaultdict(list)
         # Make sure if a file is updated without errors, it ends up in errors_by_field
         for field_id in updated_fields:
-            errors_by_field[FieldId.from_pb(field_id)] = []
+            errors_by_field[(field_id.field_type, field_id.field)] = []
 
         for error in message.errors:
-            errors_by_field[FieldId(field=error.field, field_type=error.field_type)].append(error)
+            errors_by_field[(error.field_type, error.field)].append(error)
 
         # If this message comes from the processor (not a DA worker), we clear all previous errors
         from_processor = any((x.WhichOneof("generator") == "processor" for x in message.generated_by))
 
-        for (field, field_type), errors in errors_by_field:
-            field_obj = await self.get_field(error.field, error.field_type, load=False)
+        for (field_type, field), errors in errors_by_field.items():
+            field_obj = await self.get_field(field, field_type, load=False)
             if from_processor:
                 status = writer_pb2.FieldStatus()
             else:
-                status = await field_obj.get_status()
+                status = await field_obj.get_status() or writer_pb2.FieldStatus()
 
             for error in errors:
                 field_error = writer_pb2.FieldError(
@@ -566,18 +563,23 @@ class Resource:
                 field_error.created.GetCurrentTime()
                 status.errors.append(field_error)
 
-            if len(errors) > 0:
-                status.status = writer_pb2.FieldStatus.Status.ERROR
-            else:
-                status.status = writer_pb2.FieldStatus.Status.PROCESSED
+            if message.source == BrokerMessage.MessageSource.PROCESSOR:
+                if len(errors) > 0:
+                    status.status = writer_pb2.FieldStatus.Status.ERROR
+                else:
+                    status.status = writer_pb2.FieldStatus.Status.PROCESSED
+            elif (
+                message.source == BrokerMessage.MessageSource.WRITER
+                and message.basic.metadata.status == PBMetadata.Status.PENDING
+            ):
+                status.status = writer_pb2.FieldStatus.Status.PROCESSING
 
             await field_obj.set_status(status)
 
     async def update_status(self):
-        breakpoint()
         field_ids = await self.get_all_field_ids(for_update=False)
         field_statuses = await datamanagers.fields.get_statuses(
-            self.txn, kbid=self.kb, rid=self.uuid, fields=field_ids.fields
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, fields=field_ids.fields
         )
         # If any field is processing -> PENDING
         if any((f.status == writer_pb2.FieldStatus.Status.PROCESSING for f in field_statuses)):
@@ -605,8 +607,6 @@ class Resource:
         previous_basic = Basic()
         previous_basic.CopyFrom(self.basic)
 
-        await self.update_status()
-
         maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
         for question_answers in message.question_answers:
@@ -614,6 +614,9 @@ class Resource:
 
         for extracted_text in message.extracted_text:
             await self._apply_extracted_text(extracted_text)
+
+        await self.apply_fields_status(message, self._modified_extracted_text)
+        await self.update_status()
 
         extracted_languages = []
 

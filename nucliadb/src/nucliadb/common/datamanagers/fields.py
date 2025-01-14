@@ -23,6 +23,7 @@ from typing import Optional
 from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
 
@@ -93,7 +94,9 @@ async def get_statuses(
     txn: Transaction, *, kbid: str, rid: str, fields: list[writer_pb2.FieldID]
 ) -> list[writer_pb2.FieldStatus]:
     keys = [
-        KB_RESOURCE_FIELD_STATUS.format(kbid=kbid, uuid=rid, type=fid.field_type, field=fid.field)
+        KB_RESOURCE_FIELD_STATUS.format(
+            kbid=kbid, uuid=rid, type=FIELD_TYPE_PB_TO_STR[fid.field_type], field=fid.field
+        )
         for fid in fields
     ]
     serialized = await txn.batch_get(keys, for_update=False)
