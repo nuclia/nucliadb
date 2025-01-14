@@ -19,10 +19,12 @@
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PushProcessingOptions(BaseModel):
-    # Enable ML processing
     ml_text: Optional[bool] = True
-    extract_strategy: Optional[str] = None
+    extract_strategy_id: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy to use. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
+    )
