@@ -156,7 +156,8 @@ async def graph_resource(nucliadb_writer, nucliadb_grpc, knowledgebox):
             to=nodes["inception"],
             relation_label="directed",
             metadata=RelationMetadata(
-                paragraph_id=rid + "/t/inception1/0-37",
+                # Set this field id as int enum value since this is how legacy relations reported paragraph_id
+                paragraph_id=rid + "/4/inception1/0-37",
                 data_augmentation_task_id="my_graph_task_id",
             ),
         ),
