@@ -444,10 +444,16 @@ async def merge_relations_results(
     relations_responses: list[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
     only_with_metadata: bool = False,
+    only_agentic: bool = False,
 ) -> Relations:
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
-        None, _merge_relations_results, relations_responses, query, only_with_metadata
+        None,
+        _merge_relations_results,
+        relations_responses,
+        query,
+        only_with_metadata,
+        only_agentic,
     )
 
 
@@ -455,6 +461,7 @@ def _merge_relations_results(
     relations_responses: list[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
     only_with_metadata: bool,
+    only_agentic: bool,
 ) -> Relations:
     relations = Relations(entities={})
 
@@ -468,30 +475,33 @@ def _merge_relations_results(
             relation_type = RelationTypePbMap[relation.relation]
             relation_label = relation.relation_label
             metadata = relation.metadata if relation.HasField("metadata") else None
-            if (not only_with_metadata or metadata) and origin.value in relations.entities:
-                relations.entities[origin.value].related_to.append(
-                    DirectionalRelation(
-                        entity=destination.value,
-                        entity_type=relation_node_type_to_entity_type(destination.ntype),
-                        entity_subtype=destination.subtype,
-                        relation=relation_type,
-                        relation_label=relation_label,
-                        direction=RelationDirection.OUT,
-                        metadata=from_proto.relation_metadata(metadata) if metadata else None,
+            if (not only_with_metadata or metadata) and (
+                not only_agentic or (metadata and metadata.data_augmentation_task_id)
+            ):
+                if origin.value in relations.entities:
+                    relations.entities[origin.value].related_to.append(
+                        DirectionalRelation(
+                            entity=destination.value,
+                            entity_type=relation_node_type_to_entity_type(destination.ntype),
+                            entity_subtype=destination.subtype,
+                            relation=relation_type,
+                            relation_label=relation_label,
+                            direction=RelationDirection.OUT,
+                            metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                        )
                     )
-                )
-            elif (not only_with_metadata or metadata) and destination.value in relations.entities:
-                relations.entities[destination.value].related_to.append(
-                    DirectionalRelation(
-                        entity=origin.value,
-                        entity_type=relation_node_type_to_entity_type(origin.ntype),
-                        entity_subtype=origin.subtype,
-                        relation=relation_type,
-                        relation_label=relation_label,
-                        direction=RelationDirection.IN,
-                        metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                elif destination.value in relations.entities:
+                    relations.entities[destination.value].related_to.append(
+                        DirectionalRelation(
+                            entity=origin.value,
+                            entity_type=relation_node_type_to_entity_type(origin.ntype),
+                            entity_subtype=origin.subtype,
+                            relation=relation_type,
+                            relation_label=relation_label,
+                            direction=RelationDirection.IN,
+                            metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                        )
                     )
-                )
 
     return relations
 

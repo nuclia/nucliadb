@@ -1223,7 +1223,7 @@ class GraphStrategy(RagStrategy):
 
     name: Literal["graph"] = "graph"
     hops: int = Field(
-        default=1,
+        default=3,
         title="Number of hops",
         description="""Number of hops to take when exploring the graph for relevant context.
 For example,
@@ -1234,10 +1234,15 @@ Bigger values will discover more intricate relationships but will also take more
         ge=1,
     )
     top_k: int = Field(
-        default=20,
+        default=25,
         title="Top k",
-        description="Number of relationships to keep after each hop. This number correlates to more paragraphs being sent as context.",
+        description="Number of relationships to keep after each hop after ranking them by relevance to the query. This number correlates to more paragraphs being sent as context.",
         ge=1,
+    )
+    agentic_graph_only: bool = Field(
+        default=False,
+        title="Use only the graph extracted by an agent.",
+        description="If set to true, only entities extracted from a graph extraction agent are considered for context expansion.",
     )
 
 

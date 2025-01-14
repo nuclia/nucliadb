@@ -313,7 +313,6 @@ async def get_graph_results(
                     range_modification_end=item.range_modification_end,
                     target_shard_replicas=shards,
                 )
-
             if suggest_result.entities is not None:
                 entities_to_explore = (
                     RelationNode(
@@ -345,6 +344,7 @@ async def get_graph_results(
                     target_shard_replicas=shards,
                     timeout=5.0,
                     only_with_metadata=True,
+                    only_agentic_relations=graph_strategy.agentic_graph_only,
                 )
             except Exception as e:
                 capture_exception(e)
@@ -359,7 +359,7 @@ async def get_graph_results(
                 for entity, subgraph in new_relations.entities.items()
             }
 
-            if not new_subgraphs or any(not subgraph.related_to for subgraph in new_subgraphs.values()):
+            if not new_subgraphs or all(not subgraph.related_to for subgraph in new_subgraphs.values()):
                 break
 
             explored_entities.update(new_subgraphs.keys())
@@ -368,14 +368,19 @@ async def get_graph_results(
         # Rank the relevance of the relations
         # TODO: Add upper bound to the number of entities to explore for safety
         with metrics.time("graph_strat_rank_relations"):
-            relations = await rank_relations(
-                relations,
-                query,
-                kbid,
-                user,
-                top_k=graph_strategy.top_k,
-                generative_model=generative_model,
-            )
+            try:
+                relations = await rank_relations(
+                    relations,
+                    query,
+                    kbid,
+                    user,
+                    top_k=graph_strategy.top_k,
+                    generative_model=generative_model,
+                )
+            except Exception as e:
+                capture_exception(e)
+                logger.exception("Error in ranking relations for graph strategy")
+                break
 
     # Get the text blocks of the paragraphs that contain the top relations
     with metrics.time("graph_strat_build_response"):
@@ -465,13 +470,16 @@ async def rank_relations(
     top_k: int,
     generative_model: Optional[str] = None,
     score_threshold: int = 0,
+    max_rels_to_eval: int = 300,
 ) -> Relations:
     # Store the index for keeping track after scoring
+    # XXX: Here we set a hard limit on the number of relations to evaluate for safety and performance
+    # In the future we could to several iterations of scoring
     flat_rels: list[tuple[str, int, DirectionalRelation]] = [
         (ent, idx, rel)
         for (ent, rels) in relations.entities.items()
         for (idx, rel) in enumerate(rels.related_to)
-    ]
+    ][:max_rels_to_eval]
     triplets: list[dict[str, str]] = [
         {
             "head_entity": ent,
@@ -621,6 +629,5 @@ def filter_subgraph(subgraph: EntitySubgraph, entities_to_remove: Collection[str
     Removes the relationships with entities in `entities_to_remove` from the subgraph.
     """
     return EntitySubgraph(
-        # TODO: Limit to 150 is temporary, remove it and add a reranker scoring?
-        related_to=[rel for rel in subgraph.related_to if rel.entity not in entities_to_remove][:150]
+        related_to=[rel for rel in subgraph.related_to if rel.entity not in entities_to_remove]
     )

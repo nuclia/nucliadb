@@ -217,6 +217,7 @@ async def get_relations_results(
     target_shard_replicas: Optional[list[str]],
     timeout: Optional[float] = None,
     only_with_metadata: bool = False,
+    only_agentic_relations: bool = False,
 ) -> Relations:
     try:
         predict = get_predict()
@@ -228,6 +229,7 @@ async def get_relations_results(
             target_shard_replicas=target_shard_replicas,
             timeout=timeout,
             only_with_metadata=only_with_metadata,
+            only_agentic_relations=only_agentic_relations,
         )
     except Exception as exc:
         capture_exception(exc)
@@ -242,6 +244,7 @@ async def get_relations_results_from_entities(
     target_shard_replicas: Optional[list[str]],
     timeout: Optional[float] = None,
     only_with_metadata: bool = False,
+    only_agentic_relations: bool = False,
 ) -> Relations:
     request = SearchRequest()
     request.relation_subgraph.entry_points.extend(entities)
@@ -262,7 +265,7 @@ async def get_relations_results_from_entities(
     )
     relations_results: list[RelationSearchResponse] = [result.relation for result in results]
     return await merge_relations_results(
-        relations_results, request.relation_subgraph, only_with_metadata
+        relations_results, request.relation_subgraph, only_with_metadata, only_agentic_relations
     )
 
 
