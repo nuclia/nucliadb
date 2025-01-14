@@ -955,6 +955,8 @@ pub struct FieldText {
     pub md5: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "4")]
     pub generated_by: ::core::option::Option<FieldAuthor>,
+    #[prost(string, tag = "5")]
+    pub extract_strategy: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `FieldText`.
 pub mod field_text {
@@ -1222,6 +1224,8 @@ pub struct FieldLink {
     pub css_selector: ::prost::alloc::string::String,
     #[prost(string, tag = "8")]
     pub xpath: ::prost::alloc::string::String,
+    #[prost(string, tag = "9")]
+    pub extract_strategy: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1241,6 +1245,8 @@ pub struct FieldFile {
         ::prost::alloc::string::String,
         ::prost::alloc::string::String,
     >,
+    #[prost(string, tag = "7")]
+    pub extract_strategy: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

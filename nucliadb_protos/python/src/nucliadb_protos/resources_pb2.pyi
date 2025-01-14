@@ -1642,9 +1642,11 @@ class FieldText(google.protobuf.message.Message):
     FORMAT_FIELD_NUMBER: builtins.int
     MD5_FIELD_NUMBER: builtins.int
     GENERATED_BY_FIELD_NUMBER: builtins.int
+    EXTRACT_STRATEGY_FIELD_NUMBER: builtins.int
     body: builtins.str
     format: global___FieldText.Format.ValueType
     md5: builtins.str
+    extract_strategy: builtins.str
     @property
     def generated_by(self) -> global___FieldAuthor: ...
     def __init__(
@@ -1654,9 +1656,10 @@ class FieldText(google.protobuf.message.Message):
         format: global___FieldText.Format.ValueType = ...,
         md5: builtins.str = ...,
         generated_by: global___FieldAuthor | None = ...,
+        extract_strategy: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["generated_by", b"generated_by"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["body", b"body", "format", b"format", "generated_by", b"generated_by", "md5", b"md5"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["body", b"body", "extract_strategy", b"extract_strategy", "format", b"format", "generated_by", b"generated_by", "md5", b"md5"]) -> None: ...
 
 global___FieldText = FieldText
 
@@ -2017,10 +2020,12 @@ class FieldLink(google.protobuf.message.Message):
     LOCALSTORAGE_FIELD_NUMBER: builtins.int
     CSS_SELECTOR_FIELD_NUMBER: builtins.int
     XPATH_FIELD_NUMBER: builtins.int
+    EXTRACT_STRATEGY_FIELD_NUMBER: builtins.int
     uri: builtins.str
     language: builtins.str
     css_selector: builtins.str
     xpath: builtins.str
+    extract_strategy: builtins.str
     @property
     def added(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -2040,9 +2045,10 @@ class FieldLink(google.protobuf.message.Message):
         localstorage: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         css_selector: builtins.str = ...,
         xpath: builtins.str = ...,
+        extract_strategy: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["added", b"added"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["added", b"added", "cookies", b"cookies", "css_selector", b"css_selector", "headers", b"headers", "language", b"language", "localstorage", b"localstorage", "uri", b"uri", "xpath", b"xpath"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["added", b"added", "cookies", b"cookies", "css_selector", b"css_selector", "extract_strategy", b"extract_strategy", "headers", b"headers", "language", b"language", "localstorage", b"localstorage", "uri", b"uri", "xpath", b"xpath"]) -> None: ...
 
 global___FieldLink = FieldLink
 
@@ -2072,9 +2078,11 @@ class FieldFile(google.protobuf.message.Message):
     PASSWORD_FIELD_NUMBER: builtins.int
     URL_FIELD_NUMBER: builtins.int
     HEADERS_FIELD_NUMBER: builtins.int
+    EXTRACT_STRATEGY_FIELD_NUMBER: builtins.int
     language: builtins.str
     password: builtins.str
     url: builtins.str
+    extract_strategy: builtins.str
     @property
     def added(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -2090,9 +2098,10 @@ class FieldFile(google.protobuf.message.Message):
         password: builtins.str = ...,
         url: builtins.str = ...,
         headers: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        extract_strategy: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["added", b"added", "file", b"file"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["added", b"added", "file", b"file", "headers", b"headers", "language", b"language", "password", b"password", "url", b"url"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["added", b"added", "extract_strategy", b"extract_strategy", "file", b"file", "headers", b"headers", "language", b"language", "password", b"password", "url", b"url"]) -> None: ...
 
 global___FieldFile = FieldFile
 

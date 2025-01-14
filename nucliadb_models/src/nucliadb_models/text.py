@@ -106,3 +106,4 @@ class PushTextFormat(int, Enum):
 class Text(BaseModel):
     body: str
     format: PushTextFormat
+    extract_strategy: Optional[str] = None

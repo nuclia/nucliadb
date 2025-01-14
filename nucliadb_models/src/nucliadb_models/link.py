@@ -75,3 +75,4 @@ class LinkUpload(BaseModel):
         title="Xpath",
         description="Xpath to parse the link",
     )
+    extract_strategy: Optional[str] = None
