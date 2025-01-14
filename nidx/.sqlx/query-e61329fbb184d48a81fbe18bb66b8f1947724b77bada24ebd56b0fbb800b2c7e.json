@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(MIN(seq) - 1, (SELECT last_value FROM index_requests_seq_seq)) AS \"seq!\" FROM index_requests",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "seq!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e61329fbb184d48a81fbe18bb66b8f1947724b77bada24ebd56b0fbb800b2c7e"
+}

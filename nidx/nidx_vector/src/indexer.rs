@@ -20,7 +20,6 @@
 use crate::config::VectorConfig;
 use crate::data_point::{self, Elem, LabelDictionary};
 use crate::{utils, VectorSegmentMetadata};
-use anyhow::anyhow;
 use nidx_protos::{noderesources, prost::*};
 use std::collections::HashMap;
 use std::path::Path;
