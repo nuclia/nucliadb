@@ -60,6 +60,7 @@ class FieldText(BaseModel):
     body: Optional[str] = None
     format: Optional[TextFormat] = None
     md5: Optional[str] = None
+    extract_strategy: Optional[str] = None
 
 
 # Creation and update classes (Those used on writer endpoints)

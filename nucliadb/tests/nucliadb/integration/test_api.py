@@ -24,11 +24,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.ingest.processing import DummyProcessingEngine
 from nucliadb.learning_proxy import (
     LearningConfiguration,
     SemanticConfig,
     SimilarityFunction,
 )
+from nucliadb.writer.utilities import get_processing
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
 from nucliadb_protos import resources_pb2 as rpb
@@ -1039,3 +1041,122 @@ async def test_jsonl_text_field(
         ]
     )
     assert data["icon"] == "application/x-ndjson"
+
+
+async def test_extract_strategy_on_fields(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+):
+    processing = get_processing()
+    assert isinstance(processing, DummyProcessingEngine)
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Create a resource with a field of each type
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "texts": {
+                "text": {
+                    "body": "My text",
+                    "extract_strategy": "foo",
+                }
+            },
+            "links": {
+                "link": {
+                    "uri": "https://www.example.com",
+                    "extract_strategy": "bar",
+                }
+            },
+            "files": {
+                "file": {
+                    "language": "en",
+                    "file": {
+                        "filename": "my_file.pdf",
+                        "payload": base64.b64encode(b"file content").decode(),
+                        "content_type": "application/pdf",
+                    },
+                    "extract_strategy": "baz",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Check that the extract strategies are stored
+    resp = await nucliadb_reader.get(
+        f"kb/{knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert data["data"]["texts"]["text"]["value"]["extract_strategy"] == "foo"
+    assert data["data"]["links"]["link"]["value"]["extract_strategy"] == "bar"
+    assert data["data"]["files"]["file"]["value"]["extract_strategy"] == "baz"
+
+    # Check that push payload has been sent to processing with the right extract strategies
+    def validate_processing_call(processing: DummyProcessingEngine):
+        assert len(processing.values["send_to_process"]) == 1
+        send_to_process_call = processing.values["send_to_process"][0][0]
+        assert send_to_process_call.textfield["text"].extract_strategy == "foo"
+        assert send_to_process_call.linkfield["link"].extract_strategy == "bar"
+        assert len(send_to_process_call.filefield) == 1
+        assert processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "baz"
+
+    validate_processing_call(processing)
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Reprocess resource should also send the extract strategies
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/resource/{rid}/reprocess",
+    )
+    assert resp.status_code == 202, resp.text
+
+    validate_processing_call(processing)
+
+    # Update them to make sure they are stored correctly
+    resp = await nucliadb_writer.patch(
+        f"kb/{knowledgebox}/resource/{rid}",
+        json={
+            "texts": {
+                "text": {
+                    "body": "My text",
+                    "extract_strategy": "foo1",
+                }
+            },
+            "links": {
+                "link": {
+                    "uri": "https://www.example.com",
+                    "extract_strategy": "bar1",
+                }
+            },
+            "files": {
+                "file": {
+                    "language": "en",
+                    "file": {
+                        "filename": "my_file.pdf",
+                        "payload": base64.b64encode(b"file content").decode(),
+                        "content_type": "application/pdf",
+                    },
+                    "extract_strategy": "baz1",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Check that the extract strategies are stored
+    resp = await nucliadb_reader.get(
+        f"kb/{knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200, resp.text
+
+    data = resp.json()
+    assert data["data"]["texts"]["text"]["value"]["extract_strategy"] == "foo1"
+    assert data["data"]["links"]["link"]["value"]["extract_strategy"] == "bar1"
+    assert data["data"]["files"]["file"]["value"]["extract_strategy"] == "baz1"

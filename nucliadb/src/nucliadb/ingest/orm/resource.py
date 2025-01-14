@@ -503,7 +503,6 @@ class Resource:
     @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(self, message: BrokerMessage):
         message_updated_fields = []
-
         for field, text in message.texts.items():
             fid = FieldID(field_type=FieldType.TEXT, field=field)
             await self.set_field(fid.field_type, fid.field, text)

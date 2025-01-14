@@ -38,6 +38,7 @@ class FieldLink(BaseModel):
     localstorage: Optional[Dict[str, str]] = None
     css_selector: Optional[str] = None
     xpath: Optional[str] = None
+    extract_strategy: Optional[str] = None
 
 
 # Creation and update classes (Those used on writer endpoints)

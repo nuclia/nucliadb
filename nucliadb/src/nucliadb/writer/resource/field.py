@@ -50,6 +50,7 @@ async def extract_file_field_from_pb(field_pb: resources_pb2.FieldFile) -> str:
             language=field_pb.language,
             password=field_pb.password,
             file=models.File(payload=None, uri=field_pb.file.uri),
+            extract_strategy=field_pb.extract_strategy,
         )
         return processing.convert_external_filefield_to_str(file_field)
     else:
@@ -171,6 +172,8 @@ def parse_text_field(
     writer: BrokerMessage,
     toprocess: PushPayload,
 ) -> None:
+    if text_field.extract_strategy is not None:
+        writer.texts[key].extract_strategy = text_field.extract_strategy
     writer.texts[key].body = text_field.body
     writer.texts[key].format = resources_pb2.FieldText.Format.Value(text_field.format.value)
     etw = resources_pb2.ExtractedTextWrapper()
@@ -181,6 +184,7 @@ def parse_text_field(
     toprocess.textfield[key] = models.Text(
         body=text_field.body,
         format=getattr(models.PushTextFormat, text_field.format.value),
+        extract_strategy=text_field.extract_strategy,
     )
 
 

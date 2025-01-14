@@ -36,6 +36,7 @@ class FieldFile(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
     external: bool = False
+    extract_strategy: Optional[str] = None
 
 
 # Creation and update classes (Those used on writer endpoints)
