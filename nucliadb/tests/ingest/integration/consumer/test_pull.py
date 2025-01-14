@@ -112,6 +112,8 @@ async def wait_for_messages(messages: list[BrokerMessage], max_time: int = 10) -
 
 
 async def test_pull_full_integration(
+    shard_manager,
+    dummy_nidx_utility,
     ingest_consumers,
     ingest_processed_consumer,
     pull_worker: PullWorker,

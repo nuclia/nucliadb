@@ -52,7 +52,7 @@ async def get_shards_paragraphs(kbid: str) -> list[tuple[str, int]]:
     results = {}
     for shard_meta in kb_shards.shards:
         # Rebalance using node as source of truth. But it will rebalance nidx
-        node, shard_id = choose_node(shard_meta, use_nidx=False)
+        node, shard_id = choose_node(shard_meta)
         shard_data: nodereader_pb2.Shard = await node.reader.GetShard(
             nodereader_pb2.GetShardRequest(shard_id=noderesources_pb2.ShardId(id=shard_id))  # type: ignore
         )
@@ -102,7 +102,7 @@ async def move_set_of_kb_resources(
     from_shard = [s for s in kb_shards.shards if s.shard == from_shard_id][0]
     to_shard = [s for s in kb_shards.shards if s.shard == to_shard_id][0]
 
-    from_node, from_shard_replica_id = choose_node(from_shard, use_nidx=False)
+    from_node, from_shard_replica_id = choose_node(from_shard)
     search_response: nodereader_pb2.SearchResponse = await from_node.reader.Search(  # type: ignore
         nodereader_pb2.SearchRequest(
             shard=from_shard_replica_id,

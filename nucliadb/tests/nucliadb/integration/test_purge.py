@@ -22,9 +22,11 @@ import random
 import unittest
 import uuid
 from typing import cast
+from unittest.mock import AsyncMock
 
 from httpx import AsyncClient
 
+import nucliadb.common.nidx
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.maindb.driver import Driver
@@ -134,16 +136,16 @@ async def test_purge_orphan_shards(
     )
     assert resp.status_code == 201
 
-    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
-    assert resp.status_code == 200
+    shards = []
+    for node in manager.get_index_nodes():
+        shards.extend(await node.list_shards())
+    assert len(shards) > 0
 
-    # Purge while index nodes are not available
-    index_nodes = manager.INDEX_NODES
-    manager.INDEX_NODES = type(manager.INDEX_NODES)()
-
-    await purge_kb(maindb_driver)
-
-    manager.INDEX_NODES = index_nodes
+    with unittest.mock.patch.object(nucliadb.common.nidx.get_nidx(), "api_client"):
+        nucliadb.common.nidx.get_nidx().api_client.DeleteShard = AsyncMock()
+        resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+        assert resp.status_code == 200, resp.text
+        await purge_kb(maindb_driver)
 
     # We have removed the shards in maindb but left them orphan in the index
     # nodes
@@ -190,14 +192,16 @@ async def test_purge_orphan_shard_detection(
     # Orphan shard
     available_nodes = manager.get_index_nodes()
     node = random.choice(available_nodes)
-    orphan_shard = await node.new_shard(
-        kbid="deleted-kb",
-        vector_index_config=nodewriter_pb2.VectorIndexConfig(
-            similarity=utils_pb2.VectorSimilarity.COSINE,
-            normalize_vectors=False,
-            vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-            vector_dimension=128,
-        ),
+    orphan_shard = await node.new_shard_with_vectorsets(
+        kbid=str(uuid.uuid4()),
+        vectorsets_configs={
+            "some": nodewriter_pb2.VectorIndexConfig(
+                similarity=utils_pb2.VectorSimilarity.COSINE,
+                normalize_vectors=False,
+                vector_type=nodewriter_pb2.VectorType.DENSE_F32,
+                vector_dimension=128,
+            )
+        },
     )
     orphan_shard_id = orphan_shard.id
 

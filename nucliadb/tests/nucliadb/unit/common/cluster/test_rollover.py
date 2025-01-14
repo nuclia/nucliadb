@@ -22,21 +22,9 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
-from nucliadb.common.cluster import manager, rollover
-from nucliadb.common.cluster.index_node import IndexNode
+from nucliadb.common.cluster import rollover
 from nucliadb.common.datamanagers.rollover import RolloverState
 from nucliadb_protos import writer_pb2
-
-
-@pytest.fixture()
-def available_nodes():
-    nodes = {
-        "0": IndexNode(id="0", address="node-0", available_disk=100, shard_count=0, dummy=True),
-        "1": IndexNode(id="1", address="node-1", available_disk=100, shard_count=0, dummy=True),
-        "2": IndexNode(id="2", address="node-2", available_disk=100, shard_count=0, dummy=True),
-    }
-    with patch.object(manager, "INDEX_NODES", new=nodes):
-        yield nodes
 
 
 @pytest.fixture()
@@ -165,7 +153,7 @@ def rollover_datamanager(resource_ids, cluster_datamanager):
 
 
 @pytest.fixture()
-def app_context(rollover_datamanager, resources_datamanager, available_nodes):
+def app_context(rollover_datamanager, resources_datamanager):
     mock = MagicMock()
     mock.shard_manager = MagicMock()
     mock.shard_manager.rollback_shard = AsyncMock()
@@ -180,21 +168,19 @@ def app_context(rollover_datamanager, resources_datamanager, available_nodes):
 
 
 async def test_create_rollover_shards(
-    app_context, available_nodes, shards: writer_pb2.Shards, rollover_datamanager
+    app_context, shards: writer_pb2.Shards, rollover_datamanager, dummy_nidx_utility
 ):
     new_shards = await rollover.create_rollover_shards(app_context, "kbid")
 
     assert new_shards.kbid == "kbid"
-    assert sum([len(node.writer.calls["NewShard"]) for node in available_nodes.values()]) == sum(
-        [len(s.replicas) for s in shards.shards]
-    )
+    assert dummy_nidx_utility.api_client.NewShard.call_count == len(shards.shards)
     rollover_datamanager.update_kb_rollover_shards.assert_called_with(
         ANY, kbid="kbid", kb_shards=new_shards
     )
 
 
 async def test_create_rollover_index_does_not_recreate(
-    app_context, shards: writer_pb2.Shards, rollover_datamanager
+    app_context, shards: writer_pb2.Shards, rollover_datamanager, dummy_nidx_utility
 ):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
     rollover_datamanager.get_rollover_state.return_value = RolloverState(

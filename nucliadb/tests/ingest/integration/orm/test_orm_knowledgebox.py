@@ -192,6 +192,7 @@ async def test_delete_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
     shard_manager: cluster_manager.KBShardManager,
+    dummy_nidx_utility,
 ):
     kbid, _ = await KnowledgeBox.create(
         maindb_driver,
@@ -225,7 +226,7 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
 async def test_knowledgebox_delete_all_kb_keys(
     storage,
     cache,
-    fake_node,
+    dummy_nidx_utility,
     maindb_driver,
     knowledgebox_ingest: str,
 ):

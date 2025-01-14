@@ -29,12 +29,13 @@ async def test_shard_auto_create(
     maindb_driver,
     pubsub,
     storage,
-    fake_node,
+    dummy_nidx_utility,
     knowledgebox_ingest,
 ):
     from nucliadb.common.cluster.settings import settings
 
     settings.max_shard_paragraphs = 1
+    dummy_nidx_utility.api_client.GetShard.return_value.paragraphs = 2
 
     sc = shard_creator.ShardCreatorHandler(
         driver=maindb_driver,

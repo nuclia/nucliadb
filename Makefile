@@ -49,7 +49,6 @@ python-code-lint:
 	make -C nucliadb_models/ format
 	make -C nucliadb_sdk/ format
 	make -C nucliadb_sidecar/ format
-	make -C nucliadb_node_binding/ format
 	make -C nucliadb_utils/ format
 	make -C nucliadb/ format
 	make -C nucliadb_telemetry/ format
@@ -62,7 +61,6 @@ python-code-lint:
 	make -C nucliadb_dataset/ lint
 	make -C nucliadb_models/ lint
 	make -C nucliadb_sidecar/ lint
-	make -C nucliadb_node_binding/ lint
 	make -C nucliadb_performance/ lint
 
 

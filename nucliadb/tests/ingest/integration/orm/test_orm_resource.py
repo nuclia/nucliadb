@@ -49,7 +49,9 @@ from nucliadb_protos.writer_pb2 import (
 from tests.ingest.fixtures import create_resource
 
 
-async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, knowledgebox_ingest: str):
+async def test_create_resource_orm_with_basic(
+    storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+):
     basic = PBBasic(
         icon="text/plain",
         title="My title",
@@ -102,7 +104,7 @@ async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, kn
     assert o2.source_id == "My Source"
 
 
-async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_ingest: str):
+async def test_iterate_paragraphs(storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -146,7 +148,7 @@ async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_i
         assert paragraph.metadata.labels.paragraph[0].label in ("label1", "label2")
 
 
-async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox_ingest: str):
+async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -204,7 +206,9 @@ async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox
             assert metadata.metadata.representation.file == "myfile"
 
 
-async def test_vector_duplicate_fields(storage, txn, cache, fake_node, knowledgebox_ingest: str):
+async def test_vector_duplicate_fields(
+    storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+):
     basic = PBBasic(title="My title", summary="My summary")
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
@@ -266,7 +270,7 @@ async def test_vector_duplicate_fields(storage, txn, cache, fake_node, knowledge
 
 
 async def test_generate_broker_message(
-    storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_ingest: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
@@ -404,7 +408,7 @@ async def test_generate_broker_message(
 
 
 async def test_generate_index_message_contains_all_metadata(
-    storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_ingest: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
@@ -489,7 +493,7 @@ async def test_generate_index_message_contains_all_metadata(
 
 
 async def test_generate_index_message_vectorsets(
-    storage, maindb_driver, cache, fake_node, knowledgebox_with_vectorsets: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_with_vectorsets: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
@@ -521,7 +525,7 @@ async def test_generate_index_message_vectorsets(
 
 
 async def test_generate_index_message_cancels_labels(
-    storage, maindb_driver, cache, fake_node, knowledgebox_with_vectorsets: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_with_vectorsets: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)

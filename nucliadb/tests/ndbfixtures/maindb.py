@@ -27,7 +27,6 @@ from pytest_docker_fixtures import images
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
-from nucliadb.common.nidx import NIDX_ENABLED
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.migrator.migrator import run_pg_schema_migrations
@@ -74,9 +73,12 @@ async def cleanup_maindb(driver: Driver):
             await txn.delete(key)
         await txn.commit()
 
-        if NIDX_ENABLED and isinstance(txn, PGTransaction):
-            async with txn.connection.cursor() as cur:
-                await cur.execute("TRUNCATE shards CASCADE")
+        try:
+            if isinstance(txn, PGTransaction):
+                async with txn.connection.cursor() as cur:
+                    await cur.execute("TRUNCATE shards CASCADE")
+        except Exception:
+            pass
 
 
 @pytest.fixture(scope="function")

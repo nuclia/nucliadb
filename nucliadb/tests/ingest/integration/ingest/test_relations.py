@@ -30,11 +30,11 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_utils.utilities import get_indexing, get_storage
+from nucliadb_utils.utilities import get_storage
 
 
 async def test_ingest_relations_indexing(
-    fake_node, local_files, storage, knowledgebox_ingest, processor
+    dummy_nidx_utility, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
@@ -50,10 +50,9 @@ async def test_ingest_relations_indexing(
 
     await processor.process(message=bm, seqid=1)
 
-    index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(index._calls[0][1])
+    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
     assert len(pb.relations) == 3
     assert pb.relations[0] == r0
@@ -62,7 +61,7 @@ async def test_ingest_relations_indexing(
 
 
 async def test_ingest_label_relation_extraction(
-    fake_node, local_files, storage, knowledgebox_ingest, processor
+    dummy_nidx_utility, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
@@ -79,10 +78,9 @@ async def test_ingest_label_relation_extraction(
 
     await processor.process(message=bm, seqid=1)
 
-    index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(index._calls[0][1])
+    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
     for i, (labelset, label) in enumerate(labels):
         assert pb.relations[i].relation == Relation.RelationType.ABOUT
@@ -91,7 +89,7 @@ async def test_ingest_label_relation_extraction(
 
 
 async def test_ingest_colab_relation_extraction(
-    fake_node, local_files, storage, knowledgebox_ingest, processor
+    dummy_nidx_utility, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
@@ -101,10 +99,9 @@ async def test_ingest_colab_relation_extraction(
 
     await processor.process(message=bm, seqid=1)
 
-    index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(index._calls[0][1])
+    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
     for i, collaborator in enumerate(collaborators):
         assert pb.relations[i].relation == Relation.RelationType.COLAB
@@ -113,7 +110,7 @@ async def test_ingest_colab_relation_extraction(
 
 
 async def test_ingest_field_metadata_relation_extraction(
-    fake_node, local_files, storage, knowledgebox_ingest, processor
+    dummy_nidx_utility, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
@@ -157,10 +154,9 @@ async def test_ingest_field_metadata_relation_extraction(
 
     await processor.process(message=bm, seqid=1)
 
-    index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(index._calls[0][1])
+    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
     generated_relations = [
         # From data augmentation + processor metadata
@@ -200,7 +196,7 @@ async def test_ingest_field_metadata_relation_extraction(
 
 
 async def test_ingest_field_relations_relation_extraction(
-    fake_node, local_files, storage, knowledgebox_ingest, processor
+    dummy_nidx_utility, local_files, storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
@@ -252,10 +248,9 @@ async def test_ingest_field_relations_relation_extraction(
 
     await processor.process(message=bm, seqid=1)
 
-    index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(index._calls[0][1])
+    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
 
     assert len(pb.relations) == len(test_relations)
     for relation in test_relations:

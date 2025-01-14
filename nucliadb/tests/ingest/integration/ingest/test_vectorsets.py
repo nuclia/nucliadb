@@ -33,12 +33,12 @@ from nucliadb_protos import (
     utils_pb2,
     writer_pb2,
 )
-from nucliadb_utils.utilities import get_indexing, get_storage
+from nucliadb_utils.utilities import get_storage
 from tests.ingest.fixtures import make_extracted_text
 
 
 async def test_ingest_broker_message_with_vectorsets(
-    fake_node,
+    dummy_nidx_utility,
     storage,
     knowledgebox_ingest: str,
     processor: Processor,
@@ -84,7 +84,6 @@ async def test_ingest_broker_message_with_vectorsets(
             for vector_id, sentence in vectorset_sentences.sentences.items():
                 assert len(sentence.vector) == vectorset_dimension
 
-    index = get_indexing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
     # process the broker message with vectorsets
@@ -98,7 +97,7 @@ async def test_ingest_broker_message_with_vectorsets(
     )
     await processor.process(message=bm, seqid=1)
 
-    pb = await storage.get_indexing(index._calls[0][1])
+    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
     validate_index_message(pb)
 
     # Generate a reindex to validate storage.
@@ -110,7 +109,7 @@ async def test_ingest_broker_message_with_vectorsets(
 
     await processor.process(message=bm, seqid=2)
 
-    pb = await storage.get_indexing(index._calls[1][1])
+    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[1][1][0])
     validate_index_message(pb)
 
 

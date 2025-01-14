@@ -27,7 +27,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 @pytest.mark.deploy_modes("component")
 async def test_create_entities_group(
-    dummy_index, nucliadb_ingest_grpc: WriterStub, entities_manager_mock, hosted_nucliadb
+    dummy_nidx_utility, nucliadb_ingest_grpc: WriterStub, entities_manager_mock, hosted_nucliadb
 ):
     kbid = str(uuid4())
     slug = "test"

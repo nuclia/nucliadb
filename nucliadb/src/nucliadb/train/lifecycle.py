@@ -22,10 +22,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from nucliadb.common.cluster.discovery.utils import (
-    setup_cluster_discovery,
-    teardown_cluster_discovery,
-)
 from nucliadb.train import SERVICE_NAME
 from nucliadb.train.utils import (
     start_shard_manager,
@@ -40,7 +36,6 @@ from nucliadb_utils.utilities import start_audit_utility, stop_audit_utility
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await setup_telemetry(SERVICE_NAME)
-    await setup_cluster_discovery()
     await start_shard_manager()
     await start_train_grpc(SERVICE_NAME)
     await start_audit_utility(SERVICE_NAME)
@@ -50,5 +45,4 @@ async def lifespan(app: FastAPI):
     await stop_audit_utility()
     await stop_train_grpc()
     await stop_shard_manager()
-    await teardown_cluster_discovery()
     await clean_telemetry(SERVICE_NAME)

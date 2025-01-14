@@ -24,7 +24,6 @@ import pytest
 from httpx import AsyncClient
 from pytest_lazy_fixtures import lazy_fixture
 
-from nucliadb.common.nidx import NIDX_ENABLED
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus import TUSUPLOAD, get_storage_manager
@@ -51,8 +50,7 @@ storages = [
     # lazy_fixture.lf("azure_storage"),
 ]
 # TODO: Azure blob storage not supported by nidx
-if not NIDX_ENABLED:
-    storages.append(lazy_fixture.lf("azure_storage"))
+# storages.append(lazy_fixture.lf("azure_storage"))
 
 
 @pytest.mark.parametrize(

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -63,6 +63,7 @@ class ShardReplica(BaseModel):
 
 class ShardObject(BaseModel):
     shard: str
+    nidx_shard_id: Optional[str]
     replicas: List[ShardReplica]
 
 

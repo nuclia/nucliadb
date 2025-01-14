@@ -22,10 +22,6 @@ import importlib.metadata
 from typing import Awaitable, Callable
 
 from nucliadb import health
-from nucliadb.common.cluster.discovery.utils import (
-    setup_cluster_discovery,
-    teardown_cluster_discovery,
-)
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
@@ -88,9 +84,6 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
             transaction_settings.transaction_jetstream_auth,
         )
         finalizers.append(stop_nats_manager)
-
-        await setup_cluster_discovery()
-        finalizers.append(teardown_cluster_discovery)
 
     health.register_health_checks(
         [
