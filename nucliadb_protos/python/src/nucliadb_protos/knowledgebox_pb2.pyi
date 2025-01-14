@@ -772,10 +772,33 @@ class VectorSetConfig(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _StorageKeyKind:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StorageKeyKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[VectorSetConfig._StorageKeyKind.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        UNSET: VectorSetConfig._StorageKeyKind.ValueType  # 0
+        """for Bw/c during the migration"""
+        LEGACY: VectorSetConfig._StorageKeyKind.ValueType  # 1
+        """simply "extracted_vectors", without vectorset"""
+        VECTORSET_PREFIX: VectorSetConfig._StorageKeyKind.ValueType  # 2
+        """"{vectorset}/extracted_vectors" """
+
+    class StorageKeyKind(_StorageKeyKind, metaclass=_StorageKeyKindEnumTypeWrapper): ...
+    UNSET: VectorSetConfig.StorageKeyKind.ValueType  # 0
+    """for Bw/c during the migration"""
+    LEGACY: VectorSetConfig.StorageKeyKind.ValueType  # 1
+    """simply "extracted_vectors", without vectorset"""
+    VECTORSET_PREFIX: VectorSetConfig.StorageKeyKind.ValueType  # 2
+    """"{vectorset}/extracted_vectors" """
+
     VECTORSET_ID_FIELD_NUMBER: builtins.int
     VECTORSET_INDEX_CONFIG_FIELD_NUMBER: builtins.int
     MATRYOSHKA_DIMENSIONS_FIELD_NUMBER: builtins.int
+    STORAGE_FIELD_KEY_FIELD_NUMBER: builtins.int
     vectorset_id: builtins.str
+    storage_field_key: global___VectorSetConfig.StorageKeyKind.ValueType
     @property
     def vectorset_index_config(self) -> nucliadb_protos.nodewriter_pb2.VectorIndexConfig: ...
     @property
@@ -790,9 +813,10 @@ class VectorSetConfig(google.protobuf.message.Message):
         vectorset_id: builtins.str = ...,
         vectorset_index_config: nucliadb_protos.nodewriter_pb2.VectorIndexConfig | None = ...,
         matryoshka_dimensions: collections.abc.Iterable[builtins.int] | None = ...,
+        storage_field_key: global___VectorSetConfig.StorageKeyKind.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["vectorset_index_config", b"vectorset_index_config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["matryoshka_dimensions", b"matryoshka_dimensions", "vectorset_id", b"vectorset_id", "vectorset_index_config", b"vectorset_index_config"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["matryoshka_dimensions", b"matryoshka_dimensions", "storage_field_key", b"storage_field_key", "vectorset_id", b"vectorset_id", "vectorset_index_config", b"vectorset_index_config"]) -> None: ...
 
 global___VectorSetConfig = VectorSetConfig
 
