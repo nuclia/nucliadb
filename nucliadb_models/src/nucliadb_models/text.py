@@ -77,6 +77,10 @@ If you need to store more text, consider using a file field instead or splitting
         default=TextFormat.PLAIN,
         description="The format of the text.",
     )
+    extract_strategy: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
+    )
 
     @model_validator(mode="after")
     def check_text_format(self) -> Self:

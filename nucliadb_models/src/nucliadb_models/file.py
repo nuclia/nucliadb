@@ -20,7 +20,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_models import CloudLink, File
 
@@ -45,6 +45,10 @@ class FileField(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
     file: File
+    extract_strategy: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
+    )
 
 
 # Processing classes (Those used to sent to push endpoints)
