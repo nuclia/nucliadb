@@ -82,6 +82,11 @@ TUS_HEADERS = {
     "Tus-Extension": "creation-defer-length",
 }
 
+ExtractStrategyHeader = Header(
+    default=None,
+    description="Extract strategy to use when uploading a file. If not provided, the default strategy will be used.",
+)
+
 
 @api.options(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
@@ -161,8 +166,11 @@ async def tus_post_rid_prefix(
     path_rid: str,
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
+    x_extract_strategy: Optional[str] = ExtractStrategyHeader,  # type: ignore
 ) -> Response:
-    return await _tus_post(request, kbid, item, path_rid=path_rid, field_id=field)
+    return await _tus_post(
+        request, kbid, item, path_rid=path_rid, field_id=field, extract_strategy=x_extract_strategy
+    )
 
 
 @api.post(
@@ -188,6 +196,7 @@ async def _tus_post(
     item: Optional[CreateResourcePayload] = None,
     path_rid: Optional[str] = None,
     field_id: Optional[str] = None,
+    extract_strategy: Optional[str] = None,
 ) -> Response:
     """
     An empty POST request is used to create a new upload resource.
@@ -285,6 +294,7 @@ async def _tus_post(
         deferred_length=deferred_length,
         offset=0,
         item=creation_payload,
+        extract_strategy=extract_strategy,
     )
 
     if size is not None:
@@ -569,6 +579,7 @@ async def _tus_patch(
                 request=request,
                 bucket=storage_manager.storage.get_bucket_name(kbid),
                 item=creation_payload,
+                extract_strategy=dm.get("extract_strategy") or None,
             )
         except LimitsExceededError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail)
@@ -638,6 +649,7 @@ async def upload_rid_prefix(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_extract_strategy: Optional[str] = ExtractStrategyHeader,  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -648,6 +660,7 @@ async def upload_rid_prefix(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_extract_strategy=x_extract_strategy,
     )
 
 
@@ -667,6 +680,7 @@ async def upload(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_extract_strategy: Optional[str] = ExtractStrategyHeader,  # type: ignore
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -675,6 +689,7 @@ async def upload(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_extract_strategy=x_extract_strategy,
     )
 
 
@@ -688,6 +703,7 @@ async def _upload(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_extract_strategy: Optional[str] = None,
 ) -> ResourceFileUploaded:
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
@@ -734,6 +750,8 @@ async def _upload(
         )
 
     metadata = {"content_type": content_type, "filename": filename}
+    if x_extract_strategy:
+        metadata["extract_strategy"] = x_extract_strategy
 
     await dm.update(
         upload_file_id=f"{upload_id}",
@@ -840,6 +858,7 @@ async def store_file_on_nuclia_db(
     language: Optional[str] = None,
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
+    extract_strategy: Optional[str] = None,
 ) -> Optional[int]:
     # File is on NucliaDB Storage at path
     partitioning = get_partitioning()
@@ -921,6 +940,8 @@ async def store_file_on_nuclia_db(
             file_field.language = language
         if password:
             file_field.password = password
+        if extract_strategy is not None:
+            file_field.extract_strategy = extract_strategy
 
         writer.files[field].CopyFrom(file_field)
         # Do not store passwords on maindb
