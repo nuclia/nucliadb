@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, MutableMapping, Optional, 
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -50,6 +50,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedVectorsWrapper,
     FieldClassifications,
     FieldComputedMetadataWrapper,
+    FieldFile,
     FieldID,
     FieldMetadata,
     FieldQuestionAnswerWrapper,
@@ -761,15 +762,52 @@ class Resource:
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail)
 
+    async def _should_update_resource_title_from_file_metadata(self) -> bool:
+        """
+        We only want to update resource title from file metadata if the title is empty,
+        equal to the resource uuid or equal to any of the file filenames in the resource.
+        """
+        basic = await self.get_basic()
+        if basic is None:
+            return True
+        current_title = basic.title
+        if current_title == "":
+            # If the title is empty, we should update it
+            return True
+        if current_title == self.uuid:
+            # If the title is the same as the resource uuid, we should update it
+            return True
+        fields = await self.get_fields(force=True)
+        filenames = set()
+        for (field_type, _), field_obj in fields.items():
+            if field_type == FieldType.FILE:
+                field_value: Optional[FieldFile] = await field_obj.get_value()
+                if field_value is not None:
+                    if field_value.file.filename not in ("", None):
+                        filenames.add(field_value.file.filename)
+        if current_title in filenames:
+            # If the title is equal to any of the file filenames, we should update it
+            return True
+        return False
+
     async def maybe_update_resource_title_from_file_extracted_data(self, message: BrokerMessage):
         """
         Update the resource title with the first file that has a title extracted.
         """
-        for file_extracted_data in message.file_extracted_data:
-            if file_extracted_data.title != "":
-                await self.update_resource_title(file_extracted_data.title)
-                # Break after the first file with a title is found
-                break
+        if not await self._should_update_resource_title_from_file_metadata():
+            return
+        for fed in message.file_extracted_data:
+            if fed.title == "":
+                # Skip if the extracted title is empty
+                continue
+            fid = FieldId.from_pb(rid=self.uuid, field_type=FieldType.FILE, key=fed.field)
+            logger.info(
+                "Updating resource title from file extracted data",
+                extra={"kbid": self.kb.kbid, "field": fid.full(), "new_title": fed.title},
+            )
+            await self.update_resource_title(fed.title)
+            # Break after the first file with a title is found
+            break
 
     async def _apply_field_computed_metadata(self, field_metadata: FieldComputedMetadataWrapper):
         assert self.basic is not None
