@@ -435,7 +435,7 @@ async def _reprocess_resource(
             writer.field_statuses.append(
                 FieldIDStatus(
                     id=FieldID(field_type=field_type, field=field_id),
-                    status=FieldStatus.Status.PROCESSING,
+                    status=FieldStatus.Status.PENDING,
                 )
             )
 

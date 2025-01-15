@@ -595,7 +595,7 @@ class Resource:
             self.txn, kbid=self.kb.kbid, rid=self.uuid, fields=field_ids.fields
         )
         # If any field is processing -> PENDING
-        if any((f.status == writer_pb2.FieldStatus.Status.PROCESSING for f in field_statuses)):
+        if any((f.status == writer_pb2.FieldStatus.Status.PENDING for f in field_statuses)):
             self.basic.metadata.status = PBMetadata.Status.PENDING
         # If we have any non-DA error -> ERROR
         elif any(

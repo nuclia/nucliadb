@@ -185,7 +185,7 @@ def parse_text_field(
     writer.field_statuses.append(
         FieldIDStatus(
             id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.TEXT, field=key),
-            status=FieldStatus.Status.PROCESSING,
+            status=FieldStatus.Status.PENDING,
         )
     )
 
@@ -209,7 +209,7 @@ async def parse_file_field(
     writer.field_statuses.append(
         FieldIDStatus(
             id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.FILE, field=key),
-            status=FieldStatus.Status.PROCESSING,
+            status=FieldStatus.Status.PENDING,
         )
     )
 
@@ -314,7 +314,7 @@ def parse_link_field(
     writer.field_statuses.append(
         FieldIDStatus(
             id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.LINK, field=key),
-            status=FieldStatus.Status.PROCESSING,
+            status=FieldStatus.Status.PENDING,
         )
     )
 
@@ -396,6 +396,6 @@ async def parse_conversation_field(
     writer.field_statuses.append(
         FieldIDStatus(
             id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.CONVERSATION, field=key),
-            status=FieldStatus.Status.PROCESSING,
+            status=FieldStatus.Status.PENDING,
         )
     )

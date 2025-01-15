@@ -1832,12 +1832,12 @@ class FieldStatus(google.protobuf.message.Message):
 
     class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldStatus._Status.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        PROCESSING: FieldStatus._Status.ValueType  # 0
+        PENDING: FieldStatus._Status.ValueType  # 0
         PROCESSED: FieldStatus._Status.ValueType  # 1
         ERROR: FieldStatus._Status.ValueType  # 2
 
     class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
-    PROCESSING: FieldStatus.Status.ValueType  # 0
+    PENDING: FieldStatus.Status.ValueType  # 0
     PROCESSED: FieldStatus.Status.ValueType  # 1
     ERROR: FieldStatus.Status.ValueType  # 2
 

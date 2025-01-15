@@ -521,7 +521,7 @@ message FieldError {
 
 message FieldStatus {
     enum Status {
-        PROCESSING = 0;
+        PENDING = 0;
         PROCESSED = 1;
         ERROR = 2;
     }

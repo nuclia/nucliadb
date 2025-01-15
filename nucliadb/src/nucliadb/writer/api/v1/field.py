@@ -556,7 +556,7 @@ async def reprocess_file_field(
     writer.field_statuses.append(
         FieldIDStatus(
             id=FieldID(field_type=resources_pb2.FieldType.FILE, field=field_id),
-            status=FieldStatus.Status.PROCESSING,
+            status=FieldStatus.Status.PENDING,
         )
     )
     await transaction.commit(writer, partition, wait=False)

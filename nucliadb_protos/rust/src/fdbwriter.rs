@@ -1354,7 +1354,7 @@ pub mod field_status {
     )]
     #[repr(i32)]
     pub enum Status {
-        Processing = 0,
+        Pending = 0,
         Processed = 1,
         Error = 2,
     }
@@ -1365,7 +1365,7 @@ pub mod field_status {
         /// (if the ProtoBuf definition does not change) and safe for programmatic use.
         pub fn as_str_name(&self) -> &'static str {
             match self {
-                Status::Processing => "PROCESSING",
+                Status::Pending => "PENDING",
                 Status::Processed => "PROCESSED",
                 Status::Error => "ERROR",
             }
@@ -1373,7 +1373,7 @@ pub mod field_status {
         /// Creates an enum from field names used in the ProtoBuf definition.
         pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
             match value {
-                "PROCESSING" => Some(Self::Processing),
+                "PENDING" => Some(Self::Pending),
                 "PROCESSED" => Some(Self::Processed),
                 "ERROR" => Some(Self::Error),
                 _ => None,
