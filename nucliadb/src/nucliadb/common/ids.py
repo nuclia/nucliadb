@@ -111,13 +111,11 @@ class FieldId:
         parts = value.split("/")
         if len(parts) == 3:
             rid, _type, key = parts
-            if _type not in FIELD_TYPE_STR_TO_PB:
-                raise ValueError(f"Invalid FieldId: {value}")
+            _type = cls.parse_field_type(_type)
             return cls(rid=rid, type=_type, key=key)
         elif len(parts) == 4:
             rid, _type, key, subfield_id = parts
-            if _type not in FIELD_TYPE_STR_TO_PB:
-                raise ValueError(f"Invalid FieldId: {value}")
+            _type = cls.parse_field_type(_type)
             return cls(
                 rid=rid,
                 type=_type,
@@ -126,6 +124,22 @@ class FieldId:
             )
         else:
             raise ValueError(f"Invalid FieldId: {value}")
+
+    @classmethod
+    def parse_field_type(cls, _type: str) -> str:
+        if _type not in FIELD_TYPE_STR_TO_PB:
+            # Try to parse the enum value
+            # XXX: This is to support field types that are integer values of FieldType
+            # Which is how legacy processor relations reported the paragraph_id
+            try:
+                type_pb = FieldType.ValueType(int(_type))
+            except ValueError:
+                raise ValueError(f"Invalid FieldId: {_type}")
+            if type_pb in FIELD_TYPE_PB_TO_STR:
+                return FIELD_TYPE_PB_TO_STR[type_pb]
+            else:
+                raise ValueError(f"Invalid FieldId: {_type}")
+        return _type
 
 
 @dataclass

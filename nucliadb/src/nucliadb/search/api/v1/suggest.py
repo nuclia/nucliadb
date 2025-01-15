@@ -151,8 +151,6 @@ async def suggest(
         search_results = await merge_suggest_results(
             results,
             kbid=kbid,
-            show=show,
-            field_type_filter=field_type_filter,
             highlight=highlight,
         )
 

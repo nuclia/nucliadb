@@ -22,7 +22,13 @@ from typing import Optional
 
 import pytest
 
-from nucliadb.common.ids import FieldId, ParagraphId, VectorId, extract_data_augmentation_id
+from nucliadb.common.ids import (
+    FIELD_TYPE_PB_TO_STR,
+    FieldId,
+    ParagraphId,
+    VectorId,
+    extract_data_augmentation_id,
+)
 from nucliadb_protos.resources_pb2 import FieldType
 
 
@@ -56,6 +62,18 @@ def test_field_ids():
     assert field_id.key == "field_id"
     assert field_id.subfield_id == "subfield_id"
     assert field_id.full() == "rid/u/field_id/subfield_id"
+
+
+def test_field_ids_int_field_type():
+    # Test that we can use integers as field types
+    for value in FieldType.values():
+        field_id = FieldId.from_string(f"rid/{value}/field_id/subfield_id")
+        assert field_id.rid == "rid"
+        assert field_id.type == FIELD_TYPE_PB_TO_STR[value]
+        assert field_id.key == "field_id"
+        assert field_id.subfield_id == "subfield_id"
+        assert field_id.full() == f"rid/{FIELD_TYPE_PB_TO_STR[value]}/field_id/subfield_id"
+        assert field_id.pb_type == value
 
 
 def test_paragraph_ids():

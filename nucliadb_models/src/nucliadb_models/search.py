@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self, deprecated
 
+from nucliadb_models import RelationMetadata
 from nucliadb_models.common import FieldTypeName, ParamDefault
 
 # Bw/c import to avoid breaking users
@@ -237,9 +238,11 @@ class EntityType(str, Enum):
 class DirectionalRelation(BaseModel):
     entity: str
     entity_type: EntityType
+    entity_subtype: str
     relation: RelationType
     relation_label: str
     direction: RelationDirection
+    metadata: Optional[RelationMetadata] = None
 
 
 class EntitySubgraph(BaseModel):
@@ -957,6 +960,11 @@ class ChatModel(BaseModel):
     )
     top_k: Optional[int] = Field(default=None, description="Number of best elements to get from")
 
+    format_prompt: bool = Field(
+        default=True,
+        description="If set to false, the prompt given as `user_prompt` will be used as is, without any formatting for question or context. If set to true, the prompt must contain the placeholders {question} and {context} to be replaced by the question and context respectively",  # noqa: E501
+    )
+
 
 class RephraseModel(BaseModel):
     question: str
@@ -978,6 +986,7 @@ class RagStrategyName:
     METADATA_EXTENSION = "metadata_extension"
     PREQUERIES = "prequeries"
     CONVERSATION = "conversation"
+    GRAPH = "graph"
 
 
 class ImageRagStrategyName:
@@ -1206,6 +1215,39 @@ class PreQueriesStrategy(RagStrategy):
 PreQueryResult = tuple[PreQuery, "KnowledgeboxFindResults"]
 
 
+class GraphStrategy(RagStrategy):
+    """
+    This strategy retrieves context pieces by exploring the Knowledge Graph, starting from the entities present in the query.
+    It works best if the Knowledge Box has a user-defined Graph Extraction agent enabled.
+    """
+
+    name: Literal["graph"] = "graph"
+    hops: int = Field(
+        default=3,
+        title="Number of hops",
+        description="""Number of hops to take when exploring the graph for relevant context.
+For example,
+- hops=1 will explore the neighbors of the starting entities.
+- hops=2 will explore the neighbors of the neighbors of the starting entities.
+And so on.
+Bigger values will discover more intricate relationships but will also take more time to compute.""",
+        ge=1,
+        le=10,
+    )
+    top_k: int = Field(
+        default=25,
+        title="Top k",
+        description="Number of relationships to keep after each hop after ranking them by relevance to the query. This number correlates to more paragraphs being sent as context.",
+        ge=1,
+        le=120,
+    )
+    agentic_graph_only: bool = Field(
+        default=False,
+        title="Use only the graph extracted by an agent.",
+        description="If set to true, only relationships extracted from a graph extraction agent are considered for context expansion.",
+    )
+
+
 class TableImageStrategy(ImageRagStrategy):
     name: Literal["tables"] = "tables"
 
@@ -1232,6 +1274,7 @@ RagStrategies = Annotated[
         MetadataExtensionStrategy,
         ConversationalStrategy,
         PreQueriesStrategy,
+        GraphStrategy,
     ],
     Field(discriminator="name"),
 ]
@@ -1381,6 +1424,7 @@ class AskRequest(AuditMetadataBase):
 - `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
 - `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context.
 - `prequeries` allows to run multiple retrieval queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights.
+- `graph` will retrieve context pieces by exploring the Knowledge Graph, starting from the entities present in the query. This strategy is not compatible with the `prequeries` strategy.
 
 If empty, the default strategy is used, which simply adds the text of the matching paragraphs to the context.
 """
@@ -1639,6 +1683,7 @@ class SCORE_TYPE(str, Enum):
     BM25 = "BM25"
     BOTH = "BOTH"
     RERANKER = "RERANKER"
+    RELATION_RELEVANCE = "RELATION_RELEVANCE"
 
 
 class FindTextPosition(BaseModel):

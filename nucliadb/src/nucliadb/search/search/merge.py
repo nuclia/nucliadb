@@ -23,6 +23,7 @@ import math
 from typing import Any, Optional, Set, Union
 
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import RelationTypePbMap
 from nucliadb.search.search import cache
 from nucliadb.search.search.cut import cut_page
@@ -442,15 +443,38 @@ async def merge_paragraph_results(
 async def merge_relations_results(
     relations_responses: list[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
+    only_with_metadata: bool = False,
+    only_agentic: bool = False,
 ) -> Relations:
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _merge_relations_results, relations_responses, query)
+    return await loop.run_in_executor(
+        None,
+        _merge_relations_results,
+        relations_responses,
+        query,
+        only_with_metadata,
+        only_agentic,
+    )
 
 
 def _merge_relations_results(
     relations_responses: list[RelationSearchResponse],
     query: EntitiesSubgraphRequest,
+    only_with_metadata: bool,
+    only_agentic: bool,
 ) -> Relations:
+    """
+    Merge relation search responses into a single Relations object while applying filters.
+
+    Args:
+        relations_responses: List of relation search responses
+        query: EntitiesSubgraphRequest object
+        only_with_metadata: If True, only include relations with metadata. This metadata includes paragraph_id and entity positions among other things.
+        only_agentic: If True, only include relations extracted by a Graph Extraction Agent.
+
+    Returns:
+        Relations
+    """
     relations = Relations(entities={})
 
     for entry_point in query.entry_points:
@@ -462,27 +486,37 @@ def _merge_relations_results(
             destination = relation.to
             relation_type = RelationTypePbMap[relation.relation]
             relation_label = relation.relation_label
-
-            if origin.value in relations.entities:
-                relations.entities[origin.value].related_to.append(
-                    DirectionalRelation(
-                        entity=destination.value,
-                        entity_type=relation_node_type_to_entity_type(destination.ntype),
-                        relation=relation_type,
-                        relation_label=relation_label,
-                        direction=RelationDirection.OUT,
+            metadata = relation.metadata if relation.HasField("metadata") else None
+            # If only_with_metadata is True, we check that metadata for the relation is not None
+            # If only_agentic is True, we check that metadata for the relation is not None and that it has a data_augmentation_task_id
+            # TODO: This is suboptimal, we should be able to filter this in the query to the index,
+            if (not only_with_metadata or metadata) and (
+                not only_agentic or (metadata and metadata.data_augmentation_task_id)
+            ):
+                if origin.value in relations.entities:
+                    relations.entities[origin.value].related_to.append(
+                        DirectionalRelation(
+                            entity=destination.value,
+                            entity_type=relation_node_type_to_entity_type(destination.ntype),
+                            entity_subtype=destination.subtype,
+                            relation=relation_type,
+                            relation_label=relation_label,
+                            direction=RelationDirection.OUT,
+                            metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                        )
                     )
-                )
-            elif destination.value in relations.entities:
-                relations.entities[destination.value].related_to.append(
-                    DirectionalRelation(
-                        entity=origin.value,
-                        entity_type=relation_node_type_to_entity_type(origin.ntype),
-                        relation=relation_type,
-                        relation_label=relation_label,
-                        direction=RelationDirection.IN,
+                elif destination.value in relations.entities:
+                    relations.entities[destination.value].related_to.append(
+                        DirectionalRelation(
+                            entity=origin.value,
+                            entity_type=relation_node_type_to_entity_type(origin.ntype),
+                            entity_subtype=origin.subtype,
+                            relation=relation_type,
+                            relation_label=relation_label,
+                            direction=RelationDirection.IN,
+                            metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                        )
                     )
-                )
 
     return relations
 
@@ -584,8 +618,6 @@ async def merge_suggest_entities_results(
 async def merge_suggest_results(
     suggest_responses: list[SuggestResponse],
     kbid: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
     highlight: bool = False,
 ) -> KnowledgeboxSuggestResults:
     api_results = KnowledgeboxSuggestResults()
