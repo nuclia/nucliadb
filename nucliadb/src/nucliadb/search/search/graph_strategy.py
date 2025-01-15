@@ -305,8 +305,6 @@ async def get_graph_results(
                 suggest_result = await fuzzy_search_entities(
                     kbid=kbid,
                     query=query,
-                    show=[],
-                    field_type_filter=item.field_type_filter,
                     range_creation_start=item.range_creation_start,
                     range_creation_end=item.range_creation_end,
                     range_modification_start=item.range_modification_start,
@@ -411,8 +409,6 @@ async def get_graph_results(
 async def fuzzy_search_entities(
     kbid: str,
     query: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
