@@ -282,18 +282,9 @@ async def managed_serialize(
                     resource.data.links[field.id].value = from_proto.field_link(value)
 
                 if include_errors:
-                    status = await field.get_status()
-                    if status is not None and len(status.errors) > 0:
-                        resource.data.links[field.id].error = Error(
-                            body=status.errors[0].source_error.error,
-                            code=status.errors[0].source_error.code,
-                        )
-                    else:
-                        error = await field.get_error()
-                        if error is not None:
-                            resource.data.links[field.id].error = Error(
-                                body=error.error, code=error.code
-                            )
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.links[field.id].error = Error(body=error.error, code=error.code)
 
                 if include_extracted_data:
                     resource.data.links[field.id].extracted = LinkFieldExtractedData()
