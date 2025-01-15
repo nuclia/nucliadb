@@ -432,7 +432,7 @@ async def fuzzy_search_entities(
     tasks = []
     # XXX: Splitting by words is not ideal, in the future, modify suggest to better handle this
     for word in query.split():
-        if len(word) <= 3:
+        if len(word) < 3:
             continue
         request = nodereader_pb2.SuggestRequest()
         request.CopyFrom(base_request)

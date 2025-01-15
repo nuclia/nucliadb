@@ -231,6 +231,8 @@ def paragraph_id_to_text_block_match(paragraph_id: str) -> TextBlockMatch:
     Given a paragraph_id, return a TextBlockMatch with the bare minimum fields
     This is required by the Graph Strategy to get text blocks from the relevant paragraphs
     """
+    # XXX: this is a workaround for the fact we always assume retrieval means keyword/semantic search and
+    # the hydration and find response building code works with TextBlockMatch
     parsed_paragraph_id = ParagraphId.from_string(paragraph_id)
     return TextBlockMatch(
         paragraph_id=parsed_paragraph_id,

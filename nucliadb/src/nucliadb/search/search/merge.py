@@ -489,6 +489,7 @@ def _merge_relations_results(
             metadata = relation.metadata if relation.HasField("metadata") else None
             # If only_with_metadata is True, we check that metadata for the relation is not None
             # If only_agentic is True, we check that metadata for the relation is not None and that it has a data_augmentation_task_id
+            # TODO: This is suboptimal, we should be able to filter this in the query to the index,
             if (not only_with_metadata or metadata) and (
                 not only_agentic or (metadata and metadata.data_augmentation_task_id)
             ):

@@ -962,7 +962,7 @@ class ChatModel(BaseModel):
 
     format_prompt: bool = Field(
         default=True,
-        description="If set to false, the prompt will be used as is, without any formatting for query or context",
+        description="If set to false, the prompt given as `user_prompt` will be used as is, without any formatting for question or context. If set to true, the prompt must contain the placeholders {question} and {context} to be replaced by the question and context respectively",  # noqa: E501
     )
 
 
@@ -1244,7 +1244,7 @@ Bigger values will discover more intricate relationships but will also take more
     agentic_graph_only: bool = Field(
         default=False,
         title="Use only the graph extracted by an agent.",
-        description="If set to true, only entities extracted from a graph extraction agent are considered for context expansion.",
+        description="If set to true, only relationships extracted from a graph extraction agent are considered for context expansion.",
     )
 
 
@@ -1424,7 +1424,7 @@ class AskRequest(AuditMetadataBase):
 - `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
 - `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context.
 - `prequeries` allows to run multiple retrieval queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights.
-- `graph` will retrieve context pieces by exploring the Knowledge Graph, starting from the entities present in the query.
+- `graph` will retrieve context pieces by exploring the Knowledge Graph, starting from the entities present in the query. This strategy is not compatible with the `prequeries` strategy.
 
 If empty, the default strategy is used, which simply adds the text of the matching paragraphs to the context.
 """
