@@ -55,7 +55,7 @@ from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import FieldID, Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
@@ -553,6 +553,12 @@ async def reprocess_file_field(
     writer.source = BrokerMessage.MessageSource.WRITER
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=FieldID(field_type=resources_pb2.FieldType.FILE, field=field_id),
+            status=FieldStatus.Status.PROCESSING,
+        )
+    )
     await transaction.commit(writer, partition, wait=False)
     # Send current resource to reprocess.
     try:

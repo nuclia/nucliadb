@@ -136,6 +136,8 @@ message BrokerMessage {
     utils.Security security = 39;
 
     repeated Generator generated_by = 40;
+
+    repeated FieldIDStatus field_statuses = 41;
 }
 
 message BrokerMessageBlobReference {
@@ -525,4 +527,9 @@ message FieldStatus {
     }
     Status status = 1;
     repeated FieldError errors = 2;
+}
+
+message FieldIDStatus {
+    resources.FieldID id = 1;
+    FieldStatus.Status status = 2;
 }

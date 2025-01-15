@@ -253,6 +253,8 @@ pub struct BrokerMessage {
     pub security: ::core::option::Option<super::utils::Security>,
     #[prost(message, repeated, tag = "40")]
     pub generated_by: ::prost::alloc::vec::Vec<Generator>,
+    #[prost(message, repeated, tag = "41")]
+    pub field_statuses: ::prost::alloc::vec::Vec<FieldIdStatus>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
@@ -1378,6 +1380,14 @@ pub mod field_status {
             }
         }
     }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldIdStatus {
+    #[prost(message, optional, tag = "1")]
+    pub id: ::core::option::Option<super::resources::FieldId>,
+    #[prost(enumeration = "field_status::Status", tag = "2")]
+    pub status: i32,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

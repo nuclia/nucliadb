@@ -63,8 +63,8 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_protos.resources_pb2 import Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
+from nucliadb_protos.resources_pb2 import FieldID, Metadata
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus, IndexResource
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -422,6 +422,7 @@ async def _reprocess_resource(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
+    writer = BrokerMessage()
     async with driver.transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid)
 
@@ -430,8 +431,14 @@ async def _reprocess_resource(
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
         await extract_fields(resource=resource, toprocess=toprocess)
+        for field_type, field_id in resource.fields.keys():
+            writer.field_statuses.append(
+                FieldIDStatus(
+                    id=FieldID(field_type=field_type, field=field_id),
+                    status=FieldStatus.Status.PROCESSING,
+                )
+            )
 
-    writer = BrokerMessage()
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER

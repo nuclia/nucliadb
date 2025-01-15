@@ -135,6 +135,7 @@ from nucliadb_protos.writer_pb2 import (
     DelVectorSetResponse as DelVectorSetResponse,
     Error as Error,
     FieldError as FieldError,
+    FieldIDStatus as FieldIDStatus,
     FieldStatus as FieldStatus,
     Generator as Generator,
     GetEntitiesGroupRequest as GetEntitiesGroupRequest,
