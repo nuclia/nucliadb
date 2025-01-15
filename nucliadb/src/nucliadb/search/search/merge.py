@@ -463,6 +463,18 @@ def _merge_relations_results(
     only_with_metadata: bool,
     only_agentic: bool,
 ) -> Relations:
+    """
+    Merge relation search responses into a single Relations object while applying filters.
+
+    Args:
+        relations_responses: List of relation search responses
+        query: EntitiesSubgraphRequest object
+        only_with_metadata: If True, only include relations with metadata. This metadata includes paragraph_id and entity positions among other things.
+        only_agentic: If True, only include relations extracted by a Graph Extraction Agent.
+
+    Returns:
+        Relations
+    """
     relations = Relations(entities={})
 
     for entry_point in query.entry_points:
@@ -475,6 +487,8 @@ def _merge_relations_results(
             relation_type = RelationTypePbMap[relation.relation]
             relation_label = relation.relation_label
             metadata = relation.metadata if relation.HasField("metadata") else None
+            # If only_with_metadata is True, we check that metadata for the relation is not None
+            # If only_agentic is True, we check that metadata for the relation is not None and that it has a data_augmentation_task_id
             if (not only_with_metadata or metadata) and (
                 not only_agentic or (metadata and metadata.data_augmentation_task_id)
             ):
