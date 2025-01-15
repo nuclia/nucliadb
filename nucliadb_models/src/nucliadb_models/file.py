@@ -36,7 +36,10 @@ class FieldFile(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
     external: bool = False
-    extract_strategy: Optional[str] = None
+    extract_strategy: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
+    )
 
 
 # Creation and update classes (Those used on writer endpoints)
