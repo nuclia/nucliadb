@@ -62,6 +62,16 @@ async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
 
             print(f"Processing {len(records)} field errors from {start}")
             for key, value in records:
+                start = key
+
+                parts = key.split("/")
+                parts[-1] = "status"
+                status_key = "/".join(parts)
+
+                existing_status = await txn.get(status_key)
+                if existing_status is not None:
+                    continue
+
                 error = writer_pb2.Error()
                 error.ParseFromString(value)
 
@@ -70,7 +80,6 @@ async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
                 # which is not desired.
                 # There is no way to do this 100% accurate since the /error key is only cleared on field deletion
                 if error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION:
-                    parts = key.split("/")
                     kbid = parts[2]
                     rid = parts[4]
                     basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
@@ -86,7 +95,6 @@ async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
                 )
                 field_error.created.GetCurrentTime()
                 status.errors.append(field_error)
-                status_key = key[:-5] + "status"
                 await txn.set(status_key, status.SerializeToString())
 
             await txn.commit()
