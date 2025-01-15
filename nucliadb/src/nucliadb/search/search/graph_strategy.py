@@ -31,6 +31,8 @@ from nuclia_models.predict.generative_responses import (
 )
 from sentry_sdk import capture_exception
 
+from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.ids import ParagraphId
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.chat.query import (
@@ -41,7 +43,6 @@ from nucliadb.search.search.find import query_parser_from_find_request
 from nucliadb.search.search.find_merge import (
     compose_find_resources,
     hydrate_and_rerank,
-    paragraph_id_to_text_block_matches,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.merge import merge_suggest_results
@@ -52,6 +53,7 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
+    SCORE_TYPE,
     AskRequest,
     ChatModel,
     DirectionalRelation,
@@ -63,6 +65,7 @@ from nucliadb_models.search import (
     RelationDirection,
     Relations,
     ResourceProperties,
+    TextPosition,
     UserPrompt,
 )
 from nucliadb_protos import nodereader_pb2
@@ -366,7 +369,7 @@ async def get_graph_results(
         # Rank the relevance of the relations
         with metrics.time("graph_strat_rank_relations"):
             try:
-                relations = await rank_relations(
+                relations, scores = await rank_relations(
                     relations,
                     query,
                     kbid,
@@ -381,18 +384,21 @@ async def get_graph_results(
 
     # Get the text blocks of the paragraphs that contain the top relations
     with metrics.time("graph_strat_build_response"):
-        paragraph_ids = {
-            r.metadata.paragraph_id
-            for rel in relations.entities.values()
-            for r in rel.related_to
-            if r.metadata and r.metadata.paragraph_id
-        }
+        paragraph_ids_scores: dict[str, int] = defaultdict(lambda: 0)
+        # Merge the paragraph ids for each relationship and keep the max score
+        for ent, rels in relations.entities.items():
+            for rel_score, rel in zip(scores[ent], rels.related_to):
+                if rel.metadata and rel.metadata.paragraph_id:
+                    paragraph_ids_scores[rel.metadata.paragraph_id] = max(
+                        paragraph_ids_scores[rel.metadata.paragraph_id], rel_score
+                    )
+
         find_request = find_request_from_ask_request(item, query)
         query_parser, rank_fusion, reranker = await query_parser_from_find_request(
             kbid, find_request, generative_model=generative_model
         )
         find_results = await build_graph_response(
-            paragraph_ids,
+            paragraph_ids_scores,
             kbid=kbid,
             query=query,
             final_relations=relations,
@@ -462,7 +468,7 @@ async def rank_relations(
     generative_model: Optional[str] = None,
     score_threshold: int = 0,
     max_rels_to_eval: int = 300,
-) -> Relations:
+) -> tuple[Relations, dict[str, list[int]]]:
     # Store the index for keeping track after scoring
     flat_rels: list[tuple[str, int, DirectionalRelation]] = [
         (ent, idx, rel)
@@ -566,17 +572,19 @@ async def rank_relations(
 
     top_k_scores = heapq.nlargest(top_k, scores, key=lambda x: x[1])
     top_k_rels: dict[str, EntitySubgraph] = defaultdict(lambda: EntitySubgraph(related_to=[]))
+    top_k_scores_by_ent: dict[str, list[int]] = defaultdict(list)
     for idx_flat, score in top_k_scores:
         (ent, idx, _) = flat_rels[idx_flat]
         rel = relations.entities[ent].related_to[idx]
         if score > score_threshold:
             top_k_rels[ent].related_to.append(rel)
+            top_k_scores_by_ent[ent].append(score)
 
-    return Relations(entities=top_k_rels)
+    return Relations(entities=top_k_rels), top_k_scores_by_ent
 
 
 async def build_graph_response(
-    paragraph_ids: Iterable[str],
+    paragraph_ids_scores: dict[str, int],
     *,
     kbid: str,
     query: str,
@@ -589,7 +597,7 @@ async def build_graph_response(
 ) -> KnowledgeboxFindResults:
     # manually generate paragraph results
 
-    text_blocks = paragraph_id_to_text_block_matches(paragraph_ids)
+    text_blocks = paragraph_id_to_text_block_matches(paragraph_ids_scores)
 
     # hydrate and rerank
     resource_hydration_options = ResourceHydrationOptions(
@@ -625,3 +633,38 @@ def filter_subgraph(subgraph: EntitySubgraph, entities_to_remove: Collection[str
     return EntitySubgraph(
         related_to=[rel for rel in subgraph.related_to if rel.entity not in entities_to_remove]
     )
+
+
+def paragraph_id_to_text_block_match(paragraph_id: str, score: int) -> TextBlockMatch:
+    """
+    Given a paragraph_id, return a TextBlockMatch with the bare minimum fields
+    This is required by the Graph Strategy to get text blocks from the relevant paragraphs
+    """
+    # XXX: this is a workaround for the fact we always assume retrieval means keyword/semantic search and
+    # the hydration and find response building code works with TextBlockMatch
+    parsed_paragraph_id = ParagraphId.from_string(paragraph_id)
+    return TextBlockMatch(
+        paragraph_id=parsed_paragraph_id,
+        score=score,
+        score_type=SCORE_TYPE.RELATION_RELEVANCE,
+        order=0,  # NOTE: this will be filled later
+        text="",  # NOTE: this will be filled later too
+        position=TextPosition(
+            page_number=0,
+            index=0,
+            start=parsed_paragraph_id.paragraph_start,
+            end=parsed_paragraph_id.paragraph_end,
+            start_seconds=[],
+            end_seconds=[],
+        ),
+        field_labels=[],
+        paragraph_labels=[],
+        fuzzy_search=False,
+        is_a_table=False,
+        representation_file="",
+        page_with_visual=False,
+    )
+
+
+def paragraph_id_to_text_block_matches(paragraph_ids: dict[str, int]) -> list[TextBlockMatch]:
+    return [paragraph_id_to_text_block_match(p_id, score) for p_id, score in paragraph_ids.items()]

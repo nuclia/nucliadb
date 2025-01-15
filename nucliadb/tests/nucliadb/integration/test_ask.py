@@ -800,9 +800,12 @@ async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox, resources):
 @pytest.mark.asyncio
 @patch("nucliadb.search.search.graph_strategy.rank_relations")
 async def test_ask_graph_strategy(mocker, nucliadb_reader: AsyncClient, knowledgebox, graph_resource):
-    # Mock the rank_relations function to return the same relations (no ranking)
+    # Mock the rank_relations function to return the same relations with a score of 5 (no ranking)
     # This function is already unit tested and requires predict
-    mocker.side_effect = lambda *args, **kwargs: args[0]
+    mocker.side_effect = lambda relations, *args, **kwargs: (
+        relations,
+        {ent: [5 for _ in rels.related_to] for ent, rels in relations.entities.items()},
+    )
 
     data = {
         "query": "Which actors have been in movies directed by Christopher Nolan?",
@@ -836,6 +839,11 @@ async def test_ask_graph_strategy(mocker, nucliadb_reader: AsyncClient, knowledg
             for paragraph in field.paragraphs.values()
         }
         assert paragraph_texts == expected
+
+        paragraph_scores = [
+            paragraph.score for field in paragraphs.values() for paragraph in field.paragraphs.values()
+        ]
+        assert all(score == 5 for score in paragraph_scores)
         # We expect a ranking for each hop
         assert mocker.call_count == 2
         mocker.reset_mock()

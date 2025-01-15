@@ -1683,6 +1683,7 @@ class SCORE_TYPE(str, Enum):
     BM25 = "BM25"
     BOTH = "BOTH"
     RERANKER = "RERANKER"
+    RELATION_RELEVANCE = "RELATION_RELEVANCE"
 
 
 class FindTextPosition(BaseModel):

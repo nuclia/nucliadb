@@ -133,7 +133,7 @@ async def test_rank_relations(
             ),
         }
     )
-    result = await rank_relations(
+    result, scores = await rank_relations(
         relations=relations, query="my_query", kbid="my_kbid", user="my_user", top_k=3, score_threshold=0
     )
     assert "John Adams Roofing Inc." in result.entities
@@ -142,3 +142,6 @@ async def test_rank_relations(
         == relations.entities["John Adams Roofing Inc."].related_to[1:]
     )
     assert "John Adams" not in result.entities
+    assert dict(scores) == {
+        "John Adams Roofing Inc.": [10, 6, 6],
+    }
