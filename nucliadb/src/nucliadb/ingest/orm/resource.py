@@ -615,8 +615,24 @@ class Resource:
 
     @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
+        errors = False
+        field_obj: Field
+        for error in message.errors:
+            field_obj = await self.get_field(error.field, error.field_type, load=False)
+            await field_obj.set_error(error)
+            errors = True
+
+        await self.get_basic()
+        if self.basic is None:
+            raise KeyError("Resource Not Found")
+
         previous_basic = Basic()
         previous_basic.CopyFrom(self.basic)
+
+        if errors:
+            self.basic.metadata.status = PBMetadata.Status.ERROR
+        elif errors is False and message.source is message.MessageSource.PROCESSOR:
+            self.basic.metadata.status = PBMetadata.Status.PROCESSED
 
         maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
@@ -626,9 +642,9 @@ class Resource:
         for extracted_text in message.extracted_text:
             await self._apply_extracted_text(extracted_text)
 
-        # Update field and resource status depending on processing results
+        # TODO: Update field and resource status depending on processing results
         await self.apply_fields_status(message, self._modified_extracted_text)
-        await self.update_status()
+        # await self.update_status()
 
         extracted_languages = []
 
