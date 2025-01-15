@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, MutableMapping, Optional, 
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -538,13 +538,15 @@ class Resource:
     @processor_observer.wrap({"type": "apply_fields_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
         # Dictionary of all errors per field (we may have several due to DA tasks)
-        errors_by_field = defaultdict(list)
+        errors_by_field: dict[tuple[FieldType.ValueType, str], list[writer_pb2.Error]] = defaultdict(
+            list
+        )
 
         # Make sure if a file is updated without errors, it ends up in errors_by_field
         for field_id in updated_fields:
             errors_by_field[(field_id.field_type, field_id.field)] = []
-        for field in message.field_statuses:
-            errors_by_field[(field.id.field_type, field.id.field)] = []
+        for fs in message.field_statuses:
+            errors_by_field[(fs.id.field_type, fs.id.field)] = []
 
         for error in message.errors:
             errors_by_field[(error.field_type, error.field)].append(error)
