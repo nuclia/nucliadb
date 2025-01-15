@@ -18,12 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import Dict, List, Optional
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
-
-from nucliadb_protos import resources_pb2
 
 from .common import (
     Classification,
@@ -33,25 +30,13 @@ from .common import (
     Paragraph,
     QuestionAnswers,
 )
-from .metadata import Relation, convert_pb_relation_to_api
-
-_T = TypeVar("_T")
+from .metadata import Relation
 
 
 class ExtractedText(BaseModel):
     text: Optional[str] = None
     split_text: Optional[Dict[str, str]] = None
     deleted_splits: Optional[List[str]] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.ExtractedText) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
 
 
 class ExtractedTextWrapper(BaseModel):
@@ -76,16 +61,6 @@ class VectorObject(BaseModel):
     vectors: Optional[Vectors] = None
     split_vectors: Optional[Dict[str, Vectors]] = None
     deleted_splits: Optional[List[str]] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.VectorObject) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
 
 
 class ExtractedVectorsWrapper(BaseModel):
@@ -141,40 +116,6 @@ class FieldComputedMetadata(BaseModel):
     split_metadata: Optional[Dict[str, FieldMetadata]] = None
     deleted_splits: Optional[List[str]] = None
 
-    @classmethod
-    def from_message(
-        cls,
-        message: resources_pb2.FieldComputedMetadata,
-        shortened: bool = False,
-    ):
-        if shortened:
-            cls.shorten_fieldmetadata(message)
-        metadata = convert_fieldmetadata_pb_to_dict(message.metadata)
-        split_metadata = {
-            split: convert_fieldmetadata_pb_to_dict(metadata_split)
-            for split, metadata_split in message.split_metadata.items()
-        }
-        value = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        value["metadata"] = metadata
-        value["split_metadata"] = split_metadata
-        return cls(**value)
-
-    @classmethod
-    def shorten_fieldmetadata(
-        cls,
-        message: resources_pb2.FieldComputedMetadata,
-    ) -> None:
-        large_fields = ["ner", "relations", "positions", "classifications", "entities"]
-        for field in large_fields:
-            message.metadata.ClearField(field)  # type: ignore
-        for metadata in message.split_metadata.values():
-            for field in large_fields:
-                metadata.ClearField(field)  # type: ignore
-
 
 class FieldComputedMetadataWrapper(BaseModel):
     metadata: Optional[FieldComputedMetadata] = None
@@ -197,16 +138,6 @@ class LargeComputedMetadata(BaseModel):
     split_metadata: Optional[Dict[str, FieldLargeMetadata]] = None
     deleted_splits: Optional[List[str]] = None
 
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.LargeComputedMetadata) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-
 
 class LargeComputedMetadataWrapper(BaseModel):
     real: Optional[LargeComputedMetadata] = None
@@ -227,16 +158,6 @@ class LinkExtractedData(BaseModel):
     type: Optional[str] = None
     embed: Optional[str] = None
     file_generated: Optional[Dict[str, CloudLink]] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.LinkExtractedData) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
 
 
 class NestedPosition(BaseModel):
@@ -306,65 +227,8 @@ class FileExtractedData(BaseModel):
     nested_position: Optional[Dict[str, NestedPosition]] = None
     nested_list_position: Optional[Dict[str, NestedListPosition]] = None
 
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.FileExtractedData) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-
 
 class FieldQuestionAnswers(BaseModel):
     question_answers: QuestionAnswers
     split_question_answers: Optional[Dict[str, QuestionAnswers]] = None
     deleted_splits: Optional[List[str]] = None
-
-    @classmethod
-    def from_message(
-        cls: Type[_T],
-        message: resources_pb2.FieldQuestionAnswers,
-    ) -> _T:
-        value = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        return cls(**value)
-
-
-def convert_fieldmetadata_pb_to_dict(
-    message: resources_pb2.FieldMetadata,
-) -> Dict[str, Any]:
-    # Backwards compatibility with old entities format
-    # TODO: Remove once deprecated fields are removed
-    # If we recieved processor entities in the new field and the old field is empty, we copy them to the old field
-    if "processor" in message.entities and len(message.positions) == 0 and len(message.ner) == 0:
-        message.ner.update(
-            {entity.text: entity.label for entity in message.entities["processor"].entities}
-        )
-        for entity in message.entities["processor"].entities:
-            message.positions[entity.label + "/" + entity.text].entity = entity.text
-            message.positions[entity.label + "/" + entity.text].position.extend(
-                [
-                    resources_pb2.Position(
-                        start=position.start,
-                        end=position.end,
-                    )
-                    for position in entity.positions
-                ]
-            )
-
-    value = MessageToDict(
-        message,
-        preserving_proto_field_name=True,
-        including_default_value_fields=True,
-    )
-    value["relations"] = [
-        convert_pb_relation_to_api(relation)
-        for relations in message.relations
-        for relation in relations.relations
-    ]
-    return value

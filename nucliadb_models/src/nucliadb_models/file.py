@@ -18,15 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional, Type, TypeVar
+from typing import Optional
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 
 from nucliadb_models import CloudLink, File
-from nucliadb_protos import resources_pb2
-
-_T = TypeVar("_T")
 
 # Shared classes
 # - Nothing to see here
@@ -40,20 +36,6 @@ class FieldFile(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
     external: bool = False
-
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.FieldFile) -> _T:
-        instance = cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-        instance.external = (  # type: ignore
-            message.file.source == resources_pb2.CloudFile.Source.EXTERNAL
-        )
-        return instance
 
 
 # Creation and update classes (Those used on writer endpoints)

@@ -22,9 +22,9 @@ from typing import Optional, Union
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
-import nucliadb_models as models
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
@@ -37,7 +37,6 @@ from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
     FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP,
-    FIELD_NAMES_TO_PB_TYPE_MAP,
     ResourceField,
 )
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
@@ -334,9 +333,7 @@ async def _get_resource_field(
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
-
-    pb_field_id = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
-
+    pb_field_id = to_proto.field_type_name(field_type)
     async with driver.transaction() as txn:
         kb = ORMKnowledgeBox(txn, storage, kbid)
 
@@ -358,15 +355,15 @@ async def _get_resource_field(
 
             if isinstance(value, resources_pb2.FieldText):
                 value = await field.get_value()
-                resource_field.value = models.FieldText.from_message(value)
+                resource_field.value = from_proto.field_text(value)
 
             if isinstance(value, resources_pb2.FieldFile):
                 value = await field.get_value()
-                resource_field.value = models.FieldFile.from_message(value)
+                resource_field.value = from_proto.field_file(value)
 
             if isinstance(value, resources_pb2.FieldLink):
                 value = await field.get_value()
-                resource_field.value = models.FieldLink.from_message(value)
+                resource_field.value = from_proto.field_link(value)
 
             if isinstance(field, Conversation):
                 if page == "first":
@@ -379,7 +376,7 @@ async def _get_resource_field(
 
                 value = await field.get_value(page=page_to_fetch)
                 if value is not None:
-                    resource_field.value = models.Conversation.from_message(value)
+                    resource_field.value = from_proto.conversation(value)
 
         if ResourceFieldProperties.EXTRACTED in show and extracted:
             resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()

@@ -18,15 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import List, Type, TypeVar
+from typing import List
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
-
-from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from nucliadb_protos.writer_pb2 import Shards as PBShards
-
-_T = TypeVar("_T")
 
 
 class DocumentServiceEnum(str, Enum):
@@ -71,26 +65,7 @@ class ShardObject(BaseModel):
     shard: str
     replicas: List[ShardReplica]
 
-    @classmethod
-    def from_message(cls: Type[_T], message: PBShardObject) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-
 
 class KnowledgeboxShards(BaseModel):
     kbid: str
     shards: List[ShardObject]
-
-    @classmethod
-    def from_message(cls: Type[_T], message: PBShards) -> _T:
-        as_dict = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        return cls(**as_dict)

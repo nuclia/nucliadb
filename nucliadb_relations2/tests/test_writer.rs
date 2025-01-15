@@ -22,7 +22,7 @@ mod common;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
-use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::protos::{RelationMetadata, Resource, ResourceId};
 use nucliadb_core::relations::*;
 use nucliadb_relations2::writer::RelationsWriterService;
 use tempfile::TempDir;
@@ -69,7 +69,7 @@ fn test_index_docs() -> NodeResult<()> {
             shard_id: "shard_id".to_string(),
         }),
         relations: vec![
-            common::create_relation(
+            common::create_relation_with_metadata(
                 "cat".to_string(),
                 NodeType::Entity,
                 "ANIMALS".to_string(),
@@ -77,6 +77,15 @@ fn test_index_docs() -> NodeResult<()> {
                 NodeType::Entity,
                 "ANIMALS".to_string(),
                 RelationType::Entity,
+                RelationMetadata {
+                    paragraph_id: Some("myresource/0/myresource/100-200".to_string()),
+                    source_start: Some(0),
+                    source_end: Some(10),
+                    to_start: Some(11),
+                    to_end: Some(20),
+                    data_augmentation_task_id: Some("mytask".to_string()),
+                    ..Default::default()
+                },
             ),
             common::create_relation(
                 "dolphin".to_string(),

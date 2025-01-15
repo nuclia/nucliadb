@@ -24,8 +24,8 @@ use nucliadb_core::protos::entities_subgraph_request::DeletedEntities;
 use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::{
-    EntitiesSubgraphRequest, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, Resource,
-    ResourceId,
+    EntitiesSubgraphRequest, RelationMetadata, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
+    Resource, ResourceId,
 };
 use nucliadb_core::relations::*;
 use nucliadb_relations2::reader::RelationsReaderService;
@@ -93,7 +93,7 @@ fn create_reader() -> NodeResult<RelationsReaderService> {
                 "PEOPLE".to_string(),
                 RelationType::Entity,
             ),
-            common::create_relation(
+            common::create_relation_with_metadata(
                 "Anthony".to_string(),
                 NodeType::Entity,
                 "PEOPLE".to_string(),
@@ -101,6 +101,15 @@ fn create_reader() -> NodeResult<RelationsReaderService> {
                 NodeType::Entity,
                 "PLACES".to_string(),
                 RelationType::Entity,
+                RelationMetadata {
+                    paragraph_id: Some("myresource/0/myresource/100-200".to_string()),
+                    source_start: Some(0),
+                    source_end: Some(10),
+                    to_start: Some(11),
+                    to_end: Some(20),
+                    data_augmentation_task_id: Some("mytask".to_string()),
+                    ..Default::default()
+                },
             ),
             common::create_relation(
                 "Anna".to_string(),
@@ -208,6 +217,38 @@ fn test_search() -> NodeResult<()> {
     })?;
 
     assert_eq!(result.subgraph.unwrap().relations.len(), 2);
+
+    Ok(())
+}
+
+#[test]
+fn test_search_metadata() -> NodeResult<()> {
+    let reader = create_reader()?;
+
+    let result = reader.search(&RelationSearchRequest {
+        subgraph: Some(EntitiesSubgraphRequest {
+            depth: Some(1_i32),
+            entry_points: vec![common::create_relation_node(
+                "Anthony".to_string(),
+                NodeType::Entity,
+                "PEOPLE".to_string(),
+            )],
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+
+    let subgraph = result.subgraph.unwrap();
+    assert_eq!(subgraph.relations.len(), 1);
+
+    let relation = &subgraph.relations[0];
+    let metadata = relation.metadata.as_ref().unwrap();
+    assert_eq!(metadata.paragraph_id, Some("myresource/0/myresource/100-200".to_string()));
+    assert_eq!(metadata.source_start, Some(0));
+    assert_eq!(metadata.source_end, Some(10));
+    assert_eq!(metadata.to_start, Some(11));
+    assert_eq!(metadata.to_end, Some(20));
+    assert_eq!(metadata.data_augmentation_task_id, Some("mytask".to_string()));
 
     Ok(())
 }

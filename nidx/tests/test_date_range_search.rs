@@ -92,14 +92,8 @@ async fn populate(fixture: &mut NidxFixture, shard_id: String, metadata: IndexMe
         resource: Some(resource_id),
         metadata: Some(metadata),
         status: ResourceStatus::Processed as i32,
-        labels: vec![],
         texts: HashMap::from([(field_id.clone(), text_content)]),
         paragraphs: HashMap::from([(format!("{raw_resource_id}/{field_id}"), paragraphs)]),
-        paragraphs_to_delete: vec![],
-        sentences_to_delete: vec![],
-        relations: vec![],
-        vectors: HashMap::default(),
-        vectors_to_delete: HashMap::default(),
         ..Default::default()
     };
 

@@ -666,6 +666,24 @@ class Resource(google.protobuf.message.Message):
         def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
 
     @typing.final
+    class VectorPrefixesToDeleteEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___StringList: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___StringList | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    @typing.final
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -709,6 +727,7 @@ class Resource(google.protobuf.message.Message):
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     PARAGRAPHS_TO_DELETE_FIELD_NUMBER: builtins.int
     SENTENCES_TO_DELETE_FIELD_NUMBER: builtins.int
+    VECTOR_PREFIXES_TO_DELETE_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
     VECTORS_FIELD_NUMBER: builtins.int
@@ -743,7 +762,15 @@ class Resource(google.protobuf.message.Message):
     @property
     def paragraphs_to_delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
-    def sentences_to_delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def sentences_to_delete(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """DEPRECATED: replaced by vector_prefixes_to_delete in order to support
+        updates on a subset of the available vectorsets
+        """
+
+    @property
+    def vector_prefixes_to_delete(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___StringList]:
+        """vectorset_id -> [vector_key_prefix, ...]"""
+
     @property
     def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]:
         """Relations"""
@@ -769,6 +796,7 @@ class Resource(google.protobuf.message.Message):
         paragraphs: collections.abc.Mapping[builtins.str, global___IndexParagraphs] | None = ...,
         paragraphs_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
         sentences_to_delete: collections.abc.Iterable[builtins.str] | None = ...,
+        vector_prefixes_to_delete: collections.abc.Mapping[builtins.str, global___StringList] | None = ...,
         relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
         shard_id: builtins.str = ...,
         vectors: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectors] | None = ...,
@@ -776,7 +804,7 @@ class Resource(google.protobuf.message.Message):
         security: nucliadb_protos.utils_pb2.Security | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_security", b"_security", "metadata", b"metadata", "resource", b"resource", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_security", b"_security", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_security", b"_security", "labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "resource", b"resource", "security", b"security", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vector_prefixes_to_delete", b"vector_prefixes_to_delete", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_security", b"_security"]) -> typing.Literal["security"] | None: ...
 
 global___Resource = Resource
@@ -868,3 +896,19 @@ class NodeMetadata(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["_primary_node_id", b"_primary_node_id"]) -> typing.Literal["primary_node_id"] | None: ...
 
 global___NodeMetadata = NodeMetadata
+
+@typing.final
+class StringList(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        items: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
+
+global___StringList = StringList

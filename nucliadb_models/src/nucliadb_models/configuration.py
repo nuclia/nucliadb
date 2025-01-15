@@ -19,14 +19,9 @@
 #
 
 import warnings
-from typing import Optional, Type, TypeVar
+from typing import Optional
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
-
-from nucliadb_protos import knowledgebox_pb2
-
-_T = TypeVar("_T")
 
 
 class KBConfiguration(BaseModel):
@@ -40,12 +35,3 @@ class KBConfiguration(BaseModel):
     ner_model: Optional[str] = None
     anonymization_model: Optional[str] = None
     visual_labeling: Optional[str] = None
-
-    @classmethod
-    def from_message(cls: Type[_T], message: knowledgebox_pb2.KBConfiguration) -> _T:
-        entity = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=False,
-        )
-        return cls(**entity)

@@ -263,7 +263,7 @@ fn index_resource_to_index(
     };
 
     let deletions = match index.kind {
-        IndexKind::Vector => nidx_vector::VectorIndexer.deletions_for_resource(resource),
+        IndexKind::Vector => nidx_vector::VectorIndexer.deletions_for_resource(resource, &index.name),
         IndexKind::Text => nidx_text::TextIndexer.deletions_for_resource(resource),
         IndexKind::Paragraph => nidx_paragraph::ParagraphIndexer.deletions_for_resource(resource),
         IndexKind::Relation => nidx_relation::RelationIndexer.deletions_for_resource(resource),
@@ -277,6 +277,7 @@ fn index_resource_to_index(
 mod tests {
     use std::io::{Seek, Write};
 
+    use nidx_protos::StringList;
     use nidx_vector::config::{Similarity, VectorConfig, VectorType};
     use tempfile::tempfile;
     use uuid::Uuid;
@@ -354,7 +355,12 @@ mod tests {
             format!("{}/a/title/0-15", resource.resource.as_ref().unwrap().uuid),
             format!("{}/a/summary/0-150", resource.resource.as_ref().unwrap().uuid),
         ];
-        resource.sentences_to_delete.append(&mut keys.clone());
+        resource.vector_prefixes_to_delete.insert(
+            index.name,
+            StringList {
+                items: keys.clone(),
+            },
+        );
         index_resource(
             &meta,
             storage.clone(),

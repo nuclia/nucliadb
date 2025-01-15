@@ -18,22 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import TYPE_CHECKING, Optional, Type, TypeVar
+from typing import Optional
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import Self
 
 from nucliadb_models.utils import validate_json
-from nucliadb_protos import resources_pb2
-
-_T = TypeVar("_T")
-
-
-if TYPE_CHECKING:  # pragma: no cover
-    TextFormatValue = resources_pb2.FieldText.Format.V
-else:
-    TextFormatValue = int
 
 MB = 1024 * 1024
 
@@ -71,16 +61,6 @@ class FieldText(BaseModel):
     format: Optional[TextFormat] = None
     md5: Optional[str] = None
 
-    @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.FieldText) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
-
 
 # Creation and update classes (Those used on writer endpoints)
 
@@ -108,7 +88,7 @@ If you need to store more text, consider using a file field instead or splitting
 # Processing classes (Those used to sent to push endpoints)
 
 
-class PushTextFormat(TextFormatValue, Enum):  # type: ignore
+class PushTextFormat(int, Enum):
     PLAIN = 0
     HTML = 1
     MARKDOWN = 2

@@ -29,8 +29,9 @@ use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
-    EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationNode, RelationNodeFilter,
-    RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, Resource, ResourceId,
+    EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationMetadata, RelationNode,
+    RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse, Resource,
+    ResourceId,
 };
 use nidx_protos::{SearchRequest, VectorIndexConfig};
 use sqlx::PgPool;
@@ -259,6 +260,15 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
             source: Some(relation_nodes.get("Poetry").unwrap().clone()),
             to: Some(relation_nodes.get("Swallow").unwrap().clone()),
             relation_label: "about".to_string(),
+            metadata: Some(RelationMetadata {
+                paragraph_id: Some("myresource/0/myresource/100-200".to_string()),
+                source_start: Some(0),
+                source_end: Some(10),
+                to_start: Some(11),
+                to_end: Some(20),
+                data_augmentation_task_id: Some("mytask".to_string()),
+                ..Default::default()
+            }),
             ..Default::default()
         },
         Relation {
@@ -642,6 +652,19 @@ async fn test_search_relations_neighbours(pool: PgPool) -> Result<(), Box<dyn st
     .await?;
 
     let expected = HashSet::from_iter([("Poetry".to_string(), "Swallow".to_string())]);
+
+    // Check that the relation obtained as response has appropiate metadata
+    let subgraph = response.subgraph.clone().unwrap();
+    let first_relation = &subgraph.relations[0];
+    let metadata = first_relation.metadata.as_ref().unwrap();
+
+    assert_eq!(metadata.paragraph_id, Some("myresource/0/myresource/100-200".to_string()));
+    assert_eq!(metadata.source_start, Some(0));
+    assert_eq!(metadata.source_end, Some(10));
+    assert_eq!(metadata.to_start, Some(11));
+    assert_eq!(metadata.to_end, Some(20));
+    assert_eq!(metadata.data_augmentation_task_id, Some("mytask".to_string()));
+
     let neighbour_relations = extract_relations(response);
     assert!(expected.is_subset(&neighbour_relations));
 

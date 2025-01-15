@@ -395,16 +395,10 @@ mod tests {
         };
         let resource = Resource {
             resource: Some(resource_id),
-            metadata: None,
             texts: HashMap::with_capacity(0),
             status: ResourceStatus::Processed as i32,
             labels: vec!["2".to_string()],
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
-            paragraphs_to_delete: vec![],
-            sentences_to_delete: vec![],
-            relations: vec![],
-            vectors: HashMap::default(),
-            vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
             ..Default::default()
         };
@@ -486,16 +480,10 @@ mod tests {
         };
         let resource = Resource {
             resource: Some(resource_id),
-            metadata: None,
             texts: HashMap::with_capacity(0),
             status: ResourceStatus::Processed as i32,
             labels: vec!["2".to_string()],
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
-            paragraphs_to_delete: vec![],
-            sentences_to_delete: vec![],
-            relations: vec![],
-            vectors: HashMap::default(),
-            vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
             ..Default::default()
         };
@@ -608,16 +596,10 @@ mod tests {
         };
         let resource = Resource {
             resource: Some(resource_id),
-            metadata: None,
             texts: HashMap::with_capacity(0),
             status: ResourceStatus::Processed as i32,
             labels: vec!["2".to_string()],
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
-            paragraphs_to_delete: vec![],
-            sentences_to_delete: vec![],
-            relations: vec![],
-            vectors: HashMap::default(),
-            vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
             ..Default::default()
         };

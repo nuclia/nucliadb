@@ -19,7 +19,7 @@
 #
 import json
 from enum import Enum
-from typing import Any, Literal, Optional, TypeVar, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -33,9 +33,6 @@ from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.utils import DateTime
-from nucliadb_protos.audit_pb2 import ClientType, TaskType
-from nucliadb_protos.nodereader_pb2 import OrderBy
-from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb_models.internal.shards import (  # noqa isort: skip
     DocumentServiceEnum,
@@ -48,8 +45,6 @@ from nucliadb_models.internal.shards import (  # noqa isort: skip
     KnowledgeboxShards,
 )
 
-
-_T = TypeVar("_T")
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
     "name": "structred_response",
@@ -125,9 +120,6 @@ class NucliaDBClientType(str, Enum):
     DASHBOARD = "dashboard"
     DESKTOP = "desktop"
     CHROME_EXTENSION = "chrome_extension"
-
-    def to_proto(self) -> int:
-        return ClientType.Value(self.name)
 
 
 class Sort(int, Enum):
@@ -242,14 +234,6 @@ class EntityType(str, Enum):
     USER = "user"
 
 
-RelationNodeTypeMap = {
-    RelationNode.NodeType.ENTITY: EntityType.ENTITY,
-    RelationNode.NodeType.LABEL: EntityType.LABEL,
-    RelationNode.NodeType.RESOURCE: EntityType.RESOURCE,
-    RelationNode.NodeType.USER: EntityType.USER,
-}
-
-
 class DirectionalRelation(BaseModel):
     entity: str
     entity_type: EntityType
@@ -338,14 +322,6 @@ class SortField(str, Enum):
     CREATED = "created"
     MODIFIED = "modified"
     TITLE = "title"
-
-
-SortFieldMap = {
-    SortField.SCORE: None,
-    SortField.CREATED: OrderBy.OrderField.CREATED,
-    SortField.MODIFIED: OrderBy.OrderField.MODIFIED,
-    SortField.TITLE: None,
-}
 
 
 class SortOrder(str, Enum):
@@ -1756,9 +1732,6 @@ class KnowledgeboxFindResults(JsonBaseModel):
 
 class FeedbackTasks(str, Enum):
     CHAT = "CHAT"
-
-    def to_proto(self) -> int:
-        return TaskType.Value(self.name)
 
 
 class FeedbackRequest(BaseModel):
