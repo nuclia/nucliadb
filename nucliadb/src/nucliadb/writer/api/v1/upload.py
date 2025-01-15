@@ -83,7 +83,6 @@ TUS_HEADERS = {
 }
 
 ExtractStrategyHeader = Header(
-    default=None,
     description="Extract strategy to use when uploading a file. If not provided, the default strategy will be used.",
 )
 
