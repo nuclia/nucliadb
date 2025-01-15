@@ -796,9 +796,9 @@ class VectorSetConfig(google.protobuf.message.Message):
     VECTORSET_ID_FIELD_NUMBER: builtins.int
     VECTORSET_INDEX_CONFIG_FIELD_NUMBER: builtins.int
     MATRYOSHKA_DIMENSIONS_FIELD_NUMBER: builtins.int
-    STORAGE_FIELD_KEY_FIELD_NUMBER: builtins.int
+    STORAGE_KEY_KIND_FIELD_NUMBER: builtins.int
     vectorset_id: builtins.str
-    storage_field_key: global___VectorSetConfig.StorageKeyKind.ValueType
+    storage_key_kind: global___VectorSetConfig.StorageKeyKind.ValueType
     @property
     def vectorset_index_config(self) -> nucliadb_protos.nodewriter_pb2.VectorIndexConfig: ...
     @property
@@ -813,10 +813,10 @@ class VectorSetConfig(google.protobuf.message.Message):
         vectorset_id: builtins.str = ...,
         vectorset_index_config: nucliadb_protos.nodewriter_pb2.VectorIndexConfig | None = ...,
         matryoshka_dimensions: collections.abc.Iterable[builtins.int] | None = ...,
-        storage_field_key: global___VectorSetConfig.StorageKeyKind.ValueType = ...,
+        storage_key_kind: global___VectorSetConfig.StorageKeyKind.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["vectorset_index_config", b"vectorset_index_config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["matryoshka_dimensions", b"matryoshka_dimensions", "storage_field_key", b"storage_field_key", "vectorset_id", b"vectorset_id", "vectorset_index_config", b"vectorset_index_config"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["matryoshka_dimensions", b"matryoshka_dimensions", "storage_key_kind", b"storage_key_kind", "vectorset_id", b"vectorset_id", "vectorset_index_config", b"vectorset_index_config"]) -> None: ...
 
 global___VectorSetConfig = VectorSetConfig
 

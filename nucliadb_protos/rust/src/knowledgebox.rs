@@ -323,7 +323,7 @@ pub struct VectorSetConfig {
     #[prost(uint32, repeated, tag = "3")]
     pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
     #[prost(enumeration = "vector_set_config::StorageKeyKind", tag = "4")]
-    pub storage_field_key: i32,
+    pub storage_key_kind: i32,
 }
 /// Nested message and enum types in `VectorSetConfig`.
 pub mod vector_set_config {

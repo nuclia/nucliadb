@@ -218,7 +218,7 @@ message VectorSetConfig {
         LEGACY = 1;             // simply "extracted_vectors", without vectorset
         VECTORSET_PREFIX = 2;   // "{vectorset}/extracted_vectors"
     }
-    StorageKeyKind storage_field_key = 4;
+    StorageKeyKind storage_key_kind = 4;
 }
 
 // KB vectorsets and their configuration

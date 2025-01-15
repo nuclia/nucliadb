@@ -163,9 +163,9 @@ class KnowledgeBox:
                 # remove that bw/c behavior
                 #
                 if len(semantic_models) == 1:
-                    storage_field_key = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.LEGACY
+                    storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.LEGACY
                 else:
-                    storage_field_key = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
+                    storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
 
                 for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                     # if this KB uses a matryoshka model, we can choose a different
@@ -193,7 +193,7 @@ class KnowledgeBox:
                             vector_dimension=dimension,
                         ),
                         matryoshka_dimensions=semantic_model.matryoshka_dimensions,
-                        storage_field_key=storage_field_key,
+                        storage_key_kind=storage_key_kind,
                     )
                     await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
 
