@@ -50,6 +50,7 @@ async def extract_file_field_from_pb(field_pb: resources_pb2.FieldFile) -> str:
             language=field_pb.language,
             password=field_pb.password,
             file=models.File(payload=None, uri=field_pb.file.uri),
+            extract_strategy=field_pb.extract_strategy,
         )
         return processing.convert_external_filefield_to_str(file_field)
     else:
@@ -171,6 +172,8 @@ def parse_text_field(
     writer: BrokerMessage,
     toprocess: PushPayload,
 ) -> None:
+    if text_field.extract_strategy is not None:
+        writer.texts[key].extract_strategy = text_field.extract_strategy
     writer.texts[key].body = text_field.body
     writer.texts[key].format = resources_pb2.FieldText.Format.Value(text_field.format.value)
     etw = resources_pb2.ExtractedTextWrapper()
@@ -181,6 +184,7 @@ def parse_text_field(
     toprocess.textfield[key] = models.Text(
         body=text_field.body,
         format=getattr(models.PushTextFormat, text_field.format.value),
+        extract_strategy=text_field.extract_strategy,
     )
 
 
@@ -213,6 +217,8 @@ async def parse_internal_file_field(
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
+    if file_field.extract_strategy is not None:
+        writer.files[key].extract_strategy = file_field.extract_strategy
 
     processing = get_processing()
 
@@ -248,6 +254,8 @@ def parse_external_file_field(
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
+    if file_field.extract_strategy is not None:
+        writer.files[key].extract_strategy = file_field.extract_strategy
     uri = file_field.file.uri
     writer.files[key].url = uri  # type: ignore
     writer.files[key].file.uri = uri  # type: ignore
@@ -290,6 +298,9 @@ def parse_link_field(
     if link_field.xpath is not None:
         writer.links[key].xpath = link_field.xpath
 
+    if link_field.extract_strategy is not None:
+        writer.links[key].extract_strategy = link_field.extract_strategy
+
     toprocess.linkfield[key] = models.LinkUpload(
         link=link_field.uri,
         headers=link_field.headers or {},
@@ -297,6 +308,7 @@ def parse_link_field(
         localstorage=link_field.localstorage or {},
         css_selector=link_field.css_selector,
         xpath=link_field.xpath,
+        extract_strategy=link_field.extract_strategy,
     )
 
 
@@ -310,7 +322,6 @@ async def parse_conversation_field(
 ) -> None:
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
-
     field_value = resources_pb2.Conversation()
     convs = models.PushConversation()
     for message in conversation_field.messages:

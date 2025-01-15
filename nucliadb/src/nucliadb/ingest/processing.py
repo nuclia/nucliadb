@@ -261,6 +261,7 @@ class ProcessingEngine:
             "content_type": file.file.content_type,
             "password": file.password,
             "language": file.language,
+            "extract_strategy": file.extract_strategy,
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
@@ -278,6 +279,8 @@ class ProcessingEngine:
         headers["X-LANGUAGE"] = file.language
         headers["X-FILENAME"] = base64.b64encode(file.file.filename.encode()).decode()  # type: ignore
         headers["X-MD5"] = file.file.md5
+        if file.extract_strategy is not None:
+            headers["X-EXTRACT-STRATEGY"] = file.extract_strategy
         headers["CONTENT_TYPE"] = file.file.content_type
         headers["CONTENT-LENGTH"] = str(len(file.file.payload))  # type: ignore
         headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
@@ -317,6 +320,7 @@ class ProcessingEngine:
             "content_type": file_field.file.content_type,
             "language": file_field.language,
             "password": file_field.password,
+            "extract_strategy": file_field.extract_strategy,
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
@@ -341,6 +345,8 @@ class ProcessingEngine:
             headers["CONTENT-TYPE"] = file.file.content_type
             if file.file.size:
                 headers["CONTENT-LENGTH"] = str(file.file.size)
+            if file.extract_strategy != "":
+                headers["X-EXTRACT-STRATEGY"] = file.extract_strategy
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
 
             iterator = storage.downloadbytescf_iterator(file.file)
