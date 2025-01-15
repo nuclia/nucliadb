@@ -1232,12 +1232,14 @@ For example,
 And so on.
 Bigger values will discover more intricate relationships but will also take more time to compute.""",
         ge=1,
+        le=10,
     )
     top_k: int = Field(
         default=25,
         title="Top k",
         description="Number of relationships to keep after each hop after ranking them by relevance to the query. This number correlates to more paragraphs being sent as context.",
         ge=1,
+        le=120,
     )
     agentic_graph_only: bool = Field(
         default=False,

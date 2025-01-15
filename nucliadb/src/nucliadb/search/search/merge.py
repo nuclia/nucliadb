@@ -603,8 +603,6 @@ async def merge_suggest_entities_results(
 async def merge_suggest_results(
     suggest_responses: list[SuggestResponse],
     kbid: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
     highlight: bool = False,
 ) -> KnowledgeboxSuggestResults:
     api_results = KnowledgeboxSuggestResults()

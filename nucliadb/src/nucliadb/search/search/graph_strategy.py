@@ -450,8 +450,6 @@ async def fuzzy_search_entities(
         return await merge_suggest_results(
             [item for r in results_raw for item in r[0]],
             kbid=kbid,
-            show=show,
-            field_type_filter=field_type_filter,
         )
     except Exception as e:
         capture_exception(e)
