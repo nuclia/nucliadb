@@ -60,6 +60,10 @@ class FieldText(BaseModel):
     body: Optional[str] = None
     format: Optional[TextFormat] = None
     md5: Optional[str] = None
+    extract_strategy: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
+    )
 
 
 # Creation and update classes (Those used on writer endpoints)
@@ -76,6 +80,10 @@ If you need to store more text, consider using a file field instead or splitting
     format: TextFormat = Field(
         default=TextFormat.PLAIN,
         description="The format of the text.",
+    )
+    extract_strategy: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
     )
 
     @model_validator(mode="after")
@@ -102,3 +110,4 @@ class PushTextFormat(int, Enum):
 class Text(BaseModel):
     body: str
     format: PushTextFormat
+    extract_strategy: Optional[str] = None
