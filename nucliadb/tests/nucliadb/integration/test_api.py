@@ -993,13 +993,52 @@ async def test_file_computed_titles_are_set_on_resource_title(
     fed.field = "email"
     fed.title = extracted_title
     bm.file_extracted_data.append(fed)
-    resp = await nucliadb_grpc.ProcessMessage([bm])
-    assert resp.status == OpStatusWriter.Status.OK
+    await inject_message(nucliadb_grpc, bm)
 
     # Check that the resource title changed
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
     assert resp.status_code == 200
     assert resp.json()["title"] == extracted_title
+
+    # Now test that if the title is changed on creation, it is not overwritten
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Something else",
+            "files": {
+                "email": {
+                    "file": {
+                        "filename": "my_email.eml",
+                        "payload": base64.b64encode(b"email content").decode(),
+                        "content_type": "message/rfc822",
+                    }
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid2 = resp.json()["uuid"]
+
+    # Simulate processing file extracted data with a computed title
+    extracted_title = "Foobar"
+    bm = BrokerMessage()
+    bm.type = BrokerMessage.MessageType.AUTOCOMMIT
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid2
+    bm.kbid = kbid
+    fed = FileExtractedData()
+    fed.field = "email"
+    fed.title = extracted_title
+    bm.file_extracted_data.append(fed)
+    await inject_message(nucliadb_grpc, bm)
+
+    # Check that the resource title changed
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}")
+    assert resp.status_code == 200
+    title = resp.json()["title"]
+    assert title != extracted_title
+    assert title == "Something else"
 
 
 async def test_jsonl_text_field(
@@ -1160,3 +1199,29 @@ async def test_extract_strategy_on_fields(
     assert data["data"]["texts"]["text"]["value"]["extract_strategy"] == "foo1"
     assert data["data"]["links"]["link"]["value"]["extract_strategy"] == "bar1"
     assert data["data"]["files"]["file"]["value"]["extract_strategy"] == "baz1"
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Upload a file with the upload endpoint, and set the extract strategy via a header
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/resource/{rid}/file/file2/upload",
+        headers={"x-extract-strategy": "barbafoo"},
+        content=b"file content",
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Check that the extract strategy is stored
+    resp = await nucliadb_reader.get(
+        f"kb/{knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["data"]["files"]["file2"]["value"]["extract_strategy"] == "barbafoo"
+
+    # Check processing
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = processing.values["send_to_process"][0][0]
+    assert len(send_to_process_call.filefield) == 1
+    assert processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo"

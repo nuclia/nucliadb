@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime
 from hashlib import md5
 from io import BytesIO
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import HTTPException
 from fastapi.params import Header
@@ -147,9 +147,12 @@ async def tus_post_rslug_prefix(
     rslug: str,
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
+    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
 ) -> Response:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
-    return await _tus_post(request, kbid, item, path_rid=rid, field_id=field)
+    return await _tus_post(
+        request, kbid, item, path_rid=rid, field_id=field, extract_strategy=x_extract_strategy
+    )
 
 
 @api.post(
@@ -166,7 +169,7 @@ async def tus_post_rid_prefix(
     path_rid: str,
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
-    x_extract_strategy: Optional[str] = ExtractStrategyHeader,  # type: ignore
+    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
 ) -> Response:
     return await _tus_post(
         request, kbid, item, path_rid=path_rid, field_id=field, extract_strategy=x_extract_strategy
@@ -185,8 +188,9 @@ async def tus_post(
     request: Request,
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
+    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item)
+    return await _tus_post(request, kbid, item, extract_strategy=x_extract_strategy)
 
 
 # called by one the three POST above - there are defined distinctly to produce clean API doc
@@ -617,6 +621,7 @@ async def upload_rslug_prefix(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
 ) -> ResourceFileUploaded:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _upload(
@@ -628,6 +633,7 @@ async def upload_rslug_prefix(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_extract_strategy=x_extract_strategy,
     )
 
 
@@ -649,7 +655,7 @@ async def upload_rid_prefix(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
-    x_extract_strategy: Optional[str] = ExtractStrategyHeader,  # type: ignore
+    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -680,7 +686,7 @@ async def upload(
     x_password: Optional[list[str]] = Header(None),  # type: ignore
     x_language: Optional[list[str]] = Header(None),  # type: ignore
     x_md5: Optional[list[str]] = Header(None),  # type: ignore
-    x_extract_strategy: Optional[str] = ExtractStrategyHeader,  # type: ignore
+    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -750,8 +756,6 @@ async def _upload(
         )
 
     metadata = {"content_type": content_type, "filename": filename}
-    if x_extract_strategy:
-        metadata["extract_strategy"] = x_extract_strategy
 
     await dm.update(
         upload_file_id=f"{upload_id}",
@@ -799,6 +803,7 @@ async def _upload(
             path=path,
             request=request,
             bucket=storage_manager.storage.get_bucket_name(kbid),
+            extract_strategy=x_extract_strategy,
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
