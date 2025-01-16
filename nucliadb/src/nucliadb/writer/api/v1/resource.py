@@ -90,8 +90,8 @@ async def create_resource(
     request: Request,
     item: CreateResourcePayload,
     kbid: str,
-    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER],
     x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
     kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
     if item.hidden and not (kb_config and kb_config.hidden_resources_enabled):
@@ -180,8 +180,8 @@ async def modify_resource_rslug_prefix(
     kbid: str,
     rslug: str,
     item: UpdateResourcePayload,
-    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER],
     x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await modify_resource_endpoint(
@@ -208,7 +208,7 @@ async def modify_resource_rid_prefix(
     kbid: str,
     rid: str,
     item: UpdateResourcePayload,
-    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER],
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
 ):
     return await modify_resource_endpoint(
@@ -371,7 +371,7 @@ async def reprocess_resource_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER],
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _reprocess_resource(request, kbid, rid, x_nucliadb_user=x_nucliadb_user)
@@ -390,7 +390,7 @@ async def reprocess_resource_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER],
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
     return await _reprocess_resource(request, kbid, rid, x_nucliadb_user=x_nucliadb_user)
 

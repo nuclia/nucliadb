@@ -22,9 +22,8 @@ from fastapi.params import Header
 X_SKIP_STORE = Header(
     description="If set to true, file fields will not be saved in the blob storage. They will only be sent to process.",
 )
-X_NUCLIADB_USER = Header("")
+X_NUCLIADB_USER = Header()
 X_FILE_PASSWORD = Header(
-    None,
     description="If a file is password protected, the password must be provided here for the file to be processed",
 )
 X_EXTRACT_STRATEGY = Header(

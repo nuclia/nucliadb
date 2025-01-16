@@ -503,7 +503,7 @@ async def reprocess_file_field(
     kbid: str,
     rid: str,
     field_id: FieldIdString,
-    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER],
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     x_file_password: Annotated[Optional[str], X_FILE_PASSWORD] = None,
 ) -> ResourceUpdated:
     await maybe_back_pressure(request, kbid, resource_uuid=rid)
