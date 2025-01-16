@@ -322,6 +322,53 @@ pub struct VectorSetConfig {
     /// supports it)
     #[prost(uint32, repeated, tag = "3")]
     pub matryoshka_dimensions: ::prost::alloc::vec::Vec<u32>,
+    #[prost(enumeration = "vector_set_config::StorageKeyKind", tag = "4")]
+    pub storage_key_kind: i32,
+}
+/// Nested message and enum types in `VectorSetConfig`.
+pub mod vector_set_config {
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
+    #[repr(i32)]
+    pub enum StorageKeyKind {
+        /// for Bw/c during the migration
+        Unset = 0,
+        /// simply "extracted_vectors", without vectorset
+        Legacy = 1,
+        /// "{vectorset}/extracted_vectors"
+        VectorsetPrefix = 2,
+    }
+    impl StorageKeyKind {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                StorageKeyKind::Unset => "UNSET",
+                StorageKeyKind::Legacy => "LEGACY",
+                StorageKeyKind::VectorsetPrefix => "VECTORSET_PREFIX",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "UNSET" => Some(Self::Unset),
+                "LEGACY" => Some(Self::Legacy),
+                "VECTORSET_PREFIX" => Some(Self::VectorsetPrefix),
+                _ => None,
+            }
+        }
+    }
 }
 /// KB vectorsets and their configuration
 #[allow(clippy::derive_partial_eq_without_eq)]
