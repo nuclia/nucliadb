@@ -1424,7 +1424,6 @@ class AskRequest(AuditMetadataBase):
 - `neighbouring_paragraphs` will add the sorrounding paragraphs to the context for each matching paragraph.
 - `metadata_extension` will add the metadata of the matching paragraphs or its resources to the context.
 - `prequeries` allows to run multiple retrieval queries before the main query and add the results to the context. The results of specific queries can be boosted by the specifying weights.
-- `graph` will retrieve context pieces by exploring the Knowledge Graph, starting from the entities present in the query. This strategy is not compatible with the `prequeries` strategy.
 
 If empty, the default strategy is used, which simply adds the text of the matching paragraphs to the context.
 """
