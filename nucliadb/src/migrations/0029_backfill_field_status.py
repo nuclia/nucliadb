@@ -76,9 +76,9 @@ async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
             records = await cur.fetchall()
             resources_basic = {}
             for k, v in records:
-                basic = resources_pb2.Basic()
-                basic.ParseFromString(v)
-                resources_basic[k] = basic
+                row_basic = resources_pb2.Basic()
+                row_basic.ParseFromString(v)
+                resources_basic[k] = row_basic
 
             # Retrieve field errors
             await cur.execute(
@@ -93,9 +93,9 @@ async def do_batch(context: ExecutionContext, start: str) -> Optional[str]:
             records = await cur.fetchall()
             errors = {}
             for k, v in records:
-                error = writer_pb2.Error()
-                error.ParseFromString(v)
-                errors[k] = error
+                row_error = writer_pb2.Error()
+                row_error.ParseFromString(v)
+                errors[k] = row_error
 
             # Retrieve existing status keys
             await cur.execute(
