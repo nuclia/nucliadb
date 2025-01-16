@@ -82,10 +82,6 @@ TUS_HEADERS = {
     "Tus-Extension": "creation-defer-length",
 }
 
-ExtractStrategyHeader = Header(
-    description="Extract strategy to use when uploading a file. If not provided, the default strategy will be used.",
-)
-
 
 @api.options(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
