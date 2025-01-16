@@ -542,33 +542,48 @@ class Resource:
             await self.delete_field(FieldType.TEXT, key=field)
 
         if da_cleanup.labelsets or da_cleanup.qas or da_cleanup.entities:
-            for field_obj in (await self.get_fields(force=True)).values():
+            for (ftype, fkey), field_obj in (await self.get_fields(force=True)).items():
+                if da_cleanup.qas:
+                    await field_obj.delete_question_answers()
+
                 if da_cleanup.labelsets or da_cleanup.entities:
                     fcm = await field_obj.get_field_metadata()
                     if fcm is not None:
+                        set_field_metadata = False
                         if da_cleanup.labelsets:
-                            fcm.metadata.classifications
-
-        if da_cleanup.qas:
-            for field_obj in (await self.get_fields(force=True)).values():
-                await field_obj.delete_question_answers()
-
-        if da_cleanup.entities:
-            for field_obj in (await self.get_fields(force=True)).values():
-                fcm = await field_obj.get_field_metadata()
-                if fcm is not None:
-                    fcm.metadata.entities.pop(da_task_id, None)
+                            # Remove all classifications that belong to the labelsets to be cleaned up
+                            clean_classifications = [
+                                classification
+                                for classification in fcm.metadata.classifications
+                                if classification.labelset in da_cleanup.labelsets
+                            ]
+                            set_field_metadata = len(clean_classifications) != len(
+                                fcm.metadata.classifications
+                            )
+                            fcm.metadata.ClearField("classifications")
+                            fcm.metadata.classifications.extend(clean_classifications)
+                        if da_cleanup.entities:
+                            # Remove all entities that belong to the task to be cleaned up
+                            if da_task_id in fcm.metadata.entities:
+                                set_field_metadata = True
+                                fcm.metadata.entities.pop(da_task_id, None)
+                        if set_field_metadata:
+                            fcmw = FieldComputedMetadataWrapper()
+                            fcmw.field.field_type = ftype
+                            fcmw.field.field = fkey
+                            fcmw.metadata.CopyFrom(fcm)
+                            await field_obj.set_field_metadata(fcmw)
 
         if da_cleanup.relations:
             relations = await self.get_relations()
             if relations is not None:
-                new_relations = [
+                clean_relations = [
                     relation
                     for relation in relations.relations
                     if relation.metadata.data_augmentation_task_id != da_task_id
                 ]
-                if len(new_relations) != len(relations.relations):
-                    await self.set_relations(new_relations)
+                if len(clean_relations) != len(relations.relations):
+                    await self.set_relations(clean_relations)
 
     @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
