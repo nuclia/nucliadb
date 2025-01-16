@@ -391,7 +391,7 @@ async def _get_resource_field(
         if ResourceFieldProperties.ERROR in show:
             status = await field.get_status()
             if status is None:
-                status = FieldStatus(status=FieldStatus.Status.PROCESSED)
+                status = FieldStatus()
             resource_field.status = status.Status.Name(status.status)
             if status.errors:
                 resource_field.errors = []

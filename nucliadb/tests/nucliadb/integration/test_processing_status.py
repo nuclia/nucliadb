@@ -145,7 +145,7 @@ async def test_field_status_errors_data_augmentation(
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PENDING"
     assert resp_json["data"]["generics"]["title"]["status"] == "PENDING"
-    assert resp_json["data"]["generics"]["text"]["status"] == "PENDING"
+    assert resp_json["data"]["texts"]["text"]["status"] == "PENDING"
 
     # Receive message from processor with success
     br.source = BrokerMessage.MessageSource.PROCESSOR
@@ -164,12 +164,12 @@ async def test_field_status_errors_data_augmentation(
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PROCESSED"
     assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
-    assert resp_json["data"]["generics"]["summary"]["text"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["text"]["status"] == "PROCESSED"
 
     # Receive message from data augmentation with errors
     br.errors.append(
         Error(
-            field_type=rpb.FieldType.GENERIC,
+            field_type=rpb.FieldType.TEXT,
             field="text",
             error="Data augmentation failed",
             code=Error.ErrorCode.DATAAUGMENTATION,
@@ -186,8 +186,8 @@ async def test_field_status_errors_data_augmentation(
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PROCESSED"
     assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
-    assert resp_json["data"]["generics"]["text"]["status"] == "ERROR"
-    assert len(resp_json["data"]["generics"]["text"]["errors"]) == 1
+    assert resp_json["data"]["texts"]["text"]["status"] == "ERROR"
+    assert len(resp_json["data"]["texts"]["text"]["errors"]) == 1
 
     # Receive message from data augmentation without errors
     br.errors.pop()
@@ -198,5 +198,5 @@ async def test_field_status_errors_data_augmentation(
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PROCESSED"
     assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
-    assert resp_json["data"]["generics"]["text"]["status"] == "ERROR"
-    assert len(resp_json["data"]["generics"]["text"]["errors"]) == 1
+    assert resp_json["data"]["texts"]["text"]["status"] == "ERROR"
+    assert len(resp_json["data"]["texts"]["text"]["errors"]) == 1

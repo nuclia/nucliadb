@@ -143,7 +143,7 @@ async def serialize_field_errors(
 ):
     status = await field.get_status()
     if status is None:
-        status = FieldStatus(status=FieldStatus.Status.PROCESSED)
+        status = FieldStatus()
     serialized.status = status.Status.Name(status.status)
     if status.errors:
         serialized.errors = []
