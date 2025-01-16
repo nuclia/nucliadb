@@ -65,6 +65,29 @@ pub mod audit {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Generator {
+    #[prost(oneof = "generator::Generator", tags = "1, 2")]
+    pub generator: ::core::option::Option<generator::Generator>,
+}
+/// Nested message and enum types in `Generator`.
+pub mod generator {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct Processor {}
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct DataAugmentation {}
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Generator {
+        #[prost(message, tag = "1")]
+        Processor(Processor),
+        #[prost(message, tag = "2")]
+        DataAugmentation(DataAugmentation),
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Error {
     #[prost(string, tag = "1")]
     pub field: ::prost::alloc::string::String,
@@ -74,6 +97,8 @@ pub struct Error {
     pub error: ::prost::alloc::string::String,
     #[prost(enumeration = "error::ErrorCode", tag = "4")]
     pub code: i32,
+    #[prost(message, optional, tag = "5")]
+    pub generated_by: ::core::option::Option<Generator>,
 }
 /// Nested message and enum types in `Error`.
 pub mod error {
@@ -226,6 +251,10 @@ pub struct BrokerMessage {
     >,
     #[prost(message, optional, tag = "39")]
     pub security: ::core::option::Option<super::utils::Security>,
+    #[prost(message, repeated, tag = "40")]
+    pub generated_by: ::prost::alloc::vec::Vec<Generator>,
+    #[prost(message, repeated, tag = "41")]
+    pub field_statuses: ::prost::alloc::vec::Vec<FieldIdStatus>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
@@ -1293,6 +1322,72 @@ pub struct NewKnowledgeBoxV2Response {
     pub status: i32,
     #[prost(string, tag = "2")]
     pub error_message: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldError {
+    #[prost(message, optional, tag = "1")]
+    pub source_error: ::core::option::Option<Error>,
+    #[prost(message, optional, tag = "2")]
+    pub created: ::core::option::Option<::prost_types::Timestamp>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldStatus {
+    #[prost(enumeration = "field_status::Status", tag = "1")]
+    pub status: i32,
+    #[prost(message, repeated, tag = "2")]
+    pub errors: ::prost::alloc::vec::Vec<FieldError>,
+}
+/// Nested message and enum types in `FieldStatus`.
+pub mod field_status {
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+        PartialOrd,
+        Ord,
+        ::prost::Enumeration
+    )]
+    #[repr(i32)]
+    pub enum Status {
+        Pending = 0,
+        Processed = 1,
+        Error = 2,
+    }
+    impl Status {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Status::Pending => "PENDING",
+                Status::Processed => "PROCESSED",
+                Status::Error => "ERROR",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "PENDING" => Some(Self::Pending),
+                "PROCESSED" => Some(Self::Processed),
+                "ERROR" => Some(Self::Error),
+                _ => None,
+            }
+        }
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FieldIdStatus {
+    #[prost(message, optional, tag = "1")]
+    pub id: ::core::option::Option<super::resources::FieldId>,
+    #[prost(enumeration = "field_status::Status", tag = "2")]
+    pub status: i32,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

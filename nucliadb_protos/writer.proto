@@ -28,6 +28,16 @@ message Audit {
     repeated audit.AuditField audit_fields = 9;
 }
 
+message Generator {
+    message Processor {}
+    message DataAugmentation {}
+
+    oneof generator {
+        Processor processor = 1;
+        DataAugmentation data_augmentation = 2;
+    }
+}
+
 message Error {
     string field = 1;
     resources.FieldType field_type = 2;
@@ -39,6 +49,7 @@ message Error {
         DATAAUGMENTATION = 3;
     }
     ErrorCode code = 4;
+    Generator generated_by = 5;
 }
 
 message BrokerMessage {
@@ -123,6 +134,10 @@ message BrokerMessage {
     repeated resources.FieldQuestionAnswerWrapper question_answers = 38;
 
     utils.Security security = 39;
+
+    repeated Generator generated_by = 40;
+
+    repeated FieldIDStatus field_statuses = 41;
 }
 
 message BrokerMessageBlobReference {
@@ -497,4 +512,24 @@ service Writer {
 
     rpc NewVectorSet(NewVectorSetRequest) returns (NewVectorSetResponse) {}
     rpc DelVectorSet(DelVectorSetRequest) returns (DelVectorSetResponse) {}
+}
+
+message FieldError {
+    Error source_error = 1;
+    google.protobuf.Timestamp created = 2;
+}
+
+message FieldStatus {
+    enum Status {
+        PENDING = 0;
+        PROCESSED = 1;
+        ERROR = 2;
+    }
+    Status status = 1;
+    repeated FieldError errors = 2;
+}
+
+message FieldIDStatus {
+    resources.FieldID id = 1;
+    FieldStatus.Status status = 2;
 }

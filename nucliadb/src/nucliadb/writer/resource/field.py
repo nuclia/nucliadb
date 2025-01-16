@@ -37,7 +37,7 @@ from nucliadb_models.writer import (
     UpdateResourcePayload,
 )
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
 
@@ -186,6 +186,12 @@ def parse_text_field(
         format=getattr(models.PushTextFormat, text_field.format.value),
         extract_strategy=text_field.extract_strategy,
     )
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.TEXT, field=key),
+            status=FieldStatus.Status.PENDING,
+        )
+    )
 
 
 async def parse_file_field(
@@ -203,6 +209,13 @@ async def parse_file_field(
         await parse_internal_file_field(
             key, file_field, writer, toprocess, kbid, uuid, skip_store=skip_store
         )
+
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.FILE, field=key),
+            status=FieldStatus.Status.PENDING,
+        )
+    )
 
 
 async def parse_internal_file_field(
@@ -310,6 +323,12 @@ def parse_link_field(
         xpath=link_field.xpath,
         extract_strategy=link_field.extract_strategy,
     )
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.LINK, field=key),
+            status=FieldStatus.Status.PENDING,
+        )
+    )
 
 
 async def parse_conversation_field(
@@ -385,3 +404,9 @@ async def parse_conversation_field(
 
     toprocess.conversationfield[key] = convs
     writer.conversations[key].CopyFrom(field_value)
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.CONVERSATION, field=key),
+            status=FieldStatus.Status.PENDING,
+        )
+    )

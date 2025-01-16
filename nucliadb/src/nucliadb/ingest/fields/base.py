@@ -41,7 +41,7 @@ from nucliadb_protos.resources_pb2 import (
     QuestionAnswers,
 )
 from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
-from nucliadb_protos.writer_pb2 import Error
+from nucliadb_protos.writer_pb2 import Error, FieldStatus
 from nucliadb_utils.storages.storage import Storage, StorageField
 
 SUBFIELDFIELDS = ("c",)
@@ -213,6 +213,25 @@ class Field(Generic[PbType]):
             field_type=self.type,
             field_id=self.id,
             error=error,
+        )
+
+    async def get_status(self) -> Optional[FieldStatus]:
+        return await datamanagers.fields.get_status(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
+        )
+
+    async def set_status(self, status: FieldStatus) -> None:
+        await datamanagers.fields.set_status(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_type=self.type,
+            field_id=self.id,
+            status=status,
         )
 
     async def get_question_answers(self, force=False) -> Optional[FieldQuestionAnswers]:

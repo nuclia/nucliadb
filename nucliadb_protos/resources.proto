@@ -598,7 +598,6 @@ message RowsPreview {
     map<string, Sheet> sheets = 1;
 }
 
-
 message FieldID {
     FieldType field_type = 1;
     string field = 2;
