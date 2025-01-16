@@ -188,4 +188,5 @@ def text_block_to_find_paragraph(text_block: TextBlockMatch) -> FindParagraph:
         reference=text_block.representation_file,
         page_with_visual=text_block.page_with_visual,
         position=text_block.position,
+        relevant_relations=text_block.relevant_relations,
     )

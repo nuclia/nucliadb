@@ -1719,6 +1719,11 @@ class FindParagraph(BaseModel):
         title="Is a table",
         description="The referenced image of the paragraph is a table",
     )
+    relevant_relations: Optional[Relations] = Field(
+        default=None,
+        title="Relevant relations",
+        description="Relevant relations from which the paragraph was found, will only be filled if using the Graph RAG Strategy",
+    )
 
 
 class FindField(BaseModel):

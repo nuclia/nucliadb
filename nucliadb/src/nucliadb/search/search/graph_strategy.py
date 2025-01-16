@@ -29,6 +29,7 @@ from nuclia_models.predict.generative_responses import (
     MetaGenerativeResponse,
     StatusGenerativeResponse,
 )
+from pydantic import BaseModel
 from sentry_sdk import capture_exception
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
@@ -284,6 +285,12 @@ Now, let's get started! Here are the triplets you need to score:
 """
 
 
+class RelationsParagraphMatch(BaseModel):
+    paragraph_id: str
+    score: int
+    relations: Relations
+
+
 async def get_graph_results(
     *,
     kbid: str,
@@ -384,24 +391,15 @@ async def get_graph_results(
 
     # Get the text blocks of the paragraphs that contain the top relations
     with metrics.time("graph_strat_build_response"):
-        paragraph_ids_scores: dict[str, int] = defaultdict(lambda: 0)
-        # Merge the paragraph ids for each relationship and keep the max score
-        for ent, rels in relations.entities.items():
-            for rel_score, rel in zip(scores[ent], rels.related_to):
-                if rel.metadata and rel.metadata.paragraph_id:
-                    paragraph_ids_scores[rel.metadata.paragraph_id] = max(
-                        paragraph_ids_scores[rel.metadata.paragraph_id], rel_score
-                    )
-
         find_request = find_request_from_ask_request(item, query)
         query_parser, rank_fusion, reranker = await query_parser_from_find_request(
             kbid, find_request, generative_model=generative_model
         )
         find_results = await build_graph_response(
-            paragraph_ids_scores,
             kbid=kbid,
             query=query,
             final_relations=relations,
+            scores=scores,
             top_k=graph_strategy.top_k,
             reranker=reranker,
             show=find_request.show,
@@ -583,21 +581,45 @@ async def rank_relations(
     return Relations(entities=top_k_rels), top_k_scores_by_ent
 
 
+def get_paragraph_info_from_relations(
+    relations: Relations,
+    scores: dict[str, list[int]],
+) -> list[RelationsParagraphMatch]:
+    paragraphs_info: dict[str, RelationsParagraphMatch] = {}
+    # Merge the paragraph ids for each relationship and keep the max score while storing the relations
+    for ent, rels in relations.entities.items():
+        for rel_score, rel in zip(scores[ent], rels.related_to):
+            if rel.metadata and rel.metadata.paragraph_id:
+                para_info = paragraphs_info.get(rel.metadata.paragraph_id)
+                # Create a new paragraph info if it doesn't exist
+                if para_info is None:
+                    paragraphs_info[rel.metadata.paragraph_id] = RelationsParagraphMatch(
+                        paragraph_id=rel.metadata.paragraph_id,
+                        score=rel_score,
+                        relations=Relations(entities={ent: EntitySubgraph(related_to=[rel])}),
+                    )
+                # Update the paragraph info
+                else:
+                    para_info.score = max(para_info.score, rel_score)
+                    para_info.relations.entities.setdefault(ent, EntitySubgraph(related_to=[]))
+                    para_info.relations.entities[ent].related_to.append(rel)
+    return list(paragraphs_info.values())
+
+
 async def build_graph_response(
-    paragraph_ids_scores: dict[str, int],
     *,
     kbid: str,
     query: str,
     final_relations: Relations,
+    scores: dict[str, list[int]],
     top_k: int,
     reranker: Reranker,
     show: list[ResourceProperties] = [],
     extracted: list[ExtractedDataTypeName] = [],
     field_type_filter: list[FieldTypeName] = [],
 ) -> KnowledgeboxFindResults:
-    # manually generate paragraph results
-
-    text_blocks = paragraph_id_to_text_block_matches(paragraph_ids_scores)
+    paragraphs_info = get_paragraph_info_from_relations(final_relations, scores)
+    text_blocks = relations_matches_to_text_block_matches(paragraphs_info)
 
     # hydrate and rerank
     resource_hydration_options = ResourceHydrationOptions(
@@ -635,17 +657,19 @@ def filter_subgraph(subgraph: EntitySubgraph, entities_to_remove: Collection[str
     )
 
 
-def paragraph_id_to_text_block_match(paragraph_id: str, score: int) -> TextBlockMatch:
+def relations_match_to_text_block_match(
+    paragraph_match: RelationsParagraphMatch,
+) -> TextBlockMatch:
     """
     Given a paragraph_id, return a TextBlockMatch with the bare minimum fields
     This is required by the Graph Strategy to get text blocks from the relevant paragraphs
     """
     # XXX: this is a workaround for the fact we always assume retrieval means keyword/semantic search and
-    # the hydration and find response building code works with TextBlockMatch
-    parsed_paragraph_id = ParagraphId.from_string(paragraph_id)
+    # the hydration and find response building code works with TextBlockMatch, we extended it to have relevant relations information
+    parsed_paragraph_id = ParagraphId.from_string(paragraph_match.paragraph_id)
     return TextBlockMatch(
         paragraph_id=parsed_paragraph_id,
-        score=score,
+        score=paragraph_match.score,
         score_type=SCORE_TYPE.RELATION_RELEVANCE,
         order=0,  # NOTE: this will be filled later
         text="",  # NOTE: this will be filled later too
@@ -663,8 +687,11 @@ def paragraph_id_to_text_block_match(paragraph_id: str, score: int) -> TextBlock
         is_a_table=False,
         representation_file="",
         page_with_visual=False,
+        relevant_relations=paragraph_match.relations,
     )
 
 
-def paragraph_id_to_text_block_matches(paragraph_ids: dict[str, int]) -> list[TextBlockMatch]:
-    return [paragraph_id_to_text_block_match(p_id, score) for p_id, score in paragraph_ids.items()]
+def relations_matches_to_text_block_matches(
+    paragraph_matches: Collection[RelationsParagraphMatch],
+) -> list[TextBlockMatch]:
+    return [relations_match_to_text_block_match(match) for match in paragraph_matches]

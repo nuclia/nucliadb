@@ -823,7 +823,7 @@ async def test_ask_graph_strategy(mocker, nucliadb_reader: AsyncClient, knowledg
 
     url = f"/kb/{knowledgebox}/ask"
 
-    async def assert_ask(d, expected):
+    async def assert_ask(d, expected_paragraphs_text, expected_paragraphs_relations):
         resp = await nucliadb_reader.post(
             url,
             json=d,
@@ -832,45 +832,66 @@ async def test_ask_graph_strategy(mocker, nucliadb_reader: AsyncClient, knowledg
         assert resp.status_code == 200, resp.text
         ask_response = SyncAskResponse.model_validate_json(resp.content)
         assert ask_response.status == "success"
+
         paragraphs = ask_response.retrieval_results.resources[graph_resource].fields
         paragraph_texts = {
             p_id: paragraph.text
             for p_id, field in paragraphs.items()
             for paragraph in field.paragraphs.values()
         }
-        assert paragraph_texts == expected
+        assert paragraph_texts == expected_paragraphs_text
+        paragraph_relations = {
+            p_id: [
+                {ent, r.relation_label, r.entity}
+                for ent, rels in paragraph.relevant_relations.entities.items()
+                for r in rels.related_to
+            ]
+            for p_id, field in paragraphs.items()
+            for paragraph in field.paragraphs.values()
+            if paragraph.relevant_relations is not None
+        }
+        assert paragraph_relations == expected_paragraphs_relations
 
         paragraph_scores = [
             paragraph.score for field in paragraphs.values() for paragraph in field.paragraphs.values()
         ]
         assert all(score == 5 for score in paragraph_scores)
+
         # We expect a ranking for each hop
         assert mocker.call_count == 2
         mocker.reset_mock()
 
-    expected = {
+    expected_paragraphs_text = {
         "/t/inception3": "Joseph Gordon-Levitt starred in Inception.",
         "/t/inception2": "Leonardo DiCaprio starred in Inception.",
         "/t/inception1": "Christopher Nolan directed Inception.",
     }
-    await assert_ask(data, expected)
+    expected_paragraphs_relations = {
+        "/t/inception1": [{"Christopher Nolan", "directed", "Inception"}],
+        "/t/inception2": [{"Leonardo DiCaprio", "starred", "Inception"}],
+        "/t/inception3": [{"Joseph Gordon-Levitt", "starred", "Inception"}],
+    }
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
     data["query"] = "In which movie has DiCaprio starred? And Joseph Gordon-Levitt?"
-    expected = {
+    expected_paragraphs_text = {
         "/t/inception1": "Christopher Nolan directed Inception.",
         "/t/inception3": "Joseph Gordon-Levitt starred in Inception.",
         "/t/inception2": "Leonardo DiCaprio starred in Inception.",
         "/t/leo": "Leonardo DiCaprio is a great actor. DiCaprio started acting in 1989.",
     }
-    await assert_ask(data, expected)
+    expected_paragraphs_relations["/t/leo"] = [{"Leonardo DiCaprio", "analogy", "DiCaprio"}]
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
     # Now with agentic graph only
     data["rag_strategies"][0]["agentic_graph_only"] = True  # type: ignore
-    expected = {
+    expected_paragraphs_text = {
         "/t/inception2": "Leonardo DiCaprio starred in Inception.",
         "/t/leo": "Leonardo DiCaprio is a great actor. DiCaprio started acting in 1989.",
     }
-    await assert_ask(data, expected)
+    del expected_paragraphs_relations["/t/inception1"]
+    del expected_paragraphs_relations["/t/inception3"]
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
 
 async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowledgebox, resources):
