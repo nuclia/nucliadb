@@ -574,6 +574,9 @@ class Processor:
         await resource.apply_fields(message)
         await resource.apply_extracted(message)
 
+        if message.HasField("data_augmentation_cleanup"):
+            await resource.apply_da_cleanup(message.data_augmentation_cleanup)
+
     async def maybe_update_resource_basic(
         self, resource: Resource, message: writer_pb2.BrokerMessage
     ) -> None:

@@ -130,6 +130,7 @@ from nucliadb_protos.writer_pb2 import (
     Audit as Audit,
     BrokerMessage as BrokerMessage,
     BrokerMessageBlobReference as BrokerMessageBlobReference,
+    DataAugmentationCleanup as DataAugmentationCleanup,
     DelEntitiesRequest as DelEntitiesRequest,
     DelVectorSetRequest as DelVectorSetRequest,
     DelVectorSetResponse as DelVectorSetResponse,

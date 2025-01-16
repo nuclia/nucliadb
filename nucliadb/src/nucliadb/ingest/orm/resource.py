@@ -534,6 +534,42 @@ class Resource:
                 errors=message.errors,  # type: ignore
             )
 
+    @processor_observer.wrap({"type": "apply_da_cleanup"})
+    async def apply_da_cleanup(self, da_cleanup: writer_pb2.DataAugmentationCleanup):
+        da_task_id = da_cleanup.task_id
+
+        for field in da_cleanup.text_fields:
+            await self.delete_field(FieldType.TEXT, key=field)
+
+        if da_cleanup.labelsets or da_cleanup.qas or da_cleanup.entities:
+            for field_obj in (await self.get_fields(force=True)).values():
+                if da_cleanup.labelsets or da_cleanup.entities:
+                    fcm = await field_obj.get_field_metadata()
+                    if fcm is not None:
+                        if da_cleanup.labelsets:
+                            fcm.metadata.classifications
+
+        if da_cleanup.qas:
+            for field_obj in (await self.get_fields(force=True)).values():
+                await field_obj.delete_question_answers()
+
+        if da_cleanup.entities:
+            for field_obj in (await self.get_fields(force=True)).values():
+                fcm = await field_obj.get_field_metadata()
+                if fcm is not None:
+                    fcm.metadata.entities.pop(da_task_id, None)
+
+        if da_cleanup.relations:
+            relations = await self.get_relations()
+            if relations is not None:
+                new_relations = [
+                    relation
+                    for relation in relations.relations
+                    if relation.metadata.data_augmentation_task_id != da_task_id
+                ]
+                if len(new_relations) != len(relations.relations):
+                    await self.set_relations(new_relations)
+
     @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
         errors = False
