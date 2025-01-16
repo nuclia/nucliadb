@@ -271,6 +271,7 @@ def expected_find_response():
                                     "start_seconds": [],
                                 },
                                 "reference": "myfile.pdf",
+                                "relevant_relations": None,
                                 "score": 1.7799999713897705,
                                 "score_type": SCORE_TYPE.BOTH,
                                 "text": "extracted text",
