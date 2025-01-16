@@ -212,6 +212,8 @@ ExtractedDataType = Optional[
 class Error(BaseModel):
     body: str
     code: int
+    code_str: str
+    created: Optional[datetime]
 
 
 class FieldData(BaseModel): ...
@@ -221,30 +223,40 @@ class TextFieldData(BaseModel):
     value: Optional[FieldText] = None
     extracted: Optional[TextFieldExtractedData] = None
     error: Optional[Error] = None
+    status: Optional[str] = None
+    errors: Optional[list[Error]] = None
 
 
 class FileFieldData(BaseModel):
     value: Optional[FieldFile] = None
     extracted: Optional[FileFieldExtractedData] = None
     error: Optional[Error] = None
+    status: Optional[str] = None
+    errors: Optional[list[Error]] = None
 
 
 class LinkFieldData(BaseModel):
     value: Optional[FieldLink] = None
     extracted: Optional[LinkFieldExtractedData] = None
     error: Optional[Error] = None
+    status: Optional[str] = None
+    errors: Optional[list[Error]] = None
 
 
 class ConversationFieldData(BaseModel):
     value: Optional[FieldConversation] = None
     extracted: Optional[ConversationFieldExtractedData] = None
     error: Optional[Error] = None
+    status: Optional[str] = None
+    errors: Optional[list[Error]] = None
 
 
 class GenericFieldData(BaseModel):
     value: Optional[str] = None
     extracted: Optional[TextFieldExtractedData] = None
     error: Optional[Error] = None
+    status: Optional[str] = None
+    errors: Optional[list[Error]] = None
 
 
 class ResourceData(BaseModel):

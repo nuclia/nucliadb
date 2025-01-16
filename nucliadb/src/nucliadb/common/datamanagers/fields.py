@@ -105,6 +105,9 @@ async def get_statuses(
         pb = writer_pb2.FieldStatus()
         if serialized_status is not None:
             pb.ParseFromString(serialized_status)
+        else:
+            # Default status is processed, we didn't backfill those on migration
+            pb = writer_pb2.FieldStatus(status=writer_pb2.FieldStatus.Status.PROCESSED)
         statuses.append(pb)
 
     return statuses

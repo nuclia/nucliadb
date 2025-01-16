@@ -52,6 +52,7 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_protos import resources_pb2
+from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_storage
@@ -388,9 +389,22 @@ async def _get_resource_field(
             )
 
         if ResourceFieldProperties.ERROR in show:
-            error = await field.get_error()
-            if error is not None:
-                resource_field.error = Error(body=error.error, code=error.code)
+            status = await field.get_status()
+            if status is None:
+                status = FieldStatus(status=FieldStatus.Status.PROCESSED)
+            resource_field.status = status.Status.Name(status.status)
+            if status.errors:
+                resource_field.errors = []
+                for error in status.errors:
+                    resource_field.errors.append(
+                        Error(
+                            body=error.source_error.error,
+                            code=error.source_error.code,
+                            code_str=error.source_error.ErrorCode.Name(error.source_error.code),
+                            created=error.created.ToDatetime(),
+                        )
+                    )
+                resource_field.error = resource_field.errors[-1]
 
     return Response(
         content=resource_field.model_dump_json(exclude_unset=True, by_alias=True),
