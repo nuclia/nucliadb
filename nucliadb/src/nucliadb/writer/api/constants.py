@@ -29,3 +29,13 @@ X_FILE_PASSWORD = Header(
 X_EXTRACT_STRATEGY = Header(
     description="Extract strategy to use when uploading a file. If not provided, the default strategy will be used.",
 )
+X_FILENAME = Header(min_length=1, description="Name of the file being uploaded.")
+X_MD5 = Header(
+    min_length=32,
+    max_length=32,
+    description="MD5 hash of the file being uploaded. This is used to check if the file has been uploaded before.",
+)
+X_PASSWORD = Header(
+    min_length=1, description="If the file is password protected, the password must be provided here."
+)
+X_LANGUAGE = Header()
