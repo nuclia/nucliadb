@@ -594,6 +594,8 @@ class Resource:
 
     async def update_status(self):
         field_ids = await self.get_all_field_ids(for_update=False)
+        if field_ids is None:
+            return
         field_statuses = await datamanagers.fields.get_statuses(
             self.txn, kbid=self.kb.kbid, rid=self.uuid, fields=field_ids.fields
         )
