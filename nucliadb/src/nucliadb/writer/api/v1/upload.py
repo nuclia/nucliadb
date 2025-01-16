@@ -146,11 +146,7 @@ async def tus_post_rslug_prefix(
     rslug: str,
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
-<<<<<<< HEAD
-    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
-=======
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
->>>>>>> origin/main
 ) -> Response:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _tus_post(
@@ -172,11 +168,7 @@ async def tus_post_rid_prefix(
     path_rid: str,
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
-<<<<<<< HEAD
-    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
-=======
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
->>>>>>> origin/main
 ) -> Response:
     return await _tus_post(
         request, kbid, item, path_rid=path_rid, field_id=field, extract_strategy=x_extract_strategy
@@ -195,11 +187,7 @@ async def tus_post(
     request: Request,
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
-<<<<<<< HEAD
-    x_extract_strategy: Annotated[Optional[str], ExtractStrategyHeader] = None,
-=======
     x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
->>>>>>> origin/main
 ) -> Response:
     return await _tus_post(request, kbid, item, extract_strategy=x_extract_strategy)
 
