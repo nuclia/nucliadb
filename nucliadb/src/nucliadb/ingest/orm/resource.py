@@ -572,7 +572,7 @@ class Resource:
 
             # We infer the status for processor messages
             if message.source == BrokerMessage.MessageSource.PROCESSOR:
-                if len(errors) > 0:
+                if len(status.errors) > 0:
                     status.status = writer_pb2.FieldStatus.Status.ERROR
                 else:
                     status.status = writer_pb2.FieldStatus.Status.PROCESSED
@@ -638,7 +638,7 @@ class Resource:
         for extracted_text in message.extracted_text:
             await self._apply_extracted_text(extracted_text)
 
-        # Update field and resource status depending on processing results+
+        # Update field and resource status depending on processing results
         await self.apply_fields_status(message, self._modified_extracted_text)
         await self.update_status()
 

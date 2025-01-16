@@ -64,8 +64,8 @@ from nucliadb_models import content_types
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
-from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FieldID, FieldType, Metadata
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
@@ -515,7 +515,7 @@ async def _tus_patch(
 
     if offset != dm.offset:
         raise HTTPConflict(
-            detail=f"Current upload offset({offset}) does not match " f"object offset {dm.offset}"
+            detail=f"Current upload offset({offset}) does not match object offset {dm.offset}"
         )
 
     storage_manager = get_storage_manager()
@@ -950,6 +950,12 @@ async def store_file_on_nuclia_db(
         writer.files[field].CopyFrom(file_field)
         # Do not store passwords on maindb
         writer.files[field].ClearField("password")
+        writer.field_statuses.append(
+            FieldIDStatus(
+                id=FieldID(field_type=FieldType.FILE, field=field),
+                status=FieldStatus.Status.PENDING,
+            )
+        )
 
         toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
             file_field, storage=storage
