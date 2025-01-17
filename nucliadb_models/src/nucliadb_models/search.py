@@ -1215,6 +1215,16 @@ class PreQueriesStrategy(RagStrategy):
 PreQueryResult = tuple[PreQuery, "KnowledgeboxFindResults"]
 
 
+class RelationRanking(str, Enum):
+    RERANKER = "reranker"
+    GENERATIVE = "generative"
+
+
+class QueryEntityDetection(str, Enum):
+    PREDICT = "predict"
+    SUGGEST = "suggest"
+
+
 class GraphStrategy(RagStrategy):
     """
     This strategy retrieves context pieces by exploring the Knowledge Graph, starting from the entities present in the query.
@@ -1235,16 +1245,36 @@ Bigger values will discover more intricate relationships but will also take more
         le=10,
     )
     top_k: int = Field(
-        default=25,
+        default=75,
         title="Top k",
         description="Number of relationships to keep after each hop after ranking them by relevance to the query. This number correlates to more paragraphs being sent as context.",
         ge=1,
-        le=120,
+        le=300,
     )
     agentic_graph_only: bool = Field(
-        default=False,
+        default=True,
         title="Use only the graph extracted by an agent.",
         description="If set to true, only relationships extracted from a graph extraction agent are considered for context expansion.",
+    )
+    relation_text_as_paragraphs: bool = Field(
+        default=False,
+        title="Use relation text as context",
+        description="If set to true, the text of the relationships is to create context paragraphs, this enables to use bigger top K values without running into the generative model's context limits. If set to false, the paragraphs that contain the relationships are used as context.",
+    )
+    relation_ranking: RelationRanking = Field(
+        default=RelationRanking.RERANKER,
+        title="Method to rank relationships",
+        description="""Method to rank relationships.
+- `reranker` uses the reranker model to rank relationships.
+- `generative` uses first the reranker to first lower the amount of relationships and then the generative model to rank relationships.
+The generative model is slower and consumes more tokens, but can provide better results.""",
+    )
+    query_entity_detection: QueryEntityDetection = Field(
+        default=QueryEntityDetection.PREDICT,
+        title="Method to detect entities in the query",
+        description="""Method to detect entities in the query.
+- `predict` uses NUA to detect entities in the query, slower and more accurate but requires an exact text match between Knowledge Box entities and entities in the query.
+- `suggest` uses fuzzy search to detect entities. It's faster and more flexible but might have trouble matching entities composed of multiple words. It will fallback to Predict if no entities are detected.""",
     )
 
 

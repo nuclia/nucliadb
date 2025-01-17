@@ -66,6 +66,9 @@ class TextBlockHydrationOptions(BaseModel):
     # list of exact matches to highlight
     ematches: Optional[list[str]] = None
 
+    # If true, only hydrate the text block if its text is not already populated
+    only_hydrate_empty: bool = False
+
 
 @hydrator_observer.wrap({"type": "resource_text"})
 async def hydrate_resource_text(
@@ -165,6 +168,8 @@ async def hydrate_text_block(
         if concurrency_control is not None:
             await stack.enter_async_context(concurrency_control)
 
+        if options.only_hydrate_empty and text_block.text:
+            return text_block
         text_block.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
             paragraph_id=text_block.paragraph_id,

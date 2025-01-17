@@ -20,7 +20,7 @@
 import json
 from itertools import combinations
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -798,14 +798,26 @@ async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox, resources):
 
 
 @pytest.mark.asyncio
-@patch("nucliadb.search.search.graph_strategy.rank_relations")
-async def test_ask_graph_strategy(mocker, nucliadb_reader: AsyncClient, knowledgebox, graph_resource):
-    # Mock the rank_relations function to return the same relations with a score of 5 (no ranking)
-    # This function is already unit tested and requires predict
-    mocker.side_effect = lambda relations, *args, **kwargs: (
-        relations,
-        {ent: [5 for _ in rels.related_to] for ent, rels in relations.entities.items()},
-    )
+@pytest.mark.parametrize("relation_ranking", ["generative", "reranker"])
+@patch("nucliadb.search.search.graph_strategy.get_predict")
+@patch("nucliadb.search.search.graph_strategy.rank_relations_reranker")
+@patch("nucliadb.search.search.graph_strategy.rank_relations_generative")
+async def test_ask_graph_strategy(
+    mocker_generative,
+    mocker_reranker,
+    mocker_predict,
+    relation_ranking: str,
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    graph_resource,
+):
+    # Mock the rank_relations functions to return the same relations with a score of 5 (no ranking)
+    # This functions are unit tested and require connection to predict
+    def mock_rank(relations, *args, **kwargs):
+        return relations, {ent: [5 for _ in rels.related_to] for ent, rels in relations.entities.items()}
+
+    mocker_generative.side_effect = mock_rank
+    mocker_reranker.side_effect = mock_rank
 
     data = {
         "query": "Which actors have been in movies directed by Christopher Nolan?",
@@ -815,6 +827,9 @@ async def test_ask_graph_strategy(mocker, nucliadb_reader: AsyncClient, knowledg
                 "hops": 2,
                 "top_k": 5,
                 "agentic_graph_only": False,
+                "query_entity_detection": "suggest",
+                "relation_ranking": relation_ranking,
+                "relation_text_as_paragraphs": False,
             }
         ],
         "debug": True,
@@ -858,8 +873,9 @@ async def test_ask_graph_strategy(mocker, nucliadb_reader: AsyncClient, knowledg
         assert all(score == 5 for score in paragraph_scores)
 
         # We expect a ranking for each hop
-        assert mocker.call_count == 2
-        mocker.reset_mock()
+        assert mocker_reranker.call_count == 2 or mocker_generative.call_count == 2
+        mocker_reranker.reset_mock()
+        mocker_generative.reset_mock()
 
     expected_paragraphs_text = {
         "/t/inception3": "Joseph Gordon-Levitt starred in Inception.",
@@ -883,8 +899,40 @@ async def test_ask_graph_strategy(mocker, nucliadb_reader: AsyncClient, knowledg
     expected_paragraphs_relations["/t/leo"] = [{"Leonardo DiCaprio", "analogy", "DiCaprio"}]
     await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
+    # Setup a mock to test query entity extraction with predict
+    predict_mock = AsyncMock()
+    predict_mock.detect_entities.return_value = [
+        RelationNode(
+            value="DiCaprio",
+            ntype=RelationNode.NodeType.ENTITY,
+            subtype="ACTOR",
+        ),
+        RelationNode(
+            value="Joseph Gordon-Levitt",
+            ntype=RelationNode.NodeType.ENTITY,
+            subtype="ACTOR",
+        ),
+    ]
+    mocker_predict.return_value = predict_mock
+
+    # Run the same query but with query_entity_detection set to "predict"
+    data["rag_strategies"][0]["query_entity_detection"] = "predict"  # type: ignore
+
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
+
+    # Now test with relation_text_as_paragraphs
+    data["rag_strategies"][0]["relation_text_as_paragraphs"] = True  # type: ignore
+    expected_paragraphs_text = {
+        "/t/inception2": "- Leonardo DiCaprio starred Inception",
+        "/t/leo": "- Leonardo DiCaprio analogy DiCaprio",
+        "/t/inception1": "- Christopher Nolan directed Inception",
+        "/t/inception3": "- Joseph Gordon-Levitt starred Inception",
+    }
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
+
     # Now with agentic graph only
     data["rag_strategies"][0]["agentic_graph_only"] = True  # type: ignore
+    data["rag_strategies"][0]["relation_text_as_paragraphs"] = False  # type: ignore
     expected_paragraphs_text = {
         "/t/inception2": "Leonardo DiCaprio starred in Inception.",
         "/t/leo": "Leonardo DiCaprio is a great actor. DiCaprio started acting in 1989.",
