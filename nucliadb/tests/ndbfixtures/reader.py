@@ -39,7 +39,7 @@ from .utils import create_api_client_factory
 
 
 @pytest.fixture(scope="function")
-async def component_nucliadb_reader(reader_api_server: FastAPI, natsd) -> AsyncIterator[AsyncClient]:
+async def component_nucliadb_reader(reader_api_server: FastAPI) -> AsyncIterator[AsyncClient]:
     with patch.object(running_settings, "debug", False):
         client_factory = create_api_client_factory(reader_api_server)
         async with client_factory(roles=[NucliaDBRoles.READER]) as client:

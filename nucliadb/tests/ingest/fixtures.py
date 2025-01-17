@@ -336,14 +336,18 @@ async def nats_index_stream(nats_server: str):
     consumers = [
         (const.Streams.INDEX.name, const.Streams.INDEX.group.format(node="1")),
     ]
-    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
+    # Do not clean consumers after the fixture, since search tests uses a session level sidecar that will reuse it
+    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers, clean=False):
         with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
             yield
 
 
 @asynccontextmanager
 async def _nats_streams_and_consumers_setup(
-    nats_server: str, streams: list[tuple[str, str]], consumers: list[tuple[str, str]]
+    nats_server: str,
+    streams: list[tuple[str, str]],
+    consumers: list[tuple[str, str]],
+    clean: bool = True,
 ):
     nc = await nats.connect(servers=[nats_server])
     js = nc.jetstream()
@@ -362,24 +366,25 @@ async def _nats_streams_and_consumers_setup(
     # we close and reopen the connection with nats between yield points to avoid
     # warnings complaining on tasks being closed and tasks being killed.
     # Probably some nats invariant is breaking across yield points
-    nc = await nats.connect(servers=[nats_server])
-    js = nc.jetstream()
+    if clean:
+        nc = await nats.connect(servers=[nats_server])
+        js = nc.jetstream()
 
-    # delete consumers
-    for stream, consumer in consumers:
-        try:
-            await js.delete_consumer(stream, consumer)
-        except nats.js.errors.NotFoundError:
-            pass
+        # delete consumers
+        for stream, consumer in consumers:
+            try:
+                await js.delete_consumer(stream, consumer)
+            except nats.js.errors.NotFoundError:
+                pass
 
-    # delete streams
-    for stream, subject in streams:
-        try:
-            await js.delete_stream(stream)
-        except nats.js.errors.NotFoundError:
-            pass
+        # delete streams
+        for stream, subject in streams:
+            try:
+                await js.delete_stream(stream)
+            except nats.js.errors.NotFoundError:
+                pass
 
-    await nc.close()
+        await nc.close()
 
 
 @pytest.fixture(scope="function")
