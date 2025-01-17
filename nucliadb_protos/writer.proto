@@ -47,7 +47,16 @@ message DataAugmentationCleanup {
     string task_id = 1;
 
     // For the labeler, llm security and content-safety tasks
-    repeated string labelsets = 2;
+    message Labels {
+        // The labelsets to cleanup
+        repeated string labelsets = 1;
+        // True if the task was a field-level labeler
+        bool fields = 2;
+        // True if the task was a paragraph-level labeler
+        bool paragraphs = 3;
+    }
+
+    Labels labels = 2;
 
     // For the ask task
     bool qas = 3;

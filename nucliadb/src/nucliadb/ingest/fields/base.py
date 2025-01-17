@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import asyncio
 import enum
 from datetime import datetime
 from typing import Any, Generic, Optional, Type, TypeVar
@@ -162,10 +163,12 @@ class Field(Generic[PbType]):
             field_type=self.type,
             field_id=self.id,
         )
-        await self.delete_extracted_text()
-        await self.delete_vectors()
-        await self.delete_metadata()
-        await self.delete_question_answers()
+        tasks = []
+        tasks.append(self.delete_extracted_text())
+        tasks.append(self.delete_vectors())
+        tasks.append(self.delete_metadata())
+        tasks.append(self.delete_question_answers())
+        await asyncio.gather(*tasks)
 
     async def delete_question_answers(self) -> None:
         sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)

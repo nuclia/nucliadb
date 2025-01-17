@@ -127,9 +127,8 @@ pub mod error {
 pub struct DataAugmentationCleanup {
     #[prost(string, tag = "1")]
     pub task_id: ::prost::alloc::string::String,
-    /// For the labeler, llm security and content-safety tasks
-    #[prost(string, repeated, tag = "2")]
-    pub labelsets: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "2")]
+    pub labels: ::core::option::Option<data_augmentation_cleanup::Labels>,
     /// For the ask task
     #[prost(bool, tag = "3")]
     pub qas: bool,
@@ -141,6 +140,23 @@ pub struct DataAugmentationCleanup {
     /// For the generator task
     #[prost(string, repeated, tag = "6")]
     pub text_fields: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+/// Nested message and enum types in `DataAugmentationCleanup`.
+pub mod data_augmentation_cleanup {
+    /// For the labeler, llm security and content-safety tasks
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct Labels {
+        /// The labelsets to cleanup
+        #[prost(string, repeated, tag = "1")]
+        pub labelsets: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+        /// True if the task was a field-level labeler
+        #[prost(bool, tag = "2")]
+        pub fields: bool,
+        /// True if the task was a paragraph-level labeler
+        #[prost(bool, tag = "3")]
+        pub paragraphs: bool,
+    }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

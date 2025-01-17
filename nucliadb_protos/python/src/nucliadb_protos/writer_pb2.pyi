@@ -311,8 +311,34 @@ class DataAugmentationCleanup(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
+    class Labels(google.protobuf.message.Message):
+        """For the labeler, llm security and content-safety tasks"""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        LABELSETS_FIELD_NUMBER: builtins.int
+        FIELDS_FIELD_NUMBER: builtins.int
+        PARAGRAPHS_FIELD_NUMBER: builtins.int
+        fields: builtins.bool
+        """True if the task was a field-level labeler"""
+        paragraphs: builtins.bool
+        """True if the task was a paragraph-level labeler"""
+        @property
+        def labelsets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+            """The labelsets to cleanup"""
+
+        def __init__(
+            self,
+            *,
+            labelsets: collections.abc.Iterable[builtins.str] | None = ...,
+            fields: builtins.bool = ...,
+            paragraphs: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["fields", b"fields", "labelsets", b"labelsets", "paragraphs", b"paragraphs"]) -> None: ...
+
     TASK_ID_FIELD_NUMBER: builtins.int
-    LABELSETS_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     QAS_FIELD_NUMBER: builtins.int
     ENTITIES_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
@@ -324,9 +350,7 @@ class DataAugmentationCleanup(google.protobuf.message.Message):
     """For the graph task"""
     relations: builtins.bool
     @property
-    def labelsets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """For the labeler, llm security and content-safety tasks"""
-
+    def labels(self) -> global___DataAugmentationCleanup.Labels: ...
     @property
     def text_fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """For the generator task"""
@@ -335,13 +359,14 @@ class DataAugmentationCleanup(google.protobuf.message.Message):
         self,
         *,
         task_id: builtins.str = ...,
-        labelsets: collections.abc.Iterable[builtins.str] | None = ...,
+        labels: global___DataAugmentationCleanup.Labels | None = ...,
         qas: builtins.bool = ...,
         entities: builtins.bool = ...,
         relations: builtins.bool = ...,
         text_fields: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["entities", b"entities", "labelsets", b"labelsets", "qas", b"qas", "relations", b"relations", "task_id", b"task_id", "text_fields", b"text_fields"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["labels", b"labels"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["entities", b"entities", "labels", b"labels", "qas", b"qas", "relations", b"relations", "task_id", b"task_id", "text_fields", b"text_fields"]) -> None: ...
 
 global___DataAugmentationCleanup = DataAugmentationCleanup
 
