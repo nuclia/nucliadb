@@ -124,7 +124,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         }
         INDEXING_COUNTER.get_or_create(&OperationStatusLabels::success()).inc();
 
-        if let Err(e) = acker.ack().await {
+        if let Err(e) = acker.double_ack().await {
             warn!("Error acking index message: {e:?}");
             continue;
         }
