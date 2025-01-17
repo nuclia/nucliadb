@@ -29,7 +29,7 @@ from nucliadb.reader.app import create_application
 from nucliadb.standalone.settings import Settings
 from nucliadb.writer import API_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.settings import running_settings
+from nucliadb_utils.settings import running_settings, transaction_settings
 from nucliadb_utils.storages.storage import Storage
 from tests.utils.dirty_index import wait_for_sync
 
@@ -39,7 +39,7 @@ from .utils import create_api_client_factory
 
 
 @pytest.fixture(scope="function")
-async def component_nucliadb_reader(reader_api_server: FastAPI) -> AsyncIterator[AsyncClient]:
+async def component_nucliadb_reader(reader_api_server: FastAPI, natsd) -> AsyncIterator[AsyncClient]:
     with patch.object(running_settings, "debug", False):
         client_factory = create_api_client_factory(reader_api_server)
         async with client_factory(roles=[NucliaDBRoles.READER]) as client:
@@ -84,5 +84,6 @@ async def reader_api_server(
     dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
     application = create_application()
-    async with application.router.lifespan_context(application):
-        yield application
+    with patch.object(transaction_settings, "transaction_local", True):
+        async with application.router.lifespan_context(application):
+            yield application
