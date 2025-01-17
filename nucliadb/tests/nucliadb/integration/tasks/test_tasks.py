@@ -20,6 +20,7 @@
 import asyncio
 import time
 from contextlib import contextmanager
+from unittest.mock import patch
 
 import pydantic
 import pytest
@@ -28,6 +29,7 @@ from nucliadb import tasks
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.context import ApplicationContext
 from nucliadb_utils import const
+from nucliadb_utils.settings import indexing_settings
 
 
 @contextmanager
@@ -40,7 +42,7 @@ def set_standalone_mode(value: bool):
 
 @pytest.fixture()
 async def context(nucliadb, natsd):
-    with set_standalone_mode(False):
+    with set_standalone_mode(False), patch.object(indexing_settings, "index_jetstream_servers", [natsd]):
         context = ApplicationContext()
         await context.initialize()
         yield context
