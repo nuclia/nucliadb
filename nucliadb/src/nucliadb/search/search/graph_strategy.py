@@ -342,7 +342,12 @@ async def get_graph_results(
                     not entities_to_explore
                     or graph_strategy.query_entity_detection == QueryEntityDetection.PREDICT
                 ):
-                    entities_to_explore = await predict.detect_entities(kbid, query)
+                    try:
+                        entities_to_explore = await predict.detect_entities(kbid, query)
+                    except Exception as e:
+                        capture_exception(e)
+                        logger.exception("Error in detecting entities for graph strategy")
+                        entities_to_explore = []
         else:
             # Find neighbors of the current relations and remove the ones already explored
             entities_to_explore = (
