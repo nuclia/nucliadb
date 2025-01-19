@@ -36,7 +36,6 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import TokenSplit as PBTokenSplit
 from nucliadb_protos.resources_pb2 import UserFieldMetadata as PBUserFieldMetadata
-from nucliadb_protos.train_pb2 import EnabledMetadata
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import (
@@ -100,50 +99,6 @@ async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, kn
     o2 = await r.get_origin()
     assert o2 is not None
     assert o2.source_id == "My Source"
-
-
-async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_ingest: str):
-    # Create a resource
-    basic = PBBasic(
-        icon="text/plain",
-        title="My title",
-        summary="My summary",
-        thumbnail="/file",
-    )
-    basic.metadata.metadata["key"] = "value"
-    basic.metadata.language = "ca"
-    basic.metadata.useful = True
-    basic.metadata.status = PBMetadata.Status.PROCESSED
-
-    uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
-    r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
-    assert r is not None
-
-    # Add some labelled paragraphs to it
-    bm = BrokerMessage()
-    field1_if = FieldID()
-    field1_if.field = "field1"
-    field1_if.field_type = FieldType.TEXT
-    fcmw = FieldComputedMetadataWrapper()
-    fcmw.field.CopyFrom(field1_if)
-    p1 = Paragraph()
-    p1.start = 0
-    p1.end = 82
-    p1.classifications.append(Classification(labelset="ls1", label="label1"))
-    p2 = Paragraph()
-    p2.start = 84
-    p2.end = 103
-    p2.classifications.append(Classification(labelset="ls1", label="label2"))
-    fcmw.metadata.metadata.paragraphs.append(p1)
-    fcmw.metadata.metadata.paragraphs.append(p2)
-    bm.field_metadata.append(fcmw)
-    await r.apply_extracted(bm)
-
-    # Check iterate paragraphs
-    async for paragraph in r.iterate_paragraphs(EnabledMetadata(labels=True)):
-        assert len(paragraph.metadata.labels.paragraph) == 1
-        assert paragraph.metadata.labels.paragraph[0].label in ("label1", "label2")
 
 
 async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox_ingest: str):

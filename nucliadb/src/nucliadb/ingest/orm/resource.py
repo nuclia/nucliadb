@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, AsyncIterator, MutableMapping, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -51,7 +51,6 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldFile,
     FieldID,
-    FieldMetadata,
     FieldQuestionAnswerWrapper,
     FieldText,
     FieldType,
@@ -60,7 +59,6 @@ from nucliadb_protos.resources_pb2 import (
     LinkExtractedData,
     Metadata,
     Paragraph,
-    ParagraphAnnotation,
 )
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -68,15 +66,6 @@ from nucliadb_protos.resources_pb2 import Extra as PBExtra
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
-from nucliadb_protos.train_pb2 import (
-    EnabledMetadata,
-    TrainField,
-    TrainMetadata,
-    TrainParagraph,
-    TrainResource,
-    TrainSentence,
-)
-from nucliadb_protos.train_pb2 import Position as TrainPosition
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.storages.storage import Storage
@@ -893,291 +882,6 @@ class Resource:
         self._indexer = None
         self.txn = None
 
-    async def iterate_sentences(
-        self, enabled_metadata: EnabledMetadata
-    ) -> AsyncIterator[TrainSentence]:  # pragma: no cover
-        fields = await self.get_fields(force=True)
-        metadata = TrainMetadata()
-        userdefinedparagraphclass: dict[str, ParagraphAnnotation] = {}
-        if enabled_metadata.labels:
-            if self.basic is None:
-                self.basic = await self.get_basic()
-            if self.basic is not None:
-                metadata.labels.resource.extend(self.basic.usermetadata.classifications)
-                for fieldmetadata in self.basic.fieldmetadata:
-                    field_id = self.generate_field_id(fieldmetadata.field)
-                    for annotationparagraph in fieldmetadata.paragraphs:
-                        userdefinedparagraphclass[annotationparagraph.key] = annotationparagraph
-
-        for (type_id, field_id), field in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)
-            field_key = self.generate_field_id(fieldid)
-            fm = await field.get_field_metadata()
-            extracted_text = None
-            vo = None
-            text = None
-
-            if enabled_metadata.vector:
-                vo = await field.get_vectors()
-
-            extracted_text = await field.get_extracted_text()
-
-            if fm is None:
-                continue
-
-            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
-            for subfield_metadata, splitted_metadata in fm.split_metadata.items():
-                field_metadatas.append((subfield_metadata, splitted_metadata))
-
-            for subfield, field_metadata in field_metadatas:
-                if enabled_metadata.labels:
-                    metadata.labels.ClearField("field")
-                    metadata.labels.field.extend(field_metadata.classifications)
-
-                entities: dict[str, str] = {}
-                if enabled_metadata.entities:
-                    _update_entities_dict(entities, field_metadata)
-
-                precomputed_vectors = {}
-                if vo is not None:
-                    if subfield is not None:
-                        vectors = vo.split_vectors[subfield]
-                        base_vector_key = f"{self.uuid}/{field_key}/{subfield}"
-                    else:
-                        vectors = vo.vectors
-                        base_vector_key = f"{self.uuid}/{field_key}"
-                    for index, vector in enumerate(vectors.vectors):
-                        vector_key = f"{base_vector_key}/{index}/{vector.start}-{vector.end}"
-                        precomputed_vectors[vector_key] = vector.vector
-
-                if extracted_text is not None:
-                    if subfield is not None:
-                        text = extracted_text.split_text[subfield]
-                    else:
-                        text = extracted_text.text
-
-                for paragraph in field_metadata.paragraphs:
-                    if subfield is not None:
-                        paragraph_key = (
-                            f"{self.uuid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
-                        )
-                    else:
-                        paragraph_key = f"{self.uuid}/{field_key}/{paragraph.start}-{paragraph.end}"
-
-                    if enabled_metadata.labels:
-                        metadata.labels.ClearField("field")
-                        metadata.labels.paragraph.extend(paragraph.classifications)
-                        if paragraph_key in userdefinedparagraphclass:
-                            metadata.labels.paragraph.extend(
-                                userdefinedparagraphclass[paragraph_key].classifications
-                            )
-
-                    for index, sentence in enumerate(paragraph.sentences):
-                        if subfield is not None:
-                            sentence_key = f"{self.uuid}/{field_key}/{subfield}/{index}/{sentence.start}-{sentence.end}"
-                        else:
-                            sentence_key = (
-                                f"{self.uuid}/{field_key}/{index}/{sentence.start}-{sentence.end}"
-                            )
-
-                        if vo is not None:
-                            metadata.ClearField("vector")
-                            vector_tmp = precomputed_vectors.get(sentence_key)
-                            if vector_tmp:
-                                metadata.vector.extend(vector_tmp)
-
-                        if extracted_text is not None and text is not None:
-                            metadata.text = text[sentence.start : sentence.end]
-
-                        metadata.ClearField("entities")
-                        metadata.ClearField("entity_positions")
-                        if enabled_metadata.entities and text is not None:
-                            local_text = text[sentence.start : sentence.end]
-                            add_entities_to_metadata(entities, local_text, metadata)
-
-                        pb_sentence = TrainSentence()
-                        pb_sentence.uuid = self.uuid
-                        pb_sentence.field.CopyFrom(fieldid)
-                        pb_sentence.paragraph = paragraph_key
-                        pb_sentence.sentence = sentence_key
-                        pb_sentence.metadata.CopyFrom(metadata)
-                        yield pb_sentence
-
-    async def iterate_paragraphs(
-        self, enabled_metadata: EnabledMetadata
-    ) -> AsyncIterator[TrainParagraph]:
-        fields = await self.get_fields(force=True)
-        metadata = TrainMetadata()
-        userdefinedparagraphclass: dict[str, ParagraphAnnotation] = {}
-        if enabled_metadata.labels:
-            if self.basic is None:
-                self.basic = await self.get_basic()
-            if self.basic is not None:
-                metadata.labels.resource.extend(self.basic.usermetadata.classifications)
-                for fieldmetadata in self.basic.fieldmetadata:
-                    field_id = self.generate_field_id(fieldmetadata.field)
-                    for annotationparagraph in fieldmetadata.paragraphs:
-                        userdefinedparagraphclass[annotationparagraph.key] = annotationparagraph
-
-        for (type_id, field_id), field in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)
-            field_key = self.generate_field_id(fieldid)
-            fm = await field.get_field_metadata()
-            extracted_text = None
-            text = None
-
-            extracted_text = await field.get_extracted_text()
-
-            if fm is None:
-                continue
-
-            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
-            for subfield_metadata, splitted_metadata in fm.split_metadata.items():
-                field_metadatas.append((subfield_metadata, splitted_metadata))
-
-            for subfield, field_metadata in field_metadatas:
-                if enabled_metadata.labels:
-                    metadata.labels.ClearField("field")
-                    metadata.labels.field.extend(field_metadata.classifications)
-
-                entities: dict[str, str] = {}
-                if enabled_metadata.entities:
-                    _update_entities_dict(entities, field_metadata)
-
-                if extracted_text is not None:
-                    if subfield is not None:
-                        text = extracted_text.split_text[subfield]
-                    else:
-                        text = extracted_text.text
-
-                for paragraph in field_metadata.paragraphs:
-                    if subfield is not None:
-                        paragraph_key = (
-                            f"{self.uuid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
-                        )
-                    else:
-                        paragraph_key = f"{self.uuid}/{field_key}/{paragraph.start}-{paragraph.end}"
-
-                    if enabled_metadata.labels:
-                        metadata.labels.ClearField("paragraph")
-                        metadata.labels.paragraph.extend(paragraph.classifications)
-
-                        if extracted_text is not None and text is not None:
-                            metadata.text = text[paragraph.start : paragraph.end]
-
-                        metadata.ClearField("entities")
-                        metadata.ClearField("entity_positions")
-                        if enabled_metadata.entities and text is not None:
-                            local_text = text[paragraph.start : paragraph.end]
-                            add_entities_to_metadata(entities, local_text, metadata)
-
-                        if paragraph_key in userdefinedparagraphclass:
-                            metadata.labels.paragraph.extend(
-                                userdefinedparagraphclass[paragraph_key].classifications
-                            )
-
-                        pb_paragraph = TrainParagraph()
-                        pb_paragraph.uuid = self.uuid
-                        pb_paragraph.field.CopyFrom(fieldid)
-                        pb_paragraph.paragraph = paragraph_key
-                        pb_paragraph.metadata.CopyFrom(metadata)
-
-                        yield pb_paragraph
-
-    async def iterate_fields(self, enabled_metadata: EnabledMetadata) -> AsyncIterator[TrainField]:
-        fields = await self.get_fields(force=True)
-        metadata = TrainMetadata()
-        if enabled_metadata.labels:
-            if self.basic is None:
-                self.basic = await self.get_basic()
-            if self.basic is not None:
-                metadata.labels.resource.extend(self.basic.usermetadata.classifications)
-
-        for (type_id, field_id), field in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)
-            fm = await field.get_field_metadata()
-            extracted_text = None
-
-            if enabled_metadata.text:
-                extracted_text = await field.get_extracted_text()
-
-            if fm is None:
-                continue
-
-            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
-            for subfield_metadata, splitted_metadata in fm.split_metadata.items():
-                field_metadatas.append((subfield_metadata, splitted_metadata))
-
-            for subfield, splitted_metadata in field_metadatas:
-                if enabled_metadata.labels:
-                    metadata.labels.ClearField("field")
-                    metadata.labels.field.extend(splitted_metadata.classifications)
-
-                if extracted_text is not None:
-                    if subfield is not None:
-                        metadata.text = extracted_text.split_text[subfield]
-                    else:
-                        metadata.text = extracted_text.text
-
-                if enabled_metadata.entities:
-                    metadata.ClearField("entities")
-                    _update_entities_dict(metadata.entities, splitted_metadata)
-
-                pb_field = TrainField()
-                pb_field.uuid = self.uuid
-                pb_field.field.CopyFrom(fieldid)
-                pb_field.metadata.CopyFrom(metadata)
-                yield pb_field
-
-    async def generate_train_resource(self, enabled_metadata: EnabledMetadata) -> TrainResource:
-        fields = await self.get_fields(force=True)
-        metadata = TrainMetadata()
-        if enabled_metadata.labels:
-            if self.basic is None:
-                self.basic = await self.get_basic()
-            if self.basic is not None:
-                metadata.labels.resource.extend(self.basic.usermetadata.classifications)
-
-        metadata.labels.ClearField("field")
-        metadata.ClearField("entities")
-
-        for (_, _), field in fields.items():
-            extracted_text = None
-            fm = await field.get_field_metadata()
-
-            if enabled_metadata.text:
-                extracted_text = await field.get_extracted_text()
-
-            if extracted_text is not None:
-                metadata.text += extracted_text.text
-                for text in extracted_text.split_text.values():
-                    metadata.text += f" {text}"
-
-            if fm is None:
-                continue
-
-            field_metadatas: list[tuple[Optional[str], FieldMetadata]] = [(None, fm.metadata)]
-            for subfield_metadata, splitted_metadata in fm.split_metadata.items():
-                field_metadatas.append((subfield_metadata, splitted_metadata))
-
-            for _, splitted_metadata in field_metadatas:
-                if enabled_metadata.labels:
-                    metadata.labels.field.extend(splitted_metadata.classifications)
-
-                if enabled_metadata.entities:
-                    _update_entities_dict(metadata.entities, splitted_metadata)
-
-        pb_resource = TrainResource()
-        pb_resource.uuid = self.uuid
-        if self.basic is not None:
-            pb_resource.title = self.basic.title
-            pb_resource.icon = self.basic.icon
-            pb_resource.slug = self.basic.slug
-            pb_resource.modified.CopyFrom(self.basic.modified)
-            pb_resource.created.CopyFrom(self.basic.created)
-        pb_resource.metadata.CopyFrom(metadata)
-        return pb_resource
-
 
 async def get_file_page_positions(field: File) -> FilePagePositions:
     positions: FilePagePositions = {}
@@ -1220,24 +924,6 @@ def add_field_classifications(basic: PBBasic, fcmw: FieldComputedMetadataWrapper
 
     basic.computedmetadata.field_classifications.append(fcfs)
     return True
-
-
-def add_entities_to_metadata(entities: dict[str, str], local_text: str, metadata: TrainMetadata) -> None:
-    for entity_key, entity_value in entities.items():
-        if entity_key not in local_text:
-            # Add the entity only if found in text
-            continue
-        metadata.entities[entity_key] = entity_value
-
-        # Add positions for the entity relative to the local text
-        poskey = f"{entity_value}/{entity_key}"
-        metadata.entity_positions[poskey].entity = entity_key
-        last_occurrence_end = 0
-        for _ in range(local_text.count(entity_key)):
-            start = local_text.index(entity_key, last_occurrence_end)
-            end = start + len(entity_key)
-            metadata.entity_positions[poskey].positions.append(TrainPosition(start=start, end=end))
-            last_occurrence_end = end
 
 
 def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
@@ -1308,23 +994,3 @@ def extract_field_metadata_languages(
     for _, splitted_metadata in field_metadata.metadata.split_metadata.items():
         languages.add(splitted_metadata.language)
     return list(languages)
-
-
-def _update_entities_dict(target_entites_dict: MutableMapping[str, str], field_metadata: FieldMetadata):
-    """
-    Update the entities dict with the entities from the field metadata.
-    Method created to ease the transition from legacy ner field to new entities field.
-    """
-    # Data Augmentation + Processor entities
-    # This will overwrite entities detected from more than one data augmentation task
-    # TODO: Change TrainMetadata proto to accept multiple entities with the same text
-    entity_map = {
-        entity.text: entity.label
-        for data_augmentation_task_id, entities_wrapper in field_metadata.entities.items()
-        for entity in entities_wrapper.entities
-    }
-    target_entites_dict.update(entity_map)
-
-    # Legacy processor entities
-    # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
-    target_entites_dict.update(field_metadata.ner)
