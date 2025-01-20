@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import AsyncIterator, MutableMapping, Optional
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.resources_pb2 import (
     FieldID,
@@ -64,7 +65,16 @@ async def iterate_sentences(
         text = None
 
         if enabled_metadata.vector:
-            vo = await field.get_vectors()
+            # XXX: Given that nobody requested any particular vectorset, we'll
+            # return any
+            vectorset_id = None
+            async with datamanagers.with_ro_transaction() as txn:
+                async for vectorset_id, vs in datamanagers.vectorsets.iter(
+                    txn=txn, kbid=resource.kb.kbid
+                ):
+                    break
+            assert vectorset_id is not None, "All KBs must have at least a vectorset"
+            vo = await field.get_vectors(vectorset_id, vs.storage_key_kind)
 
         extracted_text = await field.get_extracted_text()
 
