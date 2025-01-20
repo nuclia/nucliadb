@@ -27,6 +27,7 @@ from google.protobuf.message import DecodeError, Message
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
+from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
     ExtractedTextWrapper,
@@ -47,6 +48,8 @@ from nucliadb_utils.storages.storage import Storage, StorageField
 SUBFIELDFIELDS = ("c",)
 
 
+# NOTE extracted vectors key is no longer a static key, it is stored in each
+# vectorset
 class FieldTypes(str, enum.Enum):
     FIELD_TEXT = "extracted_text"
     FIELD_VECTORS = "extracted_vectors"
@@ -119,7 +122,11 @@ class Field(Generic[PbType]):
     def get_storage_field(self, field_type: FieldTypes) -> StorageField:
         return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, field_type.value)
 
-    def _get_extracted_vectors_storage_field(self, vectorset: Optional[str] = None) -> StorageField:
+    def _get_extracted_vectors_storage_field(
+        self,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+    ) -> StorageField:
         if vectorset:
             key = FieldTypes.FIELD_VECTORSET.value.format(vectorset=vectorset)
         else:
@@ -181,9 +188,13 @@ class Field(Generic[PbType]):
         except KeyError:
             pass
 
-    async def delete_vectors(self, vectorset: Optional[str] = None) -> None:
+    async def delete_vectors(
+        self,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+    ) -> None:
         # Try delete vectors
-        sf = self._get_extracted_vectors_storage_field(vectorset)
+        sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -309,12 +320,17 @@ class Field(Generic[PbType]):
                 self.extracted_text = payload
         return self.extracted_text
 
-    async def set_vectors(self, payload: ExtractedVectorsWrapper) -> Optional[VectorObject]:
-        vectorset = payload.vectorset_id or None
+    async def set_vectors(
+        self,
+        payload: ExtractedVectorsWrapper,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+    ) -> Optional[VectorObject]:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[VectorObject] = await self.get_vectors(
                     vectorset=vectorset,
+                    storage_key_kind=storage_key_kind,
                     force=True,
                 )
             except KeyError:
@@ -322,7 +338,7 @@ class Field(Generic[PbType]):
         else:
             actual_payload = None
 
-        sf = self._get_extracted_vectors_storage_field(vectorset)
+        sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
         vo: Optional[VectorObject] = None
         if actual_payload is None:
             # Its first extracted text
@@ -354,18 +370,17 @@ class Field(Generic[PbType]):
         return vo
 
     async def get_vectors(
-        self, vectorset: Optional[str] = None, force: bool = False
+        self,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+        force: bool = False,
     ) -> Optional[VectorObject]:
-        # compat with vectorsets coming from protobuffers where no value is
-        # empty string instead of None. This shouldn't be handled here but we
-        # have to make sure it gets the correct vectorset
-        vectorset = vectorset or None
-        if self.extracted_vectors.get(vectorset, None) is None or force:
-            sf = self._get_extracted_vectors_storage_field(vectorset)
+        if self.extracted_vectors[vectorset] is None or force:
+            sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
             payload = await self.storage.download_pb(sf, VectorObject)
             if payload is not None:
                 self.extracted_vectors[vectorset] = payload
-        return self.extracted_vectors.get(vectorset, None)
+        return self.extracted_vectors[vectorset]
 
     async def set_field_metadata(self, payload: FieldComputedMetadataWrapper) -> FieldComputedMetadata:
         if self.type in SUBFIELDFIELDS:
