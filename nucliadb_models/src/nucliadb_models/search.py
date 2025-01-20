@@ -1245,9 +1245,9 @@ Bigger values will discover more intricate relationships but will also take more
         le=10,
     )
     top_k: int = Field(
-        default=75,
+        default=None,
         title="Top k",
-        description="Number of relationships to keep after each hop after ranking them by relevance to the query. This number correlates to more paragraphs being sent as context.",
+        description="Number of relationships to keep after each hop after ranking them by relevance to the query. This number correlates to more paragraphs being sent as context. If not set, this number will be set to 30 if `relation_text_as_paragraphs` is set to false or 200 if `relation_text_as_paragraphs` is set to true.",
         ge=1,
         le=300,
     )
@@ -1276,6 +1276,12 @@ The generative model is slower and consumes more tokens, but can provide better 
 - `predict` uses NUA to detect entities in the query, slower and more accurate but requires an exact text match between Knowledge Box entities and entities in the query.
 - `suggest` uses fuzzy search to detect entities. It's faster and more flexible but might have trouble matching entities composed of multiple words. It will fallback to Predict if no entities are detected.""",
     )
+
+    @model_validator(mode="before")
+    def set_dynamic_defaults(cls, values):
+        if values.get("top_k") is None:
+            values["top_k"] = 200 if values.get("relation_text_as_paragraphs") else 30
+        return values
 
 
 class TableImageStrategy(ImageRagStrategy):

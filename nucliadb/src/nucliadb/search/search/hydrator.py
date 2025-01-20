@@ -164,12 +164,12 @@ async def hydrate_text_block(
     `text_block` object.
 
     """
+    if options.only_hydrate_empty and text_block.text:
+        return text_block
     async with AsyncExitStack() as stack:
         if concurrency_control is not None:
             await stack.enter_async_context(concurrency_control)
 
-        if options.only_hydrate_empty and text_block.text:
-            return text_block
         text_block.text = await paragraphs.get_paragraph_text(
             kbid=kbid,
             paragraph_id=text_block.paragraph_id,
