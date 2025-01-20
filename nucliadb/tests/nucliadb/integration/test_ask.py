@@ -20,6 +20,7 @@
 import json
 from itertools import combinations
 from unittest import mock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -47,6 +48,10 @@ from nucliadb_models.search import (
     RagStrategies,
     SyncAskResponse,
 )
+from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from tests.utils import inject_message
+from tests.utils.dirty_index import wait_for_sync
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -108,6 +113,92 @@ async def resource(nucliadb_writer, knowledgebox):
     rid = resp.json()["uuid"]
 
     yield rid
+
+
+@pytest.fixture
+async def graph_resource(nucliadb_writer, nucliadb_grpc, knowledgebox):
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "Knowledge graph",
+            "slug": "knowledgegraph",
+            "summary": "Test knowledge graph",
+            "texts": {
+                "inception1": {"body": "Christopher Nolan directed Inception. Very interesting movie."},
+                "inception2": {"body": "Leonardo DiCaprio starred in Inception."},
+                "inception3": {"body": "Joseph Gordon-Levitt starred in Inception."},
+                "leo": {"body": "Leonardo DiCaprio is a great actor. DiCaprio started acting in 1989."},
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    nodes = {
+        "nolan": RelationNode(
+            value="Christopher Nolan", ntype=RelationNode.NodeType.ENTITY, subtype="DIRECTOR"
+        ),
+        "inception": RelationNode(
+            value="Inception", ntype=RelationNode.NodeType.ENTITY, subtype="MOVIE"
+        ),
+        "leo": RelationNode(
+            value="Leonardo DiCaprio", ntype=RelationNode.NodeType.ENTITY, subtype="ACTOR"
+        ),
+        "dicaprio": RelationNode(value="DiCaprio", ntype=RelationNode.NodeType.ENTITY, subtype="ACTOR"),
+        "levitt": RelationNode(
+            value="Joseph Gordon-Levitt", ntype=RelationNode.NodeType.ENTITY, subtype="ACTOR"
+        ),
+    }
+    edges = [
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=nodes["nolan"],
+            to=nodes["inception"],
+            relation_label="directed",
+            metadata=RelationMetadata(
+                # Set this field id as int enum value since this is how legacy relations reported paragraph_id
+                paragraph_id=rid + "/4/inception1/0-37",
+                data_augmentation_task_id="my_graph_task_id",
+            ),
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=nodes["leo"],
+            to=nodes["inception"],
+            relation_label="starred",
+            metadata=RelationMetadata(
+                paragraph_id=rid + "/t/inception2/0-39",
+                data_augmentation_task_id="my_graph_task_id",
+            ),
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=nodes["levitt"],
+            to=nodes["inception"],
+            relation_label="starred",
+            metadata=RelationMetadata(
+                paragraph_id=rid + "/t/inception3/0-42",
+                data_augmentation_task_id="",
+            ),
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=nodes["leo"],
+            to=nodes["dicaprio"],
+            relation_label="analogy",
+            metadata=RelationMetadata(
+                paragraph_id=rid + "/t/leo/0-70",
+                data_augmentation_task_id="my_graph_task_id",
+            ),
+        ),
+    ]
+    bm = BrokerMessage()
+    bm.uuid = rid
+    bm.kbid = knowledgebox
+    bm.relations.extend(edges)
+    await inject_message(nucliadb_grpc, bm)
+    await wait_for_sync()
+    return rid
 
 
 async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resource):
@@ -704,6 +795,151 @@ async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox, resources):
     ask_response = SyncAskResponse.model_validate_json(resp.content)
     assert len(ask_response.retrieval_results.best_matches) == 1
     assert ask_response.retrieval_results.best_matches[0] == prev_best_matches[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("relation_ranking", ["generative", "reranker"])
+@patch("nucliadb.search.search.graph_strategy.get_predict")
+@patch("nucliadb.search.search.graph_strategy.rank_relations_reranker")
+@patch("nucliadb.search.search.graph_strategy.rank_relations_generative")
+async def test_ask_graph_strategy(
+    mocker_generative,
+    mocker_reranker,
+    mocker_predict,
+    relation_ranking: str,
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    graph_resource,
+):
+    # Mock the rank_relations functions to return the same relations with a score of 5 (no ranking)
+    # This functions are unit tested and require connection to predict
+    def mock_rank(relations, *args, **kwargs):
+        return relations, {ent: [5 for _ in rels.related_to] for ent, rels in relations.entities.items()}
+
+    mocker_generative.side_effect = mock_rank
+    mocker_reranker.side_effect = mock_rank
+
+    data = {
+        "query": "Which actors have been in movies directed by Christopher Nolan?",
+        "rag_strategies": [
+            {
+                "name": "graph",
+                "hops": 2,
+                "top_k": 5,
+                "agentic_graph_only": False,
+                "query_entity_detection": "suggest",
+                "relation_ranking": relation_ranking,
+                "relation_text_as_paragraphs": False,
+            }
+        ],
+        "debug": True,
+    }
+    headers = {"X-Synchronous": "True"}
+
+    url = f"/kb/{knowledgebox}/ask"
+
+    async def assert_ask(d, expected_paragraphs_text, expected_paragraphs_relations):
+        resp = await nucliadb_reader.post(
+            url,
+            json=d,
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        ask_response = SyncAskResponse.model_validate_json(resp.content)
+        assert ask_response.status == "success"
+
+        paragraphs = ask_response.retrieval_results.resources[graph_resource].fields
+        paragraph_texts = {
+            p_id: paragraph.text
+            for p_id, field in paragraphs.items()
+            for paragraph in field.paragraphs.values()
+        }
+        assert paragraph_texts == expected_paragraphs_text
+        paragraph_relations = {
+            p_id: [
+                {ent, r.relation_label, r.entity}
+                for ent, rels in paragraph.relevant_relations.entities.items()
+                for r in rels.related_to
+            ]
+            for p_id, field in paragraphs.items()
+            for paragraph in field.paragraphs.values()
+            if paragraph.relevant_relations is not None
+        }
+        assert paragraph_relations == expected_paragraphs_relations
+
+        paragraph_scores = [
+            paragraph.score for field in paragraphs.values() for paragraph in field.paragraphs.values()
+        ]
+        assert all(score == 5 for score in paragraph_scores)
+
+        # We expect a ranking for each hop
+        assert mocker_reranker.call_count == 2 or mocker_generative.call_count == 2
+        mocker_reranker.reset_mock()
+        mocker_generative.reset_mock()
+
+    expected_paragraphs_text = {
+        "/t/inception3": "Joseph Gordon-Levitt starred in Inception.",
+        "/t/inception2": "Leonardo DiCaprio starred in Inception.",
+        "/t/inception1": "Christopher Nolan directed Inception.",
+    }
+    expected_paragraphs_relations = {
+        "/t/inception1": [{"Christopher Nolan", "directed", "Inception"}],
+        "/t/inception2": [{"Leonardo DiCaprio", "starred", "Inception"}],
+        "/t/inception3": [{"Joseph Gordon-Levitt", "starred", "Inception"}],
+    }
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
+
+    data["query"] = "In which movie has DiCaprio starred? And Joseph Gordon-Levitt?"
+    expected_paragraphs_text = {
+        "/t/inception1": "Christopher Nolan directed Inception.",
+        "/t/inception3": "Joseph Gordon-Levitt starred in Inception.",
+        "/t/inception2": "Leonardo DiCaprio starred in Inception.",
+        "/t/leo": "Leonardo DiCaprio is a great actor. DiCaprio started acting in 1989.",
+    }
+    expected_paragraphs_relations["/t/leo"] = [{"Leonardo DiCaprio", "analogy", "DiCaprio"}]
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
+
+    # Setup a mock to test query entity extraction with predict
+    predict_mock = AsyncMock()
+    predict_mock.detect_entities.return_value = [
+        RelationNode(
+            value="DiCaprio",
+            ntype=RelationNode.NodeType.ENTITY,
+            subtype="ACTOR",
+        ),
+        RelationNode(
+            value="Joseph Gordon-Levitt",
+            ntype=RelationNode.NodeType.ENTITY,
+            subtype="ACTOR",
+        ),
+    ]
+    mocker_predict.return_value = predict_mock
+
+    # Run the same query but with query_entity_detection set to "predict"
+    data["rag_strategies"][0]["query_entity_detection"] = "predict"  # type: ignore
+
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
+
+    # Now test with relation_text_as_paragraphs
+    data["rag_strategies"][0]["relation_text_as_paragraphs"] = True  # type: ignore
+    expected_paragraphs_text = {
+        "/t/inception2": "- Leonardo DiCaprio starred Inception",
+        "/t/leo": "- Leonardo DiCaprio analogy DiCaprio",
+        "/t/inception1": "- Christopher Nolan directed Inception",
+        "/t/inception3": "- Joseph Gordon-Levitt starred Inception",
+    }
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
+
+    # Now with agentic graph only
+    data["rag_strategies"][0]["agentic_graph_only"] = True  # type: ignore
+    data["rag_strategies"][0]["relation_text_as_paragraphs"] = False  # type: ignore
+    expected_paragraphs_text = {
+        "/t/inception2": "Leonardo DiCaprio starred in Inception.",
+        "/t/leo": "Leonardo DiCaprio is a great actor. DiCaprio started acting in 1989.",
+    }
+    del expected_paragraphs_relations["/t/inception1"]
+    del expected_paragraphs_relations["/t/inception3"]
+    await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
 
 async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowledgebox, resources):
