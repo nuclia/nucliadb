@@ -21,8 +21,10 @@
 use std::{any::TypeId, path::PathBuf};
 
 use anyhow::anyhow;
+use nidx_text::TextConfig;
 use nidx_vector::config::VectorConfig;
 use serde::{Deserialize, Serialize};
+use serde_json::Map;
 use sqlx::{
     self,
     types::{time::PrimitiveDateTime, JsonValue},
@@ -67,7 +69,7 @@ pub struct Index {
 }
 
 pub enum IndexConfig {
-    Text(()),
+    Text(TextConfig),
     Paragraph(()),
     Vector(VectorConfig),
     Relation(()),
@@ -219,13 +221,20 @@ impl Index {
     pub fn config<T: for<'de> Deserialize<'de> + 'static>(&self) -> anyhow::Result<T> {
         let config_type = match self.kind {
             IndexKind::Vector => TypeId::of::<VectorConfig>(),
+            IndexKind::Text => TypeId::of::<TextConfig>(),
             _ => TypeId::of::<()>(),
         };
 
         if TypeId::of::<T>() != config_type {
             return Err(anyhow!("Invalid index type while getting configuration"));
         }
-        Ok(serde_json::from_value::<T>(self.configuration.clone())?)
+        if self.configuration.is_null() {
+            // Deserialize null as if it was an empty dictionary for better backwards compatibility
+            // when adding configuration to an index for the first time
+            Ok(serde_json::from_value::<T>(JsonValue::Object(Map::new()))?)
+        } else {
+            Ok(serde_json::from_value::<T>(self.configuration.clone())?)
+        }
     }
 }
 
@@ -275,7 +284,7 @@ impl TryInto<VectorConfig> for IndexConfig {
 
 impl IndexConfig {
     pub fn new_text() -> Self {
-        Self::Text(())
+        Self::Text(TextConfig::default())
     }
 
     pub fn new_paragraph() -> Self {
@@ -284,5 +293,33 @@ impl IndexConfig {
 
     pub fn new_relation() -> Self {
         Self::Relation(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nidx_text::TextConfig;
+    use uuid::Uuid;
+
+    use crate::{
+        metadata::{Index, IndexConfig, Shard},
+        NidxMetadata,
+    };
+
+    #[sqlx::test]
+    async fn test_text_config(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
+
+        // Default version for new indexes is 2
+        let shard = Shard::create(&meta.pool, Uuid::new_v4()).await.unwrap();
+        let index = Index::create(&meta.pool, shard.id, "multilingual", IndexConfig::new_text()).await.unwrap();
+        assert_eq!(index.config::<TextConfig>()?.version, 2);
+
+        // Default version if DB is empty is 1
+        sqlx::query("UPDATE indexes SET configuration = NULL").execute(&meta.pool).await?;
+        let index = Index::get(&meta.pool, index.id).await?;
+        assert_eq!(index.config::<TextConfig>()?.version, 1);
+
+        Ok(())
     }
 }

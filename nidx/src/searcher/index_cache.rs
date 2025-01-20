@@ -193,7 +193,7 @@ impl IndexCache {
         };
 
         let searcher = match meta.index.kind {
-            IndexKind::Text => IndexSearcher::Text(TextSearcher::open(open_index)?),
+            IndexKind::Text => IndexSearcher::Text(TextSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Paragraph => IndexSearcher::Paragraph(ParagraphSearcher::open(open_index)?),
             IndexKind::Vector => IndexSearcher::Vector(VectorSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Relation => IndexSearcher::Relation(RelationSearcher::open(open_index)?),
