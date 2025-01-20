@@ -51,6 +51,7 @@ async def test_ingest_broker_message_with_vectorsets(
     kbid = knowledgebox_ingest
     rid = uuid.uuid4().hex
     field_id = "my-text-field"
+    default_vectorset_id = "my-semantic-model"
     vectorset_id = "fancy-multilang"
     default_vectorset_dimension = 10
     vectorset_dimension = 7
@@ -76,10 +77,13 @@ async def test_ingest_broker_message_with_vectorsets(
         field_id = list(resource.paragraphs.keys())[0]
         field_paragraphs = resource.paragraphs[field_id]
         for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
-            for vector_id, sentence in paragraph.sentences.items():
+            assert len(paragraph.vectorsets_sentences) == 2
+
+            assert default_vectorset_id in paragraph.vectorsets_sentences
+            vectorset_sentences = paragraph.vectorsets_sentences[default_vectorset_id]
+            for vector_id, sentence in vectorset_sentences.sentences.items():
                 assert len(sentence.vector) == default_vectorset_dimension
 
-            assert len(paragraph.vectorsets_sentences) == 1
             assert vectorset_id in paragraph.vectorsets_sentences
             vectorset_sentences = paragraph.vectorsets_sentences[vectorset_id]
             for vector_id, sentence in vectorset_sentences.sentences.items():
