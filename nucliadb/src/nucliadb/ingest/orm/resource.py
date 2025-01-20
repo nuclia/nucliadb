@@ -23,7 +23,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TYPE_CHECKING, Any, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Type
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -332,11 +332,10 @@ class Resource:
 
             if self.disable_vectors is False:
                 vectorset_configs = []
-                async with datamanagers.with_ro_transaction() as ro_txn:
-                    async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
-                        ro_txn, kbid=self.kb.kbid
-                    ):
-                        vectorset_configs.append(vectorset_config)
+                async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(
+                    self.txn, kbid=self.kb.kbid
+                ):
+                    vectorset_configs.append(vectorset_config)
 
                 for vectorset_config in vectorset_configs:
                     vo = await field.get_vectors(
@@ -349,7 +348,7 @@ class Resource:
                             field_key,
                             vo,
                             vectorset=vectorset_config.vectorset_id,
-                            matryoshka_vector_dimension=dimension,
+                            vector_dimension=dimension,
                             replace_field=reindex,
                         )
         return brain
@@ -564,9 +563,7 @@ class Resource:
         # Upload to binary storage
         # Vector indexing
         if self.disable_vectors is False:
-            await self.get_fields(force=True)
-            for field_vectors in message.field_vectors:
-                await self._apply_extracted_vectors(field_vectors)
+            await self._apply_extracted_vectors(message.field_vectors)
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
@@ -750,55 +747,69 @@ class Resource:
 
         add_field_classifications(self.basic, field_metadata)
 
-    async def _apply_extracted_vectors(self, field_vectors: ExtractedVectorsWrapper):
-        # Store vectors in the resource
+    async def _apply_extracted_vectors(
+        self,
+        fields_vectors: Sequence[ExtractedVectorsWrapper],
+    ):
+        await self.get_fields(force=True)
+        vectorsets = {
+            vectorset_id: vs
+            async for vectorset_id, vs in datamanagers.vectorsets.iter(self.txn, kbid=self.kb.kbid)
+        }
 
-        if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
-            # skipping because field does not exist
-            logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-            return
+        for field_vectors in fields_vectors:
+            # Bw/c with extracted vectors without vectorsets
+            if not field_vectors.vectorset_id:
+                assert (
+                    len(vectorsets) == 1
+                ), "Invalid broker message, can't ingest vectors from unknown vectorset to KB with multiple vectorsets"
+                vectorset = list(vectorsets.values())[0]
 
-        field_obj = await self.get_field(
-            field_vectors.field.field,
-            field_vectors.field.field_type,
-            load=False,
-        )
-        vo = await field_obj.set_vectors(field_vectors)
-
-        # Prepare vectors to be indexed
-
-        field_key = self.generate_field_id(field_vectors.field)
-        if vo is not None:
-            vectorset_id = field_vectors.vectorset_id or None
-            if vectorset_id is None:
-                dimension = await datamanagers.kb.get_matryoshka_vector_dimension(
-                    self.txn, kbid=self.kb.kbid
-                )
             else:
-                config = await datamanagers.vectorsets.get(
-                    self.txn, kbid=self.kb.kbid, vectorset_id=vectorset_id
-                )
-                if config is None:
+                if field_vectors.vectorset_id not in vectorsets:
                     logger.warning(
-                        f"Trying to apply a resource on vectorset '{vectorset_id}' that doesn't exist."
+                        "Dropping extracted vectors for unknown vectorset",
+                        extra={"kbid": self.kb.kbid, "vectorset": field_vectors.vectorset_id},
                     )
-                    return
-                dimension = config.vectorset_index_config.vector_dimension
-                if not dimension:
-                    raise ValueError(f"Vector dimension not set for vectorset '{vectorset_id}'")
+                    continue
+
+                vectorset = vectorsets[field_vectors.vectorset_id]
+
+            # Store vectors in the resource
+
+            if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
+                # skipping because field does not exist
+                logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
+                return
+
+            field_obj = await self.get_field(
+                field_vectors.field.field,
+                field_vectors.field.field_type,
+                load=False,
+            )
+            vo = await field_obj.set_vectors(
+                field_vectors, vectorset.vectorset_id, vectorset.storage_key_kind
+            )
+            if vo is None:
+                raise AttributeError("Vector object not found on set_vectors")
+
+            # Prepare vectors to be indexed
+
+            field_key = self.generate_field_id(field_vectors.field)
+            dimension = vectorset.vectorset_index_config.vector_dimension
+            if not dimension:
+                raise ValueError(f"Vector dimension not set for vectorset '{vectorset.vectorset_id}'")
 
             apply_field_vectors_partial = partial(
                 self.indexer.apply_field_vectors,
                 field_key,
                 vo,
-                vectorset=vectorset_id,
+                vectorset=vectorset.vectorset_id,
                 replace_field=True,
-                matryoshka_vector_dimension=dimension,
+                vector_dimension=dimension,
             )
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(_executor, apply_field_vectors_partial)
-        else:
-            raise AttributeError("VO not found on set")
 
     async def _apply_field_large_metadata(self, field_large_metadata: LargeComputedMetadataWrapper):
         field_obj = await self.get_field(

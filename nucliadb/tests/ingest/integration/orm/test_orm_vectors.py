@@ -22,7 +22,10 @@ from typing import Optional
 from uuid import uuid4
 
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.knowledgebox import (
+    KnowledgeBox,
+)
+from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
     ExtractedVectorsWrapper,
@@ -40,16 +43,19 @@ async def test_create_resource_orm_vector(
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
+    vectorset_id = "my-semantic-model"
+    storage_key_kind = VectorSetConfig.StorageKeyKind.LEGACY
 
     ex1 = ExtractedVectorsWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
+    ex1.vectorset_id = vectorset_id
     v1 = Vector(start=1, end=2, vector=b"ansjkdn")
     ex1.vectors.vectors.vectors.append(v1)
 
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
-    await field_obj.set_vectors(ex1)
+    await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
-    ex2: Optional[VectorObject] = await field_obj.get_vectors()
+    ex2: Optional[VectorObject] = await field_obj.get_vectors(vectorset_id, storage_key_kind)
     assert ex2 is not None
     assert ex2.vectors.vectors[0].vector == ex1.vectors.vectors.vectors[0].vector
 
@@ -61,9 +67,12 @@ async def test_create_resource_orm_vector_file(
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
+    vectorset_id = "my-semantic-model"
+    storage_key_kind = VectorSetConfig.StorageKeyKind.LEGACY
 
     ex1 = ExtractedVectorsWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
+    ex1.vectorset_id = vectorset_id
 
     filename = f"{dirname(__file__)}/assets/vectors.pb"
     cf1 = CloudFile(
@@ -77,9 +86,9 @@ async def test_create_resource_orm_vector_file(
     ex1.file.CopyFrom(cf1)
 
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
-    await field_obj.set_vectors(ex1)
+    await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
-    ex2: Optional[VectorObject] = await field_obj.get_vectors()
+    ex2: Optional[VectorObject] = await field_obj.get_vectors(vectorset_id, storage_key_kind)
     ex3 = VectorObject()
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
@@ -96,9 +105,12 @@ async def test_create_resource_orm_vector_split(
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
+    vectorset_id = "my-semantic-model"
+    storage_key_kind = VectorSetConfig.StorageKeyKind.LEGACY
 
     ex1 = ExtractedVectorsWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.CONVERSATION, field="text1"))
+    ex1.vectorset_id = vectorset_id
     v1 = Vector(start=1, vector=b"ansjkdn")
     vs1 = Vectors()
     vs1.vectors.append(v1)
@@ -106,10 +118,11 @@ async def test_create_resource_orm_vector_split(
     ex1.vectors.split_vectors["es2"].vectors.append(v1)
 
     field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
-    await field_obj.set_vectors(ex1)
+    await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
     ex1 = ExtractedVectorsWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.CONVERSATION, field="text1"))
+    ex1.vectorset_id = vectorset_id
     v1 = Vector(start=1, vector=b"ansjkdn")
     vs1 = Vectors()
     vs1.vectors.append(v1)
@@ -117,8 +130,8 @@ async def test_create_resource_orm_vector_split(
     ex1.vectors.split_vectors["es2"].vectors.append(v1)
 
     field_obj2: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
-    await field_obj2.set_vectors(ex1)
+    await field_obj2.set_vectors(ex1, vectorset_id, storage_key_kind)
 
-    ex2: Optional[VectorObject] = await field_obj2.get_vectors()
+    ex2: Optional[VectorObject] = await field_obj2.get_vectors(vectorset_id, storage_key_kind)
     assert ex2 is not None
     assert len(ex2.split_vectors) == 3

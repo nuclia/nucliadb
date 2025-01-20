@@ -485,6 +485,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 vector_dimension=request.vector_dimension,
             ),
             matryoshka_dimensions=request.matryoshka_dimensions,
+            storage_key_kind=VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
         )
         response = NewVectorSetResponse()
         try:

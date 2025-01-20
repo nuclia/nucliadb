@@ -22,11 +22,13 @@ from typing import Optional
 from uuid import uuid4
 
 from nucliadb.common import datamanagers
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
 from nucliadb_protos import utils_pb2 as upb
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Classification as PBClassification
@@ -159,63 +161,82 @@ async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox
             assert metadata.metadata.representation.file == "myfile"
 
 
-async def test_vector_duplicate_fields(storage, txn, cache, fake_node, knowledgebox_ingest: str):
-    basic = PBBasic(title="My title", summary="My summary")
-    basic.metadata.status = PBMetadata.Status.PROCESSED
+async def test_vector_duplicate_fields(maindb_driver: Driver, storage, fake_node):
+    vector_dimension = 768
 
-    uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
-    r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
-    assert r is not None
-
-    # Add some labelled paragraphs to it
-    bm = BrokerMessage()
-    field = FieldID(field="field1", field_type=FieldType.TEXT)
-    fcmw = FieldComputedMetadataWrapper(field=field)
-    p1 = Paragraph(
-        start=0,
-        end=82,
-        classifications=[Classification(labelset="ls1", label="label1")],
-    )
-    p2 = Paragraph(
-        start=84,
-        end=103,
-        classifications=[Classification(labelset="ls1", label="label2")],
-    )
-    fcmw.metadata.metadata.paragraphs.append(p1)
-    fcmw.metadata.metadata.paragraphs.append(p2)
-    bm.field_metadata.append(fcmw)
-    bm.texts["field1"].body = "My text1"
-
-    for i in range(5):
-        bm.field_vectors.append(
-            ExtractedVectorsWrapper(
-                field=field,
-                vectors=utils_pb2.VectorObject(
-                    vectors=utils_pb2.Vectors(
-                        vectors=[
-                            utils_pb2.Vector(
-                                start=0,
-                                end=1,
-                                start_paragraph=0,
-                                end_paragraph=1,
-                                vector=[0.1] * 768,
-                            )
-                        ]
-                    )
-                ),
+    kbid = KnowledgeBox.new_unique_kbid()
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=f"slug-{kbid}",
+        semantic_models={
+            "my-model": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE,
+                vector_dimension=768,
             )
-        )
+        },
+    )
+    async with datamanagers.with_rw_transaction() as txn:
+        kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
-    await r.apply_fields(bm)
-    await r.apply_extracted(bm)
+        basic = PBBasic(title="My title", summary="My summary")
+        basic.metadata.status = PBMetadata.Status.PROCESSED
+
+        rid = str(uuid4())
+        resource = await kb_obj.add_resource(uuid=rid, slug="slug", basic=basic)
+        assert resource is not None
+
+        # Add some labelled paragraphs to it
+        bm = BrokerMessage()
+        field = FieldID(field="field1", field_type=FieldType.TEXT)
+        fcmw = FieldComputedMetadataWrapper(field=field)
+        p1 = Paragraph(
+            start=0,
+            end=82,
+            classifications=[Classification(labelset="ls1", label="label1")],
+        )
+        p2 = Paragraph(
+            start=84,
+            end=103,
+            classifications=[Classification(labelset="ls1", label="label2")],
+        )
+        fcmw.metadata.metadata.paragraphs.append(p1)
+        fcmw.metadata.metadata.paragraphs.append(p2)
+        bm.field_metadata.append(fcmw)
+        bm.texts["field1"].body = "My text1"
+
+        for i in range(5):
+            bm.field_vectors.append(
+                ExtractedVectorsWrapper(
+                    field=field,
+                    vectors=utils_pb2.VectorObject(
+                        vectors=utils_pb2.Vectors(
+                            vectors=[
+                                utils_pb2.Vector(
+                                    start=0,
+                                    end=1,
+                                    start_paragraph=0,
+                                    end_paragraph=1,
+                                    vector=[0.1] * vector_dimension,
+                                )
+                            ]
+                        )
+                    ),
+                )
+            )
+
+        await resource.apply_fields(bm)
+        await resource.apply_extracted(bm)
 
     count = 0
-    for pkey1, para in r.indexer.brain.paragraphs.items():
-        for pkey2, para2 in para.paragraphs.items():
-            for key, sent in para2.sentences.items():
-                count += 1
-                assert len(sent.vector) == 768, f"bad key {len(sent.vector)} {pkey1} - {pkey2} - {key}"
+    for field_id, field_paragraphs in resource.indexer.brain.paragraphs.items():
+        for paragraph_id, paragraph in field_paragraphs.paragraphs.items():
+            for vectorset_id, vectorset_sentences in paragraph.vectorsets_sentences.items():
+                for vector_id, sentence in vectorset_sentences.sentences.items():
+                    count += 1
+                    assert (
+                        len(sentence.vector) == 768
+                    ), f"bad key {len(sentence.vector)} {field_id} - {paragraph_id} - {vectorset_id} - {vector_id}"
 
     assert count == 1
 
@@ -224,17 +245,17 @@ async def test_generate_broker_message(
     storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
 ):
     # Create a resource with all possible metadata in it
-    resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
+    full_resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
 
     # Now fetch it
     async with maindb_driver.transaction() as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
-        r = await kb_obj.get(resource.uuid)
-        assert r is not None
+        resource = await kb_obj.get(full_resource.uuid)
+        assert resource is not None
 
     async with maindb_driver.transaction() as txn:
-        r.txn = txn
-        bm = await generate_broker_message(r)
+        resource.txn = txn
+        bm = await generate_broker_message(resource)
 
     # Check generated broker message has the same metadata as the created resource
 
@@ -333,11 +354,19 @@ async def test_generate_broker_message(
     assert llfm.real.metadata.tokens["tok"] == 3
 
     # Field vectors
-    lfv = [v for v in bm.field_vectors if v.field.field == "link1"][0]
-    assert len(lfv.vectors.vectors.vectors) == 1
-    assert lfv.vectors.vectors.vectors[0].start == 0
-    assert lfv.vectors.vectors.vectors[0].end == 20
-    assert lfv.vectors.vectors.vectors[0].vector == list(map(int, b"ansjkdn"))
+    idx = 0
+    async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kb_obj.kbid):
+        lfv = [
+            v for v in bm.field_vectors if v.field.field == "link1" and v.vectorset_id == vectorset_id
+        ][0]
+        assert len(lfv.vectors.vectors.vectors) == 1
+        assert lfv.vectors.vectors.vectors[0].start == 0
+        assert lfv.vectors.vectors.vectors[0].end == 20
+        assert (
+            lfv.vectors.vectors.vectors[0].vector
+            == [float(idx)] * vs.vectorset_index_config.vector_dimension
+        )
+        idx += 1
 
     # 2.3 CONVERSATION FIELD
     conv_field = bm.conversations["conv1"]

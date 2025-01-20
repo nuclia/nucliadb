@@ -246,9 +246,10 @@ class ResourceBrain:
         field_id: str,
         vo: utils_pb2.VectorObject,
         *,
-        vectorset: Optional[str] = None,
+        vectorset: str,
         replace_field: bool = False,
-        matryoshka_vector_dimension: Optional[int] = None,
+        # cut to specific dimension if specified
+        vector_dimension: Optional[int] = None,
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
@@ -277,7 +278,7 @@ class ResourceBrain:
                     sentence_key,
                     vector,
                     vectorset=vectorset,
-                    matryoshka_vector_dimension=matryoshka_vector_dimension,
+                    vector_dimension=vector_dimension,
                 )
 
         _field_id = ids.FieldId(
@@ -303,16 +304,12 @@ class ResourceBrain:
                 sentence_key,
                 vector,
                 vectorset=vectorset,
-                matryoshka_vector_dimension=matryoshka_vector_dimension,
+                vector_dimension=vector_dimension,
             )
 
         if replace_field:
             full_field_id = ids.FieldId(rid=self.rid, type=fid.type, key=fid.key).full()
-            if vectorset is None:
-                # DEPRECATED
-                self.brain.sentences_to_delete.append(full_field_id)
-            else:
-                self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
+            self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
 
     def _apply_field_vector(
         self,
@@ -321,22 +318,15 @@ class ResourceBrain:
         sentence_key: ids.VectorId,
         vector: utils_pb2.Vector,
         *,
-        vectorset: Optional[str],
-        matryoshka_vector_dimension: Optional[int] = None,
+        vectorset: str,
+        # cut vectors if a specific dimension is specified
+        vector_dimension: Optional[int] = None,
     ):
         paragraph_pb = self.brain.paragraphs[field_id].paragraphs[paragraph_key.full()]
-        if vectorset:
-            sentence_pb = paragraph_pb.vectorsets_sentences[vectorset].sentences[sentence_key.full()]
-        else:
-            sentence_pb = paragraph_pb.sentences[sentence_key.full()]
+        sentence_pb = paragraph_pb.vectorsets_sentences[vectorset].sentences[sentence_key.full()]
 
         sentence_pb.ClearField("vector")  # clear first to prevent duplicates
-
-        # cut vectors if a specific dimension is specified
-        if matryoshka_vector_dimension is not None:
-            sentence_pb.vector.extend(vector.vector[:matryoshka_vector_dimension])
-        else:
-            sentence_pb.vector.extend(vector.vector)
+        sentence_pb.vector.extend(vector.vector[:vector_dimension])
 
         # we only care about start/stop position of the paragraph for a given sentence here
         # the key has the sentence position

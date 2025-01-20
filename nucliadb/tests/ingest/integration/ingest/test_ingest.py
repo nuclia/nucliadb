@@ -668,19 +668,19 @@ async def test_ingest_autocommit_deadletter_marks_resource(
     assert resource.basic.metadata.status == PBMetadata.Status.ERROR  # type: ignore
 
 
-def message_resource_with_vectors(knowledgebox_ingest, rid):
+def message_resource_with_vectors(knowledgebox_ingest: str, rid: str):
     message = make_message(knowledgebox_ingest, rid)
     add_filefields(message, [("some_text", "file.png")])
     message.field_metadata.append(
         FieldComputedMetadataWrapper(
-            field=FieldID(field="some_text", field_type=0),
+            field=FieldID(field="some_text", field_type=FieldType.FILE),
             metadata=FieldComputedMetadata(
                 metadata=FieldMetadata(
                     paragraphs=[
                         Paragraph(
                             start=0,
                             end=5,
-                            kind=0,
+                            kind=Paragraph.TypeParagraph.TEXT,
                         )
                     ]
                 )
@@ -689,7 +689,8 @@ def message_resource_with_vectors(knowledgebox_ingest, rid):
     )
     message.field_vectors.append(
         ExtractedVectorsWrapper(
-            field=FieldID(field="some_text", field_type=0),
+            field=FieldID(field="some_text", field_type=FieldType.FILE),
+            vectorset_id="my-semantic-model",
             vectors=VectorObject(
                 vectors=Vectors(
                     vectors=[
@@ -804,7 +805,7 @@ async def test_ingest_update_labels(
         brain_mock.assert_called_once()
         brain = brain_mock.call_args[0][0]
         assert f"{rid}/f/some_text" in brain.paragraphs_to_delete
-        assert f"{rid}/f/some_text" in brain.sentences_to_delete
+        assert f"{rid}/f/some_text" in brain.vector_prefixes_to_delete["my-semantic-model"].items
         assert "/l/names/john" in brain.labels
 
 

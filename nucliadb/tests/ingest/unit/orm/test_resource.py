@@ -31,6 +31,7 @@ from nucliadb.ingest.orm.resource import (
     update_basic_languages,
 )
 from nucliadb_protos import utils_pb2, writer_pb2
+from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
     AllFieldIDs,
     Basic,
@@ -272,7 +273,7 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     ]
 
 
-async def test_apply_extracted_vectors_matryoshka_embeddings(txn, storage, kb):
+async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb):
     STORED_VECTOR_DIMENSION = 100
     MATRYOSHKA_DIMENSION = 10
 
@@ -291,25 +292,32 @@ async def test_apply_extracted_vectors_matryoshka_embeddings(txn, storage, kb):
         )
     )
     mock_field.set_vectors.return_value = (vectors, False, [])
-
     resource = Resource(txn, storage, kb, "matryoshka-rid")
+
     with (
+        patch.object(resource, "get_fields", AsyncMock()),
         patch.object(resource, "has_field", Mock(return_value=True)),
         patch.object(resource, "get_field", AsyncMock(return_value=mock_field)),
         patch.object(resource, "generate_field_id", Mock(return_value="field_id")),
         patch("nucliadb.ingest.orm.resource.datamanagers") as mock_datamanagers,
         patch.object(resource.indexer, "apply_field_vectors", AsyncMock()) as apply_field_vectors,
     ):
-        mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(return_value=None)
-        await resource._apply_extracted_vectors(writer_pb2.ExtractedVectorsWrapper(vectors=vectors))
-        assert apply_field_vectors.call_count == 1
-        assert apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"] is None
+        config = VectorSetConfig()
+        config.vectorset_id = "my-vectorset"
+        config.storage_key_kind = VectorSetConfig.StorageKeyKind.LEGACY
 
-        mock_datamanagers.kb.get_matryoshka_vector_dimension = AsyncMock(
-            return_value=MATRYOSHKA_DIMENSION
-        )
-        await resource._apply_extracted_vectors(writer_pb2.ExtractedVectorsWrapper(vectors=vectors))
+        async def _iter_vectorsets(txn, kbid):
+            for vs in [config]:
+                yield (vs.vectorset_id, vs)
+
+        mock_datamanagers.vectorsets.iter = _iter_vectorsets
+
+        config.vectorset_index_config.vector_dimension = STORED_VECTOR_DIMENSION
+        await resource._apply_extracted_vectors([writer_pb2.ExtractedVectorsWrapper(vectors=vectors)])
+        assert apply_field_vectors.call_count == 1
+        assert apply_field_vectors.call_args.kwargs["vector_dimension"] == STORED_VECTOR_DIMENSION
+
+        config.vectorset_index_config.vector_dimension = MATRYOSHKA_DIMENSION
+        await resource._apply_extracted_vectors([writer_pb2.ExtractedVectorsWrapper(vectors=vectors)])
         assert apply_field_vectors.call_count == 2
-        assert (
-            apply_field_vectors.call_args.kwargs["matryoshka_vector_dimension"] == MATRYOSHKA_DIMENSION
-        )
+        assert apply_field_vectors.call_args.kwargs["vector_dimension"] == MATRYOSHKA_DIMENSION

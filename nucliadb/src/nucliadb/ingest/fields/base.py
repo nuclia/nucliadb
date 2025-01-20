@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any, Generic, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 
 from google.protobuf.message import DecodeError, Message
 
@@ -44,6 +44,10 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error
 from nucliadb_utils.storages.storage import Storage, StorageField
+
+if TYPE_CHECKING:  # pragma: no cover
+    from nucliadb.ingest.orm.resource import Resource
+
 
 SUBFIELDFIELDS = ("c",)
 
@@ -76,7 +80,7 @@ class Field(Generic[PbType]):
     def __init__(
         self,
         id: str,
-        resource: Any,
+        resource: Resource,
         pb: Optional[Any] = None,
         value: Optional[Any] = None,
     ):
@@ -91,7 +95,7 @@ class Field(Generic[PbType]):
         self.question_answers = None
 
         self.id: str = id
-        self.resource: Any = resource
+        self.resource = resource
 
         if value is not None:
             newpb = self.pbklass()
@@ -175,7 +179,8 @@ class Field(Generic[PbType]):
             field_id=self.id,
         )
         await self.delete_extracted_text()
-        await self.delete_vectors()
+        async for vectorset_id, vs in datamanagers.vectorsets.iter(self.resource.txn, kbid=self.kbid):
+            await self.delete_vectors(vectorset_id, vs.storage_key_kind)
         await self.delete_metadata()
         await self.delete_question_answers()
 
@@ -380,12 +385,12 @@ class Field(Generic[PbType]):
         storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
         force: bool = False,
     ) -> Optional[VectorObject]:
-        if self.extracted_vectors[vectorset] is None or force:
+        if self.extracted_vectors.get(vectorset, None) is None or force:
             sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
             payload = await self.storage.download_pb(sf, VectorObject)
             if payload is not None:
                 self.extracted_vectors[vectorset] = payload
-        return self.extracted_vectors[vectorset]
+        return self.extracted_vectors.get(vectorset, None)
 
     async def set_field_metadata(self, payload: FieldComputedMetadataWrapper) -> FieldComputedMetadata:
         if self.type in SUBFIELDFIELDS:

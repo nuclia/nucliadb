@@ -103,9 +103,9 @@ class KnowledgeBox:
         *,
         kbid: str,
         slug: str,
+        semantic_models: dict[str, SemanticModelMetadata],
         title: str = "",
         description: str = "",
-        semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
         hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
@@ -120,7 +120,7 @@ class KnowledgeBox:
             raise KnowledgeBoxCreationError(
                 "Cannot hide new resources if the hidden resources feature is disabled"
             )
-        if semantic_models is None or len(semantic_models) == 0:
+        if len(semantic_models) == 0:
             raise KnowledgeBoxCreationError("KB must define at least one semantic model")
 
         rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
