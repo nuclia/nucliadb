@@ -127,10 +127,15 @@ class Field(Generic[PbType]):
         vectorset: str,
         storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
     ) -> StorageField:
-        if vectorset:
+        if storage_key_kind == VectorSetConfig.StorageKeyKind.LEGACY:
+            key = FieldTypes.FIELD_VECTORS.value
+        elif storage_key_kind == VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX:
             key = FieldTypes.FIELD_VECTORSET.value.format(vectorset=vectorset)
         else:
-            key = FieldTypes.FIELD_VECTORS.value
+            raise ValueError(
+                f"Can't do anything with UNSET or unknown vectorset storage key kind: {storage_key_kind}"
+            )
+
         return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, key)
 
     async def db_get_value(self) -> Optional[PbType]:
