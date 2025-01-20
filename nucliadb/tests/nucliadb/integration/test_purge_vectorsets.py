@@ -56,6 +56,8 @@ async def test_purge_vectorsets(
             value = await txn.get(KB_VECTORSET_TO_DELETE.format(kbid=kbid, vectorset=vectorset_id))
             assert value is None
 
-        assert mock.await_count == 1
+        # FIXME: go back to 1 when we forward information about the extracted
+        # vectors to vectorset purge
+        assert mock.await_count == 2
         storage_key = mock.await_args.args[0]  # type: ignore
         assert storage_key.endswith(f"/{vectorset_id}/extracted_vectors")

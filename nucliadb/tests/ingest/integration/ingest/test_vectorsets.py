@@ -66,6 +66,7 @@ async def test_ingest_broker_message_with_vectorsets(
                 vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
                     vector_dimension=vectorset_dimension
                 ),
+                storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
             ),
         )
         await txn.commit()
@@ -135,6 +136,7 @@ def create_broker_message_with_vectorset(
         field_vectors = resources_pb2.ExtractedVectorsWrapper()
         field_vectors.field.field = field_id
         field_vectors.field.field_type = resources_pb2.FieldType.TEXT
+        field_vectors.vectorset_id = "my-semantic-model"
         for i in range(0, 100, 10):
             field_vectors.vectors.vectors.vectors.append(
                 utils_pb2.Vector(
