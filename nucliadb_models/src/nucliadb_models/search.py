@@ -1244,7 +1244,8 @@ Bigger values will discover more intricate relationships but will also take more
         ge=1,
         le=10,
     )
-    top_k: int = Field(
+    # Here we ingore mypy because the default value is set dynamically in the model_validator
+    top_k: int = Field(  # type: ignore
         default=None,
         title="Top k",
         description="Number of relationships to keep after each hop after ranking them by relevance to the query. This number correlates to more paragraphs being sent as context. If not set, this number will be set to 30 if `relation_text_as_paragraphs` is set to false or 200 if `relation_text_as_paragraphs` is set to true.",
