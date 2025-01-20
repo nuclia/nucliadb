@@ -35,6 +35,7 @@ from nucliadb.ingest.orm.knowledgebox import (
     RESOURCE_TO_DELETE_STORAGE_BASE,
     KnowledgeBox,
 )
+from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_utils.storages.storage import Storage
@@ -217,7 +218,11 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                     fields = await resource.get_fields(force=True)
             # we don't need the maindb transaction anymore to remove vectors from storage
             for field in fields.values():
-                await field.delete_vectors(vectorset)
+                # XXX: as purge is asynchronous, we try both storage keys for
+                # simplicity, but we should pass the correct one through the
+                # delete key or delay the vectorset key removal here.
+                await field.delete_vectors(vectorset, VectorSetConfig.StorageKeyKind.LEGACY)
+                await field.delete_vectors(vectorset, VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX)
         except Exception as exc:
             errors.capture_exception(exc)
             logger.error(
