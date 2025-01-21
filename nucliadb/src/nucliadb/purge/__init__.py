@@ -203,8 +203,8 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
     """
     logger.info("START PURGING KB VECTORSETS")
 
-    purged = []
-    async for key in _iter_keys(driver, KB_VECTORSET_TO_DELETE_BASE):
+    vectorsets_to_delete = [key async for key in _iter_keys(driver, KB_VECTORSET_TO_DELETE_BASE)]
+    for key in vectorsets_to_delete:
         logger.info(f"Purging vectorsets {key}")
         try:
             _base, kbid, vectorset = key.lstrip("/").split("/")
@@ -240,6 +240,11 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 else:
                     await field.delete_vectors(vectorset, purge_payload.storage_key_kind)
 
+            # Finally, delete the key
+            async with driver.transaction() as txn:
+                await txn.delete(key)
+                await txn.commit()
+
         except Exception as exc:
             errors.capture_exception(exc)
             logger.error(
@@ -248,13 +253,6 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 extra={"kbid": kbid},
             )
             continue
-
-        purged.append(key)
-
-    async with driver.transaction() as txn:
-        for key in purged:
-            await txn.delete(key)
-        await txn.commit()
 
     logger.info("FINISH PURGING KB VECTORSETS")
 
