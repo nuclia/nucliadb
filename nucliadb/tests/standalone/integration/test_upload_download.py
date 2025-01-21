@@ -213,6 +213,68 @@ async def test_file_tus_upload_and_download(
     assert resp.status_code == 416
 
 
+###
+
+
+@pytest.mark.parametrize(
+    "storage",
+    storages,
+    indirect=True,
+)
+@pytest.mark.deploy_modes("standalone")
+async def test_file_tus_supports_empty_files(
+    storage: Storage,
+    configure_redis_dm,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
+):
+    language = "ca"
+    filename = "image.jpeg"
+    md5 = "7af0916dba8b70e29d99e72941923529"
+    content_type = "image/jpeg"
+    upload_metadata = ",".join(
+        [
+            f"filename {header_encode(filename)}",
+            f"language {header_encode(language)}",
+            f"md5 {header_encode(md5)}",
+        ]
+    )
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox_one}/tusupload",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "content-type": content_type,
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 201, resp.json()
+    url = resp.headers["location"]
+
+    # Make sure the upload is at the right offset
+    resp = await nucliadb_writer.head(url, timeout=None)
+    assert resp.headers["Upload-Length"] == "0"
+    assert resp.headers["Upload-Offset"] == "0"
+
+    # Upload the empty chunk
+    resp = await nucliadb_writer.patch(
+        url,
+        content=b"",
+        headers={
+            "upload-offset": "0",
+            "content-length": "0",
+            "upload-length": "0",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Make sure the upload is finished on the server side
+    assert resp.headers["Tus-Upload-Finished"] == "1"
+    assert "NDB-Resource" in resp.headers
+    assert "NDB-Field" in resp.headers
+
+
 @pytest.mark.deploy_modes("standalone")
 async def test_tus_upload_handles_unknown_upload_ids(
     configure_redis_dm,
