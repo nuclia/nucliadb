@@ -22,7 +22,6 @@ from typing import Optional
 from uuid import uuid4
 
 from nucliadb.common import datamanagers
-from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import resources_pb2 as rpb
