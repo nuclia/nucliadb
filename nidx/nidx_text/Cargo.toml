@@ -13,6 +13,8 @@ nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
 nidx_tantivy = { version = "0.1.0", path = "../nidx_tantivy" }
 anyhow = "1.0.91"
 tracing = "0.1.40"
+uuid = "1.12.0"
+serde = { version = "1.0.210", features = ["derive"] }
 
 [dev-dependencies]
 nidx_tests = { path = "../nidx_tests" }
