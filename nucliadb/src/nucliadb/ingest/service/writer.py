@@ -514,6 +514,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
                 await kbobj.delete_vectorset(request.vectorset_id)
                 await txn.commit()
+        except VectorSetConflict as exc:
+            response.status = DelVectorSetResponse.Status.ERROR
+            response.details = str(exc)
         except Exception as exc:
             errors.capture_exception(exc)
             logger.error("Error in ingest gRPC while deleting a vectorset", exc_info=True)
