@@ -21,7 +21,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from nucliadb_models import CloudLink, FieldRef, FileB64
 from nucliadb_models.utils import DateTime
@@ -101,6 +101,15 @@ class InputMessage(BaseModel):
     content: InputMessageContent
     ident: str
     type_: Optional[MessageType] = Field(None, alias="type")
+
+    @field_validator("ident", mode="after")
+    @classmethod
+    def ident_not_zero(cls, value: str) -> str:
+        # The split value "0" is reserved by learning
+        # Used to mark questions to override in the QA agent
+        if value == "0":
+            raise ValueError('Message ident cannot be "0"')
+        return value
 
 
 class InputConversationField(BaseModel):
