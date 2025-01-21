@@ -311,11 +311,12 @@ async def get_graph_results(
 ) -> tuple[KnowledgeboxFindResults, QueryParser]:
     relations = Relations(entities={})
     explored_entities: set[str] = set()
+    scores: dict[str, list[float]] = {}
     predict = get_predict()
 
     for hop in range(graph_strategy.hops):
         entities_to_explore: Iterable[RelationNode] = []
-        scores: dict[str, list[float]] = {}
+
         if hop == 0:
             # Get the entities from the query
             with metrics.time("graph_strat_query_entities"):
@@ -415,6 +416,7 @@ async def get_graph_results(
                 capture_exception(e)
                 logger.exception("Error in ranking relations for graph strategy")
                 relations = Relations(entities={})
+                scores = {}
                 break
 
     # Get the text blocks of the paragraphs that contain the top relations
