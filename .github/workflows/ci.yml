@@ -84,7 +84,7 @@ jobs:
       - name: Lint source code
         run: |
           source .venv/bin/activate
-          for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models nucliadb_sidecar nucliadb_node_binding nucliadb_performance
+          for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models nucliadb_sidecar nucliadb_performance
           do
               make -C $package lint || ERROR=1
           done
@@ -118,7 +118,7 @@ jobs:
       - name: Lint source code
         run: |
           source .venv/bin/activate
-          for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models nucliadb_sidecar nucliadb_node_binding nucliadb_performance
+          for package in nucliadb nucliadb_utils nucliadb_telemetry nucliadb_sdk nucliadb_dataset nucliadb_models nucliadb_sidecar nucliadb_performance
           do
               make -C $package lint || ERROR=1
           done
@@ -365,7 +365,6 @@ jobs:
         package:
           - nucliadb_dataset
           - nucliadb_models
-          - nucliadb_node_binding
           - nucliadb_sdk
           - nucliadb_telemetry
           - nucliadb_utils
