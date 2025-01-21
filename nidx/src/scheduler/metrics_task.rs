@@ -26,12 +26,6 @@ use crate::{
     NidxMetadata,
 };
 
-pub async fn update_metrics(metadb: &NidxMetadata) -> anyhow::Result<()> {
-    update_merge_job_metric(metadb).await?;
-
-    Ok(())
-}
-
 pub async fn update_merge_job_metric(metadb: &NidxMetadata) -> anyhow::Result<()> {
     let job_states = sqlx::query!(
         r#"
