@@ -246,7 +246,6 @@ jobs:
     needs:
       - upload-chart-nucliadb-shared
       - upload-charts-nucliadb-component
-      - upload-chart-nucliadb-node
       - upload-chart-nidx
     steps:
       - name: Generate a token
