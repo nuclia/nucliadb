@@ -16,24 +16,6 @@ concurrency:
 
 jobs:
   # Pre-checks
-  format-rust:
-    name: "Pre-checks: Rust code Format"
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: rustfmt
-        run: cargo fmt --check
-
-  clippy-rust:
-    name: "Pre-checks: Clippy lint"
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - run: rustup component add clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: clippy
-        run: cargo clippy
-
   nidx-format-rust:
     name: "nidx: Rust code Format"
     runs-on: ubuntu-24.04
@@ -195,20 +177,6 @@ jobs:
         run: .venv/bin/nucliadb-validate-migrations
 
   # Builds
-  build-node-binaries:
-    name: Build node binaries
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-      - name: Compile
-        run: cargo build --release --bin node_reader --bin node_writer
-      - name: Upload binaries to cache
-        uses: actions/cache/save@v4
-        with:
-          path: "target/release/node_*er"
-          key: node-bin-${{ github.sha }}
-
   build-nidx-binary:
     name: Build nidx binary
     runs-on: ubuntu-24.04
@@ -259,50 +227,11 @@ jobs:
           key: venv-${{ github.sha }}
 
   # Tests
-  sidecar-tests:
-    name: Sidecar tests
-    runs-on: ubuntu-24.04
-    needs:
-      - build-node-binaries
-      - build-virtual-env
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12.5"
-      - name: Restore venv
-        uses: actions/cache/restore@v4
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
-      - name: Restore binaries
-        uses: actions/cache/restore@v4
-        with:
-          path: "target/release/node_*er"
-          key: node-bin-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Build docker images for node
-        run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
-
-      - name: Run tests
-        run: source .venv/bin/activate && make -C nucliadb_sidecar test-cov
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./nucliadb_sidecar/coverage.xml
-          flags: nucliadb_sidecar
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
   nucliadb-search-tests:
     name: NucliaDB search tests
     runs-on: ubuntu-24.04
     needs:
-      - build-node-binaries
+      - build-nidx-binary
       - build-virtual-env
     steps:
       - uses: actions/checkout@v4
@@ -339,15 +268,6 @@ jobs:
           flags: nucliadb-search
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  node-rust-tests:
-    name: Node Rust tests
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-      - name: test
-        run: cargo test --workspace --all-features
 
   nucliadb-tests:
     name: NucliaDB tests
@@ -477,198 +397,19 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  # Tests with nidx
-  nidx-tests:
-    name: nidx tests
-    runs-on: ubuntu-24.04
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 1s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: nidx
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: test
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
-          SQLX_OFFLINE: true
-        run: cd nidx && cargo test --workspace --all-features
-
-  nucliadb-search-tests-nidx:
-    name: NucliaDB search tests (nidx)
-    runs-on: ubuntu-24.04
-    needs:
-      - build-node-binaries
-      - build-nidx-binary
-      - build-virtual-env
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12.5"
-      - name: Restore venv
-        uses: actions/cache/restore@v4
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
-      - name: Restore binaries
-        uses: actions/cache/restore@v4
-        with:
-          path: "target/release/node_*er"
-          key: node-bin-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Build docker images for node
-        run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
-
-      - name: Build sidecar image
-        run: make build-sidecar
-
-      - name: Restore nidx binary
-        uses: actions/cache/restore@v4
-        with:
-          path: "nidx/target/release/nidx"
-          key: nidx-bin-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Build docker images for nidx
-        run: mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
-
-      - name: Run tests
-        env:
-          NIDX_ENABLED: 1
-        run: source .venv/bin/activate && make -C nucliadb test-cov-search
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./nucliadb/coverage.xml
-          flags: nucliadb-search
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  nucliadb-tests-nidx:
-    name: NucliaDB tests (nidx)
-    runs-on: ubuntu-24.04
-    needs:
-      - build-virtual-env
-    strategy:
-      fail-fast: false
-      matrix:
-        maindb_driver: ["pg"]
-        shard: [0, 1, 2]
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12.5"
-
-      - name: Restore venv
-        uses: actions/cache/restore@v4
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Run NucliaDB tests
-        # These tests can be flaky, let's retry them...
-        uses: nick-fields/retry@v3
-        env:
-          TESTING_MAINDB_DRIVERS: ${{ matrix.maindb_driver }}
-          NIDX_ENABLED: 1
-        with:
-          max_attempts: 2
-          retry_on: error
-          timeout_minutes: 10
-          command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 2" || make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./nucliadb/coverage.xml
-          flags: nucliadb
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  nucliadb-components-tests-nidx:
-    name: NucliaDB components tests (nidx)
-    runs-on: ubuntu-24.04
-    needs:
-      - build-virtual-env
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-          - ingest
-          - reader
-          - standalone
-          - train
-          - writer
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12.5"
-
-      - name: Restore venv
-        uses: actions/cache/restore@v4
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Run package tests
-        run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
-        env:
-          NIDX_ENABLED: 1
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./nucliadb/coverage.xml
-          flags: nucliadb-${{ matrix.component }}
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
   # Depends on all tests to pass
   ci-passed:
     name: CI passed
     runs-on: ubuntu-24.04
     needs:
-      - format-rust
-      - clippy-rust
+      - nidx-format-rust
+      - nidx-clippy-rust
       - updated-protos
       - pre-checks-python
       - check-licenses
       - check-migrations
       - lint-helm
-      - sidecar-tests
       - nucliadb-search-tests
-      - node-rust-tests
       - nucliadb-tests
       - nucliadb-components-tests
       - python-packages-tests
