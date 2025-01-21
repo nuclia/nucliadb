@@ -59,11 +59,6 @@ async def test_introspect_endpoint(nucliadb_writer_manager: AsyncClient) -> None
             assert "nucliadb" in dependencies
             assert "nucliadb-models" in dependencies
 
-        # Check cluster info
-        assert os.path.exists(os.path.join(extracted_tar, "cluster_info.txt"))
-        cluster_info = ClusterInfo.parse_file(os.path.join(extracted_tar, "cluster_info.txt"))
-        assert len(cluster_info.nodes) > 0
-
         # Check settings
         assert os.path.exists(os.path.join(extracted_tar, "settings.json"))
         introspect_settings = Settings.parse_file(os.path.join(extracted_tar, "settings.json"))

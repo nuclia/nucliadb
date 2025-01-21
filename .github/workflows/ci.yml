@@ -254,7 +254,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Build docker images for nidx
-        run: mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
+        run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
 
       - name: Run tests
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
