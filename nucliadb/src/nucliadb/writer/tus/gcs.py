@@ -354,24 +354,23 @@ class GCloudFileStorageManager(FileStorageManager):
         if dm.size == 0:
             if self.storage.session is None:
                 raise AttributeError()
+            # In case of empty file, we need to send a PUT request with empty body
+            # and Content-Range header set to "bytes */0"
             headers = {
                 "Content-Length": "0",
+                "Content-Range": "bytes */0",
             }
-            if dm.offset != 0:
-                headers["Content-Range"] = "bytes {init}-{chunk}/{total}".format(
-                    init=dm.offset, chunk=dm.offset, total=dm.offset
-                )
-            else:
-                # In case of empty file
-                headers["Content-Range"] = "bytes */0"
             resumable_uri = dm.get("resumable_uri")
             async with self.storage.session.put(
                 resumable_uri,
                 headers=headers,
                 data="",
             ) as call:
-                text = await call.text()  # noqa
                 if call.status not in [200, 201, 308]:
+                    try:
+                        text = await call.text()
+                    except Exception:
+                        text = ""
                     raise GoogleCloudException(f"{call.status}: {text}")
         path = dm.get("path")
         await dm.finish()
