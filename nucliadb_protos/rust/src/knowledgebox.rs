@@ -379,6 +379,12 @@ pub struct KnowledgeBoxVectorSetsConfig {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorSetPurge {
+    #[prost(enumeration = "vector_set_config::StorageKeyKind", tag = "1")]
+    pub storage_key_kind: i32,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TermSynonyms {
     #[prost(string, repeated, tag = "1")]
     pub synonyms: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,

@@ -46,7 +46,7 @@ from nucliadb.ingest.settings import DriverSettings
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
+from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata, VectorSetConfig
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.cache.nats import NatsPubsub
@@ -419,33 +419,35 @@ TEST_CLOUDFILE = rpb.CloudFile(
 
 
 # HELPERS
-async def kb_vectorsets(kb):
+async def kb_vectorsets(kb: KnowledgeBox) -> list[VectorSetConfig]:
     vectorsets = []
     async for _, vs in datamanagers.vectorsets.iter(kb.txn, kbid=kb.kbid):
         vectorsets.append(vs)
     return vectorsets
 
 
-async def make_field(field, extracted_text):
+async def make_field(field: Field, extracted_text: str):
     vectorsets = await kb_vectorsets(field.resource.kb)
     await field.set_extracted_text(make_extracted_text(field.id, body=extracted_text))
     await field.set_field_metadata(make_field_metadata(field.id))
     await field.set_large_field_metadata(make_field_large_metadata(field.id))
-    if len(vectorsets) >= 2:
-        for idx, vs in enumerate(vectorsets):
-            await field.set_vectors(make_extracted_vectors(field.id, vs, idx))
-    else:
-        await field.set_vectors(make_extracted_vectors(field.id))
+    assert len(vectorsets) > 0, "KBs must have at least a vectorset"
+    for idx, vs in enumerate(vectorsets):
+        await field.set_vectors(
+            make_extracted_vectors(field.id, vs, idx),
+            vectorset=vs.vectorset_id,
+            storage_key_kind=vs.storage_key_kind,
+        )
 
 
-def make_extracted_text(field_id, body: str):
+def make_extracted_text(field_id: str, body: str) -> rpb.ExtractedTextWrapper:
     ex1 = rpb.ExtractedTextWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
     ex1.body.text = body
     return ex1
 
 
-def make_field_metadata(field_id):
+def make_field_metadata(field_id: str) -> rpb.FieldComputedMetadataWrapper:
     ex1 = rpb.FieldComputedMetadataWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
     ex1.metadata.metadata.links.append("https://nuclia.com")
@@ -492,7 +494,7 @@ def make_field_metadata(field_id):
     return ex1
 
 
-def make_field_large_metadata(field_id):
+def make_field_large_metadata(field_id: str) -> rpb.LargeComputedMetadataWrapper:
     ex1 = rpb.LargeComputedMetadataWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
     en1 = rpb.Entity(token="tok1", root="tok", type="NAME")
@@ -503,16 +505,15 @@ def make_field_large_metadata(field_id):
     return ex1
 
 
-def make_extracted_vectors(field_id, vectorset=None, vectorset_idx=None):
+def make_extracted_vectors(
+    field_id: str, vectorset: VectorSetConfig, vectorset_idx: int
+) -> rpb.ExtractedVectorsWrapper:
     ex1 = rpb.ExtractedVectorsWrapper()
     ex1.field.CopyFrom(rpb.FieldID(field_type=rpb.FieldType.TEXT, field=field_id))
-    if vectorset:
-        ex1.vectorset_id = vectorset.vectorset_id
-        dimension = vectorset.vectorset_index_config.vector_dimension
-        # We set a distinctive vector that we can later check
-        v1 = rpb.Vector(start=0, end=20, vector=[float(vectorset_idx)] * dimension)
-    else:
-        v1 = rpb.Vector(start=0, end=20, vector=b"ansjkdn")
+    ex1.vectorset_id = vectorset.vectorset_id
+    dimension = vectorset.vectorset_index_config.vector_dimension
+    # We set a distinctive vector that we can later check
+    v1 = rpb.Vector(start=0, end=20, vector=[float(vectorset_idx)] * dimension)
     ex1.vectors.vectors.vectors.append(v1)
     return ex1
 

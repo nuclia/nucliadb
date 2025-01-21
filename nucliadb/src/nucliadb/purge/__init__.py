@@ -26,6 +26,7 @@ from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE,
     KB_TO_DELETE_BASE,
@@ -35,6 +36,7 @@ from nucliadb.ingest.orm.knowledgebox import (
     RESOURCE_TO_DELETE_STORAGE_BASE,
     KnowledgeBox,
 )
+from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig, VectorSetPurge
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_utils.storages.storage import Storage
@@ -201,8 +203,8 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
     """
     logger.info("START PURGING KB VECTORSETS")
 
-    purged = []
-    async for key in _iter_keys(driver, KB_VECTORSET_TO_DELETE_BASE):
+    vectorsets_to_delete = [key async for key in _iter_keys(driver, KB_VECTORSET_TO_DELETE_BASE)]
+    for key in vectorsets_to_delete:
         logger.info(f"Purging vectorsets {key}")
         try:
             _base, kbid, vectorset = key.lstrip("/").split("/")
@@ -212,12 +214,37 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
 
         try:
             async with driver.transaction(read_only=True) as txn:
+                value = await txn.get(key)
+                assert value is not None, "Key must exist or we wouldn't had fetch it iterating keys"
+                purge_payload = VectorSetPurge()
+                purge_payload.ParseFromString(value)
+
+            fields: list[Field] = []
+            async with driver.transaction(read_only=True) as txn:
                 kb = KnowledgeBox(txn, storage, kbid)
                 async for resource in kb.iterate_resources():
-                    fields = await resource.get_fields(force=True)
+                    fields.extend((await resource.get_fields(force=True)).values())
+
             # we don't need the maindb transaction anymore to remove vectors from storage
-            for field in fields.values():
-                await field.delete_vectors(vectorset)
+            for field in fields:
+                if purge_payload.storage_key_kind == VectorSetConfig.StorageKeyKind.UNSET:
+                    # Bw/c for purge before adding purge payload. We assume
+                    # there's only 2 kinds of KBs: with one or with more than
+                    # one vectorset. KBs with one vectorset are not allowed to
+                    # delete their vectorset, so we wouldn't be here. It has to
+                    # be a KB with multiple, so the storage key kind has to be
+                    # this:
+                    await field.delete_vectors(
+                        vectorset, VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
+                    )
+                else:
+                    await field.delete_vectors(vectorset, purge_payload.storage_key_kind)
+
+            # Finally, delete the key
+            async with driver.transaction() as txn:
+                await txn.delete(key)
+                await txn.commit()
+
         except Exception as exc:
             errors.capture_exception(exc)
             logger.error(
@@ -226,13 +253,6 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 extra={"kbid": kbid},
             )
             continue
-
-        purged.append(key)
-
-    async with driver.transaction() as txn:
-        for key in purged:
-            await txn.delete(key)
-        await txn.commit()
 
     logger.info("FINISH PURGING KB VECTORSETS")
 

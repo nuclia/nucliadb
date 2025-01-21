@@ -57,6 +57,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
     SemanticModelMetadata,
     StoredExternalIndexProviderMetadata,
+    VectorSetPurge,
 )
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_utils.settings import is_onprem_nucliadb
@@ -103,9 +104,9 @@ class KnowledgeBox:
         *,
         kbid: str,
         slug: str,
+        semantic_models: dict[str, SemanticModelMetadata],
         title: str = "",
         description: str = "",
-        semantic_models: Optional[dict[str, SemanticModelMetadata]] = None,
         external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
         hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
@@ -120,7 +121,7 @@ class KnowledgeBox:
             raise KnowledgeBoxCreationError(
                 "Cannot hide new resources if the hidden resources feature is disabled"
             )
-        if semantic_models is None or len(semantic_models) == 0:
+        if len(semantic_models) == 0:
             raise KnowledgeBoxCreationError("KB must define at least one semantic model")
 
         rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
@@ -523,11 +524,21 @@ class KnowledgeBox:
         await shard_manager.create_vectorset(self.kbid, config)
 
     async def delete_vectorset(self, vectorset_id: str):
-        await datamanagers.vectorsets.delete(self.txn, kbid=self.kbid, vectorset_id=vectorset_id)
+        vectorset_count = await datamanagers.vectorsets.count(self.txn, kbid=self.kbid)
+        if vectorset_count == 1:
+            raise VectorSetConflict("Deletion of your last vectorset is not allowed")
+
+        deleted = await datamanagers.vectorsets.delete(
+            self.txn, kbid=self.kbid, vectorset_id=vectorset_id
+        )
+        if deleted is None:
+            # already deleted
+            return
 
         # mark vectorset for async deletion
         deletion_mark_key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
-        await self.txn.set(deletion_mark_key, b"")
+        payload = VectorSetPurge(storage_key_kind=deleted.storage_key_kind)
+        await self.txn.set(deletion_mark_key, payload.SerializeToString())
 
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
