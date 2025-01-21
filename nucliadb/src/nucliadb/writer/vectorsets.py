@@ -82,6 +82,9 @@ async def delete(kbid: str, vectorset_id: str) -> None:
             kbobj = KnowledgeBox(txn, await get_storage(), kbid)
             await kbobj.delete_vectorset(vectorset_id=vectorset_id)
             await txn.commit()
+    except VectorSetConflict:
+        # caller should handle this error
+        raise
     except Exception as ex:
         errors.capture_exception(ex)
         logger.exception(
