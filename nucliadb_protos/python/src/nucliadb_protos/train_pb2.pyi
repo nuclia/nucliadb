@@ -55,6 +55,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
     VectorSet as VectorSet,
     VectorSetConfig as VectorSetConfig,
+    VectorSetPurge as VectorSetPurge,
     VectorSets as VectorSets,
 )
 from nucliadb_protos.resources_pb2 import (

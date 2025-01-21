@@ -213,6 +213,77 @@ async def test_file_tus_upload_and_download(
     assert resp.status_code == 416
 
 
+@pytest.mark.parametrize(
+    "storage",
+    storages,
+    indirect=True,
+)
+@pytest.mark.deploy_modes("standalone")
+async def test_file_tus_supports_empty_files(
+    storage: Storage,
+    configure_redis_dm,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_one: str,
+):
+    language = "ca"
+    filename = "image.jpeg"
+    content_type = "image/jpeg"
+    upload_metadata = ",".join(
+        [
+            f"filename {header_encode(filename)}",
+            f"language {header_encode(language)}",
+        ]
+    )
+    # First test with deferred length
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox_one}/tusupload",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "content-type": content_type,
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 201, resp.json()
+    url = resp.headers["location"]
+    resp = await nucliadb_writer.patch(
+        url,
+        content=b"",
+        headers={
+            "upload-offset": "0",
+            "content-length": "0",
+            "upload-length": "0",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["Tus-Upload-Finished"] == "1"
+
+    # Now test without deferred length
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox_one}/tusupload",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "content-type": content_type,
+            "upload-length": "0",
+        },
+    )
+    assert resp.status_code == 201, resp.json()
+    url = resp.headers["location"]
+
+    resp = await nucliadb_writer.patch(
+        url,
+        content=b"",
+        headers={
+            "upload-offset": "0",
+            "content-length": "0",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["Tus-Upload-Finished"] == "1"
+
+
 @pytest.mark.deploy_modes("standalone")
 async def test_tus_upload_handles_unknown_upload_ids(
     configure_redis_dm,

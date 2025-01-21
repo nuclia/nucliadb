@@ -212,7 +212,6 @@ message VectorSetConfig {
     // list of possible subdivisions of the matryoshka embeddings (if the model
     // supports it)
     repeated uint32 matryoshka_dimensions = 3;
-
     enum StorageKeyKind {
         UNSET = 0;              // for Bw/c during the migration
         LEGACY = 1;             // simply "extracted_vectors", without vectorset
@@ -224,6 +223,10 @@ message VectorSetConfig {
 // KB vectorsets and their configuration
 message KnowledgeBoxVectorSetsConfig {
     repeated VectorSetConfig vectorsets = 1;
+}
+
+message VectorSetPurge {
+    VectorSetConfig.StorageKeyKind storage_key_kind = 1;
 }
 
 

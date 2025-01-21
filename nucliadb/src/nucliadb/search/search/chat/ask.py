@@ -57,6 +57,7 @@ from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
     InvalidQueryError,
 )
+from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.utilities import get_predict
@@ -75,6 +76,7 @@ from nucliadb_models.search import (
     ErrorAskResponseItem,
     FindParagraph,
     FindRequest,
+    GraphStrategy,
     JSONAskResponseItem,
     KnowledgeboxFindResults,
     MetadataAskResponseItem,
@@ -629,6 +631,13 @@ def parse_prequeries(ask_request: AskRequest) -> Optional[PreQueriesStrategy]:
     return None
 
 
+def parse_graph_strategy(ask_request: AskRequest) -> Optional[GraphStrategy]:
+    for rag_strategy in ask_request.rag_strategies:
+        if rag_strategy.name == RagStrategyName.GRAPH:
+            return cast(GraphStrategy, rag_strategy)
+    return None
+
+
 async def retrieval_step(
     kbid: str,
     main_query: str,
@@ -675,17 +684,33 @@ async def retrieval_in_kb(
     metrics: RAGMetrics,
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
+    graph_strategy = parse_graph_strategy(ask_request)
     with metrics.time("retrieval"):
-        main_results, prequeries_results, query_parser = await get_find_results(
-            kbid=kbid,
-            query=main_query,
-            item=ask_request,
-            ndb_client=client_type,
-            user=user_id,
-            origin=origin,
-            metrics=metrics,
-            prequeries_strategy=prequeries,
-        )
+        prequeries_results = None
+        if graph_strategy is not None:
+            main_results, query_parser = await get_graph_results(
+                kbid=kbid,
+                query=main_query,
+                item=ask_request,
+                ndb_client=client_type,
+                user=user_id,
+                origin=origin,
+                graph_strategy=graph_strategy,
+                metrics=metrics,
+                shards=ask_request.shards,
+            )
+        # TODO (oni): Fallback to normal retrieval if no graph results are found
+        else:
+            main_results, prequeries_results, query_parser = await get_find_results(
+                kbid=kbid,
+                query=main_query,
+                item=ask_request,
+                ndb_client=client_type,
+                user=user_id,
+                origin=origin,
+                metrics=metrics,
+                prequeries_strategy=prequeries,
+            )
         if len(main_results.resources) == 0 and all(
             len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
         ):

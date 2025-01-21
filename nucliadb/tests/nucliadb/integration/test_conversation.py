@@ -47,7 +47,7 @@ from tests.utils import inject_message
 @pytest.fixture(scope="function")
 async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebox):
     messages = []
-    for i in range(300):
+    for i in range(1, 301):
         messages.append(
             InputMessage(
                 to=["computer"],
@@ -138,7 +138,7 @@ async def test_conversations(
     field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 200
-    assert [m["ident"] for m in msgs] == [str(i) for i in range(200)]
+    assert [m["ident"] for m in msgs] == [str(i) for i in range(1, 201)]
     assert msgs[0]["type"] == MessageType.QUESTION.value
 
     # get second page
@@ -147,7 +147,7 @@ async def test_conversations(
     field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 101
-    assert [m["ident"] for m in msgs] == [str(i) for i in range(200, 300)] + ["computer"]
+    assert [m["ident"] for m in msgs] == [str(i) for i in range(201, 301)] + ["computer"]
     assert msgs[-1]["type"] == MessageType.ANSWER.value
 
 
@@ -203,3 +203,30 @@ async def test_find_conversations(
     assert len(paragraphs) == 2
     assert paragraphs[f"{rid}/c/faq/1/0-12"].text == "Split text 1"
     assert paragraphs[f"{rid}/c/faq/2/0-12"].text == "Split text 2"
+
+
+async def test_cannot_create_message_ident_0(nucliadb_grpc, nucliadb_writer, knowledgebox):
+    messages = [
+        # model_construct skips validation, to test the API error
+        InputMessage.model_construct(
+            to=["computer"],
+            who=f"person",
+            timestamp=datetime.now(),
+            content=InputMessageContent(text="What is the meaning of life?"),
+            ident="0",
+            type=MessageType.QUESTION.value,
+        )
+    ]
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        headers={"Content-Type": "application/json"},
+        data=CreateResourcePayload(
+            slug="myresource",
+            conversations={
+                "faq": InputConversationField(messages=messages),
+            },
+        ).model_dump_json(by_alias=True),
+    )
+
+    assert resp.status_code == 422
+    assert 'cannot be "0"' in resp.json()["detail"][0]["msg"]

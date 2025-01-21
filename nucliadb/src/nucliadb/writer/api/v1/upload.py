@@ -74,7 +74,7 @@ from nucliadb_utils.utilities import (
     get_storage,
 )
 
-from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
+from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
 
 TUS_HEADERS = {
     "Tus-Resumable": "1.0.0",
@@ -227,7 +227,7 @@ async def _tus_post(
         size = int(request.headers["upload-length"])
     else:
         if not deferred_length:
-            raise HTTPPreconditionFailed(detail="We need upload-length header")
+            raise HTTPPreconditionFailed(detail="upload-length header is required")
 
     if "tus-resumable" not in request.headers:
         raise HTTPPreconditionFailed(detail="TUS needs a TUS version")
@@ -544,8 +544,8 @@ async def _tus_patch(
             raise AttributeError()
         path = await storage_manager.finish(dm)
         headers["Tus-Upload-Finished"] = "1"
-        headers["NDB-Resource"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}"
-        headers["NDB-Field"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}/field/{field}"
+        headers["NDB-Resource"] = f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}/{rid}"
+        headers["NDB-Field"] = f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}/{rid}/field/{field}"
 
         item_payload = dm.get("item")
         creation_payload = None

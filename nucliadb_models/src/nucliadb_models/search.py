@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Annotated, Self, deprecated
 
+from nucliadb_models import RelationMetadata
 from nucliadb_models.common import FieldTypeName, ParamDefault
 
 # Bw/c import to avoid breaking users
@@ -237,9 +238,11 @@ class EntityType(str, Enum):
 class DirectionalRelation(BaseModel):
     entity: str
     entity_type: EntityType
+    entity_subtype: str
     relation: RelationType
     relation_label: str
     direction: RelationDirection
+    metadata: Optional[RelationMetadata] = None
 
 
 class EntitySubgraph(BaseModel):
@@ -957,6 +960,11 @@ class ChatModel(BaseModel):
     )
     top_k: Optional[int] = Field(default=None, description="Number of best elements to get from")
 
+    format_prompt: bool = Field(
+        default=True,
+        description="If set to false, the prompt given as `user_prompt` will be used as is, without any formatting for question or context. If set to true, the prompt must contain the placeholders {question} and {context} to be replaced by the question and context respectively",  # noqa: E501
+    )
+
 
 class RephraseModel(BaseModel):
     question: str
@@ -978,6 +986,7 @@ class RagStrategyName:
     METADATA_EXTENSION = "metadata_extension"
     PREQUERIES = "prequeries"
     CONVERSATION = "conversation"
+    GRAPH = "graph"
 
 
 class ImageRagStrategyName:
@@ -1206,6 +1215,76 @@ class PreQueriesStrategy(RagStrategy):
 PreQueryResult = tuple[PreQuery, "KnowledgeboxFindResults"]
 
 
+class RelationRanking(str, Enum):
+    RERANKER = "reranker"
+    GENERATIVE = "generative"
+
+
+class QueryEntityDetection(str, Enum):
+    PREDICT = "predict"
+    SUGGEST = "suggest"
+
+
+class GraphStrategy(RagStrategy):
+    """
+    This strategy retrieves context pieces by exploring the Knowledge Graph, starting from the entities present in the query.
+    It works best if the Knowledge Box has a user-defined Graph Extraction agent enabled.
+    """
+
+    name: Literal["graph"] = "graph"
+    hops: int = Field(
+        default=3,
+        title="Number of hops",
+        description="""Number of hops to take when exploring the graph for relevant context.
+For example,
+- hops=1 will explore the neighbors of the starting entities.
+- hops=2 will explore the neighbors of the neighbors of the starting entities.
+And so on.
+Bigger values will discover more intricate relationships but will also take more time to compute.""",
+        ge=1,
+        le=10,
+    )
+    # Here we ingore mypy because the default value is set dynamically in the model_validator
+    top_k: int = Field(  # type: ignore
+        default=None,
+        title="Top k",
+        description="Number of relationships to keep after each hop after ranking them by relevance to the query. This number correlates to more paragraphs being sent as context. If not set, this number will be set to 30 if `relation_text_as_paragraphs` is set to false or 200 if `relation_text_as_paragraphs` is set to true.",
+        ge=1,
+        le=300,
+    )
+    agentic_graph_only: bool = Field(
+        default=True,
+        title="Use only the graph extracted by an agent.",
+        description="If set to true, only relationships extracted from a graph extraction agent are considered for context expansion.",
+    )
+    relation_text_as_paragraphs: bool = Field(
+        default=False,
+        title="Use relation text as context",
+        description="If set to true, the text of the relationships is to create context paragraphs, this enables to use bigger top K values without running into the generative model's context limits. If set to false, the paragraphs that contain the relationships are used as context.",
+    )
+    relation_ranking: RelationRanking = Field(
+        default=RelationRanking.RERANKER,
+        title="Method to rank relationships",
+        description="""Method to rank relationships.
+- `reranker` uses the reranker model to rank relationships.
+- `generative` uses first the reranker to first lower the amount of relationships and then the generative model to rank relationships.
+The generative model is slower and consumes more tokens, but can provide better results.""",
+    )
+    query_entity_detection: QueryEntityDetection = Field(
+        default=QueryEntityDetection.PREDICT,
+        title="Method to detect entities in the query",
+        description="""Method to detect entities in the query.
+- `predict` uses NUA to detect entities in the query, slower and more accurate but requires an exact text match between Knowledge Box entities and entities in the query.
+- `suggest` uses fuzzy search to detect entities. It's faster and more flexible but might have trouble matching entities composed of multiple words. It will fallback to Predict if no entities are detected.""",
+    )
+
+    @model_validator(mode="before")
+    def set_dynamic_defaults(cls, values):
+        if values.get("top_k") is None:
+            values["top_k"] = 200 if values.get("relation_text_as_paragraphs") else 30
+        return values
+
+
 class TableImageStrategy(ImageRagStrategy):
     name: Literal["tables"] = "tables"
 
@@ -1232,6 +1311,7 @@ RagStrategies = Annotated[
         MetadataExtensionStrategy,
         ConversationalStrategy,
         PreQueriesStrategy,
+        GraphStrategy,
     ],
     Field(discriminator="name"),
 ]
@@ -1639,6 +1719,7 @@ class SCORE_TYPE(str, Enum):
     BM25 = "BM25"
     BOTH = "BOTH"
     RERANKER = "RERANKER"
+    RELATION_RELEVANCE = "RELATION_RELEVANCE"
 
 
 class FindTextPosition(BaseModel):
@@ -1673,6 +1754,11 @@ class FindParagraph(BaseModel):
         default=False,
         title="Is a table",
         description="The referenced image of the paragraph is a table",
+    )
+    relevant_relations: Optional[Relations] = Field(
+        default=None,
+        title="Relevant relations",
+        description="Relevant relations from which the paragraph was found, will only be filled if using the Graph RAG Strategy",
     )
 
 

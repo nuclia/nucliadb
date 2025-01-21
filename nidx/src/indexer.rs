@@ -124,7 +124,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         }
         INDEXING_COUNTER.get_or_create(&OperationStatusLabels::success()).inc();
 
-        if let Err(e) = acker.ack().await {
+        if let Err(e) = acker.double_ack().await {
             warn!("Error acking index message: {e:?}");
             continue;
         }
@@ -255,7 +255,9 @@ fn index_resource_to_index(
         IndexKind::Vector => nidx_vector::VectorIndexer
             .index_resource(output_dir, &index.config()?, resource, &index.name, single_vector_index)?
             .map(|x| x.into()),
-        IndexKind::Text => nidx_text::TextIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
+        IndexKind::Text => {
+            nidx_text::TextIndexer.index_resource(output_dir, index.config()?, resource)?.map(|x| x.into())
+        }
         IndexKind::Paragraph => {
             nidx_paragraph::ParagraphIndexer.index_resource(output_dir, resource)?.map(|x| x.into())
         }

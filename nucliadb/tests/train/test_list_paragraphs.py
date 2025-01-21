@@ -17,10 +17,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from uuid import uuid4
+
 import pytest
 
-from nucliadb_protos.train_pb2 import GetParagraphsRequest
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.train.resource import iterate_paragraphs
+from nucliadb_protos.resources_pb2 import Basic as PBBasic
+from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
+from nucliadb_protos.train_pb2 import EnabledMetadata, GetParagraphsRequest
 from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    Classification,
+    FieldComputedMetadataWrapper,
+    FieldID,
+    Paragraph,
+)
 
 
 @pytest.mark.deploy_modes("component")
@@ -72,3 +86,47 @@ async def test_list_paragraphs_shows_ners_with_positions(
             assert positions.positions[1].start == 38
             assert positions.positions[1].end == 45
     assert found_manresa and found_barcelona
+
+
+async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_ingest: str):
+    # Create a resource
+    basic = PBBasic(
+        icon="text/plain",
+        title="My title",
+        summary="My summary",
+        thumbnail="/file",
+    )
+    basic.metadata.metadata["key"] = "value"
+    basic.metadata.language = "ca"
+    basic.metadata.useful = True
+    basic.metadata.status = PBMetadata.Status.PROCESSED
+
+    uuid = str(uuid4())
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+    r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
+    assert r is not None
+
+    # Add some labelled paragraphs to it
+    bm = BrokerMessage()
+    field1_if = FieldID()
+    field1_if.field = "field1"
+    field1_if.field_type = FieldType.TEXT
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(field1_if)
+    p1 = Paragraph()
+    p1.start = 0
+    p1.end = 82
+    p1.classifications.append(Classification(labelset="ls1", label="label1"))
+    p2 = Paragraph()
+    p2.start = 84
+    p2.end = 103
+    p2.classifications.append(Classification(labelset="ls1", label="label2"))
+    fcmw.metadata.metadata.paragraphs.append(p1)
+    fcmw.metadata.metadata.paragraphs.append(p2)
+    bm.field_metadata.append(fcmw)
+    await r.apply_extracted(bm)
+
+    # Check iterate paragraphs
+    async for paragraph in iterate_paragraphs(r, EnabledMetadata(labels=True)):
+        assert len(paragraph.metadata.labels.paragraph) == 1
+        assert paragraph.metadata.labels.paragraph[0].label in ("label1", "label2")

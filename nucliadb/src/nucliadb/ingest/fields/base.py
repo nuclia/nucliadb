@@ -21,12 +21,13 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any, Generic, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Optional, Type, TypeVar
 
 from google.protobuf.message import DecodeError, Message
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
+from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
     ExtractedTextWrapper,
@@ -44,9 +45,15 @@ from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error, FieldStatus
 from nucliadb_utils.storages.storage import Storage, StorageField
 
+if TYPE_CHECKING:  # pragma: no cover
+    from nucliadb.ingest.orm.resource import Resource
+
+
 SUBFIELDFIELDS = ("c",)
 
 
+# NOTE extracted vectors key is no longer a static key, it is stored in each
+# vectorset
 class FieldTypes(str, enum.Enum):
     FIELD_TEXT = "extracted_text"
     FIELD_VECTORS = "extracted_vectors"
@@ -73,7 +80,7 @@ class Field(Generic[PbType]):
     def __init__(
         self,
         id: str,
-        resource: Any,
+        resource: Resource,
         pb: Optional[Any] = None,
         value: Optional[Any] = None,
     ):
@@ -88,7 +95,7 @@ class Field(Generic[PbType]):
         self.question_answers = None
 
         self.id: str = id
-        self.resource: Any = resource
+        self.resource = resource
 
         if value is not None:
             newpb = self.pbklass()
@@ -119,11 +126,20 @@ class Field(Generic[PbType]):
     def get_storage_field(self, field_type: FieldTypes) -> StorageField:
         return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, field_type.value)
 
-    def _get_extracted_vectors_storage_field(self, vectorset: Optional[str] = None) -> StorageField:
-        if vectorset:
+    def _get_extracted_vectors_storage_field(
+        self,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+    ) -> StorageField:
+        if storage_key_kind == VectorSetConfig.StorageKeyKind.LEGACY:
+            key = FieldTypes.FIELD_VECTORS.value
+        elif storage_key_kind == VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX:
             key = FieldTypes.FIELD_VECTORSET.value.format(vectorset=vectorset)
         else:
-            key = FieldTypes.FIELD_VECTORS.value
+            raise ValueError(
+                f"Can't do anything with UNSET or unknown vectorset storage key kind: {storage_key_kind}"
+            )
+
         return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, key)
 
     async def db_get_value(self) -> Optional[PbType]:
@@ -163,7 +179,8 @@ class Field(Generic[PbType]):
             field_id=self.id,
         )
         await self.delete_extracted_text()
-        await self.delete_vectors()
+        async for vectorset_id, vs in datamanagers.vectorsets.iter(self.resource.txn, kbid=self.kbid):
+            await self.delete_vectors(vectorset_id, vs.storage_key_kind)
         await self.delete_metadata()
         await self.delete_question_answers()
 
@@ -181,9 +198,13 @@ class Field(Generic[PbType]):
         except KeyError:
             pass
 
-    async def delete_vectors(self, vectorset: Optional[str] = None) -> None:
+    async def delete_vectors(
+        self,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+    ) -> None:
         # Try delete vectors
-        sf = self._get_extracted_vectors_storage_field(vectorset)
+        sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -328,12 +349,17 @@ class Field(Generic[PbType]):
                 self.extracted_text = payload
         return self.extracted_text
 
-    async def set_vectors(self, payload: ExtractedVectorsWrapper) -> Optional[VectorObject]:
-        vectorset = payload.vectorset_id or None
+    async def set_vectors(
+        self,
+        payload: ExtractedVectorsWrapper,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+    ) -> Optional[VectorObject]:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[VectorObject] = await self.get_vectors(
                     vectorset=vectorset,
+                    storage_key_kind=storage_key_kind,
                     force=True,
                 )
             except KeyError:
@@ -341,7 +367,7 @@ class Field(Generic[PbType]):
         else:
             actual_payload = None
 
-        sf = self._get_extracted_vectors_storage_field(vectorset)
+        sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
         vo: Optional[VectorObject] = None
         if actual_payload is None:
             # Its first extracted text
@@ -373,14 +399,13 @@ class Field(Generic[PbType]):
         return vo
 
     async def get_vectors(
-        self, vectorset: Optional[str] = None, force: bool = False
+        self,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+        force: bool = False,
     ) -> Optional[VectorObject]:
-        # compat with vectorsets coming from protobuffers where no value is
-        # empty string instead of None. This shouldn't be handled here but we
-        # have to make sure it gets the correct vectorset
-        vectorset = vectorset or None
         if self.extracted_vectors.get(vectorset, None) is None or force:
-            sf = self._get_extracted_vectors_storage_field(vectorset)
+            sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
             payload = await self.storage.download_pb(sf, VectorObject)
             if payload is not None:
                 self.extracted_vectors[vectorset] = payload

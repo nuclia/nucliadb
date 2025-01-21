@@ -115,6 +115,7 @@ def test_ask_response_parser_stream():
                             DirectionalRelation(
                                 entity="Semantic Search",
                                 entity_type=EntityType.ENTITY,
+                                entity_subtype="concept",
                                 relation=RelationType.ABOUT,
                                 relation_label="performing",
                                 direction=RelationDirection.OUT,
@@ -145,6 +146,7 @@ def test_ask_response_parser_stream():
     assert ask_response.answer == "This is your Nuclia answer."
     assert ask_response.status == "success"
     assert ask_response.relations.entities["Nuclia"].related_to[0].entity == "Semantic Search"
+    assert ask_response.relations.entities["Nuclia"].related_to[0].entity_subtype == "concept"
     assert ask_response.citations["some/paragraph/id"] == "This is a citation"
     assert ask_response.retrieval_results.resources == {}
     assert ask_response.metadata.tokens.input == 10

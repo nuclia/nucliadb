@@ -160,14 +160,14 @@ pub async fn run_job(
 
     let work_dir = tempfile::tempdir_in(work_path)?;
     let work_path = work_dir.path().to_path_buf();
-    let vector_config = index.config();
     let span = Span::current();
+    let index2 = index.clone();
     let merged: NewSegment = tokio::task::spawn_blocking(move || {
         span.in_scope(|| match index.kind {
             IndexKind::Vector => {
-                VectorIndexer.merge(&work_path, vector_config.unwrap(), merge_inputs).map(|x| x.into())
+                VectorIndexer.merge(&work_path, index2.config().unwrap(), merge_inputs).map(|x| x.into())
             }
-            IndexKind::Text => TextIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+            IndexKind::Text => TextIndexer.merge(&work_path, index2.config().unwrap(), merge_inputs).map(|x| x.into()),
             IndexKind::Paragraph => ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
             IndexKind::Relation => RelationIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
         })

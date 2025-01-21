@@ -21,6 +21,7 @@
 from typing import Optional, Union
 
 import nucliadb_models as models
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto
@@ -84,7 +85,18 @@ async def set_resource_field_extracted_data(
             field_data.large_metadata = from_proto.large_computed_metadata(data_lcm)
 
     if ExtractedDataTypeName.VECTOR in wanted_extracted_data:
-        data_vec = await field.get_vectors()
+        # XXX: our extracted API is not vectorset-compatible, so we'll get the
+        # first vectorset and return the values. Ideally, we should provide a
+        # way to select a vectorset
+        vectorset_id = None
+        async with datamanagers.with_ro_transaction() as txn:
+            async for vectorset_id, vs in datamanagers.vectorsets.iter(
+                txn=txn,
+                kbid=field.resource.kb.kbid,
+            ):
+                break
+        assert vectorset_id is not None, "All KBs must have at least a vectorset"
+        data_vec = await field.get_vectors(vectorset_id, vs.storage_key_kind)
         if data_vec is not None:
             field_data.vectors = from_proto.vector_object(data_vec)
 
