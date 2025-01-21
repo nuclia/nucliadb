@@ -143,3 +143,30 @@ pub fn decode_field_id(data: &[u64]) -> (uuid::Uuid, String) {
     }
     (rid, String::from_utf8(ubytes).unwrap())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{decode_field_id, encode_field_id};
+
+    #[test]
+    fn test_encode_decode_field_id() {
+        // Test with different lengths to ensure it works when crossing block length
+        let testcases = [
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title1"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title12"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title123"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title1234"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title12345"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title123456"),
+            ("03ce0c2cdcc0060069fb8f69c73fa8e2", "/a/title1234567"),
+        ];
+        for t in testcases {
+            let rid = uuid::Uuid::parse_str(t.0).unwrap();
+            let data = encode_field_id(rid, t.1);
+            let (decoded_rid, decoded_fid) = decode_field_id(&data);
+            assert_eq!(decoded_rid.simple().to_string().as_str(), t.0);
+            assert_eq!(decoded_fid, t.1);
+        }
+    }
+}
