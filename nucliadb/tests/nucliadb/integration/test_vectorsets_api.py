@@ -20,9 +20,12 @@
 from typing import Optional
 from unittest.mock import patch
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
+from nucliadb.common.cluster.rollover import rollover_kb_index
+from nucliadb.common.context import ApplicationContext
 from nucliadb.learning_proxy import (
     LearningConfiguration,
     ProxiedLearningConfigError,
@@ -41,6 +44,7 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 MODULE = "nucliadb.writer.vectorsets"
 
@@ -140,11 +144,13 @@ async def test_learning_config_errors_are_proxied_correctly(
         assert resp.text == "Learning Internal Server Error"
 
 
+@pytest.mark.parametrize("bwc_with_default_vectorset", [True, False])
 async def test_vectorset_migration(
     nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
+    bwc_with_default_vectorset: bool,
 ):
     """Test workflow for adding a vectorset to an existing KB and ingesting
     partial updates (only for the new vectors).
@@ -203,18 +209,22 @@ async def test_vectorset_migration(
     text = "Lionel Messi is a football player."
     link_field.with_extracted_text(text)
     link_field.with_extracted_paragraph_metadata(Paragraph(start=0, end=len(text)))
-    link_field.with_extracted_vectors(
-        [
-            utils_pb2.Vector(
-                start=0,
-                end=len(text),
-                start_paragraph=0,
-                end_paragraph=len(text),
-                vector=[1.0 for _ in range(1024)],
-            )
-        ],
-        vectorset="multilingual-2024-05-06",
-    )
+    vectors = [
+        utils_pb2.Vector(
+            start=0,
+            end=len(text),
+            start_paragraph=0,
+            end_paragraph=len(text),
+            vector=[1.0 for _ in range(1024)],
+        )
+    ]
+    if bwc_with_default_vectorset:
+        # learning is not setting vectorset to be bw/c with the default vectorset in old KBs
+        link_field.with_extracted_vectors(vectors)
+    else:
+        # once fixed, learning will always set the vectorset id
+        link_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
+
     bmb.add_field_builder(link_field)
     bm = bmb.build()
 
@@ -261,6 +271,24 @@ async def test_vectorset_migration(
     await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
 
     # With the default vectorset the document should also be found
+    await _check_search(nucliadb_reader, kbid, vectorset="multilingual-2024-05-06")
+    await _check_search(nucliadb_reader, kbid)
+
+    # Do a rollover and test again
+
+    app_context = ApplicationContext()
+    await app_context.initialize()
+    # await app_context.finalize()
+
+    await rollover_kb_index(app_context, kbid)
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Make a search with the new vectorset and check that the document is found
+    await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")
+
+    # With the default vectorset the document should also be found
+    await _check_search(nucliadb_reader, kbid, vectorset="multilingual-2024-05-06")
     await _check_search(nucliadb_reader, kbid)
 
 
