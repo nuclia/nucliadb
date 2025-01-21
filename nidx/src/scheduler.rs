@@ -27,6 +27,7 @@ mod vector_merge;
 use crate::{metadata::MergeJob, settings::MergeSettings, NidxMetadata, Settings};
 use async_nats::jetstream::consumer::PullConsumer;
 use merge_task::MergeScheduler;
+use metrics_task::update_merge_job_metric;
 use nidx_types::Seq;
 use object_store::DynObjectStore;
 // TODO: This should not be public but it's used in tests
@@ -129,6 +130,9 @@ pub async fn run_tasks(
     tasks.spawn(async move {
         let merge_scheduler = MergeScheduler::from_settings(merge_settings);
         loop {
+            if let Err(e) = update_merge_job_metric(&meta2).await {
+                warn!("Error updating merge job metrics: {e:?}");
+            };
             match ack_floor.get().await {
                 Ok(oldest_confirmed_seq) => {
                     if let Err(e) = merge_scheduler.schedule_merges(&meta2, Seq::from(oldest_confirmed_seq)).await {
@@ -138,16 +142,6 @@ pub async fn run_tasks(
                 Err(e) => {
                     warn!("Error while getting consumer information: {e:?}");
                 }
-            }
-            sleep(Duration::from_secs(15)).await;
-        }
-    });
-
-    let meta2 = meta.clone();
-    tasks.spawn(async move {
-        loop {
-            if let Err(e) = metrics_task::update_metrics(&meta2).await {
-                info!("Error updating scheduler metrics: {e:?}");
             }
             sleep(Duration::from_secs(15)).await;
         }
