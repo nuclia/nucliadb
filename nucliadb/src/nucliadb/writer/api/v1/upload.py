@@ -227,7 +227,7 @@ async def _tus_post(
         size = int(request.headers["upload-length"])
     else:
         if not deferred_length:
-            raise HTTPPreconditionFailed(detail="We need upload-length header")
+            raise HTTPPreconditionFailed(detail="upload-length header is required")
 
     if "tus-resumable" not in request.headers:
         raise HTTPPreconditionFailed(detail="TUS needs a TUS version")
