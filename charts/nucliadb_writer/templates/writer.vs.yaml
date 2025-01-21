@@ -48,7 +48,7 @@ spec:
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/file/[^/]+/upload'
           method:
-            regex: "PUT|DELETE|OPTIONS"
+            regex: "POST|OPTIONS"
 
         # reprocess/reindex
         - uri:
