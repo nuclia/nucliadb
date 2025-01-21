@@ -22,7 +22,7 @@ use anyhow::anyhow;
 use nidx_tantivy::TantivyIndexer;
 use tantivy::{doc, schema::Facet};
 
-use crate::schema::{timestamp_to_datetime_utc, TextSchema};
+use crate::schema::{encode_field_id, timestamp_to_datetime_utc, TextSchema};
 
 pub fn index_document(
     writer: &mut TantivyIndexer,
@@ -41,6 +41,8 @@ pub fn index_document(
     let Some(created) = metadata.created.as_ref() else {
         return Err(anyhow!("Missing resource created date in metadata"));
     };
+
+    let resource_uuid = uuid::Uuid::parse_str(resource_id)?;
 
     let mut base_doc = doc!(
         schema.uuid => resource_id.as_bytes(),
@@ -77,6 +79,12 @@ pub fn index_document(
         let facet_field = Facet::from(facet_key.as_str());
         field_doc.add_facet(schema.field, facet_field);
         field_doc.add_text(schema.text, &text_info.text);
+
+        if let Some(encoded_field_id) = schema.encoded_field_id {
+            for d in encode_field_id(resource_uuid, &format!("/{field}")) {
+                field_doc.add_u64(encoded_field_id, d);
+            }
+        }
 
         for label in text_info.labels.iter() {
             let facet = Facet::from(label.as_str());

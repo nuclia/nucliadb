@@ -20,11 +20,13 @@
 
 from typing import cast
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.resource import Resource
+from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -90,7 +92,12 @@ class _BrokerMessageBuilder:
                     self.bm.link_extracted_data.append(link_extracted_data)
 
             # Field vectors
-            await self.generate_field_vectors(type_id, field_id, field)
+            async for vectorset_id, vs in datamanagers.vectorsets.iter(
+                resource.txn, kbid=resource.kb.kbid
+            ):
+                await self.generate_field_vectors(
+                    type_id, field_id, field, vectorset_id, vs.storage_key_kind
+                )
 
             # Large metadata
             await self.generate_field_large_computed_metadata(type_id, field_id, field)
@@ -155,13 +162,16 @@ class _BrokerMessageBuilder:
         type_id: FieldType.ValueType,
         field_id: str,
         field: Field,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
     ):
-        vo = await field.get_vectors()
+        vo = await field.get_vectors(vectorset, storage_key_kind)
         if vo is None:
             return
         evw = ExtractedVectorsWrapper()
         evw.field.field = field_id
         evw.field.field_type = type_id
+        evw.vectorset_id = vectorset
         evw.vectors.CopyFrom(vo)
         self.bm.field_vectors.append(evw)
 

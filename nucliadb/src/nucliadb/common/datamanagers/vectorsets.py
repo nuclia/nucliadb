@@ -58,6 +58,11 @@ async def iter(
         yield config.vectorset_id, config
 
 
+async def count(txn: Transaction, *, kbid: str) -> int:
+    kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=False)
+    return len(kb_vectorsets.vectorsets)
+
+
 async def set(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
     """Create or update a vectorset configuration"""
     kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=True)
@@ -73,16 +78,20 @@ async def set(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.VectorSet
     await txn.set(key, kb_vectorsets.SerializeToString())
 
 
-async def delete(txn: Transaction, *, kbid: str, vectorset_id: str):
+async def delete(
+    txn: Transaction, *, kbid: str, vectorset_id: str
+) -> Optional[knowledgebox_pb2.VectorSetConfig]:
     kb_vectorsets = await _get_or_default(txn, kbid=kbid, for_update=True)
     index = _find_vectorset(kb_vectorsets, vectorset_id)
     if index is None:
         # already deleted
-        return
+        return None
 
+    deleted = kb_vectorsets.vectorsets[index]
     del kb_vectorsets.vectorsets[index]
     key = KB_VECTORSETS.format(kbid=kbid)
     await txn.set(key, kb_vectorsets.SerializeToString())
+    return deleted
 
 
 # XXX At some point in the vectorset epic, we should make this key mandatory and

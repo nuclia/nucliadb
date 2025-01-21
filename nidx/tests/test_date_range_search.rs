@@ -34,7 +34,7 @@ use tonic::Request;
 use uuid::Uuid;
 
 async fn populate(fixture: &mut NidxFixture, shard_id: String, metadata: IndexMetadata) {
-    let raw_resource_id = Uuid::new_v4().to_string();
+    let raw_resource_id = Uuid::new_v4().simple().to_string();
     let field_id = "f/body".to_string();
 
     let resource_id = ResourceId {

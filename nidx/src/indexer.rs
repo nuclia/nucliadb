@@ -255,7 +255,9 @@ fn index_resource_to_index(
         IndexKind::Vector => nidx_vector::VectorIndexer
             .index_resource(output_dir, &index.config()?, resource, &index.name, single_vector_index)?
             .map(|x| x.into()),
-        IndexKind::Text => nidx_text::TextIndexer.index_resource(output_dir, resource)?.map(|x| x.into()),
+        IndexKind::Text => {
+            nidx_text::TextIndexer.index_resource(output_dir, index.config()?, resource)?.map(|x| x.into())
+        }
         IndexKind::Paragraph => {
             nidx_paragraph::ParagraphIndexer.index_resource(output_dir, resource)?.map(|x| x.into())
         }

@@ -19,15 +19,14 @@
 //
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::path::Path;
 use std::time::*;
 
+use crate::schema::decode_field_id;
 use crate::search_query::TextContext;
 use crate::{prefilter::*, query_io};
 
 use super::schema::TextSchema;
 use super::search_query;
-use anyhow::anyhow;
 use itertools::Itertools;
 use nidx_protos::order_by::{OrderField, OrderType};
 use nidx_protos::{
@@ -35,12 +34,12 @@ use nidx_protos::{
     ResultScore, StreamRequest,
 };
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
-use tantivy::columnar::BytesColumn;
+use tantivy::columnar::{BytesColumn, Column};
 use tantivy::fastfield::FacetReader;
 use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::schema::Value;
 use tantivy::schema::*;
-use tantivy::{DocAddress, Index, IndexReader, ReloadPolicy, Searcher};
+use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use tracing::*;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
@@ -160,6 +159,67 @@ impl Collector for FieldUuidCollector {
     }
 }
 
+struct FieldUuidSegmentCollectorV2 {
+    encoded_field_id_reader: Column,
+    results: Vec<ValidField>,
+}
+
+impl SegmentCollector for FieldUuidSegmentCollectorV2 {
+    type Fruit = Vec<ValidField>;
+
+    fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
+        let mut data = Vec::new();
+        self.encoded_field_id_reader.fill_vals(doc, &mut data);
+        let (rid, fid) = decode_field_id(&data);
+
+        self.results.push(ValidField {
+            resource_id: rid.simple().to_string(),
+            field_id: fid,
+        });
+    }
+
+    fn harvest(self) -> Self::Fruit {
+        self.results
+    }
+}
+
+struct FieldUuidCollectorV2;
+
+impl Collector for FieldUuidCollectorV2 {
+    type Fruit = Vec<ValidField>;
+
+    type Child = FieldUuidSegmentCollectorV2;
+
+    fn for_segment(
+        &self,
+        _segment_local_id: tantivy::SegmentOrdinal,
+        segment: &tantivy::SegmentReader,
+    ) -> tantivy::Result<Self::Child> {
+        let encoded_field_id_reader = segment.fast_fields().u64("encoded_field_id")?;
+        Ok(FieldUuidSegmentCollectorV2 {
+            encoded_field_id_reader,
+            results: vec![],
+        })
+    }
+
+    fn requires_scoring(&self) -> bool {
+        false
+    }
+
+    fn merge_fruits(
+        &self,
+        segment_fruits: Vec<<Self::Child as tantivy::collector::SegmentCollector>::Fruit>,
+    ) -> tantivy::Result<Self::Fruit> {
+        Ok(segment_fruits
+            .into_iter()
+            .reduce(|mut a, mut b| {
+                a.append(&mut b);
+                a
+            })
+            .unwrap_or_default())
+    }
+}
+
 impl TextReaderService {
     pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
         let schema = &self.schema;
@@ -230,7 +290,11 @@ impl TextReaderService {
 
         let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
         let searcher = self.reader.searcher();
-        let docs_fulfilled = searcher.search(&prefilter_query, &FieldUuidCollector)?;
+        let docs_fulfilled = if schema.encoded_field_id.is_some() {
+            searcher.search(&prefilter_query, &FieldUuidCollectorV2)?
+        } else {
+            searcher.search(&prefilter_query, &FieldUuidCollector)?
+        };
 
         // If none of the fields match the pre-filter, thats all the query planner needs to know.
         if docs_fulfilled.is_empty() {
@@ -323,22 +387,6 @@ impl TextReaderService {
                 OrderField::Modified => segment_reader.fast_fields().date("modified").unwrap(),
             };
             move |doc: DocId| sorter(reader.values_for_doc(doc).next().unwrap().into_timestamp_secs())
-        })
-    }
-
-    pub fn open(path: &Path) -> anyhow::Result<Self> {
-        if !path.exists() {
-            return Err(anyhow!("Invalid path {:?}", path));
-        }
-        let field_schema = TextSchema::new();
-        let index = Index::open_in_dir(path)?;
-
-        let reader = index.reader_builder().reload_policy(ReloadPolicy::OnCommitWithDelay).try_into()?;
-
-        Ok(TextReaderService {
-            index,
-            reader,
-            schema: field_schema,
         })
     }
 

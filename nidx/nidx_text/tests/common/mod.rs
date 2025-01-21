@@ -26,7 +26,7 @@ use std::time::SystemTime;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::{Resource, ResourceId};
 use nidx_tantivy::{TantivyMeta, TantivySegmentMetadata};
-use nidx_text::{TextIndexer, TextSearcher};
+use nidx_text::{TextConfig, TextIndexer, TextSearcher};
 use nidx_types::{OpenIndexMetadata, Seq};
 use tempfile::TempDir;
 
@@ -57,9 +57,9 @@ impl OpenIndexMetadata<TantivyMeta> for TestOpener {
 pub fn test_reader() -> TextSearcher {
     let dir = TempDir::new().unwrap();
     let resource = create_resource("shard".to_string());
-    let segment_meta = TextIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
+    let segment_meta = TextIndexer.index_resource(dir.path(), TextConfig::default(), &resource).unwrap().unwrap();
 
-    TextSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![])).unwrap()
+    TextSearcher::open(TextConfig::default(), TestOpener::new(vec![(segment_meta, 1i64.into())], vec![])).unwrap()
 }
 
 pub fn create_resource(shard_id: String) -> Resource {
@@ -106,7 +106,6 @@ pub fn create_resource(shard_id: String) -> Resource {
         labels: vec![],
         paragraphs: HashMap::new(),
         paragraphs_to_delete: vec![],
-        sentences_to_delete: vec![],
         relations: vec![],
         vectors: HashMap::default(),
         vectors_to_delete: HashMap::default(),

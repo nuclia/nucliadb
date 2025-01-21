@@ -839,6 +839,21 @@ class KnowledgeBoxVectorSetsConfig(google.protobuf.message.Message):
 global___KnowledgeBoxVectorSetsConfig = KnowledgeBoxVectorSetsConfig
 
 @typing.final
+class VectorSetPurge(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STORAGE_KEY_KIND_FIELD_NUMBER: builtins.int
+    storage_key_kind: global___VectorSetConfig.StorageKeyKind.ValueType
+    def __init__(
+        self,
+        *,
+        storage_key_kind: global___VectorSetConfig.StorageKeyKind.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["storage_key_kind", b"storage_key_kind"]) -> None: ...
+
+global___VectorSetPurge = VectorSetPurge
+
+@typing.final
 class TermSynonyms(google.protobuf.message.Message):
     """Synonyms of a Knowledge Box"""
 

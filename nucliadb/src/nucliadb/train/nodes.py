@@ -28,6 +28,12 @@ from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.train.resource import (
+    generate_train_resource,
+    iterate_fields,
+    iterate_paragraphs,
+    iterate_sentences,
+)
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
     GetParagraphsRequest,
@@ -83,11 +89,11 @@ class TrainShardManager(manager.KBShardManager):
                 # Filter by uuid
                 resource = await kb.get(request.uuid)
                 if resource:
-                    async for sentence in resource.iterate_sentences(request.metadata):
+                    async for sentence in iterate_sentences(resource, request.metadata):
                         yield sentence
             else:
                 async for resource in kb.iterate_resources():
-                    async for sentence in resource.iterate_sentences(request.metadata):
+                    async for sentence in iterate_sentences(resource, request.metadata):
                         yield sentence
 
     async def kb_paragraphs(self, request: GetParagraphsRequest) -> AsyncIterator[TrainParagraph]:
@@ -97,11 +103,11 @@ class TrainShardManager(manager.KBShardManager):
                 # Filter by uuid
                 resource = await kb.get(request.uuid)
                 if resource:
-                    async for paragraph in resource.iterate_paragraphs(request.metadata):
+                    async for paragraph in iterate_paragraphs(resource, request.metadata):
                         yield paragraph
             else:
                 async for resource in kb.iterate_resources():
-                    async for paragraph in resource.iterate_paragraphs(request.metadata):
+                    async for paragraph in iterate_paragraphs(resource, request.metadata):
                         yield paragraph
 
     async def kb_fields(self, request: GetFieldsRequest) -> AsyncIterator[TrainField]:
@@ -111,11 +117,11 @@ class TrainShardManager(manager.KBShardManager):
                 # Filter by uuid
                 resource = await kb.get(request.uuid)
                 if resource:
-                    async for field in resource.iterate_fields(request.metadata):
+                    async for field in iterate_fields(resource, request.metadata):
                         yield field
             else:
                 async for resource in kb.iterate_resources():
-                    async for field in resource.iterate_fields(request.metadata):
+                    async for field in iterate_fields(resource, request.metadata):
                         yield field
 
     async def kb_resources(self, request: GetResourcesRequest) -> AsyncIterator[TrainResource]:
@@ -128,4 +134,4 @@ class TrainShardManager(manager.KBShardManager):
                 if rid is not None:
                     resource = await kb.get(rid.decode())
                     if resource is not None:
-                        yield await resource.generate_train_resource(request.metadata)
+                        yield await generate_train_resource(resource, request.metadata)
