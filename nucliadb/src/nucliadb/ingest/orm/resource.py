@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import TYPE_CHECKING, Any, AsyncIterator, MutableMapping, Optional, Type
@@ -534,6 +535,86 @@ class Resource:
                 errors=message.errors,  # type: ignore
             )
 
+    @processor_observer.wrap({"type": "apply_fields_status"})
+    async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
+        # Dictionary of all errors per field (we may have several due to DA tasks)
+        errors_by_field: dict[tuple[FieldType.ValueType, str], list[writer_pb2.Error]] = defaultdict(
+            list
+        )
+
+        # Make sure if a file is updated without errors, it ends up in errors_by_field
+        for field_id in updated_fields:
+            errors_by_field[(field_id.field_type, field_id.field)] = []
+        for fs in message.field_statuses:
+            errors_by_field[(fs.id.field_type, fs.id.field)] = []
+
+        for error in message.errors:
+            errors_by_field[(error.field_type, error.field)].append(error)
+
+        # If this message comes from the processor (not a DA worker), we clear all previous errors
+        # TODO: When generated_by is populated with DA tasks by processor, remove only related errors
+        from_processor = any((x.WhichOneof("generator") == "processor" for x in message.generated_by))
+
+        for (field_type, field), errors in errors_by_field.items():
+            field_obj = await self.get_field(field, field_type, load=False)
+            if from_processor:
+                status = writer_pb2.FieldStatus()
+            else:
+                status = await field_obj.get_status() or writer_pb2.FieldStatus()
+
+            for error in errors:
+                field_error = writer_pb2.FieldError(
+                    source_error=error,
+                )
+                field_error.created.GetCurrentTime()
+                status.errors.append(field_error)
+
+            # We infer the status for processor messages
+            if message.source == BrokerMessage.MessageSource.PROCESSOR:
+                if len(errors) > 0:
+                    status.status = writer_pb2.FieldStatus.Status.ERROR
+                else:
+                    status.status = writer_pb2.FieldStatus.Status.PROCESSED
+            else:
+                field_status = next(
+                    (
+                        fs.status
+                        for fs in message.field_statuses
+                        if fs.id.field_type == field_type and fs.id.field == field
+                    ),
+                    None,
+                )
+                if field_status:
+                    status.status = field_status
+
+            await field_obj.set_status(status)
+
+    async def update_status(self):
+        field_ids = await self.get_all_field_ids(for_update=False)
+        field_statuses = await datamanagers.fields.get_statuses(
+            self.txn, kbid=self.kb.kbid, rid=self.uuid, fields=field_ids.fields
+        )
+        # If any field is processing -> PENDING
+        if any((f.status == writer_pb2.FieldStatus.Status.PENDING for f in field_statuses)):
+            self.basic.metadata.status = PBMetadata.Status.PENDING
+        # If we have any non-DA error -> ERROR
+        elif any(
+            (
+                f.status == writer_pb2.FieldStatus.Status.ERROR
+                and any(
+                    (
+                        e.source_error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION
+                        for e in f.errors
+                    )
+                )
+                for f in field_statuses
+            )
+        ):
+            self.basic.metadata.status = PBMetadata.Status.ERROR
+        # Otherwise (everything processed or we only have DA errors) -> PROCESSED
+        else:
+            self.basic.metadata.status = PBMetadata.Status.PROCESSED
+
     @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
         errors = False
@@ -562,6 +643,10 @@ class Resource:
 
         for extracted_text in message.extracted_text:
             await self._apply_extracted_text(extracted_text)
+
+        # TODO: Update field and resource status depending on processing results
+        await self.apply_fields_status(message, self._modified_extracted_text)
+        # await self.update_status()
 
         extracted_languages = []
 
