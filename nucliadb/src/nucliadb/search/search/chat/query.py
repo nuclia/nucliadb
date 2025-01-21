@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Optional
+from typing import Iterable, Optional
 
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
@@ -51,6 +51,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos import audit_pb2
 from nucliadb_protos.nodereader_pb2 import RelationSearchResponse, SearchRequest, SearchResponse
+from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.utilities import get_audit
 
@@ -145,15 +146,7 @@ async def get_find_results(
     return main_results, prequeries_results, query_parser
 
 
-async def run_main_query(
-    kbid: str,
-    query: str,
-    item: AskRequest,
-    ndb_client: NucliaDBClientType,
-    user: str,
-    origin: str,
-    metrics: RAGMetrics = RAGMetrics(),
-) -> tuple[KnowledgeboxFindResults, QueryParser]:
+def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     find_request = FindRequest()
     find_request.resource_filters = item.resource_filters
     find_request.features = []
@@ -189,7 +182,19 @@ async def run_main_query(
     find_request.show_hidden = item.show_hidden
 
     # this executes the model validators, that can tweak some fields
-    FindRequest.model_validate(find_request)
+    return FindRequest.model_validate(find_request)
+
+
+async def run_main_query(
+    kbid: str,
+    query: str,
+    item: AskRequest,
+    ndb_client: NucliaDBClientType,
+    user: str,
+    origin: str,
+    metrics: RAGMetrics = RAGMetrics(),
+) -> tuple[KnowledgeboxFindResults, QueryParser]:
+    find_request = find_request_from_ask_request(item, query)
 
     find_results, incomplete, query_parser = await find(
         kbid,
@@ -211,34 +216,57 @@ async def get_relations_results(
     text_answer: str,
     target_shard_replicas: Optional[list[str]],
     timeout: Optional[float] = None,
+    only_with_metadata: bool = False,
+    only_agentic_relations: bool = False,
 ) -> Relations:
     try:
         predict = get_predict()
         detected_entities = await predict.detect_entities(kbid, text_answer)
-        request = SearchRequest()
-        request.relation_subgraph.entry_points.extend(detected_entities)
-        request.relation_subgraph.depth = 1
 
-        results: list[SearchResponse]
-        (
-            results,
-            _,
-            _,
-        ) = await node_query(
-            kbid,
-            Method.SEARCH,
-            request,
+        return await get_relations_results_from_entities(
+            kbid=kbid,
+            entities=detected_entities,
             target_shard_replicas=target_shard_replicas,
             timeout=timeout,
-            use_read_replica_nodes=True,
-            retry_on_primary=False,
+            only_with_metadata=only_with_metadata,
+            only_agentic_relations=only_agentic_relations,
         )
-        relations_results: list[RelationSearchResponse] = [result.relation for result in results]
-        return await merge_relations_results(relations_results, request.relation_subgraph)
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error getting relations results")
         return Relations(entities={})
+
+
+async def get_relations_results_from_entities(
+    *,
+    kbid: str,
+    entities: Iterable[RelationNode],
+    target_shard_replicas: Optional[list[str]],
+    timeout: Optional[float] = None,
+    only_with_metadata: bool = False,
+    only_agentic_relations: bool = False,
+) -> Relations:
+    request = SearchRequest()
+    request.relation_subgraph.entry_points.extend(entities)
+    request.relation_subgraph.depth = 1
+    results: list[SearchResponse]
+    (
+        results,
+        _,
+        _,
+    ) = await node_query(
+        kbid,
+        Method.SEARCH,
+        request,
+        target_shard_replicas=target_shard_replicas,
+        timeout=timeout,
+        use_read_replica_nodes=True,
+        retry_on_primary=False,
+    )
+    relations_results: list[RelationSearchResponse] = [result.relation for result in results]
+    return await merge_relations_results(
+        relations_results, request.relation_subgraph, only_with_metadata, only_agentic_relations
+    )
 
 
 def maybe_audit_chat(

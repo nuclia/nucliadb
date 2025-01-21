@@ -37,7 +37,7 @@ from nucliadb_models.writer import (
     UpdateResourcePayload,
 )
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
 
@@ -50,6 +50,7 @@ async def extract_file_field_from_pb(field_pb: resources_pb2.FieldFile) -> str:
             language=field_pb.language,
             password=field_pb.password,
             file=models.File(payload=None, uri=field_pb.file.uri),
+            extract_strategy=field_pb.extract_strategy,
         )
         return processing.convert_external_filefield_to_str(file_field)
     else:
@@ -171,6 +172,8 @@ def parse_text_field(
     writer: BrokerMessage,
     toprocess: PushPayload,
 ) -> None:
+    if text_field.extract_strategy is not None:
+        writer.texts[key].extract_strategy = text_field.extract_strategy
     writer.texts[key].body = text_field.body
     writer.texts[key].format = resources_pb2.FieldText.Format.Value(text_field.format.value)
     etw = resources_pb2.ExtractedTextWrapper()
@@ -181,6 +184,13 @@ def parse_text_field(
     toprocess.textfield[key] = models.Text(
         body=text_field.body,
         format=getattr(models.PushTextFormat, text_field.format.value),
+        extract_strategy=text_field.extract_strategy,
+    )
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.TEXT, field=key),
+            status=FieldStatus.Status.PENDING,
+        )
     )
 
 
@@ -200,6 +210,13 @@ async def parse_file_field(
             key, file_field, writer, toprocess, kbid, uuid, skip_store=skip_store
         )
 
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.FILE, field=key),
+            status=FieldStatus.Status.PENDING,
+        )
+    )
+
 
 async def parse_internal_file_field(
     key: str,
@@ -213,6 +230,8 @@ async def parse_internal_file_field(
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
+    if file_field.extract_strategy is not None:
+        writer.files[key].extract_strategy = file_field.extract_strategy
 
     processing = get_processing()
 
@@ -248,6 +267,8 @@ def parse_external_file_field(
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
+    if file_field.extract_strategy is not None:
+        writer.files[key].extract_strategy = file_field.extract_strategy
     uri = file_field.file.uri
     writer.files[key].url = uri  # type: ignore
     writer.files[key].file.uri = uri  # type: ignore
@@ -290,6 +311,9 @@ def parse_link_field(
     if link_field.xpath is not None:
         writer.links[key].xpath = link_field.xpath
 
+    if link_field.extract_strategy is not None:
+        writer.links[key].extract_strategy = link_field.extract_strategy
+
     toprocess.linkfield[key] = models.LinkUpload(
         link=link_field.uri,
         headers=link_field.headers or {},
@@ -297,6 +321,13 @@ def parse_link_field(
         localstorage=link_field.localstorage or {},
         css_selector=link_field.css_selector,
         xpath=link_field.xpath,
+        extract_strategy=link_field.extract_strategy,
+    )
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.LINK, field=key),
+            status=FieldStatus.Status.PENDING,
+        )
     )
 
 
@@ -310,7 +341,6 @@ async def parse_conversation_field(
 ) -> None:
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
-
     field_value = resources_pb2.Conversation()
     convs = models.PushConversation()
     for message in conversation_field.messages:
@@ -374,3 +404,9 @@ async def parse_conversation_field(
 
     toprocess.conversationfield[key] = convs
     writer.conversations[key].CopyFrom(field_value)
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.CONVERSATION, field=key),
+            status=FieldStatus.Status.PENDING,
+        )
+    )

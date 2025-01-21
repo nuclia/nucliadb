@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from inspect import iscoroutinefunction
-from typing import TYPE_CHECKING, Callable, Optional, Type, Union
+from typing import TYPE_CHECKING, Annotated, Callable, Optional, Type, Union
 
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
@@ -30,9 +30,9 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.constants import (
-    SKIP_STORE_DEFAULT,
     X_FILE_PASSWORD,
     X_NUCLIADB_USER,
+    X_SKIP_STORE,
 )
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
@@ -55,7 +55,7 @@ from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import FieldID, Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
@@ -380,7 +380,7 @@ async def add_resource_field_file_rslug_prefix(
     rslug: str,
     field_id: FieldIdString,
     field_payload: models.FileField,
-    x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
 ) -> ResourceFieldAdded:
     return await add_field_to_resource_by_slug(
         request, kbid, rslug, field_id, field_payload, skip_store=x_skip_store
@@ -402,7 +402,7 @@ async def add_resource_field_file_rid_prefix(
     rid: str,
     field_id: FieldIdString,
     field_payload: models.FileField,
-    x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
 ) -> ResourceFieldAdded:
     return await add_field_to_resource(
         request, kbid, rid, field_id, field_payload, skip_store=x_skip_store
@@ -503,8 +503,8 @@ async def reprocess_file_field(
     kbid: str,
     rid: str,
     field_id: FieldIdString,
-    x_nucliadb_user: str = X_NUCLIADB_USER,
-    x_file_password: Optional[str] = X_FILE_PASSWORD,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
+    x_file_password: Annotated[Optional[str], X_FILE_PASSWORD] = None,
 ) -> ResourceUpdated:
     await maybe_back_pressure(request, kbid, resource_uuid=rid)
 
@@ -553,6 +553,12 @@ async def reprocess_file_field(
     writer.source = BrokerMessage.MessageSource.WRITER
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=FieldID(field_type=resources_pb2.FieldType.FILE, field=field_id),
+            status=FieldStatus.Status.PENDING,
+        )
+    )
     await transaction.commit(writer, partition, wait=False)
     # Send current resource to reprocess.
     try:

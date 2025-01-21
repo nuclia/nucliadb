@@ -29,7 +29,7 @@ from nucliadb.reader.app import create_application
 from nucliadb.standalone.settings import Settings
 from nucliadb.writer import API_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.settings import running_settings
+from nucliadb_utils.settings import running_settings, transaction_settings
 from nucliadb_utils.storages.storage import Storage
 from tests.utils.dirty_index import wait_for_sync
 
@@ -83,5 +83,6 @@ async def reader_api_server(
     dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
     application = create_application()
-    async with application.router.lifespan_context(application):
-        yield application
+    with patch.object(transaction_settings, "transaction_local", True):
+        async with application.router.lifespan_context(application):
+            yield application

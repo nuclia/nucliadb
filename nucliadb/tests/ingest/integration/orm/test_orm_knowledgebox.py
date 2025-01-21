@@ -27,7 +27,7 @@ from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxCreationError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, chunker
-from nucliadb_protos import utils_pb2
+from nucliadb_protos import knowledgebox_pb2, utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -81,6 +81,10 @@ async def test_create_knowledgebox(
         assert config.title == title
         assert config.description == description
 
+        vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="my-semantic-model")
+        assert vs is not None
+        assert vs.storage_key_kind == knowledgebox_pb2.VectorSetConfig.StorageKeyKind.LEGACY
+
 
 async def test_create_knowledgebox_with_multiple_vectorsets(
     storage: Storage,
@@ -121,6 +125,7 @@ async def test_create_knowledgebox_with_multiple_vectorsets(
         assert vs1.vectorset_index_config.similarity == utils_pb2.VectorSimilarity.COSINE
         assert vs1.vectorset_index_config.normalize_vectors is False
         assert len(vs1.matryoshka_dimensions) == 0
+        assert vs1.storage_key_kind == knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
 
         vs2 = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="vs2")
         assert vs2 is not None
@@ -129,6 +134,7 @@ async def test_create_knowledgebox_with_multiple_vectorsets(
         assert vs2.vectorset_index_config.similarity == utils_pb2.VectorSimilarity.DOT
         assert vs2.vectorset_index_config.normalize_vectors is True
         assert set(vs2.matryoshka_dimensions) == {256, 512, 2048}
+        assert vs2.storage_key_kind == knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
 
 
 async def test_create_knowledgebox_without_vectorsets_is_not_allowed(

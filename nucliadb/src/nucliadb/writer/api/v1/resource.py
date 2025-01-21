@@ -20,7 +20,7 @@
 import asyncio
 import contextlib
 from time import time
-from typing import Optional
+from typing import Annotated, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Query, Response
@@ -35,7 +35,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, logger
-from nucliadb.writer.api.constants import SKIP_STORE_DEFAULT, X_NUCLIADB_USER
+from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_SKIP_STORE
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -63,8 +63,8 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_protos.resources_pb2 import Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
+from nucliadb_protos.resources_pb2 import FieldID, Metadata
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus, IndexResource
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -90,8 +90,8 @@ async def create_resource(
     request: Request,
     item: CreateResourcePayload,
     kbid: str,
-    x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_nucliadb_user: str = X_NUCLIADB_USER,
+    x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
     kb_config = await datamanagers.atomic.kb.get_config(kbid=kbid)
     if item.hidden and not (kb_config and kb_config.hidden_resources_enabled):
@@ -180,8 +180,8 @@ async def modify_resource_rslug_prefix(
     kbid: str,
     rslug: str,
     item: UpdateResourcePayload,
-    x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_nucliadb_user: str = X_NUCLIADB_USER,
+    x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await modify_resource_endpoint(
@@ -208,8 +208,8 @@ async def modify_resource_rid_prefix(
     kbid: str,
     rid: str,
     item: UpdateResourcePayload,
-    x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_nucliadb_user: str = X_NUCLIADB_USER,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
+    x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
 ):
     return await modify_resource_endpoint(
         request,
@@ -371,7 +371,7 @@ async def reprocess_resource_rslug_prefix(
     request: Request,
     kbid: str,
     rslug: str,
-    x_nucliadb_user: str = X_NUCLIADB_USER,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _reprocess_resource(request, kbid, rid, x_nucliadb_user=x_nucliadb_user)
@@ -390,7 +390,7 @@ async def reprocess_resource_rid_prefix(
     request: Request,
     kbid: str,
     rid: str,
-    x_nucliadb_user: str = X_NUCLIADB_USER,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
     return await _reprocess_resource(request, kbid, rid, x_nucliadb_user=x_nucliadb_user)
 
@@ -422,6 +422,7 @@ async def _reprocess_resource(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
+    writer = BrokerMessage()
     async with driver.transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid)
 
@@ -430,8 +431,14 @@ async def _reprocess_resource(
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
         await extract_fields(resource=resource, toprocess=toprocess)
+        for field_type, field_id in resource.fields.keys():
+            writer.field_statuses.append(
+                FieldIDStatus(
+                    id=FieldID(field_type=field_type, field=field_id),
+                    status=FieldStatus.Status.PENDING,
+                )
+            )
 
-    writer = BrokerMessage()
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER

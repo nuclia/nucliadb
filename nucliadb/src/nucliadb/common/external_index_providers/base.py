@@ -28,7 +28,7 @@ from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexingError
 from nucliadb.common.ids import ParagraphId
 from nucliadb_models.external_index_providers import ExternalIndexProviderType
-from nucliadb_models.search import SCORE_TYPE, TextPosition
+from nucliadb_models.search import SCORE_TYPE, Relations, TextPosition
 from nucliadb_protos.knowledgebox_pb2 import (
     CreateExternalIndexProviderMetadata,
     StoredExternalIndexProviderMetadata,
@@ -73,6 +73,7 @@ class TextBlockMatch(BaseModel):
     paragraph_labels: list[str] = []
     field_labels: list[str] = []
     text: Optional[str] = None
+    relevant_relations: Optional[Relations] = None
 
 
 class QueryResults(BaseModel):

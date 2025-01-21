@@ -10,22 +10,78 @@ spec:
   http:
     - name: nucliadb_writer
       match:
-        - uri:
-            regex: '^/api/v\d+/kb/[^/]+'
-          method:
-            regex: "POST|PATCH|PUT|DELETE|OPTIONS"
-        - uri:
-            regex: '^/api/v\d+/kb/[^/]+/(resource|slug|resources|entitiesgroup|labelset|upload|custom-synonyms|export|import).*'
-          method:
-            regex: "POST|PATCH|PUT|DELETE|OPTIONS"
+        # KB config
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/configuration'
           method:
             regex: "POST|PATCH|OPTIONS"
         - uri:
-            regex: '^/api/v\d+/kb/[^/]+/vectorsets/.*'
+            regex: '^/api/v\d+/kb/[^/]+/vectorsets/[^/]+$'
           method:
             regex: "POST|DELETE|OPTIONS"
+
+        # resources
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/resources'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+$'
+          method:
+            regex: "PATCH|DELETE|OPTIONS"
+
+        # fields
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(text|file|link|conversation)/[^/]+$'
+          method:
+            regex: "PUT|DELETE|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/conversation/[^/]+/messages'
+          method:
+            regex: "PUT|OPTIONS"
+
+        # upload
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/upload'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/file/[^/]+/upload'
+          method:
+            regex: "PUT|DELETE|OPTIONS"
+
+        # reprocess/reindex
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(reprocess|reindex)'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/file/[^/]+/reprocess'
+          method:
+            regex: "POST|OPTIONS"
+
+        # misc
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/entitiesgroups'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/entitiesgroup/[^/]+$'
+          method:
+            regex: "PATCH|DELETE|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/labelset/[^/]+$'
+          method:
+            regex: "POST|DELETE|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/custom-synonyms'
+          method:
+            regex: "PUT|DELETE|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(export|import)'
+          method:
+            regex: "POST|OPTIONS"
+
       route:
         - destination:
             port:

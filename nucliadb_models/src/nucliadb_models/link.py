@@ -38,6 +38,10 @@ class FieldLink(BaseModel):
     localstorage: Optional[Dict[str, str]] = None
     css_selector: Optional[str] = None
     xpath: Optional[str] = None
+    extract_strategy: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy used at processing time. If not set, the default strategy was used. Extract strategies are defined at the learning configuration api.",
+    )
 
 
 # Creation and update classes (Those used on writer endpoints)
@@ -51,6 +55,10 @@ class LinkField(BaseModel):
     localstorage: Optional[Dict[str, str]] = {}
     css_selector: Optional[str] = None
     xpath: Optional[str] = None
+    extract_strategy: Optional[str] = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
+    )
 
 
 # Processing classes (Those used to sent to push endpoints)
@@ -71,3 +79,4 @@ class LinkUpload(BaseModel):
         title="Xpath",
         description="Xpath to parse the link",
     )
+    extract_strategy: Optional[str] = None

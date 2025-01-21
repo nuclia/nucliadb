@@ -417,6 +417,7 @@ message FieldText {
     string md5 = 3;
 
     FieldAuthor generated_by = 4;
+    string extract_strategy = 5;
 }
 
 message Block {
@@ -514,6 +515,8 @@ message FieldLink {
     map<string, string> localstorage = 6;
     string css_selector = 7;
     string xpath = 8;
+    string extract_strategy = 9;
+
 }
 
 
@@ -525,6 +528,7 @@ message FieldFile {
     string password = 4;
     string url = 5;
     map<string, string> headers = 6;
+    string extract_strategy = 7;
 }
 
 
@@ -593,7 +597,6 @@ message RowsPreview {
     }
     map<string, Sheet> sheets = 1;
 }
-
 
 message FieldID {
     FieldType field_type = 1;

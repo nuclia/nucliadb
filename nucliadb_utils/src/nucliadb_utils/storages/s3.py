@@ -485,6 +485,12 @@ class S3Storage(Storage):
                     deleted = True
         return deleted, conflict
 
+    @backoff.on_exception(
+        backoff.expo,
+        RETRIABLE_EXCEPTIONS,
+        jitter=backoff.random_jitter,
+        max_tries=MAX_TRIES,
+    )
     @s3_ops_observer.wrap({"type": "insert_object"})
     async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
         await self._s3aioclient.put_object(

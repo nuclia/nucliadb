@@ -94,14 +94,25 @@ class CreateResourcePayload(BaseModel):
         title="Origin",
         description="Origin metadata for the resource. Used to store information about the resource on the origin system. Most of its fields can later be used to filter at search time.",  # noqa
     )
-    extra: Optional[Extra] = None
-    hidden: Optional[bool] = None
+    extra: Optional[Extra] = Field(
+        default=None,
+        title="Extra",
+        description="Extra metadata for the resource. It can be used to store structured information about the resource that can't be used to query at retrieval time.",
+    )
+    hidden: Optional[bool] = Field(
+        default=None,
+        title="Hidden",
+        description="Set the hidden status of the resource. If not set, the default value for new resources in the KnowledgeBox will be used.",
+    )
 
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
     conversations: Dict[FieldIdString, InputConversationField] = FieldDefaults.conversations
-    processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
+    processing_options: Optional[PushProcessingOptions] = Field(
+        default=PushProcessingOptions(),
+        description="Options for processing the resource. If not set, the default options will be used.",
+    )
     security: Optional[ResourceSecurity] = Field(
         default=None,
         title="Security",
@@ -140,18 +151,29 @@ class UpdateResourcePayload(BaseModel):
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     origin: Optional[InputOrigin] = None
-    extra: Optional[Extra] = None
+    extra: Optional[Extra] = Field(
+        default=None,
+        title="Extra",
+        description="Extra metadata for the resource. It can be used to store structured information about the resource that can't be used to query at retrieval time. If not set, the existing extra metadata will not be modified.",
+    )
     files: Dict[FieldIdString, FileField] = FieldDefaults.files
     links: Dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: Dict[FieldIdString, TextField] = FieldDefaults.texts
     conversations: Dict[FieldIdString, InputConversationField] = FieldDefaults.conversations
-    processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
+    processing_options: Optional[PushProcessingOptions] = Field(
+        default=PushProcessingOptions(),
+        description="Options for processing the resource. If not set, the default options will be used.",
+    )
     security: Optional[ResourceSecurity] = Field(
         default=None,
         title="Security",
         description="Security metadata for the resource. It can be used to have fine-grained control over who can access the resource.",  # noqa
     )
-    hidden: Optional[bool] = None
+    hidden: Optional[bool] = Field(
+        default=None,
+        title="Hidden",
+        description="Modify the hidden status of the resource. If not set, the hidden status will not be modified.",  # noqa
+    )
 
 
 class ResourceCreated(BaseModel):

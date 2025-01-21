@@ -23,10 +23,9 @@ import uuid
 from datetime import datetime
 from hashlib import md5
 from io import BytesIO
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import HTTPException
-from fastapi.params import Header
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version
@@ -37,6 +36,7 @@ from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer.api.constants import X_EXTRACT_STRATEGY, X_FILENAME, X_LANGUAGE, X_MD5, X_PASSWORD
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
@@ -74,7 +74,7 @@ from nucliadb_utils.utilities import (
     get_storage,
 )
 
-from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
+from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
 
 TUS_HEADERS = {
     "Tus-Resumable": "1.0.0",
@@ -142,9 +142,12 @@ async def tus_post_rslug_prefix(
     rslug: str,
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
+    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
 ) -> Response:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
-    return await _tus_post(request, kbid, item, path_rid=rid, field_id=field)
+    return await _tus_post(
+        request, kbid, item, path_rid=rid, field_id=field, extract_strategy=x_extract_strategy
+    )
 
 
 @api.post(
@@ -161,8 +164,11 @@ async def tus_post_rid_prefix(
     path_rid: str,
     field: FieldIdString,
     item: Optional[CreateResourcePayload] = None,
+    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item, path_rid=path_rid, field_id=field)
+    return await _tus_post(
+        request, kbid, item, path_rid=path_rid, field_id=field, extract_strategy=x_extract_strategy
+    )
 
 
 @api.post(
@@ -177,8 +183,9 @@ async def tus_post(
     request: Request,
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
+    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
 ) -> Response:
-    return await _tus_post(request, kbid, item)
+    return await _tus_post(request, kbid, item, extract_strategy=x_extract_strategy)
 
 
 # called by one the three POST above - there are defined distinctly to produce clean API doc
@@ -188,6 +195,7 @@ async def _tus_post(
     item: Optional[CreateResourcePayload] = None,
     path_rid: Optional[str] = None,
     field_id: Optional[str] = None,
+    extract_strategy: Optional[str] = None,
 ) -> Response:
     """
     An empty POST request is used to create a new upload resource.
@@ -285,6 +293,7 @@ async def _tus_post(
         deferred_length=deferred_length,
         offset=0,
         item=creation_payload,
+        extract_strategy=extract_strategy,
     )
 
     if size is not None:
@@ -535,8 +544,8 @@ async def _tus_patch(
             raise AttributeError()
         path = await storage_manager.finish(dm)
         headers["Tus-Upload-Finished"] = "1"
-        headers["NDB-Resource"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}"
-        headers["NDB-Field"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}/field/{field}"
+        headers["NDB-Resource"] = f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}/{rid}"
+        headers["NDB-Field"] = f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}/{rid}/field/{field}"
 
         item_payload = dm.get("item")
         creation_payload = None
@@ -569,6 +578,7 @@ async def _tus_patch(
                 request=request,
                 bucket=storage_manager.storage.get_bucket_name(kbid),
                 item=creation_payload,
+                extract_strategy=dm.get("extract_strategy") or None,
             )
         except LimitsExceededError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail)
@@ -602,10 +612,11 @@ async def upload_rslug_prefix(
     kbid: str,
     rslug: str,
     field: FieldIdString,
-    x_filename: Optional[list[str]] = Header(None),  # type: ignore
-    x_password: Optional[list[str]] = Header(None),  # type: ignore
-    x_language: Optional[list[str]] = Header(None),  # type: ignore
-    x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_filename: Annotated[Optional[str], X_FILENAME] = None,
+    x_password: Annotated[Optional[str], X_PASSWORD] = None,
+    x_language: Annotated[Optional[str], X_LANGUAGE] = None,
+    x_md5: Annotated[Optional[str], X_MD5] = None,
+    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _upload(
@@ -617,6 +628,7 @@ async def upload_rslug_prefix(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_extract_strategy=x_extract_strategy,
     )
 
 
@@ -634,10 +646,11 @@ async def upload_rid_prefix(
     kbid: str,
     path_rid: str,
     field: FieldIdString,
-    x_filename: Optional[list[str]] = Header(None),  # type: ignore
-    x_password: Optional[list[str]] = Header(None),  # type: ignore
-    x_language: Optional[list[str]] = Header(None),  # type: ignore
-    x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_filename: Annotated[Optional[str], X_FILENAME] = None,
+    x_password: Annotated[Optional[str], X_PASSWORD] = None,
+    x_language: Annotated[Optional[str], X_LANGUAGE] = None,
+    x_md5: Annotated[Optional[str], X_MD5] = None,
+    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -648,6 +661,7 @@ async def upload_rid_prefix(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_extract_strategy=x_extract_strategy,
     )
 
 
@@ -663,10 +677,11 @@ async def upload_rid_prefix(
 async def upload(
     request: StarletteRequest,
     kbid: str,
-    x_filename: Optional[list[str]] = Header(None),  # type: ignore
-    x_password: Optional[list[str]] = Header(None),  # type: ignore
-    x_language: Optional[list[str]] = Header(None),  # type: ignore
-    x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_filename: Annotated[Optional[str], X_FILENAME] = None,
+    x_password: Annotated[Optional[str], X_PASSWORD] = None,
+    x_language: Annotated[Optional[str], X_LANGUAGE] = None,
+    x_md5: Annotated[Optional[str], X_MD5] = None,
+    x_extract_strategy: Annotated[Optional[str], X_EXTRACT_STRATEGY] = None,
 ) -> ResourceFileUploaded:
     return await _upload(
         request,
@@ -675,6 +690,7 @@ async def upload(
         x_password=x_password,
         x_language=x_language,
         x_md5=x_md5,
+        x_extract_strategy=x_extract_strategy,
     )
 
 
@@ -684,17 +700,18 @@ async def _upload(
     kbid: str,
     path_rid: Optional[str] = None,
     field: Optional[str] = None,
-    x_filename: Optional[list[str]] = Header(None),  # type: ignore
-    x_password: Optional[list[str]] = Header(None),  # type: ignore
-    x_language: Optional[list[str]] = Header(None),  # type: ignore
-    x_md5: Optional[list[str]] = Header(None),  # type: ignore
+    x_filename: Optional[str] = None,
+    x_password: Optional[str] = None,
+    x_language: Optional[str] = None,
+    x_md5: Optional[str] = None,
+    x_extract_strategy: Optional[str] = None,
 ) -> ResourceFileUploaded:
     if path_rid is not None:
         await validate_rid_exists_or_raise_error(kbid, path_rid)
 
     await maybe_back_pressure(request, kbid, resource_uuid=path_rid)
 
-    md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
+    md5_user = x_md5
     path, rid, valid_field = await validate_field_upload(kbid, path_rid, field, md5_user)
     dm = get_dm()
     storage_manager = get_storage_manager()
@@ -715,8 +732,8 @@ async def _upload(
 
     await dm.start(request)
 
-    if x_filename and len(x_filename):
-        filename = maybe_b64decode(x_filename[0])
+    if x_filename is not None:
+        filename = maybe_b64decode(x_filename)
     else:
         filename = uuid.uuid4().hex
 
@@ -772,15 +789,16 @@ async def _upload(
             content_type=content_type,
             override_resource_title=implies_resource_creation,
             filename=filename,
-            password=x_password[0] if x_password and len(x_password) else None,
-            language=x_language[0] if x_language and len(x_language) else None,
-            md5=x_md5[0] if x_md5 and len(x_md5) else None,
+            password=x_password,
+            language=x_language,
+            md5=x_md5,
             field=valid_field,
             source=storage_manager.storage.source,
             rid=rid,
             path=path,
             request=request,
             bucket=storage_manager.storage.get_bucket_name(kbid),
+            extract_strategy=x_extract_strategy,
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
@@ -840,6 +858,7 @@ async def store_file_on_nuclia_db(
     language: Optional[str] = None,
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
+    extract_strategy: Optional[str] = None,
 ) -> Optional[int]:
     # File is on NucliaDB Storage at path
     partitioning = get_partitioning()
@@ -921,6 +940,8 @@ async def store_file_on_nuclia_db(
             file_field.language = language
         if password:
             file_field.password = password
+        if extract_strategy is not None:
+            file_field.extract_strategy = extract_strategy
 
         writer.files[field].CopyFrom(file_field)
         # Do not store passwords on maindb

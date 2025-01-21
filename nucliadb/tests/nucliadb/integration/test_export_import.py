@@ -34,6 +34,7 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
 from nucliadb.learning_proxy import LearningConfiguration
 from nucliadb.tasks.consumer import NatsTaskConsumer
+from nucliadb_utils.settings import indexing_settings
 
 
 @pytest.fixture(scope="function")
@@ -160,7 +161,11 @@ async def test_on_standalone_nucliadb(
 
 
 @pytest.fixture(scope="function")
-def hosted_nucliadb():
+def hosted_nucliadb(natsd):
+    # FIXME
+    # This is a very hacky way to run a component/hosted version of nucliadb
+    # Instead of running all component fixtures, it runs the standalone
+    # fixture overriding some settings.
     with (
         patch("nucliadb.common.context.in_standalone_mode", return_value=False),
         patch(
@@ -171,9 +176,10 @@ def hosted_nucliadb():
             "nucliadb.writer.api.v1.export_import.in_standalone_mode",
             return_value=False,
         ),
+        patch.object(indexing_settings, "index_jetstream_servers", [natsd]),
+        set_standalone_mode_settings(False),
     ):
-        with set_standalone_mode_settings(False):
-            yield
+        yield
 
 
 @pytest.fixture(scope="function")
