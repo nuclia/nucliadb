@@ -156,6 +156,7 @@ jobs:
         with:
           log-level: warn
           command: check licenses
+          manifest-path: nidx/Cargo.toml
 
   check-migrations:
     runs-on: ubuntu-24.04
