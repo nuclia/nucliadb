@@ -37,6 +37,7 @@ use resource_indexer::index_document;
 use schema::TextSchema;
 
 pub use search_query::TextContext;
+use serde::{Deserialize, Serialize};
 use tantivy::indexer::merge_indices;
 use tantivy::schema::Field;
 use tantivy::{
@@ -45,6 +46,28 @@ use tantivy::{
     Term,
 };
 use tracing::instrument;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TextConfig {
+    #[serde(default = "default_version")]
+    pub version: u64,
+}
+
+impl Default for TextConfig {
+    fn default() -> Self {
+        Self {
+            // This is the default version when creating a new index.
+            // Should typically be set to the latest supported version
+            version: 2,
+        }
+    }
+}
+
+// This is the default version when reading from serde, i.e: no info on database
+// This should always be 1
+fn default_version() -> u64 {
+    1
+}
 
 pub struct TextIndexer;
 
@@ -60,9 +83,10 @@ impl TextIndexer {
     pub fn index_resource(
         &self,
         output_dir: &Path,
+        config: TextConfig,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
-        let field_schema = TextSchema::new();
+        let field_schema = TextSchema::new(config.version);
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
         index_document(&mut indexer, resource, field_schema)?;
@@ -77,9 +101,10 @@ impl TextIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
+        config: TextConfig,
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
-        let schema = TextSchema::new().schema;
+        let schema = TextSchema::new(config.version).schema;
         let query_builder = TextDeletionQueryBuilder(schema.get_field("uuid").unwrap());
         let index = open_index_with_deletions(schema, open_index, query_builder)?;
 
@@ -102,18 +127,15 @@ pub struct TextSearcher {
 
 impl TextSearcher {
     #[instrument(name = "text::open", skip_all)]
-    pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
-        let schema = TextSchema::new().schema;
-        let index = open_index_with_deletions(
-            schema.clone(),
-            open_index,
-            TextDeletionQueryBuilder(schema.get_field("uuid").unwrap()),
-        )?;
+    pub fn open(config: TextConfig, open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
+        let schema = TextSchema::new(config.version);
+        let index =
+            open_index_with_deletions(schema.schema.clone(), open_index, TextDeletionQueryBuilder(schema.uuid))?;
 
         Ok(Self {
             reader: TextReaderService {
                 index: index.clone(),
-                schema: TextSchema::new(),
+                schema,
                 reader: index.reader_builder().reload_policy(tantivy::ReloadPolicy::Manual).try_into()?,
             },
         })
