@@ -31,12 +31,7 @@ RUN set -eux; \
     cargo --version; \
     rustc --version;
 
-# Install system dependencies
-COPY scripts/install-system-deps.sh /tmp/
-RUN /tmp/install-system-deps.sh && rm /tmp/install-system-deps.sh
-
-RUN apt-get update -y && apt-get install --yes --no-install-recommends patchelf cmake && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
+RUN apt update && apt install -y protobuf-compiler
 RUN pip install maturin
 
 COPY . /nucliadb
@@ -44,7 +39,7 @@ COPY . /nucliadb
 WORKDIR /nucliadb
 
 RUN set -eux; \
-    cd nucliadb_node_binding; \
+    cd nidx/nidx_binding; \
     maturin build --profile ${RUST_BUILD_PROFILE}
 
 
@@ -85,17 +80,13 @@ COPY nucliadb_protos /usr/src/app/nucliadb_protos
 COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb /usr/src/app/nucliadb
 COPY nucliadb_performance /usr/src/app/nucliadb_performance
-COPY nidx/nidx_protos /usr/src/app/nidx/nidx_protos
-
-# Create a fake binding to avoid installing the real one
-RUN mkdir nucliadb_node_binding && \
-    touch nucliadb_node_binding/pyproject.toml
+COPY nidx /usr/src/app/nidx
 
 # Install our packages to the virtualenv
 RUN pdm sync --prod --no-editable
 
 # make sure to install the built wheel after so it is installed no matter what
-COPY --from=python_rust /nucliadb/target/wheels/ /wheels/
+COPY --from=python_rust /nucliadb/nidx/target/wheels/ /wheels/
 RUN /usr/src/app/.venv/bin/pip install /wheels/*.whl --force
 
 RUN mkdir -p /data

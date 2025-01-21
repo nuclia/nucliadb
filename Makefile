@@ -122,7 +122,4 @@ build-node-binding-debug:
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-nucliadb-local:
-	docker build -t nuclia/nucliadb:latest . -f Dockerfile.pipbinding
-
-build-nucliadb-local-withbinding:
 	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding
