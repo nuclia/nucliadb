@@ -245,18 +245,15 @@ jobs:
           path: .venv
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
-      - name: Restore binaries
+      - name: Restore nidx binary
         uses: actions/cache/restore@v4
         with:
-          path: "target/release/node_*er"
-          key: node-bin-${{ github.sha }}
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
           fail-on-cache-miss: true
 
-      - name: Build docker images for node
-        run: mkdir builds && mv target/release/node_* builds && docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
-
-      - name: Build sidecar image
-        run: make build-sidecar
+      - name: Build docker images for nidx
+        run: mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
 
       - name: Run tests
         run: source .venv/bin/activate && make -C nucliadb test-cov-search

@@ -16,7 +16,7 @@ fmt-check-package:
 	cargo fmt -p $(PACKAGE) --check
 
 
-protos: proto-py proto-rust
+protos: proto-py
 
 proto-py:
 	python -m grpc_tools.protoc nucliadb_protos/noderesources.proto -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
@@ -33,9 +33,6 @@ proto-py:
 	python -m grpc_tools.protoc nucliadb_protos/standalone.proto    -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/replication.proto   -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/kb_usage.proto 		-I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
-
-proto-rust:
-	cargo build --locked -p nucliadb_protos
 
 proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*.bak
