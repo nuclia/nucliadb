@@ -377,7 +377,7 @@ class StreamAuditStorage(AuditStorage):
         answer: Optional[str],
         learning_id: Optional[str],
         status_code: int,
-        model: str,
+        model: Optional[str],
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,
@@ -409,7 +409,8 @@ class StreamAuditStorage(AuditStorage):
         if answer is not None:
             auditrequest.chat.answer = answer
         auditrequest.chat.status_code = status_code
-        auditrequest.chat.model = model
+        if model is not None:
+            auditrequest.chat.model = model
 
     def feedback(
         self,

@@ -49,6 +49,7 @@ from nucliadb.search.search.chat.query import (
     ChatAuditor,
     get_find_results,
     get_relations_results,
+    maybe_audit_chat,
     rephrase_query,
     sorted_prompt_context_list,
     tokens_to_chars,
@@ -102,7 +103,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb.search.search.chat.query import maybe_audit_chat
+
 
 @dataclasses.dataclass
 class RetrievalMatch:
@@ -504,7 +505,7 @@ async def ask(
             user_query=user_query,
             rephrased_query=rephrased_query,
             text_answer=b"",
-            status_code=int(AnswerStatusCode.NO_RETRIEVAL_DATA.value),
+            status_code=AnswerStatusCode.NO_RETRIEVAL_DATA,
             chat_history=chat_history,
             query_context={},
             query_context_order={},

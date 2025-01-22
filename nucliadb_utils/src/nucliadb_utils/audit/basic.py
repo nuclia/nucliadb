@@ -87,7 +87,7 @@ class BasicAuditStorage(AuditStorage):
         answer: Optional[str],
         learning_id: Optional[str],
         status_code: int,
-        model: str,
+        model: Optional[str],
         rephrase_time: Optional[float] = None,
         generative_answer_time: Optional[float] = None,
         generative_answer_first_chunk_time: Optional[float] = None,

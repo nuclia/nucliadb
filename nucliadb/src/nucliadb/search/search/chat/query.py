@@ -286,7 +286,7 @@ def maybe_audit_chat(
     query_context: PromptContext,
     query_context_order: PromptContextOrder,
     learning_id: Optional[str],
-    model: str,
+    model: Optional[str],
 ):
     audit = get_audit()
     if audit is None:
