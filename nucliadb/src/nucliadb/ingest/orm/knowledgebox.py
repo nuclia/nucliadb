@@ -512,6 +512,12 @@ class KnowledgeBox:
             self.txn, kbid=self.kbid, vectorset_id=config.vectorset_id
         ):
             raise VectorSetConflict(f"Vectorset {config.vectorset_id} already exists")
+
+        # To ensure we always set the storage key kind, we overwrite it with the
+        # correct value. This whole enum business is to maintain bw/c with KBs
+        # pre-vectorsets, so any new vectorset should use the vectorset prefix
+        # key kind
+        config.storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
         await datamanagers.vectorsets.set(self.txn, kbid=self.kbid, config=config)
 
         # Remove the async deletion mark if it exists, just in case there was a previous deletion
