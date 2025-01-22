@@ -69,7 +69,9 @@ from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_utils import const
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import has_feature
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -600,6 +602,12 @@ class Resource:
 
     @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
+        if not has_feature(const.Features.FIELD_STATUS):
+            field_obj: Field
+            for error in message.errors:
+                field_obj = await self.get_field(error.field, error.field_type, load=False)
+                await field_obj.set_error(error)
+
         await self.get_basic()
         if self.basic is None:
             raise KeyError("Resource Not Found")
@@ -617,7 +625,15 @@ class Resource:
 
         # Update field and resource status depending on processing results
         await self.apply_fields_status(message, self._modified_extracted_text)
-        await self.update_status()
+        if has_feature(const.Features.FIELD_STATUS):
+            # Compute resource status based on all fields statuses
+            await self.update_status()
+        else:
+            # Old code path, compute resource status based on the presence of errors in this BrokerMessage
+            if message.errors:
+                self.basic.metadata.status = PBMetadata.Status.ERROR
+            elif message.source is message.MessageSource.PROCESSOR:
+                self.basic.metadata.status = PBMetadata.Status.PROCESSED
 
         extracted_languages = []
 

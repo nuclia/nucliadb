@@ -52,7 +52,8 @@ from nucliadb_models.resource import (
 from nucliadb_models.search import ResourceProperties
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_protos.writer_pb2 import FieldStatus
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils import const
+from nucliadb_utils.utilities import get_storage, has_feature
 
 
 async def set_resource_field_extracted_data(
@@ -153,22 +154,32 @@ async def serialize_field_errors(
         TextFieldData, FileFieldData, LinkFieldData, ConversationFieldData, GenericFieldData
     ],
 ):
-    status = await field.get_status()
-    if status is None:
-        status = FieldStatus()
-    serialized.status = status.Status.Name(status.status)
-    if status.errors:
-        serialized.errors = []
-        for error in status.errors:
-            serialized.errors.append(
-                Error(
-                    body=error.source_error.error,
-                    code=error.source_error.code,
-                    code_str=error.source_error.ErrorCode.Name(error.source_error.code),
-                    created=error.created.ToDatetime(),
+    if has_feature(const.Features.FIELD_STATUS):
+        status = await field.get_status()
+        if status is None:
+            status = FieldStatus()
+        serialized.status = status.Status.Name(status.status)
+        if status.errors:
+            serialized.errors = []
+            for error in status.errors:
+                serialized.errors.append(
+                    Error(
+                        body=error.source_error.error,
+                        code=error.source_error.code,
+                        code_str=error.source_error.ErrorCode.Name(error.source_error.code),
+                        created=error.created.ToDatetime(),
+                    )
                 )
+            serialized.error = serialized.errors[-1]
+    else:
+        field_error = await field.get_error()
+        if field_error is not None:
+            serialized.error = Error(
+                body=field_error.error,
+                code=field_error.code,
+                code_str=field_error.ErrorCode.Name(field_error.code),
+                created=None,
             )
-        serialized.error = serialized.errors[-1]
 
 
 async def managed_serialize(
