@@ -69,7 +69,9 @@ from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_utils import const
 from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.utilities import has_feature
 
 if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -535,6 +537,7 @@ class Resource:
         for (field_type, field), errors in errors_by_field.items():
             field_obj = await self.get_field(field, field_type, load=False)
             if from_processor:
+                # Create a new field status to clear all errors
                 status = writer_pb2.FieldStatus()
             else:
                 status = await field_obj.get_status() or writer_pb2.FieldStatus()
@@ -548,7 +551,7 @@ class Resource:
 
             # We infer the status for processor messages
             if message.source == BrokerMessage.MessageSource.PROCESSOR:
-                if len(errors) > 0:
+                if len(status.errors) > 0:
                     status.status = writer_pb2.FieldStatus.Status.ERROR
                 else:
                     status.status = writer_pb2.FieldStatus.Status.PROCESSED
@@ -563,14 +566,19 @@ class Resource:
                 )
                 if field_status:
                     status.status = field_status
+                # If the field was not found and the message comes from the writer, this implicitly sets the
+                # status to the default value, which is PROCESSING. This covers the case of new field creation.
 
             await field_obj.set_status(status)
 
     async def update_status(self):
         field_ids = await self.get_all_field_ids(for_update=False)
+        if field_ids is None:
+            return
         field_statuses = await datamanagers.fields.get_statuses(
             self.txn, kbid=self.kb.kbid, rid=self.uuid, fields=field_ids.fields
         )
+
         # If any field is processing -> PENDING
         if any((f.status == writer_pb2.FieldStatus.Status.PENDING for f in field_statuses)):
             self.basic.metadata.status = PBMetadata.Status.PENDING
@@ -594,12 +602,11 @@ class Resource:
 
     @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_extracted(self, message: BrokerMessage):
-        errors = False
-        field_obj: Field
-        for error in message.errors:
-            field_obj = await self.get_field(error.field, error.field_type, load=False)
-            await field_obj.set_error(error)
-            errors = True
+        if not has_feature(const.Features.FIELD_STATUS):
+            field_obj: Field
+            for error in message.errors:
+                field_obj = await self.get_field(error.field, error.field_type, load=False)
+                await field_obj.set_error(error)
 
         await self.get_basic()
         if self.basic is None:
@@ -607,11 +614,6 @@ class Resource:
 
         previous_basic = Basic()
         previous_basic.CopyFrom(self.basic)
-
-        if errors:
-            self.basic.metadata.status = PBMetadata.Status.ERROR
-        elif errors is False and message.source is message.MessageSource.PROCESSOR:
-            self.basic.metadata.status = PBMetadata.Status.PROCESSED
 
         maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
 
@@ -621,9 +623,17 @@ class Resource:
         for extracted_text in message.extracted_text:
             await self._apply_extracted_text(extracted_text)
 
-        # TODO: Update field and resource status depending on processing results
+        # Update field and resource status depending on processing results
         await self.apply_fields_status(message, self._modified_extracted_text)
-        # await self.update_status()
+        if has_feature(const.Features.FIELD_STATUS):
+            # Compute resource status based on all fields statuses
+            await self.update_status()
+        else:
+            # Old code path, compute resource status based on the presence of errors in this BrokerMessage
+            if message.errors:
+                self.basic.metadata.status = PBMetadata.Status.ERROR
+            elif message.source is message.MessageSource.PROCESSOR:
+                self.basic.metadata.status = PBMetadata.Status.PROCESSED
 
         extracted_languages = []
 

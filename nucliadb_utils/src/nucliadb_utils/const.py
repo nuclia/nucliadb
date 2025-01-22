@@ -80,3 +80,4 @@ class Features:
     LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
     NIDX_READS = "nucliadb_nidx_reads"
+    FIELD_STATUS = "nucliadb_field_status"

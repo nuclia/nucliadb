@@ -22,6 +22,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos.writer_pb2 import BrokerMessage, Error, Generator
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 
@@ -71,3 +72,131 @@ async def test_endpoint_set_resource_status_to_pending(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PENDING"
+
+
+async def test_field_status_errors_processor(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    # Create a resource, processing
+    br = broker_resource(knowledgebox)
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PENDING"
+    assert resp_json["data"]["generics"]["title"]["status"] == "PENDING"
+    assert resp_json["data"]["generics"]["summary"]["status"] == "PENDING"
+
+    # Receive message from processor with errors
+    br.source = BrokerMessage.MessageSource.PROCESSOR
+    g = Generator()
+    g.processor.SetInParent()
+    br.generated_by.append(g)
+    br.errors.append(
+        Error(
+            field_type=rpb.FieldType.GENERIC,
+            field="summary",
+            error="Processor failed",
+            code=Error.ErrorCode.EXTRACT,
+        )
+    )
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "ERROR"
+    assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
+    assert resp_json["data"]["generics"]["summary"]["status"] == "ERROR"
+    assert len(resp_json["data"]["generics"]["summary"]["errors"]) == 1
+
+    # Receive message from processor without errors, previous errors are cleared
+    br.errors.pop()
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+    assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
+    assert resp_json["data"]["generics"]["summary"]["status"] == "PROCESSED"
+    assert "errors" not in resp_json["data"]["generics"]["summary"]
+
+
+async def test_field_status_errors_data_augmentation(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    # Create a resource, processing
+    br = broker_resource(knowledgebox)
+    br.texts["text"].CopyFrom(
+        rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    )
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PENDING"
+    assert resp_json["data"]["generics"]["title"]["status"] == "PENDING"
+    assert resp_json["data"]["texts"]["text"]["status"] == "PENDING"
+
+    # Receive message from processor with success
+    br.source = BrokerMessage.MessageSource.PROCESSOR
+    g = Generator()
+    g.processor.SetInParent()
+    br.generated_by.append(g)
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Hello!"
+    etw.field.field = "text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    br.extracted_text.append(etw)
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+    assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["text"]["status"] == "PROCESSED"
+
+    # Receive message from data augmentation with errors
+    br.errors.append(
+        Error(
+            field_type=rpb.FieldType.TEXT,
+            field="text",
+            error="Data augmentation failed",
+            code=Error.ErrorCode.DATAAUGMENTATION,
+        )
+    )
+    g = Generator()
+    g.data_augmentation.SetInParent()
+    br.generated_by.pop()
+    br.generated_by.append(g)
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+    assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["text"]["status"] == "ERROR"
+    assert len(resp_json["data"]["texts"]["text"]["errors"]) == 1
+
+    # Receive message from data augmentation without errors
+    br.errors.pop()
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+    assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["text"]["status"] == "ERROR"
+    assert len(resp_json["data"]["texts"]["text"]["errors"]) == 1
