@@ -80,6 +80,7 @@ impl MergeJob {
             "WITH job AS (
                  SELECT id FROM merge_jobs
                  WHERE started_at IS NULL ORDER BY priority DESC, id LIMIT 1
+                 FOR UPDATE SKIP LOCKED
              )
              UPDATE merge_jobs
              SET started_at = NOW(), running_at = NOW()
@@ -113,6 +114,7 @@ impl MergeJob {
 #[cfg(test)]
 mod tests {
     use nidx_vector::config::VectorConfig;
+    use tokio::task::JoinSet;
     use uuid::Uuid;
 
     use crate::{
@@ -143,6 +145,33 @@ mod tests {
         assert_eq!(MergeJob::take(&meta.pool).await?.unwrap().id, job_low.id);
         assert_eq!(MergeJob::take(&meta.pool).await?.unwrap().id, job_low2.id);
         assert!(MergeJob::take(&meta.pool).await?.is_none());
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_merge_job_take(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await?;
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta.pool, kbid).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
+
+        // If this test fails, it doesn't do so consistently, so retry a few times
+        for attempt in 0..10 {
+            MergeJob::create(&meta, index.id, &[], 1i64.into(), 1).await?;
+
+            let mut tasks = JoinSet::new();
+            for _ in 0..8 {
+                let meta2 = meta.clone();
+                tasks.spawn(async move {
+                    let job = MergeJob::take(&meta2.pool).await.unwrap();
+                    job.is_some()
+                });
+            }
+            let results = tasks.join_all().await;
+            let taken_jobs = results.iter().filter(|x| **x).count();
+            assert_eq!(taken_jobs, 1, "Multiple jobs taken at attempt {attempt}");
+        }
 
         Ok(())
     }

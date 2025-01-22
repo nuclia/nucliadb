@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "WITH job AS (\n                 SELECT id FROM merge_jobs\n                 WHERE started_at IS NULL ORDER BY priority DESC, id LIMIT 1\n             )\n             UPDATE merge_jobs\n             SET started_at = NOW(), running_at = NOW()\n             FROM job\n             WHERE merge_jobs.id = job.id\n             RETURNING merge_jobs.*",
+  "query": "WITH job AS (\n                 SELECT id FROM merge_jobs\n                 WHERE started_at IS NULL ORDER BY priority DESC, id LIMIT 1\n                 FOR UPDATE SKIP LOCKED\n             )\n             UPDATE merge_jobs\n             SET started_at = NOW(), running_at = NOW()\n             FROM job\n             WHERE merge_jobs.id = job.id\n             RETURNING merge_jobs.*",
   "describe": {
     "columns": [
       {
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "6cc028439d3016747a00fcee92987ae6b33ea246b95b9fbc51c5bc126f5ee69f"
+  "hash": "2b065a363f58caed60e3706603c1260dbf5a4c795604a5b68edda22eb07fec1b"
 }
