@@ -495,7 +495,7 @@ async def ask(
 
         maybe_audit_chat(
             kbid=kbid,
-            user=user_id,
+            user_id=user_id,
             client_type=client_type,
             origin=origin,
             generative_answer_time=0,
