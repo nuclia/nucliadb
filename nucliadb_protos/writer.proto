@@ -428,40 +428,6 @@ message SynonymsRequest {
     string kbid = 1;
 }
 
-message NewVectorSetRequest {
-    string kbid = 1;
-    string vectorset_id = 2;
-    nodewriter.VectorType vector_type = 3;
-    utils.VectorSimilarity similarity = 4;
-    uint32 vector_dimension = 5;
-    bool normalize_vectors = 6;
-    repeated uint32 matryoshka_dimensions = 7;
-}
-
-message NewVectorSetResponse {
-    enum Status {
-        OK = 0;
-        ERROR = 1;              // generic error
-    }
-    Status status = 1;
-    string details = 2;
-}
-
-message DelVectorSetRequest {
-    string kbid = 1;
-    string vectorset_id = 2;
-}
-
-message DelVectorSetResponse {
-    enum Status {
-        OK = 0;
-        ERROR = 1;              // generic error
-    }
-    Status status = 1;
-    string details = 2;
-}
-
-
 message NewKnowledgeBoxV2Request {
     string kbid = 1;
     string slug = 2;
@@ -509,9 +475,6 @@ service Writer {
 
     rpc Index(IndexResource) returns (IndexStatus) {}
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
-
-    rpc NewVectorSet(NewVectorSetRequest) returns (NewVectorSetResponse) {}
-    rpc DelVectorSet(DelVectorSetRequest) returns (DelVectorSetResponse) {}
 }
 
 message FieldError {

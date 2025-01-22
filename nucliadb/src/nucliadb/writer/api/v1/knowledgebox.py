@@ -20,7 +20,7 @@
 import asyncio
 from functools import partial
 
-from fastapi import HTTPException, Response
+from fastapi import HTTPException
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -32,7 +32,7 @@ from nucliadb.common.external_index_providers.exceptions import (
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.writer import logger, vectorsets
+from nucliadb.writer import logger
 from nucliadb.writer.api.utils import only_for_onprem
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
@@ -248,47 +248,3 @@ def to_pinecone_serverless_cloud_pb(
         PineconeServerlessCloud.AZURE_EASTUS2: knowledgebox_pb2.PineconeServerlessCloud.AZURE_EASTUS2,
         PineconeServerlessCloud.GCP_US_CENTRAL1: knowledgebox_pb2.PineconeServerlessCloud.GCP_US_CENTRAL1,
     }[serverless]
-
-
-@api.post(
-    f"/{KB_PREFIX}/{{kbid}}/vectorsets/{{vectorset_id}}",
-    status_code=200,
-    summary="Add a vectorset to Knowledge Box",
-    tags=["Knowledge Boxes"],
-    # TODO: remove when the feature is mature
-    include_in_schema=False,
-)
-@requires(NucliaDBRoles.MANAGER)
-@version(1)
-async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
-    try:
-        await vectorsets.add(kbid, vectorset_id)
-    except learning_proxy.ProxiedLearningConfigError as err:
-        return Response(
-            status_code=err.status_code,
-            content=err.content,
-            media_type=err.content_type,
-        )
-    return Response(status_code=200)
-
-
-@api.delete(
-    f"/{KB_PREFIX}/{{kbid}}/vectorsets/{{vectorset_id}}",
-    status_code=200,
-    summary="Delete vectorset from Knowledge Box",
-    tags=["Knowledge Boxes"],
-    # TODO: remove when the feature is mature
-    include_in_schema=False,
-)
-@requires(NucliaDBRoles.MANAGER)
-@version(1)
-async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
-    try:
-        await vectorsets.delete(kbid, vectorset_id)
-    except learning_proxy.ProxiedLearningConfigError as err:
-        return Response(
-            status_code=err.status_code,
-            content=err.content,
-            media_type=err.content_type,
-        )
-    return Response(status_code=200)

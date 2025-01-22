@@ -31,12 +31,12 @@ from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, VectorSetConflict
+from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.processor import Processor, sequence_manager
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
-from nucliadb_protos import nodewriter_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import writer_pb2, writer_pb2_grpc
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
     KnowledgeBoxID,
@@ -44,13 +44,10 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxUpdate,
     SemanticModelMetadata,
     UpdateKnowledgeBoxResponse,
-    VectorSetConfig,
 )
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     DelEntitiesRequest,
-    DelVectorSetRequest,
-    DelVectorSetResponse,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -63,8 +60,6 @@ from nucliadb_protos.writer_pb2 import (
     ListMembersResponse,
     NewEntitiesGroupRequest,
     NewEntitiesGroupResponse,
-    NewVectorSetRequest,
-    NewVectorSetResponse,
     OpStatusWriter,
     SetEntitiesRequest,
     UpdateEntitiesGroupRequest,
@@ -472,56 +467,3 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             raise
-
-    async def NewVectorSet(  # type: ignore
-        self, request: NewVectorSetRequest, context=None
-    ) -> NewVectorSetResponse:
-        config = VectorSetConfig(
-            vectorset_id=request.vectorset_id,
-            vectorset_index_config=nodewriter_pb2.VectorIndexConfig(
-                similarity=request.similarity,
-                normalize_vectors=request.normalize_vectors,
-                vector_type=request.vector_type,
-                vector_dimension=request.vector_dimension,
-            ),
-            matryoshka_dimensions=request.matryoshka_dimensions,
-            storage_key_kind=VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
-        )
-        response = NewVectorSetResponse()
-        try:
-            async with self.driver.transaction() as txn:
-                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-                await kbobj.create_vectorset(config)
-                await txn.commit()
-        except VectorSetConflict as exc:
-            response.status = NewVectorSetResponse.Status.ERROR
-            response.details = str(exc)
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.error("Error in ingest gRPC while creating a vectorset", exc_info=True)
-            response.status = NewVectorSetResponse.Status.ERROR
-            response.details = str(exc)
-        else:
-            response.status = NewVectorSetResponse.Status.OK
-        return response
-
-    async def DelVectorSet(  # type: ignore
-        self, request: DelVectorSetRequest, context=None
-    ) -> DelVectorSetResponse:
-        response = DelVectorSetResponse()
-        try:
-            async with self.driver.transaction() as txn:
-                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-                await kbobj.delete_vectorset(request.vectorset_id)
-                await txn.commit()
-        except VectorSetConflict as exc:
-            response.status = DelVectorSetResponse.Status.ERROR
-            response.details = str(exc)
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.error("Error in ingest gRPC while deleting a vectorset", exc_info=True)
-            response.status = DelVectorSetResponse.Status.ERROR
-            response.details = str(exc)
-        else:
-            response.status = DelVectorSetResponse.Status.OK
-        return response
