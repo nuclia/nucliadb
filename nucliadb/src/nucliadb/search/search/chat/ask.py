@@ -487,6 +487,12 @@ async def ask(
             resource=resource,
         )
     except NoRetrievalResultsError as err:
+        try:
+            rephrase_time = metrics.elapsed("rephrase")
+        except KeyError:
+            # Not all ask requests have a rephrase step
+            rephrase_time = None
+
         maybe_audit_chat(
             kbid=kbid,
             user=user_id,
@@ -494,7 +500,7 @@ async def ask(
             origin=origin,
             generative_answer_time=0,
             generative_answer_first_chunk_time=0,
-            rephrase_time=metrics.elapsed("rephrase"),
+            rephrase_time=rephrase_time,
             user_query=user_query,
             rephrased_query=rephrased_query,
             text_answer=b"",
