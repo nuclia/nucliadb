@@ -38,13 +38,12 @@ from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType, Pa
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     FieldID,
-    NewVectorSetRequest,
-    NewVectorSetResponse,
 )
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
+from tests.utils.vectorsets import add_vectorset
 
 MODULE = "nucliadb.writer.vectorsets"
 
@@ -94,6 +93,8 @@ async def test_add_delete_vectorsets(
             existing_lconfig,  # Initial configuration
             updated_lconfig,  # Configuration after adding the vectorset
             updated_lconfig,  # Configuration right before deleting the vectorset
+            existing_lconfig,  # Initial configuration
+            existing_lconfig,  # Initial configuration
         ],
     ) as get_configuration:
         with patch(f"{MODULE}.learning_proxy.update_configuration", return_value=None):
@@ -122,6 +123,17 @@ async def test_add_delete_vectorsets(
             async with datamanagers.with_ro_transaction() as txn:
                 vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset_id)
                 assert vs is None
+
+            # Deleting your last vectorset is not allowed
+            resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/multilingual")
+            assert resp.status_code == 409, resp.text
+            assert "Deletion of your last vectorset is not allowed" in resp.json()["detail"]
+
+            # But deleting twice is okay
+            resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            # XXX: however, we get the same error as before due to our lazy
+            # check strategy. This shuold be a 200
+            assert resp.status_code == 409, resp.text
 
 
 async def test_learning_config_errors_are_proxied_correctly(
@@ -234,14 +246,11 @@ async def test_vectorset_migration(
     await _check_search(nucliadb_reader, kbid)
 
     # Now add a new vectorset
-    request = NewVectorSetRequest(
-        kbid=kbid,
-        vectorset_id="en-2024-05-06",
-        similarity=utils_pb2.VectorSimilarity.COSINE,
-        vector_dimension=1024,
+    vectorset_id = "en-2024-05-06"
+    resp = await add_vectorset(
+        nucliadb_manager, kbid, vectorset_id, similarity=SimilarityFunction.COSINE, vector_dimension=1024
     )
-    resp: NewVectorSetResponse = await nucliadb_grpc.NewVectorSet(request)  # type: ignore
-    assert resp.status == NewVectorSetResponse.Status.OK  # type: ignore
+    assert resp.status_code == 200
 
     # Ingest a new broker message as if it was coming from the migration
     bm2 = BrokerMessage(
