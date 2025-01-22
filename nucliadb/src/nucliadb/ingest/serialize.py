@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+
+from typing import Optional, Union
 
 import nucliadb_models as models
 from nucliadb.common import datamanagers
@@ -50,7 +51,9 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_models.security import ResourceSecurity
-from nucliadb_utils.utilities import get_storage
+from nucliadb_protos.writer_pb2 import FieldStatus
+from nucliadb_utils import const
+from nucliadb_utils.utilities import get_storage, has_feature
 
 
 async def set_resource_field_extracted_data(
@@ -143,6 +146,40 @@ async def serialize(
             service_name=service_name,
             slug=slug,
         )
+
+
+async def serialize_field_errors(
+    field: Field,
+    serialized: Union[
+        TextFieldData, FileFieldData, LinkFieldData, ConversationFieldData, GenericFieldData
+    ],
+):
+    if has_feature(const.Features.FIELD_STATUS):
+        status = await field.get_status()
+        if status is None:
+            status = FieldStatus()
+        serialized.status = status.Status.Name(status.status)
+        if status.errors:
+            serialized.errors = []
+            for error in status.errors:
+                serialized.errors.append(
+                    Error(
+                        body=error.source_error.error,
+                        code=error.source_error.code,
+                        code_str=error.source_error.ErrorCode.Name(error.source_error.code),
+                        created=error.created.ToDatetime(),
+                    )
+                )
+            serialized.error = serialized.errors[-1]
+    else:
+        field_error = await field.get_error()
+        if field_error is not None:
+            serialized.error = Error(
+                body=field_error.error,
+                code=field_error.code,
+                code_str=field_error.ErrorCode.Name(field_error.code),
+                created=None,
+            )
 
 
 async def managed_serialize(
@@ -249,9 +286,7 @@ async def managed_serialize(
                     serialized_value = from_proto.field_text(value) if value is not None else None
                     resource.data.texts[field.id].value = serialized_value
                 if include_errors:
-                    error = await field.get_error()
-                    if error is not None:
-                        resource.data.texts[field.id].error = Error(body=error.error, code=error.code)
+                    await serialize_field_errors(field, resource.data.texts[field.id])
                 if include_extracted_data:
                     resource.data.texts[field.id].extracted = TextFieldExtractedData()
                     await set_resource_field_extracted_data(
@@ -272,9 +307,7 @@ async def managed_serialize(
                         resource.data.files[field.id].value = None
 
                 if include_errors:
-                    error = await field.get_error()
-                    if error is not None:
-                        resource.data.files[field.id].error = Error(body=error.error, code=error.code)
+                    await serialize_field_errors(field, resource.data.files[field.id])
 
                 if include_extracted_data:
                     resource.data.files[field.id].extracted = FileFieldExtractedData()
@@ -293,9 +326,7 @@ async def managed_serialize(
                     resource.data.links[field.id].value = from_proto.field_link(value)
 
                 if include_errors:
-                    error = await field.get_error()
-                    if error is not None:
-                        resource.data.links[field.id].error = Error(body=error.error, code=error.code)
+                    await serialize_field_errors(field, resource.data.links[field.id])
 
                 if include_extracted_data:
                     resource.data.links[field.id].extracted = LinkFieldExtractedData()
@@ -311,11 +342,7 @@ async def managed_serialize(
                 if field.id not in resource.data.conversations:
                     resource.data.conversations[field.id] = ConversationFieldData()
                 if include_errors:
-                    error = await field.get_error()
-                    if error is not None:
-                        resource.data.conversations[field.id].error = Error(
-                            body=error.error, code=error.code
-                        )
+                    await serialize_field_errors(field, resource.data.conversations[field.id])
                 if include_value and isinstance(field, Conversation):
                     value = await field.get_metadata()
                     resource.data.conversations[field.id].value = from_proto.field_conversation(value)
@@ -335,9 +362,7 @@ async def managed_serialize(
                 if include_value:
                     resource.data.generics[field.id].value = value
                 if include_errors:
-                    error = await field.get_error()
-                    if error is not None:
-                        resource.data.generics[field.id].error = Error(body=error.error, code=error.code)
+                    await serialize_field_errors(field, resource.data.generics[field.id])
                 if include_extracted_data:
                     resource.data.generics[field.id].extracted = TextFieldExtractedData(
                         text=models.ExtractedText(text=resource.data.generics[field.id].value)
