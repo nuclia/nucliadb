@@ -54,7 +54,7 @@ message ChatAudit {
   // context retrieved on the current ask
   repeated ChatContext chat_context = 6;
   repeated RetrievedContext retrieved_context = 8;
-  string learning_id = 5;
+  optional string learning_id = 5;
   int32 status_code = 9;
   string model = 10;
 }

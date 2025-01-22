@@ -85,7 +85,7 @@ class BasicAuditStorage(AuditStorage):
         chat_context: List[ChatContext],
         retrieved_context: List[RetrievedContext],
         answer: Optional[str],
-        learning_id: str,
+        learning_id: Optional[str],
         status_code: int,
         model: str,
         rephrase_time: Optional[float] = None,

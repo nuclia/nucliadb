@@ -375,7 +375,7 @@ class StreamAuditStorage(AuditStorage):
         chat_context: List[ChatContext],
         retrieved_context: List[RetrievedContext],
         answer: Optional[str],
-        learning_id: str,
+        learning_id: Optional[str],
         status_code: int,
         model: str,
         rephrase_time: Optional[float] = None,
@@ -402,7 +402,8 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.chat.question = question
         auditrequest.chat.chat_context.extend(chat_context)
         auditrequest.chat.retrieved_context.extend(retrieved_context)
-        auditrequest.chat.learning_id = learning_id
+        if learning_id is not None:
+            auditrequest.chat.learning_id = learning_id
         if rephrased_question is not None:
             auditrequest.chat.rephrased_question = rephrased_question
         if answer is not None:

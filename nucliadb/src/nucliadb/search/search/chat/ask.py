@@ -102,7 +102,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import LimitsExceededError
-
+from nucliadb.search.search.chat.query import maybe_audit_chat
 
 @dataclasses.dataclass
 class RetrievalMatch:
@@ -487,6 +487,25 @@ async def ask(
             resource=resource,
         )
     except NoRetrievalResultsError as err:
+        maybe_audit_chat(
+            kbid=kbid,
+            user=user_id,
+            client_type=client_type,
+            origin=origin,
+            generative_answer_time=0,
+            generative_answer_first_chunk_time=0,
+            rephrase_time=metrics.elapsed("rephrase"),
+            user_query=user_query,
+            rephrased_query=rephrased_query,
+            text_answer=b"",
+            status_code=int(AnswerStatusCode.NO_RETRIEVAL_DATA.value),
+            chat_history=chat_history,
+            query_context={},
+            query_context_order={},
+            learning_id=None,
+            model=ask_request.generative_model,
+        )
+
         # If a retrieval was attempted but no results were found,
         # early return the ask endpoint without querying the generative model
         return NotEnoughContextAskResult(

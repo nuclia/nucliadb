@@ -121,12 +121,14 @@ class AnswerStatusCode(str, Enum):
     SUCCESS = "0"
     ERROR = "-1"
     NO_CONTEXT = "-2"
+    NO_RETRIEVAL_DATA = "-3"
 
     def prettify(self) -> str:
         return {
             AnswerStatusCode.SUCCESS: "success",
             AnswerStatusCode.ERROR: "error",
             AnswerStatusCode.NO_CONTEXT: "no_context",
+            AnswerStatusCode.NO_RETRIEVAL_DATA: "no_retrieval_data",
         }[self]
 
 

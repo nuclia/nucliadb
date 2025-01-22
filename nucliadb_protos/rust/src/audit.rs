@@ -101,8 +101,8 @@ pub struct ChatAudit {
     pub chat_context: ::prost::alloc::vec::Vec<ChatContext>,
     #[prost(message, repeated, tag = "8")]
     pub retrieved_context: ::prost::alloc::vec::Vec<RetrievedContext>,
-    #[prost(string, tag = "5")]
-    pub learning_id: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "5")]
+    pub learning_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, tag = "9")]
     pub status_code: i32,
     #[prost(string, tag = "10")]
