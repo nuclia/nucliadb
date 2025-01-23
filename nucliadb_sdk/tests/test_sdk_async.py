@@ -21,6 +21,7 @@ import pytest
 
 import nucliadb_sdk
 from nucliadb_models.search import FeedbackTasks
+from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 
 
 async def test_kb_management(sdk_async: nucliadb_sdk.NucliaDBAsync):
@@ -45,6 +46,11 @@ async def test_kb_services(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.get_entitygroups(kbid=kb.uuid)
     await sdk_async.get_entitygroup(kbid=kb.uuid, group="foo")
     await sdk_async.delete_entitygroup(kbid=kb.uuid, group="foo")
+
+    # Synonyms
+    synonyms = KnowledgeBoxSynonyms(synonyms={"foo": ["bar"]})
+    await sdk_async.set_custom_synonyms(kbid=kb.uuid, content=synonyms)
+    assert (await sdk_async.get_custom_synonyms(kbid=kb.uuid)) == synonyms
 
 
 async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
