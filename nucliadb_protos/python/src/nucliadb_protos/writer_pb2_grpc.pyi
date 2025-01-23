@@ -256,16 +256,6 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexStatus,
     ]
 
-    NewVectorSet: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.NewVectorSetRequest,
-        nucliadb_protos.writer_pb2.NewVectorSetResponse,
-    ]
-
-    DelVectorSet: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.DelVectorSetRequest,
-        nucliadb_protos.writer_pb2.DelVectorSetResponse,
-    ]
-
 class WriterAsyncStub:
     NewKnowledgeBoxV2: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
@@ -341,16 +331,6 @@ class WriterAsyncStub:
     ReIndex: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus,
-    ]
-
-    NewVectorSet: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.NewVectorSetRequest,
-        nucliadb_protos.writer_pb2.NewVectorSetResponse,
-    ]
-
-    DelVectorSet: grpc.aio.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.DelVectorSetRequest,
-        nucliadb_protos.writer_pb2.DelVectorSetResponse,
     ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
@@ -459,19 +439,5 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.writer_pb2.IndexStatus, collections.abc.Awaitable[nucliadb_protos.writer_pb2.IndexStatus]]: ...
-
-    @abc.abstractmethod
-    def NewVectorSet(
-        self,
-        request: nucliadb_protos.writer_pb2.NewVectorSetRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.NewVectorSetResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.NewVectorSetResponse]]: ...
-
-    @abc.abstractmethod
-    def DelVectorSet(
-        self,
-        request: nucliadb_protos.writer_pb2.DelVectorSetRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[nucliadb_protos.writer_pb2.DelVectorSetResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.DelVectorSetResponse]]: ...
 
 def add_WriterServicer_to_server(servicer: WriterServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

@@ -59,9 +59,10 @@ async def add(kbid: str, vectorset_id: str) -> None:
         assert lconfig is not None
 
     # Then, add the vectorset to the index if it's not already there
+    storage = await get_storage()
+    vectorset_config = get_vectorset_config(lconfig, vectorset_id)
     async with datamanagers.with_rw_transaction() as txn:
-        kbobj = KnowledgeBox(txn, await get_storage(), kbid)
-        vectorset_config = get_vectorset_config(lconfig, vectorset_id)
+        kbobj = KnowledgeBox(txn, storage, kbid)
         try:
             await kbobj.create_vectorset(vectorset_config)
             await txn.commit()
@@ -77,11 +78,17 @@ async def delete(kbid: str, vectorset_id: str) -> None:
         if vectorset_id in semantic_models:
             semantic_models.remove(vectorset_id)
             await learning_proxy.update_configuration(kbid, {"semantic_models": semantic_models})
+
+    storage = await get_storage()
     try:
         async with datamanagers.with_rw_transaction() as txn:
-            kbobj = KnowledgeBox(txn, await get_storage(), kbid)
+            kbobj = KnowledgeBox(txn, storage, kbid)
             await kbobj.delete_vectorset(vectorset_id=vectorset_id)
             await txn.commit()
+
+    except VectorSetConflict:
+        # caller should handle this error
+        raise
     except Exception as ex:
         errors.capture_exception(ex)
         logger.exception(

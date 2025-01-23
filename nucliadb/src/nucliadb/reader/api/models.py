@@ -52,6 +52,8 @@ class ResourceField(BaseModel):
     value: ValueType = None
     extracted: Optional[ExtractedDataType] = None
     error: Optional[Error] = None
+    status: Optional[str] = None
+    errors: Optional[list[Error]] = None
 
 
 FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP: dict[FieldTypeName, Any] = {

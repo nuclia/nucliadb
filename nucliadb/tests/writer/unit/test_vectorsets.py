@@ -23,7 +23,7 @@ from nucliadb.writer.vectorsets import get_vectorset_config
 from nucliadb_protos import knowledgebox_pb2
 
 
-def test_get_vectoret_config():
+def test_get_vectorset_config():
     lconfig = LearningConfiguration(
         semantic_model="multilingual",
         semantic_vector_size=1024,

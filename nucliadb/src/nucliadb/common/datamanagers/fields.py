@@ -105,6 +105,8 @@ async def get_statuses(
         pb = writer_pb2.FieldStatus()
         if serialized_status is not None:
             pb.ParseFromString(serialized_status)
+        else:
+            pb = writer_pb2.FieldStatus()
         statuses.append(pb)
 
     return statuses
