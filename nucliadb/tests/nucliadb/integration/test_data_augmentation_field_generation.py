@@ -25,6 +25,7 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
+from tests.utils import inject_message
 
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
@@ -38,6 +39,7 @@ from nucliadb.ingest.processing import (
 from nucliadb_protos import noderesources_pb2, resources_pb2
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
+    FieldAuthor,
     FieldID,
     FieldType,
     Paragraph,
@@ -57,7 +59,6 @@ from nucliadb_utils.utilities import (
     start_partitioning_utility,
     stop_partitioning_utility,
 )
-from tests.utils import inject_message
 
 
 @pytest.fixture(scope="function")
@@ -132,8 +133,7 @@ async def test_send_to_process_generated_fields(
     da_field = "da-author-f-0-0"
     bm.texts[da_field].body = "Text author"
     bm.texts[da_field].md5 = hashlib.md5("Text author".encode()).hexdigest()
-    # TODO: add this again when processor sends this to us
-    # bm.texts[da_field].generated_by = FieldAuthor.DATA_AUGMENTATION
+    bm.texts[da_field].generated_by.data_augmentation.SetInParent()
 
     processor_index_resource_spy = mocker.spy(processor, "index_resource")
     await processor.process(bm, 3)
@@ -237,8 +237,7 @@ async def test_data_augmentation_field_generation_and_search(
     da_field_id = "da-author-f-0-0"
     bm.texts[da_field_id].body = "Text author"
     bm.texts[da_field_id].md5 = hashlib.md5("Text author".encode()).hexdigest()
-    # TODO: add this again when processor sends this to us
-    # bm.texts[da_field].generated_by = FieldAuthor.DATA_AUGMENTATION
+    bm.texts[da_field_id].generated_by.data_augmentation.SetInParent()
     await inject_message(nucliadb_grpc, bm)
 
     # Processed DA resource (from processing)
