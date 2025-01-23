@@ -21,6 +21,7 @@ import httpx
 import pytest
 
 import nucliadb_sdk
+from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 
 
 def test_constructor():
@@ -59,6 +60,11 @@ def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.get_entitygroups(kbid=kb.uuid)
     sdk.get_entitygroup(kbid=kb.uuid, group="foo")
     sdk.delete_entitygroup(kbid=kb.uuid, group="foo")
+
+    # Synonyms
+    synonyms = KnowledgeBoxSynonyms(synonyms={"foo": ["bar"]})
+    sdk.set_custom_synonyms(kbid=kb.uuid, content=synonyms)
+    assert sdk.get_custom_synonyms(kbid=kb.uuid) == synonyms
 
 
 def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
