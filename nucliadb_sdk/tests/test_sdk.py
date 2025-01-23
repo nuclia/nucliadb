@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import time
+
 import httpx
 import pytest
 
@@ -54,6 +56,7 @@ def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.delete_labelset(kbid=kb.uuid, labelset="foo")
 
     # Entities
+    time.sleep(1)  # Sleep to get the index ready
     sdk.create_entitygroup(kbid=kb.uuid, group="foo")
     sdk.update_entitygroup(kbid=kb.uuid, group="foo", title="bar")
     sdk.get_entitygroups(kbid=kb.uuid)

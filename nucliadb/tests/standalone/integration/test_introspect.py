@@ -25,7 +25,6 @@ import tempfile
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.standalone.introspect import ClusterInfo
 from nucliadb.standalone.settings import Settings
 
 

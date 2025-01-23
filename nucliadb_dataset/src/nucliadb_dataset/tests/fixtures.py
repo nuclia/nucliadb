@@ -169,6 +169,8 @@ def upload_data_paragraph_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
 
 @pytest.fixture(scope="function")
 def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
+    time.sleep(1)  # Sleep to get the index ready
+
     sdk.create_entitygroup(
         kbid=kb.uuid,
         content=CreateEntitiesGroupPayload(

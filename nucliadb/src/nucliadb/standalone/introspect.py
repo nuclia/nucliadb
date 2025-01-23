@@ -32,7 +32,6 @@ import psutil
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.standalone.settings import Settings
 from nucliadb_telemetry.settings import LogOutputType, LogSettings
 
