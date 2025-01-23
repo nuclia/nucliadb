@@ -564,7 +564,7 @@ class Resource:
                     ),
                     None,
                 )
-                if field_status:
+                if field_status is not None:
                     status.status = field_status
                 # If the field was not found and the message comes from the writer, this implicitly sets the
                 # status to the default value, which is PROCESSING. This covers the case of new field creation.
