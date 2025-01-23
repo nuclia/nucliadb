@@ -130,7 +130,12 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install venv
-        run: pdm sync -d --clean --no-editable -G nidx
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 20
+          command: pdm sync -d --clean --no-editable -G nidx
       - name: Clean build
         run: find . -name build | xargs rm -r || true
       - name: Lint source code
@@ -251,7 +256,12 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install venv
-        run: pdm sync -d --clean --no-editable -G nidx
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 2
+          retry_on: error
+          timeout_minutes: 20
+          command: pdm sync -d --clean --no-editable -G nidx
       - name: Upload virtualenv to cache
         uses: actions/cache/save@v4
         with:
