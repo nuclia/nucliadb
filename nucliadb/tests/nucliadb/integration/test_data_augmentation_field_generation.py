@@ -25,7 +25,6 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
-from tests.utils import inject_message
 
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
@@ -39,7 +38,6 @@ from nucliadb.ingest.processing import (
 from nucliadb_protos import noderesources_pb2, resources_pb2
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
-    FieldAuthor,
     FieldID,
     FieldType,
     Paragraph,
@@ -59,6 +57,7 @@ from nucliadb_utils.utilities import (
     start_partitioning_utility,
     stop_partitioning_utility,
 )
+from tests.utils import inject_message
 
 
 @pytest.fixture(scope="function")
