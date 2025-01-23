@@ -182,6 +182,8 @@ def kb(sdk: nucliadb_sdk.NucliaDB):
     kbslug = uuid4().hex
     kb = sdk.create_knowledge_box(slug=kbslug)
 
+    time.sleep(1)
+
     yield kb
 
     sdk.delete_knowledge_box(kbid=kb.uuid)
