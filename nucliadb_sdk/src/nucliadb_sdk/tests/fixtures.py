@@ -206,6 +206,8 @@ async def init_fixture(
     import_id = sdk.start_import(kbid=kbid, content=import_data).import_id
     assert sdk.import_status(kbid=kbid, import_id=import_id).status.value == "finished"
 
+    time.sleep(1)
+
     return kbid
 
 
