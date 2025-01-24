@@ -4,15 +4,15 @@ on:
   pull_request:
     branches:
       - main
-    # paths:
-    #   - "nidx"
-    #   - "nucliadb_protos"
+    paths:
+      - "nidx"
+      - "nucliadb_protos"
   push:
     branches:
       - main
-    # paths:
-    #   - "nidx"
-    #   - "nucliadb_protos"
+    paths:
+      - "nidx"
+      - "nucliadb_protos"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -80,7 +80,7 @@ jobs:
 
   list-pypi-files:
     needs: [build]
-    # if: github.event_name == 'push'
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
 
     steps:
@@ -98,7 +98,7 @@ jobs:
   release:
     needs: [build]
     runs-on: ubuntu-24.04
-    # if: github.event_name == 'push'
+    if: github.event_name == 'push'
 
     steps:
       - uses: actions/checkout@v4

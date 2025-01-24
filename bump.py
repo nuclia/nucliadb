@@ -41,7 +41,7 @@ def run(args):
         return
 
     # replace node binding toml version as well
-    with open("nucliadb_node_binding/Cargo.toml", "r") as f:
+    with open("nidx/nidx_binding/Cargo.toml", "r") as f:
         cargo = f.read()
 
     new_cargo = []
@@ -50,7 +50,7 @@ def run(args):
             line = f'version = "{version}"'
         new_cargo.append(line)
 
-    with open("nucliadb_node_binding/Cargo.toml", "w") as f:
+    with open("nidx/nidx_binding/Cargo.toml", "w") as f:
         f.write("\n".join(new_cargo))
 
     # go through each requirements.txt and update the version to the new bump
