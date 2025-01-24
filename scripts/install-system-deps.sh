@@ -36,10 +36,5 @@ if [ "$machine" == "linux" ]; then
 fi
 
 if [ "$machine" == "macos" ]; then
-	SUDO=''
-	if (($EUID != 0)); then
-		SUDO='sudo'
-	fi
-
-	$SUDO brew install protobuf
+	brew install protobuf
 fi
