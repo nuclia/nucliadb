@@ -69,22 +69,6 @@ def resource_id(kbid: str):
     return resp.json()["uuid"]
 
 
-def test_nodes_ready():
-    tries = 1
-    while True:
-        try:
-            resp = requests.get(os.path.join(BASE_URL, "api/v1/cluster/nodes"))
-            raise_for_status(resp)
-            assert len(resp.json()) == 2
-            return
-        except Exception:
-            time.sleep(1)
-            print(f"Waiting for nodes to be ready...")
-            if tries > 30:
-                raise
-            tries += 1
-
-
 def test_versions():
     resp = requests.get(os.path.join(BASE_URL, "api/v1/versions"))
     raise_for_status(resp)
@@ -151,14 +135,14 @@ def test_b64_file_upload(kbid: str):
         json={
             "files": {
                 "image": {
-                     "file": {
-                         "filename": "image.png",
-                         "content_type": "image/png",
-                         "payload": base64.b64encode(image).decode("utf-8"),
-                     }
+                    "file": {
+                        "filename": "image.png",
+                        "content_type": "image/png",
+                        "payload": base64.b64encode(image).decode("utf-8"),
+                    }
                 }
             }
-        }
+        },
     )
     raise_for_status(resp)
     resource_id = resp.json()["uuid"]
@@ -275,9 +259,7 @@ def _test_predict_proxy_chat(kbid: str):
         },
         json={
             "question": "Who is the best football player?",
-            "query_context": [
-                "Many football players have existed. Messi is by far the greatest."
-            ],
+            "query_context": ["Many football players have existed. Messi is by far the greatest."],
             "user_id": "someone@company.uk",
         },
     )
