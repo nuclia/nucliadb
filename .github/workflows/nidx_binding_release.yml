@@ -59,9 +59,8 @@ jobs:
 
       - name: build wheels
         uses: messense/maturin-action@v1
-        env:
-          RUSTFLAGS: --cfg tokio_unstable
         with:
+          before-script-linux: scripts/install-system-deps.sh
           target: ${{ matrix.target }}
           manylinux: 2_28
           args: -m nidx/nidx_binding/Cargo.toml --release --out dist --profile release-wheel
