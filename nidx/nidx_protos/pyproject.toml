@@ -1,5 +1,5 @@
 [build-system]
-requires = ["pdm-backend", "grpcio-tools"]
+requires = ["pdm-backend", "grpcio-tools>=1.44.0,<1.63.0"]
 build-backend = "pdm.backend"
 
 [project]
