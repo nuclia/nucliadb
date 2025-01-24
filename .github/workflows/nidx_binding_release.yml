@@ -1,36 +1,18 @@
-name: Release NucliaDB Node
+name: Release nidx binding
 
 on:
   pull_request:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node_binding/**"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "nucliadb_core/**"
-      - "nucliadb_node/src/**"
-      - "nucliadb_node/Cargo.toml"
-      - "nucliadb_paragraphs[0-9]*/**"
-      - "nucliadb_relations[0-9]*/**"
-      - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors/**"
+    # paths:
+    #   - "nidx"
+    #   - "nucliadb_protos"
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node_binding/**"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "nucliadb_core/**"
-      - "nucliadb_node/Cargo.toml"
-      - "nucliadb_node/src/**"
-      - "nucliadb_paragraphs[0-9]*/**"
-      - "nucliadb_relations[0-9]*/**"
-      - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors/**"
+    # paths:
+    #   - "nidx"
+    #   - "nucliadb_protos"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -88,12 +70,13 @@ jobs:
       - name: Check system deps
         run: make -C nucliadb check-system
 
+      # Run the source distribution once, as part of any platform
       - name: build sdist
         if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' && matrix.manylinux == 'auto' }}
         uses: messense/maturin-action@v1
         with:
           command: sdist
-          args: -m nucliadb_node_binding/Cargo.toml --out dist
+          args: -m nidx/nidx_binding/Cargo.toml --out dist
 
       - name: build wheels
         uses: messense/maturin-action@v1
@@ -104,21 +87,20 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           container: ${{ matrix.container }}
-          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel
+          args: -m nidx/nidx_binding/Cargo.toml --release --out dist --profile release-wheel
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
       - run: twine check dist/*
 
       - uses: actions/upload-artifact@v3
-        if: github.event_name == 'push'
         with:
           name: pypi_files
           path: dist
 
   list-pypi-files:
     needs: [build]
-    if: github.event_name == 'push'
+    # if: github.event_name == 'push'
     runs-on: ubuntu-24.04
 
     steps:
@@ -136,7 +118,7 @@ jobs:
   release:
     needs: [build]
     runs-on: ubuntu-24.04
-    if: github.event_name == 'push'
+    # if: github.event_name == 'push'
 
     steps:
       - uses: actions/checkout@v4
