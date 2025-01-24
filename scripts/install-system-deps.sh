@@ -24,17 +24,13 @@ if [ "$machine" == "linux" ]; then
 		$SUDO cpanm IPC::Cmd
 		;;
 
-	fedora | rhel | centos | almalinux)
+	fedora | rhel | centos)
 		$SUDO yum update -y
-		$SUDO yum -y install elfutils-devel pkgconfig openssl-devel perl-IPC-Cmd protobuf-compiler
+		$SUDO yum -y install elfutils-devel pkgconfig openssl-devel perl-IPC-Cmd
 		;;
 
 	*)
 		echo -n "unsupported linux distro"
 		;;
 	esac
-fi
-
-if [ "$machine" == "macos" ]; then
-	brew install protobuf
 fi
