@@ -105,8 +105,8 @@ pub struct ChatAudit {
     pub learning_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, tag = "9")]
     pub status_code: i32,
-    #[prost(string, tag = "10")]
-    pub model: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "10")]
+    pub model: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
