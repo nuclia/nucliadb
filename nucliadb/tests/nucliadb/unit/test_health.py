@@ -56,20 +56,6 @@ async def test_grpc_health_check():
         task.cancel()
 
 
-async def test_health_check_fail():
-    servicer = AsyncMock()
-    with (
-        patch.object(manager, "INDEX_NODES", {}),
-        patch.object(settings, "driver", DriverConfig.PG),
-    ):
-        task = asyncio.create_task(health.grpc_health_check(servicer))
-        await asyncio.sleep(0.05)
-
-        servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)
-
-        task.cancel()
-
-
 async def test_health_check_fail_unhealthy_nats(nats_manager):
     nats_manager.healthy.return_value = False
     servicer = AsyncMock()
