@@ -30,7 +30,6 @@ from cachetools import TTLCache
 from fastapi import HTTPException, Request
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.manager import get_index_nodes
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
@@ -168,7 +167,7 @@ class Materializer:
         self.ingest_check_interval = ingest_check_interval
 
         self.ingest_pending: int = 0
-        self.indexing_pending: dict[str, int] = {}
+        self.indexing_pending: int = 0
 
         self._tasks: list[asyncio.Task] = []
         self._running = False
@@ -232,7 +231,7 @@ class Materializer:
         response = await self.processing_http_client.stats(kbid=kbid, timeout=0.5)
         return response.incomplete
 
-    def get_indexing_pending(self) -> dict[str, int]:
+    def get_indexing_pending(self) -> int:
         return self.indexing_pending
 
     def get_ingest_pending(self) -> int:
@@ -241,20 +240,18 @@ class Materializer:
     async def _get_indexing_pending_task(self):
         try:
             while True:
-                for node in get_index_nodes():
-                    try:
-                        with back_pressure_observer({"type": "get_indexing_pending"}):
-                            self.indexing_pending[node.id] = await get_nats_consumer_pending_messages(
-                                self.nats_manager,
-                                stream=const.Streams.INDEX.name,
-                                consumer=const.Streams.INDEX.group.format(node=node.id),
-                            )
-                    except Exception:
-                        logger.exception(
-                            "Error getting pending messages to index",
-                            exc_info=True,
-                            extra={"node_id": node.id},
+                try:
+                    with back_pressure_observer({"type": "get_indexing_pending"}):
+                        self.indexing_pending = await get_nats_consumer_pending_messages(
+                            self.nats_manager,
+                            stream="nidx",
+                            consumer="nidx",
                         )
+                except Exception:
+                    logger.exception(
+                        "Error getting pending messages to index",
+                        exc_info=True,
+                    )
                 await asyncio.sleep(self.indexing_check_interval)
         except asyncio.CancelledError:
             pass
@@ -386,7 +383,7 @@ async def check_indexing_behind(
     context: ApplicationContext,
     kbid: str,
     resource_uuid: Optional[str],
-    pending_by_node: dict[str, int],
+    pending: int,
 ):
     """
     If a resource uuid is provided, it will check the nodes that have the replicas
@@ -398,36 +395,10 @@ async def check_indexing_behind(
         # Indexing back pressure is disabled
         return
 
-    if len(pending_by_node) == 0:
-        logger.warning("No nodes found to check for pending messages")
-        return
-
-    # Get nodes that are involved in the indexing of the request
-    if resource_uuid is not None:
-        nodes_to_check = await get_nodes_for_resource_shard(context, kbid, resource_uuid)
-    else:
-        nodes_to_check = await get_nodes_for_kb_active_shards(context, kbid)
-
-    if len(nodes_to_check) == 0:
-        logger.warning(
-            "No nodes found to check for pending messages",
-            extra={"kbid": kbid, "resource_uuid": resource_uuid},
-        )
-        return
-
-    # Get the highest pending value
-    highest_pending = 0
-    for node in nodes_to_check:
-        if node not in pending_by_node:
-            logger.warning("Node not found in pending messages", extra={"node": node})
-            continue
-        if pending_by_node[node] > highest_pending:
-            highest_pending = pending_by_node[node]
-
-    if highest_pending > max_pending:
+    if pending > max_pending:
         try_after = estimate_try_after(
             rate=settings.indexing_rate,
-            pending=highest_pending,
+            pending=pending,
             max_wait=settings.max_wait_time,
         )
         data = BackPressureData(type="indexing", try_after=try_after)
@@ -437,7 +408,7 @@ async def check_indexing_behind(
                 "kbid": kbid,
                 "resource_uuid": resource_uuid,
                 "try_after": try_after,
-                "pending": highest_pending,
+                "pending": pending,
             },
         )
         raise BackPressureException(data)

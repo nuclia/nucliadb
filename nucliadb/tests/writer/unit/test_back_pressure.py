@@ -162,37 +162,6 @@ async def test_check_processing_behind_does_not_run_if_configured_max_is_zero(
     materializer.get_processing_pending.assert_not_called()
 
 
-@pytest.fixture(scope="function")
-def get_nodes_for_resource_shard():
-    with mock.patch(f"{MODULE}.get_nodes_for_resource_shard", return_value=["node1", "node2"]) as mock_:
-        yield mock_
-
-
-async def test_check_indexing_behind(get_nodes_for_resource_shard, settings, cache):
-    settings.max_indexing_pending = 5
-    context = mock.Mock()
-
-    # Check that it runs and does not raise an exception if the pending is low
-    await check_indexing_behind(context, "kbid", "rid", {"node1": 0, "node2": 2})
-    get_nodes_for_resource_shard.assert_awaited_once_with(context, "kbid", "rid")
-
-    # Check that it raises an exception if the pending is too high
-    get_nodes_for_resource_shard.reset_mock()
-    with pytest.raises(BackPressureException):
-        await check_indexing_behind(context, "kbid", "rid", {"node1": 10, "node2": 2})
-    get_nodes_for_resource_shard.assert_awaited_once_with(context, "kbid", "rid")
-
-
-async def test_check_indexing_behind_does_not_run_if_configured_max_is_zero(
-    get_nodes_for_resource_shard, settings
-):
-    settings.max_indexing_pending = 0
-
-    await check_indexing_behind(mock.Mock(), "kbid", "rid", {"node1": 100})
-
-    get_nodes_for_resource_shard.assert_not_called()
-
-
 def test_check_ingest_behind(settings, cache):
     settings.max_ingest_pending = 5
 
@@ -254,15 +223,6 @@ def nats_conn(js):
 
 
 @pytest.fixture(scope="function")
-def get_index_nodes():
-    with mock.patch(
-        f"{MODULE}.get_index_nodes",
-        return_value=[mock.Mock(id="node1"), mock.Mock(id="node2")],
-    ) as mock_:
-        yield mock_
-
-
-@pytest.fixture(scope="function")
 def processing_client():
     processing_client = mock.Mock()
     resp = mock.Mock(incomplete=10)
@@ -271,7 +231,7 @@ def processing_client():
     yield processing_client
 
 
-async def test_materializer(nats_conn, get_index_nodes, js, processing_client):
+async def test_materializer(nats_conn, js, processing_client):
     materializer = Materializer(
         nats_conn,
         indexing_check_interval=0.5,
@@ -288,16 +248,16 @@ async def test_materializer(nats_conn, get_index_nodes, js, processing_client):
 
     await asyncio.sleep(0.1)
 
-    # two index nodes and ingest streams are queried
-    assert len(js.consumer_info.call_args_list) == 3
+    # one index nodes and ingest streams are queried
+    assert len(js.consumer_info.call_args_list) == 2
 
     # Wait for the next check
     await asyncio.sleep(0.5)
 
-    assert len(js.consumer_info.call_args_list) == 6
+    assert len(js.consumer_info.call_args_list) == 4
 
     # Make sure the values are materialized
-    assert materializer.get_indexing_pending() == {"node1": 10, "node2": 10}
+    assert materializer.get_indexing_pending() == 10
     assert materializer.get_ingest_pending() == 10
 
     # Make sure processing pending are cached
