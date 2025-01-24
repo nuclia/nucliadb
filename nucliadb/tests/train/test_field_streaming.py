@@ -67,6 +67,23 @@ async def test_generator_field_streaming(
         async for batch in get_batches_from_train_response_stream(response, FieldStreamingBatch):
             batches.append(batch)
             assert len(batch.data) == 3
+            for field_split_data in batch.data:
+                assert field_split_data.text.text
+        assert len(batches) == 1
+
+    # Try now excluding the text serialization
+    trainset.exclude_text = True
+    async with nucliadb_train.post(
+        f"/{API_PREFIX}/v1/{KB_PREFIX}/{kbid}/trainset/{partition_id}",
+        data=trainset.SerializeToString(),
+    ) as response:
+        assert response.status == 200
+        batches = []
+        async for batch in get_batches_from_train_response_stream(response, FieldStreamingBatch):
+            batches.append(batch)
+            assert len(batch.data) == 3
+            for field_split_data in batch.data:
+                assert field_split_data.text.text == ""
         assert len(batches) == 1
 
 

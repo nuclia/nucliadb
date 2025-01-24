@@ -32,6 +32,7 @@ message TrainSet {
     }
     Filter filter = 2;
     int32 batch_size = 3;
+    bool exclude_text = 4;
 }
 
 enum LabelFrom {
