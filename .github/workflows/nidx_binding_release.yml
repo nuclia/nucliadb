@@ -62,7 +62,7 @@ jobs:
         with:
           before-script-linux: scripts/install-system-deps.sh
           target: ${{ matrix.target }}
-          manylinux: 2_28
+          manylinux: 2_34
           args: -m nidx/nidx_binding/Cargo.toml --release --out dist --profile release-wheel
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
