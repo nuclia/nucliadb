@@ -20,36 +20,15 @@ concurrency:
 
 jobs:
   build:
-    name: Build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
+    name: Build on ${{ matrix.os }} (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, macos]
-        target: [x86_64, aarch64]
-        manylinux: [auto]
         include:
           - os: ubuntu
-            platform: linux
+            target: x86_64
           - os: macos
             target: aarch64
-          # - os: ubuntu
-          #   platform: linux
-          #   target: i686
-          # GCC 4.8.5 in manylinux2014 container doesn't support c11 atomic
-          # we use manylinux_2_24 container for aarch64 and armv7 targets instead,
-          - os: ubuntu
-            platform: linux
-            target: aarch64
-            container: messense/manylinux_2_24-cross:aarch64
-          # musllinux
-          - os: ubuntu
-            platform: linux
-            target: x86_64
-            manylinux: musllinux_1_1
-          - os: ubuntu
-            platform: linux
-            target: aarch64
-            manylinux: musllinux_1_1
 
     runs-on: ${{ matrix.os }}-latest
     steps:
@@ -72,7 +51,7 @@ jobs:
 
       # Run the source distribution once, as part of any platform
       - name: build sdist
-        if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' && matrix.manylinux == 'auto' }}
+        if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' }}
         uses: messense/maturin-action@v1
         with:
           command: sdist
@@ -83,10 +62,8 @@ jobs:
         env:
           RUSTFLAGS: --cfg tokio_unstable
         with:
-          before-script-linux: scripts/install-system-deps.sh
           target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux || 'auto' }}
-          container: ${{ matrix.container }}
+          manylinux: 2_28
           args: -m nidx/nidx_binding/Cargo.toml --release --out dist --profile release-wheel
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
