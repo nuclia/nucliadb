@@ -49,6 +49,10 @@ jobs:
       - name: Check system deps
         run: make -C nucliadb check-system
 
+      - name: Install protoc (mac)
+        if: ${{ matrix.os == 'macos' }}
+        run: brew install protobuf
+
       # Run the source distribution once, as part of any platform
       - name: build sdist
         if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' }}
