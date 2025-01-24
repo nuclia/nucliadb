@@ -42,6 +42,7 @@ from nucliadb.search.search.chat.images import (
 )
 from nucliadb.search.search.hydrator import hydrate_field_text, hydrate_resource_text
 from nucliadb.search.search.paragraphs import get_paragraph_text
+from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -267,7 +268,9 @@ async def full_resource_prompt_context(
                 if strategy.apply_to is not None:
                     # decide whether the resource should be extended or not
                     for label in strategy.apply_to.exclude:
-                        skip = skip or (label in (paragraph.labels or []))
+                        skip = skip or (
+                            translate_alias_to_system_label(label) in (paragraph.labels or [])
+                        )
 
                 if not skip:
                     ordered_resources.append(resource_uuid)
