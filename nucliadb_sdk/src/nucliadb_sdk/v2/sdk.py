@@ -83,6 +83,7 @@ from nucliadb_models.search import (
     SyncAskMetadata,
     SyncAskResponse,
 )
+from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_models.writer import (
     CreateResourcePayload,
@@ -788,6 +789,25 @@ class _NucliaDBBase:
         path_params=("kbid",),
         request_type=None,
         response_type=json_response_parser,
+    )
+
+    # Custom synonyms
+    set_custom_synonyms = _request_builder(
+        name="set_custom_synonyms",
+        path_template="/v1/kb/{kbid}/custom-synonyms",
+        method="PUT",
+        path_params=("kbid",),
+        request_type=KnowledgeBoxSynonyms,
+        response_type=None,
+    )
+
+    get_custom_synonyms = _request_builder(
+        name="get_custom_synonyms",
+        path_template="/v1/kb/{kbid}/custom-synonyms",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxSynonyms,
     )
 
 

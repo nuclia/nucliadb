@@ -39,6 +39,7 @@ enum PredictType {
     DA_QA = 13;
     DA_GUARD = 14;
     REMI = 15;
+    VLLM_EXTRACTION = 17;
 }
 
 enum ClientType {

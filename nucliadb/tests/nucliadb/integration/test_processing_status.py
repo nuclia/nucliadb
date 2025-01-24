@@ -52,8 +52,20 @@ async def test_endpoint_set_resource_status_to_pending(
     - Call endpoint that modifies the resource
     - Check that the status is set to PENDING
     """
+    # Create a resource, processing
     br = broker_resource(knowledgebox)
-    br.basic.metadata.status = rpb.Metadata.Status.PROCESSED
+    br.texts["text"].CopyFrom(
+        rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    )
+    await inject_message(nucliadb_grpc, br)
+
+    # Receive message from processor
+    br.source = BrokerMessage.MessageSource.PROCESSOR
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Hello!"
+    etw.field.field = "text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    br.extracted_text.append(etw)
     await inject_message(nucliadb_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}")

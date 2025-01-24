@@ -20,13 +20,13 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Optional
 
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import ProcessingEngine, PushPayload, Source
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_protos import resources_pb2, writer_pb2
-from nucliadb_protos.resources_pb2 import FieldID, FieldType
+from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_utils.utilities import Utility, get_partitioning, get_utility
 
 logger = logging.getLogger("ingest-processor")
@@ -50,7 +50,7 @@ async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource)
     ingest the processed thing later).
 
     Given a broker message and a resource, this function returns the list of
-    generated fields, that can be empty.
+    generated fields, that can be empty. It skips fields with errors.
 
     """
     generated_fields = GeneratedFields()
@@ -60,33 +60,11 @@ async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource)
         return generated_fields
 
     # search all fields
-
-    all_fields = await resource.get_all_field_ids(for_update=False)
-    fields: Sequence[FieldID]
-    if all_fields is None:
-        fields = []
-    else:
-        fields = all_fields.fields
-
-    for field_id in bm.texts:
-        field = FieldID(field_type=FieldType.TEXT, field=field_id)
-        if field not in fields:
+    for field_id, text in bm.texts.items():
+        errors = [e for e in bm.errors if e.field_type == FieldType.TEXT and e.field == field_id]
+        has_error = len(errors) > 0
+        if text.generated_by.WhichOneof("author") == "data_augmentation" and not has_error:
             generated_fields.texts.append(field_id)
-
-    for field_id in bm.links:
-        field = FieldID(field_type=FieldType.LINK, field=field_id)
-        if field not in fields:
-            generated_fields.links.append(field_id)
-
-    for field_id in bm.files:
-        field = FieldID(field_type=FieldType.FILE, field=field_id)
-        if field not in fields:
-            generated_fields.files.append(field_id)
-
-    for field_id in bm.conversations:
-        field = FieldID(field_type=FieldType.CONVERSATION, field=field_id)
-        if field not in fields:
-            generated_fields.conversations.append(field_id)
 
     return generated_fields
 

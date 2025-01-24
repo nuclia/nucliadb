@@ -335,7 +335,7 @@ async def test_ask_full_resource_rag_strategy_with_exclude(
                 {
                     "name": "full_resource",
                     "apply_to": {
-                        "exclude": ["/l/ls/rs-0"],
+                        "exclude": ["/classification.labels/ls/rs-0"],
                     },
                 }
             ],

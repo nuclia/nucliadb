@@ -190,8 +190,10 @@ class TrainSet(google.protobuf.message.Message):
     TYPE_FIELD_NUMBER: builtins.int
     FILTER_FIELD_NUMBER: builtins.int
     BATCH_SIZE_FIELD_NUMBER: builtins.int
+    EXCLUDE_TEXT_FIELD_NUMBER: builtins.int
     type: global___TaskType.ValueType
     batch_size: builtins.int
+    exclude_text: builtins.bool
     @property
     def filter(self) -> global___TrainSet.Filter: ...
     def __init__(
@@ -200,9 +202,10 @@ class TrainSet(google.protobuf.message.Message):
         type: global___TaskType.ValueType = ...,
         filter: global___TrainSet.Filter | None = ...,
         batch_size: builtins.int = ...,
+        exclude_text: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["filter", b"filter"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["batch_size", b"batch_size", "filter", b"filter", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["batch_size", b"batch_size", "exclude_text", b"exclude_text", "filter", b"filter", "type", b"type"]) -> None: ...
 
 global___TrainSet = TrainSet
 

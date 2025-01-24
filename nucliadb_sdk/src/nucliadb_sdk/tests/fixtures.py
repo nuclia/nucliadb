@@ -55,7 +55,7 @@ images.settings["nucliadb"] = {
 }
 
 NUCLIA_DOCS_dataset = (
-    "https://storage.googleapis.com/config.flaps.dev/test_nucliadb/nuclia-datasets.export"
+    "https://storage.googleapis.com/ncl-testbed-gcp-stage-1/test_nucliadb/nuclia-datasets.export"
 )
 
 
