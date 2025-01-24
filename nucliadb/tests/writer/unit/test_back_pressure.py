@@ -31,7 +31,6 @@ from nucliadb.writer.back_pressure import (
     BackPressureException,
     Materializer,
     cached_back_pressure,
-    check_indexing_behind,
     check_ingest_behind,
     check_processing_behind,
     estimate_try_after,
