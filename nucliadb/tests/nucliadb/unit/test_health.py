@@ -30,9 +30,7 @@ from nucliadb.ingest.settings import DriverConfig, settings
 
 @pytest.fixture(autouse=True)
 def register_checks():
-    health.register_health_checks(
-        [health.nats_manager_healthy, health.nodes_health_check, health.pubsub_check]
-    )
+    health.register_health_checks([health.nats_manager_healthy, health.pubsub_check])
     yield
     health.unregister_all_checks()
 

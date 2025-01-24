@@ -88,7 +88,6 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     health.register_health_checks(
         [
             health.nats_manager_healthy,
-            health.nodes_health_check,
             health.pubsub_check,
         ]
     )

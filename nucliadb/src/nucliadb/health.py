@@ -40,13 +40,6 @@ def nats_manager_healthy() -> bool:
     return nats_manager.healthy()
 
 
-def nodes_health_check() -> bool:
-    from nucliadb.common.cluster import manager
-    from nucliadb.ingest.settings import DriverConfig, settings
-
-    return len(manager.INDEX_NODES) > 0 or settings.driver == DriverConfig.LOCAL
-
-
 def pubsub_check() -> bool:
     driver: Optional[PubSubDriver] = get_utility(Utility.PUBSUB)
     if driver is None:
