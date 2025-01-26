@@ -434,14 +434,14 @@ class NotEnoughContextAskResult(AskResult):
         """
         yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
-        status = AnswerStatusCode.NO_CONTEXT
+        status = AnswerStatusCode.NO_RETRIEVAL_DATA
         yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
 
     async def json(self) -> str:
         return SyncAskResponse(
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.main_results,
-            status=AnswerStatusCode.NO_CONTEXT,
+            status=AnswerStatusCode.NO_RETRIEVAL_DATA,
         ).model_dump_json()
 
 
