@@ -89,14 +89,14 @@ jobs:
             --set "image=localhost:32000/nucliadb" \
             --set "imageVersion=test"
           sleep 10
-          kubectl -n nucliadb wait --timeout=2m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-0 || (
+          kubectl -n nucliadb wait --timeout=2m --for=condition=Available deploy/nucliadb || (
             kubectl get all --all-namespaces
             microk8s inspect &&
-            kubectl logs -n nucliadb pod/nucliadb-0 &&
-            kubectl logs -n nucliadb pod/nucliadb-1 &&
-            kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
+            kubectl logs -n nucliadb deploy/nucliadb &&
+            kubectl logs -n nucliadb deploy/nidx &&
+            kubectl logs -n nucliadb deploy/nucliadb-worker &&
             exit 1)
-          kubectl -n nucliadb wait --timeout=1m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-1
+          kubectl -n nucliadb wait --timeout=2m --for=condition=Available deploy/nidx
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -114,7 +114,7 @@ jobs:
           pytest -s -vv --tb=native e2e/test_e2e.py ||
             (kubectl get all --all-namespaces &&
               microk8s inspect &&
-              kubectl logs -n nucliadb pod/nucliadb-0 &&
-              kubectl logs -n nucliadb pod/nucliadb-1 &&
-              kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
+              kubectl logs -n nucliadb deploy/nucliadb &&
+              kubectl logs -n nucliadb deploy/nidx &&
+              kubectl logs -n nucliadb deploy/nucliadb-worker &&
               exit 1)
