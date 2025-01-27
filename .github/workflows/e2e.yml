@@ -96,7 +96,13 @@ jobs:
             kubectl logs -n nucliadb deploy/nidx &&
             kubectl logs -n nucliadb deploy/nucliadb-worker &&
             exit 1)
-          kubectl -n nucliadb wait --timeout=2m --for=condition=Available deploy/nidx
+          kubectl -n nucliadb wait --timeout=1m --for=condition=Available deploy/nidx  || (
+            kubectl get all --all-namespaces
+            microk8s inspect &&
+            kubectl logs -n nucliadb deploy/nucliadb &&
+            kubectl logs -n nucliadb deploy/nidx &&
+            kubectl logs -n nucliadb deploy/nucliadb-worker &&
+            exit 1)
 
       - name: Setup Python
         uses: actions/setup-python@v5
