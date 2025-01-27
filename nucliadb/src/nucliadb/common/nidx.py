@@ -96,7 +96,9 @@ class NidxBindingUtility(NidxUtility):
 
         self.config = {
             "METADATA__DATABASE_URL": ingest_settings.driver_pg_url,
-            "SEARCHER__METADATA_REFRESH_INTERVAL": indexing_settings.index_searcher_refresh_interval,
+            "SEARCHER__METADATA_REFRESH_INTERVAL": str(
+                indexing_settings.index_searcher_refresh_interval
+            ),
             **_storage_config("INDEXER", None),
             **_storage_config("STORAGE", "nidx"),
         }
