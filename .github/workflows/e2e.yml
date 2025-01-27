@@ -56,7 +56,7 @@ jobs:
       - name: Wait for Minio to be ready
         run: |
           kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=minio,app.kubernetes.io/instance=my-minio
-          kubectl --context minikube exec deploy/my-minio -- mkdir /bitnami/minio/data/nidx
+          kubectl exec deploy/my-minio -- mkdir /bitnami/minio/data/nidx
 
       - name: Credentials
         id: envs
