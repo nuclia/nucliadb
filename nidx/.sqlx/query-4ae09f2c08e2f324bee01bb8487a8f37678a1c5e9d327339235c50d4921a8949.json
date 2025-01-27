@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM index_requests WHERE seq = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4ae09f2c08e2f324bee01bb8487a8f37678a1c5e9d327339235c50d4921a8949"
+}
