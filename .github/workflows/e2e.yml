@@ -70,10 +70,12 @@ jobs:
           MINIO_PASSWORD=`kubectl get secret --namespace default my-minio -o jsonpath="{.data.root-password}" | base64 -d`
           echo "MINIO_PASSWORD=$MINIO_PASSWORD" >> $GITHUB_OUTPUT
 
-      - name: Build and push image
+      - name: Build and push images
         run: |
-          docker build -t localhost:32000/nucliadb:test . -f Dockerfile.withbinding
+          docker build -t localhost:32000/nucliadb:test . -f Dockerfile
           docker push localhost:32000/nucliadb:test
+          docker build -t localhost:32000/nidx:test . -f Dockerfile.nidx
+          docker push localhost:32000/nidx:test
 
       - name: Install NucliaDB with Helm
         run: |
@@ -87,7 +89,9 @@ jobs:
             --set "minio_user=${{ steps.envs.outputs.MINIO_USER }}" \
             --set "minio_password=${{ steps.envs.outputs.MINIO_PASSWORD }}" \
             --set "image=localhost:32000/nucliadb" \
-            --set "imageVersion=test"
+            --set "imageVersion=test" \
+            --set "nidx.image=localhost:32000/nidx" \
+            --set "nidx.imageVersion=test"
           sleep 10
           kubectl -n nucliadb wait --timeout=2m --for=condition=Available deploy/nucliadb || (
             kubectl get all --all-namespaces
