@@ -84,8 +84,8 @@ jobs:
             --values e2e/conf/chart.values.yaml \
             --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}" \
             --set "pg_url=postgresql://postgres:${{ steps.envs.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
-            --set "minio_user={{ steps.envs.outputs.MINIO_USER }}" \
-            --set "minio_password={{ steps.envs.outputs.MINIO_PASSWORD }}" \
+            --set "minio_user=${{ steps.envs.outputs.MINIO_USER }}" \
+            --set "minio_password=${{ steps.envs.outputs.MINIO_PASSWORD }}" \
             --set "image=localhost:32000/nucliadb" \
             --set "imageVersion=test"
           sleep 10
