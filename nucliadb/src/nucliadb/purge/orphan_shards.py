@@ -224,6 +224,9 @@ def parse_arguments():
     return args
 
 
+from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
+
+
 async def main():
     """This script will detect orphan shards, i.e., indexed shards with no
     reference in our source of truth.
@@ -240,6 +243,7 @@ async def main():
     """
     args = parse_arguments()
 
+    await start_nidx_utility()
     await setup_cluster()
     driver = await setup_driver()
 
@@ -252,6 +256,7 @@ async def main():
     finally:
         await teardown_driver()
         await teardown_cluster()
+        await stop_nidx_utility()
 
 
 def run() -> int:  # pragma: no cover
