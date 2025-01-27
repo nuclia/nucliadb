@@ -4,7 +4,11 @@ build-backend = "pdm.backend"
 
 [project]
 name = "nidx_protos"
-version = "0.0.1"
+dynamic = ["version"]
 
 [tool.pdm.build]
 custom-hook = "build.py"
+
+[tool.pdm.version]
+source = "call"
+getter = "build:get_version"

@@ -9,8 +9,8 @@ env:
   ARTIFACT_REGISTRY_URL: oci://europe-west4-docker.pkg.dev/nuclia-internal/charts
 
 permissions:
-  id-token: write   # This is required for requesting the JWT
-  contents: read    # This is required for actions/checkout
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
 
 jobs:
   build_wheels:
@@ -37,6 +37,11 @@ jobs:
           pip install wheel
           pip install -U twine
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set dependency versions in requirements
         run: |
           python bump.py --build=${{github.run_number}}
@@ -57,11 +62,15 @@ jobs:
               - 'nucliadb_dataset/**'
             nucliadb_telemetry:
               - 'nucliadb_telemetry/**'
+            nidx_protos:
+              - 'nidx/nidx_protos/**'
+              - 'nucliadb_protos/**'
 
       # Install all packages we are going to release
       - name: Install all packages
         run: |
           pip install -e ./nucliadb_protos/python/
+          pip install -e ./nidx/nidx_protos/
           pip install -e ./nucliadb_telemetry/
           pip install -e ./nucliadb_utils/
           pip install -e ./nucliadb_models/
@@ -70,7 +79,7 @@ jobs:
           pip install -e ./nucliadb/
 
       - name: Build wheels
-        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry ./nucliadb_dataset/ ./nucliadb/
+        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nidx/nidx_protos/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_telemetry ./nucliadb_dataset/ ./nucliadb/
 
       - name: Upload to pypi
         run: twine upload --verbose dist/*

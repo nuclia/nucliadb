@@ -1,36 +1,18 @@
-name: Release NucliaDB Node
+name: Release nidx binding
 
 on:
   pull_request:
     branches:
       - main
     paths:
-      - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node_binding/**"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "nucliadb_core/**"
-      - "nucliadb_node/src/**"
-      - "nucliadb_node/Cargo.toml"
-      - "nucliadb_paragraphs[0-9]*/**"
-      - "nucliadb_relations[0-9]*/**"
-      - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors/**"
+      - "nidx"
+      - "nucliadb_protos"
   push:
     branches:
       - main
     paths:
-      - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node_binding/**"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "nucliadb_core/**"
-      - "nucliadb_node/Cargo.toml"
-      - "nucliadb_node/src/**"
-      - "nucliadb_paragraphs[0-9]*/**"
-      - "nucliadb_relations[0-9]*/**"
-      - "nucliadb_texts[0-9]*/**"
-      - "nucliadb_vectors/**"
+      - "nidx"
+      - "nucliadb_protos"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,36 +20,15 @@ concurrency:
 
 jobs:
   build:
-    name: Build on ${{ matrix.platform || matrix.os }} (${{ matrix.target }} - ${{ matrix.manylinux || 'auto' }})
+    name: Build on ${{ matrix.os }} (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu, macos]
-        target: [x86_64, aarch64]
-        manylinux: [auto]
         include:
           - os: ubuntu
-            platform: linux
+            target: x86_64
           - os: macos
             target: aarch64
-          # - os: ubuntu
-          #   platform: linux
-          #   target: i686
-          # GCC 4.8.5 in manylinux2014 container doesn't support c11 atomic
-          # we use manylinux_2_24 container for aarch64 and armv7 targets instead,
-          - os: ubuntu
-            platform: linux
-            target: aarch64
-            container: messense/manylinux_2_24-cross:aarch64
-          # musllinux
-          - os: ubuntu
-            platform: linux
-            target: x86_64
-            manylinux: musllinux_1_1
-          - os: ubuntu
-            platform: linux
-            target: aarch64
-            manylinux: musllinux_1_1
 
     runs-on: ${{ matrix.os }}-latest
     steps:
@@ -88,30 +49,31 @@ jobs:
       - name: Check system deps
         run: make -C nucliadb check-system
 
+      - name: Install protoc (mac)
+        if: ${{ matrix.os == 'macos' }}
+        run: brew install protobuf
+
+      # Run the source distribution once, as part of any platform
       - name: build sdist
-        if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' && matrix.manylinux == 'auto' }}
+        if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' }}
         uses: messense/maturin-action@v1
         with:
           command: sdist
-          args: -m nucliadb_node_binding/Cargo.toml --out dist
+          args: -m nidx/nidx_binding/Cargo.toml --out dist
 
       - name: build wheels
         uses: messense/maturin-action@v1
-        env:
-          RUSTFLAGS: --cfg tokio_unstable
         with:
-          before-script-linux: scripts/install-system-deps.sh
+          before-script-linux: scripts/install-protoc.sh
           target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux || 'auto' }}
-          container: ${{ matrix.container }}
-          args: -m nucliadb_node_binding/Cargo.toml --release --out dist --profile release-wheel
+          manylinux: 2_34
+          args: -m nidx/nidx_binding/Cargo.toml --release --out dist --profile release-wheel
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
       - run: twine check dist/*
 
       - uses: actions/upload-artifact@v3
-        if: github.event_name == 'push'
         with:
           name: pypi_files
           path: dist
