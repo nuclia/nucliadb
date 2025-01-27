@@ -55,7 +55,14 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let storage_copy = storage.clone();
     let search_task = tokio::spawn(async move {
         synced_searcher
-            .run(storage_copy, SearcherSettings::default(), CancellationToken::new(), ShardSelector::new_single(), None)
+            .run(
+                storage_copy,
+                SearcherSettings::default(),
+                CancellationToken::new(),
+                ShardSelector::new_single(),
+                None,
+                None,
+            )
             .await
     });
 

@@ -223,7 +223,7 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
                     )
             else:
                 errors.capture_exception(result)
-                logger.exception("Error while querying shard data", exc_info=result)
+                logger.exception(f"Error while querying shard data {result}", exc_info=result)
 
             return HTTPException(status_code=status_code, detail=reason)
 

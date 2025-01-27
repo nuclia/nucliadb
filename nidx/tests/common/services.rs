@@ -90,6 +90,7 @@ impl NidxFixture {
                     shutdown.clone(),
                     ShardSelector::new_single(),
                     None,
+                    None,
                 )
                 .await
         });

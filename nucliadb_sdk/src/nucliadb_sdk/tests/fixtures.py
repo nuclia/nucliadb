@@ -51,7 +51,7 @@ images.settings["nucliadb"] = {
         "TEST_RELATIONS": """{"tokens": [{"text": "Nuclia", "ner": "ORG"}]}""",
         "LOG_LEVEL": "DEBUG",
         "DEBUG": "true",
-        "INDEX_SEARCHER_REFRESH_INTERVAL": "0.05",
+        "INDEX_SEARCHER_REFRESH_INTERVAL": "0.1",
     },
 }
 
