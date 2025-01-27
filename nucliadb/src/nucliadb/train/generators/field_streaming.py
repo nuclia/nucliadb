@@ -97,9 +97,13 @@ async def generate_field_streaming_payloads(
         tl.field = field
         tl.field_type = field_type
         tl.split = split
-        extracted = await get_field_text(kbid, rid, field, field_type)
-        if extracted is not None:
-            tl.text.CopyFrom(extracted)
+
+        if trainset.exclude_text:
+            tl.text.text = ""
+        else:
+            extracted = await get_field_text(kbid, rid, field, field_type)
+            if extracted is not None:
+                tl.text.CopyFrom(extracted)
 
         metadata_obj = await get_field_metadata(kbid, rid, field, field_type)
         if metadata_obj is not None:

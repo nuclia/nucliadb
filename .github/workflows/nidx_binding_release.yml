@@ -1,0 +1,125 @@
+name: Release nidx binding
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "nidx"
+      - "nucliadb_protos"
+  push:
+    branches:
+      - main
+    paths:
+      - "nidx"
+      - "nucliadb_protos"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }} (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu
+            target: x86_64
+          - os: macos
+            target: aarch64
+
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.5"
+          architecture: ${{ matrix.python-architecture || 'x64' }}
+
+      - name: Setup env
+        run: |
+          python bump.py --build=${{github.run_number}}
+
+      - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
+
+      - name: Check system deps
+        run: make -C nucliadb check-system
+
+      - name: Install protoc (mac)
+        if: ${{ matrix.os == 'macos' }}
+        run: brew install protobuf
+
+      # Run the source distribution once, as part of any platform
+      - name: build sdist
+        if: ${{ matrix.os == 'ubuntu' && matrix.target == 'x86_64' }}
+        uses: messense/maturin-action@v1
+        with:
+          command: sdist
+          args: -m nidx/nidx_binding/Cargo.toml --out dist
+
+      - name: build wheels
+        uses: messense/maturin-action@v1
+        with:
+          before-script-linux: scripts/install-protoc.sh
+          target: ${{ matrix.target }}
+          manylinux: 2_34
+          args: -m nidx/nidx_binding/Cargo.toml --release --out dist --profile release-wheel
+
+      - run: ${{ matrix.ls || 'ls -lh' }} dist/
+
+      - run: twine check dist/*
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: pypi_files
+          path: dist
+
+  list-pypi-files:
+    needs: [build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: get dist artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: pypi_files
+          path: dist
+
+      - run: ls -lh dist/
+      - run: echo "`ls dist | wc -l` files"
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.5"
+
+      - run: pip install -U twine
+
+      - name: get dist artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: pypi_files
+          path: dist
+
+      - run: twine check dist/*
+
+      - name: upload to pypi
+        run: twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
