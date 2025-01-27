@@ -53,7 +53,7 @@ impl NidxFixture {
             settings: EnvSettings {
                 indexer: Some(nidx::settings::IndexerSettings {
                     object_store: Arc::new(InMemory::new()),
-                    nats_server: String::new(),
+                    nats_server: None,
                 }),
                 storage: Some(StorageSettings {
                     object_store: Arc::new(InMemory::new()),

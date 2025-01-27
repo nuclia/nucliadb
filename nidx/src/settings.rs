@@ -153,7 +153,7 @@ pub struct MetadataSettings {
 pub struct IndexerSettings {
     #[serde(flatten, deserialize_with = "deserialize_object_store")]
     pub object_store: Arc<DynObjectStore>,
-    pub nats_server: String,
+    pub nats_server: Option<String>,
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -400,7 +400,7 @@ mod tests {
         ];
         let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
         assert_eq!(&settings.metadata.unwrap().database_url, "postgresql://localhost");
-        assert_eq!(&settings.indexer.unwrap().nats_server, "localhost");
+        assert_eq!(settings.indexer.unwrap().nats_server, Some("localhost".to_string()));
         assert_eq!(settings.merge.max_deletions, 1234);
         assert_eq!(settings.merge.log_merge.min_number_of_segments, LogMergeSettings::default().min_number_of_segments);
     }

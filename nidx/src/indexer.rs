@@ -20,8 +20,11 @@
 use anyhow::anyhow;
 use async_nats::jetstream::consumer::PullConsumer;
 use futures::stream::StreamExt;
+use nidx_protos::nidx::nidx_indexer_server::NidxIndexer;
+use nidx_protos::nidx::nidx_indexer_server::NidxIndexerServer;
 use nidx_protos::prost::*;
 use nidx_protos::IndexMessage;
+use nidx_protos::OpStatus;
 use nidx_protos::Resource;
 use nidx_protos::TypeMessage;
 use nidx_types::Seq;
@@ -35,6 +38,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::*;
 use uuid::Uuid;
 
+use crate::errors::NidxError;
+use crate::grpc_server::GrpcServer;
 use crate::metrics::indexer::INDEXING_COUNTER;
 use crate::metrics::indexer::PER_INDEX_INDEXING_TIME;
 use crate::metrics::indexer::TOTAL_INDEXING_TIME;
@@ -47,6 +52,74 @@ use crate::{metadata::*, Settings};
 use crate::telemetry;
 
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
+    let indexer_settings = settings.indexer.as_ref().ok_or(anyhow!("Indexer settings required"))?;
+    if indexer_settings.nats_server.is_some() {
+        run_nats(settings, shutdown).await
+    } else {
+        let service = IndexerServer::new(settings)?.into_service();
+        let server = GrpcServer::new("0.0.0.0:10002").await?;
+        debug!("Running indexer grpc server at port {}", server.port()?);
+        server.serve(service, shutdown).await?;
+
+        Ok(())
+    }
+}
+
+pub struct IndexerServer {
+    meta: NidxMetadata,
+    indexer_storage: Arc<DynObjectStore>,
+    segment_storage: Arc<DynObjectStore>,
+}
+
+impl IndexerServer {
+    pub fn new(settings: Settings) -> anyhow::Result<Self> {
+        let meta = settings.metadata.clone();
+
+        let indexer_settings = settings.indexer.as_ref().ok_or(anyhow!("Indexer settings required"))?;
+        let indexer_storage = Arc::clone(&indexer_settings.object_store);
+
+        let storage_settings = settings.storage.as_ref().ok_or(anyhow!("Storage settings required"))?;
+        let segment_storage = Arc::clone(&storage_settings.object_store);
+
+        Ok(Self {
+            meta,
+            indexer_storage,
+            segment_storage,
+        })
+    }
+
+    pub fn into_service(self) -> tonic::service::Routes {
+        tonic::service::Routes::new(NidxIndexerServer::new(self))
+    }
+}
+
+#[tonic::async_trait]
+impl NidxIndexer for IndexerServer {
+    async fn index(&self, request: tonic::Request<IndexMessage>) -> tonic::Result<tonic::Response<OpStatus>> {
+        let msg = request.into_inner();
+
+        let request = IndexRequest::create(&self.meta.pool).await.map_err(NidxError::from)?;
+        process_index_message(
+            &self.meta,
+            self.indexer_storage.clone(),
+            self.segment_storage.clone(),
+            &tempfile::env::temp_dir(),
+            msg,
+            request.seq(),
+        )
+        .await
+        .map_err(NidxError::from)?;
+
+        request.delete(&self.meta.pool).await.map_err(NidxError::from)?;
+
+        Ok(tonic::Response::new(OpStatus {
+            status: nidx_protos::op_status::Status::Ok.into(),
+            ..Default::default()
+        }))
+    }
+}
+
+pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let meta = settings.metadata.clone();
 
     let indexer_settings = settings.indexer.as_ref().ok_or(anyhow!("Indexer settings required"))?;
@@ -55,7 +128,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
     let storage_settings = settings.storage.as_ref().ok_or(anyhow!("Storage settings required"))?;
     let segment_storage = &storage_settings.object_store;
 
-    let nats_client = async_nats::connect(&indexer_settings.nats_server).await?;
+    let nats_client = async_nats::connect(&indexer_settings.nats_server.as_ref().unwrap()).await?;
     let jetstream = async_nats::jetstream::new(nats_client);
     let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
     let mut subscription = consumer.stream().max_messages_per_batch(1).messages().await?;
