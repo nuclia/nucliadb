@@ -21,7 +21,7 @@ import json
 import os
 import random
 from enum import Enum
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncGenerator, Optional
 from unittest.mock import AsyncMock, Mock
 
 import aiohttp
@@ -268,7 +268,7 @@ class PredictEngine:
     @predict_observer.wrap({"type": "chat_ndjson"})
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
-    ) -> tuple[str, str, AsyncIterator[GenerativeChunk]]:
+    ) -> tuple[str, str, AsyncGenerator[GenerativeChunk, None]]:
         """
         Chat query using the new stream format
         Format specs: https://github.com/ndjson/ndjson-spec
@@ -444,7 +444,7 @@ class DummyPredictEngine(PredictEngine):
 
     async def chat_query_ndjson(
         self, kbid: str, item: ChatModel
-    ) -> tuple[str, str, AsyncIterator[GenerativeChunk]]:
+    ) -> tuple[str, str, AsyncGenerator[GenerativeChunk, None]]:
         self.calls.append(("chat_query_ndjson", item))
 
         async def generate():
@@ -555,7 +555,7 @@ def get_answer_generator(response: aiohttp.ClientResponse):
 
 def get_chat_ndjson_generator(
     response: aiohttp.ClientResponse,
-) -> AsyncIterator[GenerativeChunk]:
+) -> AsyncGenerator[GenerativeChunk, None]:
     async def _parse_generative_chunks(gen):
         async for chunk in gen:
             try:
