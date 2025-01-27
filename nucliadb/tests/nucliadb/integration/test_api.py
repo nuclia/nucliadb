@@ -1233,10 +1233,12 @@ async def test_extract_strategy_on_fields(
     def header_encode(some_string):
         return base64.b64encode(some_string.encode()).decode()
 
+    encoded_filename = header_encode("image.jpeg")
+    encoded_language = header_encode("ca")
     upload_metadata = ",".join(
         [
-            f"filename {header_encode("image.jpeg")}",
-            f"language {header_encode("ca")}",
+            f"filename {encoded_filename}",
+            f"language {encoded_language}",
         ]
     )
     file_content = b"file content"
