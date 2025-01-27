@@ -37,6 +37,7 @@ from nucliadb.common.datamanagers.entities import (
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.settings import settings
+from nucliadb.search.search.shards import query_shard
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
     EntitiesGroup,
@@ -216,7 +217,7 @@ class EntitiesManager:
                     ],
                 ),
             )
-            response = await node.reader.Search(request)  # type: ignore
+            response = await query_shard(node, shard_id, request)
             return response.relation
 
         results = await shard_manager.apply_for_all_shards(
@@ -312,7 +313,7 @@ class EntitiesManager:
                 paragraph=False,
                 faceted=Faceted(labels=["/e"]),
             )
-            response: SearchResponse = await node.reader.Search(request)  # type: ignore
+            response: SearchResponse = await query_shard(node, shard_id, request)
             try:
                 facetresults = response.document.facets["/e"].facetresults
                 return {facet.tag.split("/")[-1] for facet in facetresults}

@@ -133,7 +133,11 @@ macro_rules! shard_request {
         }
 
         error!(?errors, ?nodes, ?$shard_id, concat!("Error in ", $name, ", exhausted all availabled nodes"));
-        return Err(Status::internal(errors[0].to_string()));
+        if let Some(reported_error) = errors.pop() {
+            return Err(reported_error.into());
+        } else {
+            return Err(Status::internal("Unknown search error"));
+        }
     }};
 }
 
