@@ -131,6 +131,7 @@ class NidxNatsIndexer:
             nats_servers=indexing_settings.index_jetstream_servers,
             nats_creds=indexing_settings.index_jetstream_auth,
         )
+        self.subject = indexing_settings.index_nidx_subject
 
     async def initialize(self):
         await self.nats_connection_manager.initialize()

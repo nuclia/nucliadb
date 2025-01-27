@@ -18,9 +18,6 @@ env:
   NUCLIA_ZONE: "europe-1"
   CORS_ORIGINS: '["http://localhost:8080"]'
   #NUA_API_KEY: "..."
-  cluster_discovery_mode: kubernetes
-  cluster_discovery_kubernetes_namespace: nucliadb
-  cluster_discovery_kubernetes_selector: "app.kubernetes.io/name=node"
   nidx_api_address: nidx:10000
   nidx_searcher_address: nidx:10001
   nidx_indexer_address: nidx:10002
