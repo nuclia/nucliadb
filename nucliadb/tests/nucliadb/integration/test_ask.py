@@ -224,7 +224,7 @@ async def test_ask_status_code_no_retrieval_data(nucliadb_reader: AsyncClient, k
     resp_data = SyncAskResponse.model_validate_json(resp.content)
     assert resp_data.answer == "Not enough data to answer this."
     assert len(resp_data.retrieval_results.resources) == 0
-    assert resp_data.status == AnswerStatusCode.NO_RETRIEVAL_DATA.value
+    assert resp_data.status == AnswerStatusCode.NO_RETRIEVAL_DATA.prettify()
 
 
 async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, resource):

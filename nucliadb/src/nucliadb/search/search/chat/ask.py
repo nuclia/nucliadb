@@ -441,7 +441,7 @@ class NotEnoughContextAskResult(AskResult):
         return SyncAskResponse(
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.main_results,
-            status=AnswerStatusCode.NO_RETRIEVAL_DATA,
+            status=AnswerStatusCode.NO_RETRIEVAL_DATA.prettify(),
         ).model_dump_json()
 
 
