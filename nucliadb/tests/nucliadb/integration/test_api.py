@@ -1225,3 +1225,58 @@ async def test_extract_strategy_on_fields(
     send_to_process_call = processing.values["send_to_process"][0][0]
     assert len(send_to_process_call.filefield) == 1
     assert processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo"
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Upload a file with the tus upload endpoint, and set the extract strategy via a header
+    def header_encode(some_string):
+        return base64.b64encode(some_string.encode()).decode()
+
+    upload_metadata = ",".join(
+        [
+            f"filename {header_encode("image.jpeg")}",
+            f"language {header_encode("ca")}",
+        ]
+    )
+    file_content = b"file content"
+    resp = await nucliadb_writer.post(
+        f"kb/{knowledgebox}/tusupload",
+        headers={
+            "x-extract-strategy": "barbafoo-tus",
+            "tus-resumable": "1.0.0",
+            "upload-metadata": upload_metadata,
+            "content-type": "image/jpeg",
+            "upload-length": str(len(file_content)),
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    url = resp.headers["location"]
+
+    resp = await nucliadb_writer.patch(
+        url,
+        content=file_content,
+        headers={
+            "upload-offset": "0",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["Tus-Upload-Finished"] == "1"
+    rid = resp.headers["NDB-Resource"].split("/")[-1]
+    field_id = resp.headers["NDB-Field"].split("/")[-1]
+
+    # Check that the extract strategy is stored
+    resp = await nucliadb_reader.get(
+        f"kb/{knowledgebox}/resource/{rid}?show=values",
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["data"]["files"][field_id]["value"]["extract_strategy"] == "barbafoo-tus"
+
+    # Check processing
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = processing.values["send_to_process"][0][0]
+    assert len(send_to_process_call.filefield) == 1
+    assert (
+        processing.values["convert_internal_filefield_to_str"][0][0].extract_strategy == "barbafoo-tus"
+    )
