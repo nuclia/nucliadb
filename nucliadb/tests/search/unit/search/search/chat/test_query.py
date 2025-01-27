@@ -106,6 +106,7 @@ async def test_get_find_results_vector_search_is_optional(predict, chat_features
     [
         (b"foobar", AnswerStatusCode.NO_CONTEXT, None),
         (b"foobar", AnswerStatusCode.SUCCESS, "foobar"),
+        (b"foobar", AnswerStatusCode.NO_RETRIEVAL_DATA, None),
     ],
 )
 def test_parse_audit_answer(raw_text_answer, status_code, audit_answer):

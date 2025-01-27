@@ -214,6 +214,19 @@ async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox, resou
     assert resp_data.status == AnswerStatusCode.SUCCESS.prettify()
 
 
+async def test_ask_status_code_no_retrieval_data(nucliadb_reader: AsyncClient, knowledgebox):
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={"query": "title"},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
+    assert resp_data.answer == "Not enough data to answer this."
+    assert len(resp_data.retrieval_results.resources) == 0
+    assert resp_data.status == AnswerStatusCode.NO_RETRIEVAL_DATA.prettify()
+
+
 async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox, resource):
     citations = {"foo": [], "bar": []}  # type: ignore
     citations_gen = CitationsGenerativeResponse(citations=citations)

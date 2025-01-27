@@ -49,6 +49,7 @@ from nucliadb.search.search.chat.query import (
     ChatAuditor,
     get_find_results,
     get_relations_results,
+    maybe_audit_chat,
     rephrase_query,
     sorted_prompt_context_list,
     tokens_to_chars,
@@ -433,14 +434,14 @@ class NotEnoughContextAskResult(AskResult):
         """
         yield self._ndjson_encode(RetrievalAskResponseItem(results=self.main_results))
         yield self._ndjson_encode(AnswerAskResponseItem(text=NOT_ENOUGH_CONTEXT_ANSWER))
-        status = AnswerStatusCode.NO_CONTEXT
+        status = AnswerStatusCode.NO_RETRIEVAL_DATA
         yield self._ndjson_encode(StatusAskResponseItem(code=status.value, status=status.prettify()))
 
     async def json(self) -> str:
         return SyncAskResponse(
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.main_results,
-            status=AnswerStatusCode.NO_CONTEXT,
+            status=AnswerStatusCode.NO_RETRIEVAL_DATA.prettify(),
         ).model_dump_json()
 
 
@@ -487,6 +488,31 @@ async def ask(
             resource=resource,
         )
     except NoRetrievalResultsError as err:
+        try:
+            rephrase_time = metrics.elapsed("rephrase")
+        except KeyError:
+            # Not all ask requests have a rephrase step
+            rephrase_time = None
+
+        maybe_audit_chat(
+            kbid=kbid,
+            user_id=user_id,
+            client_type=client_type,
+            origin=origin,
+            generative_answer_time=0,
+            generative_answer_first_chunk_time=0,
+            rephrase_time=rephrase_time,
+            user_query=user_query,
+            rephrased_query=rephrased_query,
+            text_answer=b"",
+            status_code=AnswerStatusCode.NO_RETRIEVAL_DATA,
+            chat_history=chat_history,
+            query_context={},
+            query_context_order={},
+            learning_id=None,
+            model=ask_request.generative_model,
+        )
+
         # If a retrieval was attempted but no results were found,
         # early return the ask endpoint without querying the generative model
         return NotEnoughContextAskResult(

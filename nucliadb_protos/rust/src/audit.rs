@@ -101,12 +101,12 @@ pub struct ChatAudit {
     pub chat_context: ::prost::alloc::vec::Vec<ChatContext>,
     #[prost(message, repeated, tag = "8")]
     pub retrieved_context: ::prost::alloc::vec::Vec<RetrievedContext>,
-    #[prost(string, tag = "5")]
-    pub learning_id: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "5")]
+    pub learning_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, tag = "9")]
     pub status_code: i32,
-    #[prost(string, tag = "10")]
-    pub model: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "10")]
+    pub model: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
