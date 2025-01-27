@@ -19,7 +19,6 @@
 
 import re
 import tempfile
-import time
 from typing import AsyncIterator, Iterator, Optional
 
 import docker  # type: ignore
@@ -91,8 +90,6 @@ def upload_data_field_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
         ),
     )
 
-    time.sleep(1)
-
     return kb
 
 
@@ -161,16 +158,11 @@ def upload_data_paragraph_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
             ),
         ),
     )
-
-    time.sleep(1)
-
     return kb
 
 
 @pytest.fixture(scope="function")
 def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
-    time.sleep(1)  # Sleep to get the index ready
-
     sdk.create_entitygroup(
         kbid=kb.uuid,
         content=CreateEntitiesGroupPayload(
@@ -255,8 +247,6 @@ def upload_data_token_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
         ),
     )
 
-    time.sleep(1)
-
     return kb
 
 
@@ -315,9 +305,6 @@ def text_editors_kb(sdk: NucliaDB, kb: KnowledgeBoxObj):
             },
         ),
     )
-
-    time.sleep(1)
-
     return kb
 
 

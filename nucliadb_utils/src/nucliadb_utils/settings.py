@@ -187,6 +187,7 @@ class IndexingSettings(BaseSettings):
     index_jetstream_auth: Optional[str] = None
     index_local: bool = False
     index_nidx_subject: Optional[str] = None
+    index_searcher_refresh_interval: float = 1.0
 
 
 indexing_settings = IndexingSettings()

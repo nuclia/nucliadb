@@ -80,7 +80,7 @@ def qa_kb(sdk: NucliaDB, kb: KnowledgeBoxObj, ingest_stub_sync: WriterStub) -> K
 
     inject_message(ingest_stub_sync, bm)
     # wait for processing
-    time.sleep(1)
+    time.sleep(0.1)
 
     return kb
 

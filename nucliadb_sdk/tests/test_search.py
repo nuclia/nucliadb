@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
-import time
 from typing import Any, Dict
 
 import nucliadb_sdk
@@ -247,8 +246,6 @@ def test_search_resource(kb: KnowledgeBoxObj, sdk: nucliadb_sdk.NucliaDB):
             texts={"text": {"body": text}},
             usermetadata={"classifications": [{"labelset": "emoji", "label": label}]},
         )
-
-    time.sleep(1)  # Time for index to refresh
 
     resources = sdk.list_resources(kbid=kb.uuid, query_params={"size": 50})
     assert resources.pagination.size == 50

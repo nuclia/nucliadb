@@ -196,7 +196,7 @@ pub async fn run_sync(
 
             // If we didn't sync anything, wait for a bit
             if no_updates {
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs_f32(settings.metadata_refresh_interval)).await;
             }
 
             Ok(())

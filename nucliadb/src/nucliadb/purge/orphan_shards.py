@@ -33,6 +33,7 @@ from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
+from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.ingest import logger
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
@@ -222,9 +223,6 @@ def parse_arguments():
     )
     args = parser.parse_args()
     return args
-
-
-from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 
 
 async def main():

@@ -51,6 +51,7 @@ images.settings["nucliadb"] = {
         "TEST_RELATIONS": """{"tokens": [{"text": "Nuclia", "ner": "ORG"}]}""",
         "LOG_LEVEL": "DEBUG",
         "DEBUG": "true",
+        "INDEX_SEARCHER_REFRESH_INTERVAL": "0.05",
     },
 }
 
@@ -182,8 +183,6 @@ def kb(sdk: nucliadb_sdk.NucliaDB):
     kbslug = uuid4().hex
     kb = sdk.create_knowledge_box(slug=kbslug)
 
-    time.sleep(1)
-
     yield kb
 
     sdk.delete_knowledge_box(kbid=kb.uuid)
@@ -207,8 +206,6 @@ async def init_fixture(
 
     import_id = sdk.start_import(kbid=kbid, content=import_data).import_id
     assert sdk.import_status(kbid=kbid, import_id=import_id).status.value == "finished"
-
-    time.sleep(1)
 
     return kbid
 

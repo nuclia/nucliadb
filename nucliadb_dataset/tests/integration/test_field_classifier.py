@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import time
-
 import pyarrow as pa  # type: ignore
 
 from integration.utils import export_dataset
@@ -92,8 +90,6 @@ def test_datascientist(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
             ),
         ),
     )
-
-    time.sleep(1)
 
     arrow_filenames = download_all_partitions(
         task="FIELD_CLASSIFICATION",

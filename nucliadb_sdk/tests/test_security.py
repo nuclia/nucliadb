@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import time
-
 import nucliadb_sdk
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.security import RequestSecurity, ResourceSecurity
@@ -57,8 +55,6 @@ def test_security_search(sdk: nucliadb_sdk.NucliaDB, kb: KnowledgeBoxObj):
     # Create some public news resources
     for i, text in enumerate(PUBLIC_NEWS):
         sdk.create_resource(kbid=kb.uuid, title=f"News {i}", summary=text, security=None)
-
-    time.sleep(1)
 
     # Only legal group has access to any classified info
     results = sdk.find(kbid=kb.uuid, query="Classified", security=RequestSecurity(groups=[sales_group]))

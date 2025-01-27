@@ -72,8 +72,6 @@ def test_datascientist_tokens(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
         ),
     )
 
-    time.sleep(1)
-
     arrow_filenames = download_all_partitions(
         task="TOKEN_CLASSIFICATION",
         slug=kb.slug,
