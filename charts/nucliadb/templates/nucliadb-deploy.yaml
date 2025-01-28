@@ -81,8 +81,6 @@ spec:
           {{- if .Values.envSecrets }}
 {{ toYaml .Values.envSecrets | indent 10 }}
           {{- end }}
-          - name: NIDX_ENABLED
-            value: "1"
           - name: DATA_PATH
             value: "/data"
           - name: standalone_node_role
