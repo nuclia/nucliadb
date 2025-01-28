@@ -1549,7 +1549,7 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
         examples=[ANSWER_JSON_SCHEMA_EXAMPLE],
     )
 
-    generate_answer: bool = Field(
+    generate_answer: SkipJsonSchema[bool] = Field(
         default=True,
         description="Whether to generate an answer using the generative model. If set to false, the response will only contain the retrieval results.",
     )
