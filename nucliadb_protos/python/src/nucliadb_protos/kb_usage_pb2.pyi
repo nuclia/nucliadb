@@ -45,6 +45,7 @@ class _ServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTy
     PROCESSING: _Service.ValueType  # 1
     NUCLIA_DB: _Service.ValueType  # 2
     TASK: _Service.ValueType  # 3
+    PREDICT_INTERNAL: _Service.ValueType  # 4
 
 class Service(_Service, metaclass=_ServiceEnumTypeWrapper): ...
 
@@ -52,6 +53,7 @@ PREDICT: Service.ValueType  # 0
 PROCESSING: Service.ValueType  # 1
 NUCLIA_DB: Service.ValueType  # 2
 TASK: Service.ValueType  # 3
+PREDICT_INTERNAL: Service.ValueType  # 4
 global___Service = Service
 
 class _SearchType:
