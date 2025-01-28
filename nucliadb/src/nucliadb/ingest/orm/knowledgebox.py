@@ -60,11 +60,13 @@ from nucliadb_protos.knowledgebox_pb2 import (
     VectorSetPurge,
 )
 from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_utils import const
 from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
     get_storage,
+    has_feature,
 )
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
@@ -148,6 +150,31 @@ class KnowledgeBox:
 
                 vs_external_indexes = []
 
+                # HACK! Currently, we share responsibility of deciding where to
+                # store extracted vectors with processing. Depending on whether
+                # it sends the vectorset id or not (in the extracted vectors
+                # wrapper) nucliadb will store the extracted vectors in a different place
+                #
+                # Right now, processing behaviour is not setting vectorset ids
+                # if there's only one semantic model configured. This is done
+                # for Bw/c with KBs previous to vectorsets.
+                #
+                # We now hardcode this assumption here, so we can annotate each
+                # vectorset with a mark and don't depend on processing
+                # information to decide the storage key. Once this is done we'll
+                # be able to force processing to always send vectorset ids and
+                # remove that bw/c behavior
+                #
+                if has_feature(const.Features.REMOVE_DEFAULT_VECTORSET):
+                    storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
+                else:
+                    if len(semantic_models) == 1:
+                        storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.LEGACY
+                    else:
+                        storage_key_kind = (
+                            knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
+                        )
+
                 for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                     # if this KB uses a matryoshka model, we can choose a different
                     # dimension
@@ -174,7 +201,7 @@ class KnowledgeBox:
                             vector_dimension=dimension,
                         ),
                         matryoshka_dimensions=semantic_model.matryoshka_dimensions,
-                        storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
+                        storage_key_kind=storage_key_kind,
                     )
                     await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
 
