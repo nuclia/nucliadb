@@ -326,3 +326,4 @@ class ResourceField(BaseModel):
         FieldLink,
         Conversation,
     ]
+    extracted: ExtractedDataType = None
