@@ -21,7 +21,6 @@ import enum
 import inspect
 import io
 import warnings
-from functools import partial
 from json import JSONDecodeError
 from typing import (
     Any,
@@ -115,7 +114,9 @@ def json_response_parser(response: httpx.Response) -> Any:
     return orjson.loads(response.content.decode())
 
 
-def resource_field_parser(response: httpx.Response) -> Conversation:
+def get_resource_field_parser(
+    response: httpx.Response,
+) -> Union[FieldText, FieldFile, FieldLink, Conversation]:
     json_data = response.json()
     model = {
         "text": FieldText,
@@ -547,12 +548,12 @@ class _NucliaDBBase:
     )
 
     get_resource_field = _request_builder(
-        name="get_field",
+        name="get_resource_field",
         path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
         method="GET",
         path_params=("kbid", "rid", "field_type", "field_id"),
         request_type=None,
-        response_type=resource_field_parser,
+        response_type=get_resource_field_parser,
     )
 
     # Labels
@@ -833,18 +834,6 @@ class _NucliaDBBase:
         request_type=None,
         response_type=KnowledgeBoxSynonyms,
     )
-
-
-def _get_conversation_func(
-    self, kbid: str, rid: str, field_id: str, page: int = 1
-) -> Callable[[_NucliaDBBase], Conversation]:
-    func = partial(
-        self.get_resource_field, kbid=kbid, rid=rid, field_id=field_id, query_params={"page": page}
-    )
-    return func
-
-
-_NucliaDBBase.get_conversation = _get_conversation_func
 
 
 class NucliaDB(_NucliaDBBase):

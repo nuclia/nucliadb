@@ -106,7 +106,9 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
     ]
     fid = "conv"
     sdk.add_conversation_message(kbid=kbid, rid=rid, field_id=fid, content=messages)
-    conv = sdk.get_conversation(kbid=kbid, rid=rid, field_id=fid, page=1)
+    conv = sdk.get_resource_field(
+        kbid=kbid, rid=rid, field_type="conversation", field_id=fid, query_params={"page": 1}
+    )
     assert conv.messages[0].content.text == "Hello"
 
 
