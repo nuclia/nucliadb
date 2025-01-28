@@ -60,11 +60,13 @@ from nucliadb_protos.knowledgebox_pb2 import (
     VectorSetPurge,
 )
 from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_utils import const
 from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
     get_storage,
+    has_feature,
 )
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
@@ -163,10 +165,15 @@ class KnowledgeBox:
                 # be able to force processing to always send vectorset ids and
                 # remove that bw/c behavior
                 #
-                if len(semantic_models) == 1:
-                    storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.LEGACY
-                else:
+                if has_feature(const.Features.REMOVE_DEFAULT_VECTORSET):
                     storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
+                else:
+                    if len(semantic_models) == 1:
+                        storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.LEGACY
+                    else:
+                        storage_key_kind = (
+                            knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
+                        )
 
                 for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                     # if this KB uses a matryoshka model, we can choose a different

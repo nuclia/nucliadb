@@ -83,7 +83,7 @@ async def test_create_knowledgebox(
 
         vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="my-semantic-model")
         assert vs is not None
-        assert vs.storage_key_kind == knowledgebox_pb2.VectorSetConfig.StorageKeyKind.LEGACY
+        assert vs.storage_key_kind == knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
 
 
 async def test_create_knowledgebox_with_multiple_vectorsets(
