@@ -49,7 +49,9 @@ def should_giveup(e: Exception):
     return False
 
 
-@backoff.on_exception(backoff.expo, Exception, factor=0.1, max_tries=3, giveup=should_giveup)
+@backoff.on_exception(
+    backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
+)
 async def query_shard(node: AbstractIndexNode, shard: str, query: SearchRequest) -> SearchResponse:
     req = SearchRequest()
     req.CopyFrom(query)
@@ -58,7 +60,9 @@ async def query_shard(node: AbstractIndexNode, shard: str, query: SearchRequest)
         return await node.reader.Search(req)  # type: ignore
 
 
-@backoff.on_exception(backoff.expo, Exception, factor=0.1, max_tries=3, giveup=should_giveup)
+@backoff.on_exception(
+    backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
+)
 async def get_shard(node: AbstractIndexNode, shard_id: str) -> Shard:
     req = GetShardRequest()
     req.shard_id.id = shard_id
@@ -66,7 +70,9 @@ async def get_shard(node: AbstractIndexNode, shard_id: str) -> Shard:
         return await node.reader.GetShard(req)  # type: ignore
 
 
-@backoff.on_exception(backoff.expo, Exception, factor=0.1, max_tries=3, giveup=should_giveup)
+@backoff.on_exception(
+    backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
+)
 async def suggest_shard(node: AbstractIndexNode, shard: str, query: SuggestRequest) -> SuggestResponse:
     req = SuggestRequest()
     req.CopyFrom(query)

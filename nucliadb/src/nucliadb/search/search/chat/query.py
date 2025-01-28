@@ -349,7 +349,7 @@ class ChatAuditor:
         learning_id: Optional[str],
         query_context: PromptContext,
         query_context_order: PromptContextOrder,
-        model: str,
+        model: Optional[str],
     ):
         self.kbid = kbid
         self.user_id = user_id
