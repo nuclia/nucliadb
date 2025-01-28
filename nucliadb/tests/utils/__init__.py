@@ -19,6 +19,7 @@
 #
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
@@ -118,7 +119,12 @@ def broker_resource_with_title_paragraph(
     return bm
 
 
-async def inject_message(writer: WriterStub, message: BrokerMessage):
+async def inject_message(
+    writer: WriterStub,
+    message: BrokerMessage,
+    timeout: Optional[float] = None,
+    wait_for_ready: Optional[bool] = None,
+):
     await mark_dirty()
-    resp = await writer.ProcessMessage([message])  # type: ignore
+    resp = await writer.ProcessMessage([message], timeout=timeout, wait_for_ready=wait_for_ready)  # type: ignore
     assert resp.status == OpStatusWriter.Status.OK

@@ -26,6 +26,7 @@ from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 
 
 @pytest.mark.deploy_modes("component")
@@ -65,7 +66,7 @@ async def test_reindex_resource(dummy_nidx_utility, nucliadb_ingest_grpc: Writer
     evw.field.field_type = field_type
     bm.field_vectors.append(evw)
 
-    await nucliadb_ingest_grpc.ProcessMessage([bm])  # type: ignore
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Reindex it along with its vectors
     req = IndexResource(kbid=kbid, rid=rid, reindex_vectors=True)
