@@ -21,6 +21,7 @@ import httpx
 import pytest
 
 import nucliadb_sdk
+from nucliadb_models.conversation import InputMessage, InputMessageContent
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 
 
@@ -89,6 +90,24 @@ def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
         sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
     except nucliadb_sdk.exceptions.NotFoundError:
         pass
+
+
+def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
+    kbid = kb.uuid
+    resource = sdk.create_resource(kbid=kbid, title="Resource")
+    rid = resource.uuid
+    messages = [
+        InputMessage(
+            ident="1",
+            content=InputMessageContent(
+                text="Hello",
+            ),
+        )
+    ]
+    fid = "conv"
+    sdk.add_conversation_message(kbid=kbid, rid=rid, field_id=fid, content=messages)
+    conv = sdk.get_conversation(kbid=kbid, rid=rid, field_id=fid, page=1)
+    assert conv.messages[0].content.text == "Hello"
 
 
 def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
