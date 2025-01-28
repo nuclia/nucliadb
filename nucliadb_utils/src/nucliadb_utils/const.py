@@ -81,3 +81,4 @@ class Features:
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
     NIDX_READS = "nucliadb_nidx_reads"
     FIELD_STATUS = "nucliadb_field_status"
+    REMOVE_DEFAULT_VECTORSET = "nucliadb_removing_default_vectorset__ingest"
