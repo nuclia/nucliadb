@@ -88,8 +88,8 @@ impl IndexerServer {
         })
     }
 
-    pub fn into_service(self) -> tonic::service::Routes {
-        tonic::service::Routes::new(NidxIndexerServer::new(self))
+    pub fn into_service(self) -> axum::Router {
+        tonic::service::Routes::new(NidxIndexerServer::new(self)).into_axum_router()
     }
 }
 

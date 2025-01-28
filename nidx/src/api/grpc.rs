@@ -19,34 +19,122 @@
 //
 
 use std::collections::HashMap;
+use std::io::Write;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::errors::NidxError;
-use crate::metadata::{Index, IndexKind, Shard};
+use crate::metadata::{Index, IndexId, IndexKind, Shard};
+use axum::body::{Body, Bytes};
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use nidx_protos::nidx::nidx_api_server::*;
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
+use object_store::DynObjectStore;
+use tokio::sync::mpsc::Sender;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::service::Routes;
 use tonic::{Request, Response, Result, Status};
 use uuid::Uuid;
 
 use crate::api::shards;
-use crate::NidxMetadata;
+use crate::{NidxMetadata, Settings};
 
+use super::export;
+
+#[derive(Clone)]
 pub struct ApiServer {
     meta: NidxMetadata,
+    storage: Arc<DynObjectStore>,
 }
 
 impl ApiServer {
-    pub fn new(meta: NidxMetadata) -> Self {
+    pub fn new(settings: &Settings) -> Self {
         Self {
-            meta,
+            meta: settings.metadata.clone(),
+            storage: settings.storage.as_ref().unwrap().object_store.clone(),
         }
     }
 
-    pub fn into_service(self) -> Routes {
+    pub fn into_router(self) -> axum::Router {
+        let myself = self.clone();
+        let myself2 = self.clone();
         Routes::new(NidxApiServer::new(self))
+            .into_axum_router()
+            .route("/api/shard/:shard_id/download", axum::routing::get(download_shard).with_state(myself))
+            .route("/api/index/:index_id/download", axum::routing::get(download_index).with_state(myself2))
     }
+}
+
+struct ChannelWriter(Sender<anyhow::Result<Bytes>>);
+
+impl Write for ChannelWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if let Err(e) = self.0.blocking_send(Ok(Bytes::copy_from_slice(buf))) {
+            return Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, e));
+        };
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+async fn download_shard(State(server): State<ApiServer>, Path(shard_id): Path<Uuid>) -> impl IntoResponse {
+    let shard = Shard::get(&server.meta.pool, shard_id).await;
+    if let Err(e) = shard {
+        return axum::response::Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from(e.to_string()))
+            .unwrap();
+    };
+
+    download_export(server, shard_id, None, shard_id.to_string()).await
+}
+
+async fn download_index(State(server): State<ApiServer>, Path(index_id): Path<i64>) -> impl IntoResponse {
+    let index = match Index::get(&server.meta.pool, index_id.into()).await {
+        Ok(index) => index,
+        Err(e) => {
+            return axum::response::Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::from(e.to_string()))
+                .unwrap();
+        }
+    };
+
+    download_export(server, index.shard_id, Some(index.id), index_id.to_string()).await
+}
+
+async fn download_export(
+    server: ApiServer,
+    shard_id: Uuid,
+    index_id: Option<IndexId>,
+    filename: String,
+) -> axum::response::Response<axum::body::Body> {
+    let (tx, rx) = tokio::sync::mpsc::channel(10);
+    let txc = tx.clone();
+    let writer = ChannelWriter(tx);
+
+    tokio::spawn(async move {
+        let r = export::export_shard(server.meta, server.storage, shard_id, index_id, writer).await;
+        // If an error happens during the export, send it to the stream so axum cancels the download
+        // and the user gets an error. Status code will still be 200 since this happens in the middle
+        // of a stream, but it's better than nothing
+        if let Err(e) = r {
+            let _ = txc.send(Err(e)).await;
+        }
+    });
+
+    let body = Body::from_stream(ReceiverStream::new(rx));
+    axum::response::Response::builder()
+        .header("Content-Disposition", format!("attachment; filename=\"{filename}.tar.zstd\""))
+        .body(body)
+        .unwrap()
 }
 
 #[tonic::async_trait]

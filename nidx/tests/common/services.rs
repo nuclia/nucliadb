@@ -69,7 +69,7 @@ impl NidxFixture {
             },
         };
         // API server
-        let api_service = ApiServer::new(settings.metadata.clone()).into_service();
+        let api_service = ApiServer::new(settings.metadata.clone()).into_router();
         let api_server = GrpcServer::new("localhost:0").await?;
         let api_port = api_server.port()?;
         tokio::task::spawn(api_server.serve(api_service, shutdown.clone()));
@@ -80,7 +80,7 @@ impl NidxFixture {
         let searcher_api = SearchServer::new(searcher.index_cache(), ShardSelector::new_single());
         let searcher_server = GrpcServer::new("localhost:0").await?;
         let searcher_port = searcher_server.port()?;
-        tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));
+        tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
         let settings_copy = settings.clone();
         tokio::task::spawn(async move {
             searcher
