@@ -120,7 +120,7 @@ jobs:
         id: version_step
         run: |-
           python bump.py --build=${{github.run_number}}
-          cargo update --manifest-path nidx/Cargo.toml --offline nidx_binding
+          cargo update --manifest-path nidx/Cargo.toml nidx_binding
           VERSION=`cat VERSION`
           HASH=`git rev-parse --short HEAD`
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
