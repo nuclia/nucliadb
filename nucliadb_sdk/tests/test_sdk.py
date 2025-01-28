@@ -97,7 +97,7 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
     resource = sdk.create_resource(kbid=kbid, title="Resource", slug="myslug")
     rid = resource.uuid
     messages = [
-        InputMessage(
+        InputMessage(  # type: ignore
             ident="1",
             content=InputMessageContent(
                 text="Hello",
