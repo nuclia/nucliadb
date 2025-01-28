@@ -50,7 +50,7 @@ async def test_reindex_resource(dummy_nidx_utility, nucliadb_ingest_grpc: Writer
 
     # Create a resource with a field and some vectors
     bm = BrokerMessage()
-    rid = "test1"
+    rid = str(uuid4())
     field_id = "text1"
     field_type = FieldType.TEXT
     bm.uuid = rid
