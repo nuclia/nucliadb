@@ -31,7 +31,6 @@ from pytest_mock import MockerFixture
 from nucliadb.common.cluster import manager
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NIDX_ENABLED
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.requesters import utils
@@ -74,18 +73,12 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
 
     shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
     logic_shard = shards[0]
-    node, shard_id = manager.choose_node(logic_shard, use_nidx=NIDX_ENABLED)
+    node, shard_id = manager.choose_node(logic_shard)
     await wait_for_sync()
 
     test_cases = [
         (vectorset_dimension, vectorset_id),
     ]
-
-    if not NIDX_ENABLED:
-        # If there is just one vectorset, it should be used by default when
-        # no vectorset is specified.
-        # This is no longer supported in nidx
-        test_cases.append((vectorset_dimension, ""))
 
     for dimension, vectorset in test_cases:
         query_pb = nodereader_pb2.SearchRequest(

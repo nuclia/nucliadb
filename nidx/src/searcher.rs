@@ -115,6 +115,7 @@ impl SyncedSearcher {
         shutdown: CancellationToken,
         shard_selector: ShardSelector,
         watcher: Option<watch::Sender<SyncStatus>>,
+        request_sync: Option<Receiver<()>>,
     ) -> anyhow::Result<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(1000);
 
@@ -129,6 +130,7 @@ impl SyncedSearcher {
             shutdown.clone(),
             tx,
             watcher,
+            request_sync,
             shard_selector,
         ));
         let sync_task_id = sync_task.id();
@@ -197,7 +199,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
     let shutdown2 = shutdown.clone();
     let shard_selector = ShardSelector::new(list_nodes, searcher_settings.shard_partitioning.replicas);
     let search_task = tasks
-        .spawn(async move { searcher.run(storage, searcher_settings, shutdown2, shard_selector, None).await })
+        .spawn(async move { searcher.run(storage, searcher_settings, shutdown2, shard_selector, None, None).await })
         .id();
 
     while let Some(join_result) = tasks.join_next_with_id().await {

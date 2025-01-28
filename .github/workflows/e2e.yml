@@ -76,10 +76,8 @@ jobs:
             kubectl get all --all-namespaces
             microk8s inspect &&
             kubectl logs -n nucliadb pod/nucliadb-0 &&
-            kubectl logs -n nucliadb pod/nucliadb-1 &&
             kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
             exit 1)
-          kubectl -n nucliadb wait --timeout=1m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-1
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -98,6 +96,5 @@ jobs:
             (kubectl get all --all-namespaces &&
               microk8s inspect &&
               kubectl logs -n nucliadb pod/nucliadb-0 &&
-              kubectl logs -n nucliadb pod/nucliadb-1 &&
               kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
               exit 1)

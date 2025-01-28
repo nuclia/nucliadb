@@ -48,9 +48,7 @@ from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
 from nucliadb_utils.authentication import requires, requires_one
-from nucliadb_utils.utilities import has_feature
 
 MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
 
@@ -166,9 +164,7 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
     queried_shards = []
     for shard_object in shard_groups:
         try:
-            node, shard_id = choose_node(
-                shard_object, use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": kbid})
-            )
+            node, shard_id = choose_node(shard_object)
         except KeyError:
             raise HTTPException(
                 status_code=500,

@@ -13,57 +13,22 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  id-token: write   # This is required for requesting the JWT
-  contents: read    # This is required for actions/checkout
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
 
 env:
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
   GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
   ARTIFACT_REGISTRY_URL: oci://europe-west4-docker.pkg.dev/nuclia-internal/charts
 
-
 jobs:
-  build-node-image:
-    name: Build node image
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Restore binaries
-        uses: actions/cache/restore@v4
-        with:
-          path: "target/release/node_*er"
-          key: node-bin-${{ github.sha }}
-          fail-on-cache-miss: true
-      - name: Build docker images for node
-        id: build-image
-        run: mkdir builds && mv target/release/node_* builds && docker build -f Dockerfile.node_prebuilt . --iidfile imageid && echo imageid=$(cat imageid) >> $GITHUB_OUTPUT
-      - name: Push image
-        id: push-image
-        uses: ./.github/actions/push-img-nucliadb
-        env:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          GCP_SERVICE_ACCOUNT: ${{ env.GCP_SERVICE_ACCOUNT }}
-        with:
-          imageid: ${{ steps.build-image.outputs.imageid }}
-          image-name: node
-          aws-ecr-role: ${{ secrets.AWS_ECR_ROLE }}
-
-  build-python-images:
-    name: Build Python images
-    strategy:
-      matrix:
-        include:
-          - file: Dockerfile
-            image-name: nucliadb_hosted
-          - file: Dockerfile.node_sidecar
-            image-name: node_sidecar
+  build-python-image:
+    name: Build Python image
     uses: ./.github/workflows/_build-img-nucliadb.yml
     with:
-      file: ${{ matrix.file }}
-      image-name: ${{ matrix.image-name }}
-    secrets:
-      inherit
+      file: Dockerfile
+      image-name: nucliadb_hosted
+    secrets: inherit
 
   build-nidx-image:
     name: Build nidx image
@@ -71,75 +36,11 @@ jobs:
     with:
       file: Dockerfile.nidx
       image-name: nidx
-    secrets:
-      inherit
+    secrets: inherit
 
   upload-chart-nucliadb-shared:
     name: Deploy nucliadb shared
     runs-on: ubuntu-24.04
-    steps:
-    - name: Generate a token
-      id: app-token
-      uses: actions/create-github-app-token@v1
-      with:
-        app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
-        private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
-        owner: nuclia
-
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Authenticate to Google Cloud
-      id: gcp-auth
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: "${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
-        service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
-        token_format: access_token
-
-    - name: Login to Google Artifact Registry
-      uses: docker/login-action@v3
-      with:
-        registry: europe-west4-docker.pkg.dev
-        username: oauth2accesstoken
-        password: ${{ steps.gcp-auth.outputs.access_token }}
-
-    - name: Calculate short sha
-      id: env-vars
-      run: |-
-        HASH=`git rev-parse --short HEAD`
-        echo "short_sha=$HASH" >> $GITHUB_OUTPUT
-
-    - name: Set helm package image
-      id: version_step
-      run: |-
-        VERSION=`cat VERSION`
-        VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
-        sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_shared/Chart.yaml
-        echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
-
-    - name: Configure Git
-      run: |
-        git config user.name "$GITHUB_ACTOR"
-        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-    - name: Install Helm
-      uses: azure/setup-helm@v4
-      with:
-        version: v3.15.3
-
-    - name: Push helm package
-      run: |-
-        helm lint charts/nucliadb_shared
-        helm package charts/nucliadb_shared
-        helm push nucliadb_shared-${{ steps.version_step.outputs.version_number }}.tgz ${{ env.ARTIFACT_REGISTRY_URL }}
-
-  upload-chart-nucliadb-node:
-    name: Upload Node chart
-    runs-on: ubuntu-24.04
-    needs:
-      - build-python-images
-      - build-node-image
     steps:
       - name: Generate a token
         id: app-token
@@ -175,15 +76,10 @@ jobs:
 
       - name: Set helm package image
         id: version_step
-        env:
-          CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#node:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
-          sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#node_sidecar:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
-          sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_node/values.yaml
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
-          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_node/Chart.yaml
+          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_shared/Chart.yaml
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
       - name: Configure Git
@@ -198,9 +94,9 @@ jobs:
 
       - name: Push helm package
         run: |-
-          helm lint charts/nucliadb_node
-          helm package charts/nucliadb_node
-          helm push nucliadb_node-${{ steps.version_step.outputs.version_number }}.tgz ${{ env.ARTIFACT_REGISTRY_URL }}
+          helm lint charts/nucliadb_shared
+          helm package charts/nucliadb_shared
+          helm push nucliadb_shared-${{ steps.version_step.outputs.version_number }}.tgz ${{ env.ARTIFACT_REGISTRY_URL }}
 
   upload-charts-nucliadb-component:
     name: Upload NucliaDB component charts
@@ -208,7 +104,7 @@ jobs:
     outputs:
       version_number: ${{ steps.version_step.outputs.version_number }}
     needs:
-      - build-python-images
+      - build-python-image
     strategy:
       matrix:
         component:
@@ -350,7 +246,6 @@ jobs:
     needs:
       - upload-chart-nucliadb-shared
       - upload-charts-nucliadb-component
-      - upload-chart-nucliadb-node
       - upload-chart-nidx
     steps:
       - name: Generate a token
@@ -372,11 +267,11 @@ jobs:
             {
               "commit-sha": "${{ github.sha }}",
               "components": [
-                ${{ needs.upload-chart-nidx.result == 'skipped' && ' ' || format('{{
-                  "chart-version": "{0}",
+                {
+                  "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
                   "component": "nidx",
                   "component-type": "regional"
-                }},', needs.upload-charts-nucliadb-component.outputs.version_number) }}
+                },
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
                   "component": "nucliadb_shared",
@@ -405,11 +300,6 @@ jobs:
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
                   "component": "nucliadb_writer",
-                  "component-type": "regional"
-                },
-                {
-                  "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
-                  "component": "nucliadb_node",
                   "component-type": "regional"
                 }
               ],

@@ -123,7 +123,6 @@ async def node_query(
         try:
             node, shard_id = cluster_manager.choose_node(
                 shard_obj,
-                use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": kbid}),
                 use_read_replica_nodes=use_read_replica_nodes,
                 target_shard_replicas=target_shard_replicas,
             )
@@ -224,7 +223,7 @@ def validate_node_query_results(results: list[Any]) -> Optional[HTTPException]:
                     )
             else:
                 errors.capture_exception(result)
-                logger.exception("Error while querying shard data", exc_info=result)
+                logger.exception(f"Error while querying shard data {result}", exc_info=result)
 
             return HTTPException(status_code=status_code, detail=reason)
 

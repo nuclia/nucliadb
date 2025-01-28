@@ -27,7 +27,9 @@ from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper
 from nucliadb_protos.utils_pb2 import ExtractedText
 
 
-async def test_get_paragraph_text(storage, cache, txn, fake_node, processor, knowledgebox_ingest):
+async def test_get_paragraph_text(
+    storage, cache, txn, dummy_nidx_utility, processor, knowledgebox_ingest
+):
     kbid = knowledgebox_ingest
     rid = uuid.uuid4().hex
     basic = Basic(slug="slug", uuid=rid)

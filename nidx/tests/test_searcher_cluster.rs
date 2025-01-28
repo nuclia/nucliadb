@@ -92,6 +92,7 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
                     shutdown.clone(),
                     ShardSelector::new(arc_list_nodes, 1),
                     None,
+                    None,
                 )
                 .await
         });
@@ -174,6 +175,7 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
                     settings_copy.searcher.clone().unwrap_or_default(),
                     shutdown.clone(),
                     ShardSelector::new(arc_list_nodes, 1),
+                    None,
                     None,
                 )
                 .await

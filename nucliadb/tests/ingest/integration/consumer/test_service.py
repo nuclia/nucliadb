@@ -36,6 +36,8 @@ def create_broker_message(kbid: str) -> BrokerMessage:
 
 
 async def test_separated_ingest_consumer(
+    shard_manager,
+    dummy_nidx_utility,
     ingest_consumers,
     ingest_processed_consumer,
     knowledgebox_ingest,

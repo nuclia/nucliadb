@@ -30,9 +30,7 @@ from nucliadb.ingest.settings import DriverConfig, settings
 
 @pytest.fixture(autouse=True)
 def register_checks():
-    health.register_health_checks(
-        [health.nats_manager_healthy, health.nodes_health_check, health.pubsub_check]
-    )
+    health.register_health_checks([health.nats_manager_healthy, health.pubsub_check])
     yield
     health.unregister_all_checks()
 
@@ -54,20 +52,6 @@ async def test_grpc_health_check():
         await asyncio.sleep(0.05)
 
         servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.SERVING)
-
-        task.cancel()
-
-
-async def test_health_check_fail():
-    servicer = AsyncMock()
-    with (
-        patch.object(manager, "INDEX_NODES", {}),
-        patch.object(settings, "driver", DriverConfig.PG),
-    ):
-        task = asyncio.create_task(health.grpc_health_check(servicer))
-        await asyncio.sleep(0.05)
-
-        servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)
 
         task.cancel()
 

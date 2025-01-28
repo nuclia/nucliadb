@@ -5,7 +5,7 @@
 groups = ["default", "dev", "nidx", "sdk", "sidecar"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:1aea0210f27ecd469e751ee24ef7eab2a21b1c50e8642907d8391013834a9a08"
+content_hash = "sha256:a91566252c4b6ff9c429b0214dd643c53bf563b05c663ef93ffe93cb65af44e4"
 
 [[metadata.targets]]
 requires_python = ">=3.9"
@@ -1347,7 +1347,7 @@ name = "grpcio-tools"
 version = "1.62.3"
 requires_python = ">=3.7"
 summary = "Protobuf code generator for gRPC"
-groups = ["default", "dev", "sdk", "sidecar"]
+groups = ["default", "dev", "sidecar"]
 dependencies = [
     "grpcio>=1.62.3",
     "protobuf<5.0dev,>=4.21.6",
@@ -1567,24 +1567,6 @@ dependencies = [
 files = [
     {file = "jwcrypto-1.5.6-py3-none-any.whl", hash = "sha256:150d2b0ebbdb8f40b77f543fb44ffd2baeff48788be71f67f03566692fd55789"},
     {file = "jwcrypto-1.5.6.tar.gz", hash = "sha256:771a87762a0c081ae6166958a954f80848820b2ab066937dc8b8379d65b1b039"},
-]
-
-[[package]]
-name = "kubernetes-asyncio"
-version = "29.0.1"
-summary = "Kubernetes asynchronous python client"
-groups = ["default", "dev"]
-dependencies = [
-    "aiohttp<4.0.0,>=3.9.0",
-    "certifi>=14.05.14",
-    "python-dateutil>=2.5.3",
-    "pyyaml>=3.12",
-    "six>=1.9.0",
-    "urllib3>=1.24.2",
-]
-files = [
-    {file = "kubernetes_asyncio-29.0.1-py3-none-any.whl", hash = "sha256:6edecf15be85cb7f41137b2aa19953cc5972509361affaa0fbfc8856cdcfccfd"},
-    {file = "kubernetes_asyncio-29.0.1.tar.gz", hash = "sha256:ae3eedff97427f6a7d7b896c2cb44002ce8a2c27b5a98aa997cf25ba1c7fbf7d"},
 ]
 
 [[package]]
@@ -2110,7 +2092,7 @@ files = [
 
 [[package]]
 name = "nucliadb"
-version = "5.2.1"
+version = "6.2.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb"
@@ -2145,14 +2127,12 @@ dependencies = [
     "idna>=3.3",
     "jmespath>=1.0.0",
     "jwcrypto>=1.5.6",
-    "kubernetes-asyncio<30.0.0",
     "lru-dict>=1.1.7",
     "mmh3>=3.0.0",
     "multidict>=6.0.4",
     "nuclia-models>=0.24.2",
     "nucliadb-admin-assets>=1.0.0.post1224",
     "nucliadb-models",
-    "nucliadb-node-binding>=2.26.0",
     "nucliadb-protos",
     "nucliadb-telemetry[all]",
     "nucliadb-utils[cache,fastapi,storages]",
@@ -2216,18 +2196,8 @@ path = "./nucliadb_models"
 summary = ""
 groups = ["default", "dev", "sdk"]
 dependencies = [
-    "nucliadb-protos",
     "pydantic>=2.6",
 ]
-
-[[package]]
-name = "nucliadb-node-binding"
-version = "2.37.1"
-requires_python = ">=3.9"
-editable = true
-path = "./nucliadb_node_binding"
-summary = ""
-groups = ["default", "dev"]
 
 [[package]]
 name = "nucliadb-protos"
@@ -2237,8 +2207,6 @@ path = "./nucliadb_protos/python"
 summary = "protos for nucliadb"
 groups = ["default", "dev", "sdk", "sidecar"]
 dependencies = [
-    "grpcio-tools>=1.44.0",
-    "grpcio>=1.44.0",
     "mypy-protobuf>=3.4.0",
     "protobuf<5,>=4.22.3",
     "types-protobuf<5,>=4.24",
@@ -3986,7 +3954,7 @@ name = "setuptools"
 version = "75.2.0"
 requires_python = ">=3.8"
 summary = "Easily download, build, install, upgrade, and uninstall Python packages"
-groups = ["default", "dev", "sdk", "sidecar"]
+groups = ["default", "dev", "sidecar"]
 files = [
     {file = "setuptools-75.2.0-py3-none-any.whl", hash = "sha256:a7fcb66f68b4d9e8e66b42f9876150a3371558f98fa32222ffaa5bced76406f8"},
     {file = "setuptools-75.2.0.tar.gz", hash = "sha256:753bb6ebf1f465a1912e19ed1d41f403a79173a9acf66a42e7e6aec45c3c16ec"},

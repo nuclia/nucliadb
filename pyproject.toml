@@ -21,7 +21,6 @@ dev = [
     "-e file:///${PROJECT_ROOT}/nucliadb",
     "-e file:///${PROJECT_ROOT}/nucliadb_models",
     "-e file:///${PROJECT_ROOT}/nucliadb_sidecar",
-    "-e file:///${PROJECT_ROOT}/nucliadb_node_binding",
     "-e file:///${PROJECT_ROOT}/nucliadb_protos/python",
     "-e file:///${PROJECT_ROOT}/nucliadb_telemetry[all]",
     "-e file:///${PROJECT_ROOT}/nucliadb_utils[cache,fastapi,storages]",

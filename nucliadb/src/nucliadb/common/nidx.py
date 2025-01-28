@@ -37,12 +37,10 @@ from nucliadb_utils.settings import FileBackendConfig, indexing_settings, storag
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
-NIDX_ENABLED = bool(os.environ.get("NIDX_ENABLED"))
-
 
 class NidxUtility:
-    api_client = None
-    searcher_client = None
+    api_client: NidxApiStub
+    searcher_client: NidxSearcherStub
 
     async def initialize(self):
         raise NotImplementedError()
@@ -98,6 +96,9 @@ class NidxBindingUtility(NidxUtility):
 
         self.config = {
             "METADATA__DATABASE_URL": ingest_settings.driver_pg_url,
+            "SEARCHER__METADATA_REFRESH_INTERVAL": str(
+                indexing_settings.index_searcher_refresh_interval
+            ),
             **_storage_config("INDEXER", None),
             **_storage_config("STORAGE", "nidx"),
         }
@@ -158,11 +159,8 @@ class NidxServiceUtility(NidxUtility):
         return res.seq
 
 
-async def start_nidx_utility() -> Optional[NidxUtility]:
-    if not NIDX_ENABLED:
-        return None
-
-    nidx = get_nidx()
+async def start_nidx_utility() -> NidxUtility:
+    nidx = get_utility(Utility.NIDX)
     if nidx:
         return nidx
 
@@ -178,30 +176,33 @@ async def start_nidx_utility() -> Optional[NidxUtility]:
 
 
 async def stop_nidx_utility():
-    nidx_utility = get_nidx()
+    nidx_utility = get_utility(Utility.NIDX)
     if nidx_utility:
         clean_utility(Utility.NIDX)
         await nidx_utility.finalize()
 
 
-def get_nidx() -> Optional[NidxUtility]:
-    return get_utility(Utility.NIDX)
+def get_nidx() -> NidxUtility:
+    nidx = get_utility(Utility.NIDX)
+    if nidx is None:
+        raise Exception("nidx not initialized")
+    return nidx
 
 
-def get_nidx_api_client() -> Optional["NidxApiStub"]:
+def get_nidx_api_client() -> "NidxApiStub":
     nidx = get_nidx()
-    if nidx:
+    if nidx.api_client:
         return nidx.api_client
     else:
-        return None
+        raise Exception("nidx not initialized")
 
 
-def get_nidx_searcher_client() -> Optional["NidxSearcherStub"]:
+def get_nidx_searcher_client() -> "NidxSearcherStub":
     nidx = get_nidx()
-    if nidx:
+    if nidx.searcher_client:
         return nidx.searcher_client
     else:
-        return None
+        raise Exception("nidx not initialized")
 
 
 # TODO: Remove the index node abstraction
@@ -252,9 +253,6 @@ class FakeNode(AbstractIndexNode):
         return "nidx"
 
 
-def get_nidx_fake_node() -> Optional[FakeNode]:
+def get_nidx_fake_node() -> FakeNode:
     nidx = get_nidx()
-    if nidx:
-        return FakeNode(nidx.api_client, nidx.searcher_client)
-    else:
-        return None
+    return FakeNode(nidx.api_client, nidx.searcher_client)

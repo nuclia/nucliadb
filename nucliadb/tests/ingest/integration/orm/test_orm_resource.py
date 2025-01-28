@@ -22,7 +22,6 @@ from typing import Optional
 from uuid import uuid4
 
 from nucliadb.common import datamanagers
-from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import resources_pb2 as rpb
@@ -50,7 +49,9 @@ from nucliadb_protos.writer_pb2 import (
 from tests.ingest.fixtures import create_resource
 
 
-async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, knowledgebox_ingest: str):
+async def test_create_resource_orm_with_basic(
+    storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+):
     basic = PBBasic(
         icon="text/plain",
         title="My title",
@@ -103,7 +104,7 @@ async def test_create_resource_orm_with_basic(storage, txn, cache, fake_node, kn
     assert o2.source_id == "My Source"
 
 
-async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox_ingest: str):
+async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -161,7 +162,11 @@ async def test_paragraphs_with_page(storage, txn, cache, fake_node, knowledgebox
             assert metadata.metadata.representation.file == "myfile"
 
 
-async def test_vector_duplicate_fields(maindb_driver: Driver, storage, fake_node):
+async def test_vector_duplicate_fields(
+    maindb_driver, storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str
+):
+    basic = PBBasic(title="My title", summary="My summary")
+    basic.metadata.status = PBMetadata.Status.PROCESSED
     vector_dimension = 768
 
     kbid = KnowledgeBox.new_unique_kbid()
@@ -172,7 +177,7 @@ async def test_vector_duplicate_fields(maindb_driver: Driver, storage, fake_node
         semantic_models={
             "my-model": SemanticModelMetadata(
                 similarity_function=utils_pb2.VectorSimilarity.COSINE,
-                vector_dimension=768,
+                vector_dimension=vector_dimension,
             )
         },
     )
@@ -242,7 +247,7 @@ async def test_vector_duplicate_fields(maindb_driver: Driver, storage, fake_node
 
 
 async def test_generate_broker_message(
-    storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_ingest: str
 ):
     # Create a resource with all possible metadata in it
     full_resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
@@ -388,7 +393,7 @@ async def test_generate_broker_message(
 
 
 async def test_generate_index_message_contains_all_metadata(
-    storage, maindb_driver, cache, fake_node, knowledgebox_ingest: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_ingest: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_ingest)
@@ -473,7 +478,7 @@ async def test_generate_index_message_contains_all_metadata(
 
 
 async def test_generate_index_message_vectorsets(
-    storage, maindb_driver, cache, fake_node, knowledgebox_with_vectorsets: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_with_vectorsets: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
@@ -505,7 +510,7 @@ async def test_generate_index_message_vectorsets(
 
 
 async def test_generate_index_message_cancels_labels(
-    storage, maindb_driver, cache, fake_node, knowledgebox_with_vectorsets: str
+    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_with_vectorsets: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)

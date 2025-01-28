@@ -18,6 +18,7 @@ use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 use tokio::runtime::Runtime;
+use tokio::sync::mpsc::{channel, Sender};
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
@@ -42,6 +43,7 @@ pub struct NidxBinding {
     runtime: Option<Runtime>,
     sync_watcher: watch::Receiver<SyncStatus>,
     shutdown: CancellationToken,
+    request_sync: Sender<()>,
     _searcher_work_dir: TempDir,
 }
 
@@ -78,6 +80,7 @@ impl NidxBinding {
         self.seq.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         result.map_err(|e| PyException::new_err(format!("Error indexing {e}")))?;
+        let _ = self.request_sync.try_send(());
 
         Ok(seq)
     }
@@ -114,6 +117,7 @@ impl NidxBinding {
         tokio::task::spawn(api_server.serve(api_service, shutdown.clone()));
 
         // Searcher API
+        let (request_sync, sync_requested) = channel(2);
         let searcher_work_dir = tempdir()?;
         let (sync_reporter, sync_watcher) = watch::channel(SyncStatus::Syncing);
         let searcher = SyncedSearcher::new(settings.metadata.clone(), searcher_work_dir.path());
@@ -131,6 +135,7 @@ impl NidxBinding {
                     shutdown2,
                     ShardSelector::new_single(),
                     Some(sync_reporter),
+                    Some(sync_requested),
                 )
                 .await
         });
@@ -156,6 +161,7 @@ impl NidxBinding {
             runtime: None,
             sync_watcher,
             shutdown,
+            request_sync,
             _searcher_work_dir: searcher_work_dir,
         })
     }

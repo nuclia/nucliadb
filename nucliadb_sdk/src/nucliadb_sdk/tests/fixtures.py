@@ -35,7 +35,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 import nucliadb_sdk
 
-images.settings["postgresql"]["version"] = "11"
+images.settings["postgresql"]["version"] = "13"
 images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
 images.settings["postgresql"]["env"]["POSTGRES_DB"] = "postgres"
 
@@ -51,6 +51,7 @@ images.settings["nucliadb"] = {
         "TEST_RELATIONS": """{"tokens": [{"text": "Nuclia", "ner": "ORG"}]}""",
         "LOG_LEVEL": "DEBUG",
         "DEBUG": "true",
+        "INDEX_SEARCHER_REFRESH_INTERVAL": "0.1",
     },
 }
 

@@ -31,18 +31,14 @@ import pytest
 from grpc import aio
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NIDX_ENABLED, NidxUtility
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
-from nucliadb.ingest.settings import DriverSettings
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
@@ -58,6 +54,7 @@ from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
+    MAIN,
     Utility,
     clean_utility,
     clear_global_cache,
@@ -93,10 +90,11 @@ class IngestFixture:
 
 @pytest.fixture(scope="function")
 async def ingest_consumers(
-    maindb_settings: DriverSettings,
+    maindb_driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
-    fake_node,
+    dummy_nidx_utility,
+    indexing_utility,
     nats_manager: NatsConnectionManager,
 ):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
@@ -109,10 +107,11 @@ async def ingest_consumers(
 
 @pytest.fixture(scope="function")
 async def ingest_processed_consumer(
-    maindb_settings: DriverSettings,
+    maindb_driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
-    fake_node,
+    dummy_nidx_utility,
+    indexing_utility,
     nats_manager: NatsConnectionManager,
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
@@ -135,30 +134,6 @@ async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
 
     clean_utility(Utility.PUBSUB)
     await pubsub.finalize()
-
-
-@pytest.fixture(scope="function")
-def fake_node(indexing_utility: IndexingUtility, shard_manager):
-    manager.INDEX_NODES.clear()
-    manager.add_index_node(
-        id=str(uuid.uuid4()),
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-    )
-    manager.add_index_node(
-        id=str(uuid.uuid4()),
-        address="nohost",
-        shard_count=0,
-        available_disk=100,
-        dummy=True,
-    )
-
-    with patch.object(cluster_settings, "standalone_mode", False):
-        yield
-
-    manager.INDEX_NODES.clear()
 
 
 @pytest.fixture()
@@ -269,22 +244,17 @@ async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator
 
 @pytest.fixture(scope="function")
 async def dummy_nidx_utility():
-    class DummyNidxUtility(NidxUtility):
-        async def initialize(self):
-            pass
+    class FakeNidx:
+        api_client = AsyncMock()
+        searcher_client = AsyncMock()
+        index = AsyncMock()
+        finalize = AsyncMock()
 
-        async def finalize(self):
-            pass
+    fake = FakeNidx()
+    fake.api_client.NewShard.return_value.id = "00000"
 
-        async def index(self, msg):
-            pass
-
-    if NIDX_ENABLED:
-        set_utility(Utility.NIDX, DummyNidxUtility())
-
-    yield
-
-    clean_utility(Utility.NIDX)
+    with patch.dict(MAIN, values={Utility.NIDX: fake}, clear=False):
+        yield fake
 
 
 @pytest.fixture(scope="function")
@@ -519,7 +489,7 @@ def make_extracted_vectors(
 
 
 @pytest.fixture(scope="function")
-async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox_ingest: str, fake_node):
+async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox_ingest: str):
     """
     Create a resource that has every possible bit of information
     """

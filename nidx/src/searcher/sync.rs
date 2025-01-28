@@ -35,6 +35,7 @@ use std::{
     path::PathBuf,
 };
 use std::{sync::Arc, time::Duration};
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc::Sender, OwnedRwLockReadGuard, RwLock, RwLockReadGuard};
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinSet;
@@ -65,6 +66,7 @@ pub async fn run_sync(
     shutdown: CancellationToken,
     notifier: Sender<IndexId>,
     sync_status: Option<watch::Sender<SyncStatus>>,
+    mut request_sync: Option<Receiver<()>>,
     shard_selector: ShardSelector,
 ) -> anyhow::Result<()> {
     // Keeps track of the `updated_at` date of the most recent synced index, in order
@@ -196,7 +198,14 @@ pub async fn run_sync(
 
             // If we didn't sync anything, wait for a bit
             if no_updates {
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                if let Some(ref mut rx) = request_sync {
+                    tokio::select! {
+                        _ = tokio::time::sleep(Duration::from_secs_f32(settings.metadata_refresh_interval)) => {},
+                        _ = rx.recv() => {}
+                    };
+                } else {
+                    tokio::time::sleep(Duration::from_secs_f32(settings.metadata_refresh_interval)).await;
+                }
             }
 
             Ok(())

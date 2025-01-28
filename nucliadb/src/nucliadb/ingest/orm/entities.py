@@ -37,6 +37,7 @@ from nucliadb.common.datamanagers.entities import (
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.settings import settings
+from nucliadb.search.search.shards import query_shard
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
     EntitiesGroup,
@@ -54,8 +55,6 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from .exceptions import EntityManagementException
 
@@ -218,14 +217,13 @@ class EntitiesManager:
                     ],
                 ),
             )
-            response = await node.reader.Search(request)  # type: ignore
+            response = await query_shard(node, shard_id, request)
             return response.relation
 
         results = await shard_manager.apply_for_all_shards(
             self.kbid,
             do_entities_search,
             settings.relation_search_timeout,
-            use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": self.kbid}),
             use_read_replica_nodes=self.use_read_replica_nodes,
         )
         for result in results:
@@ -315,7 +313,7 @@ class EntitiesManager:
                 paragraph=False,
                 faceted=Faceted(labels=["/e"]),
             )
-            response: SearchResponse = await node.reader.Search(request)  # type: ignore
+            response: SearchResponse = await query_shard(node, shard_id, request)
             try:
                 facetresults = response.document.facets["/e"].facetresults
                 return {facet.tag.split("/")[-1] for facet in facetresults}
@@ -327,7 +325,6 @@ class EntitiesManager:
             self.kbid,
             query_indexed_entities_group_names,
             settings.relation_types_timeout,
-            use_nidx=has_feature(const.Features.NIDX_READS, context={"kbid": self.kbid}),
             use_read_replica_nodes=self.use_read_replica_nodes,
         )
         for result in results:

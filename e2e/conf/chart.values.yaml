@@ -13,7 +13,7 @@ env:
   ENVIRONMENT: "stage"
   FLAG_SETTINGS_URL: https://raw.githubusercontent.com/nuclia/status/main/features-v2.json
 
-replicas: 2
+replicas: 1
 
 storage:
   class: "microk8s-hostpath"

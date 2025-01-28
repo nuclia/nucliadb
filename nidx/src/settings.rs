@@ -258,12 +258,18 @@ fn default_parallel_index_syncs() -> usize {
     2
 }
 
+fn default_metadata_refresh_interval() -> f32 {
+    1.0
+}
+
 #[derive(Clone, Deserialize, Debug)]
 pub struct SearcherSettings {
     #[serde(default = "default_parallel_index_syncs")]
     pub parallel_index_syncs: usize,
     #[serde(default)]
     pub shard_partitioning: ShardPartitioningSettings,
+    #[serde(default = "default_metadata_refresh_interval")]
+    pub metadata_refresh_interval: f32,
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -292,6 +298,7 @@ impl Default for SearcherSettings {
         Self {
             parallel_index_syncs: default_parallel_index_syncs(),
             shard_partitioning: Default::default(),
+            metadata_refresh_interval: 1.0,
         }
     }
 }

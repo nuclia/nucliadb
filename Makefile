@@ -16,7 +16,7 @@ fmt-check-package:
 	cargo fmt -p $(PACKAGE) --check
 
 
-protos: proto-py proto-rust
+protos: proto-py
 
 proto-py:
 	python -m grpc_tools.protoc nucliadb_protos/noderesources.proto -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
@@ -34,9 +34,6 @@ proto-py:
 	python -m grpc_tools.protoc nucliadb_protos/replication.proto   -I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/ --grpc_python_out=./nucliadb_protos/python/src/ --mypy_grpc_out=./nucliadb_protos/python/src/
 	python -m grpc_tools.protoc nucliadb_protos/kb_usage.proto 		-I ./ --python_out=./nucliadb_protos/python/src/ --mypy_out=./nucliadb_protos/python/src/
 
-proto-rust:
-	cargo build --locked -p nucliadb_protos
-
 proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*.bak
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2.py
@@ -49,7 +46,6 @@ python-code-lint:
 	make -C nucliadb_models/ format
 	make -C nucliadb_sdk/ format
 	make -C nucliadb_sidecar/ format
-	make -C nucliadb_node_binding/ format
 	make -C nucliadb_utils/ format
 	make -C nucliadb/ format
 	make -C nucliadb_telemetry/ format
@@ -62,7 +58,6 @@ python-code-lint:
 	make -C nucliadb_dataset/ lint
 	make -C nucliadb_models/ lint
 	make -C nucliadb_sidecar/ lint
-	make -C nucliadb_node_binding/ lint
 	make -C nucliadb_performance/ lint
 
 
@@ -127,7 +122,4 @@ build-node-binding-debug:
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-nucliadb-local:
-	docker build -t nuclia/nucliadb:latest . -f Dockerfile.pipbinding
-
-build-nucliadb-local-withbinding:
 	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding

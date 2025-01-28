@@ -61,7 +61,7 @@ async def test_materialize_kb_data(
     maindb_driver,
     pubsub,
     storage,
-    fake_node,
+    dummy_nidx_utility,
     knowledgebox_ingest,
     audit_storage,
 ):

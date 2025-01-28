@@ -29,7 +29,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.deploy_modes("component")
-async def test_reindex_resource(dummy_index, nucliadb_ingest_grpc: WriterStub, hosted_nucliadb):
+async def test_reindex_resource(dummy_nidx_utility, nucliadb_ingest_grpc: WriterStub, hosted_nucliadb):
     # Create a kb
     kbid = str(uuid4())
     result = await nucliadb_ingest_grpc.NewKnowledgeBoxV2(  # type: ignore

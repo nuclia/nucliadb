@@ -33,6 +33,7 @@ from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
+from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.ingest import logger
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
@@ -135,10 +136,9 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardLocation]:
                 continue
             else:
                 for shard_object_pb in kb_shards:
-                    for shard_replica_pb in shard_object_pb.replicas:
-                        shard_replica_id = shard_replica_pb.shard.id
-                        node_id = shard_replica_pb.node
-                        stored_shards[shard_replica_id] = ShardLocation(kbid=kbid, node_id=node_id)
+                    stored_shards[shard_object_pb.nidx_shard_id] = ShardLocation(
+                        kbid=kbid, node_id="nidx"
+                    )
     return stored_shards
 
 
@@ -241,6 +241,7 @@ async def main():
     """
     args = parse_arguments()
 
+    await start_nidx_utility()
     await setup_cluster()
     driver = await setup_driver()
 
@@ -253,6 +254,7 @@ async def main():
     finally:
         await teardown_driver()
         await teardown_cluster()
+        await stop_nidx_utility()
 
 
 def run() -> int:  # pragma: no cover

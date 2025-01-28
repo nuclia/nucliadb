@@ -85,7 +85,7 @@ def partition_utility() -> Iterable[PartitionUtility]:
 
 
 async def test_send_to_process_generated_fields(
-    fake_node,
+    dummy_nidx_utility,
     knowledgebox_ingest: str,
     processor: Processor,
     partition_utility: PartitionUtility,

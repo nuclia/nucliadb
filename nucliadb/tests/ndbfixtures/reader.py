@@ -80,7 +80,7 @@ async def reader_api_server(
     # it, download tests fail only if they are run after a test without using
     # this fixture. This should be fixed or explained
     local_files,
-    dummy_index_node_cluster,
+    indexing_utility,
     dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
     application = create_application()

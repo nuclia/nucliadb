@@ -88,7 +88,7 @@ async def test_list_paragraphs_shows_ners_with_positions(
     assert found_manresa and found_barcelona
 
 
-async def test_iterate_paragraphs(storage, txn, cache, fake_node, knowledgebox_ingest: str):
+async def test_iterate_paragraphs(storage, txn, cache, dummy_nidx_utility, knowledgebox_ingest: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
