@@ -135,8 +135,8 @@ jobs:
             nuclia/${{ matrix.image }}:latest
             nuclia/${{ matrix.image }}:${{ steps.version_step.outputs.version_number }}
             nuclia/${{ matrix.image }}:${{ steps.version_step.outputs.hash }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=min
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
