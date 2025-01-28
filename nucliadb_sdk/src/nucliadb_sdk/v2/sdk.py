@@ -41,7 +41,7 @@ import httpx
 import orjson
 from pydantic import BaseModel, ValidationError
 
-from nucliadb_models.conversation import Conversation, InputMessage
+from nucliadb_models.conversation import InputMessage
 from nucliadb_models.entities import (
     CreateEntitiesGroupPayload,
     EntitiesGroup,
@@ -54,14 +54,13 @@ from nucliadb_models.export_import import (
     NewImportedKbResponse,
     StatusResponse,
 )
-from nucliadb_models.file import FieldFile
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
-from nucliadb_models.link import FieldLink
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxList,
     KnowledgeBoxObj,
     Resource,
+    ResourceField,
     ResourceList,
 )
 from nucliadb_models.search import (
@@ -86,7 +85,6 @@ from nucliadb_models.search import (
     SyncAskResponse,
 )
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
-from nucliadb_models.text import FieldText
 from nucliadb_models.trainset import TrainSetPartitions
 from nucliadb_models.writer import (
     CreateResourcePayload,
@@ -112,19 +110,6 @@ ASK_STATUS_CODE_ERROR = "-1"
 
 def json_response_parser(response: httpx.Response) -> Any:
     return orjson.loads(response.content.decode())
-
-
-def get_resource_field_parser(
-    response: httpx.Response,
-) -> Union[FieldText, FieldFile, FieldLink, Conversation]:
-    json_data = response.json()
-    model = {
-        "text": FieldText,
-        "file": FieldFile,
-        "link": FieldLink,
-        "conversation": Conversation,
-    }[json_data["field_type"]]
-    return model.model_validate(json_data["value"])
 
 
 def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
@@ -553,7 +538,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "rid", "field_type", "field_id"),
         request_type=None,
-        response_type=get_resource_field_parser,
+        response_type=ResourceField,
     )
 
     get_resource_field_by_slug = _request_builder(
@@ -562,7 +547,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "slug", "field_type", "field_id"),
         request_type=None,
-        response_type=get_resource_field_parser,
+        response_type=ResourceField,
     )
 
     # Labels

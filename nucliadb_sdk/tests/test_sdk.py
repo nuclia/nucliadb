@@ -106,17 +106,21 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
     ]
     fid = "conv"
     sdk.add_conversation_message(kbid=kbid, rid=rid, field_id=fid, content=messages)
-    conv = sdk.get_resource_field(
+    field = sdk.get_resource_field(
         kbid=kbid, rid=rid, field_type="conversation", field_id=fid, query_params={"page": 1}
     )
-    assert conv.messages[0].ident == "1"
-    assert conv.messages[0].content.text == "Hello"
+    assert field.field_id == fid
+    assert field.field_type == "conversation"
+    assert field.value.messages[0].ident == "1"
+    assert field.value.messages[0].content.text == "Hello"
 
-    conv = sdk.get_resource_field_by_slug(
+    field = sdk.get_resource_field_by_slug(
         kbid=kbid, slug="myslug", field_type="conversation", field_id=fid, query_params={"page": 1}
     )
-    assert conv.messages[0].ident == "1"
-    assert conv.messages[0].content.text == "Hello"
+    assert field.field_id == fid
+    assert field.field_type == "conversation"
+    assert field.value.messages[0].ident == "1"
+    assert field.value.messages[0].content.text == "Hello"
 
 
 def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):

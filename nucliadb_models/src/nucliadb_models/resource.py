@@ -320,10 +320,12 @@ class ResourceList(BaseModel):
 class ResourceField(BaseModel):
     field_type: FieldTypeName
     field_id: str
-    value: Union[
-        FieldText,
-        FieldFile,
-        FieldLink,
-        Conversation,
-    ]
+    value: Optional[
+        Union[
+            FieldText,
+            FieldFile,
+            FieldLink,
+            Conversation,
+        ]
+    ] = None
     extracted: ExtractedDataType = None
