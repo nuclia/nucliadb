@@ -556,6 +556,15 @@ class _NucliaDBBase:
         response_type=get_resource_field_parser,
     )
 
+    get_resource_field_by_slug = _request_builder(
+        name="get_resource_field_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/{field_type}/{field_id}",
+        method="GET",
+        path_params=("kbid", "slug", "field_type", "field_id"),
+        request_type=None,
+        response_type=get_resource_field_parser,
+    )
+
     # Labels
     set_labelset = _request_builder(
         name="set_labelset",

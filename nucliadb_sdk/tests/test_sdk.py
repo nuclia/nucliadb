@@ -94,7 +94,7 @@ def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
 
 def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
     kbid = kb.uuid
-    resource = sdk.create_resource(kbid=kbid, title="Resource")
+    resource = sdk.create_resource(kbid=kbid, title="Resource", slug="myslug")
     rid = resource.uuid
     messages = [
         InputMessage(
@@ -109,6 +109,13 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
     conv = sdk.get_resource_field(
         kbid=kbid, rid=rid, field_type="conversation", field_id=fid, query_params={"page": 1}
     )
+    assert conv.messages[0].ident == "1"
+    assert conv.messages[0].content.text == "Hello"
+
+    conv = sdk.get_resource_field_by_slug(
+        kbid=kbid, slug="myslug", field_type="conversation", field_id=fid, query_params={"page": 1}
+    )
+    assert conv.messages[0].ident == "1"
     assert conv.messages[0].content.text == "Hello"
 
 
