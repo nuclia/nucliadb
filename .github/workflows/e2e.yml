@@ -49,16 +49,33 @@ jobs:
         run: |
           kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=postgresql,app.kubernetes.io/instance=my-postgresql
 
-      - name: PG Password
+      - name: Install Minio with Helm
+        run: |
+          helm install my-minio oci://registry-1.docker.io/bitnamicharts/minio
+
+      - name: Wait for Minio to be ready
+        run: |
+          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=minio,app.kubernetes.io/instance=my-minio
+          kubectl exec deploy/my-minio -- mkdir /bitnami/minio/data/nidx
+
+      - name: Credentials
         id: envs
         run: |-
           PGPASSWORD=`kubectl get secret --namespace default my-postgresql -o jsonpath="{.data.postgres-password}" | base64 -d`
           echo "PGPASSWORD=$PGPASSWORD" >> $GITHUB_OUTPUT
 
-      - name: Build and push image
+          MINIO_USER=`kubectl get secret --namespace default my-minio -o jsonpath="{.data.root-user}" | base64 -d`
+          echo "MINIO_USER=$MINIO_USER" >> $GITHUB_OUTPUT
+
+          MINIO_PASSWORD=`kubectl get secret --namespace default my-minio -o jsonpath="{.data.root-password}" | base64 -d`
+          echo "MINIO_PASSWORD=$MINIO_PASSWORD" >> $GITHUB_OUTPUT
+
+      - name: Build and push images
         run: |
-          docker build -t localhost:32000/nucliadb:test . -f Dockerfile.withbinding
+          docker build -t localhost:32000/nucliadb:test . -f Dockerfile
           docker push localhost:32000/nucliadb:test
+          docker build -t localhost:32000/nidx:test . -f Dockerfile.nidx
+          docker push localhost:32000/nidx:test
 
       - name: Install NucliaDB with Helm
         run: |
@@ -67,16 +84,28 @@ jobs:
             --timeout 5m \
             --namespace nucliadb \
             --values e2e/conf/chart.values.yaml \
-            --set "env.DRIVER_PG_URL=postgresql://postgres:${{ steps.envs.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
             --set "env.NUA_API_KEY=${{ secrets.NUA_API_KEY }}" \
+            --set "pg_url=postgresql://postgres:${{ steps.envs.outputs.PGPASSWORD }}@my-postgresql.default.svc.cluster.local:5432/postgres" \
+            --set "minio_user=${{ steps.envs.outputs.MINIO_USER }}" \
+            --set "minio_password=${{ steps.envs.outputs.MINIO_PASSWORD }}" \
             --set "image=localhost:32000/nucliadb" \
-            --set "imageVersion=test"
+            --set "imageVersion=test" \
+            --set "nidx.image=localhost:32000/nidx" \
+            --set "nidx.imageVersion=test"
           sleep 10
-          kubectl -n nucliadb wait --timeout=2m --for=condition=Ready pod -l statefulset.kubernetes.io/pod-name=nucliadb-0 || (
+          kubectl -n nucliadb wait --timeout=2m --for=condition=Available deploy/nucliadb || (
             kubectl get all --all-namespaces
             microk8s inspect &&
-            kubectl logs -n nucliadb pod/nucliadb-0 &&
-            kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
+            kubectl logs -n nucliadb deploy/nucliadb &&
+            kubectl logs -n nucliadb deploy/nidx &&
+            kubectl logs -n nucliadb deploy/nucliadb-worker &&
+            exit 1)
+          kubectl -n nucliadb wait --timeout=1m --for=condition=Available deploy/nidx  || (
+            kubectl get all --all-namespaces
+            microk8s inspect &&
+            kubectl logs -n nucliadb deploy/nucliadb &&
+            kubectl logs -n nucliadb deploy/nidx &&
+            kubectl logs -n nucliadb deploy/nucliadb-worker &&
             exit 1)
 
       - name: Setup Python
@@ -95,6 +124,7 @@ jobs:
           pytest -s -vv --tb=native e2e/test_e2e.py ||
             (kubectl get all --all-namespaces &&
               microk8s inspect &&
-              kubectl logs -n nucliadb pod/nucliadb-0 &&
-              kubectl get pods -n nucliadb -l app=nucliadb-worker -o name | while read pod; do kubectl logs -n nucliadb $pod; done &&
+              kubectl logs -n nucliadb deploy/nucliadb &&
+              kubectl logs -n nucliadb deploy/nidx &&
+              kubectl logs -n nucliadb deploy/nucliadb-worker &&
               exit 1)

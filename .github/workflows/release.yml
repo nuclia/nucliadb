@@ -90,6 +90,14 @@ jobs:
   push-docker:
     name: Build and push nucliadb docker image
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: nucliadb
+            dockerfile: Dockerfile.withbinding
+          - image: nidx
+            dockerfile: Dockerfile.nidx
 
     steps:
       - name: Checkout
@@ -121,12 +129,12 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: Dockerfile.withbinding
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: |
-            nuclia/nucliadb:latest
-            nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
-            nuclia/nucliadb:${{ steps.version_step.outputs.hash }}
+            nuclia/${{ matrix.image }}:latest
+            nuclia/${{ matrix.image }}:${{ steps.version_step.outputs.version_number }}
+            nuclia/${{ matrix.image }}:${{ steps.version_step.outputs.hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
 

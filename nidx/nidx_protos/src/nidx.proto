@@ -27,3 +27,7 @@ service NidxSearcher {
   rpc Paragraphs(nodereader.StreamRequest) returns (stream nodereader.ParagraphItem) {}
   rpc Documents(nodereader.StreamRequest) returns (stream nodereader.DocumentItem) {}
 }
+
+service NidxIndexer {
+  rpc Index(nodewriter.IndexMessage) returns (nodewriter.OpStatus) {}
+}

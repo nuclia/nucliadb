@@ -90,6 +90,9 @@ class Settings(BaseSettings):
     nidx_searcher_address: Optional[str] = Field(
         default=None, description="NIDX gRPC searcher API address"
     )
+    nidx_indexer_address: Optional[str] = Field(
+        default=None, description="NIDX gRPC indexer API address"
+    )
 
 
 settings = Settings()

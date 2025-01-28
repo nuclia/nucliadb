@@ -21,7 +21,7 @@
 import os
 from typing import Optional
 
-from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxSearcherStub
+from nidx_protos.nidx_pb2_grpc import NidxApiStub, NidxIndexerStub, NidxSearcherStub
 
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.settings import settings
@@ -124,16 +124,8 @@ class NidxBindingUtility(NidxUtility):
         self.binding.wait_for_sync()
 
 
-class NidxServiceUtility(NidxUtility):
-    """Implements Nidx utility connecting to the network service"""
-
+class NidxNatsIndexer:
     def __init__(self):
-        if indexing_settings.index_nidx_subject is None:
-            raise ValueError("INDEX_NIDX_SUBJECT needed for nidx utility")
-
-        if not settings.nidx_api_address or not settings.nidx_searcher_address:
-            raise ValueError("NIDX_API_ADDRESS and NIDX_SEARCHER_ADDRESS are required")
-
         self.nats_connection_manager = NatsConnectionManager(
             service_name="NidxIndexer",
             nats_servers=indexing_settings.index_jetstream_servers,
@@ -143,10 +135,6 @@ class NidxServiceUtility(NidxUtility):
 
     async def initialize(self):
         await self.nats_connection_manager.initialize()
-        self.api_client = NidxApiStub(get_traced_grpc_channel(settings.nidx_api_address, "nidx_api"))
-        self.searcher_client = NidxSearcherStub(
-            get_traced_grpc_channel(settings.nidx_searcher_address, "nidx_searcher")
-        )
 
     async def finalize(self):
         await self.nats_connection_manager.finalize()
@@ -159,15 +147,68 @@ class NidxServiceUtility(NidxUtility):
         return res.seq
 
 
-async def start_nidx_utility() -> NidxUtility:
+class NidxGrpcIndexer:
+    def __init__(self, address):
+        self.address = address
+
+    async def initialize(self):
+        self.client = NidxIndexerStub(get_traced_grpc_channel(self.address, "nidx_indexer"))
+
+    async def finalize(self):
+        pass
+
+    async def index(self, writer: IndexMessage) -> int:
+        await self.client.Index(writer)
+        return 0
+
+
+class NidxServiceUtility(NidxUtility):
+    """Implements Nidx utility connecting to the network service"""
+
+    def __init__(self):
+        if not settings.nidx_api_address or not settings.nidx_searcher_address:
+            raise ValueError("NIDX_API_ADDRESS and NIDX_SEARCHER_ADDRESS are required")
+
+        if indexing_settings.index_nidx_subject:
+            self.indexer = NidxNatsIndexer()
+        elif settings.nidx_indexer_address is not None:
+            self.indexer = NidxGrpcIndexer(settings.nidx_indexer_address)
+        else:
+            raise ValueError("NIDX_INDEXER_ADDRESS or INDEX_NIDX_SUBJECT are required")
+
+    async def initialize(self):
+        await self.indexer.initialize()
+        self.api_client = NidxApiStub(get_traced_grpc_channel(settings.nidx_api_address, "nidx_api"))
+        self.searcher_client = NidxSearcherStub(
+            get_traced_grpc_channel(settings.nidx_searcher_address, "nidx_searcher")
+        )
+
+    async def finalize(self):
+        await self.indexer.finalize()
+
+    async def index(self, writer: IndexMessage) -> int:
+        return await self.indexer.index(writer)
+
+
+async def start_nidx_utility() -> Optional[NidxUtility]:
     nidx = get_utility(Utility.NIDX)
     if nidx:
         return nidx
 
     nidx_utility: NidxUtility
     if settings.standalone_mode:
-        nidx_utility = NidxBindingUtility()
+        if (
+            settings.nidx_api_address is not None
+            and settings.nidx_searcher_address is not None
+            and settings.nidx_indexer_address is not None
+        ):
+            # Standalone with nidx service (via grpc). This is used in clustered standalone mode
+            nidx_utility = NidxServiceUtility()
+        else:
+            # Normal standalone mode with binding
+            nidx_utility = NidxBindingUtility()
     else:
+        # Component deploy with nidx service via grpc & nats (cloud)
         nidx_utility = NidxServiceUtility()
 
     await nidx_utility.initialize()

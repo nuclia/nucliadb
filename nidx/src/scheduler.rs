@@ -24,7 +24,11 @@ mod metrics_task;
 mod purge_tasks;
 mod vector_merge;
 
-use crate::{metadata::MergeJob, settings::MergeSettings, NidxMetadata, Settings};
+use crate::{
+    metadata::{IndexRequest, MergeJob},
+    settings::MergeSettings,
+    NidxMetadata, Settings,
+};
 use async_nats::jetstream::consumer::PullConsumer;
 use merge_task::MergeScheduler;
 use metrics_task::update_merge_job_metric;
@@ -43,16 +47,26 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
     let merge_settings = settings.merge.clone();
     let meta = settings.metadata.clone();
 
-    let client = async_nats::connect(&indexer_settings.nats_server).await?;
-    let jetstream = async_nats::jetstream::new(client);
-    let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
-
-    tokio::select! {
-        _ = run_tasks(meta, storage_settings.object_store.clone(), merge_settings, NatsAckFloor(consumer)) => {},
-        _ = shutdown.cancelled() => {}
-    }
+    if let Some(nats_server) = &indexer_settings.nats_server {
+        let client = async_nats::connect(nats_server).await?;
+        let jetstream = async_nats::jetstream::new(client);
+        let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
+        tokio::select! {
+            _ = run_tasks(meta, storage_settings.object_store.clone(), merge_settings, NatsAckFloor(consumer)) => {},
+            _ = shutdown.cancelled() => {}
+        }
+    } else {
+        tokio::select! {
+            _ = run_tasks(meta.clone(), storage_settings.object_store.clone(), merge_settings, PgAckFloor(meta)) => {},
+            _ = shutdown.cancelled() => {}
+        }
+    };
 
     Ok(())
+}
+
+pub trait GetAckFloor {
+    fn get(&mut self) -> impl Future<Output = anyhow::Result<i64>> + Send;
 }
 
 #[derive(Clone)]
@@ -64,8 +78,13 @@ impl GetAckFloor for NatsAckFloor {
     }
 }
 
-pub trait GetAckFloor {
-    fn get(&mut self) -> impl Future<Output = anyhow::Result<i64>> + Send;
+#[derive(Clone)]
+struct PgAckFloor(NidxMetadata);
+
+impl GetAckFloor for PgAckFloor {
+    async fn get(&mut self) -> anyhow::Result<i64> {
+        Ok(IndexRequest::last_ack_seq(&self.0.pool).await?)
+    }
 }
 
 pub async fn run_tasks(
@@ -181,4 +200,49 @@ pub async fn retry_jobs(meta: &NidxMetadata) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        metadata::IndexRequest,
+        scheduler::{GetAckFloor, PgAckFloor},
+        NidxMetadata,
+    };
+
+    #[sqlx::test]
+    async fn test_pg_ack_floor(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta = NidxMetadata::new_with_pool(pool).await.unwrap();
+
+        let mut ack_floor = PgAckFloor(meta.clone());
+
+        let req = IndexRequest::create(&meta.pool).await?;
+        req.delete(&meta.pool).await?;
+
+        // Initially, ack floor is 1
+        assert_eq!(ack_floor.get().await?, 1);
+
+        // While processing, it doesn't advance
+        let req = IndexRequest::create(&meta.pool).await?;
+        assert_eq!(ack_floor.get().await?, 1);
+
+        // It does once processed
+        req.delete(&meta.pool).await?;
+        assert_eq!(ack_floor.get().await?, 2);
+
+        // With concurrent messages, it jumps when the oldest one is done
+        let req3 = IndexRequest::create(&meta.pool).await?;
+        let req4 = IndexRequest::create(&meta.pool).await?;
+        let req5 = IndexRequest::create(&meta.pool).await?;
+
+        assert_eq!(ack_floor.get().await?, 2);
+        req4.delete(&meta.pool).await?;
+        assert_eq!(ack_floor.get().await?, 2);
+        req3.delete(&meta.pool).await?;
+        assert_eq!(ack_floor.get().await?, 4);
+        req5.delete(&meta.pool).await?;
+        assert_eq!(ack_floor.get().await?, 5);
+
+        Ok(())
+    }
 }
