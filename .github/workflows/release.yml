@@ -120,6 +120,7 @@ jobs:
         id: version_step
         run: |-
           python bump.py --build=${{github.run_number}}
+          cargo update --manifest-path nidx/Cargo.toml --offline nidx_binding
           VERSION=`cat VERSION`
           HASH=`git rev-parse --short HEAD`
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
@@ -135,8 +136,8 @@ jobs:
             nuclia/${{ matrix.image }}:latest
             nuclia/${{ matrix.image }}:${{ steps.version_step.outputs.version_number }}
             nuclia/${{ matrix.image }}:${{ steps.version_step.outputs.hash }}
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=min
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
