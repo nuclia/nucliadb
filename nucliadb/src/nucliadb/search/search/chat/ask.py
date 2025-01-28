@@ -129,7 +129,7 @@ class AskResult:
         main_results: KnowledgeboxFindResults,
         prequeries_results: Optional[list[PreQueryResult]],
         nuclia_learning_id: Optional[str],
-        predict_answer_stream: AsyncGenerator[GenerativeChunk, None],
+        predict_answer_stream: Optional[AsyncGenerator[GenerativeChunk, None]],
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
         auditor: ChatAuditor,
@@ -396,6 +396,9 @@ class AskResult:
         This method does not assume any order in the stream of items, but it assumes that at least
         the answer text is streamed in order.
         """
+        if self.predict_answer_stream is None:
+            # In some cases, clients may want to skip the answer generation step
+            return
         async for generative_chunk in self.predict_answer_stream:
             item = generative_chunk.chunk
             if isinstance(item, TextGenerativeResponse):
@@ -562,14 +565,18 @@ async def ask(
         rerank_context=False,
         top_k=ask_request.top_k,
     )
-    with metrics.time("stream_start"):
-        predict = get_predict()
-        (
-            nuclia_learning_id,
-            nuclia_learning_model,
-            predict_answer_stream,
-        ) = await predict.chat_query_ndjson(kbid, chat_model)
-        debug_chat_model = chat_model
+
+    nuclia_learning_id = None
+    nuclia_learning_model = None
+    predict_answer_stream = None
+    if ask_request.generate_answer:
+        with metrics.time("stream_start"):
+            predict = get_predict()
+            (
+                nuclia_learning_id,
+                nuclia_learning_model,
+                predict_answer_stream,
+            ) = await predict.chat_query_ndjson(kbid, chat_model)
 
     auditor = ChatAuditor(
         kbid=kbid,
@@ -590,13 +597,13 @@ async def ask(
         main_results=retrieval_results.main_query,
         prequeries_results=retrieval_results.prequeries,
         nuclia_learning_id=nuclia_learning_id,
-        predict_answer_stream=predict_answer_stream,  # type: ignore
+        predict_answer_stream=predict_answer_stream,
         prompt_context=prompt_context,
         prompt_context_order=prompt_context_order,
         auditor=auditor,
         metrics=metrics,
         best_matches=retrieval_results.best_matches,
-        debug_chat_model=debug_chat_model,
+        debug_chat_model=chat_model,
     )
 
 

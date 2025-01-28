@@ -1218,3 +1218,34 @@ async def test_rag_image_rag_strategies(
         },
     )
     assert resp.status_code == 200, resp.text
+
+
+async def test_ask_skip_answer_generation(nucliadb_reader: AsyncClient, knowledgebox, resource):
+    # Synchronous
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={"query": "title", "generate_answer": False, "debug": True},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    resp_data = SyncAskResponse.model_validate_json(resp.content)
+    assert resp_data.answer == ""
+    assert len(resp_data.retrieval_results.resources) == 1
+    assert resp_data.status == AnswerStatusCode.SUCCESS.prettify()
+    assert resp_data.prompt_context is not None
+    assert resp_data.predict_request is not None
+
+    # Streaming
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/ask",
+        json={"query": "title", "generate_answer": False, "debug": True},
+    )
+    assert resp.status_code == 200
+    results = parse_ask_response(resp)
+    assert results[0].item.type == "retrieval"
+    assert len(results[0].item.results.resources) > 0
+    assert results[1].item.type == "status"
+    assert results[1].item.status == AnswerStatusCode.SUCCESS.prettify()
+    assert results[2].item.type == "debug"
+    assert results[2].item.metadata["prompt_context"] is not None
+    assert results[2].item.metadata["predict_request"] is not None
