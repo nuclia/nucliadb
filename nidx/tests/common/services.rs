@@ -69,7 +69,7 @@ impl NidxFixture {
             },
         };
         // API server
-        let api_service = ApiServer::new(settings.metadata.clone()).into_router();
+        let api_service = ApiServer::new(&settings).into_router();
         let api_server = GrpcServer::new("localhost:0").await?;
         let api_port = api_server.port()?;
         tokio::task::spawn(api_server.serve(api_service, shutdown.clone()));

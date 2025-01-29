@@ -37,12 +37,11 @@ use tokio::sync::mpsc::Sender;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::service::Routes;
 use tonic::{Request, Response, Result, Status};
+use tracing::error;
 use uuid::Uuid;
 
 use crate::api::shards;
-use crate::{NidxMetadata, Settings};
-
-use super::export;
+use crate::{import_export, NidxMetadata, Settings};
 
 #[derive(Clone)]
 pub struct ApiServer {
@@ -66,75 +65,6 @@ impl ApiServer {
             .route("/api/shard/:shard_id/download", axum::routing::get(download_shard).with_state(myself))
             .route("/api/index/:index_id/download", axum::routing::get(download_index).with_state(myself2))
     }
-}
-
-struct ChannelWriter(Sender<anyhow::Result<Bytes>>);
-
-impl Write for ChannelWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if let Err(e) = self.0.blocking_send(Ok(Bytes::copy_from_slice(buf))) {
-            return Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, e));
-        };
-
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-async fn download_shard(State(server): State<ApiServer>, Path(shard_id): Path<Uuid>) -> impl IntoResponse {
-    let shard = Shard::get(&server.meta.pool, shard_id).await;
-    if let Err(e) = shard {
-        return axum::response::Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::from(e.to_string()))
-            .unwrap();
-    };
-
-    download_export(server, shard_id, None, shard_id.to_string()).await
-}
-
-async fn download_index(State(server): State<ApiServer>, Path(index_id): Path<i64>) -> impl IntoResponse {
-    let index = match Index::get(&server.meta.pool, index_id.into()).await {
-        Ok(index) => index,
-        Err(e) => {
-            return axum::response::Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Body::from(e.to_string()))
-                .unwrap();
-        }
-    };
-
-    download_export(server, index.shard_id, Some(index.id), index_id.to_string()).await
-}
-
-async fn download_export(
-    server: ApiServer,
-    shard_id: Uuid,
-    index_id: Option<IndexId>,
-    filename: String,
-) -> axum::response::Response<axum::body::Body> {
-    let (tx, rx) = tokio::sync::mpsc::channel(10);
-    let txc = tx.clone();
-    let writer = ChannelWriter(tx);
-
-    tokio::spawn(async move {
-        let r = export::export_shard(server.meta, server.storage, shard_id, index_id, writer).await;
-        // If an error happens during the export, send it to the stream so axum cancels the download
-        // and the user gets an error. Status code will still be 200 since this happens in the middle
-        // of a stream, but it's better than nothing
-        if let Err(e) = r {
-            let _ = txc.send(Err(e)).await;
-        }
-    });
-
-    let body = Body::from_stream(ReceiverStream::new(rx));
-    axum::response::Response::builder()
-        .header("Content-Disposition", format!("attachment; filename=\"{filename}.tar.zstd\""))
-        .body(body)
-        .unwrap()
 }
 
 #[tonic::async_trait]
@@ -269,4 +199,74 @@ impl NidxApi for ApiServer {
         // TODO
         Ok(Response::new(NodeMetadata::default()))
     }
+}
+
+struct ChannelWriter(Sender<anyhow::Result<Bytes>>);
+
+impl Write for ChannelWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if let Err(e) = self.0.blocking_send(Ok(Bytes::copy_from_slice(buf))) {
+            return Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, e));
+        };
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+async fn download_shard(State(server): State<ApiServer>, Path(shard_id): Path<Uuid>) -> impl IntoResponse {
+    let shard = Shard::get(&server.meta.pool, shard_id).await;
+    if let Err(e) = shard {
+        return axum::response::Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from(e.to_string()))
+            .unwrap();
+    };
+
+    download_export(server, shard_id, None, shard_id.to_string()).await
+}
+
+async fn download_index(State(server): State<ApiServer>, Path(index_id): Path<i64>) -> impl IntoResponse {
+    let index = match Index::get(&server.meta.pool, index_id.into()).await {
+        Ok(index) => index,
+        Err(e) => {
+            return axum::response::Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::from(e.to_string()))
+                .unwrap();
+        }
+    };
+
+    download_export(server, index.shard_id, Some(index.id), index_id.to_string()).await
+}
+
+async fn download_export(
+    server: ApiServer,
+    shard_id: Uuid,
+    index_id: Option<IndexId>,
+    filename: String,
+) -> axum::response::Response<axum::body::Body> {
+    let (tx, rx) = tokio::sync::mpsc::channel(10);
+    let txc = tx.clone();
+    let writer = ChannelWriter(tx);
+
+    tokio::spawn(async move {
+        let r = import_export::export_shard(server.meta, server.storage, shard_id, index_id, writer).await;
+        // If an error happens during the export, send it to the stream so axum cancels the download
+        // and the user gets an error. Status code will still be 200 since this happens in the middle
+        // of a stream, but it's better than nothing
+        if let Err(e) = r {
+            error!("Error exporting shard: {e:?}");
+            let _ = txc.send(Err(e)).await;
+        }
+    });
+
+    let body = Body::from_stream(ReceiverStream::new(rx));
+    axum::response::Response::builder()
+        .header("Content-Disposition", format!("attachment; filename=\"{filename}.tar.zstd\""))
+        .body(body)
+        .unwrap()
 }
