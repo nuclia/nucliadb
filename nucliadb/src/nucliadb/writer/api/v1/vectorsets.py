@@ -30,7 +30,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import (
     NucliaDBRoles,
 )
-from nucliadb_utils.authentication import requires
+from nucliadb_utils.authentication import requires_one
 
 
 @api.post(
@@ -41,7 +41,7 @@ from nucliadb_utils.authentication import requires
     # TODO: remove when the feature is mature
     include_in_schema=False,
 )
-@requires(NucliaDBRoles.MANAGER)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
 async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
     try:
@@ -63,7 +63,7 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Respo
     # TODO: remove when the feature is mature
     include_in_schema=False,
 )
-@requires(NucliaDBRoles.MANAGER)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
 async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
     try:
