@@ -112,7 +112,7 @@ async def test_matryoshka_embeddings(
                 vector=[(i + 1)] * vector_dimension,
             )
         )
-    text_field.with_extracted_vectors(vectors)
+    text_field.with_extracted_vectors(vectors, vectorset="my-semantic-model")
 
     bmb.add_field_builder(text_field)
 
