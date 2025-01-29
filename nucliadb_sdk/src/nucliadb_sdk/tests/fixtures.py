@@ -53,6 +53,7 @@ images.settings["nucliadb"] = {
         "DEBUG": "true",
         "INDEX_SEARCHER_REFRESH_INTERVAL": "0.1",
     },
+    "options": {"mem_limit": "2g"},
 }
 
 NUCLIA_DOCS_dataset = (
