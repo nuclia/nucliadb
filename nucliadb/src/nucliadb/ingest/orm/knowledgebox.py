@@ -372,6 +372,8 @@ class KnowledgeBox:
         if exists is False:
             logger.error(f"{kbid} KB does not exists on Storage")
 
+        nidx_api = get_nidx_api_client()
+
         async with driver.transaction() as txn:
             storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
             await txn.set(storage_to_delete, b"")
@@ -384,25 +386,17 @@ class KnowledgeBox:
                 logger.warning(f"Shards not found for KB while purging it", extra={"kbid": kbid})
             else:
                 for shard in shards_obj.shards:
-                    # Delete the shard on nodes
-                    for replica in shard.replicas:
-                        node = get_index_node(replica.node)
-                        if node is None:
-                            logger.error(
-                                f"No node {replica.node} found, let's continue. Some shards may stay orphaned",
-                                extra={"kbid": kbid},
-                            )
-                            continue
+                    if shard.nidx_shard_id:
                         try:
-                            await node.delete_shard(replica.shard.id)
+                            await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
                             logger.debug(
-                                f"Succeded deleting shard from nodeid={replica.node} at {node.address}",
-                                extra={"kbid": kbid, "node_id": replica.node},
+                                f"Succeded deleting shard",
+                                extra={"kbid": kbid, "shard_id": shard.nidx_shard_id},
                             )
                         except AioRpcError as exc:
                             if exc.code() == StatusCode.NOT_FOUND:
                                 continue
-                            raise ShardNotFound(f"{exc.details()} @ {node.address}")
+                            raise ShardNotFound(f"{exc.details()} @ shard {shard.nidx_shard_id}")
 
             await txn.commit()
         await cls.delete_all_kb_keys(driver, kbid)

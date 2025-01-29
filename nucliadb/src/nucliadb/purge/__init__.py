@@ -25,6 +25,7 @@ from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
+from nucliadb.common.nidx import start_nidx_utility
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import (
@@ -262,6 +263,7 @@ async def main():
     This script will purge all knowledge boxes marked to be deleted in maindb.
     """
     await setup_cluster()
+    await start_nidx_utility()
     driver = await setup_driver()
     storage = await get_storage(
         gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
