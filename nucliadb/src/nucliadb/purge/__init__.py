@@ -25,7 +25,7 @@ from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
-from nucliadb.common.nidx import start_nidx_utility
+from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import (
@@ -285,6 +285,7 @@ async def main():
             purge_resources_storage_task.cancel()
             await storage.finalize()
             await teardown_driver()
+            await stop_nidx_utility()
             await teardown_cluster()
         except Exception:  # pragma: no cover
             logger.exception("Error tearing down utilities on purge command")
