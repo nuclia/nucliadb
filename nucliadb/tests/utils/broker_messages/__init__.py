@@ -73,6 +73,7 @@ class BrokerMessageBuilder:
 
     def add_field_builder(self, field: FieldBuilder):
         self.fields[(field.id.field, field.id.field_type)] = field
+        return field
 
     def field_builder(self, field_id: str, field_type: rpb.FieldType.ValueType) -> FieldBuilder:
         return self.fields[(field_id, field_type)]
@@ -149,6 +150,11 @@ class BrokerMessageBuilder:
                 # we don't need to do anything else
                 pass
 
+            elif field.id.field_type == rpb.FieldType.TEXT:
+                assert (
+                    field.extracted.text is not None
+                ), "only text fields with extracted data are supported nowadays"
+
             elif field.id.field_type == rpb.FieldType.FILE:
                 file_field = self.bm.files[field.id.field]
                 file_field.added.FromDatetime(datetime.now())
@@ -160,8 +166,9 @@ class BrokerMessageBuilder:
             ):
                 # we don't need to do anything else
                 pass
+
             else:
-                raise Exception("Unsupported field type")
+                raise Exception("Unsupported field type: {field.id.field_type}")
 
             if field.user.metadata is not None:
                 self.bm.basic.fieldmetadata.append(field.user.metadata)

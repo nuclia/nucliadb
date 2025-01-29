@@ -17,18 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-import asyncio
 import dataclasses
 
 from httpx import AsyncClient
 
+from nucliadb.common import datamanagers
 from nucliadb_models.search import SearchOptions
 from nucliadb_protos.resources_pb2 import (
-    ExtractedTextWrapper,
-    ExtractedVectorsWrapper,
-    FieldComputedMetadataWrapper,
-    FieldID,
     FieldType,
     Paragraph,
 )
@@ -36,6 +31,19 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
+from tests.utils.dirty_index import wait_for_sync
+
+
+@dataclasses.dataclass
+class FieldData:
+    """Helper to group field data"""
+
+    field_id: str
+    field_type: FieldType.ValueType
+    text: str
+    extracted_text: str
+    vector: tuple[str, list[float]]
 
 
 async def test_paragraph_index_deletions(
@@ -44,19 +52,14 @@ async def test_paragraph_index_deletions(
     nucliadb_grpc: WriterStub,
     knowledgebox,
 ):
-    @dataclasses.dataclass
-    class FieldData:
-        """
-        Used for testing purposes only
-        """
-
-        field_id: str
-        field_type: FieldType.ValueType
-        text: str
-        extracted_text: str
-        vector: list[float]
-
     # Prepare data for a resource with title, summary and a text field
+
+    async with datamanagers.with_ro_transaction() as txn:
+        vectorsets = [vs async for _, vs in datamanagers.vectorsets.iter(txn, kbid=knowledgebox)]
+    assert len(vectorsets) == 1
+    vectorset_id = vectorsets[0].vectorset_id
+    vector_dimension = vectorsets[0].vectorset_index_config.vector_dimension
+
     original_text = "Original {field_id}"
     extracted_text = "Extracted text for {field_id}"
     title_field = FieldData(
@@ -64,21 +67,21 @@ async def test_paragraph_index_deletions(
         FieldType.GENERIC,
         original_text.format(field_id="title"),
         extracted_text.format(field_id="title"),
-        [1.0] * 512,
+        (vectorset_id, [1.0] * vector_dimension),
     )
     summary_field = FieldData(
         "summary",
         FieldType.GENERIC,
         original_text.format(field_id="summary"),
         extracted_text.format(field_id="summary"),
-        [2.0] * 512,
+        (vectorset_id, [2.0] * vector_dimension),
     )
     text_field = FieldData(
         "text",
         FieldType.TEXT,
         original_text.format(field_id="text"),
         extracted_text.format(field_id="text"),
-        [3.0] * 512,
+        (vectorset_id, [3.0] * vector_dimension),
     )
 
     # Create a resource with a simple text field
@@ -98,42 +101,29 @@ async def test_paragraph_index_deletions(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    # Inject corresponding broker message as if it was coming from the processor
-    bm = BrokerMessage(
-        kbid=knowledgebox,
-        uuid=rid,
-        type=BrokerMessage.MessageType.AUTOCOMMIT,
-        source=BrokerMessage.MessageSource.PROCESSOR,
+    # Check that searching for original texts returns title and summary (text is
+    # not indexed)
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/find",
+        json={
+            "query": "Original",
+            "features": [SearchOptions.KEYWORD],
+            "min_score": {"bm25": 0.0},
+        },
+        timeout=None,
     )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert len(resp_json["resources"]) == 1
+    fields = resp_json["resources"][rid]["fields"]
+    assert len(fields) == 2
+    assert list(sorted(fields.keys())) == ["/a/summary", "/a/title"]
 
-    for field_data in (title_field, summary_field, text_field):
-        pbfield = FieldID(
-            field=field_data.field_id,
-            field_type=field_data.field_type,
-        )
-        etw = ExtractedTextWrapper()
-        etw.field.CopyFrom(pbfield)
-        etw.body.text = field_data.extracted_text
-        bm.extracted_text.append(etw)
-
-        evw = ExtractedVectorsWrapper()
-        evw.field.CopyFrom(pbfield)
-        vector = Vector(
-            start=0,
-            end=len(field_data.extracted_text),
-            start_paragraph=0,
-            end_paragraph=len(field_data.extracted_text),
-            vector=field_data.vector,
-        )
-        evw.vectors.vectors.vectors.append(vector)
-        bm.field_vectors.append(evw)
-
-        fcmw = FieldComputedMetadataWrapper()
-        fcmw.field.CopyFrom(pbfield)
-        fcmw.metadata.metadata.paragraphs.append(Paragraph(start=0, end=len(field_data.extracted_text)))
-        bm.field_metadata.append(fcmw)
-
+    # Inject corresponding broker message as if it was coming from the processor
+    bmb = BrokerMessageBuilder(kbid=knowledgebox, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
+    bm = prepare_broker_message(bmb, title_field, summary_field, text_field)
     await inject_message(nucliadb_grpc, bm)
+    await wait_for_sync()  # wait until changes are searchable
 
     # Check that searching for original texts does not return any results
     resp = await nucliadb_reader.post(
@@ -161,8 +151,7 @@ async def test_paragraph_index_deletions(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert len(resp_json["resources"]) == 1
-    _rid, resource = resp_json["resources"].popitem()
-    fields = resource["fields"]
+    fields = resp_json["resources"][rid]["fields"]
     assert len(fields) == 3
 
     # Edit the field changing it's content
@@ -171,7 +160,7 @@ async def test_paragraph_index_deletions(
         FieldType.TEXT,
         "Modified text",
         "Modified coming from processor",
-        [3.0] * 512,
+        (vectorset_id, [3.0] * 512),
     )
 
     resp = await nucliadb_writer.patch(
@@ -188,43 +177,10 @@ async def test_paragraph_index_deletions(
     assert resp.status_code == 200
 
     # Inject broker message with the modified text
-    bm = BrokerMessage(
-        kbid=knowledgebox,
-        uuid=rid,
-        type=BrokerMessage.MessageType.AUTOCOMMIT,
-        source=BrokerMessage.MessageSource.PROCESSOR,
-    )
-
-    for field_data in (title_field, summary_field, text_field):
-        pbfield = FieldID(
-            field=field_data.field_id,
-            field_type=field_data.field_type,
-        )
-        etw = ExtractedTextWrapper()
-        etw.field.CopyFrom(pbfield)
-        etw.body.text = field_data.extracted_text
-        bm.extracted_text.append(etw)
-
-        evw = ExtractedVectorsWrapper()
-        evw.field.CopyFrom(pbfield)
-        vector = Vector(
-            start=0,
-            end=len(field_data.extracted_text),
-            start_paragraph=0,
-            end_paragraph=len(field_data.extracted_text),
-            vector=field_data.vector,
-        )
-        evw.vectors.vectors.vectors.append(vector)
-        bm.field_vectors.append(evw)
-
-        fcmw = FieldComputedMetadataWrapper()
-        fcmw.field.CopyFrom(pbfield)
-        fcmw.metadata.metadata.paragraphs.append(Paragraph(start=0, end=len(field_data.extracted_text)))
-        bm.field_metadata.append(fcmw)
-
+    bmb = BrokerMessageBuilder(kbid=knowledgebox, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
+    bm = prepare_broker_message(bmb, title_field, summary_field, text_field)
     await inject_message(nucliadb_grpc, bm)
-
-    await asyncio.sleep(0.5)  # wait for a while until reader gets updated
+    await wait_for_sync()  # wait until changes are searchable
 
     # Check that searching for the first extracted text now doesn't return the
     # text field (as it has been modified)
@@ -240,9 +196,7 @@ async def test_paragraph_index_deletions(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert len(resp_json["resources"]) == 1
-    _rid, resource = resp_json["resources"].popitem()
-    assert rid == _rid
-    fields = resource["fields"]
+    fields = resp_json["resources"][rid]["fields"]
     assert len(fields) == 2
     assert list(sorted(fields.keys())) == ["/a/summary", "/a/title"]
 
@@ -258,11 +212,67 @@ async def test_paragraph_index_deletions(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert len(resp_json["resources"]) == 1
-    _rid, resource = resp_json["resources"].popitem()
-    assert rid == _rid
-    fields = resource["fields"]
+    fields = resp_json["resources"][rid]["fields"]
     assert len(fields) == 1
     assert len(fields["/t/text"]["paragraphs"]) == 1
     paragraph_id = list(fields["/t/text"]["paragraphs"].keys())[0]
     assert paragraph_id == f"{rid}/t/text/0-{len(text_field.extracted_text)}"
     fields["/t/text"]["paragraphs"][paragraph_id]["text"] == text_field.extracted_text
+
+
+def prepare_broker_message(
+    bmb: BrokerMessageBuilder,
+    title: FieldData,
+    summary: FieldData,
+    text_field: FieldData,
+) -> BrokerMessage:
+    title_builder = bmb.with_title(title.extracted_text)
+    title_builder.with_extracted_vectors(
+        [
+            Vector(
+                start=0,
+                end=len(title.extracted_text),
+                start_paragraph=0,
+                end_paragraph=len(title.extracted_text),
+                vector=title.vector[1],
+            )
+        ],
+        title.vector[0],
+    )
+
+    summary_builder = bmb.with_summary(summary.extracted_text)
+    summary_builder.with_extracted_vectors(
+        [
+            Vector(
+                start=0,
+                end=len(summary.extracted_text),
+                start_paragraph=0,
+                end_paragraph=len(summary.extracted_text),
+                vector=summary.vector[1],
+            )
+        ],
+        summary.vector[0],
+    )
+
+    field_builder = bmb.add_field_builder(FieldBuilder(text_field.field_id, text_field.field_type))
+    field_builder.with_extracted_text(text_field.extracted_text)
+    field_builder.with_extracted_paragraph_metadata(
+        Paragraph(start=0, end=len(text_field.extracted_text))
+    )
+    field_builder.with_extracted_vectors(
+        [
+            Vector(
+                start=0,
+                end=len(text_field.extracted_text),
+                start_paragraph=0,
+                end_paragraph=len(text_field.extracted_text),
+                vector=text_field.vector[1],
+            )
+        ],
+        text_field.vector[0],
+    )
+
+    bm = bmb.build()
+
+    print(bm)
+    return bm
