@@ -35,6 +35,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    TypeVar,
 )
 
 import httpx
@@ -94,6 +95,24 @@ from nucliadb_models.writer import (
     UpdateResourcePayload,
 )
 from nucliadb_sdk.v2 import exceptions
+from dataclasses import dataclass
+
+
+OUTPUT_TYPE = TypeVar(
+    "OUTPUT_TYPE",
+    bound=Union[
+        Type[BaseModel],
+        Dict[str, Any],
+        Callable[[httpx.Response], BaseModel],
+        Callable[[httpx.Response], Iterator[bytes]],
+        None,
+    ],
+)
+
+INPUT_TYPE = TypeVar(
+    "INPUT_TYPE",
+    bound=Union[Type[BaseModel], List[Type[BaseModel]], None],
+)
 
 
 class Region(enum.Enum):
@@ -108,8 +127,402 @@ RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
 ASK_STATUS_CODE_ERROR = "-1"
 
 
-def json_response_parser(response: httpx.Response) -> Any:
-    return orjson.loads(response.content.decode())
+@dataclass
+class SDKDefinition:
+    method: str
+    path_template: str
+    path_params: Tuple[str, ...]
+    request_type: Any
+    response_type: Any
+    stream_response: bool = False
+    json_output: bool = False
+    sync: bool = True
+
+
+SDK_DEFINITION = {
+    # Knowledge Box Endpoints
+    "create_knowledge_box": SDKDefinition(
+        path_template="/v1/kbs",
+        method="POST",
+        path_params=(),
+        request_type=KnowledgeBoxConfig,
+        response_type=KnowledgeBoxObj,
+    ),
+    "delete_knowledge_box": SDKDefinition(
+        path_template="/v1/kb/{kbid}",
+        method="DELETE",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
+    ),
+    "get_knowledge_box": SDKDefinition(
+        path_template="/v1/kb/{kbid}",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
+    ),
+    "get_knowledge_box_by_slug": SDKDefinition(
+        path_template="/v1/kb/s/{slug}",
+        method="GET",
+        path_params=("slug",),
+        request_type=None,
+        response_type=KnowledgeBoxObj,
+    ),
+    "list_knowledge_boxes": SDKDefinition(
+        path_template="/v1/kbs",
+        method="GET",
+        path_params=(),
+        request_type=None,
+        response_type=KnowledgeBoxList,
+    ),
+    # Resource Endpoints
+    "create_resource": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resources",
+        method="POST",
+        path_params=("kbid",),
+        request_type=CreateResourcePayload,
+        response_type=ResourceCreated,
+    ),
+    "update_resource": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="PATCH",
+        path_params=("kbid", "rid"),
+        request_type=UpdateResourcePayload,
+        response_type=ResourceUpdated,
+    ),
+    "update_resource_by_slug": SDKDefinition(
+        path_template="/v1/kb/{kbid}/slug/{rslug}",
+        method="PATCH",
+        path_params=("kbid", "rslug"),
+        request_type=UpdateResourcePayload,
+        response_type=ResourceUpdated,
+    ),
+    "delete_resource": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="DELETE",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+    ),
+    "delete_resource_by_slug": SDKDefinition(
+        path_template="/v1/kb/{kbid}/slug/{rslug}",
+        method="DELETE",
+        path_params=("kbid", "rslug"),
+        request_type=None,
+        response_type=None,
+    ),
+    "get_resource_by_slug": SDKDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}",
+        method="GET",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=Resource,
+    ),
+    "get_resource_by_id": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}",
+        method="GET",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=Resource,
+    ),
+    "list_resources": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resources",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=ResourceList,
+    ),
+    # reindex/reprocess
+    "reindex_resource": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}/reindex",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+    ),
+    "reindex_resource_by_slug": SDKDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}/reindex",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=None,
+    ),
+    "reprocess_resource": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}/reprocess",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=None,
+        response_type=None,
+    ),
+    "reprocess_resource_by_slug": SDKDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}/reprocess",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=None,
+        response_type=None,
+    ),
+    # Field endpoints
+    "delete_field_by_id": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
+        method="DELETE",
+        path_params=("kbid", "rid", "field_type", "field_id"),
+        request_type=None,
+        response_type=None,
+    ),
+    # Conversation endpoints
+    "add_conversation_message": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
+        method="PUT",
+        path_params=("kbid", "rid", "field_id"),
+        request_type=List[InputMessage],  # type: ignore
+        response_type=ResourceFieldAdded,
+    ),
+    "get_resource_field": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
+        method="GET",
+        path_params=("kbid", "rid", "field_type", "field_id"),
+        request_type=None,
+        response_type=ResourceField,
+    ),
+    "get_resource_field_by_slug": SDKDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}/{field_type}/{field_id}",
+        method="GET",
+        path_params=("kbid", "slug", "field_type", "field_id"),
+        request_type=None,
+        response_type=ResourceField,
+    ),
+    # Labels
+    "set_labelset": SDKDefinition(
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="POST",
+        path_params=("kbid", "labelset"),
+        request_type=LabelSet,
+        response_type=None,
+    ),
+    "delete_labelset": SDKDefinition(
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="DELETE",
+        path_params=("kbid", "labelset"),
+        request_type=None,
+        response_type=None,
+    ),
+    "get_labelsets": SDKDefinition(
+        path_template="/v1/kb/{kbid}/labelsets",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxLabels,
+    ),
+    "get_labelset": SDKDefinition(
+        path_template="/v1/kb/{kbid}/labelset/{labelset}",
+        method="GET",
+        path_params=("kbid", "labelset"),
+        request_type=None,
+        response_type=LabelSet,
+    ),
+    # Entity Groups
+    "create_entitygroup": SDKDefinition(
+        path_template="/v1/kb/{kbid}/entitiesgroups",
+        method="POST",
+        path_params=("kbid",),
+        request_type=CreateEntitiesGroupPayload,
+        response_type=None,
+    ),
+    "update_entitygroup": SDKDefinition(
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="PATCH",
+        path_params=("kbid", "group"),
+        request_type=UpdateEntitiesGroupPayload,
+        response_type=None,
+    ),
+    "delete_entitygroup": SDKDefinition(
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="DELETE",
+        path_params=("kbid", "group"),
+        request_type=None,
+        response_type=None,
+    ),
+    "get_entitygroups": SDKDefinition(
+        path_template="/v1/kb/{kbid}/entitiesgroups",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxEntities,
+    ),
+    "get_entitygroup": SDKDefinition(
+        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
+        method="GET",
+        path_params=("kbid", "group"),
+        request_type=None,
+        response_type=EntitiesGroup,
+    ),
+    # Search / Find Endpoints
+    "find": SDKDefinition(
+        path_template="/v1/kb/{kbid}/find",
+        method="POST",
+        path_params=("kbid",),
+        request_type=FindRequest,
+        response_type=KnowledgeboxFindResults,
+    ),
+    "search": SDKDefinition(
+        path_template="/v1/kb/{kbid}/search",
+        method="POST",
+        path_params=("kbid",),
+        request_type=SearchRequest,
+        response_type=KnowledgeboxSearchResults,
+    ),
+    "ask": SDKDefinition(
+        path_template="/v1/kb/{kbid}/ask",
+        method="POST",
+        path_params=("kbid",),
+        request_type=AskRequest,
+        response_type=ask_response_parser,
+    ),
+    "ask_on_resource": SDKDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}/ask",
+        method="POST",
+        path_params=("kbid", "rid"),
+        request_type=AskRequest,
+        response_type=ask_response_parser,
+    ),
+    "ask_on_resource_by_slug": SDKDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}/ask",
+        method="POST",
+        path_params=("kbid", "slug"),
+        request_type=AskRequest,
+        response_type=ask_response_parser,
+    ),
+    "summarize": SDKDefinition(
+        path_template="/v1/kb/{kbid}/summarize",
+        method="POST",
+        path_params=("kbid",),
+        request_type=SummarizeRequest,
+        response_type=SummarizedResponse,
+    ),
+    "feedback": SDKDefinition(
+        path_template="/v1/kb/{kbid}/feedback",
+        method="POST",
+        path_params=("kbid",),
+        request_type=FeedbackRequest,
+        response_type=None,
+    ),
+    "start_export": SDKDefinition(
+        path_template="/v1/kb/{kbid}/export",
+        method="POST",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=CreateExportResponse,
+    ),
+    "export_status": SDKDefinition(
+        path_template="/v1/kb/{kbid}/export/{export_id}/status",
+        method="GET",
+        path_params=("kbid", "export_id"),
+        request_type=None,
+        response_type=StatusResponse,
+    ),
+    "download_export": SDKDefinition(
+        path_template="/v1/kb/{kbid}/export/{export_id}",
+        method="GET",
+        path_params=("kbid", "export_id"),
+        request_type=None,
+        response_type=None,
+        stream_response=True,
+    ),
+    "create_kb_from_import": SDKDefinition(
+        path_template="/v1/kbs/import",
+        method="POST",
+        path_params=(),
+        request_type=None,
+        response_type=NewImportedKbResponse,
+    ),
+    "start_import": SDKDefinition(
+        path_template="/v1/kb/{kbid}/import",
+        method="POST",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=CreateImportResponse,
+    ),
+    "import_status": SDKDefinition(
+        path_template="/v1/kb/{kbid}/import/{import_id}/status",
+        method="GET",
+        path_params=("kbid", "import_id"),
+        request_type=None,
+        response_type=StatusResponse,
+    ),
+    "trainset": SDKDefinition(
+        path_template="/v1/kb/{kbid}/trainset",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=TrainSetPartitions,
+    ),
+    # Learning Configuration
+    "get_configuration": SDKDefinition(
+        path_template="/v1/kb/{kbid}/configuration",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=Dict[str, Any],
+        json_output=True,
+    ),
+    "set_configuration": SDKDefinition(
+        path_template="/v1/kb/{kbid}/configuration",
+        method="POST",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=None,
+    ),
+    # Learning models
+    "download_model": SDKDefinition(
+        path_template="/v1/kb/{kbid}/models/{model_id}/{filename}",
+        method="GET",
+        path_params=("kbid", "model_id", "filename"),
+        stream_response=True,
+        request_type=None,
+        response_type=None,
+    ),
+    "get_models": SDKDefinition(
+        path_template="/v1/kb/{kbid}/models",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=Dict[str, Any],
+        json_output=True,
+    ),
+    "get_model": SDKDefinition(
+        path_template="/v1/kb/{kbid}/model/{model_id}",
+        method="GET",
+        path_params=("kbid", "model_id"),
+        request_type=None,
+        response_type=Dict[str, Any],
+        json_output=True,
+    ),
+    # Learning config schema
+    "get_configuration_schema": SDKDefinition(
+        path_template="/v1/kb/{kbid}/schema",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=Dict[str, Any],
+        json_output=True,
+    ),
+    # Custom synonyms
+    "set_custom_synonyms": SDKDefinition(
+        path_template="/v1/kb/{kbid}/custom-synonyms",
+        method="PUT",
+        path_params=("kbid",),
+        request_type=KnowledgeBoxSynonyms,
+        response_type=None,
+    ),
+    "get_custom_synonyms": SDKDefinition(
+        path_template="/v1/kb/{kbid}/custom-synonyms",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=KnowledgeBoxSynonyms,
+    ),
+}
 
 
 def ask_response_parser(response: httpx.Response) -> SyncAskResponse:
@@ -193,7 +606,10 @@ def _parse_list_of_pydantic(
 def _parse_response(
     response_type: Optional[Union[Type[BaseModel], Callable[[httpx.Response], Any]]],
     resp: httpx.Response,
+    json_output: bool,
 ) -> Any:
+    if json_output:
+        return orjson.loads(resp.content.decode())
     if response_type is not None:
         if isinstance(response_type, type) and issubclass(response_type, BaseModel):
             return response_type.model_validate_json(resp.content)
@@ -214,78 +630,133 @@ def is_raw_request_content(content: Any) -> bool:
     )
 
 
+def prepare_request(content: Optional[INPUT_TYPE] = None, **kwargs):
+    path_data = {}
+    for param in path_params:
+        if param not in kwargs:
+            raise TypeError(f"Missing required parameter {param}")
+        path_data[param] = kwargs.pop(param)
+
+    path = path_template.format(**path_data)
+    data = None
+    raw_content: Optional[RawRequestContent] = None
+    if request_type is not None:
+        if content is not None:
+            if not isinstance(content, request_type):  # type: ignore
+                raise TypeError(f"Expected {request_type}, got {type(content)}")
+            elif isinstance(content, BaseModel):
+                data = content.model_dump_json(by_alias=True, exclude_unset=True)
+            elif isinstance(content, list):
+                data = _parse_list_of_pydantic(content)
+            else:
+                raise TypeError(f"Unknown type {type(content)}")
+        else:
+            # pull properties out of kwargs now
+            content_data = {}
+            for key in list(kwargs.keys()):
+                if key in request_type.model_fields:  # type: ignore
+                    content_data[key] = kwargs.pop(key)
+            data = request_type.model_validate(content_data).model_dump_json(  # type: ignore
+                by_alias=True, exclude_unset=True
+            )
+    elif is_raw_request_content(content):
+        raw_content = content  # type: ignore
+
+    query_params = kwargs.pop("query_params", None)
+    if len(kwargs) > 0:
+        raise TypeError(f"Invalid arguments provided: {kwargs}")
+    return path, data, query_params, raw_content
+
+
 def _request_builder(
     *,
     name: str,
     method: str,
     path_template: str,
     path_params: Tuple[str, ...],
-    request_type: Optional[Union[Type[BaseModel], List[Any]]],
-    response_type: Optional[
-        Union[
-            Type[BaseModel],
-            Callable[[httpx.Response], BaseModel],
-            Callable[[httpx.Response], Iterator[bytes]],
-        ]
-    ],
+    request_type: INPUT_TYPE,
+    response_type: OUTPUT_TYPE,
     stream_response: bool = False,
+    json_output: bool = False,
+    sync: bool = True,
 ):
-    def _func(self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs):
-        path_data = {}
-        for param in path_params:
-            if param not in kwargs:
-                raise TypeError(f"Missing required parameter {param}")
-            path_data[param] = kwargs.pop(param)
 
-        path = path_template.format(**path_data)
-        data = None
-        raw_content: Optional[RawRequestContent] = None
-        if request_type is not None:
-            if content is not None:
-                try:
-                    if not isinstance(content, request_type):  # type: ignore
-                        raise TypeError(f"Expected {request_type}, got {type(content)}")
-                    else:
-                        data = content.model_dump_json(by_alias=True, exclude_unset=True)
-                except TypeError:
-                    if not isinstance(content, list):
-                        raise
-                    data = _parse_list_of_pydantic(content)
-            else:
-                # pull properties out of kwargs now
-                content_data = {}
-                for key in list(kwargs.keys()):
-                    if key in request_type.model_fields:  # type: ignore
-                        content_data[key] = kwargs.pop(key)
-                data = request_type.model_validate(content_data).model_dump_json(  # type: ignore
-                    by_alias=True, exclude_unset=True
-                )
-        elif is_raw_request_content(content):
-            raw_content = content
-
-        query_params = kwargs.pop("query_params", None)
-        if len(kwargs) > 0:
-            raise TypeError(f"Invalid arguments provided: {kwargs}")
-
+    def _func(
+        self: NucliaDB, content: Optional[INPUT_TYPE] = None, **kwargs
+    ) -> OUTPUT_TYPE:
+        path, data, query_params, raw_content = prepare_request(content, **kwargs)
         if not stream_response:
-            resp = self._request(path, method, data=data, query_params=query_params, content=raw_content)
-            if asyncio.iscoroutine(resp):
-
-                async def _wrapped_resp():
-                    real_resp = await resp
-                    return _parse_response(response_type, real_resp)
-
-                return _wrapped_resp()
-            else:
-                return _parse_response(response_type, resp)  # type: ignore
+            resp = self._request(
+                path, method, data=data, query_params=query_params, content=raw_content
+            )
+            return _parse_response(response_type, resp, json_output)  # type: ignore
         else:
-            resp = self._stream_request(path, method, data=data, query_params=query_params)
+            resp = self._stream_request(
+                path, method, data=data, query_params=query_params
+            )
             return resp
 
-    return _func
+    async def _async_func(
+        self: NucliaDBAsync, content: Optional[INPUT_TYPE] = None, **kwargs
+    ) -> OUTPUT_TYPE:
+        path, data, query_params, raw_content = prepare_request(content, **kwargs)
+        if not stream_response:
+            resp = await self._request(
+                path, method, data=data, query_params=query_params, content=raw_content
+            )
+
+            return _parse_response(response_type, resp, json_output)
+        else:
+            resp = self._stream_request(
+                path, method, data=data, query_params=query_params
+            )
+            return resp
+
+    if sync:
+        return _func
+    else:
+        return _async_func
+
+
+def build_sync_request(sdk_name):
+    sdk_definition = SDK_DEFINITION[sdk_name]
+    return (
+        _request_builder(
+            name=sdk_name,
+            method=sdk_definition.method,
+            path_template=sdk_definition.path_template,
+            path_params=sdk_definition.path_params,
+            request_type=sdk_definition.request_type,
+            response_type=sdk_definition.response_type,
+            stream_response=sdk_definition.stream_response,
+            json_output=sdk_definition.json_output,
+            sync=False,
+        ),
+    )
+
+
+def build_async_request(sdk_name):
+
+    sdk_definition = SDK_DEFINITION[sdk_name]
+    return (
+        _request_builder(
+            name=sdk_name,
+            method=sdk_definition.method,
+            path_template=sdk_definition.path_template,
+            path_params=sdk_definition.path_params,
+            request_type=sdk_definition.request_type,
+            response_type=sdk_definition.response_type,
+            stream_response=sdk_definition.stream_response,
+            json_output=sdk_definition.json_output,
+            sync=True,
+        ),
+    )
 
 
 class _NucliaDBBase:
+
+    sync: bool = True
+
     def __init__(
         self,
         *,
@@ -345,7 +816,9 @@ class _NucliaDBBase:
         if response.status_code < 300:
             return response
         elif response.status_code in (401, 403):
-            raise exceptions.AuthError(f"Auth error {response.status_code}: {response.text}")
+            raise exceptions.AuthError(
+                f"Auth error {response.status_code}: {response.text}"
+            )
         elif response.status_code == 402:
             raise exceptions.AccountLimitError(
                 f"Account limits exceeded error {response.status_code}: {response.text}"
@@ -364,470 +837,13 @@ class _NucliaDBBase:
         ):  # 419 is a custom error code for kb creation conflict
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
-            raise exceptions.NotFoundError(f"Resource not found at url {response.url}: {response.text}")
+            raise exceptions.NotFoundError(
+                f"Resource not found at url {response.url}: {response.text}"
+            )
         else:
             raise exceptions.UnknownError(
                 f"Unknown error connecting to API: {response.status_code}: {response.text}"
             )
-
-    # Knowledge Box Endpoints
-    create_knowledge_box = _request_builder(
-        name="create_knowledge_box",
-        path_template="/v1/kbs",
-        method="POST",
-        path_params=(),
-        request_type=KnowledgeBoxConfig,
-        response_type=KnowledgeBoxObj,
-    )
-    delete_knowledge_box = _request_builder(
-        name="delete_knowledge_box",
-        path_template="/v1/kb/{kbid}",
-        method="DELETE",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=KnowledgeBoxObj,
-    )
-    get_knowledge_box = _request_builder(
-        name="get_knowledge_box",
-        path_template="/v1/kb/{kbid}",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=KnowledgeBoxObj,
-    )
-    get_knowledge_box_by_slug = _request_builder(
-        name="get_knowledge_box_by_slug",
-        path_template="/v1/kb/s/{slug}",
-        method="GET",
-        path_params=("slug",),
-        request_type=None,
-        response_type=KnowledgeBoxObj,
-    )
-    list_knowledge_boxes = _request_builder(
-        name="list_knowledge_boxes",
-        path_template="/v1/kbs",
-        method="GET",
-        path_params=(),
-        request_type=None,
-        response_type=KnowledgeBoxList,
-    )
-
-    # Resource Endpoints
-    create_resource = _request_builder(
-        name="create_resource",
-        path_template="/v1/kb/{kbid}/resources",
-        method="POST",
-        path_params=("kbid",),
-        request_type=CreateResourcePayload,
-        response_type=ResourceCreated,
-    )
-    update_resource = _request_builder(
-        name="update_resource",
-        path_template="/v1/kb/{kbid}/resource/{rid}",
-        method="PATCH",
-        path_params=("kbid", "rid"),
-        request_type=UpdateResourcePayload,
-        response_type=ResourceUpdated,
-    )
-    update_resource_by_slug = _request_builder(
-        name="update_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{rslug}",
-        method="PATCH",
-        path_params=("kbid", "rslug"),
-        request_type=UpdateResourcePayload,
-        response_type=ResourceUpdated,
-    )
-    delete_resource = _request_builder(
-        name="delete_resource",
-        path_template="/v1/kb/{kbid}/resource/{rid}",
-        method="DELETE",
-        path_params=("kbid", "rid"),
-        request_type=None,
-        response_type=None,
-    )
-    delete_resource_by_slug = _request_builder(
-        name="delete_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{rslug}",
-        method="DELETE",
-        path_params=("kbid", "rslug"),
-        request_type=None,
-        response_type=None,
-    )
-    get_resource_by_slug = _request_builder(
-        name="get_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{slug}",
-        method="GET",
-        path_params=("kbid", "slug"),
-        request_type=None,
-        response_type=Resource,
-    )
-    get_resource_by_id = _request_builder(
-        name="get_resource_by_id",
-        path_template="/v1/kb/{kbid}/resource/{rid}",
-        method="GET",
-        path_params=("kbid", "rid"),
-        request_type=None,
-        response_type=Resource,
-    )
-    list_resources = _request_builder(
-        name="list_resources",
-        path_template="/v1/kb/{kbid}/resources",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=ResourceList,
-    )
-
-    # reindex/reprocess
-    reindex_resource = _request_builder(
-        name="reindex_resource",
-        path_template="/v1/kb/{kbid}/resource/{rid}/reindex",
-        method="POST",
-        path_params=("kbid", "rid"),
-        request_type=None,
-        response_type=None,
-    )
-    reindex_resource_by_slug = _request_builder(
-        name="reindex_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{slug}/reindex",
-        method="POST",
-        path_params=("kbid", "slug"),
-        request_type=None,
-        response_type=None,
-    )
-    reprocess_resource = _request_builder(
-        name="reprocess_resource",
-        path_template="/v1/kb/{kbid}/resource/{rid}/reprocess",
-        method="POST",
-        path_params=("kbid", "rid"),
-        request_type=None,
-        response_type=None,
-    )
-    reprocess_resource_by_slug = _request_builder(
-        name="reprocess_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{slug}/reprocess",
-        method="POST",
-        path_params=("kbid", "slug"),
-        request_type=None,
-        response_type=None,
-    )
-
-    # Field endpoints
-    delete_field_by_id = _request_builder(
-        name="delete_field_by_id",
-        path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
-        method="DELETE",
-        path_params=("kbid", "rid", "field_type", "field_id"),
-        request_type=None,
-        response_type=None,
-    )
-
-    # Conversation endpoints
-    add_conversation_message = _request_builder(
-        name="add_conversation_message",
-        path_template="/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
-        method="PUT",
-        path_params=("kbid", "rid", "field_id"),
-        request_type=List[InputMessage],  # type: ignore
-        response_type=ResourceFieldAdded,
-    )
-
-    get_resource_field = _request_builder(
-        name="get_resource_field",
-        path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
-        method="GET",
-        path_params=("kbid", "rid", "field_type", "field_id"),
-        request_type=None,
-        response_type=ResourceField,
-    )
-
-    get_resource_field_by_slug = _request_builder(
-        name="get_resource_field_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{slug}/{field_type}/{field_id}",
-        method="GET",
-        path_params=("kbid", "slug", "field_type", "field_id"),
-        request_type=None,
-        response_type=ResourceField,
-    )
-
-    # Labels
-    set_labelset = _request_builder(
-        name="set_labelset",
-        path_template="/v1/kb/{kbid}/labelset/{labelset}",
-        method="POST",
-        path_params=("kbid", "labelset"),
-        request_type=LabelSet,
-        response_type=None,
-    )
-    delete_labelset = _request_builder(
-        name="delete_labelset",
-        path_template="/v1/kb/{kbid}/labelset/{labelset}",
-        method="DELETE",
-        path_params=("kbid", "labelset"),
-        request_type=None,
-        response_type=None,
-    )
-    get_labelsets = _request_builder(
-        name="get_labelsets",
-        path_template="/v1/kb/{kbid}/labelsets",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=KnowledgeBoxLabels,
-    )
-    get_labelset = _request_builder(
-        name="get_labelset",
-        path_template="/v1/kb/{kbid}/labelset/{labelset}",
-        method="GET",
-        path_params=("kbid", "labelset"),
-        request_type=None,
-        response_type=LabelSet,
-    )
-
-    # Entity Groups
-    create_entitygroup = _request_builder(
-        name="create_entitygroup",
-        path_template="/v1/kb/{kbid}/entitiesgroups",
-        method="POST",
-        path_params=("kbid",),
-        request_type=CreateEntitiesGroupPayload,
-        response_type=None,
-    )
-    update_entitygroup = _request_builder(
-        name="update_entitygroup",
-        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
-        method="PATCH",
-        path_params=("kbid", "group"),
-        request_type=UpdateEntitiesGroupPayload,
-        response_type=None,
-    )
-    delete_entitygroup = _request_builder(
-        name="delete_entitygroup",
-        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
-        method="DELETE",
-        path_params=("kbid", "group"),
-        request_type=None,
-        response_type=None,
-    )
-    get_entitygroups = _request_builder(
-        name="get_entitygroups",
-        path_template="/v1/kb/{kbid}/entitiesgroups",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=KnowledgeBoxEntities,
-    )
-    get_entitygroup = _request_builder(
-        name="get_entitygroup",
-        path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
-        method="GET",
-        path_params=("kbid", "group"),
-        request_type=None,
-        response_type=EntitiesGroup,
-    )
-
-    # Search / Find Endpoints
-    find = _request_builder(
-        name="find",
-        path_template="/v1/kb/{kbid}/find",
-        method="POST",
-        path_params=("kbid",),
-        request_type=FindRequest,
-        response_type=KnowledgeboxFindResults,
-    )
-    search = _request_builder(
-        name="search",
-        path_template="/v1/kb/{kbid}/search",
-        method="POST",
-        path_params=("kbid",),
-        request_type=SearchRequest,
-        response_type=KnowledgeboxSearchResults,
-    )
-
-    ask = _request_builder(
-        name="ask",
-        path_template="/v1/kb/{kbid}/ask",
-        method="POST",
-        path_params=("kbid",),
-        request_type=AskRequest,
-        response_type=ask_response_parser,
-    )
-
-    ask_on_resource = _request_builder(
-        name="ask_on_resource",
-        path_template="/v1/kb/{kbid}/resource/{rid}/ask",
-        method="POST",
-        path_params=("kbid", "rid"),
-        request_type=AskRequest,
-        response_type=ask_response_parser,
-    )
-
-    ask_on_resource_by_slug = _request_builder(
-        name="ask_on_resource_by_slug",
-        path_template="/v1/kb/{kbid}/slug/{slug}/ask",
-        method="POST",
-        path_params=("kbid", "slug"),
-        request_type=AskRequest,
-        response_type=ask_response_parser,
-    )
-
-    summarize = _request_builder(
-        name="summarize",
-        path_template="/v1/kb/{kbid}/summarize",
-        method="POST",
-        path_params=("kbid",),
-        request_type=SummarizeRequest,
-        response_type=SummarizedResponse,
-    )
-
-    feedback = _request_builder(
-        name="feedback",
-        path_template="/v1/kb/{kbid}/feedback",
-        method="POST",
-        path_params=("kbid",),
-        request_type=FeedbackRequest,
-        response_type=None,
-    )
-
-    start_export = _request_builder(
-        name="start_export",
-        path_template="/v1/kb/{kbid}/export",
-        method="POST",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=CreateExportResponse,
-    )
-
-    export_status = _request_builder(
-        name="export_status",
-        path_template="/v1/kb/{kbid}/export/{export_id}/status",
-        method="GET",
-        path_params=("kbid", "export_id"),
-        request_type=None,
-        response_type=StatusResponse,
-    )
-
-    download_export = _request_builder(
-        name="download_export",
-        path_template="/v1/kb/{kbid}/export/{export_id}",
-        method="GET",
-        path_params=("kbid", "export_id"),
-        request_type=None,
-        response_type=None,
-        stream_response=True,
-    )
-
-    create_kb_from_import = _request_builder(
-        name="create_kb_from_import",
-        path_template="/v1/kbs/import",
-        method="POST",
-        path_params=(),
-        request_type=None,
-        response_type=NewImportedKbResponse,
-    )
-
-    start_import = _request_builder(
-        name="start_import",
-        path_template="/v1/kb/{kbid}/import",
-        method="POST",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=CreateImportResponse,
-    )
-
-    import_status = _request_builder(
-        name="import_status",
-        path_template="/v1/kb/{kbid}/import/{import_id}/status",
-        method="GET",
-        path_params=("kbid", "import_id"),
-        request_type=None,
-        response_type=StatusResponse,
-    )
-
-    trainset = _request_builder(
-        name="trainset",
-        path_template="/v1/kb/{kbid}/trainset",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=TrainSetPartitions,
-    )
-
-    # Learning Configuration
-    get_configuration = _request_builder(
-        name="get_configuration",
-        path_template="/v1/kb/{kbid}/configuration",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=json_response_parser,
-    )
-    set_configuration = _request_builder(
-        name="set_configuration",
-        path_template="/v1/kb/{kbid}/configuration",
-        method="POST",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=None,
-    )
-
-    # Learning models
-    download_model = _request_builder(
-        name="download_model",
-        path_template="/v1/kb/{kbid}/models/{model_id}/{filename}",
-        method="GET",
-        path_params=("kbid", "model_id", "filename"),
-        stream_response=True,
-        request_type=None,
-        response_type=None,
-    )
-
-    get_models = _request_builder(
-        name="get_models",
-        path_template="/v1/kb/{kbid}/models",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=json_response_parser,
-    )
-
-    get_model = _request_builder(
-        name="get_model",
-        path_template="/v1/kb/{kbid}/model/{model_id}",
-        method="GET",
-        path_params=("kbid", "model_id"),
-        request_type=None,
-        response_type=json_response_parser,
-    )
-
-    # Learning config schema
-    get_configuration_schema = _request_builder(
-        name="get_configuration_schema",
-        path_template="/v1/kb/{kbid}/schema",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=json_response_parser,
-    )
-
-    # Custom synonyms
-    set_custom_synonyms = _request_builder(
-        name="set_custom_synonyms",
-        path_template="/v1/kb/{kbid}/custom-synonyms",
-        method="PUT",
-        path_params=("kbid",),
-        request_type=KnowledgeBoxSynonyms,
-        response_type=None,
-    )
-
-    get_custom_synonyms = _request_builder(
-        name="get_custom_synonyms",
-        path_template="/v1/kb/{kbid}/custom-synonyms",
-        method="GET",
-        path_params=("kbid",),
-        request_type=None,
-        response_type=KnowledgeBoxSynonyms,
-    )
 
 
 class NucliaDB(_NucliaDBBase):
@@ -878,7 +894,9 @@ class NucliaDB(_NucliaDBBase):
         >>> sdk = NucliaDB(api_key="api-key", region=Region.ON_PREM, url=\"http://localhost:8080\")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.Client(headers=self.headers, base_url=self.base_url, timeout=timeout)
+        self.session = httpx.Client(
+            headers=self.headers, base_url=self.base_url, timeout=timeout
+        )
 
     def _request(
         self,
@@ -918,12 +936,80 @@ class NucliaDB(_NucliaDBBase):
             opts["params"] = query_params
 
         def iter_bytes(chunk_size=None) -> Iterator[bytes]:
-            with self.session.stream(method.lower(), url=url, **opts, timeout=30.0) as response:
+            with self.session.stream(
+                method.lower(), url=url, **opts, timeout=30.0
+            ) as response:
                 self._check_response(response)
                 for chunk in response.iter_raw(chunk_size=chunk_size):
                     yield chunk
 
         return iter_bytes
+
+    create_knowledge_box = build_sync_request("create_knowledge_box")
+    delete_knowledge_box = build_sync_request("delete_knowledge_box")
+    get_knowledge_box = build_sync_request("get_knowledge_box")
+    get_knowledge_box_by_slug = build_sync_request("get_knowledge_box_by_slug")
+    list_knowledge_boxes = build_sync_request("list_knowledge_boxes")
+    # Resource Endpoints
+    create_resource = build_sync_request("create_resource")
+    update_resource = build_sync_request("update_resource")
+    update_resource_by_slug = build_sync_request("update_resource_by_slug")
+    delete_resource = build_sync_request("delete_resource")
+    delete_resource_by_slug = build_sync_request("delete_resource_by_slug")
+    get_resource_by_slug = build_sync_request("get_resource_by_slug")
+    get_resource_by_id = build_sync_request("get_resource_by_id")
+    list_resources = build_sync_request("list_resources")
+    # reindex/reprocess
+    reindex_resource = build_sync_request("reindex_resource")
+    reindex_resource_by_slug = build_sync_request("reindex_resource_by_slug")
+    reprocess_resource = build_sync_request("reprocess_resource")
+    reprocess_resource_by_slug = build_sync_request("reprocess_resource_by_slug")
+    # Field endpoints
+    delete_field_by_id = build_sync_request("delete_field_by_id")
+    # Conversation endpoints
+    add_conversation_message = build_sync_request("add_conversation_message")
+    get_resource_field = build_sync_request("get_resource_field")
+    get_resource_field_by_slug = build_sync_request("get_resource_field_by_slug")
+    # Labels
+    set_labelset = build_sync_request("set_labelset")
+    delete_labelset = build_sync_request("delete_labelset")
+    get_labelsets = build_sync_request("get_labelsets")
+    get_labelset = build_sync_request("get_labelset")
+    # Entity Groups
+    create_entitygroup = build_sync_request("create_entitygroup")
+    update_entitygroup = build_sync_request("update_entitygroup")
+    delete_entitygroup = build_sync_request("delete_entitygroup")
+    get_entitygroups = build_sync_request("get_entitygroups")
+    get_entitygroup = build_sync_request("get_entitygroup")
+    # Search / Find Endpoints
+    find = build_sync_request("find")
+    search = build_sync_request("search")
+    ask = build_sync_request("ask")
+    ask_on_resource = build_sync_request("ask_on_resource")
+    ask_on_resource_by_slug = build_sync_request("ask_on_resource_by_slug")
+    summarize = build_sync_request("summarize")
+    feedback = build_sync_request("feedback")
+    start_export = build_sync_request("start_export")
+    export_status = build_sync_request("export_status")
+    download_export = build_sync_request("download_export")
+    create_kb_from_import = build_sync_request("create_kb_from_import")
+    start_import = build_sync_request("start_import")
+    import_status = build_sync_request("import_status")
+    trainset = build_sync_request("trainset")
+    # Learning Configuration
+    get_configuration = build_sync_request("get_configuration")
+    set_configuration = build_sync_request("set_configuration")
+
+    # Learning models
+    download_model = build_sync_request("download_model")
+    get_models = build_sync_request("get_models")
+    get_model = build_sync_request("get_model")
+
+    # Learning config schema
+    get_configuration_schema = build_sync_request("get_configuration_schema")
+    # Custom synonyms
+    set_custom_synonyms = build_sync_request("set_custom_synonyms")
+    set_custom_synonyms = build_sync_request("set_custom_synonyms")
 
 
 class NucliaDBAsync(_NucliaDBBase):
@@ -972,7 +1058,9 @@ class NucliaDBAsync(_NucliaDBBase):
         >>> sdk = NucliaDBAsync(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.AsyncClient(headers=self.headers, base_url=self.base_url, timeout=timeout)
+        self.session = httpx.AsyncClient(
+            headers=self.headers, base_url=self.base_url, timeout=timeout
+        )
 
     async def _request(
         self,
@@ -994,7 +1082,9 @@ class NucliaDBAsync(_NucliaDBBase):
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
-        response: httpx.Response = await getattr(self.session, method.lower())(url, **opts)
+        response: httpx.Response = await getattr(self.session, method.lower())(
+            url, **opts
+        )
         return self._check_response(response)
 
     def _stream_request(
@@ -1018,3 +1108,69 @@ class NucliaDBAsync(_NucliaDBBase):
                     yield chunk
 
         return iter_bytes
+
+    create_knowledge_box = build_async_request("create_knowledge_box")
+    delete_knowledge_box = build_async_request("delete_knowledge_box")
+    get_knowledge_box = build_async_request("get_knowledge_box")
+    get_knowledge_box_by_slug = build_async_request("get_knowledge_box_by_slug")
+    list_knowledge_boxes = build_async_request("list_knowledge_boxes")
+    # Resource Endpoints
+    create_resource = build_async_request("create_resource")
+    update_resource = build_async_request("update_resource")
+    update_resource_by_slug = build_async_request("update_resource_by_slug")
+    delete_resource = build_async_request("delete_resource")
+    delete_resource_by_slug = build_async_request("delete_resource_by_slug")
+    get_resource_by_slug = build_async_request("get_resource_by_slug")
+    get_resource_by_id = build_async_request("get_resource_by_id")
+    list_resources = build_async_request("list_resources")
+    # reindex/reprocess
+    reindex_resource = build_async_request("reindex_resource")
+    reindex_resource_by_slug = build_async_request("reindex_resource_by_slug")
+    reprocess_resource = build_async_request("reprocess_resource")
+    reprocess_resource_by_slug = build_async_request("reprocess_resource_by_slug")
+    # Field endpoints
+    delete_field_by_id = build_async_request("delete_field_by_id")
+    # Conversation endpoints
+    add_conversation_message = build_async_request("add_conversation_message")
+    get_resource_field = build_async_request("get_resource_field")
+    get_resource_field_by_slug = build_async_request("get_resource_field_by_slug")
+    # Labels
+    set_labelset = build_async_request("set_labelset")
+    delete_labelset = build_async_request("delete_labelset")
+    get_labelsets = build_async_request("get_labelsets")
+    get_labelset = build_async_request("get_labelset")
+    # Entity Groups
+    create_entitygroup = build_async_request("create_entitygroup")
+    update_entitygroup = build_async_request("update_entitygroup")
+    delete_entitygroup = build_async_request("delete_entitygroup")
+    get_entitygroups = build_async_request("get_entitygroups")
+    get_entitygroup = build_async_request("get_entitygroup")
+    # Search / Find Endpoints
+    find = build_async_request("find")
+    search = build_async_request("search")
+    ask = build_async_request("ask")
+    ask_on_resource = build_async_request("ask_on_resource")
+    ask_on_resource_by_slug = build_async_request("ask_on_resource_by_slug")
+    summarize = build_async_request("summarize")
+    feedback = build_async_request("feedback")
+    start_export = build_async_request("start_export")
+    export_status = build_async_request("export_status")
+    download_export = build_async_request("download_export")
+    create_kb_from_import = build_async_request("create_kb_from_import")
+    start_import = build_async_request("start_import")
+    import_status = build_async_request("import_status")
+    trainset = build_async_request("trainset")
+    # Learning Configuration
+    get_configuration = build_async_request("get_configuration")
+    set_configuration = build_async_request("set_configuration")
+
+    # Learning models
+    download_model = build_async_request("download_model")
+    get_models = build_async_request("get_models")
+    get_model = build_async_request("get_model")
+
+    # Learning config schema
+    get_configuration_schema = build_async_request("get_configuration_schema")
+    # Custom synonyms
+    set_custom_synonyms = build_async_request("set_custom_synonyms")
+    set_custom_synonyms = build_async_request("set_custom_synonyms")
