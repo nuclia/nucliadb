@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from __future__ import annotations
 import enum
 import inspect
 import io
@@ -520,7 +521,7 @@ def prepare_request(
     content: Optional[INPUT_TYPE] = None,
     **kwargs,
 ):
-    path, query_params = prepare_request_base(path_template, path_params)
+    path, query_params = prepare_request_base(path_template, path_params, **kwargs)
     data = None
     if request_type is not None:
         if content is not None:
@@ -1007,8 +1008,8 @@ class NucliaDB(_NucliaDBBase):
     set_custom_synonyms = _request_sync_builder(
         "set_custom_synonyms", KnowledgeBoxSynonyms, NoneType
     )
-    set_custom_synonyms = _request_sync_builder(
-        "set_custom_synonyms", NoneType, KnowledgeBoxSynonyms
+    get_custom_synonyms = _request_sync_builder(
+        "get_custom_synonyms", NoneType, KnowledgeBoxSynonyms
     )
 
 
@@ -1233,6 +1234,6 @@ class NucliaDBAsync(_NucliaDBBase):
     set_custom_synonyms = _request_async_builder(
         "set_custom_synonyms", KnowledgeBoxSynonyms, NoneType
     )
-    set_custom_synonyms = _request_async_builder(
-        "set_custom_synonyms", NoneType, KnowledgeBoxSynonyms
+    get_custom_synonyms = _request_async_builder(
+        "get_custom_synonyms", NoneType, KnowledgeBoxSynonyms
     )
