@@ -60,6 +60,7 @@ from nucliadb_models.resource import (
     KnowledgeBoxList,
     KnowledgeBoxObj,
     Resource,
+    ResourceField,
     ResourceList,
 )
 from nucliadb_models.search import (
@@ -529,6 +530,24 @@ class _NucliaDBBase:
         path_params=("kbid", "rid", "field_id"),
         request_type=List[InputMessage],  # type: ignore
         response_type=ResourceFieldAdded,
+    )
+
+    get_resource_field = _request_builder(
+        name="get_resource_field",
+        path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
+        method="GET",
+        path_params=("kbid", "rid", "field_type", "field_id"),
+        request_type=None,
+        response_type=ResourceField,
+    )
+
+    get_resource_field_by_slug = _request_builder(
+        name="get_resource_field_by_slug",
+        path_template="/v1/kb/{kbid}/slug/{slug}/{field_type}/{field_id}",
+        method="GET",
+        path_params=("kbid", "slug", "field_type", "field_id"),
+        request_type=None,
+        response_type=ResourceField,
     )
 
     # Labels

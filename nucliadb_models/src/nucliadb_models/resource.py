@@ -25,7 +25,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from nucliadb_models.conversation import FieldConversation
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.conversation import Conversation, FieldConversation
 from nucliadb_models.external_index_providers import ExternalIndexProvider
 from nucliadb_models.extracted import (
     ExtractedText,
@@ -314,3 +315,17 @@ class ResourcePagination(BaseModel):
 class ResourceList(BaseModel):
     resources: List[Resource]
     pagination: ResourcePagination
+
+
+class ResourceField(BaseModel):
+    field_type: FieldTypeName
+    field_id: str
+    value: Optional[
+        Union[
+            FieldText,
+            FieldFile,
+            FieldLink,
+            Conversation,
+        ]
+    ] = None
+    extracted: ExtractedDataType = None

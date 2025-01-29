@@ -21,6 +21,7 @@ import httpx
 import pytest
 
 import nucliadb_sdk
+from nucliadb_models.conversation import InputMessage, InputMessageContent
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 
 
@@ -89,6 +90,37 @@ def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
         sdk.delete_resource(kbid=kb.uuid, rid=resource.id)
     except nucliadb_sdk.exceptions.NotFoundError:
         pass
+
+
+def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb):
+    kbid = kb.uuid
+    resource = sdk.create_resource(kbid=kbid, title="Resource", slug="myslug")
+    rid = resource.uuid
+    messages = [
+        InputMessage(  # type: ignore
+            ident="1",
+            content=InputMessageContent(
+                text="Hello",
+            ),
+        )
+    ]
+    fid = "conv"
+    sdk.add_conversation_message(kbid=kbid, rid=rid, field_id=fid, content=messages)
+    field = sdk.get_resource_field(
+        kbid=kbid, rid=rid, field_type="conversation", field_id=fid, query_params={"page": 1}
+    )
+    assert field.field_id == fid
+    assert field.field_type == "conversation"
+    assert field.value.messages[0].ident == "1"
+    assert field.value.messages[0].content.text == "Hello"
+
+    field = sdk.get_resource_field_by_slug(
+        kbid=kbid, slug="myslug", field_type="conversation", field_id=fid, query_params={"page": 1}
+    )
+    assert field.field_id == fid
+    assert field.field_type == "conversation"
+    assert field.value.messages[0].ident == "1"
+    assert field.value.messages[0].content.text == "Hello"
 
 
 def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
