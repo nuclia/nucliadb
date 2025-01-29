@@ -241,3 +241,105 @@ async fn import_file(storage: &Arc<DynObjectStore>, path: PathBuf, mut reader: i
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+    use std::sync::Arc;
+
+    use nidx_tests::little_prince;
+    use nidx_vector::config::Similarity;
+    use nidx_vector::config::VectorConfig;
+    use nidx_vector::config::VectorType;
+    use object_store::ObjectStore;
+    use sqlx::testing::TestArgs;
+    use sqlx::testing::TestSupport;
+    use sqlx::Postgres;
+    use tempfile::NamedTempFile;
+    use uuid::Uuid;
+
+    use crate::import_export::export_shard;
+    use crate::import_export::import_shard;
+    use crate::indexer::index_resource;
+    use crate::metadata::Segment;
+    use crate::{
+        metadata::{Index, IndexConfig, Shard},
+        NidxMetadata,
+    };
+
+    const VECTOR_CONFIG: VectorConfig = VectorConfig {
+        similarity: Similarity::Cosine,
+        normalize_vectors: false,
+        vector_type: VectorType::DenseF32 {
+            dimension: 3,
+        },
+    };
+
+    #[sqlx::test]
+    async fn test_export_and_import(pool_source: sqlx::PgPool) -> anyhow::Result<()> {
+        let meta_source = NidxMetadata::new_with_pool(pool_source).await?;
+
+        // Create a shard with indexes
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta_source.pool, kbid).await?;
+        let mut index_ids = Vec::new();
+        index_ids.push(Index::create(&meta_source.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?.id);
+        index_ids.push(Index::create(&meta_source.pool, shard.id, "text", IndexConfig::new_text()).await?.id);
+        index_ids.push(Index::create(&meta_source.pool, shard.id, "paragraph", IndexConfig::new_paragraph()).await?.id);
+
+        let storage_source = Arc::new(object_store::memory::InMemory::new());
+        index_resource(
+            &meta_source,
+            storage_source.clone(),
+            &tempfile::env::temp_dir(),
+            &shard.id.to_string(),
+            little_prince(shard.id.to_string(), None),
+            123i64.into(),
+        )
+        .await?;
+
+        // Some quick sanity checks to see that we indexed something
+        assert_eq!(
+            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM segments WHERE delete_at IS NULL")
+                .fetch_one(&meta_source.pool)
+                .await?,
+            3
+        );
+        assert_eq!(
+            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions").fetch_one(&meta_source.pool).await?,
+            1
+        );
+
+        // Create destination DB
+        let config_dest = Postgres::test_context(&TestArgs::new("test_export_and_import_dest")).await?;
+        let pool_dest = sqlx::PgPool::connect_with(config_dest.connect_opts).await?;
+        let meta_dest = NidxMetadata::new_with_pool(pool_dest).await?;
+        let storage_dest = Arc::new(object_store::memory::InMemory::new());
+
+        // Export and import
+        let (export_file, export_path) = NamedTempFile::new()?.into_parts();
+        export_shard(meta_source, storage_source, shard.id, None, export_file).await?;
+        let import_file = File::open(export_path)?;
+        import_shard(meta_dest.clone(), storage_dest.clone(), import_file).await?;
+
+        // Check the import
+        let shard_dest = Shard::get(&meta_dest.pool, shard.id).await?;
+        assert_eq!(shard_dest.kbid, shard.kbid);
+        assert_eq!(Index::for_shard(&meta_dest.pool, shard.id).await?.len(), 3);
+        assert_eq!(
+            sqlx::query_scalar!("SELECT COUNT(*) AS \"cnt!\" FROM deletions").fetch_one(&meta_dest.pool).await?,
+            1
+        );
+
+        let all_segments = Segment::in_indexes(&meta_dest.pool, &index_ids).await?;
+        assert_eq!(all_segments.len(), 3);
+        for segment in all_segments {
+            assert_eq!(
+                storage_dest.get(&segment.id.storage_key()).await?.meta.size,
+                segment.size_bytes.unwrap() as usize
+            );
+        }
+
+        Ok(())
+    }
+}
