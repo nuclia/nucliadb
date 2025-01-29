@@ -27,7 +27,6 @@ from grpc.aio import AioRpcError
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardNotFound
-from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
 
 # XXX: this keys shouldn't be exposed outside datamanagers
