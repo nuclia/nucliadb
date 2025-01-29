@@ -26,6 +26,7 @@ from typing import (
     Any,
     AsyncGenerator,
     AsyncIterable,
+    Awaitable,
     Callable,
     Dict,
     Iterable,
@@ -35,6 +36,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    TypeVar,
 )
 
 import httpx
@@ -94,6 +96,23 @@ from nucliadb_models.writer import (
     UpdateResourcePayload,
 )
 from nucliadb_sdk.v2 import exceptions
+
+
+OUTPUT_TYPE = TypeVar(
+    "OUTPUT_TYPE",
+    bound=Union[
+        Type[BaseModel],
+        Type[Dict[str, Any]],
+        Callable[[httpx.Response], BaseModel],
+        Callable[[httpx.Response], Iterator[bytes]],
+        None,
+    ],
+)
+
+INPUT_TYPE = TypeVar(
+    "INPUT_TYPE",
+    bound=Union[Type[BaseModel], List[Type[BaseModel]], None],
+)
 
 
 class Region(enum.Enum):
@@ -191,9 +210,9 @@ def _parse_list_of_pydantic(
 
 
 def _parse_response(
-    response_type: Optional[Union[Type[BaseModel], Callable[[httpx.Response], Any]]],
+    response_type: OUTPUT_TYPE,
     resp: httpx.Response,
-) -> Any:
+) -> OUTPUT_TYPE:
     if response_type is not None:
         if isinstance(response_type, type) and issubclass(response_type, BaseModel):
             return response_type.model_validate_json(resp.content)
@@ -220,17 +239,13 @@ def _request_builder(
     method: str,
     path_template: str,
     path_params: Tuple[str, ...],
-    request_type: Optional[Union[Type[BaseModel], List[Any]]],
-    response_type: Optional[
-        Union[
-            Type[BaseModel],
-            Callable[[httpx.Response], BaseModel],
-            Callable[[httpx.Response], Iterator[bytes]],
-        ]
-    ],
+    request_type: INPUT_TYPE,
+    response_type: OUTPUT_TYPE,
     stream_response: bool = False,
 ):
-    def _func(self: "NucliaDB | NucliaDBAsync", content: Optional[Any] = None, **kwargs):
+    def _func(
+        self: "NucliaDB | NucliaDBAsync", content: INPUT_TYPE = None, **kwargs
+    ) -> OUTPUT_TYPE | Awaitable[OUTPUT_TYPE]:
         path_data = {}
         for param in path_params:
             if param not in kwargs:
@@ -242,15 +257,14 @@ def _request_builder(
         raw_content: Optional[RawRequestContent] = None
         if request_type is not None:
             if content is not None:
-                try:
-                    if not isinstance(content, request_type):  # type: ignore
-                        raise TypeError(f"Expected {request_type}, got {type(content)}")
-                    else:
-                        data = content.model_dump_json(by_alias=True, exclude_unset=True)
-                except TypeError:
-                    if not isinstance(content, list):
-                        raise
+                if not isinstance(content, request_type):  # type: ignore
+                    raise TypeError(f"Expected {request_type}, got {type(content)}")
+                elif isinstance(content, BaseModel):
+                    data = content.model_dump_json(by_alias=True, exclude_unset=True)
+                elif isinstance(content, list):
                     data = _parse_list_of_pydantic(content)
+                else:
+                    raise TypeError(f"Unknown type {type(content)}")
             else:
                 # pull properties out of kwargs now
                 content_data = {}
@@ -268,19 +282,19 @@ def _request_builder(
             raise TypeError(f"Invalid arguments provided: {kwargs}")
 
         if not stream_response:
-            resp = self._request(path, method, data=data, query_params=query_params, content=raw_content)
-            if asyncio.iscoroutine(resp):
-
-                async def _wrapped_resp():
-                    real_resp = await resp
-                    return _parse_response(response_type, real_resp)
-
-                return _wrapped_resp()
-            else:
-                return _parse_response(response_type, resp)  # type: ignore
+            resp = self._request(
+                path,
+                method,
+                data=data,
+                query_params=query_params,
+                content=raw_content,
+                output=response_type,
+            )
         else:
-            resp = self._stream_request(path, method, data=data, query_params=query_params)
-            return resp
+            resp = self._stream_request(
+                path, method, data=data, query_params=query_params
+            )
+        return resp
 
     return _func
 
@@ -329,6 +343,7 @@ class _NucliaDBBase:
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
         content: Optional[RawRequestContent] = None,
+        output: Any = None,
     ):
         raise NotImplementedError
 
@@ -345,7 +360,9 @@ class _NucliaDBBase:
         if response.status_code < 300:
             return response
         elif response.status_code in (401, 403):
-            raise exceptions.AuthError(f"Auth error {response.status_code}: {response.text}")
+            raise exceptions.AuthError(
+                f"Auth error {response.status_code}: {response.text}"
+            )
         elif response.status_code == 402:
             raise exceptions.AccountLimitError(
                 f"Account limits exceeded error {response.status_code}: {response.text}"
@@ -364,7 +381,9 @@ class _NucliaDBBase:
         ):  # 419 is a custom error code for kb creation conflict
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
-            raise exceptions.NotFoundError(f"Resource not found at url {response.url}: {response.text}")
+            raise exceptions.NotFoundError(
+                f"Resource not found at url {response.url}: {response.text}"
+            )
         else:
             raise exceptions.UnknownError(
                 f"Unknown error connecting to API: {response.status_code}: {response.text}"
@@ -760,7 +779,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid",),
         request_type=None,
-        response_type=json_response_parser,
+        response_type=Dict[str, Any],
     )
     set_configuration = _request_builder(
         name="set_configuration",
@@ -788,7 +807,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid",),
         request_type=None,
-        response_type=json_response_parser,
+        response_type=Dict[str, Any],
     )
 
     get_model = _request_builder(
@@ -797,7 +816,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid", "model_id"),
         request_type=None,
-        response_type=json_response_parser,
+        response_type=Dict[str, Any],
     )
 
     # Learning config schema
@@ -807,7 +826,7 @@ class _NucliaDBBase:
         method="GET",
         path_params=("kbid",),
         request_type=None,
-        response_type=json_response_parser,
+        response_type=Dict[str, Any],
     )
 
     # Custom synonyms
@@ -878,7 +897,9 @@ class NucliaDB(_NucliaDBBase):
         >>> sdk = NucliaDB(api_key="api-key", region=Region.ON_PREM, url=\"http://localhost:8080\")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.Client(headers=self.headers, base_url=self.base_url, timeout=timeout)
+        self.session = httpx.Client(
+            headers=self.headers, base_url=self.base_url, timeout=timeout
+        )
 
     def _request(
         self,
@@ -887,6 +908,7 @@ class NucliaDB(_NucliaDBBase):
         data: Optional[Union[str, bytes]] = None,
         query_params: Optional[Dict[str, str]] = None,
         content: Optional[RawRequestContent] = None,
+        output: OUTPUT_TYPE = None,
     ):
         url = f"{self.base_url}{path}"
         opts: Dict[str, Any] = {}
@@ -901,7 +923,7 @@ class NucliaDB(_NucliaDBBase):
         if query_params is not None:
             opts["params"] = query_params
         response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
-        return self._check_response(response)
+        return _parse_response(output, self._check_response(response))
 
     def _stream_request(
         self,
@@ -918,7 +940,9 @@ class NucliaDB(_NucliaDBBase):
             opts["params"] = query_params
 
         def iter_bytes(chunk_size=None) -> Iterator[bytes]:
-            with self.session.stream(method.lower(), url=url, **opts, timeout=30.0) as response:
+            with self.session.stream(
+                method.lower(), url=url, **opts, timeout=30.0
+            ) as response:
                 self._check_response(response)
                 for chunk in response.iter_raw(chunk_size=chunk_size):
                     yield chunk
@@ -972,7 +996,9 @@ class NucliaDBAsync(_NucliaDBBase):
         >>> sdk = NucliaDBAsync(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.AsyncClient(headers=self.headers, base_url=self.base_url, timeout=timeout)
+        self.session = httpx.AsyncClient(
+            headers=self.headers, base_url=self.base_url, timeout=timeout
+        )
 
     async def _request(
         self,
@@ -994,7 +1020,9 @@ class NucliaDBAsync(_NucliaDBBase):
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
-        response: httpx.Response = await getattr(self.session, method.lower())(url, **opts)
+        response: httpx.Response = await getattr(self.session, method.lower())(
+            url, **opts
+        )
         return self._check_response(response)
 
     def _stream_request(
