@@ -223,7 +223,7 @@ async def test_delete_knowledgebox_handles_unexisting_kb(storage: Storage, maind
 
 
 async def test_knowledgebox_purge_handles_unexisting_shard_payload(
-    storage: Storage, maindb_driver: Driver
+    storage: Storage, maindb_driver: Driver, dummy_nidx_utility
 ):
     idonotexist = uuid.uuid4().hex
     await KnowledgeBox.purge(maindb_driver, kbid=idonotexist)
