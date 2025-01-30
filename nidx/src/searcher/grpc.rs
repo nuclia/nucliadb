@@ -71,8 +71,8 @@ impl SearchServer {
         }
     }
 
-    pub fn into_service(self) -> Routes {
-        Routes::new(NidxSearcherServer::new(self))
+    pub fn into_router(self) -> axum::Router {
+        Routes::new(NidxSearcherServer::new(self)).into_axum_router()
     }
 
     async fn get_client(&self, hostname: &String) -> NidxResult<SearcherClient> {

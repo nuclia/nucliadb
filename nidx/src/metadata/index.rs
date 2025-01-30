@@ -43,7 +43,7 @@ pub enum IndexKind {
     Relation,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type, Serialize, Deserialize)]
 #[sqlx(transparent)]
 pub struct IndexId(pub(super) i64);
 impl From<i64> for IndexId {
@@ -54,6 +54,10 @@ impl From<i64> for IndexId {
 impl IndexId {
     pub fn local_path(&self) -> PathBuf {
         PathBuf::from(format!("{}", self.0))
+    }
+
+    pub(crate) fn sql(&self) -> i64 {
+        self.0
     }
 }
 

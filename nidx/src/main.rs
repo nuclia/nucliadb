@@ -24,7 +24,9 @@ use nidx::{
     control::{control_client, ControlRequest, ControlServer},
     indexer, metrics, scheduler, searcher,
     settings::EnvSettings,
-    telemetry, worker, Settings,
+    telemetry,
+    tool::{run_tool, ToolCommand},
+    worker, Settings,
 };
 use prometheus_client::registry::Registry;
 use sentry::IntoDsn;
@@ -44,6 +46,8 @@ struct CommandLine {
 enum Ctl {
     #[command(subcommand)]
     Ctl(ControlRequest),
+    #[command(subcommand)]
+    Tool(ToolCommand),
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -62,6 +66,14 @@ fn main() -> anyhow::Result<()> {
 
     if let Some(Ctl::Ctl(cmd_request)) = cmdline.cmd {
         return control_client(&env_settings, cmd_request);
+    }
+
+    if let Some(Ctl::Tool(tool_request)) = cmdline.cmd {
+        return tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(run_tool(&env_settings, tool_request));
     }
 
     let sentry_options = if let Some(sentry) = &env_settings.telemetry.sentry {
