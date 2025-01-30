@@ -54,12 +54,12 @@ class CouldNotCopyNotFound(Exception):
         self.origin_uri = origin_uri
         self.origin_bucket_name = origin_bucket_name
         self.destination_uri = destination_uri
-        self.destination_bucket_name = (destination_bucket_name,)
+        self.destination_bucket_name = destination_bucket_name
         self.text = text
         super().__init__(
-            f"Could not copy file {self.origin_bucket_name}:{self.origin_uri}"
-            f"To {self.destination_bucket_name}:{self.destination_uri}"
-            "Google: \n "
+            f"Could not copy file {self.origin_bucket_name}:{self.origin_uri} "
+            f"To {self.destination_bucket_name}:{self.destination_uri} "
+            "Storage says: \n "
             f"{text}"
         )
 
