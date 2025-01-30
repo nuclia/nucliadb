@@ -144,11 +144,15 @@ class _FindParser:
 
 
 def parse_catalog(kbid: str, item: search_models.CatalogRequest) -> CatalogQuery:
-    if item.hidden:
-        hidden_filter = Filter(all=[LABEL_HIDDEN])
-    else:
-        hidden_filter = Filter(none=[LABEL_HIDDEN])
-    label_filters: dict[str, Any] = convert_to_node_filters(item.filters + [hidden_filter])  # type: ignore
+    filters: list[Union[str, Filter]] = item.filters
+
+    if item.hidden is not None:
+        if item.hidden:
+            filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
+        else:
+            filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
+
+    label_filters: dict[str, Any] = convert_to_node_filters(item.filters)
     if len(label_filters) > 0:
         label_filters = translate_label_filters(label_filters)
 
