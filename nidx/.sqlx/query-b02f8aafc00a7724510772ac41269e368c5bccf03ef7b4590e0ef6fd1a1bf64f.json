@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) AS \"cnt!\" FROM deletions",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cnt!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b02f8aafc00a7724510772ac41269e368c5bccf03ef7b4590e0ef6fd1a1bf64f"
+}
