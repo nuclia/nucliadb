@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from __future__ import annotations
+
 import enum
 import inspect
 import io
 import warnings
 from dataclasses import dataclass
 from json import JSONDecodeError
+from types import NoneType
 from typing import (
     Any,
     AsyncGenerator,
@@ -96,8 +98,6 @@ from nucliadb_models.writer import (
     UpdateResourcePayload,
 )
 from nucliadb_sdk.v2 import exceptions
-from types import NoneType
-
 
 # Generics
 OUTPUT_TYPE = TypeVar("OUTPUT_TYPE", bound=Union[BaseModel, None])
@@ -111,9 +111,7 @@ class Region(enum.Enum):
     AWS_US_EAST_2_1 = "aws-us-east-2-1"
 
 
-RawRequestContent = Union[
-    str, bytes, Iterable[bytes], AsyncIterable[bytes], dict[str, Any]
-]
+RawRequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes], dict[str, Any]]
 
 
 ASK_STATUS_CODE_ERROR = "-1"
@@ -402,9 +400,7 @@ SDK_DEFINITION = {
 }
 
 
-def ask_response_parser(
-    response_type: Type[BaseModel], response: httpx.Response
-) -> BaseModel:
+def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response) -> BaseModel:
     content_type = response.headers.get("Content-Type")
     if content_type not in ("application/json", "application/x-ndjson"):
         raise ValueError(f"Unknown content type in response: {content_type}")
@@ -537,7 +533,6 @@ def prepare_request(
             # pull properties out of kwargs now
             content_data: Dict[str, str] = {}
             if isinstance(request_type, BaseModel):
-
                 for key in list(kwargs.keys()):
                     if key in request_type.model_fields:
                         content_data[key] = kwargs.pop(key)
@@ -553,15 +548,12 @@ def _request_sync_builder(
     request_type: Type[INPUT_TYPE],
     response_type: Type[OUTPUT_TYPE],
 ):
-
     sdk_def = SDK_DEFINITION[name]
     method = sdk_def.method
     path_template = sdk_def.path_template
     path_params = sdk_def.path_params
 
-    def _func(
-        self: NucliaDB, content: Optional[INPUT_TYPE] = None, **kwargs
-    ) -> OUTPUT_TYPE:
+    def _func(self: NucliaDB, content: Optional[INPUT_TYPE] = None, **kwargs) -> OUTPUT_TYPE:
         path, data, query_params = prepare_request(
             path_template=path_template,
             path_params=path_params,
@@ -629,15 +621,12 @@ def _request_async_builder(
     request_type: Type[INPUT_TYPE],
     response_type: Type[OUTPUT_TYPE],
 ):
-
     sdk_def = SDK_DEFINITION[name]
     method = sdk_def.method
     path_template = sdk_def.path_template
     path_params = sdk_def.path_params
 
-    async def _func(
-        self: NucliaDBAsync, content: Optional[INPUT_TYPE] = None, **kwargs
-    ) -> OUTPUT_TYPE:
+    async def _func(self: NucliaDBAsync, content: Optional[INPUT_TYPE] = None, **kwargs) -> OUTPUT_TYPE:
         path, data, query_params = prepare_request(
             path_template=path_template,
             path_params=path_params,
@@ -647,13 +636,9 @@ def _request_async_builder(
         )
         resp = await self._request(path, method, data=data, query_params=query_params)
         if response_type is not None:
-            if isinstance(response_type, type) and issubclass(
-                response_type, SyncAskResponse
-            ):
+            if isinstance(response_type, type) and issubclass(response_type, SyncAskResponse):
                 return ask_response_parser(response_type, resp)  # type: ignore
-            elif isinstance(response_type, type) and issubclass(
-                response_type, BaseModel
-            ):
+            elif isinstance(response_type, type) and issubclass(response_type, BaseModel):
                 return response_type.model_validate_json(resp.content)  # type: ignore
         return None  # type: ignore
 
@@ -676,9 +661,7 @@ def _request_json_async_builder(
             path_params=path_params,
             **kwargs,
         )
-        resp = await self._request(
-            path, method, query_params=query_params, content=content
-        )
+        resp = await self._request(path, method, query_params=query_params, content=content)
         try:
             return orjson.loads(resp.content.decode())
         except orjson.JSONDecodeError:
@@ -690,7 +673,6 @@ def _request_json_async_builder(
 def _request_iterator_async_builder(
     name: str,
 ):
-
     sdk_def = SDK_DEFINITION[name]
     method = sdk_def.method
     path_template = sdk_def.path_template
@@ -771,9 +753,7 @@ class _NucliaDBBase:
         if response.status_code < 300:
             return response
         elif response.status_code in (401, 403):
-            raise exceptions.AuthError(
-                f"Auth error {response.status_code}: {response.text}"
-            )
+            raise exceptions.AuthError(f"Auth error {response.status_code}: {response.text}")
         elif response.status_code == 402:
             raise exceptions.AccountLimitError(
                 f"Account limits exceeded error {response.status_code}: {response.text}"
@@ -792,9 +772,7 @@ class _NucliaDBBase:
         ):  # 419 is a custom error code for kb creation conflict
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
-            raise exceptions.NotFoundError(
-                f"Resource not found at url {response.url}: {response.text}"
-            )
+            raise exceptions.NotFoundError(f"Resource not found at url {response.url}: {response.text}")
         else:
             raise exceptions.UnknownError(
                 f"Unknown error connecting to API: {response.status_code}: {response.text}"
@@ -849,9 +827,7 @@ class NucliaDB(_NucliaDBBase):
         >>> sdk = NucliaDB(api_key="api-key", region=Region.ON_PREM, url=\"http://localhost:8080\")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.Client(
-            headers=self.headers, base_url=self.base_url, timeout=timeout
-        )
+        self.session = httpx.Client(headers=self.headers, base_url=self.base_url, timeout=timeout)
 
     def _request(
         self,
@@ -891,9 +867,7 @@ class NucliaDB(_NucliaDBBase):
             opts["params"] = query_params
 
         def iter_bytes(chunk_size=None) -> Iterator[bytes]:
-            with self.session.stream(
-                method.lower(), url=url, **opts, timeout=30.0
-            ) as response:
+            with self.session.stream(method.lower(), url=url, **opts, timeout=30.0) as response:
                 self._check_response(response)
                 for chunk in response.iter_raw(chunk_size=chunk_size):
                     yield chunk
@@ -903,55 +877,35 @@ class NucliaDB(_NucliaDBBase):
     create_knowledge_box = _request_sync_builder(
         "create_knowledge_box", KnowledgeBoxConfig, KnowledgeBoxObj
     )
-    delete_knowledge_box = _request_sync_builder(
-        "delete_knowledge_box", NoneType, KnowledgeBoxObj
-    )
-    get_knowledge_box = _request_sync_builder(
-        "get_knowledge_box", NoneType, KnowledgeBoxObj
-    )
+    delete_knowledge_box = _request_sync_builder("delete_knowledge_box", NoneType, KnowledgeBoxObj)
+    get_knowledge_box = _request_sync_builder("get_knowledge_box", NoneType, KnowledgeBoxObj)
     get_knowledge_box_by_slug = _request_sync_builder(
         "get_knowledge_box_by_slug", NoneType, KnowledgeBoxObj
     )
-    list_knowledge_boxes = _request_sync_builder(
-        "list_knowledge_boxes", NoneType, KnowledgeBoxList
-    )
+    list_knowledge_boxes = _request_sync_builder("list_knowledge_boxes", NoneType, KnowledgeBoxList)
     # Resource Endpoints
-    create_resource = _request_sync_builder(
-        "create_resource", CreateResourcePayload, ResourceCreated
-    )
-    update_resource = _request_sync_builder(
-        "update_resource", UpdateResourcePayload, ResourceUpdated
-    )
+    create_resource = _request_sync_builder("create_resource", CreateResourcePayload, ResourceCreated)
+    update_resource = _request_sync_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_sync_builder(
         "update_resource_by_slug", UpdateResourcePayload, ResourceUpdated
     )
     delete_resource = _request_sync_builder("delete_resource", NoneType, NoneType)
-    delete_resource_by_slug = _request_sync_builder(
-        "delete_resource_by_slug", NoneType, NoneType
-    )
-    get_resource_by_slug = _request_sync_builder(
-        "get_resource_by_slug", NoneType, Resource
-    )
+    delete_resource_by_slug = _request_sync_builder("delete_resource_by_slug", NoneType, NoneType)
+    get_resource_by_slug = _request_sync_builder("get_resource_by_slug", NoneType, Resource)
     get_resource_by_id = _request_sync_builder("get_resource_by_id", NoneType, Resource)
     list_resources = _request_sync_builder("list_resources", NoneType, ResourceList)
     # reindex/reprocess
     reindex_resource = _request_sync_builder("reindex_resource", NoneType, NoneType)
-    reindex_resource_by_slug = _request_sync_builder(
-        "reindex_resource_by_slug", NoneType, NoneType
-    )
+    reindex_resource_by_slug = _request_sync_builder("reindex_resource_by_slug", NoneType, NoneType)
     reprocess_resource = _request_sync_builder("reprocess_resource", NoneType, NoneType)
-    reprocess_resource_by_slug = _request_sync_builder(
-        "reprocess_resource_by_slug", NoneType, NoneType
-    )
+    reprocess_resource_by_slug = _request_sync_builder("reprocess_resource_by_slug", NoneType, NoneType)
     # Field endpoints
     delete_field_by_id = _request_sync_builder("delete_field_by_id", NoneType, NoneType)
     # Conversation endpoints
     add_conversation_message = _request_sync_builder(
         "add_conversation_message", List[InputMessage], ResourceFieldAdded
     )
-    get_resource_field = _request_sync_builder(
-        "get_resource_field", NoneType, ResourceField
-    )
+    get_resource_field = _request_sync_builder("get_resource_field", NoneType, ResourceField)
     get_resource_field_by_slug = _request_sync_builder(
         "get_resource_field_by_slug", NoneType, ResourceField
     )
@@ -968,17 +922,13 @@ class NucliaDB(_NucliaDBBase):
         "update_entitygroup", UpdateEntitiesGroupPayload, NoneType
     )
     delete_entitygroup = _request_sync_builder("delete_entitygroup", NoneType, NoneType)
-    get_entitygroups = _request_sync_builder(
-        "get_entitygroups", NoneType, KnowledgeBoxEntities
-    )
+    get_entitygroups = _request_sync_builder("get_entitygroups", NoneType, KnowledgeBoxEntities)
     get_entitygroup = _request_sync_builder("get_entitygroup", NoneType, EntitiesGroup)
     # Search / Find Endpoints
     find = _request_sync_builder("find", FindRequest, KnowledgeboxFindResults)
     search = _request_sync_builder("search", SearchRequest, KnowledgeboxSearchResults)
     ask = _request_sync_builder("ask", AskRequest, SyncAskResponse)
-    ask_on_resource = _request_sync_builder(
-        "ask_on_resource", AskRequest, SyncAskResponse
-    )
+    ask_on_resource = _request_sync_builder("ask_on_resource", AskRequest, SyncAskResponse)
     ask_on_resource_by_slug = _request_sync_builder(
         "ask_on_resource_by_slug", AskRequest, SyncAskResponse
     )
@@ -1005,12 +955,8 @@ class NucliaDB(_NucliaDBBase):
     # Learning config schema
     get_configuration_schema = _request_json_sync_builder("get_configuration_schema")
     # Custom synonyms
-    set_custom_synonyms = _request_sync_builder(
-        "set_custom_synonyms", KnowledgeBoxSynonyms, NoneType
-    )
-    get_custom_synonyms = _request_sync_builder(
-        "get_custom_synonyms", NoneType, KnowledgeBoxSynonyms
-    )
+    set_custom_synonyms = _request_sync_builder("set_custom_synonyms", KnowledgeBoxSynonyms, NoneType)
+    get_custom_synonyms = _request_sync_builder("get_custom_synonyms", NoneType, KnowledgeBoxSynonyms)
 
 
 class NucliaDBAsync(_NucliaDBBase):
@@ -1059,9 +1005,7 @@ class NucliaDBAsync(_NucliaDBBase):
         >>> sdk = NucliaDBAsync(api_key="api-key", region=Region.ON_PREM, url="https://mycompany.api.com/api/nucliadb")
         """  # noqa
         super().__init__(region=region, api_key=api_key, url=url, headers=headers)
-        self.session = httpx.AsyncClient(
-            headers=self.headers, base_url=self.base_url, timeout=timeout
-        )
+        self.session = httpx.AsyncClient(headers=self.headers, base_url=self.base_url, timeout=timeout)
 
     async def _request(
         self,
@@ -1083,9 +1027,7 @@ class NucliaDBAsync(_NucliaDBBase):
             opts["content"] = content
         if query_params is not None:
             opts["params"] = query_params
-        response: httpx.Response = await getattr(self.session, method.lower())(
-            url, **opts
-        )
+        response: httpx.Response = await getattr(self.session, method.lower())(url, **opts)
         return self._check_response(response)
 
     def _stream_request(
@@ -1113,70 +1055,42 @@ class NucliaDBAsync(_NucliaDBBase):
     create_knowledge_box = _request_async_builder(
         "create_knowledge_box", KnowledgeBoxConfig, KnowledgeBoxObj
     )
-    delete_knowledge_box = _request_async_builder(
-        "delete_knowledge_box", NoneType, KnowledgeBoxObj
-    )
-    get_knowledge_box = _request_async_builder(
-        "get_knowledge_box", NoneType, KnowledgeBoxObj
-    )
+    delete_knowledge_box = _request_async_builder("delete_knowledge_box", NoneType, KnowledgeBoxObj)
+    get_knowledge_box = _request_async_builder("get_knowledge_box", NoneType, KnowledgeBoxObj)
     get_knowledge_box_by_slug = _request_async_builder(
         "get_knowledge_box_by_slug", NoneType, KnowledgeBoxObj
     )
-    list_knowledge_boxes = _request_async_builder(
-        "list_knowledge_boxes", NoneType, KnowledgeBoxList
-    )
+    list_knowledge_boxes = _request_async_builder("list_knowledge_boxes", NoneType, KnowledgeBoxList)
     # Resource Endpoints
-    create_resource = _request_async_builder(
-        "create_resource", CreateResourcePayload, ResourceCreated
-    )
-    update_resource = _request_async_builder(
-        "update_resource", UpdateResourcePayload, ResourceUpdated
-    )
+    create_resource = _request_async_builder("create_resource", CreateResourcePayload, ResourceCreated)
+    update_resource = _request_async_builder("update_resource", UpdateResourcePayload, ResourceUpdated)
     update_resource_by_slug = _request_async_builder(
         "update_resource_by_slug", UpdateResourcePayload, ResourceUpdated
     )
     delete_resource = _request_async_builder("delete_resource", NoneType, NoneType)
-    delete_resource_by_slug = _request_async_builder(
-        "delete_resource_by_slug", NoneType, NoneType
-    )
-    get_resource_by_slug = _request_async_builder(
-        "get_resource_by_slug", NoneType, Resource
-    )
-    get_resource_by_id = _request_async_builder(
-        "get_resource_by_id", NoneType, Resource
-    )
+    delete_resource_by_slug = _request_async_builder("delete_resource_by_slug", NoneType, NoneType)
+    get_resource_by_slug = _request_async_builder("get_resource_by_slug", NoneType, Resource)
+    get_resource_by_id = _request_async_builder("get_resource_by_id", NoneType, Resource)
     list_resources = _request_async_builder("list_resources", NoneType, ResourceList)
     # reindex/reprocess
     reindex_resource = _request_async_builder("reindex_resource", NoneType, NoneType)
-    reindex_resource_by_slug = _request_async_builder(
-        "reindex_resource_by_slug", NoneType, NoneType
-    )
-    reprocess_resource = _request_async_builder(
-        "reprocess_resource", NoneType, NoneType
-    )
-    reprocess_resource_by_slug = _request_async_builder(
-        "reprocess_resource_by_slug", NoneType, NoneType
-    )
+    reindex_resource_by_slug = _request_async_builder("reindex_resource_by_slug", NoneType, NoneType)
+    reprocess_resource = _request_async_builder("reprocess_resource", NoneType, NoneType)
+    reprocess_resource_by_slug = _request_async_builder("reprocess_resource_by_slug", NoneType, NoneType)
     # Field endpoints
-    delete_field_by_id = _request_async_builder(
-        "delete_field_by_id", NoneType, NoneType
-    )
+    delete_field_by_id = _request_async_builder("delete_field_by_id", NoneType, NoneType)
     # Conversation endpoints
     add_conversation_message = _request_async_builder(
         "add_conversation_message", List[InputMessage], ResourceFieldAdded
     )
-    get_resource_field = _request_async_builder(
-        "get_resource_field", NoneType, ResourceField
-    )
+    get_resource_field = _request_async_builder("get_resource_field", NoneType, ResourceField)
     get_resource_field_by_slug = _request_async_builder(
         "get_resource_field_by_slug", NoneType, ResourceField
     )
     # Labels
     set_labelset = _request_async_builder("set_labelset", LabelSet, NoneType)
     delete_labelset = _request_async_builder("delete_labelset", NoneType, NoneType)
-    get_labelsets = _request_async_builder(
-        "get_labelsets", NoneType, KnowledgeBoxLabels
-    )
+    get_labelsets = _request_async_builder("get_labelsets", NoneType, KnowledgeBoxLabels)
     get_labelset = _request_async_builder("get_labelset", NoneType, LabelSet)
     # Entity Groups
     create_entitygroup = _request_async_builder(
@@ -1185,38 +1099,26 @@ class NucliaDBAsync(_NucliaDBBase):
     update_entitygroup = _request_async_builder(
         "update_entitygroup", UpdateEntitiesGroupPayload, NoneType
     )
-    delete_entitygroup = _request_async_builder(
-        "delete_entitygroup", NoneType, NoneType
-    )
-    get_entitygroups = _request_async_builder(
-        "get_entitygroups", NoneType, KnowledgeBoxEntities
-    )
+    delete_entitygroup = _request_async_builder("delete_entitygroup", NoneType, NoneType)
+    get_entitygroups = _request_async_builder("get_entitygroups", NoneType, KnowledgeBoxEntities)
     get_entitygroup = _request_async_builder("get_entitygroup", NoneType, EntitiesGroup)
     # Search / Find Endpoints
     find = _request_async_builder("find", FindRequest, KnowledgeboxFindResults)
     search = _request_async_builder("search", SearchRequest, KnowledgeboxSearchResults)
     ask = _request_async_builder("ask", AskRequest, SyncAskResponse)
-    ask_on_resource = _request_async_builder(
-        "ask_on_resource", AskRequest, SyncAskResponse
-    )
+    ask_on_resource = _request_async_builder("ask_on_resource", AskRequest, SyncAskResponse)
     ask_on_resource_by_slug = _request_async_builder(
         "ask_on_resource_by_slug", AskRequest, SyncAskResponse
     )
-    summarize = _request_async_builder(
-        "summarize", SummarizeRequest, SummarizedResponse
-    )
+    summarize = _request_async_builder("summarize", SummarizeRequest, SummarizedResponse)
     feedback = _request_async_builder("feedback", FeedbackRequest, NoneType)
-    start_export = _request_async_builder(
-        "start_export", NoneType, CreateExportResponse
-    )
+    start_export = _request_async_builder("start_export", NoneType, CreateExportResponse)
     export_status = _request_async_builder("export_status", NoneType, StatusResponse)
     download_export = _request_iterator_async_builder("download_export")
     create_kb_from_import = _request_async_builder(
         "create_kb_from_import", NoneType, NewImportedKbResponse
     )
-    start_import = _request_async_builder(
-        "start_import", NoneType, CreateImportResponse
-    )
+    start_import = _request_async_builder("start_import", NoneType, CreateImportResponse)
     import_status = _request_async_builder("import_status", NoneType, StatusResponse)
     trainset = _request_async_builder("trainset", NoneType, TrainSetPartitions)
     # Learning Configuration
@@ -1231,9 +1133,5 @@ class NucliaDBAsync(_NucliaDBBase):
     # Learning config schema
     get_configuration_schema = _request_json_async_builder("get_configuration_schema")
     # Custom synonyms
-    set_custom_synonyms = _request_async_builder(
-        "set_custom_synonyms", KnowledgeBoxSynonyms, NoneType
-    )
-    get_custom_synonyms = _request_async_builder(
-        "get_custom_synonyms", NoneType, KnowledgeBoxSynonyms
-    )
+    set_custom_synonyms = _request_async_builder("set_custom_synonyms", KnowledgeBoxSynonyms, NoneType)
+    get_custom_synonyms = _request_async_builder("get_custom_synonyms", NoneType, KnowledgeBoxSynonyms)
