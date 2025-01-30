@@ -1937,7 +1937,7 @@ class SyncAskResponse(BaseModel):
     )
     status: str = Field(
         title="Status",
-        description="The status of the query execution. It can be 'success', 'error' or 'no_context'",  # noqa: E501
+        description="The status of the query execution. It can be 'success', 'error', 'no_context' or 'no_retrieval_data'",  # noqa: E501
     )
     retrieval_results: KnowledgeboxFindResults = Field(
         title="Retrieval results",
