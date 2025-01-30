@@ -144,7 +144,7 @@ class _FindParser:
 
 
 def parse_catalog(kbid: str, item: search_models.CatalogRequest) -> CatalogQuery:
-    filters: list[Union[str, Filter]] = item.filters
+    filters = item.filters
 
     if item.hidden is not None:
         if item.hidden:
