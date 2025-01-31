@@ -1667,36 +1667,6 @@ files = [
 ]
 
 [[package]]
-name = "memorylru"
-version = "1.1.2"
-summary = ""
-groups = ["default", "dev", "sidecar"]
-files = [
-    {file = "memorylru-1.1.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:337059c79adf51d519153f7768d3f6f656d0b4af5cf7b6d48d2f022d3c67cb67"},
-    {file = "memorylru-1.1.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:789a59b3ff6ed427b6b0e4edce6487cbb964fb28bf9dc219801a5122fccb7bab"},
-    {file = "memorylru-1.1.2-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:b67beeb5e8357e56d96599a2a94f47f91965d5b781893526e47ff4b4e00be3fb"},
-    {file = "memorylru-1.1.2-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a85dc4460115a8cf5439a5514a1a583c12ec7bcc4b4bd672001091dafedd6d13"},
-    {file = "memorylru-1.1.2-cp310-cp310-musllinux_1_1_i686.whl", hash = "sha256:40d741aaaf798a899dfa969e7acc6ad65d395727b08ebe92c97ec152b1b86fd3"},
-    {file = "memorylru-1.1.2-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:d52f017c7568b42aa7103adefed4220f3621a04553bf93449670466d3bae2dec"},
-    {file = "memorylru-1.1.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:0d108c9293acb11e321404730bd1ec630c144e0dbee1c1c46e14da071ec5679a"},
-    {file = "memorylru-1.1.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:97cdaf27768ce7a05058be12acadbf96f89d1abd57cb447ea80e14fee864658f"},
-    {file = "memorylru-1.1.2-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:60ca291748cb4c1f8d438fde72631958786edf0635c876152833ab25d2a064df"},
-    {file = "memorylru-1.1.2-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:11f01b2bfad92f1c335b801eb47ea4bbef237cb399490d12aa18aedc5b94fa1d"},
-    {file = "memorylru-1.1.2-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:ba9d271e69944f8cb14f891685d292eb19da3b104e93b01bd6ccc1aa9c5b197b"},
-    {file = "memorylru-1.1.2-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:27446db56a1d6855018b5869428e474c5364c60c46427b5de16e8bc121ae8241"},
-    {file = "memorylru-1.1.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:4e12b299bf2745eeb53e84f38826064af3f908abf04e8ad704ee442e65a6b285"},
-    {file = "memorylru-1.1.2-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:985798f850eab995c888390d9b4bf308d6dd3a709cbfd6128464432e71356fd9"},
-    {file = "memorylru-1.1.2-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:1c66dff5eb23e0157dc9c422f4da86f1df78867ecd40c3834781fd346c102b12"},
-    {file = "memorylru-1.1.2-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bd90bbf5043601e8c3c5a04bc13502ce2e5c098860cc598b8b0d9e0d7d88ac08"},
-    {file = "memorylru-1.1.2-cp39-cp39-musllinux_1_1_i686.whl", hash = "sha256:bf1bb27ef578154fe4632520c006afdc2130cfa192bbf973211cf4dc514017d5"},
-    {file = "memorylru-1.1.2-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:31a7d397df8612aed9e606b6f2f2b0fd2ba9e979090722adcd1afb86df655d89"},
-    {file = "memorylru-1.1.2-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:dd949c4517ab68c0c146d2b04f8ada2fe7e45f2085101256de9648aa3f95b761"},
-    {file = "memorylru-1.1.2-pp39-pypy39_pp73-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:0f4157f89e80b2f23e157e806d64ccd66b1ebb445c0f8ecc8f4ed2b95a813789"},
-    {file = "memorylru-1.1.2-pp39-pypy39_pp73-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:eb1e5a81c182533a3523361a7d0c7c93ec0d7d16d0e46caffdcf9ba321ba2b5b"},
-    {file = "memorylru-1.1.2.tar.gz", hash = "sha256:53d8d34ee9d51089d19a3237e9f4e3314968332d16054e4b699ca9ccf271d817"},
-]
-
-[[package]]
 name = "mmh3"
 version = "5.0.1"
 requires_python = ">=3.8"
@@ -2021,21 +1991,6 @@ files = [
 ]
 
 [[package]]
-name = "nats-py"
-version = "2.9.0"
-extras = ["nkeys"]
-requires_python = ">=3.7"
-summary = "NATS client for Python"
-groups = ["default", "dev", "sidecar"]
-dependencies = [
-    "nats-py==2.9.0",
-    "nkeys",
-]
-files = [
-    {file = "nats_py-2.9.0.tar.gz", hash = "sha256:01886eb9e0a87f0ec630652cf1fae65d2a8556378a609bc6cc07d2ea60c8d0dd"},
-]
-
-[[package]]
 name = "nidx-binding"
 version = "0.1.0"
 requires_python = ">=3.8"
@@ -2051,19 +2006,6 @@ editable = true
 path = "./nidx/nidx_protos"
 summary = ""
 groups = ["default", "dev"]
-
-[[package]]
-name = "nkeys"
-version = "0.2.1"
-requires_python = ">=3.6"
-summary = "A public-key signature system based on Ed25519 for the NATS ecosystem."
-groups = ["default", "dev", "sidecar"]
-dependencies = [
-    "pynacl",
-]
-files = [
-    {file = "nkeys-0.2.1.tar.gz", hash = "sha256:3a201dcd203d8bb05ba2884d441b2c92918b2a537a10d324e73738887dde9da3"},
-]
 
 [[package]]
 name = "nodeenv"
@@ -2277,7 +2219,6 @@ summary = "NucliaDB Telemetry Library Python process"
 groups = ["default", "dev", "sidecar"]
 dependencies = [
     "-e file:///${PROJECT_ROOT}/nucliadb_telemetry#egg=nucliadb-telemetry",
-    "PyNaCl",
     "fastapi",
     "grpcio-channelz>=1.44.0",
     "grpcio-health-checking>=1.44.0",
@@ -2286,7 +2227,7 @@ dependencies = [
     "grpcio-testing>=1.44.0",
     "grpcio-tools>=1.44.0",
     "grpcio>=1.44.0",
-    "nats-py[nkeys]>=2.5.0",
+    "nats-py>=2.5.0",
     "opentelemetry-api>=1.21.0",
     "opentelemetry-exporter-jaeger>=1.21.0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
@@ -2306,13 +2247,11 @@ path = "./nucliadb_utils"
 summary = ""
 groups = ["default", "dev", "sidecar"]
 dependencies = [
-    "PyNaCl",
     "aiohttp>=3.9.4",
     "httpx>=0.27.0",
-    "memorylru>=1.1.2",
     "mmh3>=3.0.0",
     "mrflagly>=0.2.9",
-    "nats-py[nkeys]>=2.6.0",
+    "nats-py>=2.6.0",
     "nucliadb-protos",
     "nucliadb-telemetry",
     "prometheus-client>=0.12.0",
@@ -3410,28 +3349,6 @@ dependencies = [
 files = [
     {file = "PyJWT-2.9.0-py3-none-any.whl", hash = "sha256:3b02fb0f44517787776cf48f2ae25d8e14f300e6d7545a4315cee571a415e850"},
     {file = "pyjwt-2.9.0.tar.gz", hash = "sha256:7e1e5b56cc735432a7369cbfa0efe50fa113ebecdc04ae6922deba8b84582d0c"},
-]
-
-[[package]]
-name = "pynacl"
-version = "1.5.0"
-requires_python = ">=3.6"
-summary = "Python binding to the Networking and Cryptography (NaCl) library"
-groups = ["default", "dev", "sidecar"]
-dependencies = [
-    "cffi>=1.4.1",
-]
-files = [
-    {file = "PyNaCl-1.5.0-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:401002a4aaa07c9414132aaed7f6836ff98f59277a234704ff66878c2ee4a0d1"},
-    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:52cb72a79269189d4e0dc537556f4740f7f0a9ec41c1322598799b0bdad4ef92"},
-    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a36d4a9dda1f19ce6e03c9a784a2921a4b726b02e1c736600ca9c22029474394"},
-    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:0c84947a22519e013607c9be43706dd42513f9e6ae5d39d3613ca1e142fba44d"},
-    {file = "PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:06b8f6fa7f5de8d5d2f7573fe8c863c051225a27b61e6860fd047b1775807858"},
-    {file = "PyNaCl-1.5.0-cp36-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:a422368fc821589c228f4c49438a368831cb5bbc0eab5ebe1d7fac9dded6567b"},
-    {file = "PyNaCl-1.5.0-cp36-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:61f642bf2378713e2c2e1de73444a3778e5f0a38be6fee0fe532fe30060282ff"},
-    {file = "PyNaCl-1.5.0-cp36-abi3-win32.whl", hash = "sha256:e46dae94e34b085175f8abb3b0aaa7da40767865ac82c928eeb9e57e1ea8a543"},
-    {file = "PyNaCl-1.5.0-cp36-abi3-win_amd64.whl", hash = "sha256:20f42270d27e1b6a29f54032090b972d97f0a1b0948cc52392041ef7831fee93"},
-    {file = "PyNaCl-1.5.0.tar.gz", hash = "sha256:8ac7448f09ab85811607bdd21ec2464495ac8b7c66d146bf545b0f08fb9220ba"},
 ]
 
 [[package]]
