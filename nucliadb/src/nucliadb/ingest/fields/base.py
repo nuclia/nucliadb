@@ -43,6 +43,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
 from nucliadb_protos.writer_pb2 import Error, FieldStatus
+from nucliadb_utils.storages.exceptions import CouldNotCopyNotFound
 from nucliadb_utils.storages.storage import Storage, StorageField
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -370,9 +371,26 @@ class Field(Generic[PbType]):
         sf = self._get_extracted_vectors_storage_field(vectorset, storage_key_kind)
         vo: Optional[VectorObject] = None
         if actual_payload is None:
-            # Its first extracted text
+            # Its first extracted vectors
             if payload.HasField("file"):
-                await self.storage.normalize_binary(payload.file, sf)
+                # When we receive vectors in a cloud file, it points to our
+                # storage but paths are different, we may want to move it. This
+                # can happen, for example, with LEGACY KBs where processing
+                # sends us the extracted vectors prefixed by vectorset but, to
+                # maintain bw/c, we move those to the original not prefixed
+                # path.
+                try:
+                    await self.storage.normalize_binary(payload.file, sf)
+                except CouldNotCopyNotFound:
+                    # A failure here could mean the payload has already been
+                    # moved and we're retrying due to a redelivery or another
+                    # retry mechanism
+                    already_moved = await sf.exists()
+                    if already_moved:
+                        # We assume is the correct one and do nothing else
+                        pass
+                    else:
+                        raise
                 vo = await self.storage.download_pb(sf, VectorObject)
             else:
                 await self.storage.upload_pb(sf, payload.vectors)
