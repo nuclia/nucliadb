@@ -230,12 +230,7 @@ async def test_vectorset_migration(
             vector=[1.0 for _ in range(1024)],
         )
     ]
-    if bwc_with_default_vectorset:
-        # learning is not setting vectorset to be bw/c with the default vectorset in old KBs
-        link_field.with_extracted_vectors(vectors)
-    else:
-        # once fixed, learning will always set the vectorset id
-        link_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
+    link_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
 
     bmb.add_field_builder(link_field)
     bm = bmb.build()
