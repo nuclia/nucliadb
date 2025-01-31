@@ -6,6 +6,7 @@ prometheus-client>=0.12.0
 types-requests>=2.27.7
 mmh3>=3.0.0
 nats-py>=2.6.0
+PyNaCl
 pyjwt>=2.4.0
 mrflagly>=0.2.9
 
