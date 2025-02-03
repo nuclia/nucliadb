@@ -5,10 +5,9 @@ httpx>=0.27.0
 prometheus-client>=0.12.0
 types-requests>=2.27.7
 mmh3>=3.0.0
-nats-py[nkeys]>=2.6.0
+nats-py>=2.6.0
 PyNaCl
 pyjwt>=2.4.0
-memorylru>=1.1.2
 mrflagly>=0.2.9
 
 # automatically bumped during release
