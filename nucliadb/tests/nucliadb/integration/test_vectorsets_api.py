@@ -144,7 +144,7 @@ async def test_learning_config_errors_are_proxied_correctly(
     with patch(
         f"{MODULE}.learning_proxy.get_configuration",
         side_effect=ProxiedLearningConfigError(
-            status_code=500, content=b"Learning Internal Server Error", content_type="text/plain"
+            status_code=500, content="Learning Internal Server Error", content_type="text/plain"
         ),
     ):
         resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/foo")
