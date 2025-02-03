@@ -56,7 +56,6 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Creat
         raise HTTPException(
             status_code=err.status_code,
             detail=err.content,
-            headers={"content-type": err.content_type},
         )
 
     except VectorSetConflict:
@@ -148,7 +147,6 @@ async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Re
         raise HTTPException(
             status_code=err.status_code,
             detail=err.content,
-            headers={"content-type": err.content_type},
         )
 
     return Response(status_code=204)
