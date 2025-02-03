@@ -274,5 +274,4 @@ def prepare_broker_message(
 
     bm = bmb.build()
 
-    print(bm)
     return bm
