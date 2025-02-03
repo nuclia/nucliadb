@@ -149,11 +149,11 @@ async def test_learning_config_errors_are_proxied_correctly(
     ):
         resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
-        assert resp.text == "Learning Internal Server Error"
+        assert resp.json() == {"detail": "Learning Internal Server Error"}
 
         resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
-        assert resp.text == "Learning Internal Server Error"
+        assert resp.json() == {"detail": "Learning Internal Server Error"}
 
 
 @pytest.mark.parametrize("bwc_with_default_vectorset", [True, False])

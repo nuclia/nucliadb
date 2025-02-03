@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from fastapi import Response
+from fastapi import HTTPException, Response
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -52,10 +52,10 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Respo
     try:
         await _add_vectorset(kbid, vectorset_id)
     except learning_proxy.ProxiedLearningConfigError as err:
-        return Response(
+        raise HTTPException(
             status_code=err.status_code,
-            content=err.content,
-            media_type=err.content_type,
+            detail=err.content,
+            headers={"content-type": err.content_type},
         )
     return Response(status_code=200)
 
@@ -136,10 +136,10 @@ async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Re
     except VectorSetConflict as exc:
         return HTTPConflict(detail=str(exc))
     except learning_proxy.ProxiedLearningConfigError as err:
-        return Response(
+        raise HTTPException(
             status_code=err.status_code,
-            content=err.content,
-            media_type=err.content_type,
+            detail=err.content,
+            headers={"content-type": err.content_type},
         )
     return Response(status_code=200)
 
