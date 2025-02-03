@@ -38,7 +38,7 @@ requirements_grpc = [
     "grpcio-testing>=1.44.0",
     "grpcio-reflection>=1.44.0",
 ] + requirements_otel
-requirements_nats = ["nats-py>=2.5.0"] + requirements_otel
+requirements_nats = ["nats-py[nkeys]>=2.5.0", "PyNaCl"] + requirements_otel
 requirements_fastapi = ["fastapi"] + requirements_otel
 
 setup(
