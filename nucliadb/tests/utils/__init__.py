@@ -18,107 +18,66 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from datetime import datetime
+from typing import Optional
 
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty
 
 
-def broker_resource(kbid: str, rid=None, slug=None, title=None, summary=None) -> BrokerMessage:
-    """
-    Returns a broker resource with barebones metadata.
-    """
-    rid = rid or str(uuid.uuid4()).replace("-", "")
-    slug = slug or f"{rid}slug1"
-    bm: BrokerMessage = BrokerMessage(
-        kbid=kbid,
-        uuid=rid,
-        slug=slug,
-        type=BrokerMessage.AUTOCOMMIT,
-    )
-    title = title or "Title Resource"
-    summary = summary or "Summary of document"
-    bm.basic.icon = "text/plain"
-    bm.basic.title = title
-    bm.basic.summary = summary
-    bm.basic.thumbnail = "doc"
-    bm.basic.metadata.useful = True
-    bm.basic.metadata.language = "es"
-    bm.basic.created.FromDatetime(datetime.now())
-    bm.basic.modified.FromDatetime(datetime.now())
-    bm.origin.source = rpb.Origin.Source.WEB
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = title
-    etw.field.field = "title"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = summary
-    etw.field.field = "summary"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    bm.source = BrokerMessage.MessageSource.WRITER
-    return bm
-
-
-def broker_resource_with_title_paragraph(
-    kbid: str, rid=None, slug=None, title=None, summary=None
+def broker_resource(
+    kbid: str,
+    rid: Optional[str] = None,
+    slug: Optional[str] = None,
 ) -> BrokerMessage:
     """
     Returns a broker resource with barebones metadata.
     """
     rid = rid or str(uuid.uuid4()).replace("-", "")
     slug = slug or f"{rid}slug1"
-    bm: BrokerMessage = BrokerMessage(
-        kbid=kbid,
-        uuid=rid,
-        slug=slug,
-        type=BrokerMessage.AUTOCOMMIT,
-    )
-    title = title or "Title Resource"
-    summary = summary or "Summary of document"
-    bm.basic.icon = "text/plain"
-    bm.basic.title = title
-    bm.basic.summary = summary
-    bm.basic.thumbnail = "doc"
-    bm.basic.metadata.useful = True
-    bm.basic.metadata.language = "es"
-    bm.basic.created.FromDatetime(datetime.now())
-    bm.basic.modified.FromDatetime(datetime.now())
-    bm.origin.source = rpb.Origin.Source.WEB
 
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = title
-    etw.field.field = "title"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    fcm = rpb.FieldComputedMetadataWrapper()
-    fcm.field.field = "title"
-    fcm.field.field_type = rpb.FieldType.GENERIC
-    p1 = rpb.Paragraph(
-        start=0,
-        end=5,
-    )
-    fcm.metadata.metadata.paragraphs.append(p1)
-    bm.field_metadata.append(fcm)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = summary
-    etw.field.field = "summary"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    bm.source = BrokerMessage.MessageSource.WRITER
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, slug=slug)
+    bmb.with_title("Title Resource")
+    bmb.with_summary("Summary of document")
+    bm = bmb.build()
     return bm
 
 
-async def inject_message(writer: WriterStub, message: BrokerMessage):
+def broker_resource_with_title_paragraph(
+    kbid: str,
+    rid: Optional[str] = None,
+    slug: Optional[str] = None,
+) -> BrokerMessage:
+    """
+    Returns a broker resource with barebones metadata.
+    """
+    rid = rid or str(uuid.uuid4()).replace("-", "")
+    slug = slug or f"{rid}slug1"
+
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, slug=slug)
+
+    title_builder = bmb.with_title("Title Resource")
+    title_builder.with_extracted_paragraph_metadata(rpb.Paragraph(start=0, end=5))
+
+    bmb.with_summary("Summary of document")
+
+    bm = bmb.build()
+    return bm
+
+
+async def inject_message(
+    writer: WriterStub,
+    message: BrokerMessage,
+    timeout: Optional[float] = None,
+    wait_for_ready: Optional[bool] = None,
+):
+    # We should be able to enable this once all tests have been migrated
+    # for ev in message.field_vectors:
+    #     assert ev.vectorset_id, "Vectorset ID must be set in ExtractedVectorsWrapper!"
+    #     assert len(ev.vectorset_id) > 0, "Vectorset ID must be set in ExtractedVectorsWrapper!"
+
     await mark_dirty()
-    resp = await writer.ProcessMessage([message])  # type: ignore
+    resp = await writer.ProcessMessage([message], timeout=timeout, wait_for_ready=wait_for_ready)  # type: ignore
     assert resp.status == OpStatusWriter.Status.OK
