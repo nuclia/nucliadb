@@ -195,7 +195,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
     let api = grpc::SearchServer::new(searcher.index_cache(), shard_selector);
     let server = GrpcServer::new("0.0.0.0:10001").await?;
 
-    let api_task = tasks.spawn(server.serve(api.into_service(), shutdown.clone())).id();
+    let api_task = tasks.spawn(server.serve(api.into_router(), shutdown.clone())).id();
     let shutdown2 = shutdown.clone();
     let shard_selector = ShardSelector::new(list_nodes, searcher_settings.shard_partitioning.replicas);
     let search_task = tasks

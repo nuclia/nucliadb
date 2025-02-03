@@ -39,9 +39,10 @@ from nucliadb_protos.resources_pb2 import (
     PageStructurePage,
     PageStructureToken,
 )
-from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
+from tests.utils import inject_message
 from tests.utils.dirty_index import wait_for_sync
 
 _dir = os.path.dirname(__file__)
@@ -131,11 +132,8 @@ async def image_classification_resource(
         patch("nucliadb.ingest.fields.file.File.set_file_extracted_data", new=mock_set) as _,
         patch("nucliadb.ingest.fields.file.File.get_file_extracted_data", new=mock_get) as _,
     ):
-        response = await nucliadb_ingest_grpc.ProcessMessage(  # type: ignore
-            iter([broker_message]), timeout=10, wait_for_ready=True
-        )
+        await inject_message(nucliadb_ingest_grpc, broker_message, timeout=10, wait_for_ready=True)
         await wait_for_sync()
-        assert response.status == OpStatusWriter.Status.OK
         yield
 
 

@@ -79,6 +79,19 @@ async def test_hidden_search(
     assert resp.status_code == 200
     assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r1, r2}
 
+    # Test catalog ternary filter
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/catalog")
+    assert resp.status_code == 200
+    assert resp.json()["resources"].keys() == {r1, r2}
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/catalog?hidden=true")
+    assert resp.status_code == 200
+    assert resp.json()["resources"].keys() == {r1}
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/catalog?hidden=false")
+    assert resp.status_code == 200
+    assert resp.json()["resources"].keys() == {r2}
+
 
 @pytest.fixture()
 async def app_context(natsd, storage, nucliadb):

@@ -112,7 +112,7 @@ async def test_purge_kb_storage_handle_errors(keys, driver, storage):
     await purge.purge_kb_storage(driver, storage)
 
 
-async def test_main(driver, storage):
+async def test_main(driver, storage, dummy_nidx_utility):
     with (
         patch("nucliadb.purge.purge_kb", AsyncMock()) as purge_kb,
         patch("nucliadb.purge.purge_kb_storage", AsyncMock()) as purge_kb_storage,

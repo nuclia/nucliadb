@@ -549,14 +549,13 @@ class GCSStorage(Storage):
                 except Exception:
                     text = await resp.text()
                     data = {"text": text}
-                if resp.status not in (200, 204, 404):
-                    if resp.status == 404:
-                        logger.error(
-                            f"Attempt to delete not found gcloud: {data}, " f"status: {resp.status}",
-                            exc_info=True,
-                        )
-                    else:
-                        raise GoogleCloudException(f"{resp.status}: {json.dumps(data)}")
+                if resp.status == 404:
+                    logger.warning(
+                        f"Attempt to delete not found gcloud: {data}, " f"status: {resp.status}",
+                        exc_info=True,
+                    )
+                elif resp.status not in (200, 204):
+                    raise GoogleCloudException(f"{resp.status}: {json.dumps(data)}")
         else:
             raise AttributeError("No valid uri")
 

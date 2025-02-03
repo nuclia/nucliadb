@@ -73,11 +73,12 @@ class BrokerMessageBuilder:
 
     def add_field_builder(self, field: FieldBuilder):
         self.fields[(field.id.field, field.id.field_type)] = field
+        return field
 
     def field_builder(self, field_id: str, field_type: rpb.FieldType.ValueType) -> FieldBuilder:
         return self.fields[(field_id, field_type)]
 
-    def with_title(self, title: str):
+    def with_title(self, title: str) -> FieldBuilder:
         title_builder = FieldBuilder("title", rpb.FieldType.GENERIC)
         title_builder.with_extracted_text(title)
         # we do this to writer BMs in write resource API endpoint
@@ -90,8 +91,9 @@ class BrokerMessageBuilder:
         )
         self.bm.basic.title = title
         self.add_field_builder(title_builder)
+        return title_builder
 
-    def with_summary(self, summary: str):
+    def with_summary(self, summary: str) -> FieldBuilder:
         summary_builder = FieldBuilder("summary", rpb.FieldType.GENERIC)
         summary_builder.with_extracted_text(summary)
         # we do this to writer BMs in write resource API endpoint
@@ -104,6 +106,7 @@ class BrokerMessageBuilder:
         )
         self.bm.basic.summary = summary
         self.add_field_builder(summary_builder)
+        return summary_builder
 
     def with_resource_labels(self, labelset: str, labels: list[str]):
         classifications = labels_to_classifications(labelset, labels)
@@ -114,13 +117,17 @@ class BrokerMessageBuilder:
         self.bm.basic.thumbnail = "doc"
         self.bm.basic.metadata.useful = True
         self.bm.basic.metadata.language = "en"
-        self.bm.basic.metadata.status = rpb.Metadata.Status.PROCESSED
+
+        if self.bm.source == wpb.BrokerMessage.MessageSource.WRITER:
+            self.bm.basic.metadata.status = rpb.Metadata.Status.PENDING
+        elif self.bm.source == wpb.BrokerMessage.MessageSource.PROCESSOR:
+            self.bm.basic.metadata.status = rpb.Metadata.Status.PROCESSED
+        else:
+            raise ValueError(f"Unknown broker message source: {self.bm.source}")
+
         self.bm.basic.metadata.metadata["key"] = "value"
         self.bm.basic.created.FromDatetime(datetime.now())
         self.bm.basic.modified.FromDatetime(datetime.now())
-
-        self.with_title("Default test resource title")
-        self.with_summary("Default test resource summary")
 
     def _default_origin(self):
         self.bm.origin.source = rpb.Origin.Source.API
@@ -140,19 +147,28 @@ class BrokerMessageBuilder:
             field = field_builder.build()
 
             if field.id.field_type == rpb.FieldType.GENERIC:
+                # we don't need to do anything else
                 pass
+
+            elif field.id.field_type == rpb.FieldType.TEXT:
+                assert (
+                    field.extracted.text is not None
+                ), "only text fields with extracted data are supported nowadays"
+
             elif field.id.field_type == rpb.FieldType.FILE:
                 file_field = self.bm.files[field.id.field]
                 file_field.added.FromDatetime(datetime.now())
                 file_field.file.source = rpb.CloudFile.Source.EXTERNAL
+
             elif (
                 field.id.field_type == rpb.FieldType.LINK
                 and self.bm.source == wpb.BrokerMessage.MessageSource.PROCESSOR
             ):
                 # we don't need to do anything else
                 pass
+
             else:
-                raise Exception("Unsupported field type")
+                raise Exception("Unsupported field type: {field.id.field_type}")
 
             if field.user.metadata is not None:
                 self.bm.basic.fieldmetadata.append(field.user.metadata)

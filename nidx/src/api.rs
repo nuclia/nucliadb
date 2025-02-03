@@ -27,9 +27,7 @@ use tracing::debug;
 use crate::{grpc_server::GrpcServer, Settings};
 
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
-    let meta = settings.metadata.clone();
-
-    let service = grpc::ApiServer::new(meta).into_service();
+    let service = grpc::ApiServer::new(&settings).into_router();
     let server = GrpcServer::new("0.0.0.0:10000").await?;
     debug!("Running API at port {}", server.port()?);
     server.serve(service, shutdown).await?;

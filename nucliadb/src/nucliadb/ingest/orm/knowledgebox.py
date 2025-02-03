@@ -27,7 +27,6 @@ from grpc.aio import AioRpcError
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardNotFound
-from nucliadb.common.cluster.manager import get_index_node
 from nucliadb.common.cluster.utils import get_shard_manager
 
 # XXX: this keys shouldn't be exposed outside datamanagers
@@ -60,13 +59,11 @@ from nucliadb_protos.knowledgebox_pb2 import (
     VectorSetPurge,
 )
 from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_utils import const
 from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_audit,
     get_storage,
-    has_feature,
 )
 
 # XXX Eventually all these keys should be moved to datamanagers.kb
@@ -150,31 +147,6 @@ class KnowledgeBox:
 
                 vs_external_indexes = []
 
-                # HACK! Currently, we share responsibility of deciding where to
-                # store extracted vectors with processing. Depending on whether
-                # it sends the vectorset id or not (in the extracted vectors
-                # wrapper) nucliadb will store the extracted vectors in a different place
-                #
-                # Right now, processing behaviour is not setting vectorset ids
-                # if there's only one semantic model configured. This is done
-                # for Bw/c with KBs previous to vectorsets.
-                #
-                # We now hardcode this assumption here, so we can annotate each
-                # vectorset with a mark and don't depend on processing
-                # information to decide the storage key. Once this is done we'll
-                # be able to force processing to always send vectorset ids and
-                # remove that bw/c behavior
-                #
-                if has_feature(const.Features.REMOVE_DEFAULT_VECTORSET):
-                    storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
-                else:
-                    if len(semantic_models) == 1:
-                        storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.LEGACY
-                    else:
-                        storage_key_kind = (
-                            knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
-                        )
-
                 for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
                     # if this KB uses a matryoshka model, we can choose a different
                     # dimension
@@ -201,7 +173,7 @@ class KnowledgeBox:
                             vector_dimension=dimension,
                         ),
                         matryoshka_dimensions=semantic_model.matryoshka_dimensions,
-                        storage_key_kind=storage_key_kind,
+                        storage_key_kind=knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
                     )
                     await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
 
@@ -372,6 +344,8 @@ class KnowledgeBox:
         if exists is False:
             logger.error(f"{kbid} KB does not exists on Storage")
 
+        nidx_api = get_nidx_api_client()
+
         async with driver.transaction() as txn:
             storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
             await txn.set(storage_to_delete, b"")
@@ -384,25 +358,17 @@ class KnowledgeBox:
                 logger.warning(f"Shards not found for KB while purging it", extra={"kbid": kbid})
             else:
                 for shard in shards_obj.shards:
-                    # Delete the shard on nodes
-                    for replica in shard.replicas:
-                        node = get_index_node(replica.node)
-                        if node is None:
-                            logger.error(
-                                f"No node {replica.node} found, let's continue. Some shards may stay orphaned",
-                                extra={"kbid": kbid},
-                            )
-                            continue
+                    if shard.nidx_shard_id:
                         try:
-                            await node.delete_shard(replica.shard.id)
+                            await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
                             logger.debug(
-                                f"Succeded deleting shard from nodeid={replica.node} at {node.address}",
-                                extra={"kbid": kbid, "node_id": replica.node},
+                                f"Succeded deleting shard",
+                                extra={"kbid": kbid, "shard_id": shard.nidx_shard_id},
                             )
                         except AioRpcError as exc:
                             if exc.code() == StatusCode.NOT_FOUND:
                                 continue
-                            raise ShardNotFound(f"{exc.details()} @ {node.address}")
+                            raise ShardNotFound(f"{exc.details()} @ shard {shard.nidx_shard_id}")
 
             await txn.commit()
         await cls.delete_all_kb_keys(driver, kbid)

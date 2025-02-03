@@ -20,7 +20,6 @@
 
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio_util::sync::CancellationToken;
-use tonic::service::Routes;
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry;
@@ -37,9 +36,7 @@ impl GrpcServer {
         Ok(self.0.local_addr()?.port())
     }
 
-    pub async fn serve(self, routes: Routes, shutdown: CancellationToken) -> anyhow::Result<()> {
-        let router = routes.into_axum_router();
-
+    pub async fn serve(self, router: axum::Router, shutdown: CancellationToken) -> anyhow::Result<()> {
         #[cfg(feature = "telemetry")]
         let router = router.layer(telemetry::middleware::GrpcInstrumentorLayer);
 

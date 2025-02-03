@@ -19,8 +19,13 @@
 #
 from os.path import dirname, getsize
 from typing import Optional
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
+
+from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import (
     KnowledgeBox,
@@ -33,6 +38,11 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
 )
 from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
+from nucliadb_utils.storages.azure import AzureStorage
+from nucliadb_utils.storages.exceptions import CouldNotCopyNotFound
+from nucliadb_utils.storages.gcs import GCSStorage
+from nucliadb_utils.storages.local import LocalStorage
+from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -117,7 +127,7 @@ async def test_create_resource_orm_vector_split(
     ex1.vectors.split_vectors["es1"].vectors.append(v1)
     ex1.vectors.split_vectors["es2"].vectors.append(v1)
 
-    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Conversation = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
     await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
     ex1 = ExtractedVectorsWrapper()
@@ -135,3 +145,147 @@ async def test_create_resource_orm_vector_split(
     ex2: Optional[VectorObject] = await field_obj2.get_vectors(vectorset_id, storage_key_kind)
     assert ex2 is not None
     assert len(ex2.split_vectors) == 3
+
+
+@pytest.mark.parametrize(
+    "cf_uri,storage_key_kind,destination_path",
+    [
+        # legacy situation, processing stores without vectorset and we have a
+        # legacy KB (with 1 vectorset)
+        (
+            "/kbs/{kbid}/r/{rid}/e/t/{field_id}/extracted_vectors",
+            VectorSetConfig.StorageKeyKind.LEGACY,
+            "kbs/{kbid}/r/{rid}/e/t/{field_id}/extracted_vectors",
+        ),
+        # New KBs in nucliadb with legacy processing
+        (
+            "/kbs/{kbid}/r/{rid}/e/t/{field_id}/extracted_vectors",
+            VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
+            "kbs/{kbid}/r/{rid}/e/t/{field_id}/en-2024-04-24/extracted_vectors",
+        ),
+        # Legacy KBs but processing stores vectors in the new prefixed key
+        (
+            "/kbs/{kbid}/r/{rid}/e/t/{field_id}/en-2024-04-24/extracted_vectors",
+            VectorSetConfig.StorageKeyKind.LEGACY,
+            "kbs/{kbid}/r/{rid}/e/t/{field_id}/extracted_vectors",
+        ),
+        # KBs with vectorsets or new KBs with processing using prefix
+        (
+            "/kbs/{kbid}/r/{rid}/e/t/{field_id}/en-2024-04-24/extracted_vectors",
+            VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX,
+            "kbs/{kbid}/r/{rid}/e/t/{field_id}/en-2024-04-24/extracted_vectors",
+        ),
+    ],
+)
+async def test_create_resource_with_cloud_file_vectors(
+    cf_uri: str,
+    storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+    destination_path: str,
+    storage: Storage,
+    txn,
+    dummy_nidx_utility,
+    knowledgebox_ingest: str,
+):
+    vectorset_id = "en-2024-04-24"
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+
+    rid = str(uuid4())
+    resource = await kb_obj.add_resource(uuid=rid, slug="slug")
+    assert resource is not None
+
+    field_id = "my-text"
+
+    cf_uri = cf_uri.format(kbid=knowledgebox_ingest, rid=rid, field_id=field_id)
+    destination_path = destination_path.format(kbid=knowledgebox_ingest, rid=rid, field_id=field_id)
+
+    evw = ExtractedVectorsWrapper()
+    evw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_id))
+    evw.vectorset_id = vectorset_id
+    storage_map = {
+        AzureStorage: CloudFile.Source.AZURE,
+        GCSStorage: CloudFile.Source.GCS,
+        LocalStorage: CloudFile.Source.LOCAL,
+        S3Storage: CloudFile.Source.S3,
+    }
+    evw.file.source = storage_map[type(storage)]
+    evw.file.uri = cf_uri
+
+    field_obj: Field = await resource.get_field(evw.field.field, evw.field.field_type, load=False)
+
+    with patch.object(storage, "move") as move_mock:
+        await field_obj.set_vectors(evw, vectorset_id, storage_key_kind)
+        assert move_mock.call_count == 1
+        cf, sf = move_mock.call_args.args
+        assert cf.uri == cf_uri
+        assert sf.key == destination_path
+
+
+@pytest.mark.parametrize("found_in_storage", [True, False])
+async def test_create_resource_with_cloud_file_vectors_already_moved(
+    found_in_storage: bool,
+    storage: Storage,
+    txn,
+    dummy_nidx_utility,
+    knowledgebox_ingest: str,
+):
+    vectorset_id = "en-2024-04-24"
+    cf_uri = "/kbs/{kbid}/r/{rid}/e/t/{field_id}/en-2024-04-24/extracted_vectors"
+    storage_key_kind = VectorSetConfig.StorageKeyKind.LEGACY
+    destination_path = "kbs/{kbid}/r/{rid}/e/t/{field_id}/extracted_vectors"
+
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest)
+
+    rid = str(uuid4())
+    resource = await kb_obj.add_resource(uuid=rid, slug="slug")
+    assert resource is not None
+
+    field_id = "my-text"
+
+    cf_uri = cf_uri.format(kbid=knowledgebox_ingest, rid=rid, field_id=field_id)
+    destination_path = destination_path.format(kbid=knowledgebox_ingest, rid=rid, field_id=field_id)
+
+    evw = ExtractedVectorsWrapper()
+    evw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_id))
+    evw.vectorset_id = vectorset_id
+    storage_map = {
+        AzureStorage: CloudFile.Source.AZURE,
+        GCSStorage: CloudFile.Source.GCS,
+        LocalStorage: CloudFile.Source.LOCAL,
+        S3Storage: CloudFile.Source.S3,
+    }
+    evw.file.source = storage_map[type(storage)]
+    evw.file.uri = cf_uri
+
+    field_obj: Field = await resource.get_field(evw.field.field, evw.field.field_type, load=False)
+
+    sf = AsyncMock()
+    with (
+        patch.object(
+            field_obj.storage,
+            "normalize_binary",
+            side_effect=CouldNotCopyNotFound(
+                cf_uri,
+                "origin_bucket_name",
+                destination_path,
+                "destination_bucket_name",
+                "<storage error>",
+            ),
+        ),
+        patch.object(
+            field_obj.storage,
+            "download_pb",
+            return_value=VectorObject(),
+        ),
+        patch.object(
+            field_obj,
+            "_get_extracted_vectors_storage_field",
+            return_value=sf,
+        ),
+    ):
+        if found_in_storage:
+            sf.exists.return_value = True
+            await field_obj.set_vectors(evw, vectorset_id, storage_key_kind)
+        else:
+            sf.exists.return_value = False
+            with pytest.raises(CouldNotCopyNotFound):
+                await field_obj.set_vectors(evw, vectorset_id, storage_key_kind)

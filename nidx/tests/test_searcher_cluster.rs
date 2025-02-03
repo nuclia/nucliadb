@@ -83,7 +83,7 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
         searchers.push(format!("localhost:{searcher_port}"));
         let settings_copy = fixture.settings.clone();
         let shutdown = CancellationToken::new();
-        tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));
+        tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
         tokio::task::spawn(async move {
             searcher
                 .run(
@@ -167,7 +167,7 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
         searchers.push(format!("localhost:{searcher_port}"));
         let settings_copy = fixture.settings.clone();
         let shutdown = CancellationToken::new();
-        tokio::task::spawn(searcher_server.serve(searcher_api.into_service(), shutdown.clone()));
+        tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
         tokio::task::spawn(async move {
             searcher
                 .run(

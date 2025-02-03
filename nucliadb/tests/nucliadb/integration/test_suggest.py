@@ -22,8 +22,9 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_protos.resources_pb2 import LinkExtractedData
-from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 
 
 async def test_suggest_paragraphs(
@@ -290,8 +291,7 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     led.title = extracted_title
     bm.link_extracted_data.append(led)
 
-    resp = await nucliadb_grpc.ProcessMessage([bm])
-    assert resp.status == OpStatusWriter.Status.OK
+    await inject_message(nucliadb_grpc, bm)
 
     # Check that the resource title changed
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")

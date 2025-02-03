@@ -20,6 +20,7 @@
 pub mod api;
 mod errors;
 pub mod grpc_server;
+mod import_export;
 pub mod indexer;
 pub mod metadata;
 pub mod metrics;
@@ -27,6 +28,7 @@ pub mod scheduler;
 pub mod searcher;
 mod segment_store;
 pub mod settings;
+pub mod tool;
 pub mod worker;
 
 #[cfg(feature = "telemetry")]

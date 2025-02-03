@@ -182,6 +182,19 @@ impl Segment {
         .await
     }
 
+    pub async fn in_indexes(
+        meta: impl Executor<'_, Database = Postgres>,
+        indexes: &[IndexId],
+    ) -> sqlx::Result<Vec<Segment>> {
+        sqlx::query_as!(
+            Segment,
+            "SELECT * FROM segments WHERE index_id = ANY($1) AND delete_at IS NULL",
+            indexes as &[IndexId]
+        )
+        .fetch_all(meta)
+        .await
+    }
+
     pub async fn in_merge_job(
         meta: impl Executor<'_, Database = Postgres>,
         merge_job_id: i64,
