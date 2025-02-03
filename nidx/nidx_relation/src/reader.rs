@@ -277,6 +277,8 @@ impl RelationsReaderService {
         };
 
         if let Some(query) = &prefix_request.query {
+            let mut source_prefix_q = Vec::new();
+            let mut target_prefix_q = Vec::new();
             // Search for all groups of words in the query, e.g:
             // query "Films with James Bond"
             // returns:
@@ -290,13 +292,15 @@ impl RelationsReaderService {
                         break;
                     }
                     let start = end - len;
-                    self.add_fuzzy_prefix_query(&mut source_q, &mut target_q, &words[start..end]);
+                    self.add_fuzzy_prefix_query(&mut source_prefix_q, &mut target_prefix_q, &words[start..end]);
                 }
             }
+            source_q.push((Occur::Must, Box::new(BooleanQuery::new(source_prefix_q))));
+            target_q.push((Occur::Must, Box::new(BooleanQuery::new(target_prefix_q))));
         } else {
             let normalized_prefix = schema::normalize(&prefix_request.prefix);
             source_q.push((
-                Occur::Should,
+                Occur::Must,
                 Box::new(FuzzyTermQuery::new_prefix(
                     Term::from_field_text(self.schema.normalized_source_value, &normalized_prefix),
                     FUZZY_DISTANCE,
@@ -304,7 +308,7 @@ impl RelationsReaderService {
                 )),
             ));
             target_q.push((
-                Occur::Should,
+                Occur::Must,
                 Box::new(FuzzyTermQuery::new_prefix(
                     Term::from_field_text(self.schema.normalized_target_value, &normalized_prefix),
                     FUZZY_DISTANCE,
