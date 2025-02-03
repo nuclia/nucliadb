@@ -235,6 +235,6 @@ jobs:
               "team": "nucliadb",
               "tests": {
                 "run-e2e": false,
-                "run-nua-e2e": false
+                "run-nuclia-e2e": false
               }
             }
