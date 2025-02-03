@@ -136,6 +136,15 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 "PLACES".to_string(),
                 RelationType::Entity,
             ),
+            common::create_relation(
+                "James Bond".to_string(),
+                NodeType::Entity,
+                "PEOPLE".to_string(),
+                "Ian Fleming".to_string(),
+                NodeType::Entity,
+                "PEOPLE".to_string(),
+                RelationType::Entity,
+            ),
         ],
         ..Default::default()
     };
@@ -256,7 +265,7 @@ fn test_prefix_search() -> anyhow::Result<()> {
         ..Default::default()
     })?;
 
-    assert_eq!(result.prefix.unwrap().nodes.len(), 10);
+    assert_eq!(result.prefix.unwrap().nodes.len(), 12);
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {
@@ -281,6 +290,49 @@ fn test_prefix_search() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_prefix_query_search() -> anyhow::Result<()> {
+    let reader = create_reader()?;
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            query: Some("Films with James Bond played by Roger Moore".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            query: Some("Films with Jomes Bond played by Roger Moore".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            query: Some("Just James".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 0);
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            query: Some("James Bond or Anastasia".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 2);
+
+    Ok(())
+}
+
+#[test]
 fn test_prefix_search_with_filters() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
@@ -291,6 +343,7 @@ fn test_prefix_search_with_filters() -> anyhow::Result<()> {
                 node_type: NodeType::Entity as i32,
                 node_subtype: Some("ANIMALS".to_string()),
             }],
+            ..Default::default()
         }),
         ..Default::default()
     })?;
@@ -304,6 +357,7 @@ fn test_prefix_search_with_filters() -> anyhow::Result<()> {
                 node_type: NodeType::Resource as i32,
                 node_subtype: None,
             }],
+            ..Default::default()
         }),
         ..Default::default()
     })?;
@@ -317,6 +371,7 @@ fn test_prefix_search_with_filters() -> anyhow::Result<()> {
                 node_type: NodeType::Resource as i32,
                 node_subtype: Some("foobarmissing".to_string()),
             }],
+            ..Default::default()
         }),
         ..Default::default()
     })?;

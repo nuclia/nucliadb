@@ -145,6 +145,7 @@ impl RelationSearcher {
                             node_type: NodeType::Entity.into(),
                             ..Default::default()
                         }],
+                        ..Default::default()
                     }),
                     ..Default::default()
                 }

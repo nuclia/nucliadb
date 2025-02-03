@@ -825,17 +825,24 @@ class RelationPrefixSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PREFIX_FIELD_NUMBER: builtins.int
+    QUERY_FIELD_NUMBER: builtins.int
     NODE_FILTERS_FIELD_NUMBER: builtins.int
     prefix: builtins.str
+    """Search for a single prefix"""
+    query: builtins.str
+    """Search for entities appearing on a query"""
     @property
     def node_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationNodeFilter]: ...
     def __init__(
         self,
         *,
         prefix: builtins.str = ...,
+        query: builtins.str | None = ...,
         node_filters: collections.abc.Iterable[global___RelationNodeFilter] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["node_filters", b"node_filters", "prefix", b"prefix"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_query", b"_query", "query", b"query"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_query", b"_query", "node_filters", b"node_filters", "prefix", b"prefix", "query", b"query"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_query", b"_query"]) -> typing.Literal["query"] | None: ...
 
 global___RelationPrefixSearchRequest = RelationPrefixSearchRequest
 
