@@ -32,6 +32,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import (
     NucliaDBRoles,
 )
+from nucliadb_models.vectorsets import CreatedVectorSet
 from nucliadb_protos import knowledgebox_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires_one
@@ -40,24 +41,26 @@ from nucliadb_utils.utilities import get_storage
 
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/vectorsets/{{vectorset_id}}",
-    status_code=200,
+    status_code=201,
     summary="Add a vectorset to Knowledge Box",
-    tags=["Knowledge Boxes"],
+    tags=["VectorSets"],
     # TODO: remove when the feature is mature
     include_in_schema=False,
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
+async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> CreatedVectorSet:
     try:
         await _add_vectorset(kbid, vectorset_id)
+
     except learning_proxy.ProxiedLearningConfigError as err:
         raise HTTPException(
             status_code=err.status_code,
             detail=err.content,
             headers={"content-type": err.content_type},
         )
-    return Response(status_code=200)
+
+    return CreatedVectorSet(id=vectorset_id)
 
 
 async def _add_vectorset(kbid: str, vectorset_id: str) -> None:
@@ -122,9 +125,9 @@ def get_vectorset_config(
 
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/vectorsets/{{vectorset_id}}",
-    status_code=200,
+    status_code=204,
     summary="Delete vectorset from Knowledge Box",
-    tags=["Knowledge Boxes"],
+    tags=["VectorSets"],
     # TODO: remove when the feature is mature
     include_in_schema=False,
 )
@@ -141,7 +144,8 @@ async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Re
             detail=err.content,
             headers={"content-type": err.content_type},
         )
-    return Response(status_code=200)
+
+    return Response(status_code=204)
 
 
 async def _delete_vectorset(kbid: str, vectorset_id: str) -> None:
