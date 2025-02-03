@@ -26,7 +26,6 @@ from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.exceptions import VectorSetConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.models.responses import HTTPConflict
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import (
@@ -60,6 +59,12 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Creat
             headers={"content-type": err.content_type},
         )
 
+    except VectorSetConflict:
+        raise HTTPException(
+            status_code=409,
+            detail="A vectorset with this embedding model already exists in your KB",
+        )
+
     return CreatedVectorSet(id=vectorset_id)
 
 
@@ -79,12 +84,8 @@ async def _add_vectorset(kbid: str, vectorset_id: str) -> None:
     vectorset_config = get_vectorset_config(lconfig, vectorset_id)
     async with datamanagers.with_rw_transaction() as txn:
         kbobj = KnowledgeBox(txn, storage, kbid)
-        try:
-            await kbobj.create_vectorset(vectorset_config)
-            await txn.commit()
-        except VectorSetConflict:
-            # Vectorset already exists, nothing to do
-            return
+        await kbobj.create_vectorset(vectorset_config)
+        await txn.commit()
 
 
 def get_vectorset_config(
@@ -136,8 +137,13 @@ def get_vectorset_config(
 async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
     try:
         await _delete_vectorset(kbid, vectorset_id)
+
     except VectorSetConflict as exc:
-        return HTTPConflict(detail=str(exc))
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        )
+
     except learning_proxy.ProxiedLearningConfigError as err:
         raise HTTPException(
             status_code=err.status_code,
