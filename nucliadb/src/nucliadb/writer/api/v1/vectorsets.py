@@ -23,14 +23,19 @@ from fastapi_versioning import version
 from starlette.requests import Request
 
 from nucliadb import learning_proxy
+from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.exceptions import VectorSetConflict
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.responses import HTTPConflict
-from nucliadb.writer import vectorsets
+from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import (
     NucliaDBRoles,
 )
+from nucliadb_protos import knowledgebox_pb2
+from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires_one
+from nucliadb_utils.utilities import get_storage
 
 
 @api.post(
@@ -45,7 +50,7 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
     try:
-        await vectorsets.add(kbid, vectorset_id)
+        await _add_vectorset(kbid, vectorset_id)
     except learning_proxy.ProxiedLearningConfigError as err:
         return Response(
             status_code=err.status_code,
@@ -53,6 +58,66 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Respo
             media_type=err.content_type,
         )
     return Response(status_code=200)
+
+
+async def _add_vectorset(kbid: str, vectorset_id: str) -> None:
+    # First off, add the vectorset to the learning configuration if it's not already there
+    lconfig = await learning_proxy.get_configuration(kbid)
+    assert lconfig is not None
+    semantic_models = lconfig.model_dump()["semantic_models"]
+    if vectorset_id not in semantic_models:
+        semantic_models.append(vectorset_id)
+        await learning_proxy.update_configuration(kbid, {"semantic_models": semantic_models})
+        lconfig = await learning_proxy.get_configuration(kbid)
+        assert lconfig is not None
+
+    # Then, add the vectorset to the index if it's not already there
+    storage = await get_storage()
+    vectorset_config = get_vectorset_config(lconfig, vectorset_id)
+    async with datamanagers.with_rw_transaction() as txn:
+        kbobj = KnowledgeBox(txn, storage, kbid)
+        try:
+            await kbobj.create_vectorset(vectorset_config)
+            await txn.commit()
+        except VectorSetConflict:
+            # Vectorset already exists, nothing to do
+            return
+
+
+def get_vectorset_config(
+    learning_config: learning_proxy.LearningConfiguration, vectorset_id: str
+) -> knowledgebox_pb2.VectorSetConfig:
+    """
+    Create a VectorSetConfig from a LearningConfiguration for a given vectorset_id
+    """
+    vectorset_config = knowledgebox_pb2.VectorSetConfig(vectorset_id=vectorset_id)
+    vectorset_index_config = knowledgebox_pb2.VectorIndexConfig(
+        vector_type=knowledgebox_pb2.VectorType.DENSE_F32,
+    )
+    model_config = learning_config.semantic_model_configs[vectorset_id]
+
+    # Parse similarity function
+    parsed_similarity = learning_proxy.SimilarityFunction(model_config.similarity)
+    if parsed_similarity == learning_proxy.SimilarityFunction.COSINE.value:
+        vectorset_index_config.similarity = knowledgebox_pb2.VectorSimilarity.COSINE
+    elif parsed_similarity == learning_proxy.SimilarityFunction.DOT.value:
+        vectorset_index_config.similarity = knowledgebox_pb2.VectorSimilarity.DOT
+    else:
+        raise ValueError(
+            f"Unknown similarity function {model_config.similarity}, parsed as {parsed_similarity}"
+        )
+
+    # Parse vector dimension
+    vectorset_index_config.vector_dimension = model_config.size
+
+    # Parse matryoshka dimensions
+    if len(model_config.matryoshka_dims) > 0:
+        vectorset_index_config.normalize_vectors = True
+        vectorset_config.matryoshka_dimensions.extend(model_config.matryoshka_dims)
+    else:
+        vectorset_index_config.normalize_vectors = False
+    vectorset_config.vectorset_index_config.CopyFrom(vectorset_index_config)
+    return vectorset_config
 
 
 @api.delete(
@@ -67,7 +132,7 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Respo
 @version(1)
 async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
     try:
-        await vectorsets.delete(kbid, vectorset_id)
+        await _delete_vectorset(kbid, vectorset_id)
     except VectorSetConflict as exc:
         return HTTPConflict(detail=str(exc))
     except learning_proxy.ProxiedLearningConfigError as err:
@@ -77,3 +142,28 @@ async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Re
             media_type=err.content_type,
         )
     return Response(status_code=200)
+
+
+async def _delete_vectorset(kbid: str, vectorset_id: str) -> None:
+    lconfig = await learning_proxy.get_configuration(kbid)
+    if lconfig is not None:
+        semantic_models = lconfig.model_dump()["semantic_models"]
+        if vectorset_id in semantic_models:
+            semantic_models.remove(vectorset_id)
+            await learning_proxy.update_configuration(kbid, {"semantic_models": semantic_models})
+
+    storage = await get_storage()
+    try:
+        async with datamanagers.with_rw_transaction() as txn:
+            kbobj = KnowledgeBox(txn, storage, kbid)
+            await kbobj.delete_vectorset(vectorset_id=vectorset_id)
+            await txn.commit()
+
+    except VectorSetConflict:
+        # caller should handle this error
+        raise
+    except Exception as ex:
+        errors.capture_exception(ex)
+        logger.exception(
+            "Could not delete vectorset from index", extra={"kbid": kbid, "vectorset_id": vectorset_id}
+        )

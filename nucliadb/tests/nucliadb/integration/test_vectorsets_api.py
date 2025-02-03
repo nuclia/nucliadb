@@ -45,7 +45,7 @@ from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 from tests.utils.vectorsets import add_vectorset
 
-MODULE = "nucliadb.writer.vectorsets"
+MODULE = "nucliadb.writer.api.v1.vectorsets"
 
 
 async def test_add_delete_vectorsets(

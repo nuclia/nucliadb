@@ -82,14 +82,14 @@ async def add_vectorset(
 
     with (
         patch(
-            "nucliadb.writer.vectorsets.learning_proxy.get_configuration",
+            "nucliadb.writer.api.v1.vectorsets.learning_proxy.get_configuration",
             side_effect=[
                 first_get_config,
                 updated_get_config,
             ],
         ),
         patch(
-            "nucliadb.writer.vectorsets.learning_proxy.update_configuration",
+            "nucliadb.writer.api.v1.vectorsets.learning_proxy.update_configuration",
         ),
     ):
         resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
