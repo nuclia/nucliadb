@@ -73,6 +73,7 @@ async def inject_message(
     timeout: Optional[float] = None,
     wait_for_ready: Optional[bool] = None,
 ):
+    # We should be able to enable this once all tests have been migrated
     # for ev in message.field_vectors:
     #     assert ev.vectorset_id, "Vectorset ID must be set in ExtractedVectorsWrapper!"
     #     assert len(ev.vectorset_id) > 0, "Vectorset ID must be set in ExtractedVectorsWrapper!"
