@@ -21,6 +21,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::path::Path;
 
+use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::{
     EntitiesSubgraphResponse, RelationNode, RelationPrefixSearchResponse, RelationSearchRequest, RelationSearchResponse,
 };
@@ -218,9 +219,9 @@ impl RelationsReaderService {
             return Ok(None);
         };
 
-        if !prefix_request.prefix.is_empty() && prefix_request.query.is_some() {
-            return Err(anyhow::anyhow!("Cannot search by both prefix and query, specify only one"));
-        }
+        let Some(search) = &prefix_request.search else {
+            return Err(anyhow::anyhow!("Search terms needed"));
+        };
 
         // if prefix_request.prefix.is_empty() {
         //     return Ok(Some(RelationPrefixSearchResponse::default()));
@@ -276,45 +277,51 @@ impl RelationsReaderService {
             target_q.push((Occur::Must, Box::new(BooleanQuery::new(target_types))));
         };
 
-        if let Some(query) = &prefix_request.query {
-            let mut source_prefix_q = Vec::new();
-            let mut target_prefix_q = Vec::new();
-            // Search for all groups of words in the query, e.g:
-            // query "Films with James Bond"
-            // returns:
-            // "Films", "with", "James", "Bond"
-            // "Films with", "with James", "James Bond"
-            // "Films with James", "with James Bond"
-            let words: Vec<_> = query.split_whitespace().collect();
-            for end in 1..=words.len() {
-                for len in 1..=ENTITY_WORD_SIZE {
-                    if len > end {
-                        break;
+        match search {
+            Search::Query(query) => {
+                // This search is intended to do a normal tokenized search on entities names. However, since we
+                // do some custom normalization for these fields, we need to do some custom handling here.
+                // Feel free to replace this with something better if we start indexing entities name with tokenization.
+                let mut source_prefix_q = Vec::new();
+                let mut target_prefix_q = Vec::new();
+                // Search for all groups of words in the query, e.g:
+                // query "Films with James Bond"
+                // returns:
+                // "Films", "with", "James", "Bond"
+                // "Films with", "with James", "James Bond"
+                // "Films with James", "with James Bond"
+                let words: Vec<_> = query.split_whitespace().collect();
+                for end in 1..=words.len() {
+                    for len in 1..=ENTITY_WORD_SIZE {
+                        if len > end {
+                            break;
+                        }
+                        let start = end - len;
+                        self.add_fuzzy_prefix_query(&mut source_prefix_q, &mut target_prefix_q, &words[start..end]);
                     }
-                    let start = end - len;
-                    self.add_fuzzy_prefix_query(&mut source_prefix_q, &mut target_prefix_q, &words[start..end]);
                 }
+                source_q.push((Occur::Must, Box::new(BooleanQuery::new(source_prefix_q))));
+                target_q.push((Occur::Must, Box::new(BooleanQuery::new(target_prefix_q))));
             }
-            source_q.push((Occur::Must, Box::new(BooleanQuery::new(source_prefix_q))));
-            target_q.push((Occur::Must, Box::new(BooleanQuery::new(target_prefix_q))));
-        } else {
-            let normalized_prefix = schema::normalize(&prefix_request.prefix);
-            source_q.push((
-                Occur::Must,
-                Box::new(FuzzyTermQuery::new_prefix(
-                    Term::from_field_text(self.schema.normalized_source_value, &normalized_prefix),
-                    FUZZY_DISTANCE,
-                    true,
-                )),
-            ));
-            target_q.push((
-                Occur::Must,
-                Box::new(FuzzyTermQuery::new_prefix(
-                    Term::from_field_text(self.schema.normalized_target_value, &normalized_prefix),
-                    FUZZY_DISTANCE,
-                    true,
-                )),
-            ));
+            Search::Prefix(prefix) => {
+                let normalized_prefix = schema::normalize(prefix);
+                source_q.push((
+                    Occur::Must,
+                    Box::new(FuzzyTermQuery::new_prefix(
+                        Term::from_field_text(self.schema.normalized_source_value, &normalized_prefix),
+                        FUZZY_DISTANCE,
+                        true,
+                    )),
+                ));
+                target_q.push((
+                    Occur::Must,
+                    Box::new(FuzzyTermQuery::new_prefix(
+                        Term::from_field_text(self.schema.normalized_target_value, &normalized_prefix),
+                        FUZZY_DISTANCE,
+                        true,
+                    )),
+                ));
+            }
         }
 
         let source_prefix_query = BooleanQuery::new(source_q);
