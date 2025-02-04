@@ -97,9 +97,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            .
-            nidx
+          workspaces: nidx
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v4
         with:
@@ -210,9 +208,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            .
-            nidx
+          workspaces: nidx
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v4
         with:
