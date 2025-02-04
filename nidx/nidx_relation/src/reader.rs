@@ -26,7 +26,7 @@ use nidx_protos::{
     EntitiesSubgraphResponse, RelationNode, RelationPrefixSearchResponse, RelationSearchRequest, RelationSearchResponse,
 };
 use tantivy::collector::TopDocs;
-use tantivy::query::{BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
 use tantivy::{Index, IndexReader, Term};
 
@@ -142,14 +142,22 @@ impl RelationsReaderService {
                 continue;
             }
 
-            let source_subtype_filter: Box<dyn Query> = Box::new(TermQuery::new(
-                Term::from_field_text(self.schema.source_subtype, &deleted_nodes.node_subtype),
-                IndexRecordOption::Basic,
-            ));
-            let target_subtype_filter: Box<dyn Query> = Box::new(TermQuery::new(
-                Term::from_field_text(self.schema.target_subtype, &deleted_nodes.node_subtype),
-                IndexRecordOption::Basic,
-            ));
+            let source_subtype_filter: Box<dyn Query> = if deleted_nodes.node_subtype.is_empty() {
+                Box::new(AllQuery)
+            } else {
+                Box::new(TermQuery::new(
+                    Term::from_field_text(self.schema.source_subtype, &deleted_nodes.node_subtype),
+                    IndexRecordOption::Basic,
+                ))
+            };
+            let target_subtype_filter: Box<dyn Query> = if deleted_nodes.node_subtype.is_empty() {
+                Box::new(AllQuery)
+            } else {
+                Box::new(TermQuery::new(
+                    Term::from_field_text(self.schema.target_subtype, &deleted_nodes.node_subtype),
+                    IndexRecordOption::Basic,
+                ))
+            };
 
             let mut source_value_subqueries = Vec::new();
             let mut target_value_subqueries = Vec::new();
@@ -163,6 +171,7 @@ impl RelationsReaderService {
                     Term::from_field_text(self.schema.normalized_target_value, &normalized_value),
                     IndexRecordOption::Basic,
                 ));
+
                 source_value_subqueries.push((Occur::Should, exclude_source_value));
                 target_value_subqueries.push((Occur::Should, exclude_target_value));
             }

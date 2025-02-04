@@ -365,19 +365,14 @@ async def get_graph_results(
                     timeout=5.0,
                     only_with_metadata=True,
                     only_agentic_relations=graph_strategy.agentic_graph_only,
+                    deleted_entities=explored_entities,
                 )
             except Exception as e:
                 capture_exception(e)
                 logger.exception("Error in getting query relations for graph strategy")
                 new_relations = Relations(entities={})
 
-            # Removing the relations connected to the entities that were already explored
-            # XXX: This could be optimized by implementing a filter in the index
-            # so we don't have to remove them after
-            new_subgraphs = {
-                entity: filter_subgraph(subgraph, explored_entities)
-                for entity, subgraph in new_relations.entities.items()
-            }
+            new_subgraphs = new_relations.entities
 
             explored_entities.update(new_subgraphs.keys())
 
@@ -839,15 +834,6 @@ async def build_graph_response(
         best_matches=best_matches,
         relations=final_relations,
         total=len(text_blocks),
-    )
-
-
-def filter_subgraph(subgraph: EntitySubgraph, entities_to_remove: Collection[str]) -> EntitySubgraph:
-    """
-    Removes the relationships with entities in `entities_to_remove` from the subgraph.
-    """
-    return EntitySubgraph(
-        related_to=[rel for rel in subgraph.related_to if rel.entity not in entities_to_remove]
     )
 
 
