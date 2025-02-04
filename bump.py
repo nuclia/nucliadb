@@ -40,19 +40,28 @@ def run(args):
         # we only set other versions if we are not bumping a sem version
         return
 
-    # replace node binding toml version as well
-    with open("nidx/nidx_binding/Cargo.toml", "r") as f:
-        cargo = f.read()
+    # replace nidx binding toml version as well
+    VERSION_UPDATES = [
+        "nidx/nidx_binding/Cargo.toml",
+        "nidx/nidx_binding/pyproject.toml",
+        "nidx/nidx_protos/pyproject.toml",
+        "nucliadb_dataset/pyproject.toml",
+        "nucliadb_models/pyproject.toml",
+        "nucliadb_protos/python/pyproject.toml",
+        "nucliadb_sdk/pyproject.toml",
+        "nucliadb_telemetry/pyproject.toml",
+        "nucliadb_utils/pyproject.toml",
+        "pyproject.toml",
+    ]
+    for filename in VERSION_UPDATES:
+        update_version(filename, version)
 
-    new_cargo = []
-    for line in cargo.splitlines():
-        if line.startswith("version ="):
-            line = f'version = "{version}"'
-        new_cargo.append(line)
-
-    with open("nidx/nidx_binding/Cargo.toml", "w") as f:
-        f.write("\n".join(new_cargo))
-
+    REQUIREMENT_UPDATES = [
+        "nucliadb/pyproject.toml",
+        "nucliadb_utils/pyproject.toml",
+        "nucliadb_sdk/pyproject.toml",
+        "nucliadb_dataset/pyproject.toml",
+    ]
     # go through each requirements.txt and update the version to the new bump
     for req_filepath in (
         "nucliadb/requirements.txt",
@@ -71,6 +80,20 @@ def run(args):
 
         with open(req_filepath, "w") as f:
             f.write("\n".join(req_lines))
+
+
+def update_version(filename, version):
+    with open(filename, "r") as f:
+        toml = f.read()
+
+    new_toml = []
+    for line in toml.splitlines():
+        if line.startswith("version ="):
+            line = f'version = "{version}"'
+        new_toml.append(line)
+
+    with open(filename, "w") as f:
+        f.write("\n".join(new_toml))
 
 
 if __name__ == "__main__":

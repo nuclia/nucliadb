@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nucliadb_utils"
-dynamic = ["version"]
+version = "6.2.1"
 license = { text = "AGPL" }
 description = "NucliaDB util library"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
@@ -64,6 +64,3 @@ storages = [
 [project.urls]
 Homepage = "https://nuclia.com"
 Repository = "https://github.com/nuclia/nucliadb"
-
-[tool.setuptools.dynamic]
-version = { file = "VERSION" }
