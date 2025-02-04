@@ -48,7 +48,6 @@ from nucliadb.search.search.find_merge import (
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.rerankers import Reranker, RerankingOptions
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
@@ -62,6 +61,7 @@ from nucliadb_models.search import (
     ChatModel,
     DirectionalRelation,
     EntitySubgraph,
+    FindRequest,
     GraphStrategy,
     KnowledgeboxFindResults,
     KnowledgeboxSuggestResults,
@@ -308,7 +308,7 @@ async def get_graph_results(
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
     shards: Optional[list[str]] = None,
-) -> tuple[KnowledgeboxFindResults, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, FindRequest]:
     relations = Relations(entities={})
     explored_entities: set[str] = set()
     scores: dict[str, list[float]] = {}
@@ -437,7 +437,7 @@ async def get_graph_results(
             field_type_filter=find_request.field_type_filter,
             relation_text_as_paragraphs=graph_strategy.relation_text_as_paragraphs,
         )
-    return find_results, query_parser
+    return find_results, find_request
 
 
 async def fuzzy_search_entities(

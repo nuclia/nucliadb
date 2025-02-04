@@ -861,7 +861,7 @@ async def test_ask_graph_strategy(
         ask_response = SyncAskResponse.model_validate_json(resp.content)
         assert ask_response.status == "success"
 
-        paragraphs = ask_response.retrieval_results.resources[graph_resource].fields
+        paragraphs = ask_response.prequeries["graph"].resources[graph_resource].fields
         paragraph_texts = {
             p_id: paragraph.text
             for p_id, field in paragraphs.items()
