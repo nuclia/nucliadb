@@ -1,71 +1,141 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "nucliadb_workspace"
-requires-python = ">=3.9"
-version = "0.0.0"
+name = "nucliadb"
+dynamic = ["version"]
+license = { text = "AGPL" }
+description = "NucliaDB Train Python client"
+authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+]
+requires-python = ">=3.9, <4"
 dependencies = [
-    "nucliadb @ file:///${PROJECT_ROOT}/nucliadb",
-    # TODO: We don't want to add nidx-protos as a nucliadb dependency yet
-    "nidx-protos @ file:///${PROJECT_ROOT}/nidx/nidx_protos",
+    # nucliadb dependencies are auto pinned on release
+    "nucliadb-telemetry[all]",
+    "nucliadb-utils[storages,fastapi,cache]",
+    "nucliadb-protos",
+    "nucliadb-models",
+    "nucliadb-admin-assets>=1.0.0.post1224",
+    "nuclia-models>=0.24.2",
+
+    # external dependencies
+    "uvicorn",
+    "argdantic",
+
+    "aiohttp>=3.11.11",
+    "lru-dict>=1.1.7",
+    "backoff",
+    "aiofiles>=0.8.0",
+    "psutil>=5.9.7",
+    "types-psutil>=5.9.5.17",
+    "types-aiofiles>=0.8.3",
+    "protobuf>=4.22.3",
+    "types-protobuf>=4.24,<5",
+    "grpcio>=1.44.0,<1.63.0",
+    "grpcio-health-checking>=1.44.0,<1.63.0",
+    "grpcio-channelz>=1.44.0,<1.63.0",
+    "grpcio-status>=1.44.0,<1.63.0",
+    "grpcio-tools>=1.44.0,<1.63.0",
+    "grpcio-testing>=1.44.0,<1.63.0",
+    "grpcio-reflection>=1.44.0,<1.63.0",
+    "orjson>=3.6.7",
+    "types-setuptools",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "aiobotocore>=2.9.0",
+    "botocore>=1.34.0",
+    "google-cloud-storage",
+    "gcloud",
+    "oauth2client",
+    "jwcrypto>=1.5.6",
+    "pyyaml>=5.1",
+
+    "fastapi-versioning>=0.10.0",
+    # At some point FastAPI will drop support for pydantic v1
+    "fastapi>=0.95.2",
+    "sentry-sdk>=2.8.0",
+    "pyjwt>=2.4.0",
+    "mmh3>=3.0.0",
+    "httpx>=0.23.0",
+    "grpc-stubs>=1.44.0",
+    "aiodns>=3.0.0",
+
+    "types-orjson",
+
+    "psycopg[binary,pool]",
+
+    # improve dependency resolution
+    "multidict>=6.0.4",
+    "deprecated>=1.2.12",
+    "asgiref>=3.3.2",
+    "jmespath>=1.0.0",
+    "idna>=3.3",
+    "sniffio>=1.2.0",
+
+    "async_lru>=2.0.4",
+    "async-timeout>=4.0.3",
+    "cachetools>=5.3.2",
+    "types-cachetools>=5.3.0.5",
 ]
 
 [project.optional-dependencies]
-sidecar = [
-    "nucliadb-sidecar @ file:///${PROJECT_ROOT}/nucliadb_sidecar",
-]
-nidx = [
-    "nidx-binding @ file:///${PROJECT_ROOT}/nidx/nidx_binding",
-]
-[tool.pdm.dev-dependencies]
-dev = [
-    # List all the packages we want to install as editable
-    "-e file:///${PROJECT_ROOT}/nucliadb",
-    "-e file:///${PROJECT_ROOT}/nucliadb_models",
-    "-e file:///${PROJECT_ROOT}/nucliadb_sidecar",
-    "-e file:///${PROJECT_ROOT}/nucliadb_protos/python",
-    "-e file:///${PROJECT_ROOT}/nucliadb_telemetry[all]",
-    "-e file:///${PROJECT_ROOT}/nucliadb_utils[cache,fastapi,storages]",
-    "-e file:///${PROJECT_ROOT}/nidx/nidx_protos",
-    "-e file:///${PROJECT_ROOT}/nidx/nidx_binding",
-    # Linting
-    "mypy-protobuf>=3.6.0",
-    "mypy==1.10",
-    "ruff==0.4.8",
-    "pre-commit==2.20.0",
-    # Testing
-    "pytest==8.2.2",
-    "pytest-asyncio~=0.23.0",
-    "pytest-cov==3.0.0",
-    "types-setuptools",
-    "types-redis",
-    "httpx>=0.23.0,<0.28.0",
-    "pytest-docker-fixtures>=1.3.17",
-    "pytest-benchmark",
-    "docker>=7.1.0",
-    "grpcio-health-checking==1.44.0",
-    "requests",
-    "maturin",
-    "pytest-lazy-fixtures",
-    "pytest-mock",
-    "faker>=25.1.0",
-    "grpc-stubs>=1.44.0",
-    "aioresponses",
-    "psycopg2-binary",
-    "pytest-docker-fixtures>=1.3.17",
-    "aiobotocore",
-    "s3fs",
+redis = [
     "redis>=4.3.4",
-    "pytest-rerunfailures>=11.1.2",
-    "pytest-shard",
-    "jsonschema",
-    "pytest-xdist>=3.6.1",
-    "pdbpp>=0.10.3",
-    "types-PyYAML>=6.0.12.20240808",
-]
-sdk = [
-    "-e file:///${PROJECT_ROOT}/nucliadb_sdk#egg=nucliadb-sdk",
-    "-e file:///${PROJECT_ROOT}/nucliadb_dataset#egg=nucliadb-dataset",
-    "requests-mock>=1.12.1",
 ]
 
-[tool.setuptools]
-py-modules = []
+[project.scripts]
+# Service commands
+# Standalone
+nucliadb = "nucliadb.standalone.run:run"
+# Ingest
+#   - This command runs pull workers + ingest write consumer
+nucliadb-ingest = "nucliadb.ingest.app:run_consumer"
+#   - Only runs processed resources write consumer
+nucliadb-ingest-processed-consumer = "nucliadb.ingest.app:run_processed_consumer"
+#   - Only runs GRPC Service
+nucliadb-ingest-orm-grpc = "nucliadb.ingest.app:run_orm_grpc"
+#   - Subscriber workers: auditing and shard creator
+nucliadb-ingest-subscriber-workers = "nucliadb.ingest.app:run_subscriber_workers"
+# Reader
+nucliadb-reader = "nucliadb.reader.run:run"
+# Writer
+nucliadb-writer = "nucliadb.writer.run:run"
+# Search
+nucliadb-search = "nucliadb.search.run:run"
+# Train
+nucliadb-train = "nucliadb.train.run:run"
+# utilities
+nucliadb-purge = "nucliadb.purge:run"
+nucliadb-orphan-shards = "nucliadb.purge.orphan_shards:run"
+nucliadb-migrate = "nucliadb.migrator.command:main"
+nucliadb-rebalance = "nucliadb.common.cluster.rebalance:main"
+nucliadb-validate-migrations = "nucliadb.migrator.command:validate"
+nucliadb-migration-runner = "nucliadb.migrator.command:main_forever"
+nucliadb-metrics-exporter = "nucliadb.metrics_exporter:main"
+nucliadb-rollover-kbid = "nucliadb.common.cluster.rollover:rollover_kbid_command"
+nucliadb-extract-openapi-reader = "nucliadb.reader.openapi:command_extract_openapi"
+nucliadb-extract-openapi-search = "nucliadb.search.openapi:command_extract_openapi"
+nucliadb-extract-openapi-writer = "nucliadb.writer.openapi:command_extract_openapi"
+nucliadb-dataset-upload = "nucliadb.train.upload:run"
+
+[project.urls]
+Nuclia = "https://nuclia.com"
+Github = "https://github.com/nuclia/nucliadb"
+Slack = "https://nuclia-community.slack.com"
+"API Reference" = "https://docs.nuclia.dev/docs/api"
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }

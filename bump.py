@@ -58,7 +58,6 @@ def run(args):
         "nucliadb/requirements.txt",
         "nucliadb_utils/requirements.txt",
         "nucliadb_sdk/requirements.txt",
-        "nucliadb_models/requirements.txt",
         "nucliadb_dataset/requirements.txt",
     ):
         with open(req_filepath, "r") as f:

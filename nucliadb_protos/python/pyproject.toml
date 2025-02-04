@@ -1,12 +1,12 @@
 [build-system]
-requires = ["pdm-backend", "grpcio-tools>=1.44.0,<1.63.0"]
-build-backend = "pdm.backend"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "nidx_protos"
+name = "nucliadb_protos"
 dynamic = ["version"]
 license = { text = "AGPL" }
-description = "Protobuf definitions for nucliadb/nidx"
+description = "Protobuf definitions for nucliadb"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -19,14 +19,15 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 requires-python = ">=3.9, <4"
+dependencies = [
+    "protobuf >= 4.22.3, < 5",
+    "mypy-protobuf >= 3.4.0",
+    "types-protobuf >= 4.24, < 5",
+]
 
 [project.urls]
 Homepage = "https://nuclia.com"
 Repository = "https://github.com/nuclia/nucliadb"
 
-[tool.pdm.build]
-custom-hook = "build.py"
-
-[tool.pdm.version]
-source = "call"
-getter = "build:get_version"
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }

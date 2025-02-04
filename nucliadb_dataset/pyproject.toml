@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nucliadb_dataset"
+dynamic = ["version"]
+license = { text = "AGPL" }
+description = "NucliaDB Train Python client"
+authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+]
+requires-python = ">=3.9, <4"
+dependencies = [
+    "protobuf",
+    "types-protobuf",
+    "grpcio",
+    "requests",
+    "aiohttp",
+    "argdantic",
+    "pydantic-settings>=2.2",
+    "pyarrow",
+
+    # automatically bumped during release
+    "nucliadb-protos",
+    "nucliadb-sdk",
+    "nucliadb-models",
+]
+
+[project.scripts]
+dataset_export = "nucliadb_dataset.run:run"
+
+[project.urls]
+Homepage = "https://nuclia.com"
+Repository = "https://github.com/nuclia/nucliadb"
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
