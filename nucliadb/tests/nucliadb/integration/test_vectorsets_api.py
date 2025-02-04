@@ -87,17 +87,14 @@ async def test_add_delete_vectorsets(
         },
     )
 
-    with patch(
-        f"{MODULE}.learning_proxy.get_configuration",
-        side_effect=[
-            existing_lconfig,  # Initial configuration
-            updated_lconfig,  # Configuration after adding the vectorset
-            updated_lconfig,  # Configuration right before deleting the vectorset
-            existing_lconfig,  # Initial configuration
-            existing_lconfig,  # Initial configuration
-        ],
-    ) as get_configuration:
-        with patch(f"{MODULE}.learning_proxy.update_configuration", return_value=None):
+    with patch(f"{MODULE}.learning_proxy.update_configuration", return_value=None):
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                existing_lconfig,  # Initial configuration
+                updated_lconfig,  # Configuration after adding the vectorset
+            ],
+        ):
             # Add the vectorset
             resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 201, resp.text
@@ -112,9 +109,12 @@ async def test_add_delete_vectorsets(
                 assert vs.vectorset_index_config.vector_dimension == 1024
                 assert vs.matryoshka_dimensions == [1024, 512, 256, 128]
 
-            # Mock the learning_proxy to return the updated configuration on get_configuration
-            get_configuration.return_value = updated_lconfig
-
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                updated_lconfig,  # Configuration right before deleting the vectorset
+            ],
+        ):
             # Delete the vectorset
             resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 204, resp.text
@@ -124,16 +124,42 @@ async def test_add_delete_vectorsets(
                 vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset_id)
                 assert vs is None
 
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                existing_lconfig,  # initial configuration again
+            ],
+        ):
             # Deleting your last vectorset is not allowed
             resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/multilingual")
             assert resp.status_code == 409, resp.text
             assert "Deletion of your last vectorset is not allowed" in resp.json()["detail"]
 
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                existing_lconfig,  # initial configuration again
+            ],
+        ):
             # But deleting twice is okay
             resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             # XXX: however, we get the same error as before due to our lazy
             # check strategy. This shuold be a 200
             assert resp.status_code == 409, resp.text
+
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                existing_lconfig,  # Initial configuration
+                updated_lconfig,  # Configuration after adding the vectorset
+                existing_lconfig,  # Initial configuration
+            ],
+        ):
+            # Add and delete the vectorset again
+            resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            assert resp.status_code == 201, resp.text
+            resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            assert resp.status_code == 204, resp.text
 
 
 async def test_learning_config_errors_are_proxied_correctly(
