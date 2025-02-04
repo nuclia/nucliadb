@@ -104,14 +104,15 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
         }
 
         // Update segment deletion time to validate purge
-        sqlx::query!("UPDATE segments SET delete_at = NOW() WHERE index_id = $1", index_id as IndexId,)
+        sqlx::query!("UPDATE segments SET delete_at = NOW() WHERE index_id = $1", index_id as IndexId)
             .execute(&meta.pool)
             .await?;
 
         // Add a new segment as if it was coming from a merge job started before
         // deletion and finished just before it. The segment has no deletion
         // mark but shouldn't retain himself, its index or shard to be purged
-        Segment::create(&meta.pool, index_id, Seq::from(1000i64), 100, JsonValue::Null).await?;
+        let segment = Segment::create(&meta.pool, index_id, Seq::from(1000i64), 100, JsonValue::Null).await?;
+        segment.mark_ready(&meta.pool, 100).await.unwrap();
     }
 
     // Create a shard that will survive the purge, with some segments/deletions
