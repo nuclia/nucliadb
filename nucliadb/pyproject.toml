@@ -138,3 +138,6 @@ nucliadb-dataset-upload = "nucliadb.train.upload:run"
 "Github" = "https://github.com/nuclia/nucliadb"
 "Slack" = "https://nuclia-community.slack.com"
 "API Reference" = "https://docs.nuclia.dev/docs/api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

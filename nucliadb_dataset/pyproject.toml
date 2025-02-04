@@ -44,3 +44,6 @@ dataset_export = "nucliadb_dataset.run:run"
 [project.urls]
 Homepage = "https://nuclia.com"
 Repository = "https://github.com/nuclia/nucliadb"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
