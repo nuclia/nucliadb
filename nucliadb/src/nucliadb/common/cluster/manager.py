@@ -104,6 +104,14 @@ class KBShardManager:
             errors.capture_exception(exc)
             raise NodeError("Node unavailable for operation") from exc
 
+        for result in results:
+            if isinstance(result, Exception):
+                errors.capture_exception(result)
+                raise NodeError(
+                    f"Error while applying {aw.__name__} for all shards. Other similar errors may have been shadowed.\n"
+                    f"{type(result).__name__}: {result}"
+                ) from result
+
         return results
 
     # TODO: move to data manager

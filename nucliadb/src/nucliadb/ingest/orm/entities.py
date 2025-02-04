@@ -26,7 +26,6 @@ from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
     AlreadyExists,
     EntitiesGroupNotFound,
-    NodeError,
 )
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.entities import (
@@ -54,7 +53,6 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
-from nucliadb_telemetry import errors
 
 from .exceptions import EntityManagementException
 
@@ -226,10 +224,6 @@ class EntitiesManager:
             settings.relation_search_timeout,
             use_read_replica_nodes=self.use_read_replica_nodes,
         )
-        for result in results:
-            if isinstance(result, Exception):
-                errors.capture_exception(result)
-                raise NodeError("Error while querying relation index")
 
         entities = {}
         for result in results:
@@ -305,6 +299,7 @@ class EntitiesManager:
         shard_manager = get_shard_manager()
 
         async def query_indexed_entities_group_names(node: AbstractIndexNode, shard_id: str) -> set[str]:
+            """Search all relation types"""
             request = SearchRequest(
                 shard=shard_id,
                 result_per_page=0,
@@ -316,10 +311,11 @@ class EntitiesManager:
             response: SearchResponse = await query_shard(node, shard_id, request)
             try:
                 facetresults = response.document.facets["/e"].facetresults
-                return {facet.tag.split("/")[-1] for facet in facetresults}
             except KeyError:
                 # No entities found
                 return set()
+            else:
+                return {facet.tag.split("/")[-1] for facet in facetresults}
 
         results = await shard_manager.apply_for_all_shards(
             self.kbid,
@@ -327,13 +323,6 @@ class EntitiesManager:
             settings.relation_types_timeout,
             use_read_replica_nodes=self.use_read_replica_nodes,
         )
-        for result in results:
-            if isinstance(result, Exception):
-                errors.capture_exception(result)
-                raise NodeError("Error while looking for relations types")
-
-        if not results:
-            return set()
         return set.union(*results)
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
