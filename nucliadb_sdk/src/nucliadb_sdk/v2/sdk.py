@@ -516,12 +516,12 @@ def prepare_request(
     data: Optional[RawRequestContent] = None
     if request_type is not None and request_type != type(None):
         if content is not None:
-            if not isinstance(content, request_type):
+            if isinstance(content, list):
+                data = _parse_list_of_pydantic(content)
+            elif not isinstance(content, request_type):
                 raise TypeError(f"Expected {request_type}, got {type(content)}")
             elif isinstance(content, BaseModel):
                 data = content.model_dump_json(by_alias=True, exclude_unset=True)
-            elif isinstance(content, list):
-                data = _parse_list_of_pydantic(content)
             else:
                 raise TypeError(f"Unknown type {type(content)}")
         else:
