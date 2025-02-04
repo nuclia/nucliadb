@@ -323,6 +323,9 @@ class EntitiesManager:
             settings.relation_types_timeout,
             use_read_replica_nodes=self.use_read_replica_nodes,
         )
+
+        if not results:
+            return set()
         return set.union(*results)
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
