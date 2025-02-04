@@ -108,7 +108,7 @@ class Label(BaseModel):
 
 
 class LabelSet(BaseModel):
-    title: Optional[str] = "no title"
+    title: Optional[str] = None
     color: Optional[str] = "blue"
     multiple: bool = True
     kind: List[LabelSetKind] = []
