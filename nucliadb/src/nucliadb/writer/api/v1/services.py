@@ -175,6 +175,14 @@ async def delete_entities(request: Request, kbid: str, group: str):
 @version(1)
 async def set_labelset_endpoint(request: Request, kbid: str, labelset: str, item: LabelSet):
     try:
+        if item.title:
+            labelsets = await datamanagers.atomic.labelset.get_all(kbid=kbid)
+            labelset_titles = [
+                ls.title.lower() for (k, ls) in labelsets.labelset.items() if k != labelset
+            ]
+            if item.title.lower() in labelset_titles:
+                raise HTTPException(status_code=422, detail="Duplicated labelset titles are not allowed")
+
         await set_labelset(kbid, labelset, item)
     except KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
