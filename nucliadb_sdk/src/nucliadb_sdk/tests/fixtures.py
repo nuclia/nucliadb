@@ -161,9 +161,7 @@ def nucliadb(pg):
         network = container.container_obj.attrs["NetworkSettings"]
         service_port = "8060/tcp"
         grpc = network["Ports"][service_port][0]["HostPort"]
-        import pdb
 
-        pdb.set_trace()
         yield NucliaFixture(
             host=host,
             port=port,
