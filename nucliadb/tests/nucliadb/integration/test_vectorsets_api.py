@@ -45,7 +45,7 @@ from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 from tests.utils.vectorsets import add_vectorset
 
-MODULE = "nucliadb.writer.vectorsets"
+MODULE = "nucliadb.writer.api.v1.vectorsets"
 
 
 async def test_add_delete_vectorsets(
@@ -100,7 +100,7 @@ async def test_add_delete_vectorsets(
         with patch(f"{MODULE}.learning_proxy.update_configuration", return_value=None):
             # Add the vectorset
             resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
-            assert resp.status_code == 200, resp.text
+            assert resp.status_code == 201, resp.text
 
             # Check that the vectorset has been created with the correct configuration
             async with datamanagers.with_ro_transaction() as txn:
@@ -117,7 +117,7 @@ async def test_add_delete_vectorsets(
 
             # Delete the vectorset
             resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
-            assert resp.status_code == 200, resp.text
+            assert resp.status_code == 204, resp.text
 
             # Check that the vectorset has been deleted
             async with datamanagers.with_ro_transaction() as txn:
@@ -144,16 +144,16 @@ async def test_learning_config_errors_are_proxied_correctly(
     with patch(
         f"{MODULE}.learning_proxy.get_configuration",
         side_effect=ProxiedLearningConfigError(
-            status_code=500, content=b"Learning Internal Server Error", content_type="text/plain"
+            status_code=500, content="Learning Internal Server Error"
         ),
     ):
         resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
-        assert resp.text == "Learning Internal Server Error"
+        assert resp.json() == {"detail": "Learning Internal Server Error"}
 
         resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
-        assert resp.text == "Learning Internal Server Error"
+        assert resp.json() == {"detail": "Learning Internal Server Error"}
 
 
 @pytest.mark.parametrize("bwc_with_default_vectorset", [True, False])
@@ -245,7 +245,7 @@ async def test_vectorset_migration(
     resp = await add_vectorset(
         nucliadb_manager, kbid, vectorset_id, similarity=SimilarityFunction.COSINE, vector_dimension=1024
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
     # Ingest a new broker message as if it was coming from the migration
     bm2 = BrokerMessage(
