@@ -37,7 +37,8 @@ This is a cargo workspace and can use cargo for building & running as usual. Two
 development:
 - For compiling `nidx_protos` we need a protobuf compiler (`protoc`).
 - We do compile-time checking of SQL queries with sqlx. We commit `.sqlx` to the repository which avoids doing this
-  normally but, if changing the queries, you'll need to run `cargo sqlx prepare` and commit the `.sqlx` dir, which
+  normally but, if changing the queries, you'll need to run `cargo sqlx prepare
+  --all -- --tests` and commit the `.sqlx` dir, which
   contains a cached version of the information needed for compile-time checking. See the sqlx
   [docs](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#enable-building-in-offline-mode-with-query)
   for more information about offline mode.
