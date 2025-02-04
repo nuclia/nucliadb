@@ -836,7 +836,7 @@ async def test_ask_graph_strategy(
         "query": "Which actors have been in movies directed by Christopher Nolan?",
         "rag_strategies": [
             {
-                "name": "graph",
+                "name": "graph_beta",
                 "hops": 2,
                 "top_k": 5,
                 "agentic_graph_only": False,
