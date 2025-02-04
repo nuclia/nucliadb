@@ -50,7 +50,12 @@ from nucliadb_models.search import (
     parse_rephrase_prompt,
 )
 from nucliadb_protos import audit_pb2
-from nucliadb_protos.nodereader_pb2 import RelationSearchResponse, SearchRequest, SearchResponse
+from nucliadb_protos.nodereader_pb2 import (
+    EntitiesSubgraphRequest,
+    RelationSearchResponse,
+    SearchRequest,
+    SearchResponse,
+)
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.utilities import get_audit
@@ -245,10 +250,16 @@ async def get_relations_results_from_entities(
     timeout: Optional[float] = None,
     only_with_metadata: bool = False,
     only_agentic_relations: bool = False,
+    deleted_entities: set[str] = set(),
 ) -> Relations:
     request = SearchRequest()
     request.relation_subgraph.entry_points.extend(entities)
     request.relation_subgraph.depth = 1
+
+    deleted = EntitiesSubgraphRequest.DeletedEntities()
+    deleted.node_values.extend(deleted_entities)
+    request.relation_subgraph.deleted_entities.append(deleted)
+
     results: list[SearchResponse]
     (
         results,
