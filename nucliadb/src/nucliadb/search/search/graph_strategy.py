@@ -337,7 +337,14 @@ async def get_graph_results(
                     or graph_strategy.query_entity_detection == QueryEntityDetection.PREDICT
                 ):
                     try:
-                        entities_to_explore = await predict.detect_entities(kbid, query)
+                        # Purposely ignore the entity subtype. This is done so we find all entities that match
+                        # the entity by name. e.g: in a query like "2000", predict might detect the number as
+                        # a year entity or as a currency entity. We want graph results for both, so we ignore the
+                        # subtype just in this case.
+                        entities_to_explore = [
+                            RelationNode(ntype=r.ntype, value=r.value, subtype="")
+                            for r in await predict.detect_entities(kbid, query)
+                        ]
                     except Exception as e:
                         capture_exception(e)
                         logger.exception("Error in detecting entities for graph strategy")

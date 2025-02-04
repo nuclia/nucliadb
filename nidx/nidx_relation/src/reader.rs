@@ -105,10 +105,14 @@ impl RelationsReaderService {
             );
             let source_type_term =
                 TermQuery::new(Term::from_field_u64(self.schema.source_type, node_type), IndexRecordOption::Basic);
-            let source_subtype_term = TermQuery::new(
-                Term::from_field_text(self.schema.source_subtype, node_subtype),
-                IndexRecordOption::Basic,
-            );
+            let source_subtype_term: Box<dyn Query> = if node_subtype.is_empty() {
+                Box::new(AllQuery)
+            } else {
+                Box::new(TermQuery::new(
+                    Term::from_field_text(self.schema.source_subtype, node_subtype),
+                    IndexRecordOption::Basic,
+                ))
+            };
             let out_relations_query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
                 (Occur::Must, Box::new(source_value_term)),
                 (Occur::Must, Box::new(source_type_term)),
@@ -122,10 +126,14 @@ impl RelationsReaderService {
             );
             let target_type_term =
                 TermQuery::new(Term::from_field_u64(self.schema.target_type, node_type), IndexRecordOption::Basic);
-            let target_subtype_term = TermQuery::new(
-                Term::from_field_text(self.schema.target_subtype, node_subtype),
-                IndexRecordOption::Basic,
-            );
+            let target_subtype_term: Box<dyn Query> = if node_subtype.is_empty() {
+                Box::new(AllQuery)
+            } else {
+                Box::new(TermQuery::new(
+                    Term::from_field_text(self.schema.target_subtype, node_subtype),
+                    IndexRecordOption::Basic,
+                ))
+            };
             let in_relations_query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
                 (Occur::Must, Box::new(target_value_term)),
                 (Occur::Must, Box::new(target_type_term)),
