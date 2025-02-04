@@ -254,7 +254,13 @@ message RelationEdgeFilter {
 }
 
 message RelationPrefixSearchRequest {
-    string prefix = 1;
+    oneof search {
+        // Search for a single prefix
+        string prefix = 1;
+        // Search for entities appearing on a query
+        string query = 3;
+    }
+
     repeated RelationNodeFilter node_filters = 2;
 }
 

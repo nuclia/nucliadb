@@ -21,11 +21,12 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::path::Path;
 
+use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::{
     EntitiesSubgraphResponse, RelationNode, RelationPrefixSearchResponse, RelationSearchRequest, RelationSearchResponse,
 };
 use tantivy::collector::TopDocs;
-use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
+use tantivy::query::{BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
 use tantivy::{Index, IndexReader, Term};
 
@@ -33,6 +34,8 @@ use crate::schema::Schema;
 use crate::{io_maps, schema};
 
 const FUZZY_DISTANCE: u8 = 1;
+// Search for entities of these many words of length
+const ENTITY_WORD_SIZE: usize = 3;
 const NUMBER_OF_RESULTS_SUGGEST: usize = 10;
 // Hard limit until we have pagination in place
 const MAX_NUM_RELATIONS_RESULTS: usize = 500;
@@ -216,11 +219,14 @@ impl RelationsReaderService {
             return Ok(None);
         };
 
+        let Some(search) = &prefix_request.search else {
+            return Err(anyhow::anyhow!("Search terms needed"));
+        };
+
         // if prefix_request.prefix.is_empty() {
         //     return Ok(Some(RelationPrefixSearchResponse::default()));
         // }
 
-        let prefix = schema::normalize(&prefix_request.prefix);
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
         let schema = &self.schema;
@@ -260,33 +266,66 @@ impl RelationsReaderService {
             target_types.push((Occur::Should, target_clause));
         }
 
-        let source_typing_query: Box<dyn Query> = if source_types.is_empty() {
-            Box::new(AllQuery)
-        } else {
-            Box::new(BooleanQuery::new(source_types))
+        let mut source_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+        let mut target_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+
+        if !source_types.is_empty() {
+            source_q.push((Occur::Must, Box::new(BooleanQuery::new(source_types))));
         };
 
-        let target_typing_query: Box<dyn Query> = if target_types.is_empty() {
-            Box::new(AllQuery)
-        } else {
-            Box::new(BooleanQuery::new(target_types))
+        if !target_types.is_empty() {
+            target_q.push((Occur::Must, Box::new(BooleanQuery::new(target_types))));
         };
 
-        let source_value_query: Box<dyn Query> = Box::new(FuzzyTermQuery::new_prefix(
-            Term::from_field_text(schema.normalized_source_value, &prefix),
-            FUZZY_DISTANCE,
-            true,
-        ));
-        let target_value_query: Box<dyn Query> = Box::new(FuzzyTermQuery::new_prefix(
-            Term::from_field_text(schema.normalized_target_value, &prefix),
-            FUZZY_DISTANCE,
-            true,
-        ));
+        match search {
+            Search::Query(query) => {
+                // This search is intended to do a normal tokenized search on entities names. However, since we
+                // do some custom normalization for these fields, we need to do some custom handling here.
+                // Feel free to replace this with something better if we start indexing entities name with tokenization.
+                let mut source_prefix_q = Vec::new();
+                let mut target_prefix_q = Vec::new();
+                // Search for all groups of words in the query, e.g:
+                // query "Films with James Bond"
+                // returns:
+                // "Films", "with", "James", "Bond"
+                // "Films with", "with James", "James Bond"
+                // "Films with James", "with James Bond"
+                let words: Vec<_> = query.split_whitespace().collect();
+                for end in 1..=words.len() {
+                    for len in 1..=ENTITY_WORD_SIZE {
+                        if len > end {
+                            break;
+                        }
+                        let start = end - len;
+                        self.add_fuzzy_prefix_query(&mut source_prefix_q, &mut target_prefix_q, &words[start..end]);
+                    }
+                }
+                source_q.push((Occur::Must, Box::new(BooleanQuery::new(source_prefix_q))));
+                target_q.push((Occur::Must, Box::new(BooleanQuery::new(target_prefix_q))));
+            }
+            Search::Prefix(prefix) => {
+                let normalized_prefix = schema::normalize(prefix);
+                source_q.push((
+                    Occur::Must,
+                    Box::new(FuzzyTermQuery::new_prefix(
+                        Term::from_field_text(self.schema.normalized_source_value, &normalized_prefix),
+                        FUZZY_DISTANCE,
+                        true,
+                    )),
+                ));
+                target_q.push((
+                    Occur::Must,
+                    Box::new(FuzzyTermQuery::new_prefix(
+                        Term::from_field_text(self.schema.normalized_target_value, &normalized_prefix),
+                        FUZZY_DISTANCE,
+                        true,
+                    )),
+                ));
+            }
+        }
 
-        let source_prefix_query =
-            BooleanQuery::new(vec![(Occur::Must, source_value_query), (Occur::Must, source_typing_query)]);
-        let target_prefix_query =
-            BooleanQuery::new(vec![(Occur::Must, target_value_query), (Occur::Must, target_typing_query)]);
+        let source_prefix_query = BooleanQuery::new(source_q);
+        let target_prefix_query = BooleanQuery::new(target_q);
 
         let mut response = RelationPrefixSearchResponse::default();
         let mut results = HashSet::new();
@@ -302,6 +341,31 @@ impl RelationsReaderService {
         }
         response.nodes = results.into_iter().map(Into::into).collect();
         Ok(Some(response))
+    }
+
+    fn add_fuzzy_prefix_query(
+        &self,
+        source_queries: &mut Vec<(Occur, Box<dyn Query>)>,
+        target_queries: &mut Vec<(Occur, Box<dyn Query>)>,
+        prefix: &[&str],
+    ) {
+        let normalized_prefix = schema::normalize_words(prefix.iter().copied());
+        source_queries.push((
+            Occur::Should,
+            Box::new(FuzzyTermQuery::new(
+                Term::from_field_text(self.schema.normalized_source_value, &normalized_prefix),
+                FUZZY_DISTANCE,
+                true,
+            )),
+        ));
+        target_queries.push((
+            Occur::Should,
+            Box::new(FuzzyTermQuery::new(
+                Term::from_field_text(self.schema.normalized_target_value, &normalized_prefix),
+                FUZZY_DISTANCE,
+                true,
+            )),
+        ));
     }
 }
 

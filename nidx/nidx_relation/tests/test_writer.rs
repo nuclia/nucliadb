@@ -57,7 +57,6 @@ fn test_index_docs() -> anyhow::Result<()> {
                     to_start: Some(11),
                     to_end: Some(20),
                     data_augmentation_task_id: Some("mytask".to_string()),
-                    ..Default::default()
                 },
             ),
         ],
