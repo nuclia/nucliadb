@@ -42,7 +42,7 @@ jobs:
     with:
       file: Dockerfile
       image-name: nucliadb_hosted
-      image-version: ${{ outputs.generate-short-sha.SHORT_SHA }}
+      image-version: ${{ needs.generate-short-sha.outputs.SHORT_SHA }}
     secrets: inherit
 
   build-nidx-image:
@@ -52,7 +52,7 @@ jobs:
     with:
       file: Dockerfile.nidx
       image-name: nidx
-      image-version: ${{ outputs.generate-short-sha.SHORT_SHA }}
+      image-version: ${{ needs.generate-short-sha.outputs.SHORT_SHA }}
     secrets: inherit
 
   upload-chart-nucliadb-shared:
