@@ -194,7 +194,7 @@ jobs:
       - name: Build and push helm chart
         uses: ./tooling/.github/actions/build-helm-chart
         with:
-          component: ${{ matrix.component }}
+          component: nucliadb_${{ matrix.component }}
           image-name: nucliadb_hosted
           image-version: ${{ steps.env-vars.outputs.short_sha }}
           chart-version: ${{ steps.version_step.outputs.version_number }}
