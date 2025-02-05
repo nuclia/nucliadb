@@ -76,7 +76,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Calculate short sha
-        run: echo "SHORT_SHA=`echo hash${GITHUB_SHA} | cut -c1-12`" >> $GITHUB_ENV
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          echo "SHORT_SHA=$HASH" >> $GITHUB_ENV
 
       - name: Generate a token
         id: app-token
