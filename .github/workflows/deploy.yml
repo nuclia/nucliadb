@@ -22,20 +22,35 @@ env:
   ARTIFACT_REGISTRY_URL: oci://europe-west4-docker.pkg.dev/nuclia-internal/charts
 
 jobs:
+
+  generate-short-sha:
+    name: Generate short sha
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          echo "SHORT_SHA=$HASH" >> $GITHUB_ENV
+
   build-python-image:
     name: Build Python image
+    needs: generate-short-sha
     uses: ./.github/workflows/_build-img-nucliadb.yml
     with:
       file: Dockerfile
       image-name: nucliadb_hosted
+      image-version: ${{ env.SHORT_SHA }}
     secrets: inherit
 
   build-nidx-image:
     name: Build nidx image
+    needs: generate-short-sha
     uses: ./.github/workflows/_build-img-nucliadb.yml
     with:
       file: Dockerfile.nidx
       image-name: nidx
+      image-version: ${{ env.SHORT_SHA }}
     secrets: inherit
 
   upload-chart-nucliadb-shared:
