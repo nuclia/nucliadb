@@ -21,7 +21,8 @@
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+from typing_extensions import Self
 
 BASE_LABELS: dict[str, set[str]] = {
     "t": set(),  # doc tags
@@ -107,11 +108,22 @@ class Label(BaseModel):
 
 
 class LabelSet(BaseModel):
-    title: Optional[str] = "no title"
+    title: Optional[str] = None
     color: Optional[str] = "blue"
     multiple: bool = True
     kind: List[LabelSetKind] = []
     labels: List[Label] = []
+
+    @model_validator(mode="after")
+    def check_unique_labels(self) -> Self:
+        label_ids = set()
+        for label in self.labels:
+            label_id = label.title.lower()
+            if label_id in label_ids:
+                raise ValueError(f"Duplicated labels are not allowed: {label.title}")
+            label_ids.add(label_id)
+
+        return self
 
 
 class KnowledgeBoxLabels(BaseModel):

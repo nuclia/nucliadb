@@ -119,9 +119,10 @@ impl Segment {
     /// Lists segments marked as deleted, i.e., segments that can be deleted
     pub async fn marked_as_deleted(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<Vec<SegmentId>> {
         sqlx::query_scalar!(
-            r#"SELECT id AS "id: SegmentId"
+            r#"SELECT segments.id AS "id: SegmentId"
                FROM segments
-               WHERE delete_at < NOW()"#
+               LEFT JOIN indexes ON segments.index_id = indexes.id
+               WHERE segments.delete_at < NOW() OR indexes.deleted_at IS NOT NULL"#
         )
         .fetch_all(meta)
         .await

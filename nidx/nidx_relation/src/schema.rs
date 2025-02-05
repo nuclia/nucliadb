@@ -24,8 +24,12 @@ use tantivy::TantivyDocument;
 
 /// The source will be deunicoded, se
 pub fn normalize(source: &str) -> String {
+    normalize_words(source.split_whitespace())
+}
+
+pub fn normalize_words<'a>(source: impl Iterator<Item = &'a str>) -> String {
     let mut normalized = String::new();
-    for segment in source.split_whitespace() {
+    for segment in source {
         let deunicoded = deunicode::deunicode(segment);
         let ascii_lower_cased = deunicoded.to_ascii_lowercase();
         normalized.push_str(&ascii_lower_cased);

@@ -198,7 +198,12 @@ impl Index {
     }
 
     pub async fn mark_delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
-        sqlx::query!("UPDATE indexes SET deleted_at = NOW() WHERE id = $1", self.id as IndexId).execute(meta).await?;
+        sqlx::query!(
+            "UPDATE indexes SET deleted_at = NOW(), name = name || '-deleted-' || gen_random_uuid() WHERE id = $1",
+            self.id as IndexId
+        )
+        .execute(meta)
+        .await?;
         Ok(())
     }
 

@@ -96,8 +96,14 @@ async def test_service_lifecycle_labels(nucliadb_writer: AsyncClient, knowledgeb
 
     ls = LabelSet(title="My labelset", color="#0000000", multiple=False, kind=[LabelSetKind.RESOURCES])
     ls.labels.append(Label(title="asd"))
-    ls.labels.append(Label(title="asd"))
+    ls.labels.append(Label(title="fgh"))
+
     resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/labelset/ls1", json=ls.model_dump())
     assert resp.status_code == 200
+
+    resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/labelset/ls2", json=ls.model_dump())
+    assert resp.status_code == 422
+
+    ls.title = "My labelset 2"
     resp = await nucliadb_writer.post(f"/{KB_PREFIX}/{kbid}/labelset/ls2", json=ls.model_dump())
     assert resp.status_code == 200

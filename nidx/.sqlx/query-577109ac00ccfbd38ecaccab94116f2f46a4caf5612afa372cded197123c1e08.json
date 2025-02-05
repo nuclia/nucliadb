@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE indexes SET deleted_at = NOW(), name = name || '-deleted-' || gen_random_uuid() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "577109ac00ccfbd38ecaccab94116f2f46a4caf5612afa372cded197123c1e08"
+}

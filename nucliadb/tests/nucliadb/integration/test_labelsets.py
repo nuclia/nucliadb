@@ -56,3 +56,71 @@ async def test_selection_labelsets(
     assert resp.status_code == 200
     body = resp.json()
     assert body["labels"] == []
+
+
+async def test_duplicated_labelsets_not_allowed(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+):
+    kbid = knowledgebox
+
+    # Create labelset
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/labelset/myselections",
+        json={
+            "title": "test_name",
+            "kind": ["SELECTIONS"],
+            "labels": [
+                {"title": "label1"},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+
+    # Can edit same labelset
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/labelset/myselections",
+        json={
+            "title": "My Selections",
+            "kind": ["SELECTIONS"],
+            "labels": [
+                {"title": "label1"},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+
+    # Cannot create a new labelset reusing title
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/labelset/my_new_selections",
+        json={
+            "title": "MY SELECTIONS",
+            "kind": ["SELECTIONS"],
+            "labels": [
+                {"title": "label1"},
+            ],
+        },
+    )
+    assert resp.status_code == 422
+
+
+async def test_duplicated_labels_not_allowed(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+):
+    kbid = knowledgebox
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/labelset/myselections",
+        json={
+            "title": "My Selections",
+            "kind": ["SELECTIONS"],
+            "labels": [
+                {"title": "label1"},
+                {"title": "LABEL1"},
+            ],
+        },
+    )
+    assert resp.status_code == 422

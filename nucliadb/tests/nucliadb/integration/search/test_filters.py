@@ -163,6 +163,12 @@ def broker_message_with_labels(kbid):
     level (resource, field and paragraph).
     """
     bm = broker_resource(kbid=kbid)
+    # XXX remove title and summary info, as the test don't take them into
+    # account, but the rest is expected for indexing.....
+    bm.basic.ClearField("fieldmetadata")
+    bm.ClearField("field_metadata")
+    bm.ClearField("extracted_text")
+
     field_id = "text"
     field = FieldID()
     field.field = field_id

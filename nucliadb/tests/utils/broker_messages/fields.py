@@ -131,7 +131,7 @@ class FieldBuilder:
     def with_extracted_text(self, text: str):
         self._extracted_text.body.text = text
 
-    def with_extracted_vectors(self, vectors: list[utils_pb2.Vector], vectorset: str = ""):
+    def with_extracted_vectors(self, vectors: list[utils_pb2.Vector], vectorset: str):
         self._extracted_vectors(vectorset).vectors.vectors.vectors.extend(vectors)
 
     def with_extracted_paragraph_metadata(self, paragraph: rpb.Paragraph):

@@ -22,6 +22,7 @@ mod common;
 use nidx_protos::entities_subgraph_request::DeletedEntities;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
+use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::{
     EntitiesSubgraphRequest, RelationMetadata, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
     Resource, ResourceId,
@@ -124,7 +125,6 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                     to_start: Some(11),
                     to_end: Some(20),
                     data_augmentation_task_id: Some("mytask".to_string()),
-                    ..Default::default()
                 },
             ),
             common::create_relation(
@@ -134,6 +134,15 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 "New York".to_string(),
                 NodeType::Entity,
                 "PLACES".to_string(),
+                RelationType::Entity,
+            ),
+            common::create_relation(
+                "James Bond".to_string(),
+                NodeType::Entity,
+                "PEOPLE".to_string(),
+                "Ian Fleming".to_string(),
+                NodeType::Entity,
+                "PEOPLE".to_string(),
                 RelationType::Entity,
             ),
         ],
@@ -250,17 +259,17 @@ fn test_prefix_search() -> anyhow::Result<()> {
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {
-            prefix: "".to_string(),
+            search: Some(Search::Prefix("".to_string())),
             ..Default::default()
         }),
         ..Default::default()
     })?;
 
-    assert_eq!(result.prefix.unwrap().nodes.len(), 10);
+    assert_eq!(result.prefix.unwrap().nodes.len(), 12);
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {
-            prefix: "do".to_string(),
+            search: Some(Search::Prefix("do".to_string())),
             ..Default::default()
         }),
         ..Default::default()
@@ -270,7 +279,7 @@ fn test_prefix_search() -> anyhow::Result<()> {
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {
-            prefix: "ann".to_string(),
+            search: Some(Search::Prefix("ann".to_string())),
             ..Default::default()
         }),
         ..Default::default()
@@ -281,12 +290,55 @@ fn test_prefix_search() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_prefix_query_search() -> anyhow::Result<()> {
+    let reader = create_reader()?;
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("Films with James Bond played by Roger Moore".to_string())),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("Films with Jomes Bond played by Roger Moore".to_string())),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 1);
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("Just James".to_string())),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 0);
+
+    let result = reader.search(&RelationSearchRequest {
+        prefix: Some(RelationPrefixSearchRequest {
+            search: Some(Search::Query("James Bond or Anastasia".to_string())),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })?;
+    assert_eq!(result.prefix.unwrap().nodes.len(), 2);
+
+    Ok(())
+}
+
+#[test]
 fn test_prefix_search_with_filters() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {
-            prefix: "".to_string(),
+            search: Some(Search::Prefix("".to_string())),
             node_filters: vec![RelationNodeFilter {
                 node_type: NodeType::Entity as i32,
                 node_subtype: Some("ANIMALS".to_string()),
@@ -299,7 +351,7 @@ fn test_prefix_search_with_filters() -> anyhow::Result<()> {
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {
-            prefix: "".to_string(),
+            search: Some(Search::Prefix("".to_string())),
             node_filters: vec![RelationNodeFilter {
                 node_type: NodeType::Resource as i32,
                 node_subtype: None,
@@ -312,7 +364,7 @@ fn test_prefix_search_with_filters() -> anyhow::Result<()> {
 
     let result = reader.search(&RelationSearchRequest {
         prefix: Some(RelationPrefixSearchRequest {
-            prefix: "".to_string(),
+            search: Some(Search::Prefix("".to_string())),
             node_filters: vec![RelationNodeFilter {
                 node_type: NodeType::Resource as i32,
                 node_subtype: Some("foobarmissing".to_string()),

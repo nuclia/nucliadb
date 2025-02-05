@@ -17,11 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 import heapq
 import json
 from collections import defaultdict
-from datetime import datetime
 from typing import Any, Collection, Iterable, Optional, Union
 
 from nuclia_models.predict.generative_responses import (
@@ -46,9 +44,8 @@ from nucliadb.search.search.find_merge import (
     hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
-from nucliadb.search.search.merge import merge_suggest_results
+from nucliadb.search.search.merge import merge_relation_prefix_results
 from nucliadb.search.search.metrics import RAGMetrics
-from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.rerankers import Reranker, RerankingOptions
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.common import FieldTypeName
@@ -62,11 +59,12 @@ from nucliadb_models.search import (
     ChatModel,
     DirectionalRelation,
     EntitySubgraph,
+    FindRequest,
     GraphStrategy,
     KnowledgeboxFindResults,
-    KnowledgeboxSuggestResults,
     NucliaDBClientType,
     QueryEntityDetection,
+    RelatedEntities,
     RelationDirection,
     RelationRanking,
     Relations,
@@ -308,7 +306,7 @@ async def get_graph_results(
     generative_model: Optional[str] = None,
     metrics: RAGMetrics = RAGMetrics(),
     shards: Optional[list[str]] = None,
-) -> tuple[KnowledgeboxFindResults, QueryParser]:
+) -> tuple[KnowledgeboxFindResults, FindRequest]:
     relations = Relations(entities={})
     explored_entities: set[str] = set()
     scores: dict[str, list[float]] = {}
@@ -321,30 +319,32 @@ async def get_graph_results(
             # Get the entities from the query
             with metrics.time("graph_strat_query_entities"):
                 if graph_strategy.query_entity_detection == QueryEntityDetection.SUGGEST:
-                    suggest_result = await fuzzy_search_entities(
+                    relation_result = await fuzzy_search_entities(
                         kbid=kbid,
                         query=query,
-                        range_creation_start=item.range_creation_start,
-                        range_creation_end=item.range_creation_end,
-                        range_modification_start=item.range_modification_start,
-                        range_modification_end=item.range_modification_end,
-                        target_shard_replicas=shards,
                     )
-                    if suggest_result.entities is not None:
+                    if relation_result is not None:
                         entities_to_explore = (
                             RelationNode(
                                 ntype=RelationNode.NodeType.ENTITY,
                                 value=result.value,
                                 subtype=result.family,
                             )
-                            for result in suggest_result.entities.entities
+                            for result in relation_result.entities
                         )
                 elif (
                     not entities_to_explore
                     or graph_strategy.query_entity_detection == QueryEntityDetection.PREDICT
                 ):
                     try:
-                        entities_to_explore = await predict.detect_entities(kbid, query)
+                        # Purposely ignore the entity subtype. This is done so we find all entities that match
+                        # the entity by name. e.g: in a query like "2000", predict might detect the number as
+                        # a year entity or as a currency entity. We want graph results for both, so we ignore the
+                        # subtype just in this case.
+                        entities_to_explore = [
+                            RelationNode(ntype=r.ntype, value=r.value, subtype="")
+                            for r in await predict.detect_entities(kbid, query)
+                        ]
                     except Exception as e:
                         capture_exception(e)
                         logger.exception("Error in detecting entities for graph strategy")
@@ -361,6 +361,7 @@ async def get_graph_results(
                 for relation in subgraph.related_to
                 if relation.entity not in explored_entities
             )
+
         # Get the relations for the new entities
         with metrics.time("graph_strat_neighbor_relations"):
             try:
@@ -371,19 +372,14 @@ async def get_graph_results(
                     timeout=5.0,
                     only_with_metadata=True,
                     only_agentic_relations=graph_strategy.agentic_graph_only,
+                    deleted_entities=explored_entities,
                 )
             except Exception as e:
                 capture_exception(e)
                 logger.exception("Error in getting query relations for graph strategy")
                 new_relations = Relations(entities={})
 
-            # Removing the relations connected to the entities that were already explored
-            # XXX: This could be optimized by implementing a filter in the index
-            # so we don't have to remove them after
-            new_subgraphs = {
-                entity: filter_subgraph(subgraph, explored_entities)
-                for entity, subgraph in new_relations.entities.items()
-            }
+            new_subgraphs = new_relations.entities
 
             explored_entities.update(new_subgraphs.keys())
 
@@ -437,54 +433,36 @@ async def get_graph_results(
             field_type_filter=find_request.field_type_filter,
             relation_text_as_paragraphs=graph_strategy.relation_text_as_paragraphs,
         )
-    return find_results, query_parser
+    return find_results, find_request
 
 
 async def fuzzy_search_entities(
     kbid: str,
     query: str,
-    range_creation_start: Optional[datetime] = None,
-    range_creation_end: Optional[datetime] = None,
-    range_modification_start: Optional[datetime] = None,
-    range_modification_end: Optional[datetime] = None,
-    target_shard_replicas: Optional[list[str]] = None,
-) -> KnowledgeboxSuggestResults:
+) -> Optional[RelatedEntities]:
     """Fuzzy find entities in KB given a query using the same methodology as /suggest, but split by words."""
 
-    base_request = nodereader_pb2.SuggestRequest(
-        body="", features=[nodereader_pb2.SuggestFeatures.ENTITIES]
-    )
-    if range_creation_start is not None:
-        base_request.timestamps.from_created.FromDatetime(range_creation_start)
-    if range_creation_end is not None:
-        base_request.timestamps.to_created.FromDatetime(range_creation_end)
-    if range_modification_start is not None:
-        base_request.timestamps.from_modified.FromDatetime(range_modification_start)
-    if range_modification_end is not None:
-        base_request.timestamps.to_modified.FromDatetime(range_modification_end)
+    request = nodereader_pb2.SearchRequest()
+    request.relation_prefix.query = query
 
-    tasks = []
-    # XXX: Splitting by words is not ideal, in the future, modify suggest to better handle this
-    for word in query.split():
-        if len(word) < 3:
-            continue
-        request = nodereader_pb2.SuggestRequest()
-        request.CopyFrom(base_request)
-        request.body = word
-        tasks.append(
-            node_query(kbid, Method.SUGGEST, request, target_shard_replicas=target_shard_replicas)
-        )
-
+    results: list[nodereader_pb2.SearchResponse]
     try:
-        results_raw = await asyncio.gather(*tasks)
-        return await merge_suggest_results(
-            [item for r in results_raw for item in r[0]],
-            kbid=kbid,
+        (
+            results,
+            _,
+            _,
+        ) = await node_query(
+            kbid,
+            Method.SEARCH,
+            request,
+            use_read_replica_nodes=True,
+            retry_on_primary=False,
         )
+        return merge_relation_prefix_results(results)
     except Exception as e:
         capture_exception(e)
         logger.exception("Error in finding entities in query for graph strategy")
-        return KnowledgeboxSuggestResults(entities=None)
+        return None
 
 
 async def rank_relations_reranker(
@@ -863,15 +841,6 @@ async def build_graph_response(
         best_matches=best_matches,
         relations=final_relations,
         total=len(text_blocks),
-    )
-
-
-def filter_subgraph(subgraph: EntitySubgraph, entities_to_remove: Collection[str]) -> EntitySubgraph:
-    """
-    Removes the relationships with entities in `entities_to_remove` from the subgraph.
-    """
-    return EntitySubgraph(
-        related_to=[rel for rel in subgraph.related_to if rel.entity not in entities_to_remove]
     )
 
 

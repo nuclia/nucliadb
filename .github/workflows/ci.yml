@@ -287,6 +287,19 @@ jobs:
       matrix:
         shard: [0, 1, 2]
 
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 1s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
@@ -304,13 +317,12 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Run NucliaDB tests
-        # These tests can be flaky, let's retry them...
-        uses: nick-fields/retry@v3
-        with:
-          max_attempts: 2
-          retry_on: error
-          timeout_minutes: 10
-          command: source .venv/bin/activate && make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" || make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
+        env:
+          TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
+        run: |
+          source .venv/bin/activate &&
+          make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" ||
+          make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

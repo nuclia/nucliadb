@@ -43,11 +43,11 @@ from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     NewKnowledgeBoxV2Request,
     NewKnowledgeBoxV2Response,
-    OpStatusWriter,
 )
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.aiopynecone.models import IndexDescription, IndexStats, IndexStatus, QueryResponse
 from nucliadb_utils.utilities import get_endecryptor
+from tests.utils import inject_message
 
 PINECONE_MODULE = "nucliadb.common.external_index_providers.pinecone"
 
@@ -358,8 +358,7 @@ async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str,
     bm.field_vectors.append(ev)
     bm.source = BrokerMessage.MessageSource.PROCESSOR
 
-    response = await nucliadb_grpc.ProcessMessage([bm], timeout=None)  # type: ignore
-    assert response.status == OpStatusWriter.Status.OK
+    await inject_message(nucliadb_grpc, bm)
 
 
 async def test_ingestion_on_pinecone_kb(

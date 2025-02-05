@@ -19,7 +19,7 @@
 #
 
 from nucliadb.learning_proxy import LearningConfiguration, SemanticConfig, SimilarityFunction
-from nucliadb.writer.vectorsets import get_vectorset_config
+from nucliadb.writer.api.v1.vectorsets import get_vectorset_config
 from nucliadb_protos import knowledgebox_pb2
 
 

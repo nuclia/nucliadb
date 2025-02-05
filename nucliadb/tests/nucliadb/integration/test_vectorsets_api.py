@@ -45,7 +45,7 @@ from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
 from tests.utils.vectorsets import add_vectorset
 
-MODULE = "nucliadb.writer.vectorsets"
+MODULE = "nucliadb.writer.api.v1.vectorsets"
 
 
 async def test_add_delete_vectorsets(
@@ -87,20 +87,17 @@ async def test_add_delete_vectorsets(
         },
     )
 
-    with patch(
-        f"{MODULE}.learning_proxy.get_configuration",
-        side_effect=[
-            existing_lconfig,  # Initial configuration
-            updated_lconfig,  # Configuration after adding the vectorset
-            updated_lconfig,  # Configuration right before deleting the vectorset
-            existing_lconfig,  # Initial configuration
-            existing_lconfig,  # Initial configuration
-        ],
-    ) as get_configuration:
-        with patch(f"{MODULE}.learning_proxy.update_configuration", return_value=None):
+    with patch(f"{MODULE}.learning_proxy.update_configuration", return_value=None):
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                existing_lconfig,  # Initial configuration
+                updated_lconfig,  # Configuration after adding the vectorset
+            ],
+        ):
             # Add the vectorset
             resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
-            assert resp.status_code == 200, resp.text
+            assert resp.status_code == 201, resp.text
 
             # Check that the vectorset has been created with the correct configuration
             async with datamanagers.with_ro_transaction() as txn:
@@ -112,28 +109,57 @@ async def test_add_delete_vectorsets(
                 assert vs.vectorset_index_config.vector_dimension == 1024
                 assert vs.matryoshka_dimensions == [1024, 512, 256, 128]
 
-            # Mock the learning_proxy to return the updated configuration on get_configuration
-            get_configuration.return_value = updated_lconfig
-
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                updated_lconfig,  # Configuration right before deleting the vectorset
+            ],
+        ):
             # Delete the vectorset
             resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
-            assert resp.status_code == 200, resp.text
+            assert resp.status_code == 204, resp.text
 
             # Check that the vectorset has been deleted
             async with datamanagers.with_ro_transaction() as txn:
                 vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset_id)
                 assert vs is None
 
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                existing_lconfig,  # initial configuration again
+            ],
+        ):
             # Deleting your last vectorset is not allowed
             resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/multilingual")
             assert resp.status_code == 409, resp.text
             assert "Deletion of your last vectorset is not allowed" in resp.json()["detail"]
 
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                existing_lconfig,  # initial configuration again
+            ],
+        ):
             # But deleting twice is okay
             resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             # XXX: however, we get the same error as before due to our lazy
             # check strategy. This shuold be a 200
             assert resp.status_code == 409, resp.text
+
+        with patch(
+            f"{MODULE}.learning_proxy.get_configuration",
+            side_effect=[
+                existing_lconfig,  # Initial configuration
+                updated_lconfig,  # Configuration after adding the vectorset
+                existing_lconfig,  # Initial configuration
+            ],
+        ):
+            # Add and delete the vectorset again
+            resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            assert resp.status_code == 201, resp.text
+            resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            assert resp.status_code == 204, resp.text
 
 
 async def test_learning_config_errors_are_proxied_correctly(
@@ -144,16 +170,16 @@ async def test_learning_config_errors_are_proxied_correctly(
     with patch(
         f"{MODULE}.learning_proxy.get_configuration",
         side_effect=ProxiedLearningConfigError(
-            status_code=500, content=b"Learning Internal Server Error", content_type="text/plain"
+            status_code=500, content="Learning Internal Server Error"
         ),
     ):
         resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
-        assert resp.text == "Learning Internal Server Error"
+        assert resp.json() == {"detail": "Learning Internal Server Error"}
 
         resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
-        assert resp.text == "Learning Internal Server Error"
+        assert resp.json() == {"detail": "Learning Internal Server Error"}
 
 
 @pytest.mark.parametrize("bwc_with_default_vectorset", [True, False])
@@ -230,12 +256,7 @@ async def test_vectorset_migration(
             vector=[1.0 for _ in range(1024)],
         )
     ]
-    if bwc_with_default_vectorset:
-        # learning is not setting vectorset to be bw/c with the default vectorset in old KBs
-        link_field.with_extracted_vectors(vectors)
-    else:
-        # once fixed, learning will always set the vectorset id
-        link_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
+    link_field.with_extracted_vectors(vectors, vectorset="multilingual-2024-05-06")
 
     bmb.add_field_builder(link_field)
     bm = bmb.build()
@@ -250,7 +271,7 @@ async def test_vectorset_migration(
     resp = await add_vectorset(
         nucliadb_manager, kbid, vectorset_id, similarity=SimilarityFunction.COSINE, vector_dimension=1024
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
     # Ingest a new broker message as if it was coming from the migration
     bm2 = BrokerMessage(

@@ -50,7 +50,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 from tests.utils.dirty_index import wait_for_sync
@@ -151,10 +151,7 @@ async def test_creation(
     bm.uuid = rid
     bm.kbid = knowledgebox
 
-    async def iterate(value: BrokerMessage):
-        yield value
-
-    await nucliadb_grpc.ProcessMessage(iterate(bm))  # type: ignore
+    await inject_message(nucliadb_grpc, bm)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata",
@@ -642,8 +639,7 @@ async def test_language_metadata(
     fcmw.metadata.split_metadata["foo"].language = "it"
     bm.field_metadata.append(fcmw)
 
-    resp = await nucliadb_grpc.ProcessMessage([bm])
-    assert resp.status == OpStatusWriter.Status.OK
+    await inject_message(nucliadb_grpc, bm)
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]})
     assert resp.status_code == 200
@@ -753,10 +749,7 @@ async def test_question_answer(
     message.uuid = rid
     message.kbid = knowledgebox
 
-    async def iterate(value: BrokerMessage):
-        yield value
-
-    await nucliadb_grpc.ProcessMessage(iterate(message))  # type: ignore
+    await inject_message(nucliadb_grpc, message)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=extracted&extracted=question_answers",
