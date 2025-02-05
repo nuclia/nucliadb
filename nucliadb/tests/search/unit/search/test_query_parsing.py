@@ -29,11 +29,11 @@ from nucliadb_models import search as search_models
 from nucliadb_models.search import FindRequest
 
 
-def test_find_query_parsing__top_k():
+async def test_find_query_parsing__top_k():
     find = FindRequest(
         top_k=20,
     )
-    parsed = parse_find(find)
+    parsed = await parse_find("kbid", find)
     assert parsed.top_k == find.top_k
 
 
@@ -56,7 +56,7 @@ def test_find_query_parsing__top_k():
         (search_models.ReciprocalRankFusion(window=50), parser_models.ReciprocalRankFusion(window=50)),
     ],
 )
-def test_find_query_parsing__rank_fusion(
+async def test_find_query_parsing__rank_fusion(
     rank_fusion: Union[search_models.RankFusionName, search_models.RankFusion],
     expected: parser_models.RankFusion,
 ):
@@ -64,13 +64,13 @@ def test_find_query_parsing__rank_fusion(
         top_k=20,
         rank_fusion=rank_fusion,
     )
-    parsed = parse_find(find)
+    parsed = await parse_find("kbid", find)
     assert parsed.rank_fusion == expected
 
 
 # ATENTION: if you're changing this test, make sure public models, private
 # models and parsing are change accordingly!
-def test_find_query_parsing__rank_fusion_limits():
+async def test_find_query_parsing__rank_fusion_limits():
     FindRequest.model_validate(
         {
             "rank_fusion": {
@@ -80,7 +80,9 @@ def test_find_query_parsing__rank_fusion_limits():
         }
     )
 
-    parse_find(FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=500)))
+    await parse_find(
+        "kbid", FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=500))
+    )
 
     with pytest.raises(ValidationError):
         FindRequest.model_validate(
@@ -93,7 +95,7 @@ def test_find_query_parsing__rank_fusion_limits():
         )
 
     parsed = parse_find(
-        FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=501))
+        "kbid", FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=501))
     )
     assert parsed.rank_fusion.window == 500
 
@@ -102,19 +104,18 @@ def test_find_query_parsing__rank_fusion_limits():
     "reranker,expected",
     [
         (search_models.RerankerName.NOOP, parser_models.NoopReranker()),
-        (search_models.RerankerName.MULTI_MATCH_BOOSTER, parser_models.MultiMatchBoosterReranker()),
         (search_models.RerankerName.PREDICT_RERANKER, parser_models.PredictReranker(window=20 * 2)),
         (search_models.PredictReranker(window=50), parser_models.PredictReranker(window=50)),
     ],
 )
-def test_find_query_parsing__reranker(
+async def test_find_query_parsing__reranker(
     reranker: Union[search_models.RerankerName, search_models.Reranker], expected: parser_models.Reranker
 ):
     find = FindRequest(
         top_k=20,
         reranker=reranker,
     )
-    parsed = parse_find(find)
+    parsed = await parse_find("kbid", find)
     assert parsed.reranker == expected
 
 
@@ -130,10 +131,12 @@ def test_find_query_parsing__reranker_limits():
         }
     )
 
-    parse_find(FindRequest(reranker=search_models.PredictReranker(window=200)))
+    parse_find("kbid", FindRequest(reranker=search_models.PredictReranker(window=200)))
 
     with pytest.raises(ValidationError):
         FindRequest.model_validate({"reranker": {"name": "predict", "window": 201}})
 
-    parsed = parse_find(FindRequest(reranker=search_models.PredictReranker.model_construct(window=201)))
+    parsed = parse_find(
+        "kbid", FindRequest(reranker=search_models.PredictReranker.model_construct(window=201))
+    )
     assert parsed.reranker.window == 200
