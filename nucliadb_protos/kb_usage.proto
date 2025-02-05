@@ -99,6 +99,9 @@ message KbUsage {
     optional string account_id = 3;
     optional string kb_id = 4;
     KBSource kb_source = 5;
+    optional string trace_id = 10;
+    optional string learning_id = 11;
+    optional string resource_id = 12;
 
     // Data
     repeated Process processes = 6;

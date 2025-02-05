@@ -64,10 +64,10 @@ class RequestContext:
 request_context_var = contextvars.ContextVar[Optional[RequestContext]]("request_context", default=None)
 
 
-def get_trace_id() -> str:
+def get_trace_id() -> Optional[str]:
     span = get_current_span()
     if span is None:
-        return ""
+        return None
     return format_trace_id(span.get_span_context().trace_id)
 
 
@@ -88,7 +88,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         context = RequestContext()
         token = request_context_var.set(context)
         context.audit_request.time.FromDatetime(datetime.now(tz=timezone.utc))
-        context.audit_request.trace_id = get_trace_id()
+        context.audit_request.trace_id = get_trace_id() or ""
         context.path = request.url.path
 
         if request.url.path.split("/")[-1] in ("ask", "search", "find"):
@@ -252,7 +252,7 @@ class StreamAuditStorage(AuditStorage):
 
         # Reports MODIFIED / DELETED / NEW events
 
-        auditrequest.trace_id = get_trace_id()
+        auditrequest.trace_id = get_trace_id() or ""
         auditrequest.kbid = kbid
         auditrequest.userid = user or ""
         auditrequest.rid = rid or ""
@@ -276,6 +276,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(paragraphs=paragraphs, fields=fields, bytes=bytes),
+            trace_id=get_trace_id(),
         )
 
     def report_resources(
@@ -290,6 +291,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(resources=resources),
+            trace_id=get_trace_id(),
         )
 
     def visited(
@@ -318,6 +320,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(paragraphs=0, fields=0, resources=0),
+            trace_id=get_trace_id(),
         )
 
     def search(
@@ -362,6 +365,7 @@ class StreamAuditStorage(AuditStorage):
                     num_searches=1,
                 )
             ],
+            trace_id=get_trace_id(),
         )
 
     def chat(

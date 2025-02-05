@@ -284,6 +284,9 @@ class KbUsage(google.protobuf.message.Message):
     ACCOUNT_ID_FIELD_NUMBER: builtins.int
     KB_ID_FIELD_NUMBER: builtins.int
     KB_SOURCE_FIELD_NUMBER: builtins.int
+    TRACE_ID_FIELD_NUMBER: builtins.int
+    LEARNING_ID_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     PROCESSES_FIELD_NUMBER: builtins.int
     PREDICTS_FIELD_NUMBER: builtins.int
     SEARCHES_FIELD_NUMBER: builtins.int
@@ -293,6 +296,9 @@ class KbUsage(google.protobuf.message.Message):
     account_id: builtins.str
     kb_id: builtins.str
     kb_source: global___KBSource.ValueType
+    trace_id: builtins.str
+    learning_id: builtins.str
+    resource_id: builtins.str
     @property
     def timestamp(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -313,19 +319,28 @@ class KbUsage(google.protobuf.message.Message):
         account_id: builtins.str | None = ...,
         kb_id: builtins.str | None = ...,
         kb_source: global___KBSource.ValueType = ...,
+        trace_id: builtins.str | None = ...,
+        learning_id: builtins.str | None = ...,
+        resource_id: builtins.str | None = ...,
         processes: collections.abc.Iterable[global___Process] | None = ...,
         predicts: collections.abc.Iterable[global___Predict] | None = ...,
         searches: collections.abc.Iterable[global___Search] | None = ...,
         storage: global___Storage | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_account_id", b"_account_id", "_kb_id", b"_kb_id", "_storage", b"_storage", "account_id", b"account_id", "kb_id", b"kb_id", "storage", b"storage", "timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_account_id", b"_account_id", "_kb_id", b"_kb_id", "_storage", b"_storage", "account_id", b"account_id", "kb_id", b"kb_id", "kb_source", b"kb_source", "predicts", b"predicts", "processes", b"processes", "searches", b"searches", "service", b"service", "storage", b"storage", "timestamp", b"timestamp"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_account_id", b"_account_id", "_kb_id", b"_kb_id", "_learning_id", b"_learning_id", "_resource_id", b"_resource_id", "_storage", b"_storage", "_trace_id", b"_trace_id", "account_id", b"account_id", "kb_id", b"kb_id", "learning_id", b"learning_id", "resource_id", b"resource_id", "storage", b"storage", "timestamp", b"timestamp", "trace_id", b"trace_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_account_id", b"_account_id", "_kb_id", b"_kb_id", "_learning_id", b"_learning_id", "_resource_id", b"_resource_id", "_storage", b"_storage", "_trace_id", b"_trace_id", "account_id", b"account_id", "kb_id", b"kb_id", "kb_source", b"kb_source", "learning_id", b"learning_id", "predicts", b"predicts", "processes", b"processes", "resource_id", b"resource_id", "searches", b"searches", "service", b"service", "storage", b"storage", "timestamp", b"timestamp", "trace_id", b"trace_id"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_account_id", b"_account_id"]) -> typing.Literal["account_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_kb_id", b"_kb_id"]) -> typing.Literal["kb_id"] | None: ...
     @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_learning_id", b"_learning_id"]) -> typing.Literal["learning_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_resource_id", b"_resource_id"]) -> typing.Literal["resource_id"] | None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_storage", b"_storage"]) -> typing.Literal["storage"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_trace_id", b"_trace_id"]) -> typing.Literal["trace_id"] | None: ...
 
 global___KbUsage = KbUsage
 

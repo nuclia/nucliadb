@@ -96,6 +96,9 @@ class KbUsageReportUtility:
         predicts: Iterable[Predict] = (),
         searches: Iterable[Search] = (),
         storage: Optional[Storage] = None,
+        trace_id: Optional[str] = None,
+        learning_id: Optional[str] = None,
+        resource_id: Optional[str] = None,
     ):
         usage = KbUsage()
         usage.service = service  # type: ignore
@@ -105,6 +108,12 @@ class KbUsageReportUtility:
         if kb_id is not None:
             usage.kb_id = kb_id
         usage.kb_source = kb_source  # type: ignore
+        if trace_id is not None:
+            usage.trace_id = trace_id
+        if learning_id is not None:
+            usage.learning_id = learning_id
+        if resource_id is not None:
+            usage.resource_id = resource_id
 
         usage.processes.extend(processes)
         usage.predicts.extend(predicts)
