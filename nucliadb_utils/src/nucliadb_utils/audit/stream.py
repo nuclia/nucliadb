@@ -276,7 +276,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(paragraphs=paragraphs, fields=fields, bytes=bytes),
-            trace_id=get_trace_id(),
+            log_match_id=get_trace_id(),
         )
 
     def report_resources(
@@ -291,7 +291,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(resources=resources),
-            trace_id=get_trace_id(),
+            log_match_id=get_trace_id(),
         )
 
     def visited(
@@ -320,7 +320,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(paragraphs=0, fields=0, resources=0),
-            trace_id=get_trace_id(),
+            log_match_id=get_trace_id(),
         )
 
     def search(
@@ -365,7 +365,7 @@ class StreamAuditStorage(AuditStorage):
                     num_searches=1,
                 )
             ],
-            trace_id=get_trace_id(),
+            log_match_id=get_trace_id(),
         )
 
     def chat(
