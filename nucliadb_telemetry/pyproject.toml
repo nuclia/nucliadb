@@ -33,6 +33,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The following has a lot of repetition. It can be avoided by adding
+# ourselves as a dependency (e.g: nucliadb_telemetry[otel]) in each group
+# dependencies but that can run into problems when installing editable
+# dependencies. Keeping the duplication for now.
 otel = [
     "opentelemetry-sdk>=1.21.0",
     "opentelemetry-api>=1.21.0",
@@ -51,19 +55,67 @@ grpc = [
     "grpcio-tools>=1.44.0",
     "grpcio-testing>=1.44.0",
     "grpcio-reflection>=1.44.0",
-    "nucliadb_telemetry[otel]",
+
+    # Include OpenTelemetry deps
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
+    "opentelemetry-exporter-jaeger>=1.21.0",
+    "opentelemetry-propagator-b3>=1.21.0",
+    "opentelemetry-instrumentation-fastapi>=0.42b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-semantic-conventions>=0.42b0",
 ]
 nats = [
     "nats-py[nkeys]>=2.5.0",
     "PyNaCl",
-    "nucliadb_telemetry[otel]",
+
+    # Include OpenTelemetry deps
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
+    "opentelemetry-exporter-jaeger>=1.21.0",
+    "opentelemetry-propagator-b3>=1.21.0",
+    "opentelemetry-instrumentation-fastapi>=0.42b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-semantic-conventions>=0.42b0",
 ]
 fastapi = [
     "fastapi",
-    "nucliadb_telemetry[otel]",
+
+    # Include OpenTelemetry deps
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
+    "opentelemetry-exporter-jaeger>=1.21.0",
+    "opentelemetry-propagator-b3>=1.21.0",
+    "opentelemetry-instrumentation-fastapi>=0.42b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-semantic-conventions>=0.42b0",
 ]
 all = [
-    "nucliadb_telemetry[otel,grpc,nats,fastapi]",
+    # Include everything
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
+    "opentelemetry-exporter-jaeger>=1.21.0",
+    "opentelemetry-propagator-b3>=1.21.0",
+    "opentelemetry-instrumentation-fastapi>=0.42b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
+    "opentelemetry-semantic-conventions>=0.42b0",
+
+    "grpcio>=1.44.0",
+    "grpcio-health-checking>=1.44.0",
+    "grpcio-channelz>=1.44.0",
+    "grpcio-status>=1.44.0",
+    "grpcio-tools>=1.44.0",
+    "grpcio-testing>=1.44.0",
+    "grpcio-reflection>=1.44.0",
+
+    "nats-py[nkeys]>=2.5.0",
+    "PyNaCl",
+
+    "fastapi",
 ]
 
 [project.urls]

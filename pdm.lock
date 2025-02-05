@@ -2234,17 +2234,6 @@ summary = "NucliaDB Telemetry Library Python process"
 groups = ["default", "dev"]
 dependencies = [
     "-e file:///${PROJECT_ROOT}/nucliadb_telemetry#egg=nucliadb-telemetry",
-    "nucliadb-telemetry[fastapi,grpc,nats,otel]",
-]
-
-[[package]]
-name = "nucliadb-telemetry"
-version = "6.2.1"
-extras = ["fastapi", "grpc", "nats", "otel"]
-requires_python = ">=3.9, <4"
-summary = "NucliaDB Telemetry Library Python process"
-groups = ["default", "dev"]
-dependencies = [
     "PyNaCl",
     "fastapi",
     "grpcio-channelz>=1.44.0",
@@ -2255,29 +2244,6 @@ dependencies = [
     "grpcio-tools>=1.44.0",
     "grpcio>=1.44.0",
     "nats-py[nkeys]>=2.5.0",
-    "nucliadb-telemetry==6.2.1",
-    "nucliadb-telemetry[otel]",
-    "nucliadb-telemetry[otel]",
-    "nucliadb-telemetry[otel]",
-    "opentelemetry-api>=1.21.0",
-    "opentelemetry-exporter-jaeger>=1.21.0",
-    "opentelemetry-instrumentation-aiohttp-client>=0.42b0",
-    "opentelemetry-instrumentation-fastapi>=0.42b0",
-    "opentelemetry-propagator-b3>=1.21.0",
-    "opentelemetry-proto>=1.21.0",
-    "opentelemetry-sdk>=1.21.0",
-    "opentelemetry-semantic-conventions>=0.42b0",
-]
-
-[[package]]
-name = "nucliadb-telemetry"
-version = "6.2.1"
-extras = ["otel"]
-requires_python = ">=3.9, <4"
-summary = "NucliaDB Telemetry Library Python process"
-groups = ["default", "dev"]
-dependencies = [
-    "nucliadb-telemetry==6.2.1",
     "opentelemetry-api>=1.21.0",
     "opentelemetry-exporter-jaeger>=1.21.0",
     "opentelemetry-instrumentation-aiohttp-client>=0.42b0",

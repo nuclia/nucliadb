@@ -104,16 +104,5 @@ debug-run-nucliadb:
 debug-run-nucliadb-redis:
 	nucliadb --driver=REDIS --maindb=redis://localhost:55359 --blob=data/blob --node=data/node --zone=europe-1 --log=INFO
 
-
-build-node-binding:
-	rm -rf target/wheels/*
-	RUSTFLAGS="--cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml --profile release-wheel
-	pip install target/wheels/nucliadb_node_binding-*.whl --force
-
-build-node-binding-debug:
-	rm -rf target/wheels/*
-	RUSTFLAGS="--cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml
-	pip install target/wheels/nucliadb_node_binding-*.whl --force
-
 build-nucliadb-local:
 	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding
