@@ -39,6 +39,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async with datamanagers.with_rw_transaction() as txn:
         kb_labels = await datamanagers.labels.get_labels(txn, kbid=kbid)
+        changed = False
 
         for labelset in kb_labels.labelset.values():
             current_labels = labelset.labels
@@ -51,6 +52,9 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                     deduplicator.add(label_id)
                     labelset.labels.append(label)
 
-        await datamanagers.labels.set_labels(txn, kbid=kbid, labels=kb_labels)
+            changed = changed or (len(labelset.labels) < len(current_labels))
+
+        if changed:
+            await datamanagers.labels.set_labels(txn, kbid=kbid, labels=kb_labels)
 
         await txn.commit()
