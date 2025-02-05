@@ -199,7 +199,7 @@ jobs:
           image-version: ${{ steps.env-vars.outputs.short_sha }}
           chart-version: ${{ steps.version_step.outputs.version_number }}
           helm-chart-url: ${{ secrets.HELM_CHART_URL }}
-          chart-dir: "./charts/${{ matrix.component }}"
+          chart-dir: "./charts/nucliadb_${{ matrix.component }}"
           helm-version: ${{ env.HELM_VERSION }}
           push-to-artifact-registry: true
 
