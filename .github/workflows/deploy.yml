@@ -29,6 +29,10 @@ jobs:
     outputs:
       SHORT_SHA: ${{ steps.env-vars.outputs.SHORT_SHA }}
     steps:
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Calculate short sha
         id: env-vars
         run: |-
