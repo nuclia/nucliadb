@@ -118,4 +118,5 @@ jobs:
           image-name: ${{ inputs.image-name }}
           image-version: ${{ env.SHORT_SHA }}
           aws-ecr-role: ${{ secrets.AWS_ECR_ROLE }}
+          tag-latest: ${{ github.ref == 'refs/heads/main' && 'latest' || 'dev-latest' }}
           push: true
