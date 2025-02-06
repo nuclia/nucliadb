@@ -19,28 +19,51 @@ permissions:
 env:
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
   GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
-  ARTIFACT_REGISTRY_URL: oci://europe-west4-docker.pkg.dev/nuclia-internal/charts
+  HELM_VERSION: v3.15.3
 
 jobs:
+
+  generate-short-sha:
+    name: Generate short sha
+    runs-on: ubuntu-24.04
+    outputs:
+      SHORT_SHA: ${{ steps.env-vars.outputs.SHORT_SHA }}
+    steps:
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          echo "SHORT_SHA=$HASH" >> $GITHUB_OUTPUT
+
   build-python-image:
     name: Build Python image
+    needs: generate-short-sha
     uses: ./.github/workflows/_build-img-nucliadb.yml
     with:
       file: Dockerfile
       image-name: nucliadb_hosted
+      image-version: ${{ needs.generate-short-sha.outputs.SHORT_SHA }}
     secrets: inherit
 
   build-nidx-image:
     name: Build nidx image
+    needs: generate-short-sha
     uses: ./.github/workflows/_build-img-nucliadb.yml
     with:
       file: Dockerfile.nidx
       image-name: nidx
+      image-version: ${{ needs.generate-short-sha.outputs.SHORT_SHA }}
     secrets: inherit
 
   upload-chart-nucliadb-shared:
     name: Deploy nucliadb shared
     runs-on: ubuntu-24.04
+    env:
+      COMPONENT_NAME: nucliadb_shared
     steps:
       - name: Generate a token
         id: app-token
@@ -52,6 +75,14 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Checkout tooling repository
+        uses: actions/checkout@v4
+        with:
+          repository: nuclia/tooling
+          ref: main
+          path: tooling
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Authenticate to Google Cloud
         id: gcp-auth
@@ -79,24 +110,17 @@ jobs:
         run: |-
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
-          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_shared/Chart.yaml
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
+      - name: Build and push helm chart
+        uses: ./tooling/.github/actions/build-helm-chart
         with:
-          version: v3.15.3
-
-      - name: Push helm package
-        run: |-
-          helm lint charts/nucliadb_shared
-          helm package charts/nucliadb_shared
-          helm push nucliadb_shared-${{ steps.version_step.outputs.version_number }}.tgz ${{ env.ARTIFACT_REGISTRY_URL }}
+          component: ${{ env.COMPONENT_NAME }}
+          chart-version: ${{ steps.version_step.outputs.version_number }}
+          helm-chart-url: ${{ secrets.HELM_CHART_URL }}
+          chart-dir: "./charts/${{ env.COMPONENT_NAME }}"
+          helm-version: ${{ env.HELM_VERSION }}
+          push-to-artifact-registry: true
 
   upload-charts-nucliadb-component:
     name: Upload NucliaDB component charts
@@ -125,6 +149,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout tooling repository
+        uses: actions/checkout@v4
+        with:
+          repository: nuclia/tooling
+          ref: main
+          path: tooling
+          token: ${{ steps.app-token.outputs.token }}
+
       - name: Authenticate to Google Cloud
         id: gcp-auth
         uses: google-github-actions/auth@v2
@@ -148,14 +180,9 @@ jobs:
 
       - name: Set helm package image
         id: version_step
-        env:
-          CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#nucliadb_hosted:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_${{ matrix.component }}/values.yaml
-          sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_${{ matrix.component }}/values.yaml
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
-          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_${{ matrix.component }}/Chart.yaml
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
       - name: Configure Git
@@ -163,19 +190,22 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Install Helm
-        uses: azure/setup-helm@v4
+      - name: Build and push helm chart
+        uses: ./tooling/.github/actions/build-helm-chart
         with:
-          version: v3.15.3
-
-      - name: Push helm package
-        run: |-
-          helm lint charts/nucliadb_${{ matrix.component }}
-          helm package charts/nucliadb_${{ matrix.component }}
-          helm push nucliadb_${{ matrix.component }}-${{ steps.version_step.outputs.version_number }}.tgz ${{ env.ARTIFACT_REGISTRY_URL }}
+          component: nucliadb_${{ matrix.component }}
+          image-name: nucliadb_hosted
+          image-version: ${{ steps.env-vars.outputs.short_sha }}
+          chart-version: ${{ steps.version_step.outputs.version_number }}
+          helm-chart-url: ${{ secrets.HELM_CHART_URL }}
+          chart-dir: "./charts/nucliadb_${{ matrix.component }}"
+          helm-version: ${{ env.HELM_VERSION }}
+          push-to-artifact-registry: true
 
   upload-chart-nidx:
     name: Upload nidx chart
+    env:
+      COMPONENT_NAME: nidx
     runs-on: ubuntu-24.04
     needs:
       - build-nidx-image
@@ -191,6 +221,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout tooling repository
+        uses: actions/checkout@v4
+        with:
+          repository: nuclia/tooling
+          ref: main
+          path: tooling
+          token: ${{ steps.app-token.outputs.token }}
+
       - name: Authenticate to Google Cloud
         id: gcp-auth
         uses: google-github-actions/auth@v2
@@ -214,14 +252,9 @@ jobs:
 
       - name: Set helm package image
         id: version_step
-        env:
-          CONTAINER_REGISTRY: europe-west4-docker.pkg.dev/nuclia-internal/nuclia
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#nidx:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nidx/values.yaml
-          sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nidx/values.yaml
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
-          sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nidx/Chart.yaml
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
       - name: Configure Git
@@ -229,16 +262,17 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Install Helm
-        uses: azure/setup-helm@v4
+      - name: Build and push helm chart
+        uses: ./tooling/.github/actions/build-helm-chart
         with:
-          version: v3.15.3
-
-      - name: Push helm package
-        run: |-
-          helm lint charts/nidx
-          helm package charts/nidx
-          helm push nidx-${{ steps.version_step.outputs.version_number }}.tgz ${{ env.ARTIFACT_REGISTRY_URL }}
+          component: ${{ env.COMPONENT_NAME }}
+          image-name: ${{ env.COMPONENT_NAME }}
+          image-version: ${{ steps.env-vars.outputs.short_sha }}
+          chart-version: ${{ steps.version_step.outputs.version_number }}
+          helm-chart-url: ${{ secrets.HELM_CHART_URL }}
+          chart-dir: "./charts/${{ env.COMPONENT_NAME }}"
+          helm-version: ${{ env.HELM_VERSION }}
+          push-to-artifact-registry: true
 
   deploy-nucliadb-components:
     name: Deploy NucliaDB components
