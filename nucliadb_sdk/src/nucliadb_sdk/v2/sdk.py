@@ -86,7 +86,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.trainset import TrainSetPartitions
-from nucliadb_models.vectorsets import CreatedVectorSet
+from nucliadb_models.vectorsets import CreatedVectorSet, VectorSetList
 from nucliadb_models.writer import (
     CreateResourcePayload,
     ResourceCreated,
@@ -559,6 +559,15 @@ class _NucliaDBBase:
         path_params=("kbid", "vectorset_id"),
         request_type=None,
         response_type=CreatedVectorSet,
+    )
+
+    list_vector_sets = _request_builder(
+        name="list_vector_sets",
+        path_template="/v1/kb/{kbid}/vectorsets",
+        method="GET",
+        path_params=("kbid",),
+        request_type=None,
+        response_type=VectorSetList,
     )
 
     delete_vector_set = _request_builder(

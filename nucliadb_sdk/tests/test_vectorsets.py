@@ -16,7 +16,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-import os
 
 import pytest
 
@@ -26,23 +25,17 @@ from nucliadb_sdk.tests.fixtures import NucliaFixture
 from nucliadb_sdk.v2.exceptions import ConflictError
 
 
-def test_add_and_delete_vectorset(
-    nucliadb: NucliaFixture, sdk: nucliadb_sdk.NucliaDB, kb: KnowledgeBoxObj
-):
+def test_vectorsets(nucliadb: NucliaFixture, sdk: nucliadb_sdk.NucliaDB, kb: KnowledgeBoxObj):
     # this test don't have a proper learning mock set up, adding a vectorset
     # involves learning updating learning_config and returning the new semantic
     # model information and, as we can't unittest.patch either, we just test the
     # endpoint respond
 
-    # HACK: as our dummy learning config is kind of terrible, we must know
-    # whether we are starting nucliadb or not to guess the default and do a kind
-    # of useless test
-    if nucliadb.container == "local" and os.environ.get("TEST_LOCAL_NUCLIADB") != "START":
-        existing_vectorset = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
-    else:
-        # same as passed as TEST_SENTENCE_ENCODER while starting nucliadb
-        # container (see sdk fixtures)
-        existing_vectorset = "multilingual-2023-02-21"
+    vectorsets = sdk.list_vector_sets(kbid=kb.uuid)
+    assert len(vectorsets.vectorsets) == 1
+
+    existing_vectorset = vectorsets.vectorsets[0].id
+    assert existing_vectorset
 
     # can't add an already existing vectorset
     with pytest.raises(ConflictError):

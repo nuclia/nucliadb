@@ -10,10 +10,20 @@ spec:
   http:
     - name: nucliadb_reader
       match:
+        # KBs and config
         - method:
             regex: "GET|OPTIONS"
           uri:
             regex: '^/api/v\d+/kb/[^/]+$'
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/configuration'
+          method:
+            regex: "GET|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/vectorsets$'
+          method:
+            regex: "GET|OPTIONS"
+
         - method:
             regex: "GET|OPTIONS"
           uri:
@@ -32,10 +42,6 @@ spec:
             regex: "GET|OPTIONS"
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/model.*'
-          method:
-            regex: "GET|OPTIONS"
-        - uri:
-            regex: '^/api/v\d+/kb/[^/]+/configuration'
           method:
             regex: "GET|OPTIONS"
         - uri:
