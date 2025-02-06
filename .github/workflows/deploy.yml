@@ -19,7 +19,6 @@ permissions:
 env:
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
   GCP_SERVICE_ACCOUNT: "github-actions@nuclia-internal.iam.gserviceaccount.com"
-  ARTIFACT_REGISTRY_URL: oci://europe-west4-docker.pkg.dev/nuclia-internal/charts
   HELM_VERSION: v3.15.3
 
 jobs:
@@ -186,11 +185,6 @@ jobs:
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
       - name: Build and push helm chart
         uses: ./tooling/.github/actions/build-helm-chart
         with:
@@ -257,11 +251,6 @@ jobs:
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
-
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Build and push helm chart
         uses: ./tooling/.github/actions/build-helm-chart
