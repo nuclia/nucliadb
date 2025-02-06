@@ -24,7 +24,6 @@ from datetime import datetime
 from typing import Any, Awaitable, Optional, Union
 
 from nucliadb.common import datamanagers
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.search.filters import (
@@ -37,16 +36,14 @@ from nucliadb.search.search.filters import (
 )
 from nucliadb.search.search.metrics import (
     node_features,
-    query_parse_dependency_observer,
 )
-from nucliadb.search.search.query_parser.fetcher import Fetcher
+from nucliadb.search.search.query_parser.fetcher import Fetcher, get_classification_labels
 from nucliadb.search.search.rank_fusion import (
     RankFusionAlgorithm,
 )
 from nucliadb.search.search.rerankers import (
     Reranker,
 )
-from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -62,7 +59,7 @@ from nucliadb_models.search import (
     SuggestOptions,
 )
 from nucliadb_models.security import RequestSecurity
-from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
+from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
@@ -86,12 +83,6 @@ class QueryParser:
     """
 
     _query_information_task: Optional[asyncio.Task] = None
-    _detected_entities_task: Optional[asyncio.Task] = None
-    _entities_meta_cache_task: Optional[asyncio.Task] = None
-    _deleted_entities_groups_task: Optional[asyncio.Task] = None
-    _synonyms_task: Optional[asyncio.Task] = None
-    _get_classification_labels_task: Optional[asyncio.Task] = None
-    _get_matryoshka_dimension_task: Optional[asyncio.Task] = None
 
     def __init__(
         self,
@@ -197,66 +188,28 @@ class QueryParser:
             raise SendToPredictError("Error while using predict's query endpoint")
         return query_info
 
-    def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
-        if self._get_matryoshka_dimension_task is None:
-            self._get_matryoshka_dimension_task = asyncio.create_task(self._matryoshka_dimension())
-        return self._get_matryoshka_dimension_task
-
-    async def _matryoshka_dimension(self) -> Optional[int]:
-        return await self.fetcher.get_matryoshka_dimension()
-
-    def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
-        if self._detected_entities_task is None:  # pragma: no cover
-            self._detected_entities_task = asyncio.create_task(detect_entities(self.kbid, self.query))
-        return self._detected_entities_task
-
-    def _get_entities_meta_cache(
-        self,
-    ) -> Awaitable[datamanagers.entities.EntitiesMetaCache]:
-        if self._entities_meta_cache_task is None:
-            self._entities_meta_cache_task = asyncio.create_task(get_entities_meta_cache(self.kbid))
-        return self._entities_meta_cache_task
-
-    def _get_deleted_entity_groups(self) -> Awaitable[list[str]]:
-        if self._deleted_entities_groups_task is None:
-            self._deleted_entities_groups_task = asyncio.create_task(
-                get_deleted_entity_groups(self.kbid)
-            )
-        return self._deleted_entities_groups_task
-
-    def _get_synomyns(self) -> Awaitable[Optional[knowledgebox_pb2.Synonyms]]:
-        if self._synonyms_task is None:
-            self._synonyms_task = asyncio.create_task(get_kb_synonyms(self.kbid))
-        return self._synonyms_task
-
-    def _get_classification_labels(self) -> Awaitable[knowledgebox_pb2.Labels]:
-        if self._get_classification_labels_task is None:
-            self._get_classification_labels_task = asyncio.create_task(
-                get_classification_labels(self.kbid)
-            )
-        return self._get_classification_labels_task
-
     async def _schedule_dependency_tasks(self) -> None:
         """
         This will schedule concurrent tasks for different data that needs to be pulled
         for the sake of the query being performed
         """
         if len(self.label_filters) > 0 and has_classification_label_filters(self.flat_label_filters):
-            asyncio.ensure_future(self._get_classification_labels())
+            asyncio.ensure_future(self.fetcher.get_classification_labels())
 
         if self.has_vector_search and self.user_vector is None:
             self.query_endpoint_used = True
             asyncio.ensure_future(self._get_query_information())
-            asyncio.ensure_future(self._get_matryoshka_dimension())
+            # XXX: should we also ensure get_vectorset and get_query_vector?
+            asyncio.ensure_future(self.fetcher.get_matryoshka_dimension())
 
         if (self.has_relations_search or self.autofilter) and len(self.query) > 0:
             if not self.query_endpoint_used:
                 # If we only need to detect entities, we don't need the query endpoint
-                asyncio.ensure_future(self._get_detected_entities())
-            asyncio.ensure_future(self._get_entities_meta_cache())
-            asyncio.ensure_future(self._get_deleted_entity_groups())
+                asyncio.ensure_future(self.fetcher.get_detected_entities())
+            asyncio.ensure_future(self.fetcher.get_entities_meta_cache())
+            asyncio.ensure_future(self.fetcher.get_deleted_entity_groups())
         if self.with_synonyms and self.query:
-            asyncio.ensure_future(self._get_synomyns())
+            asyncio.ensure_future(self.fetcher.get_synonyms())
 
     async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str]]:
         """
@@ -289,7 +242,7 @@ class QueryParser:
             field_labels = self.flat_label_filters
             paragraph_labels: list[str] = []
             if has_classification_label_filters(self.flat_label_filters):
-                classification_labels = await self._get_classification_labels()
+                classification_labels = await self.fetcher.get_classification_labels()
                 field_labels, paragraph_labels = split_labels_by_type(
                     self.flat_label_filters, classification_labels
                 )
@@ -427,19 +380,21 @@ class QueryParser:
         autofilters = []
         if self.has_relations_search or self.autofilter:
             if not self.query_endpoint_used:
-                detected_entities = await self._get_detected_entities()
+                detected_entities = await self.fetcher.get_detected_entities()
             else:
                 query_info_result = await self._get_query_information()
                 if query_info_result.entities:
                     detected_entities = convert_relations(query_info_result.entities.model_dump())
                 else:
                     detected_entities = []
-            meta_cache = await self._get_entities_meta_cache()
+            meta_cache = await self.fetcher.get_entities_meta_cache()
             detected_entities = expand_entities(meta_cache, detected_entities)
             if self.has_relations_search:
                 request.relation_subgraph.entry_points.extend(detected_entities)
                 request.relation_subgraph.depth = 1
-                request.relation_subgraph.deleted_groups.extend(await self._get_deleted_entity_groups())
+                request.relation_subgraph.deleted_groups.extend(
+                    await self.fetcher.get_deleted_entity_groups()
+                )
                 for group_id, deleted_entities in meta_cache.deleted_entities.items():
                     request.relation_subgraph.deleted_entities.append(
                         nodereader_pb2.EntitiesSubgraphRequest.DeletedEntities(
@@ -472,7 +427,7 @@ class QueryParser:
                 "Search with custom synonyms is only supported on paragraph and document search",
             )
 
-        synonyms = await self._get_synomyns()
+        synonyms = await self.fetcher.get_synonyms()
         if synonyms is None:
             # No synonyms found
             return
@@ -608,16 +563,6 @@ async def paragraph_query_to_pb(
     return request
 
 
-@query_parse_dependency_observer.wrap({"type": "detect_entities"})
-async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
-    predict = get_predict()
-    try:
-        return await predict.detect_entities(kbid, query)
-    except SendToPredictError as ex:
-        logger.warning(f"Errors on predict api detecting entities: {ex}")
-        return []
-
-
 def expand_entities(
     meta_cache: datamanagers.entities.EntitiesMetaCache,
     detected_entities: list[utils_pb2.RelationNode],
@@ -746,30 +691,6 @@ PROCESSING_STATUS_TO_PB_MAP = {
     ResourceProcessingStatus.BLOCKED: Resource.ResourceStatus.BLOCKED,
     ResourceProcessingStatus.EXPIRED: Resource.ResourceStatus.EXPIRED,
 }
-
-
-@query_parse_dependency_observer.wrap({"type": "synonyms"})
-async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
-    async with get_driver().transaction(read_only=True) as txn:
-        return await datamanagers.synonyms.get(txn, kbid=kbid)
-
-
-@query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
-async def get_entities_meta_cache(kbid: str) -> datamanagers.entities.EntitiesMetaCache:
-    async with get_driver().transaction(read_only=True) as txn:
-        return await datamanagers.entities.get_entities_meta_cache(txn, kbid=kbid)
-
-
-@query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
-async def get_deleted_entity_groups(kbid: str) -> list[str]:
-    async with get_driver().transaction(read_only=True) as txn:
-        return list((await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups)
-
-
-@query_parse_dependency_observer.wrap({"type": "classification_labels"})
-async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
-    async with get_driver().transaction(read_only=True) as txn:
-        return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
 def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]):

@@ -32,6 +32,7 @@ from nucliadb.search.search.metrics import (
 from nucliadb.search.search.query_parser.exceptions import InvalidQueryError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
+from nucliadb_protos import knowledgebox_pb2, utils_pb2
 
 
 # We use a class as cache miss marker to allow None values in the cache and to
@@ -52,11 +53,19 @@ def is_cached(field: Union[T, NotCached]) -> TypeIs[T]:
 
 class FetcherCache:
     predict_query_info: Union[Optional[QueryInfo], NotCached] = not_cached
+    predict_detected_entities: Union[list[utils_pb2.RelationNode], NotCached] = not_cached
 
     # semantic search
     query_vector: Union[Optional[list[float]], NotCached] = not_cached
     vectorset: Union[str, NotCached] = not_cached
     matryoshka_dimension: Union[Optional[int], NotCached] = not_cached
+
+    labels: Union[knowledgebox_pb2.Labels, NotCached] = not_cached
+
+    synonyms: Union[Optional[knowledgebox_pb2.Synonyms], NotCached] = not_cached
+
+    entities_meta_cache: Union[datamanagers.entities.EntitiesMetaCache, NotCached] = not_cached
+    deleted_entity_groups: Union[list[str], NotCached] = not_cached
 
 
 class Fetcher:
@@ -94,6 +103,8 @@ class Fetcher:
         self.cache = FetcherCache()
         self._validated = False
 
+    # Validation
+
     async def initial_validate(self):
         """Runs a validation on the input parameters. It can raise errors if
         there's some wrong parameter.
@@ -109,6 +120,8 @@ class Fetcher:
     async def _validate_vectorset(self):
         if self.user_vectorset is not None:
             await validate_vectorset(self.kbid, self.user_vectorset)
+
+    # Semantic search
 
     async def get_matryoshka_dimension(self) -> Optional[int]:
         if is_cached(self.cache.matryoshka_dimension):
@@ -212,6 +225,50 @@ class Fetcher:
         self.cache.query_vector = query_vector
         return query_vector
 
+    # Labels
+
+    async def get_classification_labels(self) -> knowledgebox_pb2.Labels:
+        if is_cached(self.cache.labels):
+            return self.cache.labels
+
+        labels = await get_classification_labels(self.kbid)
+        self.cache.labels = labels
+        return labels
+
+    # Entities
+
+    async def get_entities_meta_cache(self) -> datamanagers.entities.EntitiesMetaCache:
+        if is_cached(self.cache.entities_meta_cache):
+            return self.cache.entities_meta_cache
+
+        entities_meta_cache = await get_entities_meta_cache(self.kbid)
+        self.cache.entities_meta_cache = entities_meta_cache
+        return entities_meta_cache
+
+    async def get_deleted_entity_groups(self) -> list[str]:
+        if is_cached(self.cache.deleted_entity_groups):
+            return self.cache.deleted_entity_groups
+
+        deleted_entity_groups = await get_deleted_entity_groups(self.kbid)
+        self.cache.deleted_entity_groups = deleted_entity_groups
+        return deleted_entity_groups
+
+    async def get_detected_entities(self) -> list[utils_pb2.RelationNode]:
+        detected_entities = await self._predict_detect_entities()
+        return detected_entities
+
+    # Synonyms
+
+    async def get_synonyms(self) -> Optional[knowledgebox_pb2.Synonyms]:
+        if is_cached(self.cache.synonyms):
+            return self.cache.synonyms
+
+        synonyms = await get_kb_synonyms(self.kbid)
+        self.cache.synonyms = synonyms
+        return synonyms
+
+    # Predict API
+
     async def _predict_query_endpoint(self) -> Optional[QueryInfo]:
         if is_cached(self.cache.predict_query_info):
             return self.cache.predict_query_info
@@ -233,6 +290,19 @@ class Fetcher:
 
         self.cache.predict_query_info = query_info
         return query_info
+
+    async def _predict_detect_entities(self) -> list[utils_pb2.RelationNode]:
+        if is_cached(self.cache.predict_detected_entities):
+            return self.cache.predict_detected_entities
+
+        try:
+            detected_entities = await detect_entities(self.kbid, self.query)
+        except SendToPredictError as ex:
+            logger.warning(f"Errors on Predict API detecting entities: {ex}", extra={"kbid": self.kbid})
+            detected_entities = []
+
+        self.cache.predict_detected_entities = detected_entities
+        return detected_entities
 
 
 async def validate_vectorset(kbid: str, vectorset: str):
@@ -256,6 +326,12 @@ async def query_information(
     return await predict.query(kbid, query, semantic_model, generative_model, rephrase, rephrase_prompt)
 
 
+@query_parse_dependency_observer.wrap({"type": "detect_entities"})
+async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
+    predict = get_predict()
+    return await predict.detect_entities(kbid, query)
+
+
 @alru_cache(maxsize=None)
 async def get_matryoshka_dimension_cached(kbid: str, vectorset: Optional[str]) -> Optional[int]:
     # This can be safely cached as the matryoshka dimension is not expected to change
@@ -276,3 +352,27 @@ async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optio
                 matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
 
         return matryoshka_dimension
+
+
+@query_parse_dependency_observer.wrap({"type": "classification_labels"})
+async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
+    async with get_driver().transaction(read_only=True) as txn:
+        return await datamanagers.labels.get_labels(txn, kbid=kbid)
+
+
+@query_parse_dependency_observer.wrap({"type": "synonyms"})
+async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
+    async with get_driver().transaction(read_only=True) as txn:
+        return await datamanagers.synonyms.get(txn, kbid=kbid)
+
+
+@query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
+async def get_entities_meta_cache(kbid: str) -> datamanagers.entities.EntitiesMetaCache:
+    async with get_driver().transaction(read_only=True) as txn:
+        return await datamanagers.entities.get_entities_meta_cache(txn, kbid=kbid)
+
+
+@query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
+async def get_deleted_entity_groups(kbid: str) -> list[str]:
+    async with get_driver().transaction(read_only=True) as txn:
+        return list((await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups)
