@@ -332,18 +332,12 @@ class QueryParser:
         elif self.has_vector_search and not incomplete:
             query_information = await self._get_query_information()
             vectorset = await self.fetcher.get_vectorset()
-            if vectorset is not None:
-                semantic_threshold = query_information.semantic_thresholds.get(vectorset, None)
-                if semantic_threshold is not None:
-                    semantic_min_score = semantic_threshold
-                else:
-                    logger.warning(
-                        "Semantic threshold not found in query information, using default",
-                        extra={"kbid": self.kbid},
-                    )
+            semantic_threshold = query_information.semantic_thresholds.get(vectorset, None)
+            if semantic_threshold is not None:
+                semantic_min_score = semantic_threshold
             else:
                 logger.warning(
-                    "Vectorset unset by user or predict, using default semantic threshold",
+                    "Semantic threshold not found in query information, using default",
                     extra={"kbid": self.kbid},
                 )
         self.min_score.semantic = semantic_min_score
