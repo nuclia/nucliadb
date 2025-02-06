@@ -86,7 +86,6 @@ class QueryParser:
     """
 
     _query_information_task: Optional[asyncio.Task] = None
-    _get_vectorset_task: Optional[asyncio.Task] = None
     _detected_entities_task: Optional[asyncio.Task] = None
     _entities_meta_cache_task: Optional[asyncio.Task] = None
     _deleted_entities_groups_task: Optional[asyncio.Task] = None
