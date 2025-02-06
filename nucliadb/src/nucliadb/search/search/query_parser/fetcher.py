@@ -220,7 +220,6 @@ class Fetcher:
         # functions, so we'll manually parse it
         vectorset = self._get_user_vectorset()
         try:
-            print("CALLING Predict API /query endpoint")
             query_info = await query_information(
                 self.kbid,
                 self.query,
