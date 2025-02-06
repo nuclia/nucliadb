@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import os
 
 import pytest
 
@@ -30,7 +31,7 @@ def test_add_and_delete_vectorset(sdk: nucliadb_sdk.NucliaDB, kb: KnowledgeBoxOb
     # model information and, as we can't unittest.patch either, we just test the
     # endpoint respond
 
-    existing_vectorset = "multilingual"
+    existing_vectorset = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
     # can't add an already existing vectorset
     with pytest.raises(ConflictError):
         sdk.add_vector_set(kbid=kb.uuid, vectorset_id=existing_vectorset)
