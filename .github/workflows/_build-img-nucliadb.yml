@@ -24,21 +24,6 @@ on:
         type: string
         required: false
         default: ""
-      platforms:
-        description: "Platforms to build for (default: linux/amd64)"
-        type: string
-        required: false
-        default: "linux/amd64"
-      cache-gha-mode:
-        description: "Parameter `mode` for `cache-from type=gha` (default: max)"
-        type: string
-        required: false
-        default: "max"
-      skip:
-        description: "If `true`, skip everything (default: `false`)."
-        type: boolean
-        required: false
-        default: false
     outputs:
       imageid:
         value: ${{ jobs.build-img.outputs.imageid }}
@@ -74,11 +59,6 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Calculate short sha
-        run: |-
-          HASH=`git rev-parse --short HEAD`
-          echo "SHORT_SHA=$HASH" >> $GITHUB_ENV
 
       - name: Generate a token
         id: app-token
@@ -116,7 +96,7 @@ jobs:
         with:
           file: ${{ inputs.file }}
           image-name: ${{ inputs.image-name }}
-          image-version: ${{ env.SHORT_SHA }}
+          image-version: ${{ inputs.image-version }}
           aws-ecr-role: ${{ secrets.AWS_ECR_ROLE }}
           tag-latest: ${{ github.ref == 'refs/heads/main' && 'latest' || 'dev-latest' }}
           push: true
