@@ -25,7 +25,7 @@ from typing import Any, Awaitable, Optional, Union
 
 from nucliadb.common import datamanagers
 from nucliadb.search import logger
-from nucliadb.search.predict import SendToPredictError, convert_relations
+from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.filters import (
     convert_to_node_filters,
     flatten_filter_literals,
@@ -373,14 +373,7 @@ class QueryParser:
     async def parse_relation_search(self, request: nodereader_pb2.SearchRequest) -> list[str]:
         autofilters = []
         if self.has_relations_search or self.autofilter:
-            if not self.query_endpoint_used:
-                detected_entities = await self.fetcher.get_detected_entities()
-            else:
-                query_info_result = await self._get_query_information()
-                if query_info_result.entities:
-                    detected_entities = convert_relations(query_info_result.entities.model_dump())
-                else:
-                    detected_entities = []
+            detected_entities = await self.fetcher.get_detected_entities()
             meta_cache = await self.fetcher.get_entities_meta_cache()
             detected_entities = expand_entities(meta_cache, detected_entities)
             if self.has_relations_search:

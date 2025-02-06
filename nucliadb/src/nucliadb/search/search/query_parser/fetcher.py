@@ -25,7 +25,7 @@ from typing_extensions import TypeIs
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
-from nucliadb.search.predict import SendToPredictError
+from nucliadb.search.predict import SendToPredictError, convert_relations
 from nucliadb.search.search.metrics import (
     query_parse_dependency_observer,
 )
@@ -66,6 +66,7 @@ class FetcherCache:
 
     entities_meta_cache: Union[datamanagers.entities.EntitiesMetaCache, NotCached] = not_cached
     deleted_entity_groups: Union[list[str], NotCached] = not_cached
+    detected_entities: Union[list[utils_pb2.RelationNode], NotCached] = not_cached
 
 
 class Fetcher:
@@ -254,7 +255,23 @@ class Fetcher:
         return deleted_entity_groups
 
     async def get_detected_entities(self) -> list[utils_pb2.RelationNode]:
-        detected_entities = await self._predict_detect_entities()
+        if is_cached(self.cache.detected_entities):
+            return self.cache.detected_entities
+
+        # Optimization to avoid calling predict twice
+        if is_cached(self.cache.predict_query_info):
+            # /query supersets detect entities, so we already have them
+            query_info = self.cache.predict_query_info
+            if query_info is not None and query_info.entities is not None:
+                detected_entities = convert_relations(query_info.entities.model_dump())
+            else:
+                detected_entities = []
+        else:
+            # No call to /query has been done, we'll use detect entities
+            # endpoint instead (as it's faster)
+            detected_entities = await self._predict_detect_entities()
+
+        self.cache.detected_entities = detected_entities
         return detected_entities
 
     # Synonyms
@@ -272,6 +289,11 @@ class Fetcher:
     async def _predict_query_endpoint(self) -> Optional[QueryInfo]:
         if is_cached(self.cache.predict_query_info):
             return self.cache.predict_query_info
+
+        # calling twice should be avoided as query endpoint is a superset of detect entities
+        if is_cached(self.cache.predict_detected_entities):
+            logger.warning("Fetcher is not being efficient enough and has called predict twice!")
+            raise Exception("Fetcher is not being efficient enough and has called predict twice!")
 
         # we can't call get_vectorset, as it would do a recirsive loop between
         # functions, so we'll manually parse it
