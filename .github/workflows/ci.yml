@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: rustfmt
-        run: cd nidx && cargo fmt --check
+        run: cd nidx && cargo fmt --check --all
 
   nidx-clippy-rust:
     name: "nidx: Clippy lint"
@@ -38,7 +38,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: clippy
-        run: cd nidx && cargo clippy
+        run: cd nidx && cargo clippy --workspace --tests
 
   updated-protos:
     name: "Pre-checks: Protos up-to-date"

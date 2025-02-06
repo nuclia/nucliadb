@@ -268,9 +268,7 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
                 to_start: Some(11),
                 to_end: Some(20),
                 data_augmentation_task_id: Some("mytask".to_string()),
-                ..Default::default()
             }),
-            ..Default::default()
         },
         Relation {
             relation: RelationType::Other as i32,
