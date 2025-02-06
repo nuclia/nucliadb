@@ -22,16 +22,28 @@ import pytest
 
 import nucliadb_sdk
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.tests.fixtures import NucliaFixture
 from nucliadb_sdk.v2.exceptions import ConflictError
 
 
-def test_add_and_delete_vectorset(sdk: nucliadb_sdk.NucliaDB, kb: KnowledgeBoxObj):
+def test_add_and_delete_vectorset(
+    nucliadb: NucliaFixture, sdk: nucliadb_sdk.NucliaDB, kb: KnowledgeBoxObj
+):
     # this test don't have a proper learning mock set up, adding a vectorset
     # involves learning updating learning_config and returning the new semantic
     # model information and, as we can't unittest.patch either, we just test the
     # endpoint respond
 
-    existing_vectorset = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
+    # HACK: as our dummy learning config is kind of terrible, we must know
+    # whether we are starting nucliadb or not to guess the default and do a kind
+    # of useless test
+    if nucliadb.container == "local" and os.environ.get("TEST_LOCAL_NUCLIADB") != "START":
+        existing_vectorset = os.environ.get("TEST_SENTENCE_ENCODER", "multilingual")
+    else:
+        # same as passed as TEST_SENTENCE_ENCODER while starting nucliadb
+        # container (see sdk fixtures)
+        existing_vectorset = "multilingual-2023-02-21"
+
     # can't add an already existing vectorset
     with pytest.raises(ConflictError):
         sdk.add_vector_set(kbid=kb.uuid, vectorset_id=existing_vectorset)
