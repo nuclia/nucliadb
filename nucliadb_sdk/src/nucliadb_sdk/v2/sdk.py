@@ -117,7 +117,7 @@ ASK_STATUS_CODE_ERROR = "-1"
 
 
 @dataclass
-class SDKDefinition:
+class SdkEndpointDefinition:
     method: str
     path_template: str
     path_params: Tuple[str, ...]
@@ -125,273 +125,273 @@ class SDKDefinition:
 
 SDK_DEFINITION = {
     # Knowledge Box Endpoints
-    "create_knowledge_box": SDKDefinition(
+    "create_knowledge_box": SdkEndpointDefinition(
         path_template="/v1/kbs",
         method="POST",
         path_params=(),
     ),
-    "delete_knowledge_box": SDKDefinition(
+    "delete_knowledge_box": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}",
         method="DELETE",
         path_params=("kbid",),
     ),
-    "get_knowledge_box": SDKDefinition(
+    "get_knowledge_box": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}",
         method="GET",
         path_params=("kbid",),
     ),
-    "get_knowledge_box_by_slug": SDKDefinition(
+    "get_knowledge_box_by_slug": SdkEndpointDefinition(
         path_template="/v1/kb/s/{slug}",
         method="GET",
         path_params=("slug",),
     ),
-    "list_knowledge_boxes": SDKDefinition(
+    "list_knowledge_boxes": SdkEndpointDefinition(
         path_template="/v1/kbs",
         method="GET",
         path_params=(),
     ),
     # Resource Endpoints
-    "create_resource": SDKDefinition(
+    "create_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resources",
         method="POST",
         path_params=("kbid",),
     ),
-    "update_resource": SDKDefinition(
+    "update_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}",
         method="PATCH",
         path_params=("kbid", "rid"),
     ),
-    "update_resource_by_slug": SDKDefinition(
+    "update_resource_by_slug": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/slug/{rslug}",
         method="PATCH",
         path_params=("kbid", "rslug"),
     ),
-    "delete_resource": SDKDefinition(
+    "delete_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}",
         method="DELETE",
         path_params=("kbid", "rid"),
     ),
-    "delete_resource_by_slug": SDKDefinition(
+    "delete_resource_by_slug": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/slug/{rslug}",
         method="DELETE",
         path_params=("kbid", "rslug"),
     ),
-    "get_resource_by_slug": SDKDefinition(
+    "get_resource_by_slug": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/slug/{slug}",
         method="GET",
         path_params=("kbid", "slug"),
     ),
-    "get_resource_by_id": SDKDefinition(
+    "get_resource_by_id": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}",
         method="GET",
         path_params=("kbid", "rid"),
     ),
-    "list_resources": SDKDefinition(
+    "list_resources": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resources",
         method="GET",
         path_params=("kbid",),
     ),
     # reindex/reprocess
-    "reindex_resource": SDKDefinition(
+    "reindex_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/reindex",
         method="POST",
         path_params=("kbid", "rid"),
     ),
-    "reindex_resource_by_slug": SDKDefinition(
+    "reindex_resource_by_slug": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/slug/{slug}/reindex",
         method="POST",
         path_params=("kbid", "slug"),
     ),
-    "reprocess_resource": SDKDefinition(
+    "reprocess_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/reprocess",
         method="POST",
         path_params=("kbid", "rid"),
     ),
-    "reprocess_resource_by_slug": SDKDefinition(
+    "reprocess_resource_by_slug": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/slug/{slug}/reprocess",
         method="POST",
         path_params=("kbid", "slug"),
     ),
     # Field endpoints
-    "delete_field_by_id": SDKDefinition(
+    "delete_field_by_id": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
         method="DELETE",
         path_params=("kbid", "rid", "field_type", "field_id"),
     ),
     # Conversation endpoints
-    "add_conversation_message": SDKDefinition(
+    "add_conversation_message": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
         method="PUT",
         path_params=("kbid", "rid", "field_id"),
     ),
-    "get_resource_field": SDKDefinition(
+    "get_resource_field": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
         method="GET",
         path_params=("kbid", "rid", "field_type", "field_id"),
     ),
-    "get_resource_field_by_slug": SDKDefinition(
+    "get_resource_field_by_slug": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/slug/{slug}/{field_type}/{field_id}",
         method="GET",
         path_params=("kbid", "slug", "field_type", "field_id"),
     ),
     # Labels
-    "set_labelset": SDKDefinition(
+    "set_labelset": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/labelset/{labelset}",
         method="POST",
         path_params=("kbid", "labelset"),
     ),
-    "delete_labelset": SDKDefinition(
+    "delete_labelset": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/labelset/{labelset}",
         method="DELETE",
         path_params=("kbid", "labelset"),
     ),
-    "get_labelsets": SDKDefinition(
+    "get_labelsets": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/labelsets",
         method="GET",
         path_params=("kbid",),
     ),
-    "get_labelset": SDKDefinition(
+    "get_labelset": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/labelset/{labelset}",
         method="GET",
         path_params=("kbid", "labelset"),
     ),
     # Entity Groups
-    "create_entitygroup": SDKDefinition(
+    "create_entitygroup": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/entitiesgroups",
         method="POST",
         path_params=("kbid",),
     ),
-    "update_entitygroup": SDKDefinition(
+    "update_entitygroup": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
         method="PATCH",
         path_params=("kbid", "group"),
     ),
-    "delete_entitygroup": SDKDefinition(
+    "delete_entitygroup": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
         method="DELETE",
         path_params=("kbid", "group"),
     ),
-    "get_entitygroups": SDKDefinition(
+    "get_entitygroups": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/entitiesgroups",
         method="GET",
         path_params=("kbid",),
     ),
-    "get_entitygroup": SDKDefinition(
+    "get_entitygroup": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/entitiesgroup/{group}",
         method="GET",
         path_params=("kbid", "group"),
     ),
     # Search / Find Endpoints
-    "find": SDKDefinition(
+    "find": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/find",
         method="POST",
         path_params=("kbid",),
     ),
-    "search": SDKDefinition(
+    "search": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/search",
         method="POST",
         path_params=("kbid",),
     ),
-    "ask": SDKDefinition(
+    "ask": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/ask",
         method="POST",
         path_params=("kbid",),
     ),
-    "ask_on_resource": SDKDefinition(
+    "ask_on_resource": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/ask",
         method="POST",
         path_params=("kbid", "rid"),
     ),
-    "ask_on_resource_by_slug": SDKDefinition(
+    "ask_on_resource_by_slug": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/slug/{slug}/ask",
         method="POST",
         path_params=("kbid", "slug"),
     ),
-    "summarize": SDKDefinition(
+    "summarize": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/summarize",
         method="POST",
         path_params=("kbid",),
     ),
-    "feedback": SDKDefinition(
+    "feedback": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/feedback",
         method="POST",
         path_params=("kbid",),
     ),
-    "start_export": SDKDefinition(
+    "start_export": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/export",
         method="POST",
         path_params=("kbid",),
     ),
-    "export_status": SDKDefinition(
+    "export_status": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/export/{export_id}/status",
         method="GET",
         path_params=("kbid", "export_id"),
     ),
-    "download_export": SDKDefinition(
+    "download_export": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/export/{export_id}",
         method="GET",
         path_params=("kbid", "export_id"),
     ),
-    "create_kb_from_import": SDKDefinition(
+    "create_kb_from_import": SdkEndpointDefinition(
         path_template="/v1/kbs/import",
         method="POST",
         path_params=(),
     ),
-    "start_import": SDKDefinition(
+    "start_import": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/import",
         method="POST",
         path_params=("kbid",),
     ),
-    "import_status": SDKDefinition(
+    "import_status": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/import/{import_id}/status",
         method="GET",
         path_params=("kbid", "import_id"),
     ),
-    "trainset": SDKDefinition(
+    "trainset": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/trainset",
         method="GET",
         path_params=("kbid",),
     ),
     # Learning Configuration
-    "get_configuration": SDKDefinition(
+    "get_configuration": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/configuration",
         method="GET",
         path_params=("kbid",),
     ),
-    "set_configuration": SDKDefinition(
+    "set_configuration": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/configuration",
         method="POST",
         path_params=("kbid",),
     ),
     # Learning models
-    "download_model": SDKDefinition(
+    "download_model": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/models/{model_id}/{filename}",
         method="GET",
         path_params=("kbid", "model_id", "filename"),
     ),
-    "get_models": SDKDefinition(
+    "get_models": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/models",
         method="GET",
         path_params=("kbid",),
     ),
-    "get_model": SDKDefinition(
+    "get_model": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/model/{model_id}",
         method="GET",
         path_params=("kbid", "model_id"),
     ),
     # Learning config schema
-    "get_configuration_schema": SDKDefinition(
+    "get_configuration_schema": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/schema",
         method="GET",
         path_params=("kbid",),
     ),
     # Custom synonyms
-    "set_custom_synonyms": SDKDefinition(
+    "set_custom_synonyms": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/custom-synonyms",
         method="PUT",
         path_params=("kbid",),
     ),
-    "get_custom_synonyms": SDKDefinition(
+    "get_custom_synonyms": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/custom-synonyms",
         method="GET",
         path_params=("kbid",),

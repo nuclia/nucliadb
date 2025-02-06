@@ -1988,6 +1988,11 @@ class SyncAskResponse(BaseModel):
         title="Error details",
         description="Error details message in case there was an error",
     )
+    debug: Optional[dict[str, Any]] = Field(
+        default=None,
+        title="Debug information",
+        description="Debug information about predict",
+    )
 
 
 class RetrievalAskResponseItem(BaseModel):
