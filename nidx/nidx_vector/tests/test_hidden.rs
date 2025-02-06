@@ -21,9 +21,8 @@
 mod common;
 
 use common::{resource, TestOpener};
-use nidx_protos::VectorSearchRequest;
 use nidx_types::query_language::BooleanExpression;
-use nidx_vector::{config::VectorConfig, VectorIndexer, VectorSearcher, VectorsContext};
+use nidx_vector::{config::VectorConfig, VectorIndexer, VectorSearchRequest, VectorSearcher};
 use std::collections::HashSet;
 use tempfile::tempdir;
 
@@ -54,19 +53,15 @@ fn test_hidden_search() -> anyhow::Result<()> {
         config,
         TestOpener::new(vec![(hidden_segment, 1i64.into()), (visible_segment, 2i64.into())], vec![]),
     )?;
-    let request = VectorSearchRequest {
+    let mut request = VectorSearchRequest {
         vector: vec![0.5, 0.5, 0.5, 0.5],
         min_score: -1.0,
         result_per_page: 10,
+        filtering_formula: None,
+        segment_filtering_formula: None,
         ..Default::default()
     };
-    let all = reader.search(
-        &request,
-        &VectorsContext {
-            filtering_formula: None,
-            segment_filtering_formula: None,
-        },
-    )?;
+    let all = reader.search(&request)?;
     assert_eq!(
         HashSet::from_iter(all.documents.into_iter().map(|d| d.doc_id.unwrap().id)),
         HashSet::from([
@@ -76,15 +71,9 @@ fn test_hidden_search() -> anyhow::Result<()> {
     );
 
     // Find only the visible resource
-    let visible = reader.search(
-        &request,
-        &VectorsContext {
-            filtering_formula: None,
-            segment_filtering_formula: Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal(
-                "/q/h".to_string(),
-            )))),
-        },
-    )?;
+    request.segment_filtering_formula =
+        Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/q/h".to_string()))));
+    let visible = reader.search(&request)?;
     assert_eq!(visible.documents.len(), 1);
     assert_eq!(
         visible.documents[0].clone().doc_id.unwrap().id,

@@ -132,7 +132,7 @@ fn blocking_search(
 
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();
-        move || vector_searcher.unwrap().search(&request, &index_queries.vectors_context)
+        move || vector_searcher.unwrap().search(&request)
     });
 
     let mut rtext = None;

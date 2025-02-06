@@ -19,21 +19,19 @@
 //
 
 use nidx_paragraph::ParagraphsContext;
-use nidx_protos::{
-    DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest, VectorSearchRequest,
-};
+use nidx_protos::{DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest};
 use nidx_text::prefilter::*;
 use nidx_text::TextContext;
 use nidx_types::query_language::*;
-use nidx_vector::VectorsContext;
+use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
 
 use super::query_language;
+use super::query_language::QueryAnalysis;
 
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
-    pub vectors_context: VectorsContext,
     pub paragraphs_context: ParagraphsContext,
     pub texts_context: TextContext,
     pub vectors_request: Option<VectorSearchRequest>,
@@ -117,19 +115,12 @@ fn analyze_filter(search_request: &SearchRequest) -> anyhow::Result<query_langua
 }
 
 pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
-    let vectors_request = compute_vectors_request(&search_request);
     let paragraphs_request = compute_paragraphs_request(&search_request);
     let texts_request = compute_texts_request(&search_request);
     let relations_request = compute_relations_request(&search_request);
     let query_analysis = analyze_filter(&search_request)?;
+    let vectors_request = compute_vectors_request(&search_request, &query_analysis);
     let search_query = query_analysis.search_query;
-    let vectors_context = VectorsContext {
-        filtering_formula: search_query.clone(),
-        segment_filtering_formula: query_analysis
-            .labels_prefilter_query
-            .as_ref()
-            .and_then(|e| query_language::extract_label_filters(e, SEGMENT_TAGS)),
-    };
     let paragraphs_context = ParagraphsContext {
         filtering_formula: search_query,
     };
@@ -147,7 +138,6 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
-            vectors_context,
             paragraphs_context,
             texts_context,
             vectors_request,
@@ -269,7 +259,10 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
     })
 }
 
-fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearchRequest> {
+fn compute_vectors_request(
+    search_request: &SearchRequest,
+    query_analysis: &QueryAnalysis,
+) -> Option<VectorSearchRequest> {
     if search_request.result_per_page == 0 || search_request.vector.is_empty() {
         return None;
     }
@@ -288,6 +281,11 @@ fn compute_vectors_request(search_request: &SearchRequest) -> Option<VectorSearc
         paragraph_labels: Vec::with_capacity(0),
         reload: search_request.reload,
         field_filters: search_request.fields.clone(),
+        filtering_formula: query_analysis.search_query.clone(),
+        segment_filtering_formula: query_analysis
+            .labels_prefilter_query
+            .as_ref()
+            .and_then(|e| query_language::extract_label_filters(e, SEGMENT_TAGS)),
     })
 }
 
@@ -326,6 +324,8 @@ mod tests {
                 labels_expression: expression.to_string(),
                 keywords_expression: "".to_string(),
             }),
+            result_per_page: 10,
+            vector: vec![1.0],
             ..Default::default()
         };
         let query_plan = build_query_plan(request).unwrap();
@@ -341,9 +341,9 @@ mod tests {
         assert_eq!(literal, "this");
 
         let index_queries = query_plan.index_queries;
-        let vectors_context = index_queries.vectors_context;
+        let vectors_request = index_queries.vectors_request.unwrap();
         let paragraphs_context = index_queries.paragraphs_context;
-        assert_eq!(vectors_context.filtering_formula, paragraphs_context.filtering_formula);
+        assert_eq!(vectors_request.filtering_formula, paragraphs_context.filtering_formula);
 
         let Some(formula) = paragraphs_context.filtering_formula else {
             panic!("there should be a paragraphs formula")

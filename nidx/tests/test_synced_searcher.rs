@@ -29,10 +29,10 @@ use nidx::{
     metadata::{Index, Shard},
     NidxMetadata,
 };
-use nidx_protos::{IndexMessage, TypeMessage, VectorSearchRequest};
+use nidx_protos::{IndexMessage, TypeMessage};
 use nidx_tests::*;
 use nidx_vector::config::VectorConfig;
-use nidx_vector::VectorSearcher;
+use nidx_vector::{VectorSearchRequest, VectorSearcher};
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
 
@@ -100,7 +100,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     // TODO: Test with shard_search once we have more indexes. We can make IndexSearch enum private again
     let searcher = index_cache.get(&index.id).await?;
     let vector_searcher: &VectorSearcher = searcher.as_ref().into();
-    let result = vector_searcher.search(&search_request, &Default::default())?;
+    let result = vector_searcher.search(&search_request)?;
     assert_eq!(result.documents.len(), 1);
 
     // Delete the resource, it should disappear from results
@@ -118,7 +118,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
 
     let searcher = index_cache.get(&index.id).await?;
     let vector_searcher: &VectorSearcher = searcher.as_ref().into();
-    let result = vector_searcher.search(&search_request, &Default::default())?;
+    let result = vector_searcher.search(&search_request)?;
     assert_eq!(result.documents.len(), 0);
 
     search_task.abort();
