@@ -50,13 +50,6 @@ jobs:
       metadata: ${{ steps.build-image.outputs.metadata }}
 
     steps:
-      - name: Skip everything, if needed.
-        run: |
-          if [[ "${{ inputs.skip }}" == "true" ]]; then
-            echo "Doing nothing because skip=true."
-            exit 0
-          fi
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
