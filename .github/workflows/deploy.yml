@@ -185,11 +185,6 @@ jobs:
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
 
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
       - name: Build and push helm chart
         uses: ./tooling/.github/actions/build-helm-chart
         with:
@@ -256,11 +251,6 @@ jobs:
           VERSION=`cat VERSION`
           VERSION_SHA=$VERSION-${{ steps.env-vars.outputs.short_sha }}
           echo "version_number=$VERSION_SHA" >> $GITHUB_OUTPUT
-
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Build and push helm chart
         uses: ./tooling/.github/actions/build-helm-chart
