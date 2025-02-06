@@ -94,7 +94,7 @@ async def test_find_query_parsing__rank_fusion_limits():
             }
         )
 
-    parsed = parse_find(
+    parsed = await parse_find(
         "kbid", FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=501))
     )
     assert parsed.rank_fusion.window == 500
@@ -121,7 +121,7 @@ async def test_find_query_parsing__reranker(
 
 # ATENTION: if you're changing this test, make sure public models, private
 # models and parsing are change accordingly!
-def test_find_query_parsing__reranker_limits():
+async def test_find_query_parsing__reranker_limits():
     FindRequest.model_validate(
         {
             "reranker": {
@@ -131,12 +131,12 @@ def test_find_query_parsing__reranker_limits():
         }
     )
 
-    parse_find("kbid", FindRequest(reranker=search_models.PredictReranker(window=200)))
+    await parse_find("kbid", FindRequest(reranker=search_models.PredictReranker(window=200)))
 
     with pytest.raises(ValidationError):
         FindRequest.model_validate({"reranker": {"name": "predict", "window": 201}})
 
-    parsed = parse_find(
+    parsed = await parse_find(
         "kbid", FindRequest(reranker=search_models.PredictReranker.model_construct(window=201))
     )
     assert parsed.reranker.window == 200
