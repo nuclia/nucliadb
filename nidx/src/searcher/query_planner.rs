@@ -19,9 +19,9 @@
 //
 
 use nidx_paragraph::ParagraphSearchRequest;
-use nidx_protos::{DocumentSearchRequest, RelationSearchRequest, SearchRequest};
+use nidx_protos::{RelationSearchRequest, SearchRequest};
 use nidx_text::prefilter::*;
-use nidx_text::TextContext;
+use nidx_text::DocumentSearchRequest;
 use nidx_types::query_language::*;
 use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
@@ -32,7 +32,6 @@ use super::query_language::QueryAnalysis;
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
-    pub texts_context: TextContext,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
@@ -114,9 +113,9 @@ fn analyze_filter(search_request: &SearchRequest) -> anyhow::Result<query_langua
 }
 
 pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
-    let texts_request = compute_texts_request(&search_request);
     let relations_request = compute_relations_request(&search_request);
     let query_analysis = analyze_filter(&search_request)?;
+    let texts_request = compute_texts_request(&search_request, &query_analysis);
     let vectors_request = compute_vectors_request(&search_request, &query_analysis);
     let paragraphs_request = compute_paragraphs_request(&search_request, &query_analysis.search_query);
 
@@ -126,14 +125,9 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
         query_analysis.keywords_prefilter_query,
     );
 
-    let texts_context = TextContext {
-        label_filtering_formula: query_analysis.labels_prefilter_query,
-    };
-
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
-            texts_context,
             vectors_request,
             paragraphs_request,
             texts_request,
@@ -226,14 +220,16 @@ fn compute_paragraphs_request(
         key_filters: search_request.key_filters.clone(),
         id: String::default(),
         filter: None,
-        reload: search_request.reload,
         min_score: search_request.min_score_bm25,
         security: search_request.security.clone(),
         filtering_formula: search_query.clone(),
     })
 }
 
-fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearchRequest> {
+fn compute_texts_request(
+    search_request: &SearchRequest,
+    query_analysis: &QueryAnalysis,
+) -> Option<DocumentSearchRequest> {
     if !search_request.document {
         return None;
     }
@@ -252,8 +248,8 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
         advanced_query: search_request.advanced_query.clone(),
         with_status: search_request.with_status,
         filter: search_request.filter.clone(),
-        reload: search_request.reload,
         min_score: search_request.min_score_bm25,
+        label_filtering_formula: query_analysis.labels_prefilter_query.clone(),
     })
 }
 
@@ -277,7 +273,6 @@ fn compute_vectors_request(
         min_score: search_request.min_score_semantic,
         field_labels: Vec::with_capacity(0),
         paragraph_labels: Vec::with_capacity(0),
-        reload: search_request.reload,
         field_filters: search_request.fields.clone(),
         filtering_formula: query_analysis.search_query.clone(),
         segment_filtering_formula: query_analysis

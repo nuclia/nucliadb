@@ -65,30 +65,6 @@ message FacetResults {
     repeated FacetResult facetresults = 1;
 }
 
-
-message DocumentSearchRequest {
-    string id = 1;
-    string body = 2;
-
-    repeated string fields = 3;
-
-    Filter filter = 4;
-    OrderBy order = 5;
-    Faceted faceted = 6;
-
-    int32 page_number = 7;
-    int32 result_per_page = 8;
-
-    Timestamps timestamps = 9;
-
-    bool reload = 10 [deprecated = true];
-    bool only_faceted = 15;
-    optional noderesources.Resource.ResourceStatus with_status = 16;
-    optional string advanced_query = 17;
-
-    float min_score = 18;
-}
-
 message ResultScore {
     float bm25 = 1;
     // In the case of two equal bm25 scores, booster

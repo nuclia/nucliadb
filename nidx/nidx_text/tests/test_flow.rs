@@ -20,9 +20,8 @@
 
 mod common;
 use common::TestOpener;
-use nidx_protos::DocumentSearchRequest;
 use nidx_tests::little_prince;
-use nidx_text::{TextConfig, TextContext, TextIndexer, TextSearcher};
+use nidx_text::{DocumentSearchRequest, TextConfig, TextIndexer, TextSearcher};
 use tempfile::tempdir;
 
 #[test]
@@ -51,13 +50,10 @@ fn test_index_merge_search() -> anyhow::Result<()> {
     // Search on first resource
     let searcher =
         TextSearcher::open(TextConfig::default(), TestOpener::new(vec![(meta1.clone(), 1i64.into())], vec![]))?;
-    let result = searcher.search(
-        &DocumentSearchRequest {
-            result_per_page: 20,
-            ..Default::default()
-        },
-        &TextContext::default(),
-    )?;
+    let result = searcher.search(&DocumentSearchRequest {
+        result_per_page: 20,
+        ..Default::default()
+    })?;
     assert_eq!(result.results.len(), 2);
 
     // Search on both resources
@@ -65,25 +61,19 @@ fn test_index_merge_search() -> anyhow::Result<()> {
         TextConfig::default(),
         TestOpener::new(vec![(meta1, 1i64.into()), (meta2, 2i64.into())], vec![]),
     )?;
-    let result = searcher.search(
-        &DocumentSearchRequest {
-            result_per_page: 20,
-            ..Default::default()
-        },
-        &TextContext::default(),
-    )?;
+    let result = searcher.search(&DocumentSearchRequest {
+        result_per_page: 20,
+        ..Default::default()
+    })?;
     assert_eq!(result.results.len(), 4);
 
     // Search on merged resources
     let searcher =
         TextSearcher::open(TextConfig::default(), TestOpener::new(vec![(merged_meta, 1i64.into())], vec![]))?;
-    let result = searcher.search(
-        &DocumentSearchRequest {
-            result_per_page: 20,
-            ..Default::default()
-        },
-        &TextContext::default(),
-    )?;
+    let result = searcher.search(&DocumentSearchRequest {
+        result_per_page: 20,
+        ..Default::default()
+    })?;
     assert_eq!(result.results.len(), 2);
 
     Ok(())

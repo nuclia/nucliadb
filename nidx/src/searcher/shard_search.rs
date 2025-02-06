@@ -119,7 +119,7 @@ fn blocking_search(
     // Run the rest of the plan
     let text_task = index_queries.texts_request.map(|mut request| {
         request.id = search_id.clone();
-        move || text_searcher.unwrap().search(&request, &index_queries.texts_context)
+        move || text_searcher.unwrap().search(&request)
     });
 
     let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
