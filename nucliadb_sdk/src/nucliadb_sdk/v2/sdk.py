@@ -86,6 +86,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.trainset import TrainSetPartitions
+from nucliadb_models.vectorsets import CreatedVectorSet
 from nucliadb_models.writer import (
     CreateResourcePayload,
     ResourceCreated,
@@ -548,6 +549,25 @@ class _NucliaDBBase:
         path_params=("kbid", "slug", "field_type", "field_id"),
         request_type=None,
         response_type=ResourceField,
+    )
+
+    # Vectorsets
+    add_vector_set = _request_builder(
+        name="add_vector_set",
+        path_template="/v1/kb/{kbid}/vectorsets/{vectorset_id}",
+        method="POST",
+        path_params=("kbid", "vectorset_id"),
+        request_type=None,
+        response_type=CreatedVectorSet,
+    )
+
+    delete_vector_set = _request_builder(
+        name="delete_vector_set",
+        path_template="/v1/kb/{kbid}/vectorsets/{vectorset_id}",
+        method="DELETE",
+        path_params=("kbid", "vectorset_id"),
+        request_type=None,
+        response_type=CreatedVectorSet,
     )
 
     # Labels
