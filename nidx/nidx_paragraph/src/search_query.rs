@@ -18,11 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use crate::query_io;
+use crate::request_types::ParagraphSearchRequest;
 use crate::set_query::SetQuery;
 use itertools::Itertools;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
-use nidx_protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
-use nidx_types::query_language::BooleanExpression;
+use nidx_protos::{StreamRequest, SuggestRequest};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Bound;
@@ -35,14 +35,6 @@ use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::{self, ParagraphSchema};
 use crate::stop_words::is_stop_word;
 type QueryP = (Occur, Box<dyn Query>);
-
-// In an ideal world this should be part of the actual request, but since
-// we use protos all the way down the stack here we are. Once the protos use
-// is restricted to only the upper layer, this type won't be needed anymore.
-#[derive(Clone, Default)]
-pub struct ParagraphsContext {
-    pub filtering_formula: Option<BooleanExpression>,
-}
 
 // Used to identify the terms matched by tantivy
 #[derive(Clone)]
@@ -367,7 +359,6 @@ pub fn search_query(
     text: &str,
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
-    context: &ParagraphsContext,
     distance: u8,
     with_advance: Option<Box<dyn Query>>,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
@@ -429,7 +420,7 @@ pub fn search_query(
     }
 
     // Label filters
-    if let Some(formula) = &context.filtering_formula {
+    if let Some(formula) = &search.filtering_formula {
         let query = query_io::translate_expression(formula, schema);
         fuzzies.push((Occur::Must, query.box_clone()));
         originals.push((Occur::Must, query));

@@ -22,10 +22,7 @@ use std::fmt::Debug;
 use std::time::Instant;
 
 use nidx_protos::order_by::{OrderField, OrderType};
-use nidx_protos::{
-    OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest,
-};
-use search_query::{search_query, suggest_query};
+use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest, SuggestRequest};
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
 use tantivy::{schema::*, DateTime, Order};
@@ -33,8 +30,8 @@ use tantivy::{DocAddress, Index, IndexReader};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
-use crate::search_query::SharedTermC;
-use crate::search_query::{self, ParagraphsContext};
+use crate::request_types::ParagraphSearchRequest;
+use crate::search_query::{search_query, streaming_query, suggest_query, SharedTermC};
 use crate::search_response::{extract_labels, SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
 const FUZZY_DISTANCE: u8 = 1;
@@ -118,16 +115,12 @@ impl ParagraphReaderService {
             paragraph_field: self.schema.paragraph,
             facet_field: self.schema.facets,
             searcher: self.reader.searcher(),
-            query: search_query::streaming_query(&self.schema, request),
+            query: streaming_query(&self.schema, request),
         };
         Ok(producer.flatten())
     }
 
-    pub fn search(
-        &self,
-        request: &ParagraphSearchRequest,
-        context: &ParagraphsContext,
-    ) -> anyhow::Result<ParagraphSearchResponse> {
+    pub fn search(&self, request: &ParagraphSearchRequest) -> anyhow::Result<ParagraphSearchResponse> {
         let time = Instant::now();
         let id = Some(&request.id);
 
@@ -159,7 +152,6 @@ impl ParagraphReaderService {
             &text,
             request,
             &self.schema,
-            context,
             FUZZY_DISTANCE,
             advanced
         );

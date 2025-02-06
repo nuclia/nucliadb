@@ -124,7 +124,7 @@ fn blocking_search(
 
     let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
         request.id = search_id.clone();
-        move || paragraph_searcher.unwrap().search(&request, &index_queries.paragraphs_context)
+        move || paragraph_searcher.unwrap().search(&request)
     });
 
     let relation_task =

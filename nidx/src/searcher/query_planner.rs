@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx_paragraph::ParagraphsContext;
-use nidx_protos::{DocumentSearchRequest, ParagraphSearchRequest, RelationSearchRequest, SearchRequest};
+use nidx_paragraph::ParagraphSearchRequest;
+use nidx_protos::{DocumentSearchRequest, RelationSearchRequest, SearchRequest};
 use nidx_text::prefilter::*;
 use nidx_text::TextContext;
 use nidx_types::query_language::*;
@@ -32,7 +32,6 @@ use super::query_language::QueryAnalysis;
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
-    pub paragraphs_context: ParagraphsContext,
     pub texts_context: TextContext,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
@@ -115,15 +114,11 @@ fn analyze_filter(search_request: &SearchRequest) -> anyhow::Result<query_langua
 }
 
 pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
-    let paragraphs_request = compute_paragraphs_request(&search_request);
     let texts_request = compute_texts_request(&search_request);
     let relations_request = compute_relations_request(&search_request);
     let query_analysis = analyze_filter(&search_request)?;
     let vectors_request = compute_vectors_request(&search_request, &query_analysis);
-    let search_query = query_analysis.search_query;
-    let paragraphs_context = ParagraphsContext {
-        filtering_formula: search_query,
-    };
+    let paragraphs_request = compute_paragraphs_request(&search_request, &query_analysis.search_query);
 
     let prefilter = compute_prefilters(
         &search_request,
@@ -138,7 +133,6 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
-            paragraphs_context,
             texts_context,
             vectors_request,
             paragraphs_request,
@@ -208,7 +202,10 @@ fn compute_timestamp_prefilters(search_request: &SearchRequest) -> Vec<Timestamp
     timestamp_prefilters
 }
 
-fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<ParagraphSearchRequest> {
+fn compute_paragraphs_request(
+    search_request: &SearchRequest,
+    search_query: &Option<BooleanExpression>,
+) -> Option<ParagraphSearchRequest> {
     if !search_request.paragraph {
         return None;
     }
@@ -232,6 +229,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> Option<Paragrap
         reload: search_request.reload,
         min_score: search_request.min_score_bm25,
         security: search_request.security.clone(),
+        filtering_formula: search_query.clone(),
     })
 }
 
@@ -326,6 +324,7 @@ mod tests {
             }),
             result_per_page: 10,
             vector: vec![1.0],
+            paragraph: true,
             ..Default::default()
         };
         let query_plan = build_query_plan(request).unwrap();
@@ -342,10 +341,10 @@ mod tests {
 
         let index_queries = query_plan.index_queries;
         let vectors_request = index_queries.vectors_request.unwrap();
-        let paragraphs_context = index_queries.paragraphs_context;
-        assert_eq!(vectors_request.filtering_formula, paragraphs_context.filtering_formula);
+        let paragraphs_request = index_queries.paragraphs_request.unwrap();
+        assert_eq!(vectors_request.filtering_formula, paragraphs_request.filtering_formula);
 
-        let Some(formula) = paragraphs_context.filtering_formula else {
+        let Some(formula) = paragraphs_request.filtering_formula else {
             panic!("there should be a paragraphs formula")
         };
         let BooleanExpression::Operation(inner_formula) = formula else {
