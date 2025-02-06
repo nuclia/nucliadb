@@ -117,7 +117,6 @@ message ParagraphResult {
 message ParagraphSearchResponse {
     int32 fuzzy_distance = 10;
     int32 total = 1;
-    //
     repeated ParagraphResult results = 2;
 
     // For each field what facets are.
@@ -259,9 +258,6 @@ message SearchRequest {
     optional string advanced_query = 18;
     optional noderesources.Resource.ResourceStatus with_status = 17;
 
-    // if provided, search metadata for this nodes (nodes at distance
-    // one) and get the shortest path between nodes
-    RelationSearchRequest relations = 19 [deprecated = true];
     RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
     repeated string key_filters = 22;
