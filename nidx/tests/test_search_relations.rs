@@ -27,6 +27,7 @@ use common::services::NidxFixture;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
+use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
     EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationMetadata, RelationNode,
@@ -267,9 +268,7 @@ async fn create_knowledge_graph(fixture: &mut NidxFixture, shard_id: String) -> 
                 to_start: Some(11),
                 to_end: Some(20),
                 data_augmentation_task_id: Some("mytask".to_string()),
-                ..Default::default()
             }),
-            ..Default::default()
         },
         Relation {
             relation: RelationType::Other as i32,
@@ -378,7 +377,7 @@ async fn test_search_relations_prefixed(pool: PgPool) -> Result<(), Box<dyn std:
         RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
-                prefix: String::new(),
+                search: Some(Search::Prefix(String::new())),
                 ..Default::default()
             }),
             ..Default::default()
@@ -403,7 +402,7 @@ async fn test_search_relations_prefixed(pool: PgPool) -> Result<(), Box<dyn std:
         RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
-                prefix: "cat".to_string(),
+                search: Some(Search::Prefix("cat".to_string())),
                 node_filters: vec![RelationNodeFilter {
                     node_subtype: None,
                     node_type: NodeType::Entity as i32,
@@ -429,7 +428,7 @@ async fn test_search_relations_prefixed(pool: PgPool) -> Result<(), Box<dyn std:
         RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
-                prefix: "cat".to_string(),
+                search: Some(Search::Prefix("cat".to_string())),
                 node_filters: vec![RelationNodeFilter {
                     node_subtype: Some("animal".to_string()),
                     node_type: NodeType::Entity as i32,
@@ -451,7 +450,7 @@ async fn test_search_relations_prefixed(pool: PgPool) -> Result<(), Box<dyn std:
         RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
-                prefix: "cat".to_string(),
+                search: Some(Search::Prefix("cat".to_string())),
                 node_filters: vec![RelationNodeFilter {
                     node_subtype: Some("superhero".to_string()),
                     node_type: NodeType::Entity as i32,
@@ -477,7 +476,7 @@ async fn test_search_relations_prefixed(pool: PgPool) -> Result<(), Box<dyn std:
         RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
-                prefix: String::new(),
+                search: Some(Search::Prefix(String::new())),
                 node_filters: vec![RelationNodeFilter {
                     node_type: NodeType::Entity as i32,
                     node_subtype: Some("animal".to_string()),
@@ -503,7 +502,7 @@ async fn test_search_relations_prefixed(pool: PgPool) -> Result<(), Box<dyn std:
         RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
-                prefix: "zzz".to_string(),
+                search: Some(Search::Prefix("zzz".to_string())),
                 ..Default::default()
             }),
             ..Default::default()

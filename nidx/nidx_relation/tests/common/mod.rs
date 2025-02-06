@@ -50,6 +50,7 @@ pub fn create_relation(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_relation_with_metadata(
     source: String,
     source_node_type: NodeType,

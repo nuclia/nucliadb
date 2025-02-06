@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: rustfmt
-        run: cd nidx && cargo fmt --check
+        run: cd nidx && cargo fmt --check --all
 
   nidx-clippy-rust:
     name: "nidx: Clippy lint"
@@ -38,7 +38,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: clippy
-        run: cd nidx && cargo clippy
+        run: cd nidx && cargo clippy --workspace --tests
 
   updated-protos:
     name: "Pre-checks: Protos up-to-date"
@@ -181,6 +181,36 @@ jobs:
           fail-on-cache-miss: true
       - name: Check migrations
         run: .venv/bin/nucliadb-validate-migrations
+
+  nidx-tests:
+    name: nidx tests
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 1s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nidx
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
+          SQLX_OFFLINE: true
+        run: cd nidx && cargo test --workspace --all-features
 
   # Builds
   build-nidx-binary:
@@ -432,6 +462,7 @@ jobs:
       - nucliadb-tests
       - nucliadb-components-tests
       - python-packages-tests
+      - nidx-tests
     steps:
       - name: CI passed
         run: echo "CI passed"

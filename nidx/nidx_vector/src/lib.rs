@@ -25,6 +25,7 @@ mod data_types;
 mod formula;
 mod indexer;
 mod query_io;
+mod request_types;
 mod utils;
 mod vector_types;
 
@@ -33,7 +34,7 @@ use data_point::open;
 use data_point_provider::reader::{Reader, TimeSensitiveDLog};
 use data_point_provider::DTrie;
 use indexer::{index_resource, ResourceWrapper};
-use nidx_protos::{Resource, VectorSearchRequest, VectorSearchResponse};
+use nidx_protos::{Resource, VectorSearchResponse};
 use nidx_types::{OpenIndexMetadata, SegmentMetadata};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -41,8 +42,8 @@ use std::path::Path;
 use thiserror::Error;
 use tracing::instrument;
 
-pub use data_point_provider::reader::VectorsContext;
 pub use indexer::SEGMENT_TAGS;
+pub use request_types::VectorSearchRequest;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VectorSegmentMeta {
@@ -136,12 +137,8 @@ impl VectorSearcher {
     }
 
     #[instrument(name = "vector::search", skip_all)]
-    pub fn search(
-        &self,
-        request: &VectorSearchRequest,
-        context: &VectorsContext,
-    ) -> anyhow::Result<VectorSearchResponse> {
-        self.reader.search(request, context)
+    pub fn search(&self, request: &VectorSearchRequest) -> anyhow::Result<VectorSearchResponse> {
+        self.reader.search(request)
     }
 }
 

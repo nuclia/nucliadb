@@ -120,7 +120,7 @@ async def _index_node_retrieval(
             results,
             kbid=kbid,
             query=pb_query.body,
-            relation_subgraph_query=pb_query.relations.subgraph,
+            relation_subgraph_query=pb_query.relation_subgraph,
             min_score_bm25=pb_query.min_score_bm25,
             min_score_semantic=pb_query.min_score_semantic,
             top_k=item.top_k,

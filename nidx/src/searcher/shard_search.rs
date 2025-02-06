@@ -119,12 +119,12 @@ fn blocking_search(
     // Run the rest of the plan
     let text_task = index_queries.texts_request.map(|mut request| {
         request.id = search_id.clone();
-        move || text_searcher.unwrap().search(&request, &index_queries.texts_context)
+        move || text_searcher.unwrap().search(&request)
     });
 
     let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
         request.id = search_id.clone();
-        move || paragraph_searcher.unwrap().search(&request, &index_queries.paragraphs_context)
+        move || paragraph_searcher.unwrap().search(&request)
     });
 
     let relation_task =
@@ -132,7 +132,7 @@ fn blocking_search(
 
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();
-        move || vector_searcher.unwrap().search(&request, &index_queries.vectors_context)
+        move || vector_searcher.unwrap().search(&request)
     });
 
     let mut rtext = None;

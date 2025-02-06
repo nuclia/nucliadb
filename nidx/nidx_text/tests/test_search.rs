@@ -20,10 +20,10 @@
 
 mod common;
 
+use nidx_protos::Faceted;
 use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
-use nidx_protos::{DocumentSearchRequest, Faceted};
-use nidx_text::prefilter::*;
-use nidx_text::{TextContext, TextSearcher};
+use nidx_text::TextSearcher;
+use nidx_text::{prefilter::*, DocumentSearchRequest};
 use nidx_types::query_language::BooleanExpression;
 
 #[test]
@@ -38,7 +38,7 @@ fn test_search_queries() {
             ..Default::default()
         };
 
-        let response = reader.search(&request, &TextContext::default()).unwrap();
+        let response = reader.search(&request).unwrap();
         assert_eq!(response.total, expected, "Failed query: '{}'", query);
 
         assert_eq!(response.total, response.results.len() as i32);
@@ -157,17 +157,11 @@ fn test_filtered_search() {
             body: query.clone(),
             page_number: 0,
             result_per_page: 20,
+            label_filtering_formula: label_filter,
             ..Default::default()
         };
 
-        let response = reader
-            .search(
-                &request,
-                &TextContext {
-                    label_filtering_formula: label_filter,
-                },
-            )
-            .unwrap();
+        let response = reader.search(&request).unwrap();
         assert_eq!(response.total, expected, "Failed query: '{}'", query);
 
         assert_eq!(response.total, response.results.len() as i32);
@@ -194,7 +188,7 @@ fn test_search_by_field() {
         ..Default::default()
     };
 
-    let response = reader.search(&request, &TextContext::default()).unwrap();
+    let response = reader.search(&request).unwrap();
     assert_eq!(response.total, response.results.len() as i32);
     assert_eq!(response.total, 1);
     assert!(!response.next_page);
@@ -212,7 +206,7 @@ fn test_faceted_search() {
             faceted: Some(facets.clone()),
             ..Default::default()
         };
-        let response = reader.search(&request, &TextContext::default()).unwrap();
+        let response = reader.search(&request).unwrap();
         println!("Response: {response:#?}");
         assert_eq!(response.total, expected, "Failed faceted query: '{}'. With facets: {:?}", query, facets);
 
@@ -243,7 +237,7 @@ fn test_quote_fixing() {
             ..Default::default()
         };
 
-        let response = reader.search(&request, &TextContext::default()).unwrap();
+        let response = reader.search(&request).unwrap();
         assert_eq!(response.query, "\"enough test\"");
     }
 
@@ -267,7 +261,7 @@ fn test_search_with_min_score() {
             ..Default::default()
         };
 
-        let response = reader.search(&request, &TextContext::default()).unwrap();
+        let response = reader.search(&request).unwrap();
         assert_eq!(response.results.len() as i32, expected, "Failed query: '{}'", query);
         assert!(!response.next_page);
     }
@@ -297,7 +291,7 @@ fn test_int_order_pagination() {
         ..Default::default()
     };
 
-    let response = reader.search(&request, &TextContext::default()).unwrap();
+    let response = reader.search(&request).unwrap();
     assert_eq!(response.results.len(), 1);
     assert!(response.next_page);
 }

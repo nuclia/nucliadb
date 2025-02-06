@@ -21,13 +21,13 @@
 mod common;
 
 use common::test_reader;
-use nidx_paragraph::{ParagraphSearcher, ParagraphsContext};
+use nidx_paragraph::{ParagraphSearchRequest, ParagraphSearcher};
 use nidx_protos::order_by::OrderField;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
-    Faceted, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, ParagraphSearchRequest, Resource, ResourceId,
-    StreamRequest, TextInformation, Timestamps,
+    Faceted, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId, StreamRequest,
+    TextInformation, Timestamps,
 };
 use nidx_types::query_language::{self, BooleanExpression};
 use std::collections::HashMap;
@@ -165,7 +165,6 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
 
     let resource1 = create_resource("shard1".to_string(), timestamp);
     let paragraph_reader_service = test_reader(&resource1);
-    let context = ParagraphsContext::default();
 
     // Search on all paragraphs faceted
     let search = ParagraphSearchRequest {
@@ -183,7 +182,7 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 4);
     assert_eq!(result.results.len(), 4);
 
@@ -202,7 +201,7 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert!(result.results.is_empty());
     assert_eq!(result.total, 4);
 
@@ -222,10 +221,8 @@ fn test_filtered_search() -> anyhow::Result<()> {
     let resource1 = create_resource("shard1".to_string(), timestamp);
     let paragraph_reader_service = test_reader(&resource1);
 
-    let mut context = ParagraphsContext::default();
-
     // Only one paragraph  matches
-    let search = ParagraphSearchRequest {
+    let mut search = ParagraphSearchRequest {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "".to_string(),
@@ -240,8 +237,8 @@ fn test_filtered_search() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    context.filtering_formula = Some(BooleanExpression::Literal("/tantivy".to_string()));
-    let result = paragraph_reader_service.search(&search, &context).unwrap();
+    search.filtering_formula = Some(BooleanExpression::Literal("/tantivy".to_string()));
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 1);
 
     // Two matches due to OR
@@ -252,8 +249,8 @@ fn test_filtered_search() -> anyhow::Result<()> {
             BooleanExpression::Literal("/label2".to_string()),
         ],
     };
-    context.filtering_formula = Some(BooleanExpression::Operation(expression));
-    let result = paragraph_reader_service.search(&search, &context).unwrap();
+    search.filtering_formula = Some(BooleanExpression::Operation(expression));
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 2);
 
     // No matches due to AND
@@ -264,8 +261,8 @@ fn test_filtered_search() -> anyhow::Result<()> {
             BooleanExpression::Literal("/label2".to_string()),
         ],
     };
-    context.filtering_formula = Some(BooleanExpression::Operation(expression));
-    let result = paragraph_reader_service.search(&search, &context).unwrap();
+    search.filtering_formula = Some(BooleanExpression::Operation(expression));
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 0);
 
     Ok(())
@@ -283,7 +280,6 @@ fn test_new_paragraph() -> anyhow::Result<()> {
 
     let resource1 = create_resource("shard1".to_string(), timestamp);
     let paragraph_reader_service = test_reader(&resource1);
-    let empty_context = ParagraphsContext::default();
     let faceted = Faceted {
         labels: vec!["".to_string(), "/l".to_string(), "/e".to_string(), "/c".to_string()],
     };
@@ -310,7 +306,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 4);
 
     // Search on all paragraphs without fields
@@ -329,7 +325,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 4);
 
     // Search and filter by min_score
@@ -349,7 +345,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         min_score: 30.0,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.results.len(), 0);
 
     // Search on all paragraphs in resource with typo
@@ -368,7 +364,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 1);
 
     // Search on all paragraphs in resource with typo
@@ -387,7 +383,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 1);
 
     // Search typo on all paragraph
@@ -406,7 +402,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 1);
 
     // Search with invalid and unbalanced grammar
@@ -425,7 +421,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.query, "\"shoupd + enaugh\"");
     assert_eq!(result.total, 0);
 
@@ -445,7 +441,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.query, "\"shoupd + enaugh\"");
     assert_eq!(result.total, 0);
 
@@ -465,7 +461,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 4);
 
     // Search filter all paragraphs
@@ -484,7 +480,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 3);
 
     // Search typo on all paragraph
@@ -503,7 +499,7 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         only_faceted: false,
         ..Default::default()
     };
-    let result = paragraph_reader_service.search(&search, &empty_context).unwrap();
+    let result = paragraph_reader_service.search(&search).unwrap();
     assert_eq!(result.total, 0);
 
     let request = StreamRequest {
@@ -543,8 +539,7 @@ fn test_search_paragraph_with_timestamps() -> anyhow::Result<()> {
             only_faceted: false,
             ..Default::default()
         };
-        let context = ParagraphsContext::default();
-        let result = paragraph_reader_service.search(&search, &context).unwrap();
+        let result = paragraph_reader_service.search(&search).unwrap();
         result.total
     }
 
