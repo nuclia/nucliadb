@@ -23,4 +23,5 @@ from . import knowledgebox  # noqa
 from . import learning_config  # noqa
 from . import resource  # noqa
 from . import services  # noqa
+from . import vectorsets  # noqa
 from .router import api  # noqa
