@@ -199,38 +199,143 @@ async def _test_search_request_with_security(
             f"/kb/{kbid}/find",
             json=payload,
         )
-        assert resp.status_code == 200, resp.text
-        search_response = resp.json()
-        resource_ids = search_response["resources"]
-
     elif search_endpoint == "find_get":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/find",
             params=params,
         )
-        assert resp.status_code == 200, resp.text
-        search_response = resp.json()
-        resource_ids = search_response["resources"]
-
     elif search_endpoint == "search_post":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/search",
             json=payload,
         )
-        assert resp.status_code == 200, resp.text
-        search_response = resp.json()
-        resource_ids = search_response["resources"]
-
     elif search_endpoint == "search_get":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/search",
             params=params,
         )
-        assert resp.status_code == 200, resp.text
-        search_response = resp.json()
-        resource_ids = search_response["resources"]
-
     elif search_endpoint == "ask_post":
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            json=payload,
+        )
+    else:
+        raise ValueError(f"Unknown search endpoint: {search_endpoint}")
+
+    assert resp.status_code == 200, resp.text
+    search_response = resp.json()
+    assert len(search_response["resources"]) == len(expected_resources)
+    assert set(search_response["resources"]) == set(expected_resources)
+
+
+@pytest.mark.parametrize("ask_endpoint", ("ask_post",))
+async def test_resource_security_ask(
+    nucliadb_reader,
+    nucliadb_writer,
+    knowledgebox,
+    resource_with_security,
+    ask_endpoint,
+):
+    kbid = knowledgebox
+    resource_id = resource_with_security
+    support_group = "support"
+    # Add another group to the resource
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{resource_id}",
+        json={
+            "security": {
+                "access_groups": [PLATFORM_GROUP, DEVELOPERS_GROUP, support_group],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Querying without security should return the resource
+    await _test_ask_request_with_security(
+        ask_endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[resource_id],
+    )
+
+    # Querying with security groups should return the resource
+    for access_groups in (
+        [DEVELOPERS_GROUP],
+        [PLATFORM_GROUP],
+        [support_group],
+        [PLATFORM_GROUP, DEVELOPERS_GROUP],
+        # Adding an unknown group should not affect the result, as
+        # the index is returning the union of results for each group
+        [DEVELOPERS_GROUP, "some-unknown-group"],
+    ):
+        await _test_ask_request_with_security(
+            ask_endpoint,
+            nucliadb_reader,
+            kbid,
+            query="resource",
+            security_groups=access_groups,
+            expected_resources=[resource_id],
+        )
+
+    # Querying with an unknown security group should not return the resource
+    await _test_ask_request_with_security(
+        ask_endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=["some-unknown-group"],
+        expected_resources=[],
+    )
+
+    # Make it public now
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{resource_id}",
+        json={
+            "security": {
+                "access_groups": [],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Wait for the tantivy index to be updated. This is expected as we are using
+    # the bindings and the tantivy reader is not notified in the same process.
+    await asyncio.sleep(1)
+
+    # Querying with an unknown security group should return the resource now, as it is public
+    await _test_ask_request_with_security(
+        ask_endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=["blah-blah"],
+        expected_resources=[resource_id],
+    )
+
+
+async def _test_ask_request_with_security(
+    ask_endpoint: str,
+    nucliadb_reader,
+    kbid: str,
+    query: str,
+    security_groups: Optional[list[str]],
+    expected_resources: list[str],
+):
+    payload = {
+        "query": query,
+    }
+    if security_groups:
+        payload["security"] = {"groups": security_groups}  # type: ignore
+
+    params = {
+        "query": query,
+    }
+    if security_groups:
+        params["security_groups"] = security_groups  # type: ignore
+
+    if ask_endpoint == "ask_post":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/ask", json=payload, headers={"x_synchronous": "true"}
         )
@@ -245,7 +350,7 @@ async def _test_search_request_with_security(
                 resource_ids = list(search_response["resources"].keys())
                 break
     else:
-        raise ValueError(f"Unknown search endpoint: {search_endpoint}")
+        raise ValueError(f"Unknown search endpoint: {ask_endpoint}")
 
     assert len(resource_ids) == len(expected_resources)
     assert set(resource_ids) == set(expected_resources)
