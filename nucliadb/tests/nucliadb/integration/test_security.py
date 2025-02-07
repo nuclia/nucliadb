@@ -19,18 +19,12 @@
 #
 import asyncio
 import json
-from enum import Enum
 from typing import Optional
 
 import pytest
 
 PLATFORM_GROUP = "platform"
 DEVELOPERS_GROUP = "developers"
-
-
-class SecurityInjectionType(Enum):
-    PAYLOAD = 0
-    HEADERS = 1
 
 
 @pytest.fixture(scope="function")
@@ -232,9 +226,6 @@ async def _test_search_request_with_security(
     assert set(search_response["resources"]) == set(expected_resources)
 
 
-@pytest.mark.parametrize(
-    "security_injection", (SecurityInjectionType.PAYLOAD, SecurityInjectionType.HEADERS)
-)
 @pytest.mark.parametrize("ask_endpoint", ("ask_post",))
 async def test_resource_security_ask(
     nucliadb_reader,
@@ -242,7 +233,6 @@ async def test_resource_security_ask(
     knowledgebox,
     resource_with_security,
     ask_endpoint,
-    security_injection,
 ):
     kbid = knowledgebox
     resource_id = resource_with_security
@@ -266,7 +256,6 @@ async def test_resource_security_ask(
         query="resource",
         security_groups=None,
         expected_resources=[resource_id],
-        security_injection=security_injection,
     )
 
     # Querying with security groups should return the resource
@@ -286,7 +275,6 @@ async def test_resource_security_ask(
             query="resource",
             security_groups=access_groups,
             expected_resources=[resource_id],
-            security_injection=security_injection,
         )
 
     # Querying with an unknown security group should not return the resource
@@ -297,7 +285,6 @@ async def test_resource_security_ask(
         query="resource",
         security_groups=["some-unknown-group"],
         expected_resources=[],
-        security_injection=security_injection,
     )
 
     # Make it public now
@@ -323,7 +310,6 @@ async def test_resource_security_ask(
         query="resource",
         security_groups=["blah-blah"],
         expected_resources=[resource_id],
-        security_injection=security_injection,
     )
 
 
@@ -334,17 +320,13 @@ async def _test_ask_request_with_security(
     query: str,
     security_groups: Optional[list[str]],
     expected_resources: list[str],
-    security_injection: SecurityInjectionType,
 ):
     payload = {
         "query": query,
     }
     headers = {"x_synchronous": "true"}
-    if security_groups and security_injection is SecurityInjectionType.PAYLOAD:
+    if security_groups:
         payload["security"] = {"groups": security_groups}  # type: ignore
-
-    if security_groups and security_injection is SecurityInjectionType.HEADERS:
-        headers["x-nucliadb-security-groups"] = ";".join(security_groups)
 
     if ask_endpoint == "ask_post":
         resp = await nucliadb_reader.post(f"/kb/{kbid}/ask", json=payload, headers=headers)
