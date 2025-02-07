@@ -42,36 +42,19 @@ pub struct IndexQueries {
 
 impl IndexQueries {
     fn apply_to_vectors(request: &mut VectorSearchRequest, response: &ValidFieldCollector) {
-        let ValidFieldCollector::Some(valid_fields) = &response else {
+        let ValidFieldCollector::Some(_) = &response else {
             return;
         };
-        // Add vectors key filters
-        for valid_field in valid_fields {
-            let resource_id = &valid_field.resource_id;
-            let field_id = &valid_field.field_id;
-            let as_vectors_key = format!("{}{field_id}", resource_id.simple());
-            request.key_filters.push(as_vectors_key);
-        }
+
         // Clear labels to avoid duplicate filtering
         request.field_labels.clear();
     }
 
-    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
-        if matches!(response.valid_fields, ValidFieldCollector::All) {
+    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &ValidFieldCollector) {
+        if matches!(response, ValidFieldCollector::All) {
             // Since all the fields are matching there is no need to use this filter.
             request.timestamps = None;
         }
-        let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
-            return;
-        };
-
-        // // Add key filters
-        // for valid_field in valid_fields {
-        //     let resource_id = &valid_field.resource_id;
-        //     let field_id = &valid_field.field_id;
-        //     let unique_field_key = format!("{resource_id}{field_id}");
-        //     request.key_filters.push(unique_field_key);
-        // }
     }
 
     /// When a pre-filter is run, the result can be used to modify the queries
@@ -92,9 +75,9 @@ impl IndexQueries {
             IndexQueries::apply_to_vectors(vectors_request, &self.prefilter_results);
         };
 
-        // if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
-        //     paragraph_request.key_filters = self.prefilter_results.as_ref();
-        // }
+        if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
+            IndexQueries::apply_to_paragraphs(paragraph_request, &self.prefilter_results);
+        }
     }
 }
 
@@ -270,7 +253,6 @@ fn compute_vectors_request(
         page_number: search_request.page_number,
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
-        key_filters: search_request.key_filters.clone(),
         min_score: search_request.min_score_semantic,
         field_labels: Vec::with_capacity(0),
         paragraph_labels: Vec::with_capacity(0),

@@ -67,11 +67,14 @@ fn test_basic_search(
     // Search near one specific vector
     let reader = VectorSearcher::open(config.clone(), TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))?;
     let search_for = sentence(5);
-    let results = reader.search(&VectorSearchRequest {
-        vector: search_for.vector,
-        result_per_page: 10,
-        ..Default::default()
-    })?;
+    let results = reader.search(
+        &VectorSearchRequest {
+            vector: search_for.vector,
+            result_per_page: 10,
+            ..Default::default()
+        },
+        &nidx_types::prefilter::ValidFieldCollector::All,
+    )?;
 
     assert_eq!(results.documents.len(), 10);
     assert_eq!(results.documents[0].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-5"));
@@ -84,11 +87,14 @@ fn test_basic_search(
     vector[43] = 0.7;
     vector[44] = 0.5;
     vector[45] = 0.3;
-    let results = reader.search(&VectorSearchRequest {
-        vector,
-        result_per_page: 10,
-        ..Default::default()
-    })?;
+    let results = reader.search(
+        &VectorSearchRequest {
+            vector,
+            result_per_page: 10,
+            ..Default::default()
+        },
+        &nidx_types::prefilter::ValidFieldCollector::All,
+    )?;
 
     assert_eq!(results.documents.len(), 10);
     assert_eq!(results.documents[0].doc_id.as_ref().unwrap().id, format!("{id}/a/title/0-42"));
