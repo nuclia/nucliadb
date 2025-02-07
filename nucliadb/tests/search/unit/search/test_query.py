@@ -38,8 +38,6 @@ from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.utils_pb2 import RelationNode
 
-QUERY_MODULE = "nucliadb.search.search.query"
-
 
 def test_parse_entities_to_filters():
     detected_entities = [
@@ -65,7 +63,10 @@ def test_parse_entities_to_filters():
 @pytest.fixture()
 def kbdm(read_only_txn):
     kbdm = unittest.mock.AsyncMock()
-    with unittest.mock.patch(f"{QUERY_MODULE}.datamanagers.kb", kbdm):
+    with (
+        unittest.mock.patch(f"nucliadb.search.search.query.datamanagers.kb", kbdm),
+        unittest.mock.patch(f"nucliadb.search.search.query_parser.fetcher.datamanagers.kb", kbdm),
+    ):
         yield kbdm
 
 
@@ -91,7 +92,7 @@ class TestApplySynonymsToRequest:
             min_score=MinScore(semantic=0.5),
             with_synonyms=True,
         )
-        with patch("nucliadb.search.search.query.get_kb_synonyms", get_synonyms):
+        with patch("nucliadb.search.search.query_parser.fetcher.get_kb_synonyms", get_synonyms):
             yield qp
 
     async def test_not_applies_if_empty_body(self, query_parser: QueryParser, get_synonyms):
@@ -176,11 +177,11 @@ class TestVectorSetAndMatryoshkaParsing:
 
         with (
             patch(
-                "nucliadb.search.search.query.datamanagers.vectorsets.exists",
+                "nucliadb.search.search.query_parser.fetcher.datamanagers.vectorsets.exists",
                 new=AsyncMock(return_value=(vectorset is not None)),
             ),
             patch(
-                "nucliadb.search.search.query.get_matryoshka_dimension_cached",
+                "nucliadb.search.search.query_parser.fetcher.get_matryoshka_dimension_cached",
                 new=AsyncMock(return_value=matryoshka_dimension),
             ),
             patch("nucliadb.common.datamanagers.utils.get_driver"),

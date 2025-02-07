@@ -260,7 +260,7 @@ async def query_parser_from_find_request(
     # XXX this is becoming the new /find query parsing, this should be moved to
     # a cleaner abstraction
 
-    parsed = parse_find(item)
+    parsed = await parse_find(kbid, item)
 
     rank_fusion = get_rank_fusion(parsed.rank_fusion)
     reranker = get_reranker(parsed.reranker)
