@@ -18,75 +18,71 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import nats
 from httpx import AsyncClient
-from nats.aio.client import Client
-from nats.js import JetStreamContext
+from pytest_mock import MockerFixture
 
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_protos.audit_pb2 import AuditRequest
 
 
-async def get_audit_messages(sub):
-    msg = await sub.fetch(1)
-    auditreq = AuditRequest()
-    auditreq.ParseFromString(msg[0].data)
-    return auditreq
-
-
-async def test_ask_sends_only_one_audit(
-    cluster_nucliadb_search: AsyncClient, test_search_resource: str, stream_audit
+async def test_ask_receives_injected_security_groups(
+    cluster_nucliadb_search: AsyncClient, test_search_resource: str, mocker: MockerFixture
 ) -> None:
-    from nucliadb_utils.settings import audit_settings
+    from nucliadb.search.api.v1 import ask
+    from nucliadb_models.search import AskRequest
 
     kbid = test_search_resource
 
-    # Prepare a test audit stream to receive our messages
-    partition = stream_audit.get_partition(kbid)
-    nats_client: Client = await nats.connect(stream_audit.nats_servers)
-    jetstream: JetStreamContext = nats_client.jetstream()
-    if audit_settings.audit_jetstream_target is None:
-        assert False, "Missing jetstream target in audit settings"
-    subject = audit_settings.audit_jetstream_target.format(partition=partition, type="*")
+    spy = mocker.spy(ask, "create_ask_response")
 
-    try:
-        await jetstream.delete_stream(name=audit_settings.audit_stream)
-        await jetstream.delete_stream(name="test_usage")
-    except nats.js.errors.NotFoundError:
-        pass
+    # Test security groups only on authorizer headers
+    resp = await cluster_nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/ask",
+        json={"query": "title"},
+        headers={"x-nucliadb-security-groups": "group1;group2"},
+    )
+    assert resp.status_code == 200
+    spy.assert_called_once()
+    ask_request = spy.call_args[1]
+    assert isinstance(ask_request, AskRequest)
+    assert ask_request.security is not None
+    assert set(ask_request.security.groups) == {"group1", "group2"}
+    spy.reset_mock()
 
-    await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
+    # Test security groups only on payload
+    resp = await cluster_nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/ask",
+        json={"query": "title", "security_groups": ["group1", "group2"]},
+    )
+    assert resp.status_code == 200
+    spy.assert_called_once()
+    ask_request = spy.call_args[1]
+    assert isinstance(ask_request, AskRequest)
+    assert ask_request.security is not None
+    assert set(ask_request.security.groups) == {"group1", "group2"}
+    spy.reset_mock()
 
-    psub = await jetstream.pull_subscribe(subject, "psub")
+    # Test security groups on headers override payload
+    resp = await cluster_nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/ask",
+        headers={"x-nucliadb-security-groups": "group1;group2"},
+        json={"query": "title", "security_groups": ["group3", "group4"]},
+    )
+    assert resp.status_code == 200
+    spy.assert_called_once()
+    ask_request = spy.call_args[1]
+    assert isinstance(ask_request, AskRequest)
+    assert ask_request.security is not None
+    assert set(ask_request.security.groups) == {"group1", "group2"}
+    spy.reset_mock()
 
+    # Test no security groups
     resp = await cluster_nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/ask",
         json={"query": "title"},
     )
     assert resp.status_code == 200
-
-    # Testing the middleware integration where it collects audit calls and sends a single message
-    # at requests ends. In this case we expect one seach and one chat sent once
-    stream_audit.search.assert_called_once()
-    stream_audit.chat.assert_called_once()
-    assert stream_audit.js.publish.call_count == 2
-    stream_audit.send.assert_called_once()
-
-    auditreq = await get_audit_messages(psub)
-    assert auditreq.type == AuditRequest.AuditType.CHAT
-    assert auditreq.kbid == kbid
-    assert auditreq.HasField("chat")
-    assert auditreq.HasField("search")
-    assert auditreq.request_time > 0
-    assert auditreq.generative_answer_time > 0
-    assert auditreq.retrieval_time > 0
-    assert (auditreq.generative_answer_time + auditreq.retrieval_time) < auditreq.request_time
-    try:
-        auditreq = await get_audit_messages(psub)
-    except nats.errors.TimeoutError:
-        pass
-    else:
-        assert "There was an unexpected extra audit message in nats"
-    await psub.unsubscribe()
-    await nats_client.flush()
-    await nats_client.close()
+    spy.assert_called_once()
+    ask_request = spy.call_args[1]
+    assert isinstance(ask_request, AskRequest)
+    assert ask_request.security is None
+    spy.reset_mock()
