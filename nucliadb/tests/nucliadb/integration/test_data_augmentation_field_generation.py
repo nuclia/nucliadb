@@ -177,10 +177,11 @@ async def test_send_to_process_generated_fields(
     assert "/g/da/author" in index_message.texts[f"t/{da_field}"].labels
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_data_augmentation_field_generation_and_search(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     kbid = knowledgebox
@@ -226,7 +227,7 @@ async def test_data_augmentation_field_generation_and_search(
     field_metadata.field.CopyFrom(field_id_pb)
     field_metadata.metadata.metadata.paragraphs.append(Paragraph(start=0, end=25))
     bm.field_metadata.append(field_metadata)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Data augmentation broker message
     bm = BrokerMessage()
@@ -237,7 +238,7 @@ async def test_data_augmentation_field_generation_and_search(
     bm.texts[da_field_id].body = "Text author"
     bm.texts[da_field_id].md5 = hashlib.md5("Text author".encode()).hexdigest()
     bm.texts[da_field_id].generated_by.data_augmentation.SetInParent()
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Processed DA resource (from processing)
     bm = BrokerMessage()
@@ -261,7 +262,7 @@ async def test_data_augmentation_field_generation_and_search(
     field_metadata.field.CopyFrom(da_field_id_pb)
     field_metadata.metadata.metadata.paragraphs.append(Paragraph(start=0, end=28))
     bm.field_metadata.append(field_metadata)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Now validate we can search and filter out data augmentation fields
     resp = await nucliadb_reader.post(

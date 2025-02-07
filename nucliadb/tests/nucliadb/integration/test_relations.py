@@ -33,7 +33,7 @@ from tests.utils import inject_message
 
 @pytest.fixture
 async def resource_with_bm_relations(
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
@@ -51,11 +51,12 @@ async def resource_with_bm_relations(
     bm.kbid = knowledgebox
     bm.uuid = rid
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     yield rid, "text1"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_api_aliases(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -91,6 +92,7 @@ async def test_api_aliases(
     assert "from_" not in body["extracted"]["metadata"]["metadata"]["relations"][0]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_broker_message_relations(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -138,8 +140,9 @@ async def test_broker_message_relations(
     assert len(body["extracted"]["metadata"]["metadata"]["relations"]) == 1
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_extracted_relations(
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,

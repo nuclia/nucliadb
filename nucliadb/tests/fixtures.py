@@ -121,19 +121,13 @@ async def pinecone_knowledgebox(nucliadb_manager: AsyncClient, pinecone_mock):
 
 
 @pytest.fixture(scope="function")
-async def nucliadb_grpc(nucliadb: Settings):
-    stub = WriterStub(aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}"))
-    return stub
-
-
-@pytest.fixture(scope="function")
 async def nucliadb_train(nucliadb: Settings):
     stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))
     return stub
 
 
 @pytest.fixture(scope="function")
-async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, knowledgebox):
+async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: WriterStub, knowledgebox):
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         json={
@@ -286,7 +280,7 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStu
     bm.uuid = rid
     bm.kbid = knowledgebox
     bm.relations.extend(edges)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 
     resp = await nucliadb_writer.post(

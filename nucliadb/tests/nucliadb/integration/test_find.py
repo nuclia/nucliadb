@@ -39,10 +39,11 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from tests.utils import inject_message
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_with_label_changes(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
@@ -109,6 +110,7 @@ async def test_find_with_label_changes(
     assert len(body["resources"]) == 1
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_does_not_support_fulltext_search(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -127,10 +129,11 @@ async def test_find_does_not_support_fulltext_search(
     assert "fulltext search not supported" in resp.json()["detail"][0]["msg"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_resource_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
@@ -181,6 +184,7 @@ async def test_find_resource_filters(
         assert rid in body["resources"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_min_score(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -207,6 +211,7 @@ async def test_find_min_score(
     assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.5}
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_story_7286(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -265,6 +270,7 @@ async def test_story_7286(
     assert len(body["resources"]) == 0
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_marks_fuzzy_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -323,6 +329,7 @@ def check_fuzzy_paragraphs(find_response, *, fuzzy_result: bool, n_expected: int
     assert found == n_expected
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_returns_best_matches(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb,
@@ -360,6 +367,7 @@ def find_with_limits_exceeded_error():
         yield
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_handles_limits_exceeded_error(
     nucliadb_reader, knowledgebox, find_with_limits_exceeded_error
 ):
@@ -373,6 +381,7 @@ async def test_find_handles_limits_exceeded_error(
     assert resp.json() == {"detail": "over the quota"}
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_keyword_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -469,6 +478,7 @@ async def test_find_keyword_filters(
             ), f"Keyword filters: {keyword_filters}, expected rids: {expected_rids}"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_highlight(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
@@ -496,10 +506,11 @@ async def test_find_highlight(
     assert "<mark>Marcus</mark> Aurelius" in match["text"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_fields_parameter(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     text = "This is a text"
@@ -537,7 +548,7 @@ async def test_find_fields_parameter(
     evw.vectors.vectors.vectors.append(vector)
     bm.field_vectors.append(evw)
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Semantic search only on text fields should work
     for fields_param, expected_n_resources in [

@@ -19,6 +19,7 @@
 #
 import dataclasses
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
@@ -46,10 +47,11 @@ class FieldData:
     vector: tuple[str, list[float]]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_paragraph_index_deletions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     # Prepare data for a resource with title, summary and a text field
@@ -122,7 +124,7 @@ async def test_paragraph_index_deletions(
     # Inject corresponding broker message as if it was coming from the processor
     bmb = BrokerMessageBuilder(kbid=knowledgebox, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
     bm = prepare_broker_message(bmb, title_field, summary_field, text_field)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()  # wait until changes are searchable
 
     # Check that searching for original texts does not return any results
@@ -179,7 +181,7 @@ async def test_paragraph_index_deletions(
     # Inject broker message with the modified text
     bmb = BrokerMessageBuilder(kbid=knowledgebox, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
     bm = prepare_broker_message(bmb, title_field, summary_field, text_field)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()  # wait until changes are searchable
 
     # Check that searching for the first extracted text now doesn't return the

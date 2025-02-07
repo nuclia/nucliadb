@@ -29,10 +29,11 @@ from nucliadb_models.internal.predict import (
 from tests.utils.predict import predict_query_hook
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_autofilters_are_returned(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    knowledgebox: str,
     knowledge_graph,
     mocked_predict,
 ):

@@ -48,8 +48,9 @@ from tests.utils.vectorsets import add_vectorset
 MODULE = "nucliadb.writer.api.v1.vectorsets"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_vectorsets_crud(
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
@@ -97,7 +98,7 @@ async def test_vectorsets_crud(
             ],
         ):
             # Add the vectorset
-            resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            resp = await nucliadb_writer.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 201, resp.text
 
             # Check that the vectorset has been created with the correct configuration
@@ -124,7 +125,7 @@ async def test_vectorsets_crud(
             ],
         ):
             # Delete the vectorset
-            resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            resp = await nucliadb_writer.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 204, resp.text
 
             # Check that the vectorset has been deleted
@@ -145,7 +146,7 @@ async def test_vectorsets_crud(
             ],
         ):
             # Deleting your last vectorset is not allowed
-            resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/multilingual")
+            resp = await nucliadb_writer.delete(f"/kb/{kbid}/vectorsets/multilingual")
             assert resp.status_code == 409, resp.text
             assert "Deletion of your last vectorset is not allowed" in resp.json()["detail"]
 
@@ -156,7 +157,7 @@ async def test_vectorsets_crud(
             ],
         ):
             # But deleting twice is okay
-            resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            resp = await nucliadb_writer.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             # XXX: however, we get the same error as before due to our lazy
             # check strategy. This shuold be a 200
             assert resp.status_code == 409, resp.text
@@ -170,14 +171,15 @@ async def test_vectorsets_crud(
             ],
         ):
             # Add and delete the vectorset again
-            resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            resp = await nucliadb_writer.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 201, resp.text
-            resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+            resp = await nucliadb_writer.delete(f"/kb/{kbid}/vectorsets/{vectorset_id}")
             assert resp.status_code == 204, resp.text
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_learning_config_errors_are_proxied_correctly(
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
     kbid = knowledgebox
@@ -187,20 +189,21 @@ async def test_learning_config_errors_are_proxied_correctly(
             status_code=500, content="Learning Internal Server Error"
         ),
     ):
-        resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/foo")
+        resp = await nucliadb_writer.post(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
         assert resp.json() == {"detail": "Learning Internal Server Error"}
 
-        resp = await nucliadb_manager.delete(f"/kb/{kbid}/vectorsets/foo")
+        resp = await nucliadb_writer.delete(f"/kb/{kbid}/vectorsets/foo")
         assert resp.status_code == 500
         assert resp.json() == {"detail": "Learning Internal Server Error"}
 
 
 @pytest.mark.parametrize("bwc_with_default_vectorset", [True, False])
+@pytest.mark.deploy_modes("standalone")
 async def test_vectorset_migration(
-    nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_writer_manager: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     bwc_with_default_vectorset: bool,
 ):
@@ -210,7 +213,7 @@ async def test_vectorset_migration(
     """
 
     # Create a KB
-    resp = await nucliadb_manager.post(
+    resp = await nucliadb_writer_manager.post(
         "/kbs",
         json={
             "title": "migrationexamples",
@@ -275,7 +278,7 @@ async def test_vectorset_migration(
     bmb.add_field_builder(link_field)
     bm = bmb.build()
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Make a search and check that the document is found
     await _check_search(nucliadb_reader, kbid)
@@ -283,7 +286,7 @@ async def test_vectorset_migration(
     # Now add a new vectorset
     vectorset_id = "en-2024-05-06"
     resp = await add_vectorset(
-        nucliadb_manager, kbid, vectorset_id, similarity=SimilarityFunction.COSINE, vector_dimension=1024
+        nucliadb_writer, kbid, vectorset_id, similarity=SimilarityFunction.COSINE, vector_dimension=1024
     )
     assert resp.status_code == 201
 
@@ -309,7 +312,7 @@ async def test_vectorset_migration(
     ev.vectors.vectors.vectors.append(vector)
     bm2.field_vectors.append(ev)
 
-    await inject_message(nucliadb_grpc, bm2)
+    await inject_message(nucliadb_ingest_grpc, bm2)
 
     # Make a search with the new vectorset and check that the document is found
     await _check_search(nucliadb_reader, kbid, vectorset="en-2024-05-06")

@@ -24,7 +24,7 @@ from httpx import AsyncClient
 
 @pytest.fixture(scope="function")
 async def philosophy_books_kb(
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
 ):
     payloads = [
@@ -181,7 +181,7 @@ async def philosophy_books_kb(
         },
     ]
 
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "philosophy-books"})
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": "philosophy-books"})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -194,5 +194,5 @@ async def philosophy_books_kb(
 
     yield kbid
 
-    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
     assert resp.status_code == 200

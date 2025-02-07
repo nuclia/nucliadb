@@ -45,7 +45,8 @@ from tests.utils import inject_message
 
 
 @pytest.fixture(scope="function")
-async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebox):
+@pytest.mark.deploy_modes("standalone")
+async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer, knowledgebox):
     messages = []
     for i in range(1, 301):
         messages.append(
@@ -108,11 +109,12 @@ async def resource_with_conversation(nucliadb_grpc, nucliadb_writer, knowledgebo
         fmw.metadata.split_metadata[split].paragraphs.append(paragraph)
     bm.field_metadata.append(fmw)
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     yield rid
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_conversations(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -151,6 +153,7 @@ async def test_conversations(
     assert msgs[-1]["type"] == MessageType.ANSWER.value
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_extracted_text_is_serialized_properly(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -169,6 +172,7 @@ async def test_extracted_text_is_serialized_properly(
     assert extracted.text.split_text["2"] == "Split text 2"  # type: ignore
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_conversations(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -205,7 +209,8 @@ async def test_find_conversations(
     assert paragraphs[f"{rid}/c/faq/2/0-12"].text == "Split text 2"
 
 
-async def test_cannot_create_message_ident_0(nucliadb_grpc, nucliadb_writer, knowledgebox):
+@pytest.mark.deploy_modes("standalone")
+async def test_cannot_create_message_ident_0(nucliadb_ingest_grpc, nucliadb_writer, knowledgebox):
     messages = [
         # model_construct skips validation, to test the API error
         InputMessage.model_construct(

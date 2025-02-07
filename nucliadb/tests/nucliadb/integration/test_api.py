@@ -62,8 +62,9 @@ from tests.writer.test_fields import (
 )
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_kb_creation_allows_setting_learning_configuration(
-    nucliadb_manager,
+    nucliadb_writer_manager,
     nucliadb_reader,
     onprem_nucliadb,
 ):
@@ -85,7 +86,7 @@ async def test_kb_creation_allows_setting_learning_configuration(
         )
 
         # Check that we can define it to a different semantic model
-        resp = await nucliadb_manager.post(
+        resp = await nucliadb_writer_manager.post(
             f"/kbs",
             json={
                 "title": "My KB with english semantic model",
@@ -101,10 +102,11 @@ async def test_kb_creation_allows_setting_learning_configuration(
         )
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_creation(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_train: TrainStub,
     knowledgebox,
 ):
@@ -151,7 +153,7 @@ async def test_creation(
     bm.uuid = rid
     bm.kbid = knowledgebox
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata",
@@ -223,19 +225,23 @@ async def test_creation(
     assert len(resp.content) > 0
 
 
-async def test_can_create_knowledgebox_with_colon_in_slug(nucliadb_manager: AsyncClient):
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "something:else"})
+@pytest.mark.deploy_modes("standalone")
+async def test_can_create_knowledgebox_with_colon_in_slug(
+    nucliadb_writer_manager: AsyncClient, nucliadb_reader_manager: AsyncClient
+):
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": "something:else"})
     assert resp.status_code == 201
 
-    resp = await nucliadb_manager.get(f"/kbs")
+    resp = await nucliadb_reader_manager.get(f"/kbs")
     assert resp.status_code == 200
     assert resp.json()["kbs"][0]["slug"] == "something:else"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_serialize_errors(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     """
@@ -281,7 +287,7 @@ async def test_serialize_errors(
         )
         br.errors.append(error)
 
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{br.uuid}",
@@ -295,10 +301,11 @@ async def test_serialize_errors(
         assert resp_json["data"][ftypestring][fid]["error"]["code"] == 1
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_entitygroups(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     await wait_for_sync()
@@ -333,10 +340,11 @@ async def test_entitygroups(
     assert resp.status_code == 400
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_extracted_shortened_metadata(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     """
@@ -378,7 +386,7 @@ async def test_extracted_shortened_metadata(
 
     br.field_metadata.append(fcmw)
 
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     # TODO: Remove ner and positions once fields are removed
     cropped_fields = ["ner", "positions", "relations", "classifications"]
@@ -420,6 +428,7 @@ async def test_extracted_shortened_metadata(
         ("Invalid&Character", True),
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_field_ids_are_validated(
     nucliadb_writer: AsyncClient,
     knowledgebox: str,
@@ -444,6 +453,7 @@ async def test_field_ids_are_validated(
         assert resp.status_code == 201
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_extra(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -520,6 +530,7 @@ async def test_extra(
     assert resp.json()["extra"] == extra
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -559,6 +570,7 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
         ("foo/bar", False),  # with slash
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_validation(nucliadb_writer, nucliadb_reader, knowledgebox, slug, valid):
     resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resources", json={"slug": slug})
     if valid:
@@ -572,6 +584,7 @@ async def test_resource_slug_validation(nucliadb_writer, nucliadb_reader, knowle
         assert f"Invalid slug: '{slug}'" in detail["msg"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -603,10 +616,11 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
     assert resp.json()["icon"] == "text/plain"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_language_metadata(
     nucliadb_writer,
     nucliadb_reader,
-    nucliadb_grpc,
+    nucliadb_ingest_grpc,
     knowledgebox,
 ):
     kbid = knowledgebox
@@ -639,7 +653,7 @@ async def test_language_metadata(
     fcmw.metadata.split_metadata["foo"].language = "it"
     bm.field_metadata.append(fcmw)
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{uuid}", params={"show": ["basic"]})
     assert resp.status_code == 200
@@ -673,6 +687,7 @@ async def test_language_metadata(
     assert res["metadata"]["languages"] == []
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_story_7081(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -704,10 +719,11 @@ async def test_story_7081(
     assert data["origin"]["metadata"]["some"] == "data"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_question_answer(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     # create a new resource
@@ -749,7 +765,7 @@ async def test_question_answer(
     message.uuid = rid
     message.kbid = knowledgebox
 
-    await inject_message(nucliadb_grpc, message)
+    await inject_message(nucliadb_ingest_grpc, message)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=extracted&extracted=question_answers",
@@ -780,10 +796,11 @@ async def test_question_answer(
     }
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_question_answer_annotations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     qa_annotation = metadata.QuestionAnswerAnnotation(
@@ -834,6 +851,7 @@ async def test_question_answer_annotations(
     assert resource.fieldmetadata[0].question_answers[0] == qa_annotation  # type: ignore
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_link_fields_store_css_selector(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -873,6 +891,7 @@ async def test_link_fields_store_css_selector(
     assert css_selector == "main"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_link_fields_store_xpath(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -912,6 +931,7 @@ async def test_link_fields_store_xpath(
     assert xpath == "my_xpath"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_dates_are_properly_validated(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -949,9 +969,10 @@ async def test_dates_are_properly_validated(
     assert resp.json()["origin"]["created"] == "0001-01-01T00:00:00Z"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_file_computed_titles_are_set_on_resource_title(
     nucliadb_writer,
-    nucliadb_grpc,
+    nucliadb_ingest_grpc,
     nucliadb_reader,
     knowledgebox,
 ):
@@ -986,7 +1007,7 @@ async def test_file_computed_titles_are_set_on_resource_title(
     fed.field = "email"
     fed.title = extracted_title
     bm.file_extracted_data.append(fed)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Check that the resource title changed
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
@@ -1024,7 +1045,7 @@ async def test_file_computed_titles_are_set_on_resource_title(
     fed.field = "email"
     fed.title = extracted_title
     bm.file_extracted_data.append(fed)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Check that the resource title changed
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}")
@@ -1034,6 +1055,7 @@ async def test_file_computed_titles_are_set_on_resource_title(
     assert title == "Something else"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_jsonl_text_field(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -1075,6 +1097,7 @@ async def test_jsonl_text_field(
     assert data["icon"] == "application/x-ndjson"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_extract_strategy_on_fields(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,

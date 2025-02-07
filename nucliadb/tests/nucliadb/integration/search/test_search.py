@@ -50,10 +50,11 @@ from nucliadb_utils.utilities import (
 from tests.utils import broker_resource, inject_message
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_simple_search_sc_2062(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     # PUBLIC API
@@ -137,15 +138,18 @@ async def create_resource_with_duplicates(knowledgebox, writer: WriterStub, sent
     return bm.uuid
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_filters_out_duplicate_paragraphs(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
-    await create_resource_with_duplicates(knowledgebox, nucliadb_grpc, sentence="My own text Ramon. ")
     await create_resource_with_duplicates(
-        knowledgebox, nucliadb_grpc, sentence="Another different paragraph with text"
+        knowledgebox, nucliadb_ingest_grpc, sentence="My own text Ramon. "
+    )
+    await create_resource_with_duplicates(
+        knowledgebox, nucliadb_ingest_grpc, sentence="Another different paragraph with text"
     )
 
     query = "text"
@@ -168,14 +172,15 @@ async def test_search_filters_out_duplicate_paragraphs(
     assert len(content["paragraphs"]["results"]) == 4
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_returns_paragraph_positions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     sentence = "My own text Ramon."
-    await create_resource_with_duplicates(knowledgebox, nucliadb_grpc, sentence=sentence)
+    await create_resource_with_duplicates(knowledgebox, nucliadb_ingest_grpc, sentence=sentence)
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
     assert resp.status_code == 200
     content = resp.json()
@@ -239,14 +244,15 @@ def broker_resource_with_classifications(knowledgebox):
     return bm
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_returns_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     bm = broker_resource_with_classifications(knowledgebox)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/search?query=Some",
@@ -258,16 +264,17 @@ async def test_search_returns_labels(
     assert par["labels"] == ["labelset1/label2", "labelset1/label1"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_with_filters(
     nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     # Inject a resource with a pdf icon
     bm = broker_resource(knowledgebox)
     bm.basic.icon = "application/pdf"
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Check that filtering by pdf icon returns it
     resp = await nucliadb_reader.get(
@@ -284,10 +291,11 @@ async def test_search_with_filters(
     assert len(resp.json()["resources"]) == 0
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_paragraph_search_with_filters(
     nucliadb_writer,
     nucliadb_reader,
-    nucliadb_grpc,
+    nucliadb_ingest_grpc,
     knowledgebox,
 ):
     kbid = knowledgebox
@@ -321,6 +329,7 @@ async def test_paragraph_search_with_filters(
 
 
 @pytest.mark.skip(reason="Needs sc-5626")
+@pytest.mark.deploy_modes("standalone")
 async def test_(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -367,13 +376,14 @@ async def test_(
     assert intro_to_python in resources
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_returns_sentence_positions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
-    await inject_resource_with_a_sentence(knowledgebox, nucliadb_grpc)
+    await inject_resource_with_a_sentence(knowledgebox, nucliadb_ingest_grpc)
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/search", json=dict(query="my own text", min_score=-1)
     )
@@ -436,10 +446,11 @@ async def inject_resource_with_a_sentence(knowledgebox, writer):
     await inject_message(writer, bm)
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
     knowledge_graph,
 ):
@@ -570,6 +581,7 @@ async def test_search_relations(
             assert expected_relation in entities[entity]["related_to"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_automatic_relations(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
 ):
@@ -794,6 +806,7 @@ async def get_audit_messages(sub):
     return auditreq
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_sends_audit(
     nucliadb_reader,
     knowledgebox,
@@ -839,6 +852,7 @@ async def test_search_sends_audit(
 
 
 @pytest.mark.parametrize("endpoint", ["search", "find"])
+@pytest.mark.deploy_modes("standalone")
 async def test_search_endpoints_handle_predict_errors(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -862,7 +876,7 @@ async def test_search_endpoints_handle_predict_errors(
 
 
 async def create_dummy_resources(
-    nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub, kbid, n=10, start=0
+    nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: WriterStub, kbid, n=10, start=0
 ):
     payloads = [
         {
@@ -903,24 +917,24 @@ async def create_dummy_resources(
         message.field_vectors.append(ev)
         message.source = BrokerMessage.MessageSource.PROCESSOR
 
-        await inject_message(nucliadb_grpc, message)
+        await inject_message(nucliadb_ingest_grpc, message)
 
 
 @pytest.fixture(scope="function")
 async def kb_with_one_logic_shard(
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
 ):
-    resp = await nucliadb_manager.post("/kbs", json={})
+    resp = await nucliadb_writer_manager.post("/kbs", json={})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
-    await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=10)
+    await create_dummy_resources(nucliadb_writer, nucliadb_ingest_grpc, kbid, n=10)
 
     yield kbid
 
-    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
     assert resp.status_code == 200
 
 
@@ -933,37 +947,38 @@ def max_shard_paragraphs():
 @pytest.fixture(scope="function")
 async def kb_with_two_logic_shards(
     max_shard_paragraphs,
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
 ):
     sc = shard_creator.ShardCreatorHandler(
         driver=get_driver(),
         storage=await get_storage(),
         pubsub=None,  # type: ignore
     )
-    resp = await nucliadb_manager.post("/kbs", json={})
+    resp = await nucliadb_writer_manager.post("/kbs", json={})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
-    await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=8)
+    await create_dummy_resources(nucliadb_writer, nucliadb_ingest_grpc, kbid, n=8)
 
     # trigger creating new shard manually here
     sc.shard_manager.should_create_new_shard = Mock(return_value=True)  # type: ignore
     await sc.process_kb(kbid)
 
-    await create_dummy_resources(nucliadb_writer, nucliadb_grpc, kbid, n=10, start=8)
+    await create_dummy_resources(nucliadb_writer, nucliadb_ingest_grpc, kbid, n=10, start=8)
 
     yield kbid
 
-    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
     assert resp.status_code == 200
 
 
 @pytest.mark.flaky(reruns=5)
+@pytest.mark.deploy_modes("standalone")
 async def test_search_two_logic_shards(
     nucliadb_reader: AsyncClient,
-    nucliadb_manager: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
     kb_with_one_logic_shard,
     kb_with_two_logic_shards,
 ):
@@ -971,11 +986,11 @@ async def test_search_two_logic_shards(
     kbid2 = kb_with_two_logic_shards
 
     # Check that they have one and two logic shards, respectively
-    resp = await nucliadb_manager.get(f"kb/{kbid1}/shards")
+    resp = await nucliadb_reader_manager.get(f"kb/{kbid1}/shards")
     assert resp.status_code == 200
     assert len(resp.json()["shards"]) == 1
 
-    resp = await nucliadb_manager.get(f"kb/{kbid2}/shards")
+    resp = await nucliadb_reader_manager.get(f"kb/{kbid2}/shards")
     assert resp.status_code == 200
     assert len(resp.json()["shards"]) == 2
 
@@ -1000,6 +1015,7 @@ async def test_search_two_logic_shards(
     assert len(content1["sentences"]["results"]) == len(content2["sentences"]["results"])
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_min_score(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1044,6 +1060,7 @@ async def test_search_min_score(
         (["/a/b", "/a/be"], True, ""),
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_facets_validation(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1066,6 +1083,7 @@ async def test_facets_validation(
                 assert error_message in resp.json()["detail"][0]["msg"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_marks_fuzzy_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1122,10 +1140,11 @@ def check_fuzzy_paragraphs(search_response, *, fuzzy_result: bool, n_expected: i
     assert found == n_expected
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_by_path_filter(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     paths = ["/foo", "foo/bar", "foo/bar/1", "foo/bar/2", "foo/bar/3", "foo/bar/4"]
@@ -1168,6 +1187,7 @@ async def test_search_by_path_filter(
     assert len(resp.json()["resources"]) == 1
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
     resp = await nucliadb_reader.get(
         "/kb/00000000000000/search?query=own+text",
@@ -1175,6 +1195,7 @@ async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
     assert resp.status_code == 404
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledgebox):
     kb = knowledgebox
     # If query is not present, should not fail
@@ -1187,6 +1208,7 @@ async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledg
         assert resp.status_code == 200
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_with_duplicates(nucliadb_reader, knowledgebox):
     kb = knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/search?with_duplicates=True")
@@ -1205,6 +1227,7 @@ def search_with_limits_exceeded_error():
         yield
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_handles_limits_exceeded_error(
     nucliadb_reader, knowledgebox, search_with_limits_exceeded_error
 ):
@@ -1218,6 +1241,7 @@ async def test_search_handles_limits_exceeded_error(
     assert resp.json() == {"detail": "over the quota"}
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_catalog_post(
     nucliadb_reader: AsyncClient,
     knowledgebox,
@@ -1248,6 +1272,7 @@ def not_debug():
     running_settings.debug = prev
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_api_does_not_show_tracebacks_on_api_errors(not_debug, nucliadb_reader: AsyncClient):
     with mock.patch(
         "nucliadb.search.api.v1.search.search",
@@ -1258,6 +1283,7 @@ async def test_api_does_not_show_tracebacks_on_api_errors(not_debug, nucliadb_re
         assert resp.json() == {"detail": "Something went wrong, please contact your administrator"}
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_catalog_pagination(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1309,6 +1335,7 @@ async def test_catalog_pagination(
     assert len(resource_uuids) == n_resources
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_catalog_date_range_filtering(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -1350,10 +1377,11 @@ async def test_catalog_date_range_filtering(
     assert len(body["resources"]) == 0
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_catalog_faceted(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     valid_status = ["PROCESSED", "PENDING", "ERROR"]
@@ -1363,7 +1391,7 @@ async def test_catalog_faceted(
             continue
         bm = broker_resource(knowledgebox)
         bm.basic.metadata.status = status_value
-        await inject_message(nucliadb_grpc, bm)
+        await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog?faceted=/metadata.status",
@@ -1378,10 +1406,11 @@ async def test_catalog_faceted(
         assert count == 1
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_catalog_faceted_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     # 4 resources:
@@ -1395,14 +1424,14 @@ async def test_catalog_faceted_labels(
             c.labelset = f"labelset0"
             c.label = f"label{label}"
             bm.basic.usermetadata.classifications.append(c)
-            await inject_message(nucliadb_grpc, bm)
+            await inject_message(nucliadb_ingest_grpc, bm)
 
     bm = broker_resource(knowledgebox)
     c = rpb.Classification()
     c.labelset = "labelset1"
     c.label = "label0"
     bm.basic.usermetadata.classifications.append(c)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog?faceted=/classification.labels/labelset0",
@@ -1430,10 +1459,11 @@ async def test_catalog_faceted_labels(
     }
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_catalog_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     valid_status = ["PROCESSED", "PENDING", "ERROR"]
@@ -1443,7 +1473,7 @@ async def test_catalog_filters(
             continue
         bm = broker_resource(knowledgebox)
         bm.basic.metadata.status = status_value
-        await inject_message(nucliadb_grpc, bm)
+        await inject_message(nucliadb_ingest_grpc, bm)
 
     # No filters
     resp = await nucliadb_reader.get(

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
+from httpx import AsyncClient
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb_utils.settings import nuclia_settings
@@ -40,10 +41,11 @@ def nuclia_jwt_key():
     yield
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_external_file_field(
     nuclia_jwt_key,
-    nucliadb_reader,
-    nucliadb_writer,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
     # Create a resource

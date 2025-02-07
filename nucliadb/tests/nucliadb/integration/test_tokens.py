@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
 from httpx import AsyncClient
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_metadata_tokens_cancelled_by_the_user_sc_3775(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

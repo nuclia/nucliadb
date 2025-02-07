@@ -39,9 +39,8 @@ class KbSpecs:
 
 @pytest.fixture(scope="function")
 async def kb_with_vectorset(
-    nucliadb_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ) -> AsyncIterable[KbSpecs]:
     # Now knowledgeboxes in standalone are already created with a single vectorset.
@@ -50,7 +49,7 @@ async def kb_with_vectorset(
     vectorset_id = "multilingual"
     vectorset_dimension = 512
     await inject_broker_message_with_vectorset_data(
-        nucliadb_grpc,
+        nucliadb_ingest_grpc,
         kbid,
         vectorset_id,
         vectorset_dimension=vectorset_dimension,
@@ -64,7 +63,7 @@ async def kb_with_vectorset(
 
 
 async def inject_broker_message_with_vectorset_data(
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     kbid: str,
     vectorset_id: str,
     *,
@@ -83,4 +82,4 @@ async def inject_broker_message_with_vectorset_data(
         default_vectorset_dimension=default_vector_dimension,
         vectorset_dimension=vectorset_dimension,
     )
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)

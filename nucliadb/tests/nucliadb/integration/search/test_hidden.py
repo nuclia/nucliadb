@@ -27,25 +27,28 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource_with_title_paragraph, inject_message
 
 
-async def create_resource(kbid, nucliadb_grpc):
+async def create_resource(kbid: str, nucliadb_ingest_grpc: WriterStub):
     message = broker_resource_with_title_paragraph(kbid)
-    await inject_message(nucliadb_grpc, message)
+    await inject_message(nucliadb_ingest_grpc, message)
     return message.uuid
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_hidden_search(
     app_context,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    nucliadb_manager: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_writer_manager: AsyncClient,
     knowledgebox: str,
 ):
-    resp = await nucliadb_manager.patch(f"/kb/{knowledgebox}", json={"hidden_resources_enabled": True})
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{knowledgebox}", json={"hidden_resources_enabled": True}
+    )
     assert resp.status_code == 200
 
-    r1 = await create_resource(knowledgebox, nucliadb_grpc)
-    r2 = await create_resource(knowledgebox, nucliadb_grpc)
+    r1 = await create_resource(knowledgebox, nucliadb_ingest_grpc)
+    r2 = await create_resource(knowledgebox, nucliadb_ingest_grpc)
 
     # Both resources appear in searches
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search")

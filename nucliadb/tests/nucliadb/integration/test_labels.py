@@ -20,6 +20,7 @@
 import uuid
 from datetime import datetime
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import (
@@ -163,10 +164,11 @@ async def inject_resource_with_paragraph_labels(knowledgebox, writer):
     return bm.uuid
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_labels_global(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc,
+    nucliadb_ingest_grpc,
     knowledgebox,
 ):
     # PUBLIC API
@@ -188,12 +190,13 @@ async def test_labels_global(
     assert len(resp.json()["labelsets"]) == 1
     assert resp.json()["labelsets"]["label1"]["multiple"] is False
 
-    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
+    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_ingest_grpc)
 
     resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resource/{rid}/reindex")
     assert resp.status_code == 200
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_classification_labels_cancelled_by_the_user(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -238,13 +241,14 @@ async def test_classification_labels_cancelled_by_the_user(
     assert content["resources"][rid]["usermetadata"]["classifications"][0] == expected_label
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_classification_labels_are_shown_in_resource_basic(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc,
+    nucliadb_ingest_grpc,
     knowledgebox,
 ):
-    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
+    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_ingest_grpc)
 
     classifications = [Classification(labelset="labelset1", label="label1")]
 
@@ -309,6 +313,7 @@ def test_add_field_classifications():
     )
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_fieldmetadata_classification_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

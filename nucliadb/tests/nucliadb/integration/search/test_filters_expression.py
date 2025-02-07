@@ -18,8 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
+from httpx import AsyncClient
 
-async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgebox):
+
+@pytest.mark.deploy_modes("standalone")
+async def test_filtering_expression(
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox: str
+):
     kbid = knowledgebox
 
     slug_to_uuid = {}
@@ -91,7 +97,10 @@ async def test_filtering_expression(nucliadb_reader, nucliadb_writer, knowledgeb
         assert found_uuids == expected_uuids
 
 
-async def test_filtering_expression_validation(nucliadb_reader, nucliadb_writer):
+@pytest.mark.deploy_modes("standalone")
+async def test_filtering_expression_validation(
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient
+):
     # Make sure we only allow one operator per filter
     resp = await nucliadb_reader.post(
         f"/kb/foobar/find",

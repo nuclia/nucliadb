@@ -61,10 +61,11 @@ DEFAULT_VECTOR_DIMENSION = 512
 VECTORSET_DIMENSION = 12
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     kb_with_vectorset: KbSpecs,
 ):
     kbid = kb_with_vectorset.kbid
@@ -113,11 +114,12 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     "vectorset,expected",
     [(None, "multilingual"), ("", "multilingual"), ("myvectorset", "myvectorset")],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_vectorset_parameter_without_default_vectorset(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
-    vectorset,
-    expected,
+    vectorset: Optional[str],
+    expected: str,
 ):
     kbid = knowledgebox
 
@@ -172,6 +174,7 @@ async def test_vectorset_parameter_without_default_vectorset(
     "vectorset,expected",
     [(None, "multilingual"), ("", "multilingual"), ("myvectorset", "myvectorset")],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_vectorset_parameter_with_default_vectorset(
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
@@ -221,6 +224,7 @@ async def test_vectorset_parameter_with_default_vectorset(
         assert calls[-1].vectorset == expected
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_querying_kb_with_vectorsets(
     mocker: MockerFixture,
     storage: Storage,
@@ -228,7 +232,7 @@ async def test_querying_kb_with_vectorsets(
     shard_manager,
     learning_config,
     indexing_utility,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     dummy_predict: DummyPredictEngine,
 ):
@@ -288,7 +292,7 @@ async def test_querying_kb_with_vectorsets(
     rid = uuid.uuid4().hex
     field_id = "my-field"
     bm = create_broker_message_with_vectorsets(kbid, rid, field_id, [("model", 768)])
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     with (
         patch.dict(utils.METHODS, {utils.Method.SEARCH: query_shard_wrapper}, clear=True),
@@ -356,7 +360,7 @@ async def test_querying_kb_with_vectorsets(
     bm = create_broker_message_with_vectorsets(
         kbid, rid, field_id, [("model-A", 768), ("model-B", 1024)]
     )
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     with (
         patch.dict(utils.METHODS, {utils.Method.SEARCH: query_shard_wrapper}, clear=True),

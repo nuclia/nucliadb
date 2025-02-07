@@ -262,7 +262,7 @@ def broker_message_with_labels(kbid):
     return bm
 
 
-async def create_test_labelsets(nucliadb_writer, kbid: str):
+async def create_test_labelsets(nucliadb_writer: AsyncClient, kbid: str):
     for kind, _label in (
         (LabelSetKind.RESOURCES, ClassificationLabels.RESOURCE_ANNOTATED),
         (LabelSetKind.RESOURCES, ClassificationLabels.FIELD_DETECTED),
@@ -282,16 +282,17 @@ async def create_test_labelsets(nucliadb_writer, kbid: str):
 
 @pytest.fixture(scope="function")
 async def kbid(
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_writer,
     knowledgebox,
 ):
     await create_test_labelsets(nucliadb_writer, knowledgebox)
-    await inject_message(nucliadb_grpc, broker_message_with_entities(knowledgebox))
-    await inject_message(nucliadb_grpc, broker_message_with_labels(knowledgebox))
+    await inject_message(nucliadb_ingest_grpc, broker_message_with_entities(knowledgebox))
+    await inject_message(nucliadb_ingest_grpc, broker_message_with_labels(knowledgebox))
     return knowledgebox
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_filtering_before_and_after_reindexing(
     app_context, nucliadb_reader: AsyncClient, kbid: str
 ):

@@ -41,15 +41,16 @@ from tests.utils import inject_message
     disable_gc=True,
     warmup=False,
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_search_returns_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
     asyncbenchmark: AsyncBenchmarkFixture,
 ):
     bm = broker_resource_with_classifications(knowledgebox)
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await asyncbenchmark(
         nucliadb_reader.get,
@@ -67,10 +68,11 @@ async def test_search_returns_labels(
     disable_gc=True,
     warmup=False,
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
     knowledge_graph,
     asyncbenchmark: AsyncBenchmarkFixture,

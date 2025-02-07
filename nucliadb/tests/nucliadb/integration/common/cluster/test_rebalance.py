@@ -37,11 +37,12 @@ async def app_context(natsd, storage, nucliadb):
     await ctx.finalize()
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_rebalance_kb_shards(
     app_context,
     knowledgebox,
     nucliadb_writer: AsyncClient,
-    nucliadb_manager: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
 ):
     count = 10
     for i in range(count):
@@ -60,8 +61,8 @@ async def test_rebalance_kb_shards(
         )
         assert resp.status_code == 201
 
-    counters1_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/counters")
-    shards1_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    counters1_resp = await nucliadb_reader_manager.get(f"/kb/{knowledgebox}/counters")
+    shards1_resp = await nucliadb_reader_manager.get(f"/kb/{knowledgebox}/shards")
     counters1 = counters1_resp.json()
     shards1 = shards1_resp.json()
 
@@ -70,7 +71,7 @@ async def test_rebalance_kb_shards(
     with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
         await rebalance.rebalance_kb(app_context, knowledgebox)
 
-    shards2_resp = await nucliadb_manager.get(f"/kb/{knowledgebox}/shards")
+    shards2_resp = await nucliadb_reader_manager.get(f"/kb/{knowledgebox}/shards")
     shards2 = shards2_resp.json()
     assert len(shards2["shards"]) == 2
 

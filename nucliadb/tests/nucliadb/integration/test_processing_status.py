@@ -38,13 +38,14 @@ from tests.utils import broker_resource, inject_message
         ),
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_endpoint_set_resource_status_to_pending(
     endpoint,
     expected_status,
     payload,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     """
@@ -57,7 +58,7 @@ async def test_endpoint_set_resource_status_to_pending(
     br.texts["text"].CopyFrom(
         rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
     )
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     # Receive message from processor
     br.source = BrokerMessage.MessageSource.PROCESSOR
@@ -66,7 +67,7 @@ async def test_endpoint_set_resource_status_to_pending(
     etw.field.field = "text"
     etw.field.field_type = rpb.FieldType.TEXT
     br.extracted_text.append(etw)
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}")
     assert resp.status_code == 200
@@ -86,15 +87,16 @@ async def test_endpoint_set_resource_status_to_pending(
     assert resp_json["metadata"]["status"] == "PENDING"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_field_status_errors_processor(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     # Create a resource, processing
     br = broker_resource(knowledgebox)
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
     assert resp.status_code == 200
@@ -116,7 +118,7 @@ async def test_field_status_errors_processor(
             code=Error.ErrorCode.EXTRACT,
         )
     )
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
     assert resp.status_code == 200
@@ -128,7 +130,7 @@ async def test_field_status_errors_processor(
 
     # Receive message from processor without errors, previous errors are cleared
     br.errors.pop()
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
     assert resp.status_code == 200
@@ -139,10 +141,11 @@ async def test_field_status_errors_processor(
     assert "errors" not in resp_json["data"]["generics"]["summary"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_field_status_errors_data_augmentation(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
 ):
     # Create a resource, processing
@@ -150,7 +153,7 @@ async def test_field_status_errors_data_augmentation(
     br.texts["text"].CopyFrom(
         rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
     )
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
     assert resp.status_code == 200
@@ -169,7 +172,7 @@ async def test_field_status_errors_data_augmentation(
     etw.field.field = "text"
     etw.field.field_type = rpb.FieldType.TEXT
     br.extracted_text.append(etw)
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
     assert resp.status_code == 200
@@ -191,7 +194,7 @@ async def test_field_status_errors_data_augmentation(
     g.data_augmentation.SetInParent()
     br.generated_by.pop()
     br.generated_by.append(g)
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
     assert resp.status_code == 200
@@ -203,7 +206,7 @@ async def test_field_status_errors_data_augmentation(
 
     # Receive message from data augmentation without errors
     br.errors.pop()
-    await inject_message(nucliadb_grpc, br)
+    await inject_message(nucliadb_ingest_grpc, br)
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}?show=basic&show=errors")
     assert resp.status_code == 200

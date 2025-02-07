@@ -22,6 +22,8 @@ import random
 import uuid
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import (
@@ -37,8 +39,12 @@ from tests.ingest.fixtures import make_extracted_text
 from tests.utils import inject_message
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_purge_vectorsets__kb_with_vectorsets(
-    maindb_driver: Driver, storage: Storage, nucliadb_grpc: WriterStub, knowledgebox_with_vectorsets: str
+    maindb_driver: Driver,
+    storage: Storage,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox_with_vectorsets: str,
 ):
     kbid = knowledgebox_with_vectorsets
     vectorset_id = "my-semantic-model-A"
@@ -46,7 +52,7 @@ async def test_purge_vectorsets__kb_with_vectorsets(
     resource_count = 5
     for i in range(resource_count):
         bm = await create_broker_message_with_vectorset(kbid, maindb_driver)
-        await inject_message(nucliadb_grpc, bm)
+        await inject_message(nucliadb_ingest_grpc, bm)
 
     with patch.object(
         storage, "delete_upload", new=AsyncMock(side_effect=storage.delete_upload)

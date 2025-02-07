@@ -18,14 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
+from httpx import AsyncClient
 
 from nucliadb_models.search import SearchOptions
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_custom_synonyms_api(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
 ):
     kbid = knowledgebox
     synonyms_url = f"/kb/{kbid}/custom-synonyms"
@@ -74,7 +76,7 @@ async def test_custom_synonyms_api(
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
+async def knowledgebox_with_synonyms(nucliadb_writer: AsyncClient, knowledgebox: str):
     kbid = knowledgebox
     synonyms_url = f"/kb/{kbid}/custom-synonyms"
     kb_synonyms = {
@@ -87,10 +89,11 @@ async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
     yield kbid
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_with_synonyms(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox_with_synonyms,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox_with_synonyms: str,
 ):
     kbid = knowledgebox_with_synonyms
 
@@ -188,9 +191,10 @@ def get_pararagraphs(body):
     return paragraphs
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_search_errors_if_vectors_or_relations_requested(
-    nucliadb_reader,
-    knowledgebox,
+    nucliadb_reader: AsyncClient,
+    knowledgebox: str,
 ):
     kbid = knowledgebox
     resp = await nucliadb_reader.post(

@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
 from httpx import AsyncClient
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_selection_labelsets(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -58,6 +60,7 @@ async def test_selection_labelsets(
     assert body["labels"] == []
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_duplicated_labelsets_not_allowed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -105,6 +108,7 @@ async def test_duplicated_labelsets_not_allowed(
     assert resp.status_code == 422
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_duplicated_labels_not_allowed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

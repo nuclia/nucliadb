@@ -37,6 +37,7 @@ from nucliadb_models.search import KnowledgeboxFindResults, PredictReranker, Rer
         PredictReranker(window=50).model_dump(),
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_reranker(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
@@ -80,6 +81,7 @@ async def test_reranker(
         (PredictReranker(window=5 * 2).model_dump(), 5 * 2),
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_predict_reranker_requests_more_results(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,

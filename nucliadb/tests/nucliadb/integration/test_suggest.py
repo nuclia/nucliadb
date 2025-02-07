@@ -27,8 +27,9 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_suggest_paragraphs(
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
@@ -149,6 +150,7 @@ async def test_suggest_paragraphs(
     assert len(body["paragraphs"]["results"]) == 0
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_suggest_related_entities(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox, request
 ):
@@ -256,9 +258,10 @@ async def test_suggest_related_entities(
     assert_expected_entities(body, {"Solomon Islands", "Israel"})
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_suggestion_on_link_computed_titles_sc6088(
     nucliadb_writer,
-    nucliadb_grpc,
+    nucliadb_ingest_grpc,
     nucliadb_reader,
     knowledgebox,
 ):
@@ -291,7 +294,7 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     led.title = extracted_title
     bm.link_extracted_data.append(led)
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Check that the resource title changed
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
@@ -311,8 +314,9 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     assert suggested["text"] == extracted_title
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_suggest_features(
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     knowledgebox: str,
     texts: dict[str, str],
@@ -469,7 +473,8 @@ async def entities(nucliadb_writer: AsyncClient, knowledgebox: str):
     assert resp.status_code == 201
 
 
-async def test_search_kb_not_found(nucliadb_reader) -> None:
+@pytest.mark.deploy_modes("standalone")
+async def test_search_kb_not_found(nucliadb_reader: AsyncClient) -> None:
     resp = await nucliadb_reader.get(
         f"/kb/00000000000000/suggest?query=own+text",
     )

@@ -41,13 +41,13 @@ def a_week_before(date):
 
 
 @pytest.fixture(scope="function")
-async def resource(nucliadb_grpc, knowledgebox):
+async def resource(nucliadb_ingest_grpc, knowledgebox):
     bm = get_resource_with_a_sentence(knowledgebox)
     bm.basic.created.FromDatetime(NOW)
     bm.basic.modified.FromDatetime(NOW)
     bm.origin.ClearField("created")
     bm.origin.ClearField("modified")
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
     return bm.uuid
 
 
@@ -81,9 +81,10 @@ async def resource(nucliadb_grpc, knowledgebox):
         SearchOptions.SEMANTIC,
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_search_with_date_range_filters_nucliadb_dates(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    knowledgebox: str,
     feature,
     resource,
     creation_start,
@@ -138,10 +139,11 @@ async def test_search_with_date_range_filters_nucliadb_dates(
         SearchOptions.SEMANTIC,
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_search_with_date_range_filters_origin_dates(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    knowledgebox: str,
     feature,
     resource,
     creation_start,
@@ -178,6 +180,7 @@ async def test_search_with_date_range_filters_origin_dates(
     )
 
 
+@pytest.mark.deploy_modes("standalone")
 async def _test_find_date_ranges(
     nucliadb_reader,
     kbid,
