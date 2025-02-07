@@ -133,14 +133,14 @@ class Fetcher:
         self.cache.matryoshka_dimension = matryoshka_dimension
         return matryoshka_dimension
 
-    def _get_user_vectorset(self) -> Optional[str]:
+    async def _get_user_vectorset(self) -> Optional[str]:
         """Returns the user's requested vectorset and validates if it does exist
         in the KB.
 
         """
         vectorset = self.user_vectorset
         if not self._validated:
-            self._validate_vectorset()
+            await self._validate_vectorset()
         return vectorset
 
     async def get_vectorset(self) -> str:
@@ -297,7 +297,7 @@ class Fetcher:
 
         # we can't call get_vectorset, as it would do a recirsive loop between
         # functions, so we'll manually parse it
-        vectorset = self._get_user_vectorset()
+        vectorset = await self._get_user_vectorset()
         try:
             query_info = await query_information(
                 self.kbid,
