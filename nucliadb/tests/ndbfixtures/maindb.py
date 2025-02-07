@@ -18,8 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+import os
+import random
 from typing import AsyncIterator, Iterator
 from unittest.mock import patch
+from urllib.parse import urlparse, urlunparse
 
 import psycopg
 import pytest
@@ -81,9 +84,32 @@ async def cleanup_maindb(driver: Driver):
             pass
 
 
+async def create_test_database(base_url):
+    async with (
+        await psycopg.AsyncConnection.connect(base_url, autocommit=True) as conn,
+        conn.cursor() as cursor,
+    ):
+        for i in range(10):
+            try:
+                dbname = f"_nucliadb_test_{random.randint(0,999999)}"
+                await cursor.execute(f"CREATE DATABASE {dbname}")
+                return dbname
+            except psycopg.errors.DuplicateDatabase:
+                pass
+
+
 @pytest.fixture(scope="function")
-async def pg_maindb_settings(pg) -> AsyncIterator[DriverSettings]:
-    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+async def pg_maindb_settings(request) -> AsyncIterator[DriverSettings]:
+    if "TESTING_PG_URL" in os.environ.keys():
+        # Connect to a running server and create a new DB
+        base_url = os.environ["TESTING_PG_URL"]
+        dbname = await create_test_database(base_url)
+        parsed = urlparse(base_url)
+        url = urlunparse(parsed._replace(path=f"/{dbname}"))
+    else:
+        # Start a new database server in a docker container
+        pg = request.getfixturevalue("pg")
+        url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
 
     # We want to be sure schema migrations are always run. As some tests use
     # this fixture and create their own driver, we need to create one here and

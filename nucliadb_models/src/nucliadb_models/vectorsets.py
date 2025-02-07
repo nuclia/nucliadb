@@ -17,11 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import download  # noqa
-from . import export_import  # noqa
-from . import knowledgebox  # noqa
-from . import learning_config  # noqa
-from . import resource  # noqa
-from . import services  # noqa
-from . import vectorsets  # noqa
-from .router import api  # noqa
+
+from pydantic import BaseModel
+
+
+class CreatedVectorSet(BaseModel):
+    id: str
+
+
+class VectorSetListItem(BaseModel):
+    id: str
+
+
+class VectorSetList(BaseModel):
+    vectorsets: list[VectorSetListItem]

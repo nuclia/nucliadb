@@ -24,14 +24,13 @@ use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
+use crate::request_types::VectorSearchRequest;
 use crate::utils;
 use crate::VectorSegmentMetadata;
 use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
 use nidx_protos::prost::*;
-use nidx_protos::{
-    DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest, VectorSearchResponse,
-};
+use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
 use nidx_types::query_language::*;
 use nidx_types::Seq;
 use std::cmp::Ordering;
@@ -122,15 +121,6 @@ fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> 
             operands,
         }) => operands.iter().any(|op| segment_matches(op, labels)),
     }
-}
-
-// TODO: In an ideal world this should be part of the actual request, but since
-// we use protos all the way down the stack here we are. Once the protos use
-// is restricted to only the upper layer, this type won't be needed anymore.
-#[derive(Clone, Default)]
-pub struct VectorsContext {
-    pub filtering_formula: Option<BooleanExpression>,
-    pub segment_filtering_formula: Option<BooleanExpression>,
 }
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
@@ -252,11 +242,7 @@ impl Reader {
         Ok(ffsv.into())
     }
 
-    pub fn search(
-        &self,
-        request: &VectorSearchRequest,
-        context: &VectorsContext,
-    ) -> anyhow::Result<VectorSearchResponse> {
+    pub fn search(&self, request: &VectorSearchRequest) -> anyhow::Result<VectorSearchResponse> {
         let time = Instant::now();
 
         let id = Some(&request.id);
@@ -294,7 +280,7 @@ impl Reader {
             formula.extend(compound);
         }
 
-        if let Some(filter) = context.filtering_formula.as_ref() {
+        if let Some(filter) = request.filtering_formula.as_ref() {
             let clause = query_io::map_expression(filter);
             formula.extend(clause);
         }
@@ -303,7 +289,7 @@ impl Reader {
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: starts at {v} ms");
 
-        let result = self._search(&search_request, &context.segment_filtering_formula)?;
+        let result = self._search(&search_request, &request.segment_filtering_formula)?;
 
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Searching: ends at {v} ms");
@@ -417,12 +403,11 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let context = VectorsContext::default();
-        let result = reader.search(&request, &context).unwrap();
+        let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         request.key_filters = vec!["DOC/KEY/0".to_string()];
-        let result = reader.search(&request, &context).unwrap();
+        let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 0);
 
         Ok(())
@@ -501,8 +486,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let context = VectorsContext::default();
-        let result = reader.search(&request, &context).unwrap();
+        let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         let request = VectorSearchRequest {
@@ -515,7 +499,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request, &context).unwrap();
+        let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 3);
 
         // Check that min_score works
@@ -530,7 +514,7 @@ mod tests {
             min_score: 900.0,
             ..Default::default()
         };
-        let result = reader.search(&request, &context).unwrap();
+        let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 0);
 
         let bad_request = VectorSearchRequest {
@@ -543,7 +527,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        assert!(reader.search(&bad_request, &context).is_err());
+        assert!(reader.search(&bad_request).is_err());
 
         Ok(())
     }
@@ -617,8 +601,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let context = VectorsContext::default();
-        let result = reader.search(&request, &context).unwrap();
+        let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 2);
 
         let request = VectorSearchRequest {
@@ -631,7 +614,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request, &context).unwrap();
+        let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 1);
 
         Ok(())

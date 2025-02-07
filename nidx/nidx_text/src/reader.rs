@@ -22,16 +22,15 @@ use std::fmt::Debug;
 use std::time::*;
 
 use crate::schema::decode_field_id;
-use crate::search_query::TextContext;
-use crate::{prefilter::*, query_io};
+use crate::{prefilter::*, query_io, DocumentSearchRequest};
 
 use super::schema::TextSchema;
 use super::search_query;
 use itertools::Itertools;
 use nidx_protos::order_by::{OrderField, OrderType};
 use nidx_protos::{
-    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults, OrderBy,
-    ResultScore, StreamRequest,
+    DocumentItem, DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, OrderBy, ResultScore,
+    StreamRequest,
 };
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::{BytesColumn, Column};
@@ -340,33 +339,9 @@ impl TextReaderService {
         Ok(count)
     }
 
-    pub fn search(
-        &self,
-        request: &DocumentSearchRequest,
-        context: &TextContext,
-    ) -> anyhow::Result<DocumentSearchResponse> {
-        self.do_search(request, context)
+    pub fn search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
+        self.do_search(request)
     }
-
-    // fn stored_ids(&self) -> anyhow::Result<Vec<String>> {
-    //     let mut keys = vec![];
-    //     let searcher = self.reader.searcher();
-    //     for addr in searcher.search(&AllQuery, &DocSetCollector)? {
-    //         let key = String::from_utf8(
-    //             searcher
-    //                 .doc::<TantivyDocument>(addr)?
-    //                 .get_first(self.schema.uuid)
-    //                 .expect("documents must have a uuid.")
-    //                 .as_bytes()
-    //                 .expect("uuid field must be bytes")
-    //                 .to_vec(),
-    //         )
-    //         .unwrap();
-    //         keys.push(key);
-    //     }
-
-    //     Ok(keys)
-    // }
 }
 
 impl TextReaderService {
@@ -533,11 +508,7 @@ impl TextReaderService {
         }
     }
 
-    fn do_search(
-        &self,
-        request: &DocumentSearchRequest,
-        context: &TextContext,
-    ) -> anyhow::Result<DocumentSearchResponse> {
+    fn do_search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
         use crate::search_query::create_query;
         let id = Some(&request.id);
         let time = Instant::now();
@@ -553,7 +524,7 @@ impl TextReaderService {
         let text = TextReaderService::adapt_text(&query_parser, &request.body);
         let advanced_query =
             request.advanced_query.as_ref().map(|query| query_parser.parse_query(query)).transpose()?;
-        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query, context)?;
+        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query)?;
 
         // Offset to search from
         let results = request.result_per_page as usize;

@@ -155,10 +155,9 @@ class LearningConfiguration(BaseModel):
 
 
 class ProxiedLearningConfigError(Exception):
-    def __init__(self, status_code: int, content: bytes, content_type: str):
+    def __init__(self, status_code: int, content: Union[str, dict[str, Any]]):
         self.status_code = status_code
         self.content = content
-        self.content_type = content_type
 
 
 def raise_for_status(response: httpx.Response) -> None:
@@ -166,10 +165,13 @@ def raise_for_status(response: httpx.Response) -> None:
         response.raise_for_status()
     except httpx.HTTPStatusError as err:
         content_type = err.response.headers.get("Content-Type", "application/json")
+        if content_type == "application/json":
+            content = err.response.json()
+        else:
+            content = err.response.text
         raise ProxiedLearningConfigError(
             status_code=err.response.status_code,
-            content=err.response.content,
-            content_type=content_type,
+            content=content,
         )
 
 

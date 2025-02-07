@@ -986,7 +986,7 @@ class RagStrategyName:
     METADATA_EXTENSION = "metadata_extension"
     PREQUERIES = "prequeries"
     CONVERSATION = "conversation"
-    GRAPH = "graph"
+    GRAPH = "graph_beta"
 
 
 class ImageRagStrategyName:
@@ -1231,7 +1231,7 @@ class GraphStrategy(RagStrategy):
     It works best if the Knowledge Box has a user-defined Graph Extraction agent enabled.
     """
 
-    name: Literal["graph"] = "graph"
+    name: Literal["graph_beta"] = "graph_beta"
     hops: int = Field(
         default=3,
         title="Number of hops",
@@ -1276,6 +1276,15 @@ The generative model is slower and consumes more tokens, but can provide better 
         description="""Method to detect entities in the query.
 - `predict` uses NUA to detect entities in the query, slower and more accurate but requires an exact text match between Knowledge Box entities and entities in the query.
 - `suggest` uses fuzzy search to detect entities. It's faster and more flexible but might have trouble matching entities composed of multiple words. It will fallback to Predict if no entities are detected.""",
+    )
+    weight: float = Field(
+        default=3.0,
+        title="Weight",
+        description=(
+            "Weight of the graph strategy in the context. The weight is used to scale the results of the strategy before adding them to the context."
+            "The weight should be a positive number."
+        ),
+        ge=0,
     )
 
     @model_validator(mode="before")

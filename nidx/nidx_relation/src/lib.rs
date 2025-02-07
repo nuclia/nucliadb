@@ -24,8 +24,8 @@ mod resource_indexer;
 mod schema;
 
 use nidx_protos::{
-    relation_node::NodeType, resource::ResourceStatus, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest,
-    RelationSearchRequest, RelationSearchResponse,
+    relation_node::NodeType, relation_prefix_search_request::Search, resource::ResourceStatus, RelationNode,
+    RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
 };
 use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
@@ -140,7 +140,7 @@ impl RelationSearcher {
             prefixes.iter().filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH).cloned().map(|prefix| {
                 RelationSearchRequest {
                     prefix: Some(RelationPrefixSearchRequest {
-                        prefix,
+                        search: Some(Search::Prefix(prefix)),
                         node_filters: vec![RelationNodeFilter {
                             node_type: NodeType::Entity.into(),
                             ..Default::default()

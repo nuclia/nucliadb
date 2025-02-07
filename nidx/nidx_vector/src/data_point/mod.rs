@@ -81,10 +81,10 @@ where
     Dlog: DeleteLog,
 {
     let nodes_path = data_point_path.join(file_names::NODES);
-    let mut nodes_file = File::options().read(true).write(true).create(true).open(nodes_path)?;
+    let mut nodes_file = File::options().read(true).write(true).create_new(true).open(nodes_path)?;
 
     let hnsw_path = data_point_path.join(file_names::HNSW);
-    let mut hnsw_file = File::options().read(true).write(true).create(true).open(hnsw_path)?;
+    let mut hnsw_file = File::options().read(true).write(true).create_new(true).open(hnsw_path)?;
 
     // Sort largest operant first so we reuse as much of the HNSW as possible
     let mut operants = operants.iter().collect::<Vec<_>>();
@@ -164,9 +164,9 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         }
     }
 
-    let mut nodes_file = File::options().read(true).write(true).create(true).open(path.join(file_names::NODES))?;
+    let mut nodes_file = File::options().read(true).write(true).create_new(true).open(path.join(file_names::NODES))?;
 
-    let mut hnsw_file = File::options().read(true).write(true).create(true).open(path.join(file_names::HNSW))?;
+    let mut hnsw_file = File::options().read(true).write(true).create_new(true).open(path.join(file_names::HNSW))?;
 
     // Serializing nodes on disk
     // Nodes are stored on disk and mmaped.

@@ -90,6 +90,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.trainset import TrainSetPartitions
+from nucliadb_models.vectorsets import CreatedVectorSet, VectorSetList
 from nucliadb_models.writer import (
     CreateResourcePayload,
     ResourceCreated,
@@ -393,6 +394,22 @@ SDK_DEFINITION = {
     ),
     "get_custom_synonyms": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/custom-synonyms",
+        method="GET",
+        path_params=("kbid",),
+    ),
+    # Vectorsets
+    "add_vector_set": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/vectorsets/{vectorset_id}",
+        method="POST",
+        path_params=("kbid", "vectorset_id"),
+    ),
+    "delete_vector_set": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/vectorsets/{vectorset_id}",
+        method="DELETE",
+        path_params=("kbid", "vectorset_id"),
+    ),
+    "list_vector_sets": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/vectorsets",
         method="GET",
         path_params=("kbid",),
     ),
@@ -990,6 +1007,11 @@ class NucliaDB(_NucliaDBBase):
     set_custom_synonyms = _request_sync_builder("set_custom_synonyms", KnowledgeBoxSynonyms, type(None))
     get_custom_synonyms = _request_sync_builder("get_custom_synonyms", type(None), KnowledgeBoxSynonyms)
 
+    # Vectorsets
+    add_vector_set = _request_sync_builder("add_vector_set", type(None), CreatedVectorSet)
+    delete_vector_set = _request_sync_builder("delete_vector_set", type(None), CreatedVectorSet)
+    list_vector_sets = _request_sync_builder("list_vector_sets", type(None), VectorSetList)
+
 
 class NucliaDBAsync(_NucliaDBBase):
     """
@@ -1164,3 +1186,8 @@ class NucliaDBAsync(_NucliaDBBase):
     # Custom synonyms
     set_custom_synonyms = _request_async_builder("set_custom_synonyms", KnowledgeBoxSynonyms, type(None))
     get_custom_synonyms = _request_async_builder("get_custom_synonyms", type(None), KnowledgeBoxSynonyms)
+
+    # Vectorsets
+    add_vector_set = _request_async_builder("add_vector_set", type(None), CreatedVectorSet)
+    delete_vector_set = _request_async_builder("delete_vector_set", type(None), CreatedVectorSet)
+    list_vector_sets = _request_async_builder("list_vector_sets", type(None), VectorSetList)

@@ -271,9 +271,13 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         if file.source == self.source and file.uri != destination.key:
             # This MAY BE the case for NucliaDB hosted deployment (Nuclia's cloud deployment):
             # The data has been pushed to the bucket but with a different key.
-            logger.warning(
-                f"[Nuclia hosted] Source and destination keys differ!: {file.uri} != {destination.key}"
-            )
+            #
+            # Due to migration things, extracted vectors can come in different
+            # keys and need a move, we don't want a warn in that case
+            if not destination.key.endswith("extracted_vectors"):
+                logger.warning(
+                    f"[Nuclia hosted] Source and destination keys differ!: {file.uri} != {destination.key}"
+                )
             await self.move(file, destination)
             new_cf = CloudFile()
             new_cf.CopyFrom(file)

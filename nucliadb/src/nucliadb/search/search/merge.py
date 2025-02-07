@@ -615,6 +615,19 @@ async def merge_suggest_entities_results(
     return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
 
 
+def merge_relation_prefix_results(
+    responses: list[SearchResponse],
+) -> RelatedEntities:
+    unique_entities: Set[RelatedEntity] = set()
+    for response in responses:
+        response_entities = (
+            RelatedEntity(family=e.subtype, value=e.value) for e in response.relation.prefix.nodes
+        )
+        unique_entities.update(response_entities)
+
+    return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
+
+
 async def merge_suggest_results(
     suggest_responses: list[SuggestResponse],
     kbid: str,
