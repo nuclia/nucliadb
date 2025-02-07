@@ -236,7 +236,7 @@ async def _test_search_request_with_security(
         )
         assert resp.status_code == 200, resp.text
 
-        messages = resp.split("\n")
+        messages = resp.text.split("\n")
         for message in messages:
             json_message = json.loads(message)
             if json_message["type"] == "retrieval":
