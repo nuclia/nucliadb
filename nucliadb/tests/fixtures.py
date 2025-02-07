@@ -47,28 +47,6 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def nucliadb_reader(nucliadb: Settings):
-    async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "READER"},
-        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
-        timeout=None,
-        event_hooks={"request": [wait_for_sync]},
-    ) as client:
-        yield client
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_writer(nucliadb: Settings):
-    async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "WRITER"},
-        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
-        timeout=None,
-        event_hooks={"request": [mark_dirty]},
-    ) as client:
-        yield client
-
-
-@pytest.fixture(scope="function")
 async def nucliadb_manager(nucliadb: Settings):
     async with AsyncClient(
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
