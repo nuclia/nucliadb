@@ -23,6 +23,7 @@ use crate::set_query::SetQuery;
 use itertools::Itertools;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::{StreamRequest, SuggestRequest};
+use nidx_types::prefilter::ValidFieldCollector;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Bound;
@@ -284,6 +285,7 @@ pub fn suggest_query(
     parser: &QueryParser,
     text: &str,
     request: &SuggestRequest,
+    prefilter: &ValidFieldCollector,
     schema: &ParagraphSchema,
     distance: u8,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
@@ -326,18 +328,13 @@ pub fn suggest_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
 
-    if !request.key_filters.is_empty() {
-        let (field_ids, resource_ids) = request.key_filters.iter().cloned().partition::<Vec<_>, _>(|k| k.contains('/'));
-        if !field_ids.is_empty() {
-            let set_query = Box::new(SetQuery::new(schema.field_uuid, field_ids));
-            fuzzies.push((Occur::Must, set_query.clone()));
-            originals.push((Occur::Must, set_query.clone()));
-        }
-        if !resource_ids.is_empty() {
-            let set_query = Box::new(SetQuery::new(schema.uuid, resource_ids));
-            fuzzies.push((Occur::Must, set_query.clone()));
-            originals.push((Occur::Must, set_query.clone()));
-        }
+    if let ValidFieldCollector::Some(field_keys) = prefilter {
+        let set_query = Box::new(SetQuery::new(
+            schema.field_uuid,
+            field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
+        ));
+        fuzzies.push((Occur::Must, set_query.clone()));
+        originals.push((Occur::Must, set_query.clone()));
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
@@ -358,6 +355,7 @@ pub fn search_query(
     parser: &QueryParser,
     text: &str,
     search: &ParagraphSearchRequest,
+    prefilter: &ValidFieldCollector,
     schema: &ParagraphSchema,
     distance: u8,
     with_advance: Option<Box<dyn Query>>,
@@ -426,18 +424,13 @@ pub fn search_query(
         originals.push((Occur::Must, query));
     }
 
-    if !search.key_filters.is_empty() {
-        let (field_ids, resource_ids) = search.key_filters.iter().cloned().partition::<Vec<_>, _>(|k| k.contains('/'));
-        if !field_ids.is_empty() {
-            let set_query = Box::new(SetQuery::new(schema.field_uuid, field_ids));
-            fuzzies.push((Occur::Must, set_query.clone()));
-            originals.push((Occur::Must, set_query.clone()));
-        }
-        if !resource_ids.is_empty() {
-            let set_query = Box::new(SetQuery::new(schema.uuid, resource_ids));
-            fuzzies.push((Occur::Must, set_query.clone()));
-            originals.push((Occur::Must, set_query.clone()));
-        }
+    if let ValidFieldCollector::Some(field_keys) = prefilter {
+        let set_query = Box::new(SetQuery::new(
+            schema.field_uuid,
+            field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
+        ));
+        fuzzies.push((Occur::Must, set_query.clone()));
+        originals.push((Occur::Must, set_query.clone()));
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {

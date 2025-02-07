@@ -23,11 +23,11 @@ use std::{collections::HashSet, sync::Arc};
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
-use nidx_text::{
-    prefilter::{PreFilterRequest, ValidFieldCollector},
-    TextSearcher,
+use nidx_text::{prefilter::PreFilterRequest, TextSearcher};
+use nidx_types::{
+    prefilter::ValidFieldCollector,
+    query_language::{BooleanExpression, BooleanOperation, Operator, QueryContext},
 };
-use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator, QueryContext};
 use tracing::{instrument, Span};
 
 use crate::errors::{NidxError, NidxResult};
@@ -95,7 +95,7 @@ fn blocking_suggest(
 
     let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
 
-    if let Some(filter) = &mut request.filter {
+    let prefilter = if let Some(filter) = &mut request.filter {
         if !filter.field_labels.is_empty() && suggest_paragraphs {
             let labels_formula = if filter.labels_expression.is_empty() {
                 // Backwards compatibility, take all labels to be AND'ed together
@@ -127,19 +127,22 @@ fn blocking_suggest(
             let prefiltered = text_searcher.prefilter(&prefilter)?;
 
             // Apply prefilter to paragraphs query and clear filters
-            match prefiltered.valid_fields {
-                ValidFieldCollector::All => {}
-                ValidFieldCollector::Some(keys) => {
-                    request.key_filters = keys.iter().map(|v| format!("{}{}", v.resource_id, v.field_id)).collect()
-                }
-                ValidFieldCollector::None => suggest_paragraphs = false,
-            }
             filter.labels_expression.clear();
             filter.field_labels.clear();
+
+            prefiltered.valid_fields
+        } else {
+            ValidFieldCollector::All
         }
+    } else {
+        ValidFieldCollector::All
+    };
+
+    if matches!(prefilter, ValidFieldCollector::None) {
+        suggest_paragraphs = false;
     }
 
-    let paragraph_task = suggest_paragraphs.then_some(move || paragraph_searcher.suggest(&request));
+    let paragraph_task = suggest_paragraphs.then_some(move || paragraph_searcher.suggest(&request, &prefilter));
 
     let relation_task = suggest_entities.then_some(move || relation_searcher.suggest(prefixes));
 

@@ -24,6 +24,7 @@ use nidx_protos::Faceted;
 use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
 use nidx_text::TextSearcher;
 use nidx_text::{prefilter::*, DocumentSearchRequest};
+use nidx_types::prefilter::ValidFieldCollector;
 use nidx_types::query_language::BooleanExpression;
 
 #[test]

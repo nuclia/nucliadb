@@ -32,6 +32,7 @@ use nidx_protos::{
     DocumentItem, DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, OrderBy, ResultScore,
     StreamRequest,
 };
+use nidx_types::prefilter::{ValidField, ValidFieldCollector};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::{BytesColumn, Column};
 use tantivy::fastfield::FacetReader;
@@ -40,6 +41,7 @@ use tantivy::schema::Value;
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use tracing::*;
+use uuid::Uuid;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -108,10 +110,13 @@ impl SegmentCollector for FieldUuidSegmentCollector {
         let mut facet_ords = self.field_reader.facet_ords(doc);
         let mut facet = Facet::root();
         self.field_reader.facet_from_ord(facet_ords.next().unwrap(), &mut facet).expect("field facet not found");
-        self.results.push(ValidField {
-            resource_id: String::from_utf8_lossy(&uuid_bytes).to_string(),
-            field_id: facet.to_path_string(),
-        });
+
+        if let Ok(resource_id) = Uuid::parse_str(std::str::from_utf8(&uuid_bytes).unwrap()) {
+            self.results.push(ValidField {
+                resource_id,
+                field_id: facet.to_path_string(),
+            });
+        }
     }
 
     fn harvest(self) -> Self::Fruit {
@@ -172,7 +177,7 @@ impl SegmentCollector for FieldUuidSegmentCollectorV2 {
         let (rid, fid) = decode_field_id(&data);
 
         self.results.push(ValidField {
-            resource_id: rid.simple().to_string(),
+            resource_id: rid,
             field_id: fid,
         });
     }
