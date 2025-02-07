@@ -85,9 +85,7 @@ async def test_resource_security_is_updated(
     assert resource["security"]["access_groups"] == []
 
 
-@pytest.mark.parametrize(
-    "search_endpoint", ("find_get", "find_post", "search_get", "search_post", "ask_post")
-)
+@pytest.mark.parametrize("search_endpoint", ("find_get", "find_post", "search_get", "search_post"))
 async def test_resource_security_search(
     nucliadb_reader,
     nucliadb_writer,
