@@ -71,7 +71,6 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
             user = request.headers[self.user_header]
             nuclia_user: NucliaUser = NucliaUser(username=user)
 
-            print(f"authenticate headers: {request.headers}")
             raw_security_groups: Optional[str] = request.headers.get(self.security_groups_header)
 
             security_groups: Optional[list[str]] = None

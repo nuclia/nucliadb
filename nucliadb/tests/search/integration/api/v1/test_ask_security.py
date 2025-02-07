@@ -51,7 +51,7 @@ async def test_ask_receives_injected_security_groups(
     # Test security groups only on payload
     resp = await cluster_nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/ask",
-        json={"query": "title", "security_groups": ["group1", "group2"]},
+        json={"query": "title", "security": {"groups": ["group1", "group2"]}},
     )
     assert resp.status_code == 200
     spy.assert_called_once()
@@ -65,7 +65,7 @@ async def test_ask_receives_injected_security_groups(
     resp = await cluster_nucliadb_search.post(
         f"/{KB_PREFIX}/{kbid}/ask",
         headers={"x-nucliadb-security-groups": "group1;group2"},
-        json={"query": "title", "security_groups": ["group3", "group4"]},
+        json={"query": "title", "security": {"groups": ["group3", "group4"]}},
     )
     assert resp.status_code == 200
     spy.assert_called_once()
