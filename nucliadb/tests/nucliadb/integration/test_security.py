@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import json
 from typing import Optional
 
 import pytest
@@ -198,30 +199,52 @@ async def _test_search_request_with_security(
             f"/kb/{kbid}/find",
             json=payload,
         )
+        assert resp.status_code == 200, resp.text
+        search_response = resp.json()
+        resource_ids = search_response["resources"]
+
     elif search_endpoint == "find_get":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/find",
             params=params,
         )
+        assert resp.status_code == 200, resp.text
+        search_response = resp.json()
+        resource_ids = search_response["resources"]
+
     elif search_endpoint == "search_post":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/search",
             json=payload,
         )
+        assert resp.status_code == 200, resp.text
+        search_response = resp.json()
+        resource_ids = search_response["resources"]
+
     elif search_endpoint == "search_get":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/search",
             params=params,
         )
+        assert resp.status_code == 200, resp.text
+        search_response = resp.json()
+        resource_ids = search_response["resources"]
+
     elif search_endpoint == "ask_post":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/ask", json=payload, headers={"x_synchronous": "true"}
         )
-        print(resp.text)
+        assert resp.status_code == 200, resp.text
+
+        messages = resp.split("\n")
+        for message in messages:
+            json_message = json.loads(message)
+            if json_message["type"] == "retrieval":
+                search_response = json_message["results"]
+                resource_ids = list(search_response["resources"].keys())
+                break
     else:
         raise ValueError(f"Unknown search endpoint: {search_endpoint}")
 
-    assert resp.status_code == 200, resp.text
-    search_response = resp.json()
-    assert len(search_response["resources"]) == len(expected_resources)
-    assert set(search_response["resources"]) == set(expected_resources)
+    assert len(resource_ids) == len(expected_resources)
+    assert set(resource_ids) == set(expected_resources)
