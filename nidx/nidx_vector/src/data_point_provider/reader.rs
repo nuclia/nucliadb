@@ -31,7 +31,7 @@ use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
 use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
-use nidx_types::prefilter::ValidFieldCollector;
+use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
 use nidx_types::Seq;
 use std::cmp::Ordering;
@@ -246,7 +246,7 @@ impl Reader {
     pub fn search(
         &self,
         request: &VectorSearchRequest,
-        prefilter: &ValidFieldCollector,
+        prefilter: &PrefilterResult,
     ) -> anyhow::Result<VectorSearchResponse> {
         let time = Instant::now();
 
@@ -265,7 +265,7 @@ impl Reader {
             formula.extend(field_clause);
         }
 
-        if let ValidFieldCollector::Some(valid_fields) = prefilter {
+        if let PrefilterResult::Some(valid_fields) = prefilter {
             let field_ids = valid_fields.iter().map(|f| format!("{}{}", f.resource_id.simple(), f.field_id)).collect();
             let clause_labels = AtomClause::key_set(field_ids);
             formula.extend(clause_labels);
@@ -328,7 +328,7 @@ mod tests {
 
     use nidx_protos::resource::ResourceStatus;
     use nidx_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorsetSentences};
-    use nidx_types::prefilter::ValidField;
+    use nidx_types::prefilter::FieldId;
     use tempfile::TempDir;
 
     use super::*;
@@ -408,15 +408,15 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let mut field_filter = ValidField {
+        let mut field_filter = FieldId {
             resource_id: uuid::Uuid::parse_str("6c5fc1f7a69042d4b24b7f18ea354b4a").unwrap(),
-            field_id: "f/field1".to_string(),
+            field_id: "/f/field1".to_string(),
         };
-        let result = reader.search(&request, &ValidFieldCollector::Some(vec![field_filter.clone()])).unwrap();
+        let result = reader.search(&request, &PrefilterResult::Some(vec![field_filter.clone()])).unwrap();
         assert_eq!(result.documents.len(), 4);
 
-        field_filter.field_id = "f/field2".to_string();
-        let result = reader.search(&request, &ValidFieldCollector::Some(vec![field_filter])).unwrap();
+        field_filter.field_id = "/f/field2".to_string();
+        let result = reader.search(&request, &PrefilterResult::Some(vec![field_filter])).unwrap();
         assert_eq!(result.documents.len(), 0);
 
         Ok(())
@@ -495,7 +495,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request, &ValidFieldCollector::All).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         let request = VectorSearchRequest {
@@ -508,7 +508,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request, &ValidFieldCollector::All).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 3);
 
         // Check that min_score works
@@ -523,7 +523,7 @@ mod tests {
             min_score: 900.0,
             ..Default::default()
         };
-        let result = reader.search(&request, &ValidFieldCollector::All).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 0);
 
         let bad_request = VectorSearchRequest {
@@ -536,7 +536,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        assert!(reader.search(&bad_request, &ValidFieldCollector::All).is_err());
+        assert!(reader.search(&bad_request, &PrefilterResult::All).is_err());
 
         Ok(())
     }
@@ -610,7 +610,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request, &ValidFieldCollector::All).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 2);
 
         let request = VectorSearchRequest {
@@ -623,7 +623,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request, &ValidFieldCollector::All).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 1);
 
         Ok(())

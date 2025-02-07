@@ -32,7 +32,7 @@ use nidx_protos::{
     DocumentItem, DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, OrderBy, ResultScore,
     StreamRequest,
 };
-use nidx_types::prefilter::{ValidField, ValidFieldCollector};
+use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::{BytesColumn, Column};
 use tantivy::fastfield::FacetReader;
@@ -96,11 +96,11 @@ impl Debug for TextReaderService {
 struct FieldUuidSegmentCollector {
     uuid_reader: BytesColumn,
     field_reader: FacetReader,
-    results: Vec<ValidField>,
+    results: Vec<FieldId>,
 }
 
 impl SegmentCollector for FieldUuidSegmentCollector {
-    type Fruit = Vec<ValidField>;
+    type Fruit = Vec<FieldId>;
 
     fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
         let uuid_ord = self.uuid_reader.term_ords(doc).next().unwrap();
@@ -112,7 +112,7 @@ impl SegmentCollector for FieldUuidSegmentCollector {
         self.field_reader.facet_from_ord(facet_ords.next().unwrap(), &mut facet).expect("field facet not found");
 
         if let Ok(resource_id) = Uuid::parse_str(std::str::from_utf8(&uuid_bytes).unwrap()) {
-            self.results.push(ValidField {
+            self.results.push(FieldId {
                 resource_id,
                 field_id: facet.to_path_string(),
             });
@@ -127,7 +127,7 @@ impl SegmentCollector for FieldUuidSegmentCollector {
 struct FieldUuidCollector;
 
 impl Collector for FieldUuidCollector {
-    type Fruit = Vec<ValidField>;
+    type Fruit = Vec<FieldId>;
 
     type Child = FieldUuidSegmentCollector;
 
@@ -165,18 +165,18 @@ impl Collector for FieldUuidCollector {
 
 struct FieldUuidSegmentCollectorV2 {
     encoded_field_id_reader: Column,
-    results: Vec<ValidField>,
+    results: Vec<FieldId>,
 }
 
 impl SegmentCollector for FieldUuidSegmentCollectorV2 {
-    type Fruit = Vec<ValidField>;
+    type Fruit = Vec<FieldId>;
 
     fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
         let mut data = Vec::new();
         self.encoded_field_id_reader.fill_vals(doc, &mut data);
         let (rid, fid) = decode_field_id(&data);
 
-        self.results.push(ValidField {
+        self.results.push(FieldId {
             resource_id: rid,
             field_id: fid,
         });
@@ -190,7 +190,7 @@ impl SegmentCollector for FieldUuidSegmentCollectorV2 {
 struct FieldUuidCollectorV2;
 
 impl Collector for FieldUuidCollectorV2 {
-    type Fruit = Vec<ValidField>;
+    type Fruit = Vec<FieldId>;
 
     type Child = FieldUuidSegmentCollectorV2;
 
@@ -225,7 +225,7 @@ impl Collector for FieldUuidCollectorV2 {
 }
 
 impl TextReaderService {
-    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
+    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PrefilterResult> {
         let schema = &self.schema;
         let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
         let mut created_queries = Vec::new();
@@ -287,9 +287,7 @@ impl TextReaderService {
         }
 
         if subqueries.is_empty() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::All,
-            });
+            return Ok(PrefilterResult::All);
         }
 
         let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
@@ -302,22 +300,16 @@ impl TextReaderService {
 
         // If none of the fields match the pre-filter, thats all the query planner needs to know.
         if docs_fulfilled.is_empty() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::None,
-            });
+            return Ok(PrefilterResult::None);
         }
 
         // If all the fields match the pre-filter, thats all the query planner needs to know
         if docs_fulfilled.len() as u64 == searcher.num_docs() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::All,
-            });
+            return Ok(PrefilterResult::All);
         }
 
         // The fields matching the pre-filter are a non-empty subset of all the fields
-        Ok(PreFilterResponse {
-            valid_fields: ValidFieldCollector::Some(docs_fulfilled),
-        })
+        Ok(PrefilterResult::Some(docs_fulfilled))
     }
 
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem>> {

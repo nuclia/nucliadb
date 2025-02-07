@@ -23,16 +23,16 @@ use uuid::Uuid;
 /// Represents a field that has met all of the
 /// pre-filtering requirements.
 #[derive(Debug, Clone)]
-pub struct ValidField {
+pub struct FieldId {
     pub resource_id: Uuid,
     pub field_id: String,
 }
 
 /// Utility type to identify and allow optimizations in filtering edge cases
 #[derive(Debug, Default, Clone)]
-pub enum ValidFieldCollector {
+pub enum PrefilterResult {
     #[default]
     None,
     All,
-    Some(Vec<ValidField>),
+    Some(Vec<FieldId>),
 }

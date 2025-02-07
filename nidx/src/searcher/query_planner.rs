@@ -22,7 +22,7 @@ use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::{RelationSearchRequest, SearchRequest};
 use nidx_text::prefilter::*;
 use nidx_text::DocumentSearchRequest;
-use nidx_types::prefilter::ValidFieldCollector;
+use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
 use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
@@ -33,7 +33,7 @@ use super::query_language::QueryAnalysis;
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
-    pub prefilter_results: ValidFieldCollector,
+    pub prefilter_results: PrefilterResult,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
@@ -41,8 +41,8 @@ pub struct IndexQueries {
 }
 
 impl IndexQueries {
-    fn apply_to_vectors(request: &mut VectorSearchRequest, response: &ValidFieldCollector) {
-        let ValidFieldCollector::Some(_) = &response else {
+    fn apply_to_vectors(request: &mut VectorSearchRequest, response: &PrefilterResult) {
+        let PrefilterResult::Some(_) = &response else {
             return;
         };
 
@@ -50,8 +50,8 @@ impl IndexQueries {
         request.field_labels.clear();
     }
 
-    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &ValidFieldCollector) {
-        if matches!(response, ValidFieldCollector::All) {
+    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PrefilterResult) {
+        if matches!(response, PrefilterResult::All) {
             // Since all the fields are matching there is no need to use this filter.
             request.timestamps = None;
         }
@@ -59,8 +59,8 @@ impl IndexQueries {
 
     /// When a pre-filter is run, the result can be used to modify the queries
     /// that the indexes must resolve.
-    pub fn apply_prefilter(&mut self, prefiltered: PreFilterResponse) {
-        if matches!(prefiltered.valid_fields, ValidFieldCollector::None) {
+    pub fn apply_prefilter(&mut self, prefiltered: PrefilterResult) {
+        if matches!(prefiltered, PrefilterResult::None) {
             // There are no matches so there is no need to run the rest of the search
             self.vectors_request = None;
             self.paragraphs_request = None;
@@ -69,7 +69,7 @@ impl IndexQueries {
             return;
         }
 
-        self.prefilter_results = prefiltered.valid_fields;
+        self.prefilter_results = prefiltered;
 
         if let Some(vectors_request) = self.vectors_request.as_mut() {
             IndexQueries::apply_to_vectors(vectors_request, &self.prefilter_results);
@@ -115,7 +115,7 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
-            prefilter_results: ValidFieldCollector::All,
+            prefilter_results: PrefilterResult::All,
             vectors_request,
             paragraphs_request,
             texts_request,

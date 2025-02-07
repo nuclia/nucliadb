@@ -35,7 +35,7 @@ use data_point_provider::reader::{Reader, TimeSensitiveDLog};
 use data_point_provider::DTrie;
 use indexer::{index_resource, ResourceWrapper};
 use nidx_protos::{Resource, VectorSearchResponse};
-use nidx_types::prefilter::ValidFieldCollector;
+use nidx_types::prefilter::PrefilterResult;
 use nidx_types::{OpenIndexMetadata, SegmentMetadata};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -141,7 +141,7 @@ impl VectorSearcher {
     pub fn search(
         &self,
         request: &VectorSearchRequest,
-        prefilter: &ValidFieldCollector,
+        prefilter: &PrefilterResult,
     ) -> anyhow::Result<VectorSearchResponse> {
         self.reader.search(request, prefilter)
     }

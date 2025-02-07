@@ -25,7 +25,7 @@ use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest,
 use nidx_relation::RelationSearcher;
 use nidx_text::{prefilter::PreFilterRequest, TextSearcher};
 use nidx_types::{
-    prefilter::ValidFieldCollector,
+    prefilter::PrefilterResult,
     query_language::{BooleanExpression, BooleanOperation, Operator, QueryContext},
 };
 use tracing::{instrument, Span};
@@ -95,7 +95,9 @@ fn blocking_suggest(
 
     let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
 
-    let prefilter = if let Some(filter) = &mut request.filter {
+    let mut prefiltered = PrefilterResult::All;
+
+    if let Some(filter) = &mut request.filter {
         if !filter.field_labels.is_empty() && suggest_paragraphs {
             let labels_formula = if filter.labels_expression.is_empty() {
                 // Backwards compatibility, take all labels to be AND'ed together
@@ -124,25 +126,19 @@ fn blocking_suggest(
                 keywords_formula: None,
             };
 
-            let prefiltered = text_searcher.prefilter(&prefilter)?;
+            prefiltered = text_searcher.prefilter(&prefilter)?;
 
             // Apply prefilter to paragraphs query and clear filters
             filter.labels_expression.clear();
             filter.field_labels.clear();
-
-            prefiltered.valid_fields
-        } else {
-            ValidFieldCollector::All
         }
-    } else {
-        ValidFieldCollector::All
-    };
+    }
 
-    if matches!(prefilter, ValidFieldCollector::None) {
+    if matches!(prefiltered, PrefilterResult::None) {
         suggest_paragraphs = false;
     }
 
-    let paragraph_task = suggest_paragraphs.then_some(move || paragraph_searcher.suggest(&request, &prefilter));
+    let paragraph_task = suggest_paragraphs.then_some(move || paragraph_searcher.suggest(&request, &prefiltered));
 
     let relation_task = suggest_entities.then_some(move || relation_searcher.suggest(prefixes));
 

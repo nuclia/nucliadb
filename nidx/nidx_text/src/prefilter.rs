@@ -19,7 +19,7 @@
 //
 
 use nidx_protos::{prost_types::Timestamp, Security};
-use nidx_types::{prefilter::ValidFieldCollector, query_language::BooleanExpression};
+use nidx_types::query_language::BooleanExpression;
 
 /// A field has two dates
 #[derive(Debug, Clone, Copy)]
@@ -47,11 +47,4 @@ pub struct PreFilterRequest {
     pub security: Option<Security>,
     pub labels_formula: Option<BooleanExpression>,
     pub keywords_formula: Option<BooleanExpression>,
-}
-
-/// Once a [`PreFilterRequest`] was successfully executed
-/// this type can be used to modify the rest of the query plan.
-#[derive(Debug, Default, Clone)]
-pub struct PreFilterResponse {
-    pub valid_fields: ValidFieldCollector,
 }

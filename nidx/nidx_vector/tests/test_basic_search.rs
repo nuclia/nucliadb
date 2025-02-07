@@ -43,6 +43,7 @@ fn test_basic_search(
     #[values(VectorType::DenseF32 { dimension: DIMENSION })] vector_type: VectorType,
 ) -> anyhow::Result<()> {
     use common::{resource, TestOpener};
+    use nidx_types::prefilter::PrefilterResult;
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
     let config = VectorConfig {
@@ -73,7 +74,7 @@ fn test_basic_search(
             result_per_page: 10,
             ..Default::default()
         },
-        &nidx_types::prefilter::ValidFieldCollector::All,
+        &PrefilterResult::All,
     )?;
 
     assert_eq!(results.documents.len(), 10);
@@ -93,7 +94,7 @@ fn test_basic_search(
             result_per_page: 10,
             ..Default::default()
         },
-        &nidx_types::prefilter::ValidFieldCollector::All,
+        &PrefilterResult::All,
     )?;
 
     assert_eq!(results.documents.len(), 10);

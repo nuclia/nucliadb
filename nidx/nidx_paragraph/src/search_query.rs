@@ -23,7 +23,7 @@ use crate::set_query::SetQuery;
 use itertools::Itertools;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::{StreamRequest, SuggestRequest};
-use nidx_types::prefilter::ValidFieldCollector;
+use nidx_types::prefilter::PrefilterResult;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Bound;
@@ -281,11 +281,27 @@ pub fn produce_date_range_query(
     Some(query)
 }
 
+fn apply_prefilter(
+    queries: &mut [&mut Vec<(Occur, Box<dyn Query>)>],
+    schema: &ParagraphSchema,
+    prefilter: &PrefilterResult,
+) {
+    if let PrefilterResult::Some(field_keys) = prefilter {
+        let set_query = Box::new(SetQuery::new(
+            schema.field_uuid,
+            field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
+        ));
+        for q in queries {
+            q.push((Occur::Must, set_query.clone()));
+        }
+    }
+}
+
 pub fn suggest_query(
     parser: &QueryParser,
     text: &str,
     request: &SuggestRequest,
-    prefilter: &ValidFieldCollector,
+    prefilter: &PrefilterResult,
     schema: &ParagraphSchema,
     distance: u8,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
@@ -328,14 +344,7 @@ pub fn suggest_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
 
-    if let ValidFieldCollector::Some(field_keys) = prefilter {
-        let set_query = Box::new(SetQuery::new(
-            schema.field_uuid,
-            field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
-        ));
-        fuzzies.push((Occur::Must, set_query.clone()));
-        originals.push((Occur::Must, set_query.clone()));
-    }
+    apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter);
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
@@ -355,7 +364,7 @@ pub fn search_query(
     parser: &QueryParser,
     text: &str,
     search: &ParagraphSearchRequest,
-    prefilter: &ValidFieldCollector,
+    prefilter: &PrefilterResult,
     schema: &ParagraphSchema,
     distance: u8,
     with_advance: Option<Box<dyn Query>>,
@@ -424,14 +433,7 @@ pub fn search_query(
         originals.push((Occur::Must, query));
     }
 
-    if let ValidFieldCollector::Some(field_keys) = prefilter {
-        let set_query = Box::new(SetQuery::new(
-            schema.field_uuid,
-            field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
-        ));
-        fuzzies.push((Occur::Must, set_query.clone()));
-        originals.push((Occur::Must, set_query.clone()));
-    }
+    apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter);
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;

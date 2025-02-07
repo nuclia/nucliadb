@@ -34,7 +34,7 @@ use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
 };
-use nidx_types::{prefilter::ValidFieldCollector, OpenIndexMetadata};
+use nidx_types::{prefilter::PrefilterResult, OpenIndexMetadata};
 use reader::ParagraphReaderService;
 use resource_indexer::index_paragraphs;
 use schema::ParagraphSchema;
@@ -143,7 +143,7 @@ impl ParagraphSearcher {
     pub fn search(
         &self,
         request: &ParagraphSearchRequest,
-        prefilter: &ValidFieldCollector,
+        prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
         self.reader.search(request, prefilter)
     }
@@ -152,7 +152,7 @@ impl ParagraphSearcher {
     pub fn suggest(
         &self,
         request: &SuggestRequest,
-        prefilter: &ValidFieldCollector,
+        prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
         self.reader.suggest(request, prefilter)
     }

@@ -23,7 +23,7 @@ use std::time::Instant;
 
 use nidx_protos::order_by::{OrderField, OrderType};
 use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest, SuggestRequest};
-use nidx_types::prefilter::ValidFieldCollector;
+use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
 use tantivy::{schema::*, DateTime, Order};
@@ -60,7 +60,7 @@ impl ParagraphReaderService {
     pub fn suggest(
         &self,
         request: &SuggestRequest,
-        prefilter: &ValidFieldCollector,
+        prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
         let time = Instant::now();
         let id = Some(&request.shard);
@@ -129,7 +129,7 @@ impl ParagraphReaderService {
     pub fn search(
         &self,
         request: &ParagraphSearchRequest,
-        prefilter: &ValidFieldCollector,
+        prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
         let time = Instant::now();
         let id = Some(&request.id);
