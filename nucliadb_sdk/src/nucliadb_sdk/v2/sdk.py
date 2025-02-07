@@ -435,6 +435,7 @@ def ask_response_parser(response_type: Type[BaseModel], response: httpx.Response
     tokens = None
     timings = None
     error: Optional[str] = None
+    debug = None
     for line in response.iter_lines():
         try:
             item = AskResponseItem.model_validate_json(line).item
