@@ -134,6 +134,7 @@ fn compute_prefilters(
         labels_formula: labels,
         security: None,
         keywords_formula: keywords,
+        key_filter: search_request.key_filters.clone(),
     };
 
     // Security filters
@@ -155,6 +156,7 @@ fn compute_prefilters(
         && !request_has_labels_filters
         && !request_has_keywords_filters
         && !request_has_security_filters
+        && prefilter_request.key_filter.is_empty()
     {
         None
     } else {

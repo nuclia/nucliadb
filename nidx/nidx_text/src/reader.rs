@@ -36,7 +36,7 @@ use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::{BytesColumn, Column};
 use tantivy::fastfield::FacetReader;
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery};
 use tantivy::schema::Value;
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
@@ -284,6 +284,11 @@ impl TextReaderService {
         if let Some(keywords_formula) = request.keywords_formula.as_ref() {
             let keywords_formula_query = query_io::translate_keywords_expression(keywords_formula, schema);
             subqueries.push(keywords_formula_query);
+        }
+
+        if !request.key_filter.is_empty() {
+            let terms = request.key_filter.iter().map(|k| Term::from_field_bytes(schema.uuid, k.as_bytes()));
+            subqueries.push(Box::new(TermSetQuery::new(terms)));
         }
 
         if subqueries.is_empty() {
