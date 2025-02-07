@@ -543,7 +543,7 @@ def prepare_request(
             elif not isinstance(content, request_type):
                 raise TypeError(f"Expected {request_type}, got {type(content)}")
             elif isinstance(content, BaseModel):
-                data = content.model_dump_json(by_alias=True, exclude_unset=False)
+                data = content.model_dump_json(by_alias=True, exclude_unset=True)
             else:
                 raise TypeError(f"Unknown type {type(content)}")
         else:

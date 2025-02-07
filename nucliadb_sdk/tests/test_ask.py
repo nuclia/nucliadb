@@ -205,3 +205,12 @@ def test_ask_rag_strategies(docs_dataset, sdk: nucliadb_sdk.NucliaDB, rag_strate
     sdk.ask(
         kbid=docs_dataset, query="Does Nuclia offer RAG as a service?", rag_strategies=rag_strategies
     )
+
+
+def test_ask_rag_strategy_model(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    from nucliadb_models.search import FullResourceStrategy
+
+    rag_strategy = FullResourceStrategy()
+    sdk.ask(
+        kbid=docs_dataset, query="Does Nuclia offer RAG as a service?", rag_strategies=[rag_strategy]
+    )

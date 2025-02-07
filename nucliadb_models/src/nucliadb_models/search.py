@@ -1572,6 +1572,8 @@ Using this feature also disables the `citations` parameter. For maximal accuracy
                 obj = strategy
             elif isinstance(strategy, BaseModel):
                 obj = strategy.model_dump()
+                # Explicitly mark the name field as set, so it's always included (even with exclude_unset=True)
+                strategy.name = strategy.name
             else:
                 raise ValueError(
                     "RAG strategies must be defined using a valid RagStrategy object or a dictionary"
