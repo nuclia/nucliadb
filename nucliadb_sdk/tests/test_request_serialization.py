@@ -37,7 +37,7 @@ def test_find_request_serialization() -> None:
 
         sdk.find(kbid="kbid", content=req)
 
-        sent = json.loads(spy.call_args.kwargs["data"])
+        sent = json.loads(spy.call_args.kwargs["content"])
 
         assert sent == {"query": "love", "features": [SearchOptions.RELATIONS.value]}
         assert sent == req.model_dump(exclude_unset=True)
