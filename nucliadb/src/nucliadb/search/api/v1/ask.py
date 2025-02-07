@@ -66,6 +66,7 @@ async def ask_knowledgebox_endpoint(
     current_user: NucliaUser = request.user
     # If present, security groups from AuthorizationBackend overrides any
     # security group of the payload
+    print(current_user)
     if current_user.security_groups:
         if item.security is None:
             print(f"item security={item.security}, header security={current_user.security_groups}")
