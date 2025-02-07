@@ -293,7 +293,6 @@ class Fetcher:
         # calling twice should be avoided as query endpoint is a superset of detect entities
         if is_cached(self.cache.predict_detected_entities):
             logger.warning("Fetcher is not being efficient enough and has called predict twice!")
-            raise Exception("Fetcher is not being efficient enough and has called predict twice!")
 
         # we can't call get_vectorset, as it would do a recirsive loop between
         # functions, so we'll manually parse it
