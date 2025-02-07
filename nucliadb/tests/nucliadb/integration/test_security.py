@@ -215,9 +215,9 @@ async def _test_search_request_with_security(
         )
     elif search_endpoint == "ask_post":
         resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/ask",
-            json=payload,
+            f"/kb/{kbid}/ask", json=payload, headers={"x_synchronous": True}
         )
+        print(resp.text)
     else:
         raise ValueError(f"Unknown search endpoint: {search_endpoint}")
 
