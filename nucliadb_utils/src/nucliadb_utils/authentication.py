@@ -32,8 +32,9 @@ from starlette.websockets import WebSocket
 
 
 class NucliaUser(BaseUser):
-    def __init__(self, username: str) -> None:
+    def __init__(self, username: str, security_groups: Optional[list[str]] = None) -> None:
         self.username = username
+        self.security_groups = security_groups
 
     @property
     def is_authenticated(self) -> bool:
@@ -52,9 +53,11 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
         self,
         roles_header: str = "X-NUCLIADB-ROLES",
         user_header: str = "X-NUCLIADB-USER",
+        security_groups_header: str = "X-NUCLIADB-SECURITY-GROUPS",
     ) -> None:
         self.roles_header = roles_header
         self.user_header = user_header
+        self.security_groups_header = security_groups_header
 
     async def authenticate(self, request: HTTPConnection) -> Optional[Tuple[AuthCredentials, BaseUser]]:
         if self.roles_header not in request.headers:
@@ -66,7 +69,16 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
 
         if self.user_header in request.headers:
             user = request.headers[self.user_header]
-            nuclia_user: BaseUser = NucliaUser(username=user)
+            nuclia_user: NucliaUser = NucliaUser(username=user)
+
+            raw_security_groups: Optional[str] = request.headers.get(self.security_groups_header)
+            security_groups: Optional[list[str]] = None
+            if raw_security_groups is not None:
+                security_groups = raw_security_groups.split(";")
+
+            if security_groups:
+                nuclia_user.security_groups = security_groups
+
         else:
             nuclia_user = NucliaUser(username="anonymous")
 

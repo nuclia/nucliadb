@@ -84,7 +84,9 @@ async def test_resource_security_is_updated(
     assert resource["security"]["access_groups"] == []
 
 
-@pytest.mark.parametrize("search_endpoint", ("find_get", "find_post", "search_get", "search_post"))
+@pytest.mark.parametrize(
+    "search_endpoint", ("find_get", "find_post", "search_get", "search_post", "ask_post")
+)
 async def test_resource_security_search(
     nucliadb_reader,
     nucliadb_writer,
@@ -210,6 +212,11 @@ async def _test_search_request_with_security(
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/search",
             params=params,
+        )
+    elif search_endpoint == "ask_post":
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/ask",
+            json=payload,
         )
     else:
         raise ValueError(f"Unknown search endpoint: {search_endpoint}")
