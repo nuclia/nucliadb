@@ -42,6 +42,9 @@ async def test_ask_receives_injected_security_groups(
     )
     assert resp.status_code == 200
     spy.assert_called_once()
+    print(spy.call_args)
+    print(spy.call_args[0])
+    print(spy.call_args[1])
     ask_request = spy.call_args[1]
     assert isinstance(ask_request, AskRequest)
     assert ask_request.security is not None
