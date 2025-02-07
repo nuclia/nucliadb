@@ -49,9 +49,9 @@ from nucliadb_protos.nodereader_pb2 import DocumentScored, ParagraphResult
         (search_models.ReciprocalRankFusion(), ReciprocalRankFusion),
     ],
 )
-def test_get_rank_fusion(rank_fusion, expected_type: Type):
+async def test_get_rank_fusion(rank_fusion, expected_type: Type):
     item = FindRequest(rank_fusion=rank_fusion)
-    algorithm = get_rank_fusion(parse_find(item).rank_fusion)
+    algorithm = get_rank_fusion((await parse_find("kbid", item)).rank_fusion)
     assert isinstance(algorithm, expected_type)
 
 

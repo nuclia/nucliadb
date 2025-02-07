@@ -140,7 +140,7 @@ def test_ask_response_parser_stream():
     }
     response.iter_lines = unittest.mock.Mock(return_value=raw_lines)
 
-    ask_response: SyncAskResponse = ask_response_parser(response)
+    ask_response: SyncAskResponse = ask_response_parser(SyncAskResponse, response)
 
     assert ask_response.learning_id == "learning_id"
     assert ask_response.answer == "This is your Nuclia answer."
@@ -204,4 +204,13 @@ def test_ask_stream(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
 def test_ask_rag_strategies(docs_dataset, sdk: nucliadb_sdk.NucliaDB, rag_strategies):
     sdk.ask(
         kbid=docs_dataset, query="Does Nuclia offer RAG as a service?", rag_strategies=rag_strategies
+    )
+
+
+def test_ask_rag_strategy_model(docs_dataset, sdk: nucliadb_sdk.NucliaDB):
+    from nucliadb_models.search import FullResourceStrategy
+
+    rag_strategy = FullResourceStrategy()
+    sdk.ask(
+        kbid=docs_dataset, query="Does Nuclia offer RAG as a service?", rag_strategies=[rag_strategy]
     )
