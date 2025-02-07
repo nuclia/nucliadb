@@ -68,9 +68,12 @@ async def ask_knowledgebox_endpoint(
     # security group of the payload
     if current_user.security_groups:
         if item.security is None:
+            print(f"item security={item.security}, header security={current_user.security_groups}")
             item.security = RequestSecurity(groups=current_user.security_groups)
         else:
+            print(f"item security={item.security}, header security={current_user.security_groups}")
             item.security.groups = current_user.security_groups
+    print(f"POST item security={item.security}")
     return await create_ask_response(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
     )
