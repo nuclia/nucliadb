@@ -240,8 +240,8 @@ async def _test_search_request_with_security(
         for message in messages:
             json_message = json.loads(message)
             print(json_message)
-            if json_message["type"] == "retrieval":
-                search_response = json_message["results"]
+            if json_message["item"]["type"] == "retrieval":
+                search_response = json_message["item"]["results"]
                 resource_ids = list(search_response["resources"].keys())
                 break
     else:
