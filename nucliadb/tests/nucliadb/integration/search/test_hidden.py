@@ -27,68 +27,75 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource_with_title_paragraph, inject_message
 
 
-async def create_resource(kbid, nucliadb_grpc):
+async def create_resource(kbid: str, nucliadb_ingest_grpc: WriterStub):
     message = broker_resource_with_title_paragraph(kbid)
-    await inject_message(nucliadb_grpc, message)
+    await inject_message(nucliadb_ingest_grpc, message)
     return message.uuid
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_hidden_search(
     app_context,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    nucliadb_manager: AsyncClient,
-    knowledgebox: str,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_writer_manager: AsyncClient,
+    standalone_knowledgebox: str,
 ):
-    resp = await nucliadb_manager.patch(f"/kb/{knowledgebox}", json={"hidden_resources_enabled": True})
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{standalone_knowledgebox}", json={"hidden_resources_enabled": True}
+    )
     assert resp.status_code == 200
 
-    r1 = await create_resource(knowledgebox, nucliadb_grpc)
-    r2 = await create_resource(knowledgebox, nucliadb_grpc)
+    r1 = await create_resource(standalone_knowledgebox, nucliadb_ingest_grpc)
+    r2 = await create_resource(standalone_knowledgebox, nucliadb_ingest_grpc)
 
     # Both resources appear in searches
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search")
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r1, r2}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=title")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/suggest?query=title")
     assert resp.status_code == 200
     assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r1, r2}
 
     # Hide r1
-    resp = await nucliadb_writer.patch(f"/kb/{knowledgebox}/resource/{r1}", json={"hidden": True})
+    resp = await nucliadb_writer.patch(
+        f"/kb/{standalone_knowledgebox}/resource/{r1}", json={"hidden": True}
+    )
     assert resp.status_code == 200
     await asyncio.sleep(0.5)
 
     # Only r2 appears on search
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search")
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r2}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=title")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/suggest?query=title")
     assert resp.status_code == 200
     assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r2}
 
     # Unless show_hidden is passed, then both resources are returned
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?show_hidden=true")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?show_hidden=true")
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r1, r2}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=title&show_hidden=true")
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/suggest?query=title&show_hidden=true"
+    )
     assert resp.status_code == 200
     assert set([r["rid"] for r in resp.json()["paragraphs"]["results"]]) == {r1, r2}
 
     # Test catalog ternary filter
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/catalog")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/catalog")
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r1, r2}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/catalog?hidden=true")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/catalog?hidden=true")
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r1}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/catalog?hidden=false")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/catalog?hidden=false")
     assert resp.status_code == 200
     assert resp.json()["resources"].keys() == {r2}
 

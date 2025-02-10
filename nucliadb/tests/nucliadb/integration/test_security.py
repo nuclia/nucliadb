@@ -21,14 +21,15 @@ import asyncio
 from typing import Optional
 
 import pytest
+from httpx import AsyncClient
 
 PLATFORM_GROUP = "platform"
 DEVELOPERS_GROUP = "developers"
 
 
 @pytest.fixture(scope="function")
-async def resource_with_security(nucliadb_writer, knowledgebox):
-    kbid = knowledgebox
+async def resource_with_security(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
+    kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
@@ -45,10 +46,11 @@ async def resource_with_security(nucliadb_writer, knowledgebox):
     return resp.json()["uuid"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_security_is_returned_serialization(
-    nucliadb_reader, knowledgebox, resource_with_security
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource_with_security
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resource_id = resource_with_security
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{resource_id}", params={"show": ["security"]})
@@ -57,10 +59,11 @@ async def test_resource_security_is_returned_serialization(
     assert set(resource["security"]["access_groups"]) == set([PLATFORM_GROUP, DEVELOPERS_GROUP])
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_security_is_updated(
-    nucliadb_reader, nucliadb_writer, knowledgebox, resource_with_security
+    nucliadb_reader: AsyncClient, nucliadb_writer, standalone_knowledgebox: str, resource_with_security
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resource_id = resource_with_security
 
     # Update the security of the resource: make it public for all groups
@@ -85,14 +88,15 @@ async def test_resource_security_is_updated(
 
 
 @pytest.mark.parametrize("search_endpoint", ("find_get", "find_post", "search_get", "search_post"))
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_security_search(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
     resource_with_security,
     search_endpoint,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resource_id = resource_with_security
     support_group = "support"
     # Add another group to the resource
@@ -173,7 +177,7 @@ async def test_resource_security_search(
 
 async def _test_search_request_with_security(
     search_endpoint: str,
-    nucliadb_reader,
+    nucliadb_reader: AsyncClient,
     kbid: str,
     query: str,
     security_groups: Optional[list[str]],

@@ -19,17 +19,19 @@
 #
 import json
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb_models.text import TextFormat
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_text_field_in_json_format(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     field_id = "json-text"
     payload = {"hello": "world"}
 
@@ -55,12 +57,13 @@ async def test_text_field_in_json_format(
     assert json.loads(body["data"]["texts"][field_id]["value"]["body"]) == payload
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_text_field_with_invalid_json(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     field_id = "json-text"
     invalid_json = '{hello": "world"}'
 

@@ -33,7 +33,7 @@ from nucliadb_protos import utils_pb2
 
 
 async def add_vectorset(
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer: AsyncClient,
     kbid: str,
     vectorset_id: str,
     *,
@@ -92,5 +92,5 @@ async def add_vectorset(
             "nucliadb.writer.api.v1.vectorsets.learning_proxy.update_configuration",
         ),
     ):
-        resp = await nucliadb_manager.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
+        resp = await nucliadb_writer.post(f"/kb/{kbid}/vectorsets/{vectorset_id}")
         return resp

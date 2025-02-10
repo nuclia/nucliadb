@@ -17,17 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
 from httpx import AsyncClient
 
 from nucliadb_models.search import SummarizedResponse
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_summarize(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resource_uuids = []
     resource_slugs = []
@@ -61,6 +63,7 @@ async def test_summarize(
     assert set(response.resources.keys()) == set(resources)
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_summarize_unexisting_kb(
     nucliadb_reader: AsyncClient,
 ):

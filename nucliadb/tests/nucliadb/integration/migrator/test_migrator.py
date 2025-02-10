@@ -20,6 +20,7 @@
 import uuid
 
 import pytest
+from httpx import AsyncClient
 
 from nucliadb.migrator import migrator
 from nucliadb.migrator.context import ExecutionContext
@@ -38,12 +39,13 @@ async def execution_context(natsd, storage, nucliadb):
         await context.finalize()
 
 
-async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
+@pytest.mark.deploy_modes("standalone")
+async def test_migrate_kb(execution_context: ExecutionContext, standalone_knowledgebox):
     # this will test run all available migrations
-    await execution_context.data_manager.update_kb_info(kbid=knowledgebox, current_version=-1)
+    await execution_context.data_manager.update_kb_info(kbid=standalone_knowledgebox, current_version=-1)
     await execution_context.data_manager.update_global_info(current_version=0)
 
-    kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
+    kb_info = await execution_context.data_manager.get_kb_info(kbid=standalone_knowledgebox)
     assert kb_info is not None
     assert kb_info.current_version == -1
     global_info = await execution_context.data_manager.get_global_info()
@@ -53,7 +55,7 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     # other tests can be so slow and cumbersome to maintain
     await migrator.run(execution_context, target_version=1)
 
-    kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
+    kb_info = await execution_context.data_manager.get_kb_info(kbid=standalone_knowledgebox)
     assert kb_info is not None
     assert kb_info.current_version == 1
     global_info = await execution_context.data_manager.get_global_info()
@@ -61,20 +63,21 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
 
 
 @pytest.fixture(scope="function")
-async def two_knowledgeboxes(nucliadb_manager):
+async def two_knowledgeboxes(nucliadb_writer_manager: AsyncClient):
     kbs = []
     for _ in range(2):
-        resp = await nucliadb_manager.post("/kbs", json={"slug": uuid.uuid4().hex})
+        resp = await nucliadb_writer_manager.post("/kbs", json={"slug": uuid.uuid4().hex})
         assert resp.status_code == 201
         kbs.append(resp.json().get("uuid"))
 
     yield kbs
 
     for kb in kbs:
-        resp = await nucliadb_manager.delete(f"/kb/{kb}")
+        resp = await nucliadb_writer_manager.delete(f"/kb/{kb}")
         assert resp.status_code == 200
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_run_all_kb_migrations(execution_context: ExecutionContext, two_knowledgeboxes):
     # Set migration version to -1 for all knowledgeboxes
     for kbid in two_knowledgeboxes:
@@ -100,6 +103,7 @@ async def test_run_all_kb_migrations(execution_context: ExecutionContext, two_kn
         assert global_info.current_version == 1
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_run_kb_rollovers(execution_context: ExecutionContext, two_knowledgeboxes):
     # Set migration version to -1 for all knowledgeboxes
     for kbid in two_knowledgeboxes:

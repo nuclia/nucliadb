@@ -18,15 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pytest
 from httpx import AsyncClient
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_selection_labelsets(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/labelset/myselections",
@@ -58,12 +60,13 @@ async def test_selection_labelsets(
     assert body["labels"] == []
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_duplicated_labelsets_not_allowed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     # Create labelset
     resp = await nucliadb_writer.post(
@@ -105,12 +108,13 @@ async def test_duplicated_labelsets_not_allowed(
     assert resp.status_code == 422
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_duplicated_labels_not_allowed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/labelset/myselections",

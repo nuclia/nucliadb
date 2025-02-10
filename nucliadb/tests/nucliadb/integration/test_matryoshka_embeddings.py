@@ -20,6 +20,7 @@
 import uuid
 from unittest.mock import patch
 
+import pytest
 from faker import Faker
 from httpx import AsyncClient
 
@@ -34,9 +35,10 @@ from tests.utils.broker_messages import BrokerMessageBuilder, FieldBuilder
 fake = Faker()
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_matryoshka_embeddings(
     maindb_driver: Driver,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     learning_config,
@@ -56,7 +58,7 @@ async def test_matryoshka_embeddings(
         semantic_matryoshka_dims=matryoshka_dimensions,
     )
 
-    new_kb_response = await nucliadb_grpc.NewKnowledgeBoxV2(  # type: ignore
+    new_kb_response = await nucliadb_ingest_grpc.NewKnowledgeBoxV2(  # type: ignore
         writer_pb2.NewKnowledgeBoxV2Request(
             kbid=kbid,
             slug=slug,
@@ -117,7 +119,7 @@ async def test_matryoshka_embeddings(
     bmb.add_field_builder(text_field)
 
     bm = bmb.build()
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Search
 
