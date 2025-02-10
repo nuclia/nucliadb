@@ -21,6 +21,7 @@
 mod fuzzy_query;
 mod query_io;
 mod reader;
+mod request_types;
 mod resource_indexer;
 mod schema;
 mod search_query;
@@ -28,7 +29,7 @@ mod search_response;
 mod set_query;
 mod stop_words;
 
-use nidx_protos::{ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, StreamRequest, SuggestRequest};
+use nidx_protos::{ParagraphItem, ParagraphSearchResponse, StreamRequest, SuggestRequest};
 use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
@@ -37,7 +38,6 @@ use nidx_types::OpenIndexMetadata;
 use reader::ParagraphReaderService;
 use resource_indexer::index_paragraphs;
 use schema::ParagraphSchema;
-pub use search_query::ParagraphsContext;
 use std::path::Path;
 use tantivy::{
     directory::MmapDirectory,
@@ -47,6 +47,8 @@ use tantivy::{
     Term,
 };
 use tracing::instrument;
+
+pub use request_types::ParagraphSearchRequest;
 
 pub struct ParagraphIndexer;
 
@@ -138,12 +140,8 @@ impl ParagraphSearcher {
     }
 
     #[instrument(name = "paragraph::search", skip_all)]
-    pub fn search(
-        &self,
-        request: &ParagraphSearchRequest,
-        context: &ParagraphsContext,
-    ) -> anyhow::Result<ParagraphSearchResponse> {
-        self.reader.search(request, context)
+    pub fn search(&self, request: &ParagraphSearchRequest) -> anyhow::Result<ParagraphSearchResponse> {
+        self.reader.search(request)
     }
 
     #[instrument(name = "paragraph::suggest", skip_all)]

@@ -48,8 +48,9 @@ from tests.utils.vectorsets import add_vectorset
 MODULE = "nucliadb.writer.api.v1.vectorsets"
 
 
-async def test_add_delete_vectorsets(
+async def test_vectorsets_crud(
     nucliadb_manager: AsyncClient,
+    nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
     kbid = knowledgebox
@@ -100,6 +101,13 @@ async def test_add_delete_vectorsets(
             assert resp.status_code == 201, resp.text
 
             # Check that the vectorset has been created with the correct configuration
+            resp = await nucliadb_reader.get(f"/kb/{kbid}/vectorsets")
+            assert resp.status_code == 200
+            body = resp.json()
+            assert len(body["vectorsets"]) == 2
+            assert {"id": "multilingual"} in body["vectorsets"]
+            assert {"id": vectorset_id} in body["vectorsets"]
+
             async with datamanagers.with_ro_transaction() as txn:
                 vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset_id)
                 assert vs is not None
@@ -120,6 +128,12 @@ async def test_add_delete_vectorsets(
             assert resp.status_code == 204, resp.text
 
             # Check that the vectorset has been deleted
+            resp = await nucliadb_reader.get(f"/kb/{kbid}/vectorsets")
+            assert resp.status_code == 200
+            body = resp.json()
+            assert len(body["vectorsets"]) == 1
+            assert {"id": "multilingual"} in body["vectorsets"]
+
             async with datamanagers.with_ro_transaction() as txn:
                 vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset_id)
                 assert vs is None

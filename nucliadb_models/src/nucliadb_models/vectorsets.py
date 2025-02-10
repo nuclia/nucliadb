@@ -23,3 +23,11 @@ from pydantic import BaseModel
 
 class CreatedVectorSet(BaseModel):
     id: str
+
+
+class VectorSetListItem(BaseModel):
+    id: str
+
+
+class VectorSetList(BaseModel):
+    vectorsets: list[VectorSetListItem]

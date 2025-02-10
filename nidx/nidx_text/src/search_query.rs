@@ -18,23 +18,16 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::query_io;
+use crate::{query_io, DocumentSearchRequest};
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::stream_filter::Conjunction;
-use nidx_protos::{DocumentSearchRequest, StreamFilter, StreamRequest};
-use nidx_types::query_language::BooleanExpression;
+use nidx_protos::{StreamFilter, StreamRequest};
 use std::ops::Bound;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
 
 use crate::schema::{self, TextSchema};
-
-// TODO: Remove after we stop using protobufs here
-#[derive(Clone, Default)]
-pub struct TextContext {
-    pub label_filtering_formula: Option<BooleanExpression>,
-}
 
 pub fn produce_date_range_query(
     field: &str,
@@ -70,7 +63,6 @@ pub fn create_query(
     schema: &TextSchema,
     text: &str,
     with_advance: Option<Box<dyn Query>>,
-    context: &TextContext,
 ) -> anyhow::Result<Box<dyn Query>> {
     let mut queries = vec![];
     let main_q = if text.is_empty() {
@@ -94,7 +86,7 @@ pub fn create_query(
         queries.push((Occur::Must, Box::new(BooleanQuery::new(field_filter))));
     }
 
-    if let Some(expression) = &context.label_filtering_formula {
+    if let Some(expression) = &search.label_filtering_formula {
         let query = query_io::translate_labels_expression(expression, schema);
         queries.push((Occur::Must, query));
     }

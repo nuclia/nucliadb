@@ -96,9 +96,13 @@ async def build_find_response(
         )
     )
 
-    merged_text_blocks: list[TextBlockMatch] = rank_fusion_algorithm.fuse(
-        keyword_results, semantic_results
-    )
+    merged_text_blocks: list[TextBlockMatch]
+    if len(keyword_results) == 0:
+        merged_text_blocks = semantic_results
+    elif len(semantic_results) == 0:
+        merged_text_blocks = keyword_results
+    else:
+        merged_text_blocks = rank_fusion_algorithm.fuse(keyword_results, semantic_results)
 
     # cut
     # we assume pagination + predict reranker is forbidden and has been already

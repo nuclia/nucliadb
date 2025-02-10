@@ -41,7 +41,7 @@ from nucliadb_utils.utilities import get_storage
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/vectorsets/{{vectorset_id}}",
     status_code=201,
-    summary="Add a vectorset to Knowledge Box",
+    summary="Add a vector set to Knowledge Box",
     tags=["VectorSets"],
     # TODO: remove when the feature is mature
     include_in_schema=False,
@@ -126,7 +126,7 @@ def get_vectorset_config(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/vectorsets/{{vectorset_id}}",
     status_code=204,
-    summary="Delete vectorset from Knowledge Box",
+    summary="Delete vector set from Knowledge Box",
     tags=["VectorSets"],
     # TODO: remove when the feature is mature
     include_in_schema=False,

@@ -112,6 +112,7 @@ def nucliadb(pg):
     pg_host, pg_port = pg
     # Setup the connection to pg for the maindb driver
     url = f"postgresql://postgres:postgres@{pg_host}:{pg_port}/postgres"
+
     images.settings["nucliadb"]["env"]["DRIVER"] = "PG"
     images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = url
 
@@ -137,6 +138,9 @@ def nucliadb(pg):
                     pass
                 time.sleep(1)
 
+            if requests.get(f"http://localhost:8080").status_code != 200:
+                raise Exception("No NucliaDB Running")
+
         yield NucliaFixture(
             host=host,
             port=8080,
@@ -157,6 +161,7 @@ def nucliadb(pg):
         network = container.container_obj.attrs["NetworkSettings"]
         service_port = "8060/tcp"
         grpc = network["Ports"][service_port][0]["HostPort"]
+
         yield NucliaFixture(
             host=host,
             port=port,
