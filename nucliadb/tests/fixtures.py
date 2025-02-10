@@ -311,31 +311,6 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: Wr
     return (nodes, edges)
 
 
-# TODO: remove after migrating tests/nucliadb/ to ndbfixtures. fixture already
-# moved to ndbfixtures.common
-@pytest.fixture(scope="function")
-async def stream_audit(natsd: str, mocker):
-    from nucliadb_utils.audit.stream import StreamAuditStorage
-    from nucliadb_utils.settings import audit_settings
-
-    audit = StreamAuditStorage(
-        [natsd],
-        audit_settings.audit_jetstream_target,  # type: ignore
-        audit_settings.audit_partitions,
-        audit_settings.audit_hash_seed,
-    )
-    await audit.initialize()
-
-    mocker.spy(audit, "send")
-    mocker.spy(audit.js, "publish")
-    mocker.spy(audit, "search")
-    mocker.spy(audit, "chat")
-
-    set_utility(Utility.AUDIT, audit)
-    yield audit
-    await audit.finalize()
-
-
 @pytest.fixture(scope="function")
 def predict_mock() -> Mock:  # type: ignore
     predict = get_utility(Utility.PREDICT)
