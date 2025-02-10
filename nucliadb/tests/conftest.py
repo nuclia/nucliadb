@@ -47,6 +47,8 @@ pytest_plugins.extend(
         # useful resources for tests (KBs, resources, ...)
         "tests.ndbfixtures.resources",
         "tests.nucliadb.knowledgeboxes",
+        # legacy fixtures waiting for a better place
+        "tests.ndbfixtures.legacy",
     ]
 )
 
