@@ -40,14 +40,14 @@ async def app_context(natsd, storage, nucliadb):
 @pytest.mark.deploy_modes("standalone")
 async def test_rebalance_kb_shards(
     app_context,
-    knowledgebox,
+    standalone_knowledgebox,
     nucliadb_writer: AsyncClient,
     nucliadb_reader_manager: AsyncClient,
 ):
     count = 10
     for i in range(count):
         resp = await nucliadb_writer.post(
-            f"/kb/{knowledgebox}/resources",
+            f"/kb/{standalone_knowledgebox}/resources",
             json={
                 "slug": f"myresource-{i}",
                 "title": f"My Title {i}",
@@ -61,20 +61,20 @@ async def test_rebalance_kb_shards(
         )
         assert resp.status_code == 201
 
-    counters1_resp = await nucliadb_reader_manager.get(f"/kb/{knowledgebox}/counters")
-    shards1_resp = await nucliadb_reader_manager.get(f"/kb/{knowledgebox}/shards")
+    counters1_resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/counters")
+    shards1_resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/shards")
     counters1 = counters1_resp.json()
     shards1 = shards1_resp.json()
 
     assert len(shards1["shards"]) == 1
 
     with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
-        await rebalance.rebalance_kb(app_context, knowledgebox)
+        await rebalance.rebalance_kb(app_context, standalone_knowledgebox)
 
-    shards2_resp = await nucliadb_reader_manager.get(f"/kb/{knowledgebox}/shards")
+    shards2_resp = await nucliadb_reader_manager.get(f"/kb/{standalone_knowledgebox}/shards")
     shards2 = shards2_resp.json()
     assert len(shards2["shards"]) == 2
 
     # if we run it again, we should get another shard
     with patch.object(settings, "max_shard_paragraphs", counters1["paragraphs"] / 2):
-        await rebalance.rebalance_kb(app_context, knowledgebox)
+        await rebalance.rebalance_kb(app_context, standalone_knowledgebox)

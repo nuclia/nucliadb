@@ -64,14 +64,14 @@ def audit():
 @pytest.mark.deploy_modes("standalone")
 async def test_ask(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "query"})
+    resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/ask", json={"query": "query"})
     assert resp.status_code == 200
 
     context = [{"author": "USER", "text": "query"}]
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "query",
             "context": context,
@@ -92,17 +92,17 @@ def find_incomplete_results():
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_handles_incomplete_find_results(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     find_incomplete_results,
 ):
-    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "query"})
+    resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/ask", json={"query": "query"})
     assert resp.status_code == 529
     assert resp.json() == {"detail": "Temporary error on information retrieval. Please try again."}
 
 
 @pytest.fixture
-async def resource(nucliadb_writer: AsyncClient, knowledgebox: str):
-    kbid = knowledgebox
+async def resource(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
+    kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
@@ -118,9 +118,9 @@ async def resource(nucliadb_writer: AsyncClient, knowledgebox: str):
 
 
 @pytest.fixture
-async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, knowledgebox):
+async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, standalone_knowledgebox):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "Knowledge graph",
             "slug": "knowledgegraph",
@@ -196,7 +196,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, kno
     ]
     bm = BrokerMessage()
     bm.uuid = rid
-    bm.kbid = knowledgebox
+    bm.kbid = standalone_knowledgebox
     bm.relations.extend(edges)
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
@@ -204,9 +204,9 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, kno
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox: str, resource):
+async def test_ask_synchronous(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={"query": "title"},
         headers={"X-Synchronous": "True"},
     )
@@ -218,9 +218,11 @@ async def test_ask_synchronous(nucliadb_reader: AsyncClient, knowledgebox: str, 
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_status_code_no_retrieval_data(nucliadb_reader: AsyncClient, knowledgebox: str):
+async def test_ask_status_code_no_retrieval_data(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str
+):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={"query": "title"},
         headers={"X-Synchronous": "True"},
     )
@@ -232,7 +234,7 @@ async def test_ask_status_code_no_retrieval_data(nucliadb_reader: AsyncClient, k
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox: str, resource):
+async def test_ask_with_citations(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource):
     citations = {"foo": [], "bar": []}  # type: ignore
     citations_gen = CitationsGenerativeResponse(citations=citations)
     citations_chunk = GenerativeChunk(chunk=citations_gen)
@@ -241,7 +243,7 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox: st
     predict.ndjson_answer.append(citations_chunk.model_dump_json() + "\n")  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={"query": "title", "citations": True, "citation_threshold": 0.5},
         headers={"X-Synchronous": "true"},
     )
@@ -255,11 +257,11 @@ async def test_ask_with_citations(nucliadb_reader: AsyncClient, knowledgebox: st
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.deploy_modes("standalone")
 async def test_sync_ask_returns_debug_mode(
-    nucliadb_reader: AsyncClient, knowledgebox: str, resource, debug
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource, debug
 ):
     # Make sure prompt context is returned if debug is True
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={"query": "title", "debug": debug},
         headers={"X-Synchronous": "True"},
     )
@@ -275,8 +277,8 @@ async def test_sync_ask_returns_debug_mode(
 
 
 @pytest.fixture
-async def resources(nucliadb_writer: AsyncClient, knowledgebox: str):
-    kbid = knowledgebox
+async def resources(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
+    kbid = standalone_knowledgebox
     rids = []
     for i in range(2):
         resp = await nucliadb_writer.post(
@@ -309,14 +311,16 @@ def parse_ask_response(resp):
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowledgebox: str, resources):
+async def test_ask_rag_options_full_resource(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
+):
     resource1, resource2 = resources
 
     predict = get_predict()
     predict.calls.clear()  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "features": ["keyword", "semantic", "relations"],
@@ -342,7 +346,7 @@ async def test_ask_rag_options_full_resource(nucliadb_reader: AsyncClient, knowl
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_full_resource_rag_strategy_with_exclude(
-    nucliadb_reader: AsyncClient, knowledgebox: str, resources
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):
     resource1, resource2 = resources
 
@@ -350,7 +354,7 @@ async def test_ask_full_resource_rag_strategy_with_exclude(
     predict.calls.clear()  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "features": ["keyword", "semantic", "relations"],
@@ -397,7 +401,7 @@ async def test_ask_full_resource_rag_strategy_with_exclude(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_options_extend_with_fields(
-    nucliadb_reader: AsyncClient, knowledgebox: str, resources
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):
     resource1, resource2 = resources
 
@@ -405,7 +409,7 @@ async def test_ask_rag_options_extend_with_fields(
     predict.calls.clear()  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "features": ["keyword", "semantic", "relations"],
@@ -520,10 +524,10 @@ async def test_ask_rag_strategies_validation(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox: str, resources):
+async def test_ask_capped_context(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources):
     # By default, max size is big enough to fit all the prompt context
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "rag_strategies": [{"name": "full_resource"}],
@@ -541,7 +545,7 @@ async def test_ask_capped_context(nucliadb_reader: AsyncClient, knowledgebox: st
     assert total_size > max_size * 3
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "rag_strategies": [{"name": "full_resource"}],
@@ -564,10 +568,10 @@ async def test_ask_on_a_kb_not_found(nucliadb_reader: AsyncClient):
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_max_tokens(nucliadb_reader: AsyncClient, knowledgebox, resources):
+async def test_ask_max_tokens(nucliadb_reader: AsyncClient, standalone_knowledgebox, resources):
     # As an integer
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "max_tokens": 100,
@@ -577,7 +581,7 @@ async def test_ask_max_tokens(nucliadb_reader: AsyncClient, knowledgebox, resour
 
     # Same but with the max tokens in a dict
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "max_tokens": {"context": 100, "answer": 50},
@@ -590,7 +594,7 @@ async def test_ask_max_tokens(nucliadb_reader: AsyncClient, knowledgebox, resour
     assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "max_tokens": {"context": predict.max_context + 1},
@@ -600,9 +604,9 @@ async def test_ask_max_tokens(nucliadb_reader: AsyncClient, knowledgebox, resour
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox: str, resource):
+async def test_ask_on_resource(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/resource/{resource}/ask",
+        f"/kb/{standalone_knowledgebox}/resource/{resource}/ask",
         json={"query": "title"},
         headers={"X-Synchronous": "True"},
     )
@@ -612,7 +616,7 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox: str, 
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_handles_stream_errors_on_predict(
-    nucliadb_reader: AsyncClient, knowledgebox, resource
+    nucliadb_reader: AsyncClient, standalone_knowledgebox, resource
 ):
     predict = get_predict()
     assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
@@ -625,7 +629,7 @@ async def test_ask_handles_stream_errors_on_predict(
 
     # Sync ask
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={"query": "title"},
         headers={"X-Synchronous": "True"},
     )
@@ -636,7 +640,7 @@ async def test_ask_handles_stream_errors_on_predict(
 
     # Stream ask
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={"query": "title"},
     )
     assert resp.status_code == 200
@@ -651,7 +655,7 @@ async def test_ask_handles_stream_errors_on_predict(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_handles_stream_unexpected_errors_sync(
-    nucliadb_reader: AsyncClient, knowledgebox: str, resource
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
 ):
     with mock.patch(
         "nucliadb.search.search.chat.ask.AskResult._stream",
@@ -659,7 +663,7 @@ async def test_ask_handles_stream_unexpected_errors_sync(
     ):
         # Sync ask -- should return a 500
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/ask",
+            f"/kb/{standalone_knowledgebox}/ask",
             json={"query": "title"},
             headers={"X-Synchronous": "True"},
         )
@@ -668,7 +672,7 @@ async def test_ask_handles_stream_unexpected_errors_sync(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_handles_stream_unexpected_errors_stream(
-    nucliadb_reader: AsyncClient, knowledgebox: str, resource
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
 ):
     with mock.patch(
         "nucliadb.search.search.chat.ask.AskResult._stream",
@@ -676,7 +680,7 @@ async def test_ask_handles_stream_unexpected_errors_stream(
     ):
         # Stream ask -- should handle by yielding the error item
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/ask",
+            f"/kb/{standalone_knowledgebox}/ask",
             json={"query": "title"},
         )
         assert resp.status_code == 200
@@ -691,10 +695,10 @@ async def test_ask_handles_stream_unexpected_errors_stream(
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_with_json_schema_output(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     resource,
 ):
-    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "query"})
+    resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/ask", json={"query": "query"})
     assert resp.status_code == 200
 
     predict = get_predict()
@@ -703,7 +707,7 @@ async def test_ask_with_json_schema_output(
     predict.ndjson_answer = [GenerativeChunk(chunk=predict_answer).model_dump_json() + "\n"]  # type: ignore
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "features": ["keyword", "semantic", "relations"],
@@ -724,9 +728,11 @@ async def test_ask_with_json_schema_output(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_assert_audit_retrieval_contexts(
-    nucliadb_reader: AsyncClient, knowledgebox: str, resources, audit
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources, audit
 ):
-    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/ask", json={"query": "title", "debug": True})
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask", json={"query": "title", "debug": True}
+    )
     assert resp.status_code == 200
 
     retrieved_context = audit.chat.call_args_list[0].kwargs["retrieved_context"]
@@ -737,10 +743,10 @@ async def test_ask_assert_audit_retrieval_contexts(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_strategy_neighbouring_paragraphs(
-    nucliadb_reader: AsyncClient, knowledgebox: str, resources
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "rag_strategies": [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
@@ -755,10 +761,10 @@ async def test_ask_rag_strategy_neighbouring_paragraphs(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_strategy_metadata_extension(
-    nucliadb_reader: AsyncClient, knowledgebox: str, resources
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "rag_strategies": [
@@ -793,7 +799,7 @@ async def test_ask_rag_strategy_metadata_extension(
         {"name": "field_extension", "fields": ["a/title", "a/summary"]},
     ]:
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/ask",
+            f"/kb/{standalone_knowledgebox}/ask",
             json={
                 "query": "title",
                 "rag_strategies": [
@@ -819,9 +825,9 @@ async def test_ask_rag_strategy_metadata_extension(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox: str, resources):
+async def test_ask_top_k(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
         },
@@ -834,7 +840,7 @@ async def test_ask_top_k(nucliadb_reader: AsyncClient, knowledgebox: str, resour
 
     # Check that the top_k is respected
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "title",
             "top_k": 1,
@@ -858,7 +864,7 @@ async def test_ask_graph_strategy(
     mocker_predict,
     relation_ranking: str,
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     graph_resource,
 ):
     # Mock the rank_relations functions to return the same relations with a score of 5 (no ranking)
@@ -886,7 +892,7 @@ async def test_ask_graph_strategy(
     }
     headers = {"X-Synchronous": "True"}
 
-    url = f"/kb/{knowledgebox}/ask"
+    url = f"/kb/{standalone_knowledgebox}/ask"
 
     async def assert_ask(d, expected_paragraphs_text, expected_paragraphs_relations):
         resp = await nucliadb_reader.post(
@@ -993,9 +999,11 @@ async def test_ask_graph_strategy(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowledgebox: str, resources):
+async def test_ask_rag_strategy_prequeries(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
+):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "",
             "rag_strategies": [
@@ -1030,10 +1038,10 @@ async def test_ask_rag_strategy_prequeries(nucliadb_reader: AsyncClient, knowled
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_strategy_prequeries_with_full_resource(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={
             "query": "",
             "rag_strategies": [
@@ -1065,11 +1073,11 @@ async def test_ask_rag_strategy_prequeries_with_full_resource(
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_strategy_prequeries_with_prefilter(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     resources,
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         headers={"X-Synchronous": "True"},
         json={
             "query": "",
@@ -1113,10 +1121,10 @@ async def test_ask_rag_strategy_prequeries_with_prefilter(
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_on_resource_with_json_schema_automatic_prequeries(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     resource,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     rid = resource
     answer_json_schema = {
         "name": "book_ordering",
@@ -1150,7 +1158,7 @@ async def test_ask_on_resource_with_json_schema_automatic_prequeries(
 @pytest.mark.deploy_modes("standalone")
 async def test_all_rag_strategies_combinations(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     resources,
 ):
     rag_strategies = [
@@ -1179,7 +1187,7 @@ async def test_all_rag_strategies_combinations(
     for combination in valid_combinations:  # type: ignore
         print(f"Combination: {sorted([strategy.name for strategy in combination])}")
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/ask",
+            f"/kb/{standalone_knowledgebox}/ask",
             headers={"X-Synchronous": "True"},
             json={
                 "query": "title",
@@ -1192,10 +1200,10 @@ async def test_all_rag_strategies_combinations(
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_fails_with_answer_json_schema_too_big(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     resources: list[str],
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     rid = resources[0]
 
     resp = await nucliadb_reader.post(
@@ -1230,11 +1238,11 @@ async def test_ask_fails_with_answer_json_schema_too_big(
 @pytest.mark.deploy_modes("standalone")
 async def test_rag_image_rag_strategies(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     resources: list[str],
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         headers={"X-Synchronous": "True"},
         json={
             "query": "title",
@@ -1243,7 +1251,7 @@ async def test_rag_image_rag_strategies(
     assert resp.status_code == 200, resp.text
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         headers={"X-Synchronous": "True"},
         json={
             "query": "title",
@@ -1265,10 +1273,12 @@ async def test_rag_image_rag_strategies(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_skip_answer_generation(nucliadb_reader: AsyncClient, knowledgebox: str, resource):
+async def test_ask_skip_answer_generation(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource
+):
     # Synchronous
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={"query": "title", "generate_answer": False, "debug": True},
         headers={"X-Synchronous": "True"},
     )
@@ -1282,7 +1292,7 @@ async def test_ask_skip_answer_generation(nucliadb_reader: AsyncClient, knowledg
 
     # Streaming
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/ask",
+        f"/kb/{standalone_knowledgebox}/ask",
         json={"query": "title", "generate_answer": False, "debug": True},
     )
     assert resp.status_code == 200

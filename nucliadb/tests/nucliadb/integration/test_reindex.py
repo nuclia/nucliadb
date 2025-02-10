@@ -38,9 +38,9 @@ async def test_reindex(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_ingest_grpc, knowledgebox)
+    await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_ingest_grpc, standalone_knowledgebox)
 
 
 @pytest.mark.deploy_modes("standalone")

@@ -46,15 +46,15 @@ async def test_search_returns_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
     asyncbenchmark: AsyncBenchmarkFixture,
 ):
-    bm = broker_resource_with_classifications(knowledgebox)
+    bm = broker_resource_with_classifications(standalone_knowledgebox)
     await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await asyncbenchmark(
         nucliadb_reader.get,
-        f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
+        f"/kb/{standalone_knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
     )
     assert resp.status_code == 200
 
@@ -73,7 +73,7 @@ async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
     knowledge_graph,
     asyncbenchmark: AsyncBenchmarkFixture,
 ):
@@ -88,7 +88,7 @@ async def test_search_relations(
 
     resp = await asyncbenchmark(
         nucliadb_reader.get,
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         params={
             "features": "relations",
             "query": "What relates Newton and Becquer?",

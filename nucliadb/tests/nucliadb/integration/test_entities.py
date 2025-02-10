@@ -65,9 +65,9 @@ from tests.utils.entities import (
 @pytest.fixture
 async def text_field(
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     field_id = "text-field"
 
     resp = await nucliadb_writer.post(
@@ -93,12 +93,12 @@ async def text_field(
 
 
 @pytest.fixture
-async def processing_entities(nucliadb_ingest_grpc: WriterStub, knowledgebox: str):
+async def processing_entities(nucliadb_ingest_grpc: WriterStub, standalone_knowledgebox: str):
     entities = {
         "cat": {"value": "cat"},
         "dolphin": {"value": "dolphin"},
     }
-    bm = broker_resource(knowledgebox, slug="automatic-entities")
+    bm = broker_resource(standalone_knowledgebox, slug="automatic-entities")
     ufm = UserFieldMetadata(
         field=FieldID(field_type=FieldType.GENERIC, field="title"),
         token=[TokenSplit(token="cat", start=0, end=3, klass="ANIMALS")],
@@ -180,7 +180,7 @@ async def annotated_entities(
 
 
 @pytest.fixture
-async def user_entities(nucliadb_writer: AsyncClient, knowledgebox: str):
+async def user_entities(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
     await wait_for_sync()
     payload = CreateEntitiesGroupPayload(
         group="ANIMALS",
@@ -192,32 +192,32 @@ async def user_entities(nucliadb_writer: AsyncClient, knowledgebox: str):
         title="Animals",
         color="black",
     )
-    resp = await create_entities_group(nucliadb_writer, knowledgebox, payload)
+    resp = await create_entities_group(nucliadb_writer, standalone_knowledgebox, payload)
     assert resp.status_code == 200
 
 
 @pytest.fixture
 async def entities(
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     user_entities,
     processing_entities,
     annotated_entities,
 ):
     """Single fixture to get entities injected in different ways."""
     # Ensure entities are properly stored/indexed
-    await wait_until_entity(nucliadb_ingest_grpc, knowledgebox, "ANIMALS", "cat")
-    await wait_until_entity(nucliadb_ingest_grpc, knowledgebox, "ANIMALS", "dolphin")
-    await wait_until_entity(nucliadb_ingest_grpc, knowledgebox, "ANIMALS", "bird")
+    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "cat")
+    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "dolphin")
+    await wait_until_entity(nucliadb_ingest_grpc, standalone_knowledgebox, "ANIMALS", "bird")
 
 
 @pytest.mark.deploy_modes("standalone")
 async def test_get_entities_groups(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     entities,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
@@ -244,10 +244,10 @@ async def test_get_entities_groups(
 @pytest.mark.deploy_modes("standalone")
 async def test_list_entities_groups(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     entities,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups?show_entities=false")
     assert resp.status_code == 200
@@ -262,10 +262,10 @@ async def test_list_entities_groups(
 async def test_create_entities_group_twice(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     entities,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     payload = CreateEntitiesGroupPayload(
         group="ANIMALS",
@@ -281,10 +281,10 @@ async def test_create_entities_group_twice(
 async def test_update_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     entities,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     update = UpdateEntitiesGroupPayload(
         add={"seal": Entity(value="seal")},
@@ -311,10 +311,10 @@ async def test_update_entities_group(
 async def test_update_indexed_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     processing_entities,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     update = UpdateEntitiesGroupPayload(
         add={"seal": Entity(value="seal")},
@@ -339,10 +339,10 @@ async def test_update_indexed_entities_group(
 async def test_update_entities_group_metadata(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     entities,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     update = UpdateEntitiesGroupPayload(
         title="Updated Animals",
@@ -363,10 +363,10 @@ async def test_update_entities_group_metadata(
 async def test_delete_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     entities,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await delete_entities_group(nucliadb_writer, kbid, "ANIMALS")
     assert resp.status_code == 200
@@ -379,10 +379,10 @@ async def test_delete_entities_group(
 async def test_delete_and_recreate_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     user_entities,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await delete_entities_group(nucliadb_writer, kbid, "ANIMALS")
     assert resp.status_code == 200
@@ -393,7 +393,7 @@ async def test_delete_and_recreate_entities_group(
         title="Animals",
         color="white",
     )
-    resp = await create_entities_group(nucliadb_writer, knowledgebox, payload)
+    resp = await create_entities_group(nucliadb_writer, standalone_knowledgebox, payload)
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
@@ -406,13 +406,13 @@ async def test_delete_and_recreate_entities_group(
 @pytest.mark.deploy_modes("standalone")
 async def test_entities_indexing(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     entities,
     predict_mock,
 ):
     # TODO: improve test cases here
 
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/suggest",

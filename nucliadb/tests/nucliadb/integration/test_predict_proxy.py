@@ -47,9 +47,14 @@ from httpx import AsyncClient
 )
 @pytest.mark.deploy_modes("standalone")
 async def test_predict_proxy(
-    nucliadb_reader: AsyncClient, knowledgebox: str, method: str, endpoint: str, params, payload
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    method: str,
+    endpoint: str,
+    params,
+    payload,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     http_func = getattr(nucliadb_reader, method.lower())
     http_func_kwargs = {"params": params}
     if method == "POST":
@@ -65,9 +70,9 @@ async def test_predict_proxy(
 @pytest.mark.deploy_modes("standalone")
 async def test_predict_proxy_not_proxied_returns_422(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/predict/summarize",
         json={"resources": {"foo": "bar"}},

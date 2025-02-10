@@ -45,7 +45,9 @@ from tests.utils import inject_message
 
 
 @pytest.fixture(scope="function")
-async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, knowledgebox):
+async def resource_with_conversation(
+    nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, standalone_knowledgebox
+):
     messages = []
     for i in range(1, 301):
         messages.append(
@@ -59,7 +61,7 @@ async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer: Asyn
             )
         )
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
         content=CreateResourcePayload(
             slug="myresource",
@@ -74,7 +76,7 @@ async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer: Asyn
 
     # add another message using the api to add single message
     resp = await nucliadb_writer.put(
-        f"/kb/{knowledgebox}/resource/{rid}/conversation/faq/messages",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/conversation/faq/messages",
         content="["
         + InputMessage(
             to=[f"computer"],
@@ -92,7 +94,7 @@ async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer: Asyn
 
     bm = BrokerMessage()
     bm.uuid = rid
-    bm.kbid = knowledgebox
+    bm.kbid = standalone_knowledgebox
     field = FieldID(field="faq", field_type=FieldType.CONVERSATION)
 
     etw = ExtractedTextWrapper()
@@ -116,13 +118,13 @@ async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer: Asyn
 @pytest.mark.deploy_modes("standalone")
 async def test_conversations(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
     resource_with_conversation,
 ):
     rid = resource_with_conversation
 
     # get field summary
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=values")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}?show=values")
     assert resp.status_code == 200
 
     res_resp = ResponseResponse.model_validate(resp.json())
@@ -134,7 +136,9 @@ async def test_conversations(
     )
 
     # get first page
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=1")
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/conversation/faq?page=1"
+    )
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
@@ -143,7 +147,9 @@ async def test_conversations(
     assert msgs[0]["type"] == MessageType.QUESTION.value
 
     # get second page
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/conversation/faq?page=2")
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/conversation/faq?page=2"
+    )
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
@@ -155,13 +161,13 @@ async def test_conversations(
 @pytest.mark.deploy_modes("standalone")
 async def test_extracted_text_is_serialized_properly(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
     resource_with_conversation,
 ):
     rid = resource_with_conversation
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text",
     )
     assert resp.status_code == 200
     resource = Resource.model_validate(resp.json())
@@ -174,13 +180,13 @@ async def test_extracted_text_is_serialized_properly(
 @pytest.mark.deploy_modes("standalone")
 async def test_find_conversations(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox: str,
     resource_with_conversation,
 ):
     rid = resource_with_conversation
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/find?query=",
+        f"/kb/{standalone_knowledgebox}/find?query=",
     )
     assert resp.status_code == 200
     results = KnowledgeboxFindResults.model_validate(resp.json())
@@ -188,7 +194,7 @@ async def test_find_conversations(
     assert matching_rid == rid
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text"
+        f"/kb/{standalone_knowledgebox}/resource/{rid}?show=values&show=extracted&extracted=text"
     )
     assert resp.status_code == 200
     resource = Resource.model_validate(resp.json())
@@ -210,7 +216,7 @@ async def test_find_conversations(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_cannot_create_message_ident_0(
-    nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, knowledgebox
+    nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, standalone_knowledgebox: str
 ):
     messages = [
         # model_construct skips validation, to test the API error
@@ -224,7 +230,7 @@ async def test_cannot_create_message_ident_0(
         )
     ]
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
         content=CreateResourcePayload(
             slug="myresource",

@@ -42,8 +42,8 @@ def a_week_before(date):
 
 
 @pytest.fixture(scope="function")
-async def resource(nucliadb_ingest_grpc: WriterStub, knowledgebox):
-    bm = get_resource_with_a_sentence(knowledgebox)
+async def resource(nucliadb_ingest_grpc: WriterStub, standalone_knowledgebox):
+    bm = get_resource_with_a_sentence(standalone_knowledgebox)
     bm.basic.created.FromDatetime(NOW)
     bm.basic.modified.FromDatetime(NOW)
     bm.origin.ClearField("created")
@@ -85,7 +85,7 @@ async def resource(nucliadb_ingest_grpc: WriterStub, knowledgebox):
 @pytest.mark.deploy_modes("standalone")
 async def test_search_with_date_range_filters_nucliadb_dates(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     feature,
     resource,
     creation_start,
@@ -100,7 +100,7 @@ async def test_search_with_date_range_filters_nucliadb_dates(
     """
     await _test_find_date_ranges(
         nucliadb_reader,
-        knowledgebox,
+        standalone_knowledgebox,
         [feature],
         creation_start,
         creation_end,
@@ -144,7 +144,7 @@ async def test_search_with_date_range_filters_nucliadb_dates(
 async def test_search_with_date_range_filters_origin_dates(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     feature,
     resource,
     creation_start,
@@ -159,7 +159,7 @@ async def test_search_with_date_range_filters_origin_dates(
     """
     # Set origin dates of the resource
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{resource}",
+        f"/kb/{standalone_knowledgebox}/resource/{resource}",
         json={
             "origin": {
                 "created": ORIGIN_CREATION.isoformat(),
@@ -171,7 +171,7 @@ async def test_search_with_date_range_filters_origin_dates(
 
     await _test_find_date_ranges(
         nucliadb_reader,
-        knowledgebox,
+        standalone_knowledgebox,
         [feature],
         creation_start,
         creation_end,

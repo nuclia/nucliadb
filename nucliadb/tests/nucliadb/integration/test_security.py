@@ -28,8 +28,8 @@ DEVELOPERS_GROUP = "developers"
 
 
 @pytest.fixture(scope="function")
-async def resource_with_security(nucliadb_writer: AsyncClient, knowledgebox):
-    kbid = knowledgebox
+async def resource_with_security(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
+    kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
@@ -48,9 +48,9 @@ async def resource_with_security(nucliadb_writer: AsyncClient, knowledgebox):
 
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_security_is_returned_serialization(
-    nucliadb_reader: AsyncClient, knowledgebox, resource_with_security
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource_with_security
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resource_id = resource_with_security
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{resource_id}", params={"show": ["security"]})
@@ -61,9 +61,9 @@ async def test_resource_security_is_returned_serialization(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_security_is_updated(
-    nucliadb_reader: AsyncClient, nucliadb_writer, knowledgebox, resource_with_security
+    nucliadb_reader: AsyncClient, nucliadb_writer, standalone_knowledgebox: str, resource_with_security
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resource_id = resource_with_security
 
     # Update the security of the resource: make it public for all groups
@@ -92,11 +92,11 @@ async def test_resource_security_is_updated(
 async def test_resource_security_search(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox: str,
     resource_with_security,
     search_endpoint,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resource_id = resource_with_security
     support_group = "support"
     # Add another group to the resource

@@ -27,9 +27,9 @@ from nucliadb_models.search import SummarizedResponse
 async def test_summarize(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resource_uuids = []
     resource_slugs = []

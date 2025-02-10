@@ -27,9 +27,9 @@ from nucliadb_models.search import SearchOptions
 async def test_custom_synonyms_api(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     synonyms_url = f"/kb/{kbid}/custom-synonyms"
 
     # Delete first
@@ -76,8 +76,10 @@ async def test_custom_synonyms_api(
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_with_synonyms(nucliadb_writer: AsyncClient, knowledgebox: str):
-    kbid = knowledgebox
+async def standalone_knowledgebox_with_synonyms(
+    nucliadb_writer: AsyncClient, standalone_knowledgebox: str
+):
+    kbid = standalone_knowledgebox
     synonyms_url = f"/kb/{kbid}/custom-synonyms"
     kb_synonyms = {
         "synonyms": {
@@ -93,9 +95,9 @@ async def knowledgebox_with_synonyms(nucliadb_writer: AsyncClient, knowledgebox:
 async def test_search_with_synonyms(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox_with_synonyms: str,
+    standalone_knowledgebox_with_synonyms: str,
 ):
-    kbid = knowledgebox_with_synonyms
+    kbid = standalone_knowledgebox_with_synonyms
 
     # Create a resource with:
     # - the term on the summary
@@ -194,9 +196,9 @@ def get_pararagraphs(body):
 @pytest.mark.deploy_modes("standalone")
 async def test_search_errors_if_vectors_or_relations_requested(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
         json=dict(

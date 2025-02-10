@@ -35,10 +35,10 @@ from tests.utils import inject_message
 async def resource_with_bm_relations(
     nucliadb_ingest_grpc: WriterStub,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "slug": "myresource",
             "texts": {"text1": {"body": "Mickey loves Minnie"}},
@@ -48,7 +48,7 @@ async def resource_with_bm_relations(
     rid = resp.json()["uuid"]
 
     bm = await create_broker_message_with_relations()
-    bm.kbid = knowledgebox
+    bm.kbid = standalone_knowledgebox
     bm.uuid = rid
 
     await inject_message(nucliadb_ingest_grpc, bm)
@@ -59,13 +59,13 @@ async def resource_with_bm_relations(
 @pytest.mark.deploy_modes("standalone")
 async def test_api_aliases(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     resource_with_bm_relations: tuple[str, str],
 ):
     rid, field_id = resource_with_bm_relations
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
         params=dict(
             show=["relations", "extracted"],
             extracted=["metadata"],
@@ -79,7 +79,7 @@ async def test_api_aliases(
     assert "from_" not in extracted_metadata["metadata"]["relations"][0]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/text/{field_id}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/text/{field_id}",
         params=dict(
             show=["extracted"],
             extracted=["metadata"],
@@ -95,7 +95,7 @@ async def test_api_aliases(
 @pytest.mark.deploy_modes("standalone")
 async def test_broker_message_relations(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     resource_with_bm_relations: tuple[str, str],
 ):
     """
@@ -108,7 +108,7 @@ async def test_broker_message_relations(
     rid, field_id = resource_with_bm_relations
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
         params=dict(
             show=["relations", "extracted"],
             extracted=["metadata"],
@@ -129,7 +129,7 @@ async def test_broker_message_relations(
     )
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}/text/{field_id}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/text/{field_id}",
         params=dict(
             show=["extracted"],
             extracted=["metadata"],
@@ -145,7 +145,7 @@ async def test_extracted_relations(
     nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     """
     Test description:
@@ -154,7 +154,7 @@ async def test_extracted_relations(
     extracted and test it.
     """
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "My resource",
             "slug": "myresource",
@@ -202,7 +202,7 @@ async def test_extracted_relations(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["relations"]) == 5
 

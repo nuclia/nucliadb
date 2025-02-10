@@ -24,9 +24,9 @@ from httpx import AsyncClient
 
 @pytest.mark.deploy_modes("standalone")
 async def test_filtering_expression(
-    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox: str
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, standalone_knowledgebox: str
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     slug_to_uuid = {}
     # Create 3 resources in different folders

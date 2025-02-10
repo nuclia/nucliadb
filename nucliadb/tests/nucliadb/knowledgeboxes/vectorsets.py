@@ -41,11 +41,11 @@ class KbSpecs:
 async def kb_with_vectorset(
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ) -> AsyncIterable[KbSpecs]:
-    # Now knowledgeboxes in standalone are already created with a single vectorset.
+    # Now standalone_knowledgeboxes in standalone are already created with a single vectorset.
     # By default it's the multilingual one (see mock predict implementation).
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     vectorset_id = "multilingual"
     vectorset_dimension = 512
     await inject_broker_message_with_vectorset_data(

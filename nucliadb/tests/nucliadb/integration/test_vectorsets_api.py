@@ -52,9 +52,9 @@ MODULE = "nucliadb.writer.api.v1.vectorsets"
 async def test_vectorsets_crud(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     vectorset_id = "en-2024-04-24"
     existing_lconfig = LearningConfiguration(
         semantic_model="multilingual",
@@ -180,9 +180,9 @@ async def test_vectorsets_crud(
 @pytest.mark.deploy_modes("standalone")
 async def test_learning_config_errors_are_proxied_correctly(
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     with patch(
         f"{MODULE}.learning_proxy.get_configuration",
         side_effect=ProxiedLearningConfigError(

@@ -29,9 +29,9 @@ from nucliadb_models.text import TextFormat
 async def test_text_field_in_json_format(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     field_id = "json-text"
     payload = {"hello": "world"}
 
@@ -61,9 +61,9 @@ async def test_text_field_in_json_format(
 async def test_text_field_with_invalid_json(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     field_id = "json-text"
     invalid_json = '{hello": "world"}'
 

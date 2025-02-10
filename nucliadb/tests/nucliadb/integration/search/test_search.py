@@ -55,13 +55,13 @@ async def test_simple_search_sc_2062(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}")
     assert resp.status_code == 200
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -72,19 +72,19 @@ async def test_simple_search_sc_2062(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=title")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?query=title")
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?query=summary")
     assert resp.status_code == 200
     assert len(resp.json()["paragraphs"]["results"]) == 1
 
 
-def broker_resource_with_duplicates(knowledgebox, sentence):
-    bm = broker_resource(kbid=knowledgebox)
+def broker_resource_with_duplicates(standalone_knowledgebox, sentence):
+    bm = broker_resource(kbid=standalone_knowledgebox)
     paragraph = sentence
     text = f"{paragraph}{paragraph}"
     etw = rpb.ExtractedTextWrapper()
@@ -132,8 +132,8 @@ def broker_resource_with_duplicates(knowledgebox, sentence):
     return bm
 
 
-async def create_resource_with_duplicates(knowledgebox, writer: WriterStub, sentence: str):
-    bm = broker_resource_with_duplicates(knowledgebox, sentence=sentence)
+async def create_resource_with_duplicates(standalone_knowledgebox, writer: WriterStub, sentence: str):
+    bm = broker_resource_with_duplicates(standalone_knowledgebox, sentence=sentence)
     await inject_message(writer, bm)
     return bm.uuid
 
@@ -143,30 +143,34 @@ async def test_search_filters_out_duplicate_paragraphs(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     await create_resource_with_duplicates(
-        knowledgebox, nucliadb_ingest_grpc, sentence="My own text Ramon. "
+        standalone_knowledgebox, nucliadb_ingest_grpc, sentence="My own text Ramon. "
     )
     await create_resource_with_duplicates(
-        knowledgebox, nucliadb_ingest_grpc, sentence="Another different paragraph with text"
+        standalone_knowledgebox, nucliadb_ingest_grpc, sentence="Another different paragraph with text"
     )
 
     query = "text"
     # It should filter out duplicates by default
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query={query}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?query={query}")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 2
 
     # It should filter out duplicates if specified
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query={query}&with_duplicates=false")
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/search?query={query}&with_duplicates=false"
+    )
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 2
 
     # It should return duplicates if specified
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query={query}&with_duplicates=true")
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/search?query={query}&with_duplicates=true"
+    )
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 4
@@ -177,11 +181,13 @@ async def test_search_returns_paragraph_positions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     sentence = "My own text Ramon."
-    await create_resource_with_duplicates(knowledgebox, nucliadb_ingest_grpc, sentence=sentence)
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
+    await create_resource_with_duplicates(
+        standalone_knowledgebox, nucliadb_ingest_grpc, sentence=sentence
+    )
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?query=Ramon")
     assert resp.status_code == 200
     content = resp.json()
     position = content["paragraphs"]["results"][0]["position"]
@@ -191,8 +197,8 @@ async def test_search_returns_paragraph_positions(
     assert position["page_number"] is not None
 
 
-def broker_resource_with_classifications(knowledgebox):
-    bm = broker_resource(kbid=knowledgebox)
+def broker_resource_with_classifications(standalone_knowledgebox):
+    bm = broker_resource(kbid=standalone_knowledgebox)
 
     text = "Some text"
     etw = rpb.ExtractedTextWrapper()
@@ -249,13 +255,13 @@ async def test_search_returns_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    bm = broker_resource_with_classifications(knowledgebox)
+    bm = broker_resource_with_classifications(standalone_knowledgebox)
     await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query=Some",
+        f"/kb/{standalone_knowledgebox}/search?query=Some",
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -268,24 +274,24 @@ async def test_search_returns_labels(
 async def test_search_with_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # Inject a resource with a pdf icon
-    bm = broker_resource(knowledgebox)
+    bm = broker_resource(standalone_knowledgebox)
     bm.basic.icon = "application/pdf"
 
     await inject_message(nucliadb_ingest_grpc, bm)
 
     # Check that filtering by pdf icon returns it
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=/icon/application/pdf"
+        f"/kb/{standalone_knowledgebox}/search?show=basic&filters=/icon/application/pdf"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
 
     # With a different icon should return no results
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=/icon/application/docx"
+        f"/kb/{standalone_knowledgebox}/search?show=basic&filters=/icon/application/docx"
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 0
@@ -296,9 +302,9 @@ async def test_paragraph_search_with_filters(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     # Create a resource with two fields (title and summary)
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -333,10 +339,10 @@ async def test_paragraph_search_with_filters(
 async def test_(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "Rust for dummies",
         },
@@ -345,7 +351,7 @@ async def test_(
     rust_for_dummies = resp.json()["uuid"]
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "Introduction to Python",
         },
@@ -354,7 +360,7 @@ async def test_(
     intro_to_python = resp.json()["uuid"]
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
         params={
             "query": "Rust",
         },
@@ -365,7 +371,7 @@ async def test_(
     assert rust_for_dummies in resources
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
         params={
             "query": "Intro",
         },
@@ -381,11 +387,11 @@ async def test_search_returns_sentence_positions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    await inject_resource_with_a_sentence(knowledgebox, nucliadb_ingest_grpc)
+    await inject_resource_with_a_sentence(standalone_knowledgebox, nucliadb_ingest_grpc)
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search", json=dict(query="my own text", min_score=-1)
+        f"/kb/{standalone_knowledgebox}/search", json=dict(query="my own text", min_score=-1)
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -396,8 +402,8 @@ async def test_search_returns_sentence_positions(
     assert "page_number" not in position
 
 
-def get_resource_with_a_sentence(knowledgebox):
-    bm = broker_resource(knowledgebox)
+def get_resource_with_a_sentence(standalone_knowledgebox):
+    bm = broker_resource(standalone_knowledgebox)
 
     bm.files["file"].file.uri = "http://nofile"
     bm.files["file"].file.size = 0
@@ -441,8 +447,8 @@ def get_resource_with_a_sentence(knowledgebox):
     return bm
 
 
-async def inject_resource_with_a_sentence(knowledgebox, writer):
-    bm = get_resource_with_a_sentence(knowledgebox)
+async def inject_resource_with_a_sentence(standalone_knowledgebox, writer):
+    bm = get_resource_with_a_sentence(standalone_knowledgebox)
     await inject_message(writer, bm)
 
 
@@ -451,7 +457,7 @@ async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
     knowledge_graph,
 ):
     relation_nodes, relation_edges = knowledge_graph
@@ -464,7 +470,7 @@ async def test_search_relations(
     )
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         params={
             "features": "relations",
             "query": "What relates Newton and Becquer?",
@@ -539,7 +545,7 @@ async def test_search_relations(
     predict_mock.detect_entities = AsyncMock(return_value=[relation_nodes["Animal"]])
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         params={
             "features": "relations",
             "query": "Do you like animals?",
@@ -583,13 +589,13 @@ async def test_search_relations(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_search_automatic_relations(
-    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, standalone_knowledgebox
 ):
     predict_mock = Mock()
     set_utility(Utility.PREDICT, predict_mock)
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "My resource",
             "slug": "myresource",
@@ -652,7 +658,7 @@ async def test_search_automatic_relations(
     predict_mock.detect_entities = AsyncMock(return_value=[rn])
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         params={
             "features": "relations",
             "query": "Relations for this resource",
@@ -765,7 +771,7 @@ async def test_search_automatic_relations(
     predict_mock.detect_entities = AsyncMock(return_value=[rn])
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         params={
             "features": "relations",
             "query": "You know John?",
@@ -809,12 +815,12 @@ async def get_audit_messages(sub):
 @pytest.mark.deploy_modes("standalone")
 async def test_search_sends_audit(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
     stream_audit: StreamAuditStorage,
 ):
     from nucliadb_utils.settings import audit_settings
 
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     # Prepare a test audit stream to receive our messages
     partition = stream_audit.get_partition(kbid)
@@ -855,11 +861,11 @@ async def test_search_sends_audit(
 @pytest.mark.deploy_modes("standalone")
 async def test_search_endpoints_handle_predict_errors(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
     predict_mock,
     endpoint,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     for query_mock in (AsyncMock(side_effect=SendToPredictError()),):
         predict_mock.query = query_mock
@@ -1018,16 +1024,16 @@ async def test_search_two_logic_shards(
 @pytest.mark.deploy_modes("standalone")
 async def test_search_min_score(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # When not specifying the min score on the request, it should default to 0.7
-    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/search", json={"query": "dummy"})
+    resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/search", json={"query": "dummy"})
     assert resp.status_code == 200
     assert resp.json()["sentences"]["min_score"] == 0.7
 
     # If we specify a min score, it should be used
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         json={"query": "dummy", "min_score": {"bm25": 10, "semantic": 0.5}},
     )
     assert resp.status_code == 200
@@ -1063,12 +1069,12 @@ async def test_search_min_score(
 @pytest.mark.deploy_modes("standalone")
 async def test_facets_validation(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
     facets,
     valid,
     error_message,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     for endpoint in ("search",):
         for method in ("post", "get"):
             func = getattr(nucliadb_reader, method)
@@ -1087,10 +1093,10 @@ async def test_facets_validation(
 async def test_search_marks_fuzzy_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -1100,7 +1106,7 @@ async def test_search_marks_fuzzy_results(
 
     # Should get only one non-fuzzy result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         json={
             "query": "Title",
         },
@@ -1111,7 +1117,7 @@ async def test_search_marks_fuzzy_results(
 
     # Should get only one fuzzy result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         json={
             "query": "totle",
         },
@@ -1122,7 +1128,7 @@ async def test_search_marks_fuzzy_results(
 
     # Should not get any result if exact match term queried
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         json={
             "query": '"totle"',
         },
@@ -1145,13 +1151,13 @@ async def test_search_by_path_filter(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     paths = ["/foo", "foo/bar", "foo/bar/1", "foo/bar/2", "foo/bar/3", "foo/bar/4"]
 
     for path in paths:
         resp = await nucliadb_writer.post(
-            f"/kb/{knowledgebox}/resources",
+            f"/kb/{standalone_knowledgebox}/resources",
             json={
                 "title": f"My resource: {path}",
                 "summary": "Some summary",
@@ -1163,7 +1169,7 @@ async def test_search_by_path_filter(
         assert resp.status_code == 201
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
         params={
             "query": "",
         },
@@ -1172,17 +1178,21 @@ async def test_search_by_path_filter(
     assert len(resp.json()["resources"]) == len(paths)
 
     # Get the list of all
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?filters=/origin.path/foo")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?filters=/origin.path/foo")
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == len(paths)
 
     # Get the list of under foo/bar
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar")
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/search?filters=/origin.path/foo/bar"
+    )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == len(paths) - 1
 
     # Get the list of under foo/bar/4
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?filters=/origin.path/foo/bar/4")
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/search?filters=/origin.path/foo/bar/4"
+    )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
 
@@ -1196,8 +1206,10 @@ async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_resource_search_query_param_is_optional(nucliadb_reader: AsyncClient, knowledgebox):
-    kb = knowledgebox
+async def test_resource_search_query_param_is_optional(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox
+):
+    kb = standalone_knowledgebox
     # If query is not present, should not fail
     resp = await nucliadb_reader.get(f"/kb/{kb}/search")
     assert resp.status_code == 200
@@ -1209,8 +1221,8 @@ async def test_resource_search_query_param_is_optional(nucliadb_reader: AsyncCli
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_search_with_duplicates(nucliadb_reader: AsyncClient, knowledgebox):
-    kb = knowledgebox
+async def test_search_with_duplicates(nucliadb_reader: AsyncClient, standalone_knowledgebox):
+    kb = standalone_knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/search?with_duplicates=True")
     assert resp.status_code == 200
 
@@ -1229,9 +1241,9 @@ def search_with_limits_exceeded_error():
 
 @pytest.mark.deploy_modes("standalone")
 async def test_search_handles_limits_exceeded_error(
-    nucliadb_reader: AsyncClient, knowledgebox, search_with_limits_exceeded_error
+    nucliadb_reader: AsyncClient, standalone_knowledgebox, search_with_limits_exceeded_error
 ):
-    kb = knowledgebox
+    kb = standalone_knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/search")
     assert resp.status_code == 402
     assert resp.json() == {"detail": "over the quota"}
@@ -1244,10 +1256,10 @@ async def test_search_handles_limits_exceeded_error(
 @pytest.mark.deploy_modes("standalone")
 async def test_catalog_post(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
         json={
             "query": "",
             "filters": [
@@ -1287,12 +1299,12 @@ async def test_api_does_not_show_tracebacks_on_api_errors(not_debug, nucliadb_re
 async def test_catalog_pagination(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     n_resources = 35
     for i in range(n_resources):
         resp = await nucliadb_writer.post(
-            f"/kb/{knowledgebox}/resources",
+            f"/kb/{standalone_knowledgebox}/resources",
             json={
                 "title": f"Resource {i}",
                 "texts": {
@@ -1313,7 +1325,7 @@ async def test_catalog_pagination(
     page_number = 0
     while True:
         resp = await nucliadb_reader.get(
-            f"/kb/{knowledgebox}/catalog",
+            f"/kb/{standalone_knowledgebox}/catalog",
             params={
                 "page_number": page_number,
                 "page_size": page_size,
@@ -1339,11 +1351,11 @@ async def test_catalog_pagination(
 async def test_catalog_date_range_filtering(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     now = datetime.now()
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": f"Resource",
             "texts": {
@@ -1357,7 +1369,7 @@ async def test_catalog_date_range_filtering(
 
     one_hour_ago = now - timedelta(hours=1)
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
         params={
             "range_creation_start": one_hour_ago.isoformat(),
         },
@@ -1367,7 +1379,7 @@ async def test_catalog_date_range_filtering(
     assert len(body["resources"]) == 1
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
         json={
             "range_creation_end": one_hour_ago.isoformat(),
         },
@@ -1382,19 +1394,19 @@ async def test_catalog_faceted(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     valid_status = ["PROCESSED", "PENDING", "ERROR"]
 
     for status_name, status_value in rpb.Metadata.Status.items():
         if status_name not in valid_status:
             continue
-        bm = broker_resource(knowledgebox)
+        bm = broker_resource(standalone_knowledgebox)
         bm.basic.metadata.status = status_value
         await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog?faceted=/metadata.status",
+        f"/kb/{standalone_knowledgebox}/catalog?faceted=/metadata.status",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -1411,7 +1423,7 @@ async def test_catalog_faceted_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # 4 resources:
     # 1 with /l/labelset0/label0
@@ -1419,14 +1431,14 @@ async def test_catalog_faceted_labels(
     # 1 with /l/labelset1/label0
     for label in range(2):
         for count in range(label + 1):
-            bm = broker_resource(knowledgebox)
+            bm = broker_resource(standalone_knowledgebox)
             c = rpb.Classification()
             c.labelset = f"labelset0"
             c.label = f"label{label}"
             bm.basic.usermetadata.classifications.append(c)
             await inject_message(nucliadb_ingest_grpc, bm)
 
-    bm = broker_resource(knowledgebox)
+    bm = broker_resource(standalone_knowledgebox)
     c = rpb.Classification()
     c.labelset = "labelset1"
     c.label = "label0"
@@ -1434,7 +1446,7 @@ async def test_catalog_faceted_labels(
     await inject_message(nucliadb_ingest_grpc, bm)
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog?faceted=/classification.labels/labelset0",
+        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels/labelset0",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -1447,7 +1459,7 @@ async def test_catalog_faceted_labels(
 
     # This is used by the check missing labels button in dashboard
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog?faceted=/classification.labels",
+        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -1464,20 +1476,20 @@ async def test_catalog_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     valid_status = ["PROCESSED", "PENDING", "ERROR"]
 
     for status_name, status_value in rpb.Metadata.Status.items():
         if status_name not in valid_status:
             continue
-        bm = broker_resource(knowledgebox)
+        bm = broker_resource(standalone_knowledgebox)
         bm.basic.metadata.status = status_value
         await inject_message(nucliadb_ingest_grpc, bm)
 
     # No filters
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -1485,7 +1497,7 @@ async def test_catalog_filters(
 
     # Simple filter
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/catalog?filters=/metadata.status/PENDING",
+        f"/kb/{standalone_knowledgebox}/catalog?filters=/metadata.status/PENDING",
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -1494,7 +1506,7 @@ async def test_catalog_filters(
 
     # AND filter
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
         json={"filters": [{"all": ["/metadata.status/PENDING", "/metadata.status/ERROR"]}]},
     )
     assert resp.status_code == 200
@@ -1503,7 +1515,7 @@ async def test_catalog_filters(
 
     # OR filter
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/catalog",
+        f"/kb/{standalone_knowledgebox}/catalog",
         json={"filters": [{"any": ["/metadata.status/PENDING", "/metadata.status/ERROR"]}]},
     )
     assert resp.status_code == 200

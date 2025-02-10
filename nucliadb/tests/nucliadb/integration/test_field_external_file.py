@@ -46,10 +46,10 @@ async def test_external_file_field(
     nuclia_jwt_key,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # Create a resource
-    kb_path = f"/{KB_PREFIX}/{knowledgebox}"
+    kb_path = f"/{KB_PREFIX}/{standalone_knowledgebox}"
     resp = await nucliadb_writer.post(
         f"{kb_path}/{RESOURCES_PREFIX}",
         json={

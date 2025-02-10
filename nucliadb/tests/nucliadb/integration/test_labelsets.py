@@ -26,9 +26,9 @@ from httpx import AsyncClient
 async def test_selection_labelsets(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/labelset/myselections",
@@ -64,9 +64,9 @@ async def test_selection_labelsets(
 async def test_duplicated_labelsets_not_allowed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     # Create labelset
     resp = await nucliadb_writer.post(
@@ -112,9 +112,9 @@ async def test_duplicated_labelsets_not_allowed(
 async def test_duplicated_labels_not_allowed(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/labelset/myselections",

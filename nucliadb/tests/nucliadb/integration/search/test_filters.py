@@ -284,12 +284,12 @@ async def create_test_labelsets(nucliadb_writer: AsyncClient, kbid: str):
 async def kbid(
     nucliadb_ingest_grpc: WriterStub,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    await create_test_labelsets(nucliadb_writer, knowledgebox)
-    await inject_message(nucliadb_ingest_grpc, broker_message_with_entities(knowledgebox))
-    await inject_message(nucliadb_ingest_grpc, broker_message_with_labels(knowledgebox))
-    return knowledgebox
+    await create_test_labelsets(nucliadb_writer, standalone_knowledgebox)
+    await inject_message(nucliadb_ingest_grpc, broker_message_with_entities(standalone_knowledgebox))
+    await inject_message(nucliadb_ingest_grpc, broker_message_with_labels(standalone_knowledgebox))
+    return standalone_knowledgebox
 
 
 @pytest.mark.deploy_modes("standalone")

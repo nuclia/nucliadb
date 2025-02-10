@@ -33,12 +33,12 @@ from tests.utils.predict import predict_query_hook
 async def test_autofilters_are_returned(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     knowledge_graph,
     mocked_predict,
 ):
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search",
+        f"/kb/{standalone_knowledgebox}/search",
         params={
             "query": "What relates Newton and Becquer?",
         },
@@ -47,7 +47,7 @@ async def test_autofilters_are_returned(
     assert resp.json()["autofilters"] == []
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         params={
             "autofilter": True,
             "query": "What relates Newton and Becquer?",

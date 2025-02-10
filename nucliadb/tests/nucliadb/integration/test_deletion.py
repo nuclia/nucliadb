@@ -52,12 +52,14 @@ async def test_paragraph_index_deletions(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # Prepare data for a resource with title, summary and a text field
 
     async with datamanagers.with_ro_transaction() as txn:
-        vectorsets = [vs async for _, vs in datamanagers.vectorsets.iter(txn, kbid=knowledgebox)]
+        vectorsets = [
+            vs async for _, vs in datamanagers.vectorsets.iter(txn, kbid=standalone_knowledgebox)
+        ]
     assert len(vectorsets) == 1
     vectorset_id = vectorsets[0].vectorset_id
     vector_dimension = vectorsets[0].vectorset_index_config.vector_dimension
@@ -88,7 +90,7 @@ async def test_paragraph_index_deletions(
 
     # Create a resource with a simple text field
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": title_field.text,
             "summary": summary_field.text,
@@ -106,7 +108,7 @@ async def test_paragraph_index_deletions(
     # Check that searching for original texts returns title and summary (text is
     # not indexed)
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Original",
             "features": [SearchOptions.KEYWORD],
@@ -122,14 +124,16 @@ async def test_paragraph_index_deletions(
     assert list(sorted(fields.keys())) == ["/a/summary", "/a/title"]
 
     # Inject corresponding broker message as if it was coming from the processor
-    bmb = BrokerMessageBuilder(kbid=knowledgebox, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
+    bmb = BrokerMessageBuilder(
+        kbid=standalone_knowledgebox, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR
+    )
     bm = prepare_broker_message(bmb, title_field, summary_field, text_field)
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()  # wait until changes are searchable
 
     # Check that searching for original texts does not return any results
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Original",
             "features": [SearchOptions.KEYWORD],
@@ -143,7 +147,7 @@ async def test_paragraph_index_deletions(
 
     # Check that searching for extracted texts returns all fields
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Extracted",
             "features": [SearchOptions.KEYWORD],
@@ -166,7 +170,7 @@ async def test_paragraph_index_deletions(
     )
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
         json={
             "texts": {
                 text_field.field_id: {
@@ -179,7 +183,9 @@ async def test_paragraph_index_deletions(
     assert resp.status_code == 200
 
     # Inject broker message with the modified text
-    bmb = BrokerMessageBuilder(kbid=knowledgebox, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
+    bmb = BrokerMessageBuilder(
+        kbid=standalone_knowledgebox, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR
+    )
     bm = prepare_broker_message(bmb, title_field, summary_field, text_field)
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()  # wait until changes are searchable
@@ -187,7 +193,7 @@ async def test_paragraph_index_deletions(
     # Check that searching for the first extracted text now doesn't return the
     # text field (as it has been modified)
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Extracted",
             "features": [SearchOptions.KEYWORD],
@@ -204,7 +210,7 @@ async def test_paragraph_index_deletions(
 
     # Check that searching for the modified text only returns the text field
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Modified",
             "features": [SearchOptions.KEYWORD],

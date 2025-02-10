@@ -40,12 +40,12 @@ async def execution_context(natsd, storage, nucliadb):
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
+async def test_migrate_kb(execution_context: ExecutionContext, standalone_knowledgebox):
     # this will test run all available migrations
-    await execution_context.data_manager.update_kb_info(kbid=knowledgebox, current_version=-1)
+    await execution_context.data_manager.update_kb_info(kbid=standalone_knowledgebox, current_version=-1)
     await execution_context.data_manager.update_global_info(current_version=0)
 
-    kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
+    kb_info = await execution_context.data_manager.get_kb_info(kbid=standalone_knowledgebox)
     assert kb_info is not None
     assert kb_info.current_version == -1
     global_info = await execution_context.data_manager.get_global_info()
@@ -55,7 +55,7 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     # other tests can be so slow and cumbersome to maintain
     await migrator.run(execution_context, target_version=1)
 
-    kb_info = await execution_context.data_manager.get_kb_info(kbid=knowledgebox)
+    kb_info = await execution_context.data_manager.get_kb_info(kbid=standalone_knowledgebox)
     assert kb_info is not None
     assert kb_info.current_version == 1
     global_info = await execution_context.data_manager.get_global_info()

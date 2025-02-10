@@ -117,11 +117,11 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
 @pytest.mark.deploy_modes("standalone")
 async def test_vectorset_parameter_without_default_vectorset(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     vectorset: Optional[str],
     expected: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     calls: list[nodereader_pb2.SearchRequest] = []
 
@@ -177,11 +177,11 @@ async def test_vectorset_parameter_without_default_vectorset(
 @pytest.mark.deploy_modes("standalone")
 async def test_vectorset_parameter_with_default_vectorset(
     nucliadb_reader: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
     vectorset,
     expected,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
 
     calls: list[nodereader_pb2.SearchRequest] = []
 

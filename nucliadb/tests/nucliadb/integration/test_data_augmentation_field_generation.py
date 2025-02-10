@@ -182,9 +182,9 @@ async def test_data_augmentation_field_generation_and_search(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     slug = "my-resource"
     field_id = "my-text"
 

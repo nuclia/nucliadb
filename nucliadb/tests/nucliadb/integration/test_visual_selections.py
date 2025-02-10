@@ -36,9 +36,9 @@ PAGE_0_SELECTION_COUNT = 18
 @pytest.fixture(scope="function")
 async def annotated_file_field(
     nucliadb_writer: AsyncClient,
-    knowledgebox: str,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     field_id = "invoice"
 
     with open(INVOICE_FILENAME, "rb") as f:
@@ -96,8 +96,10 @@ async def annotated_file_field(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_visual_selection(nucliadb_reader: AsyncClient, knowledgebox: str, annotated_file_field):
-    kbid = knowledgebox
+async def test_visual_selection(
+    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, annotated_file_field
+):
+    kbid = standalone_knowledgebox
     rid, field_id = annotated_file_field
 
     resp = await nucliadb_reader.get(

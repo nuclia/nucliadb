@@ -42,13 +42,13 @@ async def app_context(natsd, storage, nucliadb):
 @pytest.mark.deploy_modes("standalone")
 async def test_rollover_kb_index(
     app_context: ApplicationContext,
-    knowledgebox,
+    standalone_knowledgebox,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_reader_manager: AsyncClient,
 ):
     await _test_rollover_kb_index(
-        app_context, knowledgebox, nucliadb_writer, nucliadb_reader, nucliadb_reader_manager
+        app_context, standalone_knowledgebox, nucliadb_writer, nucliadb_reader, nucliadb_reader_manager
     )
 
 
