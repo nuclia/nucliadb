@@ -31,7 +31,7 @@ from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.settings import audit_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from nucliadb_utils.utilities import Utility
 from tests.ndbfixtures.utils import global_utility
 
 # Audit
@@ -86,8 +86,5 @@ async def local_files():
 @pytest.fixture(scope="function")
 async def shard_manager(storage: Storage, maindb_driver: Driver) -> AsyncIterator[KBShardManager]:
     sm = KBShardManager()
-    set_utility(Utility.SHARD_MANAGER, sm)
-
-    yield sm
-
-    clean_utility(Utility.SHARD_MANAGER)
+    with global_utility(Utility.SHARD_MANAGER, sm):
+        yield sm

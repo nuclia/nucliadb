@@ -24,7 +24,6 @@ import pytest
 from grpc import aio
 from httpx import AsyncClient
 
-from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.standalone.settings import Settings
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
@@ -367,11 +366,3 @@ async def txn(maindb_driver):
     async with maindb_driver.transaction() as txn:
         yield txn
         await txn.abort()
-
-
-@pytest.fixture(scope="function")
-async def shard_manager(storage, maindb_driver):
-    mng = cluster_manager.KBShardManager()
-    set_utility(Utility.SHARD_MANAGER, mng)
-    yield mng
-    clean_utility(Utility.SHARD_MANAGER)
