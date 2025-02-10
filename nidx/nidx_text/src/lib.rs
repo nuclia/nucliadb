@@ -21,13 +21,14 @@
 pub mod prefilter;
 mod query_io;
 mod reader;
+mod request_types;
 mod resource_indexer;
 mod schema;
 mod search_query;
 
 use std::path::Path;
 
-use nidx_protos::{DocumentItem, DocumentSearchRequest, DocumentSearchResponse, StreamRequest};
+use nidx_protos::{DocumentItem, DocumentSearchResponse, StreamRequest};
 use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
 use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
 use nidx_types::OpenIndexMetadata;
@@ -36,7 +37,6 @@ use reader::TextReaderService;
 use resource_indexer::index_document;
 use schema::TextSchema;
 
-pub use search_query::TextContext;
 use serde::{Deserialize, Serialize};
 use tantivy::indexer::merge_indices;
 use tantivy::schema::Field;
@@ -46,6 +46,8 @@ use tantivy::{
     Term,
 };
 use tracing::instrument;
+
+pub use request_types::DocumentSearchRequest;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TextConfig {
@@ -142,12 +144,8 @@ impl TextSearcher {
     }
 
     #[instrument(name = "text::search", skip_all)]
-    pub fn search(
-        &self,
-        request: &DocumentSearchRequest,
-        context: &TextContext,
-    ) -> anyhow::Result<DocumentSearchResponse> {
-        self.reader.search(request, context)
+    pub fn search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
+        self.reader.search(request)
     }
 
     #[instrument(name = "text::prefilter", skip_all)]
