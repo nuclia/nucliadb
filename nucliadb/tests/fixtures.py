@@ -26,7 +26,6 @@ from httpx import AsyncClient
 
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.standalone.settings import Settings
-from nucliadb.writer import API_PREFIX
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -41,31 +40,20 @@ from nucliadb_utils.utilities import (
     set_utility,
 )
 from tests.utils import inject_message
-from tests.utils.dirty_index import mark_dirty, wait_for_sync
+from tests.utils.dirty_index import wait_for_sync
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
-async def nucliadb_manager(nucliadb: Settings):
-    async with AsyncClient(
-        headers={"X-NUCLIADB-ROLES": "MANAGER"},
-        base_url=f"http://localhost:{nucliadb.http_port}/{API_PREFIX}/v1",
-        timeout=None,
-        event_hooks={"request": [mark_dirty]},
-    ) as client:
-        yield client
-
-
-@pytest.fixture(scope="function")
-async def knowledgebox(nucliadb_manager: AsyncClient):
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "knowledgebox"})
+async def knowledgebox(nucliadb_writer_manager: AsyncClient):
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": "knowledgebox"})
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
 
     yield uuid
 
-    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
     assert resp.status_code == 200
 
 
@@ -99,8 +87,8 @@ def pinecone_mock(pinecone_data_plane, pinecone_control_plane):
 
 
 @pytest.fixture(scope="function")
-async def pinecone_knowledgebox(nucliadb_manager: AsyncClient, pinecone_mock):
-    resp = await nucliadb_manager.post(
+async def pinecone_knowledgebox(nucliadb_writer_manager: AsyncClient, pinecone_mock):
+    resp = await nucliadb_writer_manager.post(
         "/kbs",
         json={
             "slug": "pinecone_knowledgebox",
@@ -116,7 +104,7 @@ async def pinecone_knowledgebox(nucliadb_manager: AsyncClient, pinecone_mock):
 
     yield uuid
 
-    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
     assert resp.status_code == 200
 
 
