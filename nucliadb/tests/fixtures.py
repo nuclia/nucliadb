@@ -20,11 +20,8 @@
 import logging
 
 import pytest
-from grpc import aio
 from httpx import AsyncClient
 
-from nucliadb.standalone.settings import Settings
-from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -44,12 +41,6 @@ async def knowledgebox(nucliadb_writer_manager: AsyncClient):
 
     resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
     assert resp.status_code == 200
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_train(nucliadb: Settings):
-    stub = TrainStub(aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}"))
-    return stub
 
 
 @pytest.fixture(scope="function")

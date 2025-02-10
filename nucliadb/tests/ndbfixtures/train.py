@@ -79,7 +79,16 @@ class TrainGrpcServer:
 @pytest.fixture(scope="function")
 async def component_nucliadb_train_grpc(train_grpc_server: TrainGrpcServer) -> AsyncIterator[TrainStub]:
     channel = aio.insecure_channel(f"localhost:{train_grpc_server.port}")
-    yield TrainStub(channel)
+    stub = TrainStub(channel)
+    yield stub
+    await channel.close(grace=None)
+
+
+@pytest.fixture(scope="function")
+async def standalone_nucliadb_train_grpc(nucliadb: Settings) -> AsyncIterator[TrainStub]:
+    channel = aio.insecure_channel(f"localhost:{nucliadb.train_grpc_port}")
+    stub = TrainStub(channel)
+    yield stub
     await channel.close(grace=None)
 
 

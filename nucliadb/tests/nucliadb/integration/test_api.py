@@ -107,7 +107,7 @@ async def test_creation(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
-    nucliadb_train: TrainStub,
+    nucliadb_train_grpc: TrainStub,
     knowledgebox,
 ):
     # PUBLIC API
@@ -200,7 +200,7 @@ async def test_creation(
     request.metadata.labels = True
     request.metadata.text = True
     paragraph: TrainParagraph
-    async for paragraph in nucliadb_train.GetParagraphs(request):  # type: ignore
+    async for paragraph in nucliadb_train_grpc.GetParagraphs(request):  # type: ignore
         if paragraph.field.field == "title":
             assert paragraph.metadata.text == "My title"
         else:
