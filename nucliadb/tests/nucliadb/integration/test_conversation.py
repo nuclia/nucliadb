@@ -220,7 +220,7 @@ async def test_cannot_create_message_ident_0(
             timestamp=datetime.now(),
             content=InputMessageContent(text="What is the meaning of life?"),
             ident="0",
-            type=MessageType.QUESTION.value,
+            type=MessageType.QUESTION,
         )
     ]
     resp = await nucliadb_writer.post(

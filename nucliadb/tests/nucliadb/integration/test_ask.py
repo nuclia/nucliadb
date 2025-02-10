@@ -1183,7 +1183,7 @@ async def test_all_rag_strategies_combinations(
             headers={"X-Synchronous": "True"},
             json={
                 "query": "title",
-                "rag_strategies": [strategy.dict() for strategy in combination],
+                "rag_strategies": [strategy.model_dump() for strategy in combination],
             },
         )
         assert resp.status_code == 200, resp.text
