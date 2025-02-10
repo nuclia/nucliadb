@@ -113,6 +113,7 @@ async def _test_rollover_kb_index(
     assert len(body["resources"]) == count
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_rollover_kb_index_does_a_clean_cutover(
     app_context,
     knowledgebox,

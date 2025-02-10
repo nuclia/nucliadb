@@ -39,6 +39,7 @@ async def execution_context(natsd, storage, nucliadb):
         await context.finalize()
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
     # this will test run all available migrations
     await execution_context.data_manager.update_kb_info(kbid=knowledgebox, current_version=-1)
