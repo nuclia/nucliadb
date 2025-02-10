@@ -46,7 +46,7 @@ from tests.utils import inject_message
 
 @pytest.fixture(scope="function")
 @pytest.mark.deploy_modes("standalone")
-async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer, knowledgebox):
+async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, knowledgebox):
     messages = []
     for i in range(1, 301):
         messages.append(
@@ -56,13 +56,13 @@ async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer, know
                 timestamp=datetime.now(),
                 content=InputMessageContent(text="What is the meaning of life?"),
                 ident=str(i),
-                type=MessageType.QUESTION.value,
+                type=MessageType.QUESTION,
             )
         )
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
-        data=CreateResourcePayload(
+        content=CreateResourcePayload(
             slug="myresource",
             conversations={
                 "faq": InputConversationField(messages=messages),
@@ -76,12 +76,12 @@ async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer, know
     # add another message using the api to add single message
     resp = await nucliadb_writer.put(
         f"/kb/{knowledgebox}/resource/{rid}/conversation/faq/messages",
-        data="["
+        content="["
         + InputMessage(
             to=[f"computer"],
             content=InputMessageContent(text="42"),
             ident="computer",
-            type=MessageType.ANSWER.value,
+            type=MessageType.ANSWER,
         ).model_dump_json(by_alias=True)
         + "]",
     )
@@ -210,7 +210,9 @@ async def test_find_conversations(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_cannot_create_message_ident_0(nucliadb_ingest_grpc, nucliadb_writer, knowledgebox):
+async def test_cannot_create_message_ident_0(
+    nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, knowledgebox
+):
     messages = [
         # model_construct skips validation, to test the API error
         InputMessage.model_construct(
@@ -225,7 +227,7 @@ async def test_cannot_create_message_ident_0(nucliadb_ingest_grpc, nucliadb_writ
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
-        data=CreateResourcePayload(
+        content=CreateResourcePayload(
             slug="myresource",
             conversations={
                 "faq": InputConversationField(messages=messages),

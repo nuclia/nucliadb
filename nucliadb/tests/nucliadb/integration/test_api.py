@@ -64,8 +64,8 @@ from tests.writer.test_fields import (
 
 @pytest.mark.deploy_modes("standalone")
 async def test_kb_creation_allows_setting_learning_configuration(
-    nucliadb_writer_manager,
-    nucliadb_reader,
+    nucliadb_writer_manager: AsyncClient,
+    nucliadb_reader: AsyncClient,
     onprem_nucliadb,
 ):
     with patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy:
@@ -571,7 +571,9 @@ async def test_icon_doesnt_change_after_labeling_resource_sc_5625(
     ],
 )
 @pytest.mark.deploy_modes("standalone")
-async def test_resource_slug_validation(nucliadb_writer, nucliadb_reader, knowledgebox, slug, valid):
+async def test_resource_slug_validation(
+    nucliadb_writer, nucliadb_reader: AsyncClient, knowledgebox, slug, valid
+):
     resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resources", json={"slug": slug})
     if valid:
         assert resp.status_code == 201
@@ -618,9 +620,9 @@ async def test_icon_doesnt_change_after_adding_file_field_sc_2388(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_language_metadata(
-    nucliadb_writer,
-    nucliadb_reader,
-    nucliadb_ingest_grpc,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     kbid = knowledgebox
@@ -971,9 +973,9 @@ async def test_dates_are_properly_validated(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_file_computed_titles_are_set_on_resource_title(
-    nucliadb_writer,
-    nucliadb_ingest_grpc,
-    nucliadb_reader,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
     # Create a resource with an email field

@@ -43,6 +43,7 @@ from nucliadb_models.text import TextField
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
 
@@ -168,7 +169,7 @@ async def inject_resource_with_paragraph_labels(knowledgebox, writer):
 async def test_labels_global(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     # PUBLIC API
@@ -245,7 +246,7 @@ async def test_classification_labels_cancelled_by_the_user(
 async def test_classification_labels_are_shown_in_resource_basic(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_ingest_grpc)

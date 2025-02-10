@@ -31,7 +31,7 @@ from nuclia_models.predict.generative_responses import (
     StatusGenerativeResponse,
 )
 
-from nucliadb.search.predict import AnswerStatusCode
+from nucliadb.search.predict import AnswerStatusCode, DummyPredictEngine
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AskRequest,
@@ -564,7 +564,7 @@ async def test_ask_on_a_kb_not_found(nucliadb_reader: AsyncClient):
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_max_tokens(nucliadb_reader, knowledgebox, resources):
+async def test_ask_max_tokens(nucliadb_reader: AsyncClient, knowledgebox, resources):
     # As an integer
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
@@ -587,6 +587,8 @@ async def test_ask_max_tokens(nucliadb_reader, knowledgebox, resources):
 
     # If the context requested is bigger than the max tokens, it should fail
     predict = get_predict()
+    assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
+
     resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/ask",
         json={
@@ -609,8 +611,11 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, knowledgebox: str, 
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_handles_stream_errors_on_predict(nucliadb_reader, knowledgebox, resource):
+async def test_ask_handles_stream_errors_on_predict(
+    nucliadb_reader: AsyncClient, knowledgebox, resource
+):
     predict = get_predict()
+    assert isinstance(predict, DummyPredictEngine), "dummy is expected in this test"
     prev = predict.ndjson_answer.copy()
 
     predict.ndjson_answer.pop(-1)

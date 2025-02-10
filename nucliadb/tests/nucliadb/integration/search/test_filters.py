@@ -283,7 +283,7 @@ async def create_test_labelsets(nucliadb_writer: AsyncClient, kbid: str):
 @pytest.fixture(scope="function")
 async def kbid(
     nucliadb_ingest_grpc: WriterStub,
-    nucliadb_writer,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
     await create_test_labelsets(nucliadb_writer, knowledgebox)

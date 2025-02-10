@@ -24,6 +24,7 @@ from httpx import AsyncClient
 
 from nucliadb.tests.vectors import V1
 from nucliadb_models.search import SearchOptions
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.nucliadb.integration.search.test_search import get_resource_with_a_sentence
 from tests.utils import inject_message
 
@@ -41,7 +42,7 @@ def a_week_before(date):
 
 
 @pytest.fixture(scope="function")
-async def resource(nucliadb_ingest_grpc, knowledgebox):
+async def resource(nucliadb_ingest_grpc: WriterStub, knowledgebox):
     bm = get_resource_with_a_sentence(knowledgebox)
     bm.basic.created.FromDatetime(NOW)
     bm.basic.modified.FromDatetime(NOW)
@@ -182,7 +183,7 @@ async def test_search_with_date_range_filters_origin_dates(
 
 @pytest.mark.deploy_modes("standalone")
 async def _test_find_date_ranges(
-    nucliadb_reader,
+    nucliadb_reader: AsyncClient,
     kbid,
     features,
     creation_start,

@@ -260,9 +260,9 @@ async def test_suggest_related_entities(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_suggestion_on_link_computed_titles_sc6088(
-    nucliadb_writer,
-    nucliadb_ingest_grpc,
-    nucliadb_reader,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
     knowledgebox,
 ):
     # Create a resource with a link field

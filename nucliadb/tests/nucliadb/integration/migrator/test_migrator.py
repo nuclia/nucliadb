@@ -20,6 +20,7 @@
 import uuid
 
 import pytest
+from httpx import AsyncClient
 
 from nucliadb.migrator import migrator
 from nucliadb.migrator.context import ExecutionContext
@@ -61,7 +62,7 @@ async def test_migrate_kb(execution_context: ExecutionContext, knowledgebox):
 
 
 @pytest.fixture(scope="function")
-async def two_knowledgeboxes(nucliadb_writer_manager):
+async def two_knowledgeboxes(nucliadb_writer_manager: AsyncClient):
     kbs = []
     for _ in range(2):
         resp = await nucliadb_writer_manager.post("/kbs", json={"slug": uuid.uuid4().hex})

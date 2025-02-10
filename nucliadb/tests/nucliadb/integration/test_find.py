@@ -369,7 +369,7 @@ def find_with_limits_exceeded_error():
 
 @pytest.mark.deploy_modes("standalone")
 async def test_find_handles_limits_exceeded_error(
-    nucliadb_reader, knowledgebox, find_with_limits_exceeded_error
+    nucliadb_reader: AsyncClient, knowledgebox, find_with_limits_exceeded_error
 ):
     kb = knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/find")

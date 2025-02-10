@@ -176,8 +176,8 @@ async def test_resource_creation_slug_conflicts(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_title_is_set_automatically_if_not_provided(
-    nucliadb_reader,
-    nucliadb_writer,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
     resp = await nucliadb_writer.post(
@@ -198,8 +198,8 @@ async def test_title_is_set_automatically_if_not_provided(
 @pytest.mark.parametrize("update_by", ["slug", "uuid"])
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_modification(
-    nucliadb_reader,
-    nucliadb_writer,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
     update_by,
 ):
@@ -234,7 +234,7 @@ async def test_resource_slug_modification(
     await check_resource(nucliadb_reader, knowledgebox, rid, new_slug, title="New title")
 
 
-async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
+async def check_resource(nucliadb_reader: AsyncClient, kbid, rid, slug, **body_checks):
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
     assert resp.status_code == 200
     assert resp.json()["slug"] == slug
@@ -249,8 +249,8 @@ async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
 
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_modification_rollbacks(
-    nucliadb_reader,
-    nucliadb_writer,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
     old_slug = "my-resource"
@@ -286,7 +286,7 @@ async def test_resource_slug_modification_rollbacks(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_modification_handles_conflicts(
-    nucliadb_writer,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
     rids = []
@@ -318,7 +318,7 @@ async def test_resource_slug_modification_handles_conflicts(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_modification_handles_unknown_resources(
-    nucliadb_writer,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
     resp = await nucliadb_writer.patch(
@@ -332,7 +332,7 @@ async def test_resource_slug_modification_handles_unknown_resources(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_parallel_dup_resource_creation_raises_conflicts(
-    nucliadb_writer,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
     driver = get_driver()

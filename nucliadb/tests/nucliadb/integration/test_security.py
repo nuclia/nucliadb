@@ -21,6 +21,7 @@ import asyncio
 from typing import Optional
 
 import pytest
+from httpx import AsyncClient
 
 PLATFORM_GROUP = "platform"
 DEVELOPERS_GROUP = "developers"
@@ -28,7 +29,7 @@ DEVELOPERS_GROUP = "developers"
 
 @pytest.fixture(scope="function")
 @pytest.mark.deploy_modes("standalone")
-async def resource_with_security(nucliadb_writer, knowledgebox):
+async def resource_with_security(nucliadb_writer: AsyncClient, knowledgebox):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -48,7 +49,7 @@ async def resource_with_security(nucliadb_writer, knowledgebox):
 
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_security_is_returned_serialization(
-    nucliadb_reader, knowledgebox, resource_with_security
+    nucliadb_reader: AsyncClient, knowledgebox, resource_with_security
 ):
     kbid = knowledgebox
     resource_id = resource_with_security
@@ -61,7 +62,7 @@ async def test_resource_security_is_returned_serialization(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_security_is_updated(
-    nucliadb_reader, nucliadb_writer, knowledgebox, resource_with_security
+    nucliadb_reader: AsyncClient, nucliadb_writer, knowledgebox, resource_with_security
 ):
     kbid = knowledgebox
     resource_id = resource_with_security
@@ -90,8 +91,8 @@ async def test_resource_security_is_updated(
 @pytest.mark.parametrize("search_endpoint", ("find_get", "find_post", "search_get", "search_post"))
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_security_search(
-    nucliadb_reader,
-    nucliadb_writer,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
     knowledgebox,
     resource_with_security,
     search_endpoint,
@@ -177,7 +178,7 @@ async def test_resource_security_search(
 
 async def _test_search_request_with_security(
     search_endpoint: str,
-    nucliadb_reader,
+    nucliadb_reader: AsyncClient,
     kbid: str,
     query: str,
     security_groups: Optional[list[str]],

@@ -293,9 +293,9 @@ async def test_search_with_filters(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_paragraph_search_with_filters(
-    nucliadb_writer,
-    nucliadb_reader,
-    nucliadb_ingest_grpc,
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox,
 ):
     kbid = knowledgebox
@@ -808,7 +808,7 @@ async def get_audit_messages(sub):
 
 @pytest.mark.deploy_modes("standalone")
 async def test_search_sends_audit(
-    nucliadb_reader,
+    nucliadb_reader: AsyncClient,
     knowledgebox,
     stream_audit: StreamAuditStorage,
 ):
@@ -1196,7 +1196,7 @@ async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledgebox):
+async def test_resource_search_query_param_is_optional(nucliadb_reader: AsyncClient, knowledgebox):
     kb = knowledgebox
     # If query is not present, should not fail
     resp = await nucliadb_reader.get(f"/kb/{kb}/search")
@@ -1209,7 +1209,7 @@ async def test_resource_search_query_param_is_optional(nucliadb_reader, knowledg
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_search_with_duplicates(nucliadb_reader, knowledgebox):
+async def test_search_with_duplicates(nucliadb_reader: AsyncClient, knowledgebox):
     kb = knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/search?with_duplicates=True")
     assert resp.status_code == 200
@@ -1229,7 +1229,7 @@ def search_with_limits_exceeded_error():
 
 @pytest.mark.deploy_modes("standalone")
 async def test_search_handles_limits_exceeded_error(
-    nucliadb_reader, knowledgebox, search_with_limits_exceeded_error
+    nucliadb_reader: AsyncClient, knowledgebox, search_with_limits_exceeded_error
 ):
     kb = knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/search")
