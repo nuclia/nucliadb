@@ -31,12 +31,8 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.aiopynecone.models import QueryResponse
 from nucliadb_utils.utilities import (
-    Utility,
     clean_pinecone,
-    clean_utility,
     get_pinecone,
-    get_utility,
-    set_utility,
 )
 from tests.utils import inject_message
 from tests.utils.dirty_index import wait_for_sync
@@ -309,20 +305,6 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: Wr
     assert resp.status_code == 200, resp.content
 
     return (nodes, edges)
-
-
-@pytest.fixture(scope="function")
-def predict_mock() -> Mock:  # type: ignore
-    predict = get_utility(Utility.PREDICT)
-    mock = Mock()
-    set_utility(Utility.PREDICT, mock)
-
-    yield mock
-
-    if predict is None:
-        clean_utility(Utility.PREDICT)
-    else:
-        set_utility(Utility.PREDICT, predict)
 
 
 @pytest.fixture(scope="function")
