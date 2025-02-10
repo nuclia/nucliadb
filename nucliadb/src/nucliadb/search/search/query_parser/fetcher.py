@@ -306,7 +306,7 @@ class Fetcher:
                 self.rephrase,
                 self.rephrase_prompt,
             )
-        except SendToPredictError:
+        except (SendToPredictError, TimeoutError):
             query_info = None
 
         self.cache.predict_query_info = query_info
@@ -318,7 +318,7 @@ class Fetcher:
 
         try:
             detected_entities = await detect_entities(self.kbid, self.query)
-        except SendToPredictError as ex:
+        except (SendToPredictError, TimeoutError) as ex:
             logger.warning(f"Errors on Predict API detecting entities: {ex}", extra={"kbid": self.kbid})
             detected_entities = []
 
