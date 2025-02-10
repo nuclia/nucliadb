@@ -308,17 +308,6 @@ async def knowledge_graph(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: Wr
 
 
 @pytest.fixture(scope="function")
-def metrics_registry():
-    import prometheus_client.registry
-
-    for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
-        if not hasattr(collector, "_metrics"):
-            continue
-        collector._metrics.clear()
-    yield prometheus_client.registry.REGISTRY
-
-
-@pytest.fixture(scope="function")
 async def txn(maindb_driver):
     async with maindb_driver.transaction() as txn:
         yield txn
