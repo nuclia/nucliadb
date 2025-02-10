@@ -272,13 +272,16 @@ class StreamAuditStorage(AuditStorage):
         self.send(auditrequest)
 
     def report_storage(self, kbid: str, paragraphs: int, fields: int, bytes: int):
+        trace_id = get_trace_id()
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
             account_id=None,
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(paragraphs=paragraphs, fields=fields, bytes=bytes),
-            activity_log_match=ActivityLogMatch(id=get_trace_id(), type=ActivityLogMatchType.TRACE_ID),
+            activity_log_match=ActivityLogMatch(id=trace_id, type=ActivityLogMatchType.TRACE_ID)
+            if trace_id
+            else None,
         )
 
     def report_resources(
@@ -287,13 +290,16 @@ class StreamAuditStorage(AuditStorage):
         kbid: str,
         resources: int,
     ):
+        trace_id = get_trace_id()
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
             account_id=None,
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(resources=resources),
-            activity_log_match=ActivityLogMatch(id=get_trace_id(), type=ActivityLogMatchType.TRACE_ID),
+            activity_log_match=ActivityLogMatch(id=trace_id, type=ActivityLogMatchType.TRACE_ID)
+            if trace_id
+            else None,
         )
 
     def visited(
@@ -316,13 +322,16 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.type = AuditRequest.VISITED
 
     def delete_kb(self, kbid: str):
+        trace_id = get_trace_id()
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
             account_id=None,
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(paragraphs=0, fields=0, resources=0),
-            activity_log_match=ActivityLogMatch(id=get_trace_id(), type=ActivityLogMatchType.TRACE_ID),
+            activity_log_match=ActivityLogMatch(id=trace_id, type=ActivityLogMatchType.TRACE_ID)
+            if trace_id
+            else None,
         )
 
     def search(
@@ -353,6 +362,7 @@ class StreamAuditStorage(AuditStorage):
         else:
             auditrequest.type = AuditRequest.SEARCH
 
+        trace_id = get_trace_id()
         self.kb_usage_utility.send_kb_usage(
             service=Service.NUCLIA_DB,
             account_id=None,
@@ -367,7 +377,9 @@ class StreamAuditStorage(AuditStorage):
                     num_searches=1,
                 )
             ],
-            activity_log_match=ActivityLogMatch(id=get_trace_id(), type=ActivityLogMatchType.TRACE_ID),
+            activity_log_match=ActivityLogMatch(id=trace_id, type=ActivityLogMatchType.TRACE_ID)
+            if trace_id
+            else None,
         )
 
     def chat(
