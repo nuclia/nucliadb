@@ -23,12 +23,9 @@ import string
 from datetime import datetime
 from typing import Any, Awaitable, Optional, Union
 
-from async_lru import alru_cache
-
 from nucliadb.common import datamanagers
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.search import logger
-from nucliadb.search.predict import SendToPredictError, convert_relations
+from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.filters import (
     convert_to_node_filters,
     flatten_filter_literals,
@@ -39,15 +36,14 @@ from nucliadb.search.search.filters import (
 )
 from nucliadb.search.search.metrics import (
     node_features,
-    query_parse_dependency_observer,
 )
+from nucliadb.search.search.query_parser.fetcher import Fetcher, get_classification_labels
 from nucliadb.search.search.rank_fusion import (
     RankFusionAlgorithm,
 )
 from nucliadb.search.search.rerankers import (
     Reranker,
 )
-from nucliadb.search.utilities import get_predict
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -63,7 +59,7 @@ from nucliadb_models.search import (
     SuggestOptions,
 )
 from nucliadb_models.security import RequestSecurity
-from nucliadb_protos import knowledgebox_pb2, nodereader_pb2, utils_pb2
+from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
@@ -87,13 +83,6 @@ class QueryParser:
     """
 
     _query_information_task: Optional[asyncio.Task] = None
-    _get_vectorset_task: Optional[asyncio.Task] = None
-    _detected_entities_task: Optional[asyncio.Task] = None
-    _entities_meta_cache_task: Optional[asyncio.Task] = None
-    _deleted_entities_groups_task: Optional[asyncio.Task] = None
-    _synonyms_task: Optional[asyncio.Task] = None
-    _get_classification_labels_task: Optional[asyncio.Task] = None
-    _get_matryoshka_dimension_task: Optional[asyncio.Task] = None
 
     def __init__(
         self,
@@ -168,6 +157,15 @@ class QueryParser:
         self.max_tokens = max_tokens
         self.rank_fusion = rank_fusion
         self.reranker = reranker
+        self.fetcher = Fetcher(
+            kbid=kbid,
+            query=query,
+            user_vector=user_vector,
+            vectorset=vectorset,
+            rephrase=rephrase,
+            rephrase_prompt=rephrase_prompt,
+            generative_model=generative_model,
+        )
 
     @property
     def has_vector_search(self) -> bool:
@@ -183,78 +181,12 @@ class QueryParser:
         return self._query_information_task
 
     async def _query_information(self) -> QueryInfo:
-        vectorset = await self.select_query_vectorset()
-        return await query_information(
-            self.kbid, self.query, vectorset, self.generative_model, self.rephrase, self.rephrase_prompt
-        )
-
-    def _get_vectorset(self) -> Awaitable[Optional[str]]:
-        if self._get_vectorset_task is None:
-            self._get_vectorset_task = asyncio.create_task(self._select_vectorset())
-        return self._get_vectorset_task
-
-    async def _select_vectorset(self) -> Optional[str]:
-        if self.vectorset:
-            return self.vectorset
-
-        # When vectorset is not provided we get the default from Predict API
-
-        try:
-            query_information = await self._get_query_information()
-        except SendToPredictError:
-            return None
-
-        if query_information.sentence is None:
-            logger.error(
-                "Asking for a vectorset but /query didn't return one", extra={"kbid": self.kbid}
-            )
-            return None
-
-        for vectorset in query_information.sentence.vectors.keys():
-            self.vectorset = vectorset
-            break
-
-        return self.vectorset
-
-    def _get_matryoshka_dimension(self) -> Awaitable[Optional[int]]:
-        if self._get_matryoshka_dimension_task is None:
-            self._get_matryoshka_dimension_task = asyncio.create_task(self._matryoshka_dimension())
-        return self._get_matryoshka_dimension_task
-
-    async def _matryoshka_dimension(self) -> Optional[int]:
-        vectorset = await self._select_vectorset()
-        return await get_matryoshka_dimension_cached(self.kbid, vectorset)
-
-    def _get_detected_entities(self) -> Awaitable[list[utils_pb2.RelationNode]]:
-        if self._detected_entities_task is None:  # pragma: no cover
-            self._detected_entities_task = asyncio.create_task(detect_entities(self.kbid, self.query))
-        return self._detected_entities_task
-
-    def _get_entities_meta_cache(
-        self,
-    ) -> Awaitable[datamanagers.entities.EntitiesMetaCache]:
-        if self._entities_meta_cache_task is None:
-            self._entities_meta_cache_task = asyncio.create_task(get_entities_meta_cache(self.kbid))
-        return self._entities_meta_cache_task
-
-    def _get_deleted_entity_groups(self) -> Awaitable[list[str]]:
-        if self._deleted_entities_groups_task is None:
-            self._deleted_entities_groups_task = asyncio.create_task(
-                get_deleted_entity_groups(self.kbid)
-            )
-        return self._deleted_entities_groups_task
-
-    def _get_synomyns(self) -> Awaitable[Optional[knowledgebox_pb2.Synonyms]]:
-        if self._synonyms_task is None:
-            self._synonyms_task = asyncio.create_task(get_kb_synonyms(self.kbid))
-        return self._synonyms_task
-
-    def _get_classification_labels(self) -> Awaitable[knowledgebox_pb2.Labels]:
-        if self._get_classification_labels_task is None:
-            self._get_classification_labels_task = asyncio.create_task(
-                get_classification_labels(self.kbid)
-            )
-        return self._get_classification_labels_task
+        # HACK: while transitioning to the new query parser, use fetcher under
+        # the hood for a smoother migration
+        query_info = await self.fetcher._predict_query_endpoint()
+        if query_info is None:
+            raise SendToPredictError("Error while using predict's query endpoint")
+        return query_info
 
     async def _schedule_dependency_tasks(self) -> None:
         """
@@ -262,21 +194,22 @@ class QueryParser:
         for the sake of the query being performed
         """
         if len(self.label_filters) > 0 and has_classification_label_filters(self.flat_label_filters):
-            asyncio.ensure_future(self._get_classification_labels())
+            asyncio.ensure_future(self.fetcher.get_classification_labels())
 
         if self.has_vector_search and self.user_vector is None:
             self.query_endpoint_used = True
             asyncio.ensure_future(self._get_query_information())
-            asyncio.ensure_future(self._get_matryoshka_dimension())
+            # XXX: should we also ensure get_vectorset and get_query_vector?
+            asyncio.ensure_future(self.fetcher.get_matryoshka_dimension())
 
         if (self.has_relations_search or self.autofilter) and len(self.query) > 0:
             if not self.query_endpoint_used:
                 # If we only need to detect entities, we don't need the query endpoint
-                asyncio.ensure_future(self._get_detected_entities())
-            asyncio.ensure_future(self._get_entities_meta_cache())
-            asyncio.ensure_future(self._get_deleted_entity_groups())
+                asyncio.ensure_future(self.fetcher.get_detected_entities())
+            asyncio.ensure_future(self.fetcher.get_entities_meta_cache())
+            asyncio.ensure_future(self.fetcher.get_deleted_entity_groups())
         if self.with_synonyms and self.query:
-            asyncio.ensure_future(self._get_synomyns())
+            asyncio.ensure_future(self.fetcher.get_synonyms())
 
     async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str]]:
         """
@@ -309,7 +242,7 @@ class QueryParser:
             field_labels = self.flat_label_filters
             paragraph_labels: list[str] = []
             if has_classification_label_filters(self.flat_label_filters):
-                classification_labels = await self._get_classification_labels()
+                classification_labels = await self.fetcher.get_classification_labels()
                 field_labels, paragraph_labels = split_labels_by_type(
                     self.flat_label_filters, classification_labels
                 )
@@ -398,19 +331,13 @@ class QueryParser:
             semantic_min_score = self.min_score.semantic
         elif self.has_vector_search and not incomplete:
             query_information = await self._get_query_information()
-            vectorset = await self._select_vectorset()
-            if vectorset is not None:
-                semantic_threshold = query_information.semantic_thresholds.get(vectorset, None)
-                if semantic_threshold is not None:
-                    semantic_min_score = semantic_threshold
-                else:
-                    logger.warning(
-                        "Semantic threshold not found in query information, using default",
-                        extra={"kbid": self.kbid},
-                    )
+            vectorset = await self.fetcher.get_vectorset()
+            semantic_threshold = query_information.semantic_thresholds.get(vectorset, None)
+            if semantic_threshold is not None:
+                semantic_min_score = semantic_threshold
             else:
                 logger.warning(
-                    "Vectorset unset by user or predict, using default semantic threshold",
+                    "Semantic threshold not found in query information, using default",
                     extra={"kbid": self.kbid},
                 )
         self.min_score.semantic = semantic_min_score
@@ -427,70 +354,18 @@ class QueryParser:
             request.paragraph = True
             node_features.inc({"type": "paragraphs"})
 
-    async def select_query_vectorset(self) -> Optional[str]:
-        """Set and return the requested vectorset parameter (if used) validated
-        for the current KB.
-
-        """
-        if not self.vectorset:
-            return None
-
-        # validate vectorset
-        async with datamanagers.with_ro_transaction() as txn:
-            if not await datamanagers.vectorsets.exists(
-                txn, kbid=self.kbid, vectorset_id=self.vectorset
-            ):
-                raise InvalidQueryError(
-                    "vectorset",
-                    f"Vectorset {self.vectorset} doesn't exist in you Knowledge Box",
-                )
-        return self.vectorset
-
     async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
         if not self.has_vector_search:
             return False
 
         node_features.inc({"type": "vectors"})
 
-        incomplete = False
+        vectorset = await self.fetcher.get_vectorset()
+        query_vector = await self.fetcher.get_query_vector()
+        incomplete = query_vector is None
 
-        vectorset = await self._select_vectorset()
-        if vectorset is not None:
-            request.vectorset = vectorset
-
-        query_vector = None
-        if self.user_vector is None:
-            try:
-                query_info = await self._get_query_information()
-            except SendToPredictError as err:
-                logger.warning(f"Errors on predict api trying to embedd query: {err}")
-                incomplete = True
-            else:
-                if query_info and query_info.sentence:
-                    if vectorset:
-                        if vectorset in query_info.sentence.vectors:
-                            query_vector = query_info.sentence.vectors[vectorset]
-                        else:
-                            incomplete = True
-                    else:
-                        for vectorset_id, vector in query_info.sentence.vectors.items():
-                            if vector:
-                                query_vector = vector
-                                break
-                        else:
-                            incomplete = True
-
-                else:
-                    incomplete = True
-        else:
-            query_vector = self.user_vector
-
+        request.vectorset = vectorset
         if query_vector is not None:
-            matryoshka_dimension = await self._get_matryoshka_dimension()
-            if matryoshka_dimension is not None:
-                # KB using a matryoshka embeddings model, cut the query vector
-                # accordingly
-                query_vector = query_vector[:matryoshka_dimension]
             request.vector.extend(query_vector)
 
         return incomplete
@@ -498,20 +373,15 @@ class QueryParser:
     async def parse_relation_search(self, request: nodereader_pb2.SearchRequest) -> list[str]:
         autofilters = []
         if self.has_relations_search or self.autofilter:
-            if not self.query_endpoint_used:
-                detected_entities = await self._get_detected_entities()
-            else:
-                query_info_result = await self._get_query_information()
-                if query_info_result.entities:
-                    detected_entities = convert_relations(query_info_result.entities.model_dump())
-                else:
-                    detected_entities = []
-            meta_cache = await self._get_entities_meta_cache()
+            detected_entities = await self.fetcher.get_detected_entities()
+            meta_cache = await self.fetcher.get_entities_meta_cache()
             detected_entities = expand_entities(meta_cache, detected_entities)
             if self.has_relations_search:
                 request.relation_subgraph.entry_points.extend(detected_entities)
                 request.relation_subgraph.depth = 1
-                request.relation_subgraph.deleted_groups.extend(await self._get_deleted_entity_groups())
+                request.relation_subgraph.deleted_groups.extend(
+                    await self.fetcher.get_deleted_entity_groups()
+                )
                 for group_id, deleted_entities in meta_cache.deleted_entities.items():
                     request.relation_subgraph.deleted_entities.append(
                         nodereader_pb2.EntitiesSubgraphRequest.DeletedEntities(
@@ -544,7 +414,7 @@ class QueryParser:
                 "Search with custom synonyms is only supported on paragraph and document search",
             )
 
-        synonyms = await self._get_synomyns()
+        synonyms = await self.fetcher.get_synonyms()
         if synonyms is None:
             # No synonyms found
             return
@@ -680,29 +550,6 @@ async def paragraph_query_to_pb(
     return request
 
 
-@query_parse_dependency_observer.wrap({"type": "query_information"})
-async def query_information(
-    kbid: str,
-    query: str,
-    semantic_model: Optional[str],
-    generative_model: Optional[str] = None,
-    rephrase: bool = False,
-    rephrase_prompt: Optional[str] = None,
-) -> QueryInfo:
-    predict = get_predict()
-    return await predict.query(kbid, query, semantic_model, generative_model, rephrase, rephrase_prompt)
-
-
-@query_parse_dependency_observer.wrap({"type": "detect_entities"})
-async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
-    predict = get_predict()
-    try:
-        return await predict.detect_entities(kbid, query)
-    except SendToPredictError as ex:
-        logger.warning(f"Errors on predict api detecting entities: {ex}")
-        return []
-
-
 def expand_entities(
     meta_cache: datamanagers.entities.EntitiesMetaCache,
     detected_entities: list[utils_pb2.RelationNode],
@@ -833,30 +680,6 @@ PROCESSING_STATUS_TO_PB_MAP = {
 }
 
 
-@query_parse_dependency_observer.wrap({"type": "synonyms"})
-async def get_kb_synonyms(kbid: str) -> Optional[knowledgebox_pb2.Synonyms]:
-    async with get_driver().transaction(read_only=True) as txn:
-        return await datamanagers.synonyms.get(txn, kbid=kbid)
-
-
-@query_parse_dependency_observer.wrap({"type": "entities_meta_cache"})
-async def get_entities_meta_cache(kbid: str) -> datamanagers.entities.EntitiesMetaCache:
-    async with get_driver().transaction(read_only=True) as txn:
-        return await datamanagers.entities.get_entities_meta_cache(txn, kbid=kbid)
-
-
-@query_parse_dependency_observer.wrap({"type": "deleted_entities_groups"})
-async def get_deleted_entity_groups(kbid: str) -> list[str]:
-    async with get_driver().transaction(read_only=True) as txn:
-        return list((await datamanagers.entities.get_deleted_groups(txn, kbid=kbid)).entities_groups)
-
-
-@query_parse_dependency_observer.wrap({"type": "classification_labels"})
-async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
-    async with get_driver().transaction(read_only=True) as txn:
-        return await datamanagers.labels.get_labels(txn, kbid=kbid)
-
-
 def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]):
     """
     Check if the provided filters are supported:
@@ -887,28 +710,6 @@ def check_supported_filters(filters: dict[str, Any], paragraph_labels: list[str]
                 "filters",
                 "Paragraph labels can only be used with 'all' filter",
             )
-
-
-@alru_cache(maxsize=None)
-async def get_matryoshka_dimension_cached(kbid: str, vectorset: Optional[str]) -> Optional[int]:
-    # This can be safely cached as the matryoshka dimension is not expected to change
-    return await get_matryoshka_dimension(kbid, vectorset)
-
-
-@query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
-async def get_matryoshka_dimension(kbid: str, vectorset: Optional[str]) -> Optional[int]:
-    async with get_driver().transaction(read_only=True) as txn:
-        matryoshka_dimension = None
-        if not vectorset:
-            # XXX this should be migrated once we remove the "default" vectorset
-            # concept
-            matryoshka_dimension = await datamanagers.kb.get_matryoshka_vector_dimension(txn, kbid=kbid)
-        else:
-            vectorset_config = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset)
-            if vectorset_config is not None and vectorset_config.vectorset_index_config.vector_dimension:
-                matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
-
-        return matryoshka_dimension
 
 
 def get_sort_field_proto(obj: SortField) -> Optional[nodereader_pb2.OrderBy.OrderField.ValueType]:

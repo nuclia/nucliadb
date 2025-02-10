@@ -34,7 +34,7 @@ use super::{
     query_planner::{self, QueryPlan},
 };
 
-#[instrument(skip_all)]
+#[instrument(skip_all, fields(shard_id = search_request.shard))]
 pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest) -> NidxResult<SearchResponse> {
     let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
 

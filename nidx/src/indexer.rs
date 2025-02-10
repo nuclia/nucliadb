@@ -249,7 +249,7 @@ pub async fn download_message(storage: Arc<DynObjectStore>, storage_key: &str) -
 
 type IndexingResult = (Segment, usize, Vec<String>);
 
-#[instrument(skip_all)]
+#[instrument(skip_all, fields(shard_id = shard_id))]
 pub async fn index_resource(
     meta: &NidxMetadata,
     storage: Arc<DynObjectStore>,
@@ -274,26 +274,29 @@ pub async fn index_resource(
         let meta = meta.clone();
         let output_dir = tempfile::tempdir_in(work_path)?;
         let storage = Arc::clone(&storage);
-        tasks.spawn(async move {
-            // Index the resource
-            let path = output_dir.path().to_path_buf();
-            let index_2 = index.clone();
-            let span = Span::current();
-            let (new_segment, deletions) = tokio::task::spawn_blocking(move || {
-                span.in_scope(|| index_resource_to_index(&index_2, &resource, &path, single_vector_index))
-            })
-            .await??;
-            let Some(new_segment) = new_segment else {
-                return Ok(None);
-            };
+        tasks.spawn(
+            async move {
+                // Index the resource
+                let path = output_dir.path().to_path_buf();
+                let index_2 = index.clone();
+                let span = Span::current();
+                let (new_segment, deletions) = tokio::task::spawn_blocking(move || {
+                    span.in_scope(|| index_resource_to_index(&index_2, &resource, &path, single_vector_index))
+                })
+                .await??;
+                let Some(new_segment) = new_segment else {
+                    return Ok(None);
+                };
 
-            // Create the segment first so we can track it if the upload gets interrupted
-            let segment =
-                Segment::create(&meta.pool, index.id, seq, new_segment.records, new_segment.index_metadata).await?;
-            let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
+                // Create the segment first so we can track it if the upload gets interrupted
+                let segment =
+                    Segment::create(&meta.pool, index.id, seq, new_segment.records, new_segment.index_metadata).await?;
+                let size = pack_and_upload(storage.clone(), output_dir.path(), segment.id.storage_key()).await?;
 
-            Ok(Some((segment, size, deletions)))
-        });
+                Ok(Some((segment, size, deletions)))
+            }
+            .in_current_span(),
+        );
     }
 
     let results: anyhow::Result<Vec<_>> = tasks.join_all().await.into_iter().collect();
