@@ -27,6 +27,7 @@ from typing import Optional
 from nats.js.client import JetStreamContext
 
 from nucliadb_protos.kb_usage_pb2 import (
+    ActivityLogMatch,
     KBSource,
     KbUsage,
     Predict,
@@ -96,7 +97,7 @@ class KbUsageReportUtility:
         predicts: Iterable[Predict] = (),
         searches: Iterable[Search] = (),
         storage: Optional[Storage] = None,
-        log_match_id: Optional[str] = None,
+        activity_log_match: Optional[ActivityLogMatch] = None,
     ):
         usage = KbUsage()
         usage.service = service  # type: ignore
@@ -106,8 +107,10 @@ class KbUsageReportUtility:
         if kb_id is not None:
             usage.kb_id = kb_id
         usage.kb_source = kb_source  # type: ignore
-        if log_match_id is not None:
-            usage.log_match_id = log_match_id
+        if activity_log_match is not None:
+            if activity_log_match.id:
+                usage.activity_log_match.id = activity_log_match.id
+                usage.activity_log_match.type = activity_log_match.type
 
         usage.processes.extend(processes)
         usage.predicts.extend(predicts)

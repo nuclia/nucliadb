@@ -37,14 +37,16 @@ from starlette.types import ASGIApp
 
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, ChatContext, ClientType, RetrievedContext
 from nucliadb_protos.kb_usage_pb2 import (
-    ClientType as ClientTypeKbUsage,
-)
-from nucliadb_protos.kb_usage_pb2 import (
+    ActivityLogMatch,
+    ActivityLogMatchType,
     KBSource,
     Search,
     SearchType,
     Service,
     Storage,
+)
+from nucliadb_protos.kb_usage_pb2 import (
+    ClientType as ClientTypeKbUsage,
 )
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.resources_pb2 import FieldID
@@ -276,7 +278,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(paragraphs=paragraphs, fields=fields, bytes=bytes),
-            log_match_id=get_trace_id(),
+            activity_log_match=ActivityLogMatch(id=get_trace_id(), type=ActivityLogMatchType.TRACE_ID),
         )
 
     def report_resources(
@@ -291,7 +293,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(resources=resources),
-            log_match_id=get_trace_id(),
+            activity_log_match=ActivityLogMatch(id=get_trace_id(), type=ActivityLogMatchType.TRACE_ID),
         )
 
     def visited(
@@ -320,7 +322,7 @@ class StreamAuditStorage(AuditStorage):
             kb_id=kbid,
             kb_source=KBSource.HOSTED,
             storage=Storage(paragraphs=0, fields=0, resources=0),
-            log_match_id=get_trace_id(),
+            activity_log_match=ActivityLogMatch(id=get_trace_id(), type=ActivityLogMatchType.TRACE_ID),
         )
 
     def search(
@@ -365,7 +367,7 @@ class StreamAuditStorage(AuditStorage):
                     num_searches=1,
                 )
             ],
-            log_match_id=get_trace_id(),
+            activity_log_match=ActivityLogMatch(id=get_trace_id(), type=ActivityLogMatchType.TRACE_ID),
         )
 
     def chat(
