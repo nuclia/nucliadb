@@ -39,27 +39,33 @@ async def app_context(natsd, storage, nucliadb):
     await ctx.finalize()
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_rollover_kb_index(
     app_context: ApplicationContext,
-    knowledgebox,
+    standalone_knowledgebox,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_manager: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
 ):
     await _test_rollover_kb_index(
-        app_context, knowledgebox, nucliadb_writer, nucliadb_reader, nucliadb_manager
+        app_context, standalone_knowledgebox, nucliadb_writer, nucliadb_reader, nucliadb_reader_manager
     )
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_rollover_kb_index_with_vectorsets(
     app_context: ApplicationContext,
     knowledgebox_with_vectorsets: str,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_manager: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
 ):
     await _test_rollover_kb_index(
-        app_context, knowledgebox_with_vectorsets, nucliadb_writer, nucliadb_reader, nucliadb_manager
+        app_context,
+        knowledgebox_with_vectorsets,
+        nucliadb_writer,
+        nucliadb_reader,
+        nucliadb_reader_manager,
     )
 
 
@@ -68,7 +74,7 @@ async def _test_rollover_kb_index(
     kbid: str,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_manager: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
 ):
     count = 20
     for i in range(count):
@@ -83,13 +89,13 @@ async def _test_rollover_kb_index(
         )
         assert resp.status_code == 201
 
-    resp = await nucliadb_manager.get(f"/kb/{kbid}/shards")
+    resp = await nucliadb_reader_manager.get(f"/kb/{kbid}/shards")
     assert resp.status_code == 200, resp.text
     shards_body1 = resp.json()
 
     await rollover.rollover_kb_index(app_context, kbid)
 
-    resp = await nucliadb_manager.get(f"/kb/{kbid}/shards")
+    resp = await nucliadb_reader_manager.get(f"/kb/{kbid}/shards")
     assert resp.status_code == 200, resp.text
     shards_body2 = resp.json()
     # check that shards have changed
@@ -107,6 +113,7 @@ async def _test_rollover_kb_index(
     assert len(body["resources"]) == count
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_rollover_kb_index_does_a_clean_cutover(
     app_context,
     knowledgebox,
@@ -124,12 +131,13 @@ async def test_rollover_kb_index_does_a_clean_cutover(
     assert shards2.extra == {}
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_rollover_kb_index_handles_changes_in_between(
     app_context,
     knowledgebox,
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
-    nucliadb_manager: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
 ):
     count = 50
     resources = []

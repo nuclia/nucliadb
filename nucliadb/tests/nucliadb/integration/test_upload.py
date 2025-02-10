@@ -19,19 +19,21 @@
 #
 import base64
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.writer.tus import UPLOAD
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_upload(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     content = b"Test for /upload endpoint"
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/{UPLOAD}",
+        f"/kb/{standalone_knowledgebox}/{UPLOAD}",
         headers={
             "X-Filename": base64.b64encode(b"testfile").decode("utf-8"),
             "Content-Type": "text/plain",
@@ -51,7 +53,7 @@ async def test_upload(
     assert rid
     assert field_id
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}/file/{field_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["value"]["file"]["filename"] == "testfile"
@@ -62,17 +64,18 @@ async def test_upload(
     assert resp.content == content
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_upload_guesses_content_type(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     filename = "testfile.txt"
     content = b"Test for /upload endpoint"
     content_type = "text/plain"
     # Upload the file without specifying the content type
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/{UPLOAD}",
+        f"/kb/{standalone_knowledgebox}/{UPLOAD}",
         headers={
             "X-Filename": base64.b64encode(filename.encode()).decode("utf-8"),
         },
@@ -84,7 +87,7 @@ async def test_upload_guesses_content_type(
     field_id = body["field_id"]
 
     # Test that the content type is correctly guessed from the filename
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}/file/{field_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["value"]["file"]["filename"] == filename

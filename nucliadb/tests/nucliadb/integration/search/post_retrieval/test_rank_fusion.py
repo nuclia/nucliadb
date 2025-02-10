@@ -39,6 +39,7 @@ from nucliadb_models.search import (
         (ReciprocalRankFusion().model_dump(), {SCORE_TYPE.BM25}),
     ],
 )
+@pytest.mark.deploy_modes("standalone")
 async def test_rank_fusion(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
@@ -91,6 +92,7 @@ def get_score_types(results: KnowledgeboxFindResults) -> set[SCORE_TYPE]:
     return score_types
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_reciprocal_rank_fusion_requests_more_results(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,

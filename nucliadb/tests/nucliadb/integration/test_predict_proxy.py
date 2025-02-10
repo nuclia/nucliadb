@@ -20,6 +20,7 @@
 
 
 import pytest
+from httpx import AsyncClient
 
 
 @pytest.mark.parametrize(
@@ -44,8 +45,16 @@ import pytest
         ),
     ],
 )
-async def test_predict_proxy(nucliadb_reader, knowledgebox, method, endpoint, params, payload):
-    kbid = knowledgebox
+@pytest.mark.deploy_modes("standalone")
+async def test_predict_proxy(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    method: str,
+    endpoint: str,
+    params,
+    payload,
+):
+    kbid = standalone_knowledgebox
     http_func = getattr(nucliadb_reader, method.lower())
     http_func_kwargs = {"params": params}
     if method == "POST":
@@ -58,11 +67,12 @@ async def test_predict_proxy(nucliadb_reader, knowledgebox, method, endpoint, pa
     assert resp.status_code == 200, resp.text
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_predict_proxy_not_proxied_returns_422(
-    nucliadb_reader,
-    knowledgebox,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/predict/summarize",
         json={"resources": {"foo": "bar"}},
@@ -70,8 +80,9 @@ async def test_predict_proxy_not_proxied_returns_422(
     assert resp.status_code == 422
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_predict_proxy_returns_404_on_non_existing_kb(
-    nucliadb_reader,
+    nucliadb_reader: AsyncClient,
 ):
     resp = await nucliadb_reader.post(
         f"/kb/idonotexist-kb/predict/chat",

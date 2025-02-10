@@ -17,20 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
 from httpx import AsyncClient
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_counters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}")
     assert resp.status_code == 200
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "My title",
             "slug": "myresource",
@@ -40,18 +42,18 @@ async def test_counters(
     assert resp.status_code == 201
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={"slug": "myresource2", "title": "mytitle1"},
     )
     assert resp.status_code == 201
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={"slug": "myresource3", "title": "mytitle1"},
     )
     assert resp.status_code == 201
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/counters")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/counters")
 
     assert resp.status_code == 200
     assert resp.json()["resources"] == 3

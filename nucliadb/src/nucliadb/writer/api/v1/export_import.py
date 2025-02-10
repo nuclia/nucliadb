@@ -112,7 +112,7 @@ async def kb_create_and_import_endpoint(request: Request):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     import_kb_config = KnowledgeBoxConfig(
         title=f"Imported KB - {now}",
-        learning_configuration=learning_config.dict(),
+        learning_configuration=learning_config.model_dump(),
     )
     kbid, slug = await create_kb(import_kb_config)
 

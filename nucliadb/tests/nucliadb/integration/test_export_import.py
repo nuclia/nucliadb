@@ -38,10 +38,12 @@ from nucliadb_utils.settings import indexing_settings
 
 
 @pytest.fixture(scope="function")
-async def src_kb(nucliadb_writer: AsyncClient, nucliadb_manager: AsyncClient) -> AsyncIterator[str]:
+async def src_kb(
+    nucliadb_writer: AsyncClient, nucliadb_writer_manager: AsyncClient
+) -> AsyncIterator[str]:
     slug = uuid.uuid4().hex
 
-    resp = await nucliadb_manager.post("/kbs", json={"slug": slug})
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -117,7 +119,7 @@ async def src_kb(nucliadb_writer: AsyncClient, nucliadb_manager: AsyncClient) ->
     assert resp.status_code == 200
     yield kbid
 
-    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
     try:
         assert resp.status_code == 200
     except AssertionError:
@@ -125,12 +127,12 @@ async def src_kb(nucliadb_writer: AsyncClient, nucliadb_manager: AsyncClient) ->
 
 
 @pytest.fixture(scope="function")
-async def dst_kb(nucliadb_manager: AsyncClient) -> AsyncIterator[str]:
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "dst_kb"})
+async def dst_kb(nucliadb_writer_manager: AsyncClient) -> AsyncIterator[str]:
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": "dst_kb"})
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
     yield uuid
-    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
     try:
         assert resp.status_code == 200
     except AssertionError:
@@ -149,6 +151,7 @@ def standalone_nucliadb():
         yield
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_on_standalone_nucliadb(
     standalone_nucliadb,
     natsd,
@@ -208,6 +211,7 @@ async def imports_consumer(context: ApplicationContext) -> AsyncIterator[NatsTas
     # await consumer.finalize()
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_on_hosted_nucliadb(
     hosted_nucliadb,
     nucliadb_writer: AsyncClient,
@@ -256,6 +260,7 @@ async def _test_export_import_kb_api(
     await _test_learning_config_mismatch(nucliadb_writer, export, dst_kb)
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_export_and_create_kb_from_import_api(
     standalone_nucliadb,
     nucliadb_writer: AsyncClient,
@@ -292,6 +297,7 @@ async def test_export_and_create_kb_from_import_api(
     await _test_learning_config_mismatch(nucliadb_writer, export, dst_kb)
 
 
+@pytest.mark.deploy_modes("standalone")
 async def _test_learning_config_mismatch(
     nucliadb_writer: AsyncClient,
     export: BytesIO,

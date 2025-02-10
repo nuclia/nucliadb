@@ -20,6 +20,7 @@
 import uuid
 from datetime import datetime
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.resource import (
@@ -42,15 +43,16 @@ from nucliadb_models.text import TextField
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
 
-def broker_resource(knowledgebox: str) -> BrokerMessage:
+def broker_resource(standalone_knowledgebox: str) -> BrokerMessage:
     rid = str(uuid.uuid4())
     slug = f"{rid}slug1"
 
     bm: BrokerMessage = BrokerMessage(
-        kbid=knowledgebox,
+        kbid=standalone_knowledgebox,
         uuid=rid,
         slug=slug,
         type=BrokerMessage.AUTOCOMMIT,
@@ -157,24 +159,25 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     return bm
 
 
-async def inject_resource_with_paragraph_labels(knowledgebox, writer):
-    bm = broker_resource(knowledgebox)
+async def inject_resource_with_paragraph_labels(standalone_knowledgebox, writer):
+    bm = broker_resource(standalone_knowledgebox)
     await inject_message(writer, bm)
     return bm.uuid
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_labels_global(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc,
-    knowledgebox,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}")
     assert resp.status_code == 200
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/labelset/label1",
+        f"/kb/{standalone_knowledgebox}/labelset/label1",
         json={
             "title": "mylabel",
             "multiple": False,
@@ -183,21 +186,22 @@ async def test_labels_global(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/labelsets")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/labelsets")
     assert resp.status_code == 200
     assert len(resp.json()["labelsets"]) == 1
     assert resp.json()["labelsets"]["label1"]["multiple"] is False
 
-    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
+    rid = await inject_resource_with_paragraph_labels(standalone_knowledgebox, nucliadb_ingest_grpc)
 
-    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resource/{rid}/reindex")
+    resp = await nucliadb_writer.post(f"/kb/{standalone_knowledgebox}/resource/{rid}/reindex")
     assert resp.status_code == 200
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_classification_labels_cancelled_by_the_user(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     expected_label = {
         "label": "label",
@@ -205,7 +209,7 @@ async def test_classification_labels_cancelled_by_the_user(
         "cancelled_by_user": True,
     }
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "My Resource",
             "summary": "My summary",
@@ -217,7 +221,7 @@ async def test_classification_labels_cancelled_by_the_user(
 
     # Check cancelled labels come in resource get
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -225,26 +229,27 @@ async def test_classification_labels_cancelled_by_the_user(
 
     # Check cancelled labels come in resource list
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
     )
     assert resp.status_code == 200
     content = resp.json()
     assert content["resources"][0]["usermetadata"]["classifications"][0] == expected_label
 
     # Check cancelled labels come in search results
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?query=summary")
     assert resp.status_code == 200
     content = resp.json()
     assert content["resources"][rid]["usermetadata"]["classifications"][0] == expected_label
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_classification_labels_are_shown_in_resource_basic(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc,
-    knowledgebox,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
 ):
-    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
+    rid = await inject_resource_with_paragraph_labels(standalone_knowledgebox, nucliadb_ingest_grpc)
 
     classifications = [Classification(labelset="labelset1", label="label1")]
 
@@ -258,19 +263,19 @@ async def test_classification_labels_are_shown_in_resource_basic(
     )
 
     # Check resource get
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200, f"Response {resp}: {resp.text}"
     resource = Resource.model_validate_json(resp.content)
     assert resource.computedmetadata == expected_computedmetadata
 
     # Check resources list
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resources?show=basic")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resources?show=basic")
     assert resp.status_code == 200
     resources = ResourceList.model_validate_json(resp.content)
     assert resources.resources[0].computedmetadata == expected_computedmetadata
 
     # Check search results list
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?show=basic")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/search?show=basic")
     assert resp.status_code == 200
     results = KnowledgeboxSearchResults.model_validate_json(resp.content)
     assert results.resources[rid].computedmetadata == expected_computedmetadata
@@ -309,10 +314,11 @@ def test_add_field_classifications():
     )
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_fieldmetadata_classification_labels(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     fieldmetadata = UserFieldMetadata(
         field=FieldID(field="text", field_type=FieldID.FieldType.TEXT),
@@ -331,14 +337,14 @@ async def test_fieldmetadata_classification_labels(
         fieldmetadata=[fieldmetadata],
     )
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        data=payload.model_dump_json(),  # type: ignore
+        f"/kb/{standalone_knowledgebox}/resources",
+        content=payload.model_dump_json(),
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
     # Check resource get
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
     resource = Resource.model_validate_json(resp.content)
     assert resource.fieldmetadata[0] == fieldmetadata  # type: ignore

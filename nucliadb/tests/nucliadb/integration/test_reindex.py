@@ -21,6 +21,7 @@ import asyncio
 import base64
 import hashlib
 
+import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
@@ -32,31 +33,35 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import dirty_index, inject_message
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_reindex(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox: str,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
 ):
-    await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_grpc, knowledgebox)
+    await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_ingest_grpc, standalone_knowledgebox)
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_reindex_kb_with_vectorsets(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     knowledgebox_with_vectorsets: str,
 ):
-    await _test_reindex(nucliadb_reader, nucliadb_writer, nucliadb_grpc, knowledgebox_with_vectorsets)
+    await _test_reindex(
+        nucliadb_reader, nucliadb_writer, nucliadb_ingest_grpc, knowledgebox_with_vectorsets
+    )
 
 
 async def _test_reindex(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     kbid,
 ):
-    rid = await create_resource(kbid, nucliadb_writer, nucliadb_grpc)
+    rid = await create_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
     # Doing a search should return results
     resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=text")
@@ -102,7 +107,7 @@ async def _test_reindex(
     assert len(content["paragraphs"]["results"]) > 0
 
 
-async def create_resource(kbid: str, nucliadb_writer: AsyncClient, nucliadb_grpc: WriterStub):
+async def create_resource(kbid: str, nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: WriterStub):
     # create resource
     file_content = b"This is a file"
     field_id = "myfile"
@@ -130,7 +135,7 @@ async def create_resource(kbid: str, nucliadb_writer: AsyncClient, nucliadb_grpc
     # update it with extracted data
     bm = await broker_resource(kbid, rid)
     bm.source = BrokerMessage.MessageSource.PROCESSOR
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
     return bm.uuid
 
 

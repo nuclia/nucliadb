@@ -17,20 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = [
-    "pytest_docker_fixtures",
-    "tests.fixtures",
-    "tests.ndbfixtures.maindb",
-    "tests.ndbfixtures.processing",
-    "tests.ndbfixtures.standalone",
-    "tests.nucliadb.knowledgeboxes",
-    "nucliadb_utils.tests.asyncbenchmark",
-    "nucliadb_utils.tests.nats",
-    "tests.ndbfixtures.nidx",
-    "tests.ingest.fixtures",
-    "nucliadb_utils.tests.fixtures",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.azure",
-    "nucliadb_utils.tests.s3",
-    "nucliadb_utils.tests.local",
-]
+
+from typing import AsyncIterator
+
+import pytest
+
+from nucliadb.common.maindb.driver import Driver, Transaction
+
+# Dependents: search, nucliadb
+
+
+@pytest.fixture(scope="function")
+async def txn(maindb_driver: Driver) -> AsyncIterator[Transaction]:
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()
