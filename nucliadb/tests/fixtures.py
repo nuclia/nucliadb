@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-from unittest.mock import AsyncMock, Mock
 
 import pytest
 from grpc import aio
@@ -29,11 +28,6 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.aiopynecone.models import QueryResponse
-from nucliadb_utils.utilities import (
-    clean_pinecone,
-    get_pinecone,
-)
 from tests.utils import inject_message
 from tests.utils.dirty_index import wait_for_sync
 
@@ -43,57 +37,6 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="function")
 async def knowledgebox(nucliadb_writer_manager: AsyncClient):
     resp = await nucliadb_writer_manager.post("/kbs", json={"slug": "knowledgebox"})
-    assert resp.status_code == 201
-    uuid = resp.json().get("uuid")
-
-    yield uuid
-
-    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
-    assert resp.status_code == 200
-
-
-@pytest.fixture(scope="function")
-def pinecone_data_plane():
-    dp = Mock()
-    dp.upsert = AsyncMock(return_value=None)
-    dp.query = AsyncMock(
-        return_value=QueryResponse(
-            matches=[],
-        )
-    )
-    return dp
-
-
-@pytest.fixture(scope="function")
-def pinecone_control_plane():
-    cp = Mock()
-    cp.create_index = AsyncMock(return_value="pinecone-host")
-    cp.delete_index = AsyncMock(return_value=None)
-    return cp
-
-
-@pytest.fixture(scope="function")
-def pinecone_mock(pinecone_data_plane, pinecone_control_plane):
-    pinecone_session = get_pinecone()
-    pinecone_session.data_plane = Mock(return_value=pinecone_data_plane)
-    pinecone_session.control_plane = Mock(return_value=pinecone_control_plane)
-    yield
-    clean_pinecone()
-
-
-@pytest.fixture(scope="function")
-async def pinecone_knowledgebox(nucliadb_writer_manager: AsyncClient, pinecone_mock):
-    resp = await nucliadb_writer_manager.post(
-        "/kbs",
-        json={
-            "slug": "pinecone_knowledgebox",
-            "external_index_provider": {
-                "type": "pinecone",
-                "api_key": "my-pinecone-api-key",
-                "serverless_cloud": "aws_us_east_1",
-            },
-        },
-    )
     assert resp.status_code == 201
     uuid = resp.json().get("uuid")
 

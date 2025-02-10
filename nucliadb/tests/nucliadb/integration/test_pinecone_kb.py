@@ -94,6 +94,28 @@ def mock_pinecone_client(data_plane, control_plane):
         yield session_mock
 
 
+@pytest.fixture(scope="function")
+async def pinecone_knowledgebox(nucliadb_writer_manager: AsyncClient, mock_pinecone_client):
+    resp = await nucliadb_writer_manager.post(
+        "/kbs",
+        json={
+            "slug": "pinecone_knowledgebox",
+            "external_index_provider": {
+                "type": "pinecone",
+                "api_key": "my-pinecone-api-key",
+                "serverless_cloud": "aws_us_east_1",
+            },
+        },
+    )
+    assert resp.status_code == 201
+    uuid = resp.json().get("uuid")
+
+    yield uuid
+
+    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
+    assert resp.status_code == 200
+
+
 @pytest.fixture(autouse=True)
 def hosted_nucliadb():
     with unittest.mock.patch("nucliadb.ingest.service.writer.is_onprem_nucliadb", return_value=False):
@@ -254,7 +276,7 @@ async def test_kb_counters(
 async def test_find_on_pinecone_kb(
     nucliadb_reader: AsyncClient,
     pinecone_knowledgebox: str,
-    pinecone_data_plane,
+    data_plane,
 ):
     kbid = pinecone_knowledgebox
 
