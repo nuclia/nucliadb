@@ -34,7 +34,7 @@ from starlette.websockets import WebSocket
 class NucliaUser(BaseUser):
     def __init__(self, username: str, security_groups: Optional[list[str]] = None) -> None:
         self.username = username
-        self.security_groups = security_groups
+        self._security_groups = security_groups
 
     @property
     def is_authenticated(self) -> bool:
@@ -43,6 +43,10 @@ class NucliaUser(BaseUser):
     @property
     def display_name(self) -> str:
         return self.username
+
+    @property
+    def security_groups(self) -> Optional[list[str]]:
+        return self._security_groups
 
 
 STFUser = NucliaUser
@@ -69,7 +73,6 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
 
         if self.user_header in request.headers:
             user = request.headers[self.user_header]
-            nuclia_user: NucliaUser = NucliaUser(username=user)
 
             raw_security_groups: Optional[str] = request.headers.get(self.security_groups_header)
 
@@ -77,8 +80,7 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
             if raw_security_groups is not None:
                 security_groups = raw_security_groups.split(";")
 
-            if security_groups:
-                nuclia_user.security_groups = security_groups
+            nuclia_user: NucliaUser = NucliaUser(username=user, security_groups=security_groups)
 
         else:
             nuclia_user = NucliaUser(username="anonymous")
