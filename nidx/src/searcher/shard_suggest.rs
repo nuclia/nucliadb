@@ -125,6 +125,7 @@ fn blocking_suggest(
                 labels_formula,
                 keywords_formula: None,
                 key_filter: vec![],
+                field_filter: vec![],
             };
 
             prefiltered = text_searcher.prefilter(&prefilter)?;

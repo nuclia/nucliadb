@@ -48,4 +48,5 @@ pub struct PreFilterRequest {
     pub labels_formula: Option<BooleanExpression>,
     pub keywords_formula: Option<BooleanExpression>,
     pub key_filter: Vec<String>,
+    pub field_filter: Vec<String>,
 }

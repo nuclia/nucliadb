@@ -24,7 +24,6 @@ use nidx_types::query_language::BooleanExpression;
 pub struct ParagraphSearchRequest {
     pub id: String,
     pub uuid: String,
-    pub fields: Vec<String>,
     /// query this text in all the paragraphs
     pub body: String,
     pub filter: Option<nidx_protos::Filter>,

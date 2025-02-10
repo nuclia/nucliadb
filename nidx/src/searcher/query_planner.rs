@@ -135,6 +135,7 @@ fn compute_prefilters(
         security: None,
         keywords_formula: keywords,
         key_filter: search_request.key_filters.clone(),
+        field_filter: search_request.fields.clone(),
     };
 
     // Security filters
@@ -157,6 +158,7 @@ fn compute_prefilters(
         && !request_has_keywords_filters
         && !request_has_security_filters
         && prefilter_request.key_filter.is_empty()
+        && prefilter_request.field_filter.is_empty()
     {
         None
     } else {
@@ -198,7 +200,6 @@ fn compute_paragraphs_request(
         uuid: "".to_string(),
         with_duplicates: search_request.with_duplicates,
         body: search_request.body.clone(),
-        fields: search_request.fields.clone(),
         order: search_request.order.clone(),
         faceted: search_request.faceted.clone(),
         page_number: search_request.page_number,

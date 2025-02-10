@@ -290,6 +290,14 @@ impl TextReaderService {
             let terms = request.key_filter.iter().map(|k| Term::from_field_bytes(schema.uuid, k.as_bytes()));
             subqueries.push(Box::new(TermSetQuery::new(terms)));
         }
+        if !request.field_filter.is_empty() {
+            let terms = request
+                .field_filter
+                .iter()
+                .filter_map(|key| Facet::from_text(&format!("/{key}")).ok())
+                .map(|facet| Term::from_facet(schema.field, &facet));
+            subqueries.push(Box::new(TermSetQuery::new(terms)));
+        }
 
         if subqueries.is_empty() {
             return Ok(PrefilterResult::All);

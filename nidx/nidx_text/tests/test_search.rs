@@ -82,6 +82,7 @@ fn test_prefilter_all_search() {
         timestamp_filters: vec![],
         keywords_formula: None,
         key_filter: vec![],
+        field_filter: vec![],
     };
     let response = reader.prefilter(&request).unwrap();
     assert!(matches!(response, PrefilterResult::All));
@@ -97,6 +98,7 @@ fn test_prefilter_not_search() {
         labels_formula: Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/l/mylabel".to_string())))),
         keywords_formula: None,
         key_filter: vec![],
+        field_filter: vec![],
     };
     println!("expression: {:?}", request.labels_formula);
     let response = reader.prefilter(&request).unwrap();
@@ -117,6 +119,7 @@ fn test_labels_prefilter_search() {
         labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
         keywords_formula: None,
         key_filter: vec![],
+        field_filter: vec![],
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::Some(fields) = response else {
@@ -134,6 +137,7 @@ fn test_keywords_prefilter_search() {
         labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
         keywords_formula: Some(BooleanExpression::Literal("foobar".to_string())),
         key_filter: vec![],
+        field_filter: vec![],
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::None = response else {
@@ -146,6 +150,7 @@ fn test_keywords_prefilter_search() {
         labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
         keywords_formula: None,
         key_filter: vec![],
+        field_filter: vec![],
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::Some(fields) = response else {
