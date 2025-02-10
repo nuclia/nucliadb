@@ -30,6 +30,7 @@ mod tests;
 use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
+use crate::inverted_index::build_indexes;
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
@@ -64,6 +65,8 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
         nodes.advise(memmap2::Advice::WillNeed)?;
         index.advise(memmap2::Advice::Sequential)?;
     }
+
+    build_indexes(path, &nodes)?;
 
     Ok(OpenDataPoint {
         metadata,
