@@ -45,7 +45,6 @@ from tests.utils import inject_message
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.deploy_modes("standalone")
 async def resource_with_conversation(nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, knowledgebox):
     messages = []
     for i in range(1, 301):

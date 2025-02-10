@@ -28,7 +28,6 @@ DEVELOPERS_GROUP = "developers"
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.deploy_modes("standalone")
 async def resource_with_security(nucliadb_writer: AsyncClient, knowledgebox):
     kbid = knowledgebox
     resp = await nucliadb_writer.post(
