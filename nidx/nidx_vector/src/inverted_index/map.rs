@@ -29,9 +29,9 @@ use stream_vbyte::{decode::decode, encode::encode, scalar::Scalar};
 use crate::VectorR;
 
 /// A structure that maps from an index entry to a list of vector ids
-struct InvertedMapWriter {
+pub struct InvertedMapWriter {
     writer: BufWriter<File>,
-    pos: usize,
+    pos: u64,
 }
 
 impl InvertedMapWriter {
@@ -44,11 +44,11 @@ impl InvertedMapWriter {
 
     /// Write a list of vector ids to the map, returns the map position they
     /// were written at, to be stored at the index.
-    pub fn write(&mut self, data: &[u32]) -> VectorR<usize> {
+    pub fn write(&mut self, data: &[u32]) -> VectorR<u64> {
         let mut buf = vec![0; data.len() * 5];
         let current_pos = self.pos;
         let encoded_len = encode::<Scalar>(data, &mut buf);
-        self.pos += encoded_len + 8;
+        self.pos += encoded_len as u64 + 8;
 
         self.writer.write_all(&data.len().to_le_bytes())?;
         self.writer.write_all(&buf[0..encoded_len])?;
@@ -62,7 +62,7 @@ impl InvertedMapWriter {
     }
 }
 
-struct InvertedMapReader {
+pub struct InvertedMapReader {
     data: Mmap,
 }
 
@@ -74,7 +74,8 @@ impl InvertedMapReader {
     }
 
     /// Gets a set of vector ids given the position in this file (as returned by InvertedMapWriter::write)
-    pub fn get(&self, pos: usize) -> Vec<u32> {
+    pub fn get(&self, pos: u64) -> Vec<u32> {
+        let pos = pos as usize;
         let nums_len = usize::from_le_bytes(self.data[pos..pos + 8].try_into().unwrap());
         let mut nums = vec![0; nums_len];
 

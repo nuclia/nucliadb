@@ -175,6 +175,8 @@ pub enum VectorErr {
     InconsistentMergeSegmentTags,
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(&'static str),
+    #[error("FST error: {0}")]
+    FstError(#[from] fst::Error),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;
