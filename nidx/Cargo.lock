@@ -2184,6 +2184,7 @@ dependencies = [
  "rstest",
  "serde",
  "simsimd",
+ "stream-vbyte",
  "tempfile",
  "thiserror 1.0.69",
  "tracing",
@@ -3958,6 +3959,12 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
+
+[[package]]
+name = "stream-vbyte"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f04a005bc697f0aed603e32beaab46d4a69fc4f41503c3b1b0c2168201b9e51"
 
 [[package]]
 name = "stringprep"
