@@ -231,6 +231,7 @@ async def _test_search_request_with_security(
 
 
 @pytest.mark.parametrize("ask_endpoint", ("ask_post",))
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_security_ask(
     nucliadb_reader,
     nucliadb_writer,
@@ -317,6 +318,7 @@ async def test_resource_security_ask(
     )
 
 
+@pytest.mark.deploy_modes("standalone")
 async def _test_ask_request_with_security(
     ask_endpoint: str,
     nucliadb_reader,
