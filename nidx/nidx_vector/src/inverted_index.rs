@@ -95,7 +95,7 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
     let mut label_builder = IndexBuilder::new();
 
     for id in 0..data_store::stored_elements(nodes) {
-        let node = data_store::get_value(Node, nodes, id);
+        let node = data_store::get_value(nodes, id);
         let key = Node::key(node);
         let labels = Node::labels(node);
 
@@ -140,11 +140,7 @@ impl InvertedIndexes {
     }
 
     pub fn ids_for_deletion_key(&self, key: &str) -> Option<impl Iterator<Item = u32>> {
-        if let Some(key) = field_id_key(key) {
-            Some(self.field_index.get_prefix(&key).into_iter())
-        } else {
-            None
-        }
+        field_id_key(key).map(|key| self.field_index.get_prefix(&key).into_iter())
     }
 
     pub fn filter(&self, formula: &Formula) -> Option<BitSet> {

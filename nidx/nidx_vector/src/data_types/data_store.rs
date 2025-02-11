@@ -53,17 +53,6 @@ pub fn get_pointer(x: &[u8], i: usize) -> Pointer {
     usize::from_le_bytes(buff)
 }
 
-pub trait Interpreter {
-    // Is a mistake to assume that x does not have trailing bytes at the end.
-    // Is safe to assume that there is an i such that x[0],.., x[i] is a valid
-    // Slot.
-    fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8];
-    // The function should split x at i, being i the index where
-    // x[0],..,x[i] is a valid representation of a slot value.
-    // i is ensured to exists.
-    fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]);
-}
-
 pub trait IntoBuffer {
     fn serialize_into<W: io::Write>(self, w: W, vector_type: &VectorType) -> io::Result<()>;
 }
@@ -82,9 +71,9 @@ pub fn stored_elements(x: &[u8]) -> usize {
 }
 
 // O(1)
-pub fn get_value<I: Interpreter>(interpreter: I, src: &[u8], id: usize) -> &[u8] {
+pub fn get_value(src: &[u8], id: usize) -> &[u8] {
     let pointer = get_pointer(src, id);
-    interpreter.read_exact(&src[pointer..]).0
+    Node.read_exact(&src[pointer..]).0
 }
 
 use lazy_static::lazy_static;
@@ -233,7 +222,6 @@ mod tests {
 
     #[test]
     fn store_test() {
-        let interpreter = Node;
         let elems = [0, 1, 2, 3, 4];
         let expected: Vec<_> = elems.iter().map(create_elem).collect();
         let mut buf = tempfile::tempfile().unwrap();
@@ -243,8 +231,8 @@ mod tests {
         let no_values = stored_elements(&buf_map);
         assert_eq!(no_values, expected.len());
         for (id, expected_value) in expected.iter().enumerate() {
-            let actual_value = get_value(interpreter, &buf_map, id);
-            let (head, tail) = interpreter.read_exact(actual_value);
+            let actual_value = get_value(&buf_map, id);
+            let (head, tail) = Node.read_exact(actual_value);
             assert_eq!(actual_value, head);
             assert_eq!(tail, &[] as &[u8]);
             assert_eq!(Node::key(actual_value), expected_value.key);
@@ -281,7 +269,7 @@ mod tests {
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(Node, &merge_map, i))
+            .map(|i| get_value(&merge_map, i))
             .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
@@ -323,7 +311,7 @@ mod tests {
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(Node, &merge_map, i))
+            .map(|i| get_value(&merge_map, i))
             .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
@@ -364,7 +352,7 @@ mod tests {
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(Node, &merge_map, i))
+            .map(|i| get_value(&merge_map, i))
             .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
@@ -405,7 +393,7 @@ mod tests {
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(Node, &merge_map, i))
+            .map(|i| get_value(&merge_map, i))
             .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
@@ -446,7 +434,7 @@ mod tests {
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
         let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(Node, &merge_store, i))
+            .map(|i| get_value(&merge_store, i))
             .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
@@ -488,7 +476,7 @@ mod tests {
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
         let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(Node, &merge_store, i))
+            .map(|i| get_value(&merge_store, i))
             .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 

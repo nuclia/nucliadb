@@ -20,7 +20,6 @@
 
 use std::io;
 
-use crate::data_types::data_store::Interpreter;
 use crate::data_types::trie;
 use crate::data_types::usize_utils::*;
 
@@ -137,12 +136,10 @@ impl Node {
         let xvec_start = xvec_ptr + 2 * U32_LEN + xvec_pad as usize;
         &x[xvec_start..(xvec_start + xvec_len)]
     }
-}
-impl Interpreter for Node {
-    fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
+    pub fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
         Self::key(x)
     }
-    fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
+    pub fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
         let len = usize_from_slice_le(&x[LEN.0..LEN.1]);
         (&x[0..len], &x[len..])
     }

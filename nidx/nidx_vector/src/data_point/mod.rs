@@ -34,7 +34,6 @@ use crate::inverted_index::{build_indexes, InvertedIndexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use bit_set::BitSet;
 use bit_vec::BitVec;
-use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
@@ -268,7 +267,7 @@ impl<'a> Retriever<'a> {
         if x == self.no_nodes {
             self.temp
         } else {
-            data_store::get_value(Node, self.nodes, x)
+            data_store::get_value(self.nodes, x)
         }
     }
 }
@@ -383,7 +382,7 @@ impl PartialEq for Neighbour {
 
 impl Neighbour {
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
-        let node = data_store::get_value(Node, data, addr);
+        let node = data_store::get_value(data, addr);
         let (exact, _) = Node.read_exact(node);
         Neighbour {
             score,
@@ -593,7 +592,7 @@ mod test {
         let nodes = dp.nodes;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
-            let node = data_store::get_value(Node, &nodes, i);
+            let node = data_store::get_value(&nodes, i);
             assert_eq!(elem.key, Node::key(node));
             assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
 
@@ -639,7 +638,7 @@ mod test {
         let nodes = merged_dp.nodes;
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
-            let node = data_store::get_value(Node, &nodes, i);
+            let node = data_store::get_value(&nodes, i);
             assert_eq!(elem.key, Node::key(node));
             assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
 
