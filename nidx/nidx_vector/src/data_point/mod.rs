@@ -151,11 +151,14 @@ where
         },
     };
 
+    build_indexes(data_point_path, &nodes)?;
+    let inverted_indexes = Some(InvertedIndexes::open(data_point_path)?);
+
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
-        inverted_indexes: None,
+        inverted_indexes,
     })
 }
 
@@ -212,11 +215,14 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         },
     };
 
+    build_indexes(path, &nodes)?;
+    let inverted_indexes = Some(InvertedIndexes::open(path)?);
+
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
-        inverted_indexes: None,
+        inverted_indexes,
     })
 }
 
@@ -489,10 +495,13 @@ impl OpenDataPoint {
     ) -> impl Iterator<Item = Neighbour> + '_ {
         let encoded_query = config.vector_type.encode(query);
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
-        let filter = FormulaFilter::new(filter);
+
+        let bitset = self.inverted_indexes.as_ref().unwrap().filter(filter);
+
+        // let filter = FormulaFilter::new(filter);
         let ops = HnswOps::new(&tracker, true);
         let neighbours =
-            ops.search(Address(self.metadata.records), self.index.as_ref(), results, filter, with_duplicates);
+            ops.search(Address(self.metadata.records), self.index.as_ref(), results, bitset, with_duplicates);
 
         neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
     }
@@ -540,7 +549,7 @@ mod test {
     }
 
     fn random_key(rng: &mut impl Rng) -> String {
-        format!("{:032x?}", rng.gen::<u128>())
+        format!("{:032x?}/f/file/0-100", rng.gen::<u128>())
     }
 
     fn random_string(rng: &mut impl Rng) -> String {

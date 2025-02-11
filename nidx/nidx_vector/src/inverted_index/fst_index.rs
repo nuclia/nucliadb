@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::File, io::BufWriter, path::Path, rc::Rc};
+use std::{fs::File, io::BufWriter, path::Path, sync::Arc};
 
 use fst::Map;
 use memmap2::Mmap;
@@ -55,11 +55,11 @@ impl<'a> FstIndexWriter<'a> {
 
 pub struct FstIndexReader {
     fst: Map<Mmap>,
-    map_reader: Rc<InvertedMapReader>,
+    map_reader: Arc<InvertedMapReader>,
 }
 
 impl FstIndexReader {
-    pub fn open(path: &Path, map_reader: Rc<InvertedMapReader>) -> VectorR<Self> {
+    pub fn open(path: &Path, map_reader: Arc<InvertedMapReader>) -> VectorR<Self> {
         Ok(Self {
             fst: Map::new(unsafe { Mmap::map(&File::open(path)?)? })?,
             map_reader,
@@ -74,7 +74,7 @@ impl FstIndexReader {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, rc::Rc};
+    use std::{collections::BTreeMap, sync::Arc};
 
     use rand::Rng;
     use tempfile::NamedTempFile;
@@ -118,7 +118,7 @@ mod tests {
         map_writer.finish()?;
 
         // Check the map has the same contents we initialized
-        let map_reader = Rc::new(InvertedMapReader::open(tmp_map.path())?);
+        let map_reader = Arc::new(InvertedMapReader::open(tmp_map.path())?);
         let reader = FstIndexReader::open(tmp.path(), map_reader)?;
 
         for (key, value) in entries {

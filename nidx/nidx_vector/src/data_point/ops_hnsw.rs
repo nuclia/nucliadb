@@ -83,7 +83,7 @@ pub type Neighbours = Vec<(Address, f32)>;
 /// Guides an algorithm to the valid nodes.
 struct NodeFilter<'a, DR> {
     tracker: &'a DR,
-    filter: &'a FormulaFilter<'a>,
+    filter: &'a Option<BitSet>,
     blocked_addresses: &'a FxHashSet<Address>,
     vec_counter: RepCounter<'a>,
 }
@@ -91,7 +91,11 @@ struct NodeFilter<'a, DR> {
 impl<'a, DR: DataRetriever> NodeFilter<'a, DR> {
     pub fn passes_formula(&self, n: Address) -> bool {
         // The vector satisfies the given filter
-        self.filter.run(n, self.tracker)
+        if let Some(bs) = self.filter {
+            bs.contains(n.0)
+        } else {
+            true
+        }
     }
 
     pub fn is_valid(&self, n: Address, score: f32) -> bool {
@@ -323,7 +327,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         query: Address,
         hnsw: H,
         k_neighbours: usize,
-        with_filter: FormulaFilter,
+        with_filter: Option<BitSet>,
         with_duplicates: bool,
     ) -> Neighbours {
         if k_neighbours == 0 {
