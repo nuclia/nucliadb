@@ -1,0 +1,17 @@
+name: Semgrep - SAST Scan
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  semgrep-scan:
+    name: Semgrep SAST Scan
+    uses: nuclia/tooling/.github/workflows/semgrep-scan.yaml@main
+    secrets: inherit
+    with:
+      scan-type: ci
+      comment: false
+      update-comment: false
