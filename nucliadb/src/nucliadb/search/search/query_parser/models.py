@@ -62,9 +62,6 @@ class Reranker(BaseModel): ...
 class NoopReranker(Reranker): ...
 
 
-class MultiMatchBoosterReranker(Reranker): ...
-
-
 class PredictReranker(Reranker):
     window: int = Field(le=200)
 
