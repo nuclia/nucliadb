@@ -123,12 +123,8 @@ impl VectorSearcher {
     pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> anyhow::Result<Self> {
         let mut delete_log = DTrie::new();
 
-        for (key, seq) in open_index.deletions() {
-            delete_log.insert(key.as_bytes(), seq);
-        }
-
         Ok(VectorSearcher {
-            reader: Reader::open(open_index.segments().collect(), config, delete_log)?,
+            reader: Reader::open(open_index.segments().collect(), config, open_index.deletions())?,
         })
     }
 

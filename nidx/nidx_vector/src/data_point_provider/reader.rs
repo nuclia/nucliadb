@@ -19,7 +19,7 @@
 //
 
 pub use crate::data_point::Neighbour;
-use crate::data_point::{self, OpenDataPoint};
+use crate::data_point::{self, NoDLog, OpenDataPoint};
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
 use crate::data_types::dtrie_ram::DTrie;
@@ -106,7 +106,6 @@ impl Fssc {
 pub struct Reader {
     config: VectorConfig,
     open_data_points: Vec<(OpenDataPoint, Seq)>,
-    delete_log: DTrie,
 }
 
 fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
@@ -166,10 +165,10 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl Reader {
-    pub fn open(
+    pub fn open<'a>(
         segments: Vec<(VectorSegmentMetadata, Seq)>,
         config: VectorConfig,
-        delete_log: DTrie,
+        deletions: impl Iterator<Item = (&'a String, Seq)>,
     ) -> VectorR<Reader> {
         let mut open_data_points = Vec::new();
 
@@ -179,10 +178,17 @@ impl Reader {
             open_data_points.push((open_data_point, seq));
         }
 
+        for (deletion, deletion_seq) in deletions {
+            for (ref mut segment, ref segment_seq) in &mut open_data_points {
+                if deletion_seq > *segment_seq {
+                    segment.apply_deletion(deletion.as_str());
+                }
+            }
+        }
+
         Ok(Reader {
             config,
             open_data_points,
-            delete_log,
         })
     }
 
@@ -222,10 +228,7 @@ impl Reader {
             if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
                 continue;
             }
-            let delete_log = TimeSensitiveDLog {
-                time: *seq,
-                dlog: &self.delete_log,
-            };
+            let delete_log = NoDLog;
             let partial_solution = open_data_point.search(
                 &delete_log,
                 query,
@@ -383,7 +386,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, std::iter::empty()).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -470,7 +473,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, std::iter::empty()).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -587,7 +590,7 @@ mod tests {
 
         let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
+        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, std::iter::empty()).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),

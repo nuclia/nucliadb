@@ -29,9 +29,11 @@ mod tests;
 
 use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
-use crate::formula::Formula;
+use crate::formula::{Clause, Formula};
 use crate::inverted_index::{build_indexes, InvertedIndexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
+use bit_set::BitSet;
+use bit_vec::BitVec;
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
@@ -39,6 +41,7 @@ use memmap2::Mmap;
 use node::Node;
 use ops_hnsw::{Cnx, HnswOps};
 use ram_hnsw::RAMHnsw;
+use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io;
@@ -75,13 +78,15 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
     if !path.join("index.map").exists() {
         build_indexes(path, &nodes)?;
     }
-    let inverted_indexes = Some(InvertedIndexes::open(path)?);
+    let inverted_indexes = InvertedIndexes::open(path)?;
+    let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
         inverted_indexes,
+        alive_bitset,
     })
 }
 
@@ -162,13 +167,15 @@ where
     };
 
     build_indexes(data_point_path, &nodes)?;
-    let inverted_indexes = Some(InvertedIndexes::open(data_point_path)?);
+    let inverted_indexes = InvertedIndexes::open(data_point_path)?;
+    let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
         inverted_indexes,
+        alive_bitset,
     })
 }
 
@@ -228,13 +235,15 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     };
 
     build_indexes(path, &nodes)?;
-    let inverted_indexes = Some(InvertedIndexes::open(path)?);
+    let inverted_indexes = InvertedIndexes::open(path)?;
+    let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
         inverted_indexes,
+        alive_bitset,
     })
 }
 
@@ -472,7 +481,8 @@ pub struct OpenDataPoint {
     metadata: VectorSegmentMetadata,
     nodes: Mmap,
     index: Mmap,
-    inverted_indexes: Option<InvertedIndexes>,
+    inverted_indexes: InvertedIndexes,
+    alive_bitset: BitSet,
 }
 
 impl AsRef<OpenDataPoint> for OpenDataPoint {
@@ -482,6 +492,14 @@ impl AsRef<OpenDataPoint> for OpenDataPoint {
 }
 
 impl OpenDataPoint {
+    pub fn apply_deletion(&mut self, key: &str) {
+        if let Some(deleted_ids) = self.inverted_indexes.ids_for_deletion_key(key) {
+            for id in deleted_ids {
+                self.alive_bitset.remove(id as usize);
+            }
+        }
+    }
+
     pub fn into_metadata(self) -> VectorSegmentMetadata {
         self.metadata
     }
@@ -505,30 +523,34 @@ impl OpenDataPoint {
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
         let query_address = Address(self.metadata.records);
 
-        let bitset = self.inverted_indexes.as_ref().unwrap().filter(filter);
-        if let Some(bitset) = &bitset {
-            let count = bitset.iter().count();
-            if count == 0 {
-                return Box::new(empty());
-            }
-            let expected_traversal_scan = results * self.metadata.records / count;
+        let mut filter_bitset = self.inverted_indexes.filter(filter);
+        if let Some(ref mut bitset) = filter_bitset {
+            bitset.intersect_with(&self.alive_bitset);
+        }
+        // If we have no filters, just the deletions
+        let bitset = filter_bitset.as_ref().unwrap_or(&self.alive_bitset);
 
-            if count < expected_traversal_scan * HNSW_COST_FACTOR {
-                let mut scored_results = Vec::new();
-                for address in bitset.iter() {
-                    let address = Address(address);
-                    if !tracker.is_deleted(address) {
-                        let score = tracker.similarity(query_address, address);
-                        if score >= min_score {
-                            scored_results.push(Cnx(address, score));
-                        }
+        let count = bitset.iter().count();
+        if count == 0 {
+            return Box::new(empty());
+        }
+        let expected_traversal_scan = results * self.metadata.records / count;
+
+        if count < expected_traversal_scan * HNSW_COST_FACTOR {
+            let mut scored_results = Vec::new();
+            for address in bitset.iter() {
+                let address = Address(address);
+                if !tracker.is_deleted(address) {
+                    let score = tracker.similarity(query_address, address);
+                    if score >= min_score {
+                        scored_results.push(Reverse(Cnx(address, score)));
                     }
                 }
-                scored_results.sort();
-                return Box::new(
-                    scored_results.into_iter().map(|a| Neighbour::new(a.0, &self.nodes, a.1)).take(results),
-                );
             }
+            scored_results.sort();
+            return Box::new(
+                scored_results.into_iter().map(|Reverse(a)| Neighbour::new(a.0, &self.nodes, a.1)).take(results),
+            );
         }
 
         let ops = HnswOps::new(&tracker, true);
