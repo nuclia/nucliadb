@@ -1,4 +1,5 @@
 import argparse
+import re
 
 parser = argparse.ArgumentParser(description="Bump version")
 parser.add_argument("--build", type=int, help="build number")
@@ -36,42 +37,63 @@ def run(args):
     with open("VERSION", "w") as f:
         f.write(python_version)
 
+    VERSION_UPDATES = [
+        "nidx/nidx_binding/pyproject.toml",
+        "nidx/nidx_protos/pyproject.toml",
+        "nucliadb_dataset/pyproject.toml",
+        "nucliadb_models/pyproject.toml",
+        "nucliadb_protos/python/pyproject.toml",
+        "nucliadb_sdk/pyproject.toml",
+        "nucliadb_telemetry/pyproject.toml",
+        "nucliadb_utils/pyproject.toml",
+        "pyproject.toml",
+    ]
+    for filename in VERSION_UPDATES:
+        update_version(filename, python_version)
+    update_version("nidx/nidx_binding/Cargo.toml", version)
+
+    # we only freeze dependency versions if we are not bumping a sem version
     if args.sem:
-        # we only set other versions if we are not bumping a sem version
         return
 
-    # replace node binding toml version as well
-    with open("nidx/nidx_binding/Cargo.toml", "r") as f:
-        cargo = f.read()
+    REQUIREMENT_UPDATES = [
+        "nucliadb/pyproject.toml",
+        "nucliadb_utils/pyproject.toml",
+        "nucliadb_sdk/pyproject.toml",
+        "nucliadb_dataset/pyproject.toml",
+    ]
+    for filename in REQUIREMENT_UPDATES:
+        update_requirements(filename, python_version)
 
-    new_cargo = []
-    for line in cargo.splitlines():
+
+def update_version(filename, version):
+    with open(filename, "r") as f:
+        toml = f.read()
+
+    new_toml = []
+    for line in toml.splitlines():
         if line.startswith("version ="):
             line = f'version = "{version}"'
-        new_cargo.append(line)
+        new_toml.append(line)
 
-    with open("nidx/nidx_binding/Cargo.toml", "w") as f:
-        f.write("\n".join(new_cargo))
+    with open(filename, "w") as f:
+        f.write("\n".join(new_toml) + "\n")
 
-    # go through each requirements.txt and update the version to the new bump
-    for req_filepath in (
-        "nucliadb/requirements.txt",
-        "nucliadb_utils/requirements.txt",
-        "nucliadb_sdk/requirements.txt",
-        "nucliadb_models/requirements.txt",
-        "nucliadb_dataset/requirements.txt",
-    ):
-        with open(req_filepath, "r") as f:
-            req_lines = []
-            for line in f.read().splitlines():
-                if line.startswith("nucliadb-") and (
-                    "=" not in line and ">" not in line and "~" not in line
-                ):
-                    line = f"{line}>={python_version}"
-                req_lines.append(line)
 
-        with open(req_filepath, "w") as f:
-            f.write("\n".join(req_lines))
+# Matches packages starting with nucliadb- or nidx-, without a version specifier (like >= 1.1.1)
+REQUIREMENT_REGEX = re.compile(r'( *"(?:nucliadb|nidx)-[a-z\[\],]+)(",?)')
+
+
+def update_requirements(filename, version):
+    with open(filename, "r") as f:
+        toml = f.read()
+
+    new_toml = []
+    for line in toml.splitlines():
+        new_toml.append(REQUIREMENT_REGEX.sub(f"\\1>={version}\\2", line))
+
+    with open(filename, "w") as f:
+        f.write("\n".join(new_toml) + "\n")
 
 
 if __name__ == "__main__":

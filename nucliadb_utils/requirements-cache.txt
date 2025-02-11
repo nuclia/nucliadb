@@ -1,3 +1,0 @@
-redis>=4.3.4
-orjson>=3.6.7
-lru-dict>=1.1.7

@@ -1,7 +1,0 @@
-httpx
-requests
-orjson
-pydantic>=2.6
-
-# automatically bumped during release
-nucliadb-models

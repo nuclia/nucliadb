@@ -45,7 +45,6 @@ python-code-lint:
 	make -C nucliadb_dataset/ format
 	make -C nucliadb_models/ format
 	make -C nucliadb_sdk/ format
-	make -C nucliadb_sidecar/ format
 	make -C nucliadb_utils/ format
 	make -C nucliadb/ format
 	make -C nucliadb_telemetry/ format
@@ -57,7 +56,6 @@ python-code-lint:
 	make -C nucliadb_sdk/ lint
 	make -C nucliadb_dataset/ lint
 	make -C nucliadb_models/ lint
-	make -C nucliadb_sidecar/ lint
 	make -C nucliadb_performance/ lint
 
 
@@ -97,10 +95,6 @@ build-node-prebuilt:
 	cp target/release/node_*er builds
 	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
 
-build-sidecar:
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node_sidecar:latest -f Dockerfile.node_sidecar .
-
-
 debug-test-nucliadb:
 	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/tests -sxv
 
@@ -109,17 +103,6 @@ debug-run-nucliadb:
 
 debug-run-nucliadb-redis:
 	nucliadb --driver=REDIS --maindb=redis://localhost:55359 --blob=data/blob --node=data/node --zone=europe-1 --log=INFO
-
-
-build-node-binding:
-	rm -rf target/wheels/*
-	RUSTFLAGS="--cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml --profile release-wheel
-	pip install target/wheels/nucliadb_node_binding-*.whl --force
-
-build-node-binding-debug:
-	rm -rf target/wheels/*
-	RUSTFLAGS="--cfg tokio_unstable" maturin build -m nucliadb_node_binding/Cargo.toml
-	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-nucliadb-local:
 	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding

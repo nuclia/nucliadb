@@ -47,21 +47,18 @@ header:
 
   paths:
     - "nucliadb/**"
-    - "nucliadb_core/**"
     - "nucliadb_dataset/**"
-    - "nucliadb_node/**"
-    - "nucliadb_paragraphs[0-9]*/**"
     - "nucliadb_performance/**"
     - "nucliadb_protos/build.rs"
     - "nucliadb_protos/src/lib.rs"
-    - "nucliadb_relations[0-9]*/**"
     - "nucliadb_sdk/**"
     - "nucliadb_telemetry/**"
-    - "nucliadb_texts[0-9]*/**"
     - "nucliadb_utils/**"
-    - "nucliadb_vectors[0-9]*/**"
+    - "nidx/**"
 
   paths-ignore:
+    - "**/*.proto"
+    - "**/pyproject.toml"
     - "**/Cargo.toml"
     - "**/Cargo.lock"
     - "**/*.sh"
@@ -94,6 +91,7 @@ header:
     - "**/.gitignore"
     - "nucliadb/tests/testdata/*"
     - "**/*.drawio.svg"
+    - "nidx/migrations/*.sql"
 
   comment: on-failure
 

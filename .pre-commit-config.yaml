@@ -33,14 +33,6 @@ repos:
         types: ["python"]
         pass_filenames: false
 
-      - id: lint_nucliadb_node_binding
-        name: Lint nucliadb_node_binding
-        entry: make -C nucliadb_node_binding lint
-        language: system
-        files: (^nucliadb_node_binding/)
-        types: ["python"]
-        pass_filenames: false
-
       - id: lint_nucliadb_performance
         name: Lint nucliadb_performance
         entry: make -C nucliadb_performance lint

@@ -4,13 +4,20 @@ build-backend = "maturin"
 
 [project]
 name = "nidx_binding"
-requires-python = ">=3.8"
+description = "Bindings for nidx (part of nucliadb)"
+license = { text = "AGPL" }
+authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
+requires-python = ">=3.9, <4"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dynamic = ["version"]
+version = "6.2.1"
+
+[project.urls]
+Homepage = "https://nuclia.com"
+Repository = "https://github.com/nuclia/nucliadb"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
