@@ -39,7 +39,7 @@ use memmap2::Mmap;
 use node::Node;
 use ops_hnsw::{Cnx, HnswOps};
 use ram_hnsw::RAMHnsw;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io;
 use std::iter::empty;
@@ -70,7 +70,11 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    build_indexes(path, &nodes)?;
+    // Build the index at runtime if they do not exist. This can
+    // be removed once we have migrated all existing indexes
+    if !path.join("index.map").exists() {
+        build_indexes(path, &nodes)?;
+    }
     let inverted_indexes = Some(InvertedIndexes::open(path)?);
 
     Ok(OpenDataPoint {
