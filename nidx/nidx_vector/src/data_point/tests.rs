@@ -25,7 +25,7 @@ use tempfile::tempdir;
 
 use crate::config::{Similarity, VectorConfig};
 use crate::data_point::{self, DeleteLog, Elem, LabelDictionary};
-use crate::formula::{AtomClause, Formula};
+use crate::formula::{AtomClause, Clause, Formula};
 use crate::VectorR;
 
 const CONFIG: VectorConfig = VectorConfig {
@@ -182,13 +182,9 @@ fn data_merge() -> anyhow::Result<()> {
 }
 
 #[test]
-fn prefiltering_test() {
+fn label_filtering_test() {
     let temp_dir = tempfile::tempdir().unwrap();
-    let mut labels = vec![];
     let mut queries = vec![];
-    for i in 0..100 {
-        labels.push(format!("LABEL_{}", i));
-    }
     for i in 0..5 {
         queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
@@ -220,6 +216,40 @@ fn prefiltering_test() {
             reader.search(&delete_log, &query, &formula, true, no_results, &CONFIG, -1.0).collect::<Vec<_>>();
         assert_eq!(result_with_deleted.len(), 0);
     }
+}
+
+#[test]
+fn label_prefix_search_test() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let mut elems = Vec::new();
+    for i in 0..5 {
+        let key = format!("6e5a546a9a5c480f8579472016b1ee14/f/field/{}-{}", i, i + 1);
+        let vector = create_query();
+
+        let labels = LabelDictionary::new(vec![format!("/l/labelset/LABEL_{}", i)]);
+        elems.push(Elem::new(key, vector, labels, None));
+    }
+
+    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
+    let query = create_query();
+
+    // Searching for the labelset, returns all results
+    let mut formula = Formula::new();
+    formula.extend(Clause::Atom(AtomClause::Label("/l/labelset".into())));
+    let result = reader.search(&HashSet::new(), &query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    assert_eq!(result.len(), 5);
+
+    // Searching for a label, returns one results
+    let mut formula = Formula::new();
+    formula.extend(Clause::Atom(AtomClause::Label("/l/labelset/LABEL_0".into())));
+    let result = reader.search(&HashSet::new(), &query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    assert_eq!(result.len(), 1);
+
+    // Searching for a label prefix, returns no results
+    let mut formula = Formula::new();
+    formula.extend(Clause::Atom(AtomClause::Label("/l/labelset/LABEL".into())));
+    let result = reader.search(&HashSet::new(), &query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    assert_eq!(result.len(), 0);
 }
 
 #[test]

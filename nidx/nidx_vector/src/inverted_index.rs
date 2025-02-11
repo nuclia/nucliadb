@@ -92,12 +92,6 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
         }
     }
 
-    // for (k, v) in &field_builder.ordered_keys {
-    //     let u = uuid::Uuid::from_bytes(k[..16].try_into().unwrap()).simple();
-    //     let f = std::str::from_utf8(&k[16..]).unwrap();
-    //     println!("{u}/{f} {}", v.len());
-    // }
-
     let mut map = InvertedMapWriter::new(&work_path.join("index.map"))?;
     let mut field_index = FstIndexWriter::new(&work_path.join("field.fst"), &mut map)?;
     field_builder.write(&mut field_index)?;
@@ -141,8 +135,7 @@ impl InvertedIndexes {
             Clause::Atom(atom_clause) => {
                 let ids: &mut dyn Iterator<Item = u32> = match atom_clause {
                     crate::formula::AtomClause::Label(label) => {
-                        // TODO: Label should use prefix match
-                        &mut self.label_index.get(&labels_key(label)).unwrap_or_default().into_iter()
+                        &mut self.label_index.get_prefix(std::str::from_utf8(&labels_key(label)).unwrap()).into_iter()
                     }
                     crate::formula::AtomClause::KeyPrefixSet(field_ids) => {
                         &mut field_ids.iter().flat_map(|id| self.field_index.get(&field_id_key(id))).flatten()

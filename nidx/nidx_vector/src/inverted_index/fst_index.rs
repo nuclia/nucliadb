@@ -17,9 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::File, io::BufWriter, path::Path, sync::Arc};
+use std::{collections::HashSet, fs::File, io::BufWriter, path::Path, sync::Arc};
 
-use fst::Map;
+use fst::{automaton::Str, Automaton, IntoStreamer, Map, Streamer};
 use memmap2::Mmap;
 
 use crate::VectorR;
@@ -69,6 +69,16 @@ impl FstIndexReader {
     /// Gets a set of vector ids given the index key
     pub fn get(&self, key: &[u8]) -> Option<Vec<u32>> {
         self.fst.get(key).map(|pos| self.map_reader.get(pos))
+    }
+
+    /// Gets a set of vector ids given a key prefix
+    pub fn get_prefix(&self, key: &str) -> HashSet<u32> {
+        let mut results = HashSet::new();
+        let mut fst_results = self.fst.search(Str::new(key).starts_with()).into_stream();
+        while let Some((_key, pos)) = fst_results.next() {
+            results.extend(self.map_reader.get(pos));
+        }
+        results
     }
 }
 
