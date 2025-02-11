@@ -122,7 +122,7 @@ fn accuracy_test() {
 #[test]
 fn single_graph() {
     let temp_dir = tempfile::tempdir().unwrap();
-    let key = "KEY_0".to_string();
+    let key = "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string();
     let vector = create_query();
 
     let elems = vec![Elem::new(key.clone(), vector.clone(), LabelDictionary::default(), None)];
@@ -141,10 +141,10 @@ fn single_graph() {
 
 #[test]
 fn data_merge() -> anyhow::Result<()> {
-    let key0 = "KEY_0".to_string();
+    let key0 = "9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string();
     let vector0 = create_query();
     let elems0 = vec![Elem::new(key0.clone(), vector0.clone(), LabelDictionary::default(), None)];
-    let key1 = "KEY_1".to_string();
+    let key1 = "29ee1f6e4585423585f31ded0202ee3a/f/field/0-100".to_string();
     let vector1 = create_query();
     let elems1 = vec![Elem::new(key1.clone(), vector1.clone(), LabelDictionary::default(), None)];
 

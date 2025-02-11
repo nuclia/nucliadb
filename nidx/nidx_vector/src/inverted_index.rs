@@ -17,14 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, path::Path, rc::Rc};
 
 use fst_index::{FstIndexReader, FstIndexWriter};
 use map::{InvertedMapReader, InvertedMapWriter};
 
 use crate::{
     data_point::node::Node,
-    data_types::data_store::{self, Interpreter},
+    data_types::data_store::{self},
     VectorR,
 };
 
@@ -102,4 +102,22 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
     map.finish()?;
 
     Ok(())
+}
+
+pub struct InvertedIndexes {
+    field_index: FstIndexReader,
+    label_index: FstIndexReader,
+}
+
+impl InvertedIndexes {
+    pub fn open(work_path: &Path) -> VectorR<Self> {
+        let map = Rc::new(InvertedMapReader::open(&work_path.join("index.map"))?);
+        let field_index = FstIndexReader::open(&work_path.join("field.fst"), map.clone())?;
+        let label_index = FstIndexReader::open(&work_path.join("label.fst"), map)?;
+
+        Ok(Self {
+            field_index,
+            label_index,
+        })
+    }
 }
