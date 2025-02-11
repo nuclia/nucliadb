@@ -32,9 +32,6 @@ use crate::data_point::params;
 
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
-    fn get_key(&self, x: Address) -> &[u8];
-    fn is_deleted(&self, x: Address) -> bool;
-    fn has_label(&self, x: Address, label: &[u8]) -> bool;
     fn similarity(&self, x: Address, y: Address) -> f32;
     fn get_vector(&self, x: Address) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
@@ -95,8 +92,6 @@ impl<'a, DR: DataRetriever> NodeFilter<'a, DR> {
 
     pub fn is_valid(&self, n: Address, score: f32) -> bool {
         !score.is_nan()
-        // The vector was deleted at some point and will be removed in a future merge
-        && !self.tracker.is_deleted(n)
         // The vector is blocked, meaning that its key is part of the current version of the solution
         && !self.blocked_addresses.contains(&n)
         // The number of times this vector appears is 0
@@ -349,7 +344,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let neighbors = self.layer_search(query, layer, k_neighbours, &entry_points);
 
         let filter = NodeFilter {
-            filter: &with_filter,
+            filter: with_filter,
             tracker: self.tracker,
             blocked_addresses: &Default::default(),
             vec_counter: RepCounter::new(!with_duplicates),

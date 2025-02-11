@@ -20,8 +20,6 @@
 
 use std::collections::HashSet;
 
-use crate::data_point::{Address, DataRetriever};
-
 /// Is a singleton clause.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AtomClause {
@@ -34,33 +32,6 @@ impl AtomClause {
     }
     pub fn key_set(field_set: HashSet<String>) -> AtomClause {
         Self::KeyPrefixSet(field_set)
-    }
-    fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        match self {
-            Self::Label(value) => retriever.has_label(x, value.as_bytes()),
-            Self::KeyPrefixSet(field_set) => {
-                let key = retriever.get_key(x);
-
-                // Matches field_id (key up to the third slash)
-                let mut slash_count = 0;
-                let mut end_pos = 0;
-                for char in key.iter() {
-                    if *char == b'/' {
-                        slash_count += 1;
-                        if slash_count == 3 {
-                            break;
-                        }
-                    }
-                    end_pos += 1;
-                }
-                // slash_count = 2 if we reach the end of string with 2 middle slashes
-                if slash_count < 2 {
-                    return false;
-                }
-
-                field_set.contains(std::str::from_utf8(&key[0..end_pos]).unwrap())
-            }
-        }
     }
 }
 
@@ -80,25 +51,10 @@ pub struct CompoundClause {
     pub operands: Vec<Clause>,
 }
 impl CompoundClause {
-    pub fn is_empty(&self) -> bool {
-        self.operands.is_empty()
-    }
     pub fn new(operator: BooleanOperator, operands: Vec<Clause>) -> CompoundClause {
         CompoundClause {
             operator,
             operands,
-        }
-    }
-    fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        if self.is_empty() {
-            return true;
-        }
-
-        let mut subquery_iterator = self.operands.iter();
-        match self.operator {
-            BooleanOperator::And => subquery_iterator.all(|subquery| subquery.run(x, retriever)),
-            BooleanOperator::Or => subquery_iterator.any(|subquery| subquery.run(x, retriever)),
-            BooleanOperator::Not => !subquery_iterator.all(|subquery| subquery.run(x, retriever)),
         }
     }
 }
@@ -108,15 +64,6 @@ impl CompoundClause {
 pub enum Clause {
     Atom(AtomClause),
     Compound(CompoundClause),
-}
-
-impl Clause {
-    fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        match self {
-            Clause::Compound(q) => q.run(x, retriever),
-            Clause::Atom(q) => q.run(x, retriever),
-        }
-    }
 }
 
 impl From<AtomClause> for Clause {
@@ -146,96 +93,5 @@ impl Formula {
         Clause: From<C>,
     {
         self.clauses.push(clause.into())
-    }
-    pub fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        self.clauses.iter().all(|q| q.run(x, retriever))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashSet;
-
-    use super::*;
-    use crate::data_point::Address;
-    struct DummyRetriever {
-        key: &'static [u8],
-        labels: HashSet<&'static [u8]>,
-    }
-    impl DataRetriever for DummyRetriever {
-        fn get_key(&self, _: Address) -> &[u8] {
-            self.key
-        }
-        fn has_label(&self, _: Address, label: &[u8]) -> bool {
-            self.labels.contains(label)
-        }
-        fn is_deleted(&self, _: Address) -> bool {
-            panic!("Not meant to be used")
-        }
-        fn similarity(&self, _: Address, _: Address) -> f32 {
-            panic!("Not meant to be used")
-        }
-        fn get_vector(&self, _: Address) -> &[u8] {
-            panic!("Not meant to be used")
-        }
-        fn min_score(&self) -> f32 {
-            -1.0
-        }
-        fn will_need(&self, _x: Address) {
-            // noop
-        }
-    }
-    #[test]
-    fn test_query() {
-        const KEY: &str = "/This/is/a/key";
-        const L1: &str = "Label1";
-        const L2: &str = "Label2";
-        const L3: &str = "Label3";
-        const ADDRESS: Address = Address::dummy();
-        let retriever = DummyRetriever {
-            key: KEY.as_bytes(),
-            labels: [L1.as_bytes(), L3.as_bytes()].into_iter().collect(),
-        };
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::label(L1.to_string()));
-        formula.extend(AtomClause::label(L3.to_string()));
-        assert!(formula.run(ADDRESS, &retriever));
-
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::label(L1.to_string()));
-        formula.extend(AtomClause::label(L2.to_string()));
-        assert!(!formula.run(ADDRESS, &retriever));
-
-        #[rustfmt::skip] let inner = vec![
-            Clause::Atom(AtomClause::label(L1.to_string())),
-            Clause::Atom(AtomClause::label(L2.to_string()))
-        ];
-        let mut formula = Formula::new();
-        formula.extend(CompoundClause::new(BooleanOperator::Or, inner));
-        assert!(formula.run(ADDRESS, &retriever));
-    }
-
-    #[test]
-    fn test_key_filters() {
-        let resource_id = String::from("015163a0629e4f368aa9d54978d2a9ff");
-        const FIELD_ID: &str = "015163a0629e4f368aa9d54978d2a9ff/f/file1";
-        let field_id = String::from(FIELD_ID);
-
-        let fake_field_id = format!("{resource_id}/f/not_a_field");
-
-        const ADDRESS: Address = Address::dummy();
-        let retriever = DummyRetriever {
-            key: FIELD_ID.as_bytes(),
-            labels: HashSet::new(),
-        };
-
-        // Find by set of field_ids
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::key_set([field_id.clone()].into_iter().collect()));
-        assert!(formula.run(ADDRESS, &retriever));
-
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::key_set([fake_field_id.clone()].into_iter().collect()));
-        assert!(!formula.run(ADDRESS, &retriever));
     }
 }

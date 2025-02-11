@@ -21,7 +21,6 @@
 mod common;
 
 use nidx_protos::VectorSentence;
-use nidx_types::OpenIndexMetadata;
 use nidx_vector::config::*;
 use rstest::rstest;
 use tempfile::tempdir;

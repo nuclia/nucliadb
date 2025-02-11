@@ -19,36 +19,21 @@
 //
 
 pub use crate::data_point::Neighbour;
-use crate::data_point::{self, NoDLog, OpenDataPoint};
+use crate::data_point::OpenDataPoint;
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
-use crate::data_types::dtrie_ram::DTrie;
-use crate::data_types::DeleteLog;
 use crate::request_types::VectorSearchRequest;
 use crate::utils;
-use crate::VectorSegmentMetadata;
 use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
 use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
-use nidx_types::Seq;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use tracing::*;
-
-#[derive(Clone, Copy)]
-pub struct TimeSensitiveDLog<'a> {
-    pub dlog: &'a DTrie,
-    pub time: Seq,
-}
-impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
-    fn is_deleted(&self, key: &[u8]) -> bool {
-        self.dlog.get(key).map(|t| t > self.time).unwrap_or_default()
-    }
-}
 
 // Fixed-sized sorted collection
 struct Fssc {
@@ -105,7 +90,7 @@ impl Fssc {
 
 pub struct Reader {
     config: VectorConfig,
-    open_data_points: Vec<(OpenDataPoint, Seq)>,
+    open_data_points: Vec<OpenDataPoint>,
 }
 
 fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
@@ -165,27 +150,7 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl Reader {
-    pub fn open<'a>(
-        segments: Vec<(VectorSegmentMetadata, Seq)>,
-        config: VectorConfig,
-        deletions: impl Iterator<Item = (&'a String, Seq)>,
-    ) -> VectorR<Reader> {
-        let mut open_data_points = Vec::new();
-
-        for (metadata, seq) in segments {
-            let open_data_point = data_point::open(metadata)?;
-
-            open_data_points.push((open_data_point, seq));
-        }
-
-        for (deletion, deletion_seq) in deletions {
-            for (ref mut segment, ref segment_seq) in &mut open_data_points {
-                if deletion_seq > *segment_seq {
-                    segment.apply_deletion(deletion.as_str());
-                }
-            }
-        }
-
+    pub fn open(open_data_points: Vec<OpenDataPoint>, config: VectorConfig) -> VectorR<Reader> {
         Ok(Reader {
             config,
             open_data_points,
@@ -223,21 +188,13 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for (open_data_point, seq) in &self.open_data_points {
+        for open_data_point in &self.open_data_points {
             // Skip this segment if it doesn't match the segment filter
             if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
                 continue;
             }
-            let delete_log = NoDLog;
-            let partial_solution = open_data_point.search(
-                &delete_log,
-                query,
-                filter,
-                with_duplicates,
-                no_results,
-                &self.config,
-                min_score,
-            );
+            let partial_solution =
+                open_data_point.search(query, filter, with_duplicates, no_results, &self.config, min_score);
             for candidate in partial_solution {
                 ffsv.add(candidate);
             }
@@ -322,6 +279,7 @@ mod tests {
 
     use super::*;
     use crate::config::{Similarity, VectorConfig, VectorType};
+    use crate::data_point;
     use crate::indexer::{index_resource, ResourceWrapper};
 
     #[test]
@@ -384,9 +342,9 @@ mod tests {
             ..Default::default()
         };
 
-        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, std::iter::empty()).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -471,9 +429,9 @@ mod tests {
             ..Default::default()
         };
 
-        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, std::iter::empty()).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -588,9 +546,9 @@ mod tests {
             ..Default::default()
         };
 
-        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, std::iter::empty()).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
