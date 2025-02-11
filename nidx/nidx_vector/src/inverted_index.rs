@@ -85,7 +85,7 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
     let mut label_builder = IndexBuilder::new();
 
     for id in 0..data_store::stored_elements(nodes) {
-        let node = data_store::get_value(Node, nodes, id);
+        let node = data_store::get_value(nodes, id);
         let key = Node::key(node);
         let labels = Node::labels(node);
 
