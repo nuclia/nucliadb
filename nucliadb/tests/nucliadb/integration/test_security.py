@@ -231,14 +231,15 @@ async def _test_search_request_with_security(
 
 
 @pytest.mark.parametrize("ask_endpoint", ("ask_post",))
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_security_ask(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
     resource_with_security,
-    ask_endpoint,
+    ask_endpoint: str,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     resource_id = resource_with_security
     support_group = "support"
     # Add another group to the resource
