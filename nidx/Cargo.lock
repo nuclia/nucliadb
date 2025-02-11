@@ -2183,6 +2183,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bit-set",
+ "bit-vec",
  "fst",
  "fxhash",
  "lazy_static",
