@@ -37,11 +37,15 @@ mod map;
 fn field_id_key(paragraph_key: &str) -> Vec<u8> {
     let mut parts = paragraph_key.split('/');
     let uuid = parts.next().unwrap();
-    let field_type = parts.next().unwrap();
-    let field_name = parts.next().unwrap();
 
-    [uuid::Uuid::parse_str(uuid).unwrap().as_bytes(), field_type.as_bytes(), "/".as_bytes(), field_name.as_bytes()]
-        .concat()
+    if let Some(field_type) = parts.next() {
+        let field_name = parts.next().unwrap();
+
+        [uuid::Uuid::parse_str(uuid).unwrap().as_bytes(), field_type.as_bytes(), "/".as_bytes(), field_name.as_bytes()]
+            .concat()
+    } else {
+        uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec()
+    }
 }
 
 /// The key for the labels, ending with a separator to allow for easy prefix search
@@ -123,6 +127,10 @@ impl InvertedIndexes {
         })
     }
 
+    pub fn ids_for_deletion_key(&self, key: &str) -> impl Iterator<Item = u32> {
+        self.field_index.get_prefix(&field_id_key(key)).into_iter()
+    }
+
     pub fn filter(&self, formula: &Formula) -> Option<BitSet> {
         formula.clauses.iter().map(|f| self.filter_clause(f)).reduce(|mut a, b| {
             a.intersect_with(&b);
@@ -135,7 +143,7 @@ impl InvertedIndexes {
             Clause::Atom(atom_clause) => {
                 let ids: &mut dyn Iterator<Item = u32> = match atom_clause {
                     crate::formula::AtomClause::Label(label) => {
-                        &mut self.label_index.get_prefix(std::str::from_utf8(&labels_key(label)).unwrap()).into_iter()
+                        &mut self.label_index.get_prefix(&labels_key(label)).into_iter()
                     }
                     crate::formula::AtomClause::KeyPrefixSet(field_ids) => {
                         &mut field_ids.iter().flat_map(|id| self.field_index.get(&field_id_key(id))).flatten()

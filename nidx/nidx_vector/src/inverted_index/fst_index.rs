@@ -19,7 +19,7 @@
 
 use std::{collections::HashSet, fs::File, io::BufWriter, path::Path, sync::Arc};
 
-use fst::{automaton::Str, Automaton, IntoStreamer, Map, Streamer};
+use fst::{Automaton, IntoStreamer, Map, Streamer};
 use memmap2::Mmap;
 
 use crate::VectorR;
@@ -72,9 +72,9 @@ impl FstIndexReader {
     }
 
     /// Gets a set of vector ids given a key prefix
-    pub fn get_prefix(&self, key: &str) -> HashSet<u32> {
+    pub fn get_prefix(&self, key: &[u8]) -> HashSet<u32> {
         let mut results = HashSet::new();
-        let mut fst_results = self.fst.search(Str::new(key).starts_with()).into_stream();
+        let mut fst_results = self.fst.search(StartsWithBytes(key)).into_stream();
         while let Some((_key, pos)) = fst_results.next() {
             results.extend(self.map_reader.get(pos));
         }
@@ -141,5 +141,42 @@ mod tests {
         assert!(reader.get(key).is_none());
 
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StartsWithBytes<'a>(&'a [u8]);
+
+impl<'a> Automaton for StartsWithBytes<'a> {
+    type State = Option<usize>;
+
+    fn start(&self) -> Option<usize> {
+        Some(0)
+    }
+
+    fn is_match(&self, pos: &Option<usize>) -> bool {
+        *pos >= Some(self.0.len())
+    }
+
+    fn can_match(&self, pos: &Option<usize>) -> bool {
+        pos.is_some()
+    }
+
+    fn will_always_match(&self, pos: &Option<usize>) -> bool {
+        *pos >= Some(self.0.len())
+    }
+
+    fn accept(&self, pos: &Option<usize>, b: u8) -> Option<usize> {
+        if let Some(pos) = *pos {
+            // Already at the end, match
+            if pos >= self.0.len() {
+                return Some(pos + 1);
+            }
+            // If this character matches, advance
+            if self.0.get(pos).cloned() == Some(b) {
+                return Some(pos + 1);
+            }
+        }
+        None
     }
 }
