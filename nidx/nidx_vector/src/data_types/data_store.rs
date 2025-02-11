@@ -22,6 +22,7 @@ use std::fs::File;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 
 use crate::config::{VectorConfig, VectorType};
+use crate::data_point::node::Node;
 
 use super::usize_utils::*;
 
@@ -52,23 +53,6 @@ pub fn get_pointer(x: &[u8], i: usize) -> Pointer {
     usize::from_le_bytes(buff)
 }
 
-pub trait Interpreter {
-    // Is a mistake to assume that x does not have trailing bytes at the end.
-    // Is safe to assume that there is an i such that x[0],.., x[i] is a valid
-    // Slot.
-    fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8];
-    // The function should split x at i, being i the index where
-    // x[0],..,x[i] is a valid representation of a slot value.
-    // i is ensured to exists.
-    fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]);
-    // Is a mistake to assume that x does not have trailing bytes at the end.
-    // Is safe to assume that there is an i such that x[0],.., x[i] is a valid
-    // Slot.
-    fn keep_in_merge(&self, _: &[u8]) -> bool {
-        true
-    }
-}
-
 pub trait IntoBuffer {
     fn serialize_into<W: io::Write>(self, w: W, vector_type: &VectorType) -> io::Result<()>;
 }
@@ -87,9 +71,9 @@ pub fn stored_elements(x: &[u8]) -> usize {
 }
 
 // O(1)
-pub fn get_value<I: Interpreter>(interpreter: I, src: &[u8], id: usize) -> &[u8] {
+pub fn get_value(src: &[u8], id: usize) -> &[u8] {
     let pointer = get_pointer(src, id);
-    interpreter.read_exact(&src[pointer..]).0
+    Node.read_exact(&src[pointer..]).0
 }
 
 use lazy_static::lazy_static;
@@ -164,18 +148,18 @@ pub fn create_key_value<D: IntoBuffer>(
 }
 
 // Merge algorithm. Returns the number of elements merged into the file.
-pub fn merge<S: Interpreter + Copy>(
+pub fn merge(
     recipient: &mut File,
-    producers: &[(S, &[u8])],
+    segments: &mut [(impl Iterator<Item = usize>, &[u8])],
     config: &VectorConfig,
 ) -> io::Result<bool> {
     // Number of elements, deleted or alive.
     let mut prologue_section_size = HEADER_LEN;
     // To know the range of valid ids per producer
-    let mut lengths = Vec::with_capacity(producers.len());
+    let mut lengths = Vec::with_capacity(segments.len());
 
     // Computing lengths and total sizes
-    for (_, store) in producers.iter().copied() {
+    for (_, store) in segments.iter() {
         let producer_elements = stored_elements(store);
         lengths.push(producer_elements);
         prologue_section_size += POINTER_LEN * producer_elements;
@@ -185,39 +169,20 @@ pub fn merge<S: Interpreter + Copy>(
     // and the id section.
     recipient.set_len(prologue_section_size as u64)?;
 
-    // Lengths of the producers have been computed and
-    // should not be modified anymore.
-    let lengths = lengths;
-    // Producer being traversed
-    let mut producer_cursor = 0;
-    // Next element to be visited in the current producer.
-    let mut element_cursor = 0;
     // Number of elements that are actually written in the recipient.
     let mut written_elements: usize = 0;
     // Using a buffered writer for efficient transferring.
     let mut recipient_buffer = BufWriter::new(recipient);
     // Pointer to the next unused id slot
     let mut id_section_cursor = HEADER_LEN;
-    let mut has_deletions = false;
 
     let alignment = config.vector_type.vector_alignment();
-    while producer_cursor < producers.len() {
-        // If the end of the current producer was reached we move
-        // to the start of the next producer.
-        if element_cursor == lengths[producer_cursor] {
-            element_cursor = 0;
-            producer_cursor += 1;
-            continue;
-        }
-
-        // We check if the current element is deleted and, in that case, it
-        // is transferred to the recipient.
-        let (interpreter, store) = producers[producer_cursor];
-        let element_pointer = get_pointer(store, element_cursor);
-        let element_slice = &store[element_pointer..];
-        if interpreter.keep_in_merge(element_slice) {
+    for (ref mut alive_ids, store) in segments {
+        for element_cursor in alive_ids {
+            let element_pointer = get_pointer(store, element_cursor);
+            let element_slice = &store[element_pointer..];
             // Moving to the end of the file to write the current element.
-            let (exact_element, _) = interpreter.read_exact(element_slice);
+            let (exact_element, _) = Node.read_exact(element_slice);
             let mut element_pointer = recipient_buffer.seek(SeekFrom::End(0))?;
             if element_pointer as usize % alignment > 0 {
                 let pad = alignment - (element_pointer as usize % alignment);
@@ -231,12 +196,7 @@ pub fn merge<S: Interpreter + Copy>(
             recipient_buffer.write_all(&element_pointer.to_le_bytes())?;
             id_section_cursor += POINTER_LEN;
             written_elements += 1;
-        } else {
-            has_deletions = true;
         }
-
-        // Moving to the next element of this producer.
-        element_cursor += 1;
     }
 
     // Write the number of elements
@@ -244,40 +204,13 @@ pub fn merge<S: Interpreter + Copy>(
     recipient_buffer.write_all(&written_elements.to_le_bytes())?;
     recipient_buffer.seek(SeekFrom::Start(0))?;
     recipient_buffer.flush()?;
-    Ok(has_deletions)
+    Ok(written_elements < lengths.iter().sum())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_types::DeleteLog;
-
-    const ZERO: [u8; 4] = [0, 0, 0, 0];
-    const ONE: [u8; 4] = [0, 0, 0, 1];
-    const THREE: [u8; 4] = [0, 0, 0, 3];
-    const TWO: [u8; 4] = [0, 0, 0, 2];
-    const SIX: [u8; 4] = [0, 0, 0, 6];
-    const TEN: [u8; 4] = [0, 0, 0, 10];
-
-    #[derive(Clone, Copy)]
-    struct GreaterThan([u8; 4]);
-    impl DeleteLog for GreaterThan {
-        fn is_deleted(&self, x: &[u8]) -> bool {
-            x.cmp(&self.0).is_le()
-        }
-    }
-
-    // u32 numbers in big-endian (so cmp is faster)
-    #[derive(Clone, Copy)]
-    struct TElem;
-    impl Interpreter for TElem {
-        fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
-            &x[0..4]
-        }
-        fn read_exact<'a>(&self, x: &'a [u8]) -> (&'a [u8], &'a [u8]) {
-            x.split_at(4)
-        }
-    }
+    use crate::data_point::{Elem, LabelDictionary};
 
     const VECTOR_CONFIG: VectorConfig = VectorConfig {
         vector_type: VectorType::DenseF32 {
@@ -289,9 +222,8 @@ mod tests {
 
     #[test]
     fn store_test() {
-        let interpreter = TElem;
-        let elems: [u32; 5] = [0, 1, 2, 3, 4];
-        let expected: Vec<_> = elems.iter().map(|x| x.to_be_bytes()).collect();
+        let elems = [0, 1, 2, 3, 4];
+        let expected: Vec<_> = elems.iter().map(create_elem).collect();
         let mut buf = tempfile::tempfile().unwrap();
         create_key_value(&mut buf, expected.clone(), &VECTOR_CONFIG.vector_type).unwrap();
 
@@ -299,20 +231,24 @@ mod tests {
         let no_values = stored_elements(&buf_map);
         assert_eq!(no_values, expected.len());
         for (id, expected_value) in expected.iter().enumerate() {
-            let actual_value = get_value(interpreter, &buf_map, id);
-            let (head, tail) = interpreter.read_exact(actual_value);
+            let actual_value = get_value(&buf_map, id);
+            let (head, tail) = Node.read_exact(actual_value);
             assert_eq!(actual_value, head);
             assert_eq!(tail, &[] as &[u8]);
-            assert_eq!(actual_value, expected_value);
+            assert_eq!(Node::key(actual_value), expected_value.key);
         }
+    }
+
+    fn create_elem(num: &usize) -> Elem {
+        Elem::new(num.to_string(), [*num as f32; 16].to_vec(), LabelDictionary::default(), None)
     }
 
     #[test]
     fn merge_test() {
-        let v0: Vec<_> = [0u32, 2, 4].iter().map(|x| x.to_be_bytes()).collect();
-        let v1: Vec<_> = [1u32, 5, 7].iter().map(|x| x.to_be_bytes()).collect();
-        let v2: Vec<_> = [8u32, 9, 10, 11].iter().map(|x| x.to_be_bytes()).collect();
-        let expected = [0u32, 1, 2, 4, 5, 7, 8, 9, 10, 11];
+        let v0: Vec<_> = [0, 2, 4].iter().map(create_elem).collect();
+        let v1: Vec<_> = [1, 5, 7].iter().map(create_elem).collect();
+        let v2: Vec<_> = [8, 9, 10, 11].iter().map(create_elem).collect();
+        let expected = [0, 1, 2, 4, 5, 7, 8, 9, 10, 11];
 
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();
@@ -327,14 +263,14 @@ mod tests {
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
         let mut merge_store = tempfile::tempfile().unwrap();
-        let elems = vec![(TElem, v0_map.as_ref()), (TElem, v1_map.as_ref()), (TElem, v2_map.as_ref())];
+        let mut elems = vec![(0..3, v0_map.as_ref()), (0..3, v1_map.as_ref()), (0..4, v2_map.as_ref())];
 
-        merge(&mut merge_store, &elems, &VECTOR_CONFIG).unwrap();
+        merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_map, i))
-            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .map(|i| get_value(&merge_map, i))
+            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -344,9 +280,9 @@ mod tests {
 
     #[test]
     fn merge_some_deleted_different_length() {
-        let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
-        let v1: Vec<_> = [3u32, 4, 5, 11].iter().map(|x| x.to_be_bytes()).collect();
-        let v2: Vec<_> = [6u32, 7, 8, 9, 10].iter().map(|x| x.to_be_bytes()).collect();
+        let v0: Vec<_> = [0, 1, 2].iter().map(create_elem).collect();
+        let v1: Vec<_> = [3, 4, 5, 11].iter().map(create_elem).collect();
+        let v2: Vec<_> = [6, 7, 8, 9, 10].iter().map(create_elem).collect();
 
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();
@@ -360,24 +296,23 @@ mod tests {
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
-        let interpreter = (GreaterThan(ONE), TElem);
         let mut merge_store = tempfile::tempfile().unwrap();
-        let elems = vec![
+        let mut elems = vec![
             // zero and 1 will be removed
-            (interpreter, v0_map.as_ref()),
+            (2..3, v0_map.as_ref()),
             // no element is removed
-            (interpreter, v1_map.as_ref()),
+            (0..4, v1_map.as_ref()),
             // no element is removed
-            (interpreter, v2_map.as_ref()),
+            (0..5, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VECTOR_CONFIG).unwrap();
+        merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_map, i))
-            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .map(|i| get_value(&merge_map, i))
+            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -387,9 +322,9 @@ mod tests {
 
     #[test]
     fn merge_some_elements_deleted() {
-        let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
-        let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
-        let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
+        let v0: Vec<_> = [0, 1, 2].iter().map(create_elem).collect();
+        let v1: Vec<_> = [3, 4, 5].iter().map(create_elem).collect();
+        let v2: Vec<_> = [6, 7, 8].iter().map(create_elem).collect();
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
@@ -402,24 +337,23 @@ mod tests {
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
-        let interpreter = (GreaterThan(ONE), TElem);
         let mut merge_store = tempfile::tempfile().unwrap();
-        let elems = vec![
+        let mut elems = vec![
             // zero and 1 will be removed
-            (interpreter, v0_map.as_ref()),
+            (2..3, v0_map.as_ref()),
             // no element is removed
-            (interpreter, v1_map.as_ref()),
+            (0..3, v1_map.as_ref()),
             // no element is removed
-            (interpreter, v2_map.as_ref()),
+            (0..3, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VECTOR_CONFIG).unwrap();
+        merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![2, 3, 4, 5, 6, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_map, i))
-            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .map(|i| get_value(&merge_map, i))
+            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -429,9 +363,9 @@ mod tests {
 
     #[test]
     fn merge_first_deleted() {
-        let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
-        let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
-        let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
+        let v0: Vec<_> = [0, 1, 2].iter().map(create_elem).collect();
+        let v1: Vec<_> = [3, 4, 5].iter().map(create_elem).collect();
+        let v2: Vec<_> = [6, 7, 8].iter().map(create_elem).collect();
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
@@ -445,22 +379,22 @@ mod tests {
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
         let mut merge_store = tempfile::tempfile().unwrap();
-        let elems = vec![
+        let mut elems = vec![
             // The first element is deleted
-            ((GreaterThan(ZERO), TElem), v0_map.as_ref()),
+            (1..3, v0_map.as_ref()),
             // The first element is deleted
-            ((GreaterThan(THREE), TElem), v1_map.as_ref()),
+            (1..3, v1_map.as_ref()),
             // The first element is deleted
-            ((GreaterThan(SIX), TElem), v2_map.as_ref()),
+            (1..3, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_store, elems.as_slice(), &VECTOR_CONFIG).unwrap();
+        merge(&mut merge_store, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![1, 2, 4, 5, 7, 8];
         let merge_map = unsafe { memmap2::Mmap::map(&merge_store).unwrap() };
         let number_of_elements = stored_elements(&merge_map);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_map, i))
-            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .map(|i| get_value(&merge_map, i))
+            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -470,9 +404,9 @@ mod tests {
 
     #[test]
     fn merge_one_store_empty() {
-        let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
-        let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
-        let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
+        let v0: Vec<_> = [0, 1, 2].iter().map(create_elem).collect();
+        let v1: Vec<_> = [3, 4, 5].iter().map(create_elem).collect();
+        let v2: Vec<_> = [6, 7, 8].iter().map(create_elem).collect();
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
@@ -485,67 +419,23 @@ mod tests {
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
-        let interpreter = (GreaterThan(TWO), TElem);
         let mut merge_storage = tempfile::tempfile().unwrap();
-        let elems = vec![
+        let mut elems = vec![
             // all the elements are deleted
-            (interpreter, v0_map.as_ref()),
+            (0..0, v0_map.as_ref()),
             // no element is removed
-            (interpreter, v1_map.as_ref()),
+            (0..3, v1_map.as_ref()),
             // no element is removed
-            (interpreter, v2_map.as_ref()),
+            (0..3, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice(), &VECTOR_CONFIG).unwrap();
+        merge(&mut merge_storage, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![3, 4, 5, 6, 7, 8];
         let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
         let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_store, i))
-            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
-            .collect();
-
-        assert_eq!(number_of_elements, values.len());
-        assert_eq!(values.len(), expected.len());
-        assert!(values.iter().all(|i| expected.contains(i)));
-    }
-
-    #[test]
-    fn merge_with_different_interpreters() {
-        let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
-        let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
-        let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
-        let mut v0_store = tempfile::tempfile().unwrap();
-        let mut v1_store = tempfile::tempfile().unwrap();
-        let mut v2_store = tempfile::tempfile().unwrap();
-
-        create_key_value(&mut v0_store, v0, &VECTOR_CONFIG.vector_type).unwrap();
-        create_key_value(&mut v1_store, v1, &VECTOR_CONFIG.vector_type).unwrap();
-        create_key_value(&mut v2_store, v2, &VECTOR_CONFIG.vector_type).unwrap();
-
-        let v0_map = unsafe { memmap2::Mmap::map(&v0_store).unwrap() };
-        let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
-        let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
-
-        let greater_than_2 = (GreaterThan(TWO), TElem);
-        let greater_than_10 = (GreaterThan(TEN), TElem);
-        let mut merge_storage = tempfile::tempfile().unwrap();
-        let elems = vec![
-            // all the elements are removed
-            (greater_than_2, v0_map.as_ref()),
-            // no element are removed
-            (greater_than_2, v1_map.as_ref()),
-            // all the elements are removed
-            (greater_than_10, v2_map.as_ref()),
-        ];
-
-        merge::<(GreaterThan, TElem)>(&mut merge_storage, elems.as_slice(), &VECTOR_CONFIG).unwrap();
-        let expected: Vec<u32> = vec![3, 4, 5];
-        let merge_store = unsafe { memmap2::Mmap::map(&merge_storage).unwrap() };
-        let number_of_elements = stored_elements(&merge_store);
-        let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_store, i))
-            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .map(|i| get_value(&merge_store, i))
+            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());
@@ -555,9 +445,9 @@ mod tests {
 
     #[test]
     fn merge_all_deleted() {
-        let v0: Vec<_> = [0u32, 1, 2].iter().map(|x| x.to_be_bytes()).collect();
-        let v1: Vec<_> = [3u32, 4, 5].iter().map(|x| x.to_be_bytes()).collect();
-        let v2: Vec<_> = [6u32, 7, 8].iter().map(|x| x.to_be_bytes()).collect();
+        let v0: Vec<_> = [0, 1, 2].iter().map(create_elem).collect();
+        let v1: Vec<_> = [3, 4, 5].iter().map(create_elem).collect();
+        let v2: Vec<_> = [6, 7, 8].iter().map(create_elem).collect();
         let mut v0_store = tempfile::tempfile().unwrap();
         let mut v1_store = tempfile::tempfile().unwrap();
         let mut v2_store = tempfile::tempfile().unwrap();
@@ -570,25 +460,24 @@ mod tests {
         let v1_map = unsafe { memmap2::Mmap::map(&v1_store).unwrap() };
         let v2_map = unsafe { memmap2::Mmap::map(&v2_store).unwrap() };
 
-        let interpreter = (GreaterThan(TEN), TElem);
         let mut file = tempfile::tempfile().unwrap();
 
-        let elems = vec![
+        let mut elems = vec![
             // all the elements are removed
-            (interpreter, v0_map.as_ref()),
+            (0..0, v0_map.as_ref()),
             // all the elements are removed
-            (interpreter, v1_map.as_ref()),
+            (0..0, v1_map.as_ref()),
             // all the elements are removed
-            (interpreter, v2_map.as_ref()),
+            (0..0, v2_map.as_ref()),
         ];
 
-        merge::<(GreaterThan, TElem)>(&mut file, elems.as_slice(), &VECTOR_CONFIG).unwrap();
+        merge(&mut file, elems.as_mut_slice(), &VECTOR_CONFIG).unwrap();
         let expected: Vec<u32> = vec![];
         let merge_store = unsafe { memmap2::Mmap::map(&file).unwrap() };
         let number_of_elements = stored_elements(&merge_store);
         let values: Vec<u32> = (0..number_of_elements)
-            .map(|i| get_value(TElem, &merge_store, i))
-            .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+            .map(|i| get_value(&merge_store, i))
+            .map(|s| std::str::from_utf8(Node::key(s)).unwrap().parse().unwrap())
             .collect();
 
         assert_eq!(number_of_elements, values.len());

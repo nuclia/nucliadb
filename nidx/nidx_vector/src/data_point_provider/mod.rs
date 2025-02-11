@@ -21,7 +21,6 @@
 pub mod reader;
 
 use crate::config::VectorConfig;
-pub use crate::data_types::dtrie_ram::DTrie;
 use crate::formula::Formula;
 
 pub trait SearchRequest {
