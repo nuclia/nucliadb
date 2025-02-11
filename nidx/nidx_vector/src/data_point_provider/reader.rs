@@ -420,14 +420,14 @@ mod tests {
             },
         };
         let raw_sentences = [
-            ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
-            ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
-            ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
-            ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-1".to_string(), vec![1.0, 3.0, 4.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/1-2".to_string(), vec![2.0, 4.0, 5.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/2-3".to_string(), vec![3.0, 5.0, 6.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/3-4".to_string(), vec![3.0, 5.0, 6.0]),
         ];
         let resource_id = ResourceId {
-            shard_id: "DOC".to_string(),
-            uuid: "DOC/KEY".to_string(),
+            shard_id: "dec1c64b-06e5-419c-897a-72d8a39b799e".to_string(),
+            uuid: "9cb39c75f8d9498d8f82d92b173011f5".to_string(),
         };
 
         let mut sentences = HashMap::new();
@@ -538,11 +538,13 @@ mod tests {
                 dimension: 3,
             },
         };
-        let raw_sentences =
-            [("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]), ("DOC/KEY/1/2".to_string(), vec![1.0, 2.0, 3.0])];
+        let raw_sentences = [
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string(), vec![1.0, 2.0, 3.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/100-200".to_string(), vec![1.0, 2.0, 3.0]),
+        ];
         let resource_id = ResourceId {
-            shard_id: "DOC".to_string(),
-            uuid: "DOC/KEY".to_string(),
+            shard_id: "dec1c64b-06e5-419c-897a-72d8a39b799e".to_string(),
+            uuid: "9cb39c75f8d9498d8f82d92b173011f5".to_string(),
         };
 
         let mut sentences = HashMap::new();
@@ -571,14 +573,14 @@ mod tests {
             metadata: None,
         };
         let paragraphs = IndexParagraphs {
-            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+            paragraphs: HashMap::from([("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string(), paragraph)]),
         };
         let resource = Resource {
             resource: Some(resource_id),
             texts: HashMap::with_capacity(0),
             status: ResourceStatus::Processed as i32,
             labels: vec!["2".to_string()],
-            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs: HashMap::from([("f/field".to_string(), paragraphs)]),
             shard_id: "DOC".to_string(),
             ..Default::default()
         };

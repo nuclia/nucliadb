@@ -30,7 +30,7 @@ mod tests;
 use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
-use crate::inverted_index::build_indexes;
+use crate::inverted_index::{build_indexes, InvertedIndexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
@@ -67,11 +67,13 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
     }
 
     build_indexes(path, &nodes)?;
+    let inverted_indexes = Some(InvertedIndexes::open(path)?);
 
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
+        inverted_indexes,
     })
 }
 
@@ -153,6 +155,7 @@ where
         metadata,
         nodes,
         index,
+        inverted_indexes: None,
     })
 }
 
@@ -213,6 +216,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         metadata,
         nodes,
         index,
+        inverted_indexes: None,
     })
 }
 
@@ -450,6 +454,7 @@ pub struct OpenDataPoint {
     metadata: VectorSegmentMetadata,
     nodes: Mmap,
     index: Mmap,
+    inverted_indexes: Option<InvertedIndexes>,
 }
 
 impl AsRef<OpenDataPoint> for OpenDataPoint {
