@@ -59,7 +59,7 @@ pub trait Hnsw {
 /// implement [`Ord`]. [`Cnx`] is an application of the new-type pattern that lets us bypass the
 /// orphan rules and store such tuples in a [`BinaryHeap`].
 #[derive(Clone, Copy)]
-struct Cnx(Address, f32);
+pub struct Cnx(pub Address, pub f32);
 impl Eq for Cnx {}
 impl Ord for Cnx {
     fn cmp(&self, other: &Self) -> Ordering {

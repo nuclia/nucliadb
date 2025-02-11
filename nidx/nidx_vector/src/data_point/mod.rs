@@ -37,14 +37,18 @@ use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
 use node::Node;
-use ops_hnsw::HnswOps;
+use ops_hnsw::{Cnx, HnswOps};
 use ram_hnsw::RAMHnsw;
-use std::collections::HashSet;
+use std::collections::{BinaryHeap, HashSet};
 use std::fs::File;
 use std::io;
+use std::iter::empty;
 use std::path::Path;
 
 pub use ops_hnsw::DataRetriever;
+
+/// How much expensive is to find a node via HNSW compared to a simple brute force scan
+const HNSW_COST_FACTOR: usize = 200;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
@@ -492,18 +496,42 @@ impl OpenDataPoint {
         results: usize,
         config: &VectorConfig,
         min_score: f32,
-    ) -> impl Iterator<Item = Neighbour> + '_ {
+    ) -> Box<dyn Iterator<Item = Neighbour> + '_> {
         let encoded_query = config.vector_type.encode(query);
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
+        let query_address = Address(self.metadata.records);
 
         let bitset = self.inverted_indexes.as_ref().unwrap().filter(filter);
+        if let Some(bitset) = &bitset {
+            let count = bitset.iter().count();
+            if count == 0 {
+                return Box::new(empty());
+            }
+            let expected_traversal_scan = results * self.metadata.records / count;
 
-        // let filter = FormulaFilter::new(filter);
+            if count < expected_traversal_scan * HNSW_COST_FACTOR {
+                let mut scored_results = Vec::new();
+                for address in bitset.iter() {
+                    let address = Address(address);
+                    if !tracker.is_deleted(address) {
+                        let score = tracker.similarity(query_address, address);
+                        if score >= min_score {
+                            scored_results.push(Cnx(address, score));
+                        }
+                    }
+                }
+                scored_results.sort();
+                return Box::new(
+                    scored_results.into_iter().map(|a| Neighbour::new(a.0, &self.nodes, a.1)).take(results),
+                );
+            }
+        }
+
         let ops = HnswOps::new(&tracker, true);
-        let neighbours =
-            ops.search(Address(self.metadata.records), self.index.as_ref(), results, bitset, with_duplicates);
-
-        neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
+        let neighbours = ops.search(query_address, self.index.as_ref(), results, bitset, with_duplicates);
+        Box::new(
+            neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results),
+        )
     }
 }
 

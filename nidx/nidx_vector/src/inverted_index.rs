@@ -92,6 +92,12 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
         }
     }
 
+    // for (k, v) in &field_builder.ordered_keys {
+    //     let u = uuid::Uuid::from_bytes(k[..16].try_into().unwrap()).simple();
+    //     let f = std::str::from_utf8(&k[16..]).unwrap();
+    //     println!("{u}/{f} {}", v.len());
+    // }
+
     let mut map = InvertedMapWriter::new(&work_path.join("index.map"))?;
     let mut field_index = FstIndexWriter::new(&work_path.join("field.fst"), &mut map)?;
     field_builder.write(&mut field_index)?;
@@ -159,9 +165,10 @@ impl InvertedIndexes {
                         a
                     },
                 };
-                let bitset = expression.operands.iter().map(|f| self.filter_clause(f)).reduce(func).unwrap();
+                let mut bitset = expression.operands.iter().map(|f| self.filter_clause(f)).reduce(func).unwrap();
                 if matches!(expression.operator, crate::formula::BooleanOperator::Not) {
-                    bitset.iter().map(|f| usize::MAX ^ f).collect()
+                    bitset.get_mut().iter_mut().for_each(|mut f| *f = !*f);
+                    bitset
                 } else {
                     bitset
                 }
