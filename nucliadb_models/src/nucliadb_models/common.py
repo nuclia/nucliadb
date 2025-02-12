@@ -263,15 +263,16 @@ class Question(BaseModel):
     ids_paragraphs: List[str]
 
 
-class Answer(BaseModel):
+class Answers(BaseModel):
     text: str
     language: Optional[str] = None
     ids_paragraphs: List[str]
+    reason: str
 
 
 class QuestionAnswer(BaseModel):
     question: Question
-    answers: List[Answer]
+    answers: List[Answers]
 
 
 class QuestionAnswers(BaseModel):
