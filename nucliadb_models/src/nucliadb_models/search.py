@@ -1684,7 +1684,16 @@ class SummarizedResponse(BaseModel):
     )
 
 
+class KnowledgeGraphEntity(BaseModel):
+    name: str
+    type: Optional[EntityType] = None
+    subtype: Optional[str] = None
+
+
 class FindRequest(BaseSearchRequest):
+    query_entities: SkipJsonSchema[Optional[list[KnowledgeGraphEntity]]] = Field(
+        default=None, title="Query entities", description="Entities to use in a knowledge graph search"
+    )
     features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             SearchOptions.KEYWORD,
