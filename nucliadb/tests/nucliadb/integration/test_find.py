@@ -39,14 +39,15 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from tests.utils import inject_message
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_with_label_changes(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -61,7 +62,7 @@ async def test_find_with_label_changes(
 
     # should get 1 result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "title",
         },
@@ -72,7 +73,7 @@ async def test_find_with_label_changes(
 
     # assert we get no results with label filter
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={"query": "title", "filters": ["/classification.labels/labels/label1"]},
     )
     assert resp.status_code == 200
@@ -81,7 +82,7 @@ async def test_find_with_label_changes(
 
     # add new label
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
         json={
             # "title": "My new title",
             "usermetadata": {
@@ -101,7 +102,7 @@ async def test_find_with_label_changes(
 
     # we should get 1 result now with updated label
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={"query": "title", "filters": ["/classification.labels/labels/label1"]},
     )
     assert resp.status_code == 200
@@ -109,32 +110,34 @@ async def test_find_with_label_changes(
     assert len(body["resources"]) == 1
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_does_not_support_fulltext_search(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/find?query=title&features=fulltext&features=keyword",
+        f"/kb/{standalone_knowledgebox}/find?query=title&features=fulltext&features=keyword",
     )
     assert resp.status_code == 422
     assert "fulltext search not supported" in resp.json()["detail"][0]["msg"]
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={"query": "title", "features": [SearchOptions.FULLTEXT, SearchOptions.KEYWORD]},
     )
     assert resp.status_code == 422
     assert "fulltext search not supported" in resp.json()["detail"][0]["msg"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_resource_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "My Title",
             "summary": "My summary",
@@ -145,7 +148,7 @@ async def test_find_resource_filters(
     rid1 = resp.json()["uuid"]
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "title": "My Title",
             "summary": "My summary",
@@ -157,7 +160,7 @@ async def test_find_resource_filters(
 
     # Should get 2 result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "title",
         },
@@ -169,7 +172,7 @@ async def test_find_resource_filters(
     # Check that resource filtering works
     for rid in [rid1, rid2]:
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/find",
+            f"/kb/{standalone_knowledgebox}/find",
             json={
                 "query": "title",
                 "resource_filters": [rid],
@@ -181,19 +184,20 @@ async def test_find_resource_filters(
         assert rid in body["resources"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_min_score(
     nucliadb_reader: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # When not specifying the min score on the request
     # it should default to 0 for bm25 and 0.7 for semantic
-    resp = await nucliadb_reader.post(f"/kb/{knowledgebox}/find", json={"query": "dummy"})
+    resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/find", json={"query": "dummy"})
     assert resp.status_code == 200
     assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.7}
 
     # When specifying the min score on the request
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={"query": "dummy", "min_score": {"bm25": 10, "semantic": 0.5}},
     )
     assert resp.status_code == 200
@@ -201,19 +205,20 @@ async def test_find_min_score(
 
     # Check that old api still works
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find", json={"query": "dummy", "min_score": 0.5}
+        f"/kb/{standalone_knowledgebox}/find", json={"query": "dummy", "min_score": 0.5}
     )
     assert resp.status_code == 200
     assert resp.json()["min_score"] == {"bm25": 0, "semantic": 0.5}
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_story_7286(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -225,7 +230,7 @@ async def test_story_7286(
     rid = resp.json()["uuid"]
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
         json={
             "fieldmetadata": [
                 {
@@ -248,7 +253,7 @@ async def test_story_7286(
     with patch("nucliadb.search.search.hydrator.managed_serialize", return_value=None):
         # should get no result (because serialize returns None, as the resource is not found in the DB)
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/find",
+            f"/kb/{standalone_knowledgebox}/find",
             json={
                 "query": "title",
                 "features": [SearchOptions.KEYWORD, SearchOptions.SEMANTIC, SearchOptions.RELATIONS],
@@ -265,13 +270,14 @@ async def test_story_7286(
     assert len(body["resources"]) == 0
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_marks_fuzzy_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -281,7 +287,7 @@ async def test_find_marks_fuzzy_results(
 
     # Should get only one non-fuzzy result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "Title",
         },
@@ -292,7 +298,7 @@ async def test_find_marks_fuzzy_results(
 
     # Should get only one fuzzy result
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": "totle",
         },
@@ -303,7 +309,7 @@ async def test_find_marks_fuzzy_results(
 
     # Should not get any result if exact match term queried
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/find",
+        f"/kb/{standalone_knowledgebox}/find",
         json={
             "query": '"totle"',
         },
@@ -323,6 +329,7 @@ def check_fuzzy_paragraphs(find_response, *, fuzzy_result: bool, n_expected: int
     assert found == n_expected
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_returns_best_matches(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb,
@@ -360,10 +367,11 @@ def find_with_limits_exceeded_error():
         yield
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_handles_limits_exceeded_error(
-    nucliadb_reader, knowledgebox, find_with_limits_exceeded_error
+    nucliadb_reader: AsyncClient, standalone_knowledgebox, find_with_limits_exceeded_error
 ):
-    kb = knowledgebox
+    kb = standalone_knowledgebox
     resp = await nucliadb_reader.get(f"/kb/{kb}/find")
     assert resp.status_code == 402
     assert resp.json() == {"detail": "over the quota"}
@@ -373,12 +381,13 @@ async def test_find_handles_limits_exceeded_error(
     assert resp.json() == {"detail": "over the quota"}
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_keyword_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
-    kbid = knowledgebox
+    kbid = standalone_knowledgebox
     # Create a couple of resources with different keywords in the title
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -469,6 +478,7 @@ async def test_find_keyword_filters(
             ), f"Keyword filters: {keyword_filters}, expected rids: {expected_rids}"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_highlight(
     nucliadb_reader: AsyncClient,
     philosophy_books_kb: str,
@@ -496,15 +506,16 @@ async def test_find_highlight(
     assert "<mark>Marcus</mark> Aurelius" in match["text"]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_fields_parameter(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox: str,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
 ):
     text = "This is a text"
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "slug": "myresource",
             "title": "My Title",
@@ -521,7 +532,7 @@ async def test_find_fields_parameter(
     rid = resp.json()["uuid"]
 
     bm = BrokerMessage()
-    bm.kbid = knowledgebox
+    bm.kbid = standalone_knowledgebox
     bm.uuid = rid
 
     field = FieldID(field_type=FieldType.TEXT, field="text1")
@@ -537,7 +548,7 @@ async def test_find_fields_parameter(
     evw.vectors.vectors.vectors.append(vector)
     bm.field_vectors.append(evw)
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
     # Semantic search only on text fields should work
     for fields_param, expected_n_resources in [
@@ -546,7 +557,7 @@ async def test_find_fields_parameter(
         (["u"], 0),
     ]:
         resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/find",
+            f"/kb/{standalone_knowledgebox}/find",
             json={
                 "query": text,
                 "features": ["semantic"],

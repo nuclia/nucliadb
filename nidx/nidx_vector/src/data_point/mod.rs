@@ -151,6 +151,8 @@ where
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    build_indexes(data_point_path, &nodes)?;
+
     let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
         records: no_nodes,
@@ -214,6 +216,8 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         nodes.advise(memmap2::Advice::WillNeed)?;
         index.advise(memmap2::Advice::Sequential)?;
     }
+
+    build_indexes(path, &nodes)?;
 
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
@@ -480,10 +484,6 @@ impl AsRef<OpenDataPoint> for OpenDataPoint {
 impl OpenDataPoint {
     pub fn into_metadata(self) -> VectorSegmentMetadata {
         self.metadata
-    }
-
-    pub fn no_nodes(&self) -> usize {
-        self.metadata.records
     }
 
     pub fn tags(&self) -> &HashSet<String> {

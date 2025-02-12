@@ -94,20 +94,43 @@ def mock_pinecone_client(data_plane, control_plane):
         yield session_mock
 
 
+@pytest.fixture(scope="function")
+async def pinecone_knowledgebox(nucliadb_writer_manager: AsyncClient, mock_pinecone_client):
+    resp = await nucliadb_writer_manager.post(
+        "/kbs",
+        json={
+            "slug": "pinecone_knowledgebox",
+            "external_index_provider": {
+                "type": "pinecone",
+                "api_key": "my-pinecone-api-key",
+                "serverless_cloud": "aws_us_east_1",
+            },
+        },
+    )
+    assert resp.status_code == 201
+    uuid = resp.json().get("uuid")
+
+    yield uuid
+
+    resp = await nucliadb_writer_manager.delete(f"/kb/{uuid}")
+    assert resp.status_code == 200
+
+
 @pytest.fixture(autouse=True)
 def hosted_nucliadb():
     with unittest.mock.patch("nucliadb.ingest.service.writer.is_onprem_nucliadb", return_value=False):
         yield
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_kb_creation(
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     control_plane,
 ):
     """
     This tests the new method for creating kbs on a hosted nucliadb that
-    uses the nucliadb_grpc.NewKnowledgeBoxV2 method.
+    uses the nucliadb_ingest_grpc.NewKnowledgeBoxV2 method.
     """
     expected_index_names = ["nuclia-someuuid1", "nuclia-someuuid2"]
     with mock.patch(
@@ -146,7 +169,7 @@ async def test_kb_creation(
         )
 
         # Creating a knowledge with 2 vectorsets box should create two Pinecone indexes
-        response: NewKnowledgeBoxV2Response = await nucliadb_grpc.NewKnowledgeBoxV2(
+        response: NewKnowledgeBoxV2Response = await nucliadb_ingest_grpc.NewKnowledgeBoxV2(
             request, timeout=None
         )  # type: ignore
         assert response.status == KnowledgeBoxResponseStatus.OK
@@ -192,7 +215,7 @@ async def test_kb_creation(
             assert pinecone_config.indexes[english].vector_dimension == 3
 
         # Deleting a knowledge box should delete the Pinecone index
-        response = await nucliadb_grpc.DeleteKnowledgeBox(
+        response = await nucliadb_ingest_grpc.DeleteKnowledgeBox(
             KnowledgeBoxID(slug=slug, uuid=kbid), timeout=None
         )  # type: ignore
         assert response.status == KnowledgeBoxResponseStatus.OK
@@ -201,6 +224,7 @@ async def test_kb_creation(
         assert control_plane.delete_index.call_count == 2
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_get_kb(
     nucliadb_reader: AsyncClient,
     pinecone_knowledgebox: str,
@@ -216,6 +240,7 @@ async def test_get_kb(
     assert config["configured_external_index_provider"]["type"] == "pinecone"
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_kb_counters(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
@@ -247,10 +272,11 @@ async def test_kb_counters(
     }
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_find_on_pinecone_kb(
     nucliadb_reader: AsyncClient,
     pinecone_knowledgebox: str,
-    pinecone_data_plane,
+    data_plane,
 ):
     kbid = pinecone_knowledgebox
 
@@ -261,7 +287,8 @@ async def test_find_on_pinecone_kb(
     assert resp.status_code == 200, resp.text
 
 
-async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str, slug: str):
+@pytest.mark.deploy_modes("standalone")
+async def _inject_broker_message(nucliadb_ingest_grpc: WriterStub, kbid: str, rid: str, slug: str):
     bm = BrokerMessage(kbid=kbid, uuid=rid, slug=slug, type=BrokerMessage.AUTOCOMMIT)
     bm.basic.icon = "text/plain"
     bm.basic.title = "Title Resource"
@@ -358,11 +385,12 @@ async def _inject_broker_message(nucliadb_grpc: WriterStub, kbid: str, rid: str,
     bm.field_vectors.append(ev)
     bm.source = BrokerMessage.MessageSource.PROCESSOR
 
-    await inject_message(nucliadb_grpc, bm)
+    await inject_message(nucliadb_ingest_grpc, bm)
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_ingestion_on_pinecone_kb(
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     pinecone_knowledgebox: str,
@@ -383,7 +411,7 @@ async def test_ingestion_on_pinecone_kb(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    await _inject_broker_message(nucliadb_grpc, kbid, rid, slug)
+    await _inject_broker_message(nucliadb_ingest_grpc, kbid, rid, slug)
 
     assert data_plane.delete_by_id_prefix.await_count == 1
     assert data_plane.upsert_in_batches.await_count == 1
@@ -401,9 +429,10 @@ async def app_context(natsd, storage, nucliadb):
     await ctx.finalize()
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_pinecone_kb_rollover_index(
     app_context,
-    nucliadb_grpc: WriterStub,
+    nucliadb_ingest_grpc: WriterStub,
     nucliadb_writer: AsyncClient,
     pinecone_knowledgebox: str,
     data_plane,
@@ -425,7 +454,7 @@ async def test_pinecone_kb_rollover_index(
     rid = resp.json()["uuid"]
 
     # Inject a broker message as if it was the result of a Nuclia processing request
-    await _inject_broker_message(nucliadb_grpc, kbid, rid, slug)
+    await _inject_broker_message(nucliadb_ingest_grpc, kbid, rid, slug)
 
     # Check that vectors were upserted to pinecone
     assert data_plane.upsert_in_batches.await_count == 1

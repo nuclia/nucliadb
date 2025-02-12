@@ -43,6 +43,7 @@ DEPLOY_MODE_FIXTURES = {
     ],
     "nucliadb_train_grpc": [
         "component",
+        "standalone",
     ],
     "nucliadb_ingest_grpc": [
         "component",

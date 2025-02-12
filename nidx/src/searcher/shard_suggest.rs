@@ -45,7 +45,7 @@ const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 ///
 /// TODO: review implementation. Timestamps are not used and we are probably
 /// filtering twice in the prefilter and paragraphs filter
-#[instrument(skip_all)]
+#[instrument(skip_all, fields(shard_id = request.shard))]
 pub async fn suggest(index_cache: Arc<IndexCache>, request: SuggestRequest) -> NidxResult<SuggestResponse> {
     let shard_id = uuid::Uuid::parse_str(&request.shard)?;
 

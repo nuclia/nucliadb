@@ -22,6 +22,7 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 use bit_set::BitSet;
 use fst_index::{FstIndexReader, FstIndexWriter};
 use map::{InvertedMapReader, InvertedMapWriter};
+use tracing::warn;
 
 use crate::{
     data_point::node::Node,
@@ -34,14 +35,25 @@ mod fst_index;
 mod map;
 
 /// The key for the field index. [uuid_as_bytes, field_type/field_name]
-fn field_id_key(paragraph_key: &str) -> Vec<u8> {
+fn field_id_key(paragraph_key: &str) -> Option<Vec<u8>> {
     let mut parts = paragraph_key.split('/');
-    let uuid = parts.next().unwrap();
-    let field_type = parts.next().unwrap();
-    let field_name = parts.next().unwrap();
-
-    [uuid::Uuid::parse_str(uuid).unwrap().as_bytes(), field_type.as_bytes(), "/".as_bytes(), field_name.as_bytes()]
-        .concat()
+    if let Some(uuid) = parts.next() {
+        if let Some(field_type) = parts.next() {
+            if let Some(field_name) = parts.next() {
+                return Some(
+                    [
+                        uuid::Uuid::parse_str(uuid).unwrap().as_bytes(),
+                        field_type.as_bytes(),
+                        "/".as_bytes(),
+                        field_name.as_bytes(),
+                    ]
+                    .concat(),
+                );
+            }
+        }
+    }
+    warn!(?paragraph_key, "Unable to parse field id from key");
+    None
 }
 
 /// The key for the labels, ending with a separator to allow for easy prefix search
@@ -86,7 +98,9 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
         let labels = Node::labels(node);
 
         let id = id as u32;
-        field_builder.insert(field_id_key(std::str::from_utf8(key).unwrap()), id);
+        if let Some(key) = field_id_key(std::str::from_utf8(key).unwrap()) {
+            field_builder.insert(key, id);
+        }
         for l in labels {
             label_builder.insert(labels_key(&l), id);
         }
@@ -137,9 +151,11 @@ impl InvertedIndexes {
                     crate::formula::AtomClause::Label(label) => {
                         &mut self.label_index.get_prefix(std::str::from_utf8(&labels_key(label)).unwrap()).into_iter()
                     }
-                    crate::formula::AtomClause::KeyPrefixSet(field_ids) => {
-                        &mut field_ids.iter().flat_map(|id| self.field_index.get(&field_id_key(id))).flatten()
-                    }
+                    crate::formula::AtomClause::KeyPrefixSet(field_ids) => &mut field_ids
+                        .iter()
+                        .filter_map(|id| field_id_key(id).map(|k| self.field_index.get(&k)))
+                        .flatten()
+                        .flatten(),
                 };
                 let mut bitset = BitSet::new();
                 ids.for_each(|id| {

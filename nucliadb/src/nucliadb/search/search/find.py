@@ -106,7 +106,7 @@ async def _index_node_retrieval(
         kbid, item, generative_model=generative_model
     )
     with metrics.time("query_parse"):
-        pb_query, incomplete_results, autofilters = await query_parser.parse()
+        pb_query, incomplete_results, autofilters, rephrased_query = await query_parser.parse()
 
     with metrics.time("node_query"):
         results, query_incomplete_results, queried_nodes = await node_query(
@@ -120,6 +120,7 @@ async def _index_node_retrieval(
             results,
             kbid=kbid,
             query=pb_query.body,
+            rephrased_query=rephrased_query,
             relation_subgraph_query=pb_query.relation_subgraph,
             min_score_bm25=pb_query.min_score_bm25,
             min_score_semantic=pb_query.min_score_semantic,
@@ -194,7 +195,7 @@ async def _external_index_retrieval(
     query_parser, _, reranker = await query_parser_from_find_request(
         kbid, item, generative_model=generative_model
     )
-    search_request, incomplete_results, _ = await query_parser.parse()
+    search_request, incomplete_results, _, rephrased_query = await query_parser.parse()
 
     # Query index
     query_results = await external_index_manager.query(search_request)  # noqa
@@ -225,6 +226,7 @@ async def _external_index_retrieval(
     retrieval_results = KnowledgeboxFindResults(
         resources=find_resources,
         query=item.query,
+        rephrased_query=rephrased_query,
         total=0,
         page_number=0,
         page_size=item.top_k,
@@ -260,7 +262,7 @@ async def query_parser_from_find_request(
     # XXX this is becoming the new /find query parsing, this should be moved to
     # a cleaner abstraction
 
-    parsed = parse_find(item)
+    parsed = await parse_find(kbid, item)
 
     rank_fusion = get_rank_fusion(parsed.rank_fusion)
     reranker = get_reranker(parsed.reranker)
@@ -269,6 +271,7 @@ async def query_parser_from_find_request(
         kbid=kbid,
         features=item.features,
         query=item.query,
+        query_entities=item.query_entities,
         label_filters=item.filters,
         keyword_filters=item.keyword_filters,
         faceted=None,

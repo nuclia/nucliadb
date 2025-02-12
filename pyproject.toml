@@ -9,9 +9,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-sidecar = [
-    "nucliadb-sidecar @ file:///${PROJECT_ROOT}/nucliadb_sidecar",
-]
 nidx = [
     "nidx-binding @ file:///${PROJECT_ROOT}/nidx/nidx_binding",
 ]
@@ -20,7 +17,6 @@ dev = [
     # List all the packages we want to install as editable
     "-e file:///${PROJECT_ROOT}/nucliadb",
     "-e file:///${PROJECT_ROOT}/nucliadb_models",
-    "-e file:///${PROJECT_ROOT}/nucliadb_sidecar",
     "-e file:///${PROJECT_ROOT}/nucliadb_protos/python",
     "-e file:///${PROJECT_ROOT}/nucliadb_telemetry[all]",
     "-e file:///${PROJECT_ROOT}/nucliadb_utils[cache,fastapi,storages]",

@@ -16,5 +16,19 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
-from .indexed_publisher import IndexedPublisher  # noqa
+from typing import AsyncIterator
+
+import pytest
+
+from nucliadb.common.maindb.driver import Driver, Transaction
+
+# Dependents: search, nucliadb
+
+
+@pytest.fixture(scope="function")
+async def txn(maindb_driver: Driver) -> AsyncIterator[Transaction]:
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()

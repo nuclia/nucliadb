@@ -117,4 +117,5 @@ message AuditRequest {
   optional float rephrase_time = 25;
   FeedbackAudit feedback = 26;
   optional string user_request = 27;
+  optional string processing_id = 28;
 }

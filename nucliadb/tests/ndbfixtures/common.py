@@ -18,20 +18,27 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from os.path import dirname
-from typing import AsyncIterator, Iterator
+from typing import AsyncIterable, AsyncIterator, Iterator
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
-from nucliadb_utils.settings import audit_settings
+from nucliadb_utils.settings import (
+    audit_settings,
+    nuclia_settings,
+)
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from nucliadb_utils.utilities import (
+    Utility,
+)
 from tests.ndbfixtures.utils import global_utility
 
 # Audit
@@ -80,14 +87,33 @@ async def local_files():
     storage_settings.local_testing_files = f"{dirname(__file__)}"
 
 
+# Predict
+
+
+@pytest.fixture(scope="function")
+def predict_mock() -> Mock:  # type: ignore
+    mock = AsyncMock()
+    with global_utility(Utility.PREDICT, mock):
+        yield mock
+
+
+@pytest.fixture(scope="function")
+async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
+    with (
+        patch.object(nuclia_settings, "dummy_predict", True),
+    ):
+        predict_util = DummyPredictEngine()
+        await predict_util.initialize()
+
+        with global_utility(Utility.PREDICT, predict_util):
+            yield predict_util
+
+
 # Shard manager
 
 
 @pytest.fixture(scope="function")
 async def shard_manager(storage: Storage, maindb_driver: Driver) -> AsyncIterator[KBShardManager]:
     sm = KBShardManager()
-    set_utility(Utility.SHARD_MANAGER, sm)
-
-    yield sm
-
-    clean_utility(Utility.SHARD_MANAGER)
+    with global_utility(Utility.SHARD_MANAGER, sm):
+        yield sm

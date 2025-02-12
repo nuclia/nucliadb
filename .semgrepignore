@@ -1,0 +1,8 @@
+Dockerfile
+Dockerfile.*
+docker-compose.yaml
+config/nginx.conf
+**/docs
+docs/*
+**/migrations
+**/tests

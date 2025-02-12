@@ -83,10 +83,10 @@ flag_management:
       statuses:
         - type: project
           target: 60%
-    - name: node-sidecar
+    - name: nidx
       paths:
-        - nucliadb_sidecar/src/nucliadb_sidecar/**
+        - nidx/**
       carryforward: true
       statuses:
         - type: project
-          target: 75%
+          target: 70%

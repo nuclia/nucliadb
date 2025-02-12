@@ -26,7 +26,7 @@ from nucliadb.search.search.filters import (
     convert_to_node_filters,
     translate_label_filters,
 )
-from nucliadb.search.search.query_parser.exceptions import ParserError
+from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.models import (
     CatalogFilters,
     CatalogQuery,
@@ -50,25 +50,26 @@ from nucliadb_models.search import (
 )
 
 
-def parse_find(item: FindRequest) -> UnitRetrieval:
-    parser = _FindParser(item)
-    return parser.parse()
+async def parse_find(kbid: str, item: FindRequest) -> UnitRetrieval:
+    parser = _FindParser(kbid, item)
+    return await parser.parse()
 
 
 class _FindParser:
-    def __init__(self, item: FindRequest):
+    def __init__(self, kbid: str, item: FindRequest):
+        self.kbid = kbid
         self.item = item
 
-    def parse(self) -> UnitRetrieval:
+    async def parse(self) -> UnitRetrieval:
         top_k = self._parse_top_k()
         try:
             rank_fusion = self._parse_rank_fusion()
         except ValidationError as exc:
-            raise ParserError(f"Parsing error in rank fusion: {str(exc)}") from exc
+            raise InternalParserError(f"Parsing error in rank fusion: {str(exc)}") from exc
         try:
             reranker = self._parse_reranker()
         except ValidationError as exc:
-            raise ParserError(f"Parsing error in reranker: {str(exc)}") from exc
+            raise InternalParserError(f"Parsing error in reranker: {str(exc)}") from exc
 
         # Adjust retrieval windows. Our current implementation assume:
         # `top_k <= reranker.window <= rank_fusion.window`
@@ -98,7 +99,7 @@ class _FindParser:
             if self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
                 rank_fusion = ReciprocalRankFusion(window=window)
             else:
-                raise ParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
+                raise InternalParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
 
         elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
             user_window = self.item.rank_fusion.window
@@ -109,7 +110,7 @@ class _FindParser:
             )
 
         else:
-            raise ParserError(f"Unknown rank fusion {self.item.rank_fusion}")
+            raise InternalParserError(f"Unknown rank fusion {self.item.rank_fusion}")
 
         return rank_fusion
 
@@ -131,14 +132,14 @@ class _FindParser:
                 reranking = PredictReranker(window=min(top_k * 2, 200))
 
             else:
-                raise ParserError(f"Unknown reranker algorithm: {self.item.reranker}")
+                raise InternalParserError(f"Unknown reranker algorithm: {self.item.reranker}")
 
         elif isinstance(self.item.reranker, search_models.PredictReranker):
             user_window = self.item.reranker.window
             reranking = PredictReranker(window=min(max(user_window or 0, top_k), 200))
 
         else:
-            raise ParserError(f"Unknown reranker {self.item.reranker}")
+            raise InternalParserError(f"Unknown reranker {self.item.reranker}")
 
         return reranking
 

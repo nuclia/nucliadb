@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from typing import AsyncIterable
 from unittest.mock import patch
 
 import pytest
@@ -31,7 +30,6 @@ from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.cache import clear_ingest_cache
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.search.app import application
-from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
@@ -45,11 +43,10 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
-    Utility,
     clear_global_cache,
 )
 from tests.ingest.fixtures import broker_resource
-from tests.ndbfixtures.utils import create_api_client_factory, global_utility
+from tests.ndbfixtures.utils import create_api_client_factory
 
 # Main fixtures
 
@@ -86,18 +83,6 @@ async def cluster_nucliadb_search(
 
 
 # Rest, TODO keep cleaning
-
-
-@pytest.fixture(scope="function")
-async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
-    with (
-        patch.object(nuclia_settings, "dummy_predict", True),
-    ):
-        predict_util = DummyPredictEngine()
-        await predict_util.initialize()
-
-        with global_utility(Utility.PREDICT, predict_util):
-            yield predict_util
 
 
 @pytest.fixture(scope="function")
@@ -190,13 +175,3 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
     # Wait an extra couple of seconds for reader/searcher to catch up
     await asyncio.sleep(2)
     return knowledgebox_ingest
-
-
-# Dependencies from tests/fixtures.py
-
-
-@pytest.fixture(scope="function")
-async def txn(maindb_driver):
-    async with maindb_driver.transaction() as txn:
-        yield txn
-        await txn.abort()

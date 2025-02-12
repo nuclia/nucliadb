@@ -1,0 +1,35 @@
+name: Semgrep - SAST Scan
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: semgrep ci --config=auto --junit-xml-output semgrep-results.xml
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v5
+        if: (success() || failure()) && github.event_name == 'pull_request'
+        with:
+          report_paths: 'semgrep-results.xml'
+          job_summary: true
+          comment: false
+          summary: "Semgrep Results"
+          updateComment: false
+          check_name: "Semgrep SAST"
+          detailed_summary: true
+          include_passed: true

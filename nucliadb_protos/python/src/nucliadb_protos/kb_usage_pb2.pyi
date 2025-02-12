@@ -143,6 +143,23 @@ CHROME_EXTENSION: ClientType.ValueType  # 5
 INTERNAL: ClientType.ValueType  # 6
 global___ClientType = ClientType
 
+class _ActivityLogMatchType:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ActivityLogMatchTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ActivityLogMatchType.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    TRACE_ID: _ActivityLogMatchType.ValueType  # 0
+    PROCESSING_ID: _ActivityLogMatchType.ValueType  # 1
+    ACTIVITY_LOG_ID: _ActivityLogMatchType.ValueType  # 2
+
+class ActivityLogMatchType(_ActivityLogMatchType, metaclass=_ActivityLogMatchTypeEnumTypeWrapper): ...
+
+TRACE_ID: ActivityLogMatchType.ValueType  # 0
+PROCESSING_ID: ActivityLogMatchType.ValueType  # 1
+ACTIVITY_LOG_ID: ActivityLogMatchType.ValueType  # 2
+global___ActivityLogMatchType = ActivityLogMatchType
+
 @typing.final
 class Process(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -276,6 +293,24 @@ class Predict(google.protobuf.message.Message):
 global___Predict = Predict
 
 @typing.final
+class ActivityLogMatch(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    type: global___ActivityLogMatchType.ValueType
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        type: global___ActivityLogMatchType.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["id", b"id", "type", b"type"]) -> None: ...
+
+global___ActivityLogMatch = ActivityLogMatch
+
+@typing.final
 class KbUsage(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -284,6 +319,7 @@ class KbUsage(google.protobuf.message.Message):
     ACCOUNT_ID_FIELD_NUMBER: builtins.int
     KB_ID_FIELD_NUMBER: builtins.int
     KB_SOURCE_FIELD_NUMBER: builtins.int
+    ACTIVITY_LOG_MATCH_FIELD_NUMBER: builtins.int
     PROCESSES_FIELD_NUMBER: builtins.int
     PREDICTS_FIELD_NUMBER: builtins.int
     SEARCHES_FIELD_NUMBER: builtins.int
@@ -295,6 +331,8 @@ class KbUsage(google.protobuf.message.Message):
     kb_source: global___KBSource.ValueType
     @property
     def timestamp(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    @property
+    def activity_log_match(self) -> global___ActivityLogMatch: ...
     @property
     def processes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Process]:
         """Data"""
@@ -313,15 +351,18 @@ class KbUsage(google.protobuf.message.Message):
         account_id: builtins.str | None = ...,
         kb_id: builtins.str | None = ...,
         kb_source: global___KBSource.ValueType = ...,
+        activity_log_match: global___ActivityLogMatch | None = ...,
         processes: collections.abc.Iterable[global___Process] | None = ...,
         predicts: collections.abc.Iterable[global___Predict] | None = ...,
         searches: collections.abc.Iterable[global___Search] | None = ...,
         storage: global___Storage | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_account_id", b"_account_id", "_kb_id", b"_kb_id", "_storage", b"_storage", "account_id", b"account_id", "kb_id", b"kb_id", "storage", b"storage", "timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_account_id", b"_account_id", "_kb_id", b"_kb_id", "_storage", b"_storage", "account_id", b"account_id", "kb_id", b"kb_id", "kb_source", b"kb_source", "predicts", b"predicts", "processes", b"processes", "searches", b"searches", "service", b"service", "storage", b"storage", "timestamp", b"timestamp"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_account_id", b"_account_id", "_activity_log_match", b"_activity_log_match", "_kb_id", b"_kb_id", "_storage", b"_storage", "account_id", b"account_id", "activity_log_match", b"activity_log_match", "kb_id", b"kb_id", "storage", b"storage", "timestamp", b"timestamp"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_account_id", b"_account_id", "_activity_log_match", b"_activity_log_match", "_kb_id", b"_kb_id", "_storage", b"_storage", "account_id", b"account_id", "activity_log_match", b"activity_log_match", "kb_id", b"kb_id", "kb_source", b"kb_source", "predicts", b"predicts", "processes", b"processes", "searches", b"searches", "service", b"service", "storage", b"storage", "timestamp", b"timestamp"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_account_id", b"_account_id"]) -> typing.Literal["account_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_activity_log_match", b"_activity_log_match"]) -> typing.Literal["activity_log_match"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_kb_id", b"_kb_id"]) -> typing.Literal["kb_id"] | None: ...
     @typing.overload
