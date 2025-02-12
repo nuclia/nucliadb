@@ -169,6 +169,7 @@ from nucliadb_protos.resources_pb2 import (
     UserMetadata as UserMetadata,
     UserVectorsWrapper as UserVectorsWrapper,
     VisualSelection as VisualSelection,
+    _Dummy as _Dummy,
 )
 
 _T = typing.TypeVar("_T")

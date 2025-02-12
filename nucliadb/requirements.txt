@@ -19,6 +19,7 @@ types-psutil>=5.9.5.17
 types-aiofiles>=0.8.3
 protobuf>=4.22.3
 types-protobuf>=4.24,<5
+protobuf_to_pydantic==0.3.0.3
 grpcio>=1.44.0,<1.63.0
 grpcio-health-checking>=1.44.0,<1.63.0
 grpcio-channelz>=1.44.0,<1.63.0

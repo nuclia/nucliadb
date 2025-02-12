@@ -126,6 +126,7 @@ from nucliadb_protos.resources_pb2 import (
     UserMetadata as UserMetadata,
     UserVectorsWrapper as UserVectorsWrapper,
     VisualSelection as VisualSelection,
+    _Dummy as _Dummy,
 )
 from nucliadb_protos.writer_pb2 import (
     Audit as Audit,
