@@ -202,15 +202,25 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: nidx
+          cache-all-crates: true # To cache cargo-llvm-cov
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov
       - name: test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost/postgres
           SQLX_OFFLINE: true
-        run: cd nidx && cargo test --workspace --all-features
+        run: cd nidx && cargo llvm-cov --codecov --output-path codecov.json test --workspace --all-features
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./nidx/codecov.json
+          flags: nidx
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Builds
   build-nidx-binary:
