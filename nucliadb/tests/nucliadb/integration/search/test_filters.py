@@ -27,7 +27,7 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb.tests.vectors import V1, V2, Q
 from nucliadb_models.labels import Label, LabelSetKind
-from nucliadb_models.search import MinScore, SearchOptions
+from nucliadb_models.search import MinScore, RerankerName, SearchOptions
 from nucliadb_protos.resources_pb2 import (
     Classification,
     ExtractedTextWrapper,
@@ -368,6 +368,7 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
                 features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
                 vector=Q,
                 min_score=MinScore(semantic=-1).model_dump(),
+                reranker=RerankerName.NOOP,
             ),
         )
     assert resp.status_code == 200, resp.text

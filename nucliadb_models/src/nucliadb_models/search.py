@@ -23,7 +23,7 @@ from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
-from typing_extensions import Annotated, Self, deprecated
+from typing_extensions import Annotated, Self
 
 from nucliadb_models import RelationMetadata
 from nucliadb_models.common import FieldTypeName, ParamDefault
@@ -389,10 +389,6 @@ RankFusion = Annotated[
 class RerankerName(str, Enum):
     """Rerankers
 
-    - Multi-match booster (default, deprecated): given a set of results from different
-      sources, e.g., keyword and semantic search boost results appearing in both
-      sets
-
     - Predict reranker: after retrieval, send the results to Predict API to
       rerank it. This method uses a reranker model, so one can expect better
       results at the expense of more latency.
@@ -404,10 +400,6 @@ class RerankerName(str, Enum):
 
     """
 
-    MULTI_MATCH_BOOSTER: Annotated[
-        str,
-        deprecated("We recommend switching to the new default predict reranker for far better results"),
-    ] = "multi_match_booster"
     PREDICT_RERANKER = "predict"
     NOOP = "noop"
 
@@ -554,9 +546,9 @@ class SearchParamDefaults:
         description="Rank fusion algorithm to use to merge results from multiple retrievers (keyword, semantic)",
     )
     reranker = ParamDefault(
-        default=RerankerName.MULTI_MATCH_BOOSTER,
+        default=RerankerName.PREDICT_RERANKER,
         title="Reranker",
-        description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval\nDEPRECATION! multi_match_booster will be deprecated and predict will be the new default",  # noqa: E501
+        description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval",  # noqa: E501
     )
     debug = ParamDefault(
         default=False,

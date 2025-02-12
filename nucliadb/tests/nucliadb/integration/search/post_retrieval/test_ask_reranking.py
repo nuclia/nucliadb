@@ -38,7 +38,6 @@ from nucliadb_models.search import (
 @pytest.mark.parametrize(
     "reranker,expected_reranker",
     [
-        (RerankerName.MULTI_MATCH_BOOSTER, RerankerName.MULTI_MATCH_BOOSTER),
         (RerankerName.PREDICT_RERANKER, RerankerName.PREDICT_RERANKER),
         (RerankerName.NOOP, RerankerName.NOOP),
         (PredictReranker(window=20), PredictReranker(window=20)),
