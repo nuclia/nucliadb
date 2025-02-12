@@ -32,14 +32,16 @@ use nidx_protos::{
     DocumentItem, DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, OrderBy, ResultScore,
     StreamRequest,
 };
+use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::{BytesColumn, Column};
 use tantivy::fastfield::FacetReader;
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery};
 use tantivy::schema::Value;
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
 use tracing::*;
+use uuid::Uuid;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -94,11 +96,11 @@ impl Debug for TextReaderService {
 struct FieldUuidSegmentCollector {
     uuid_reader: BytesColumn,
     field_reader: FacetReader,
-    results: Vec<ValidField>,
+    results: Vec<FieldId>,
 }
 
 impl SegmentCollector for FieldUuidSegmentCollector {
-    type Fruit = Vec<ValidField>;
+    type Fruit = Vec<FieldId>;
 
     fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
         let uuid_ord = self.uuid_reader.term_ords(doc).next().unwrap();
@@ -108,10 +110,13 @@ impl SegmentCollector for FieldUuidSegmentCollector {
         let mut facet_ords = self.field_reader.facet_ords(doc);
         let mut facet = Facet::root();
         self.field_reader.facet_from_ord(facet_ords.next().unwrap(), &mut facet).expect("field facet not found");
-        self.results.push(ValidField {
-            resource_id: String::from_utf8_lossy(&uuid_bytes).to_string(),
-            field_id: facet.to_path_string(),
-        });
+
+        if let Ok(resource_id) = Uuid::parse_str(std::str::from_utf8(&uuid_bytes).unwrap()) {
+            self.results.push(FieldId {
+                resource_id,
+                field_id: facet.to_path_string(),
+            });
+        }
     }
 
     fn harvest(self) -> Self::Fruit {
@@ -122,7 +127,7 @@ impl SegmentCollector for FieldUuidSegmentCollector {
 struct FieldUuidCollector;
 
 impl Collector for FieldUuidCollector {
-    type Fruit = Vec<ValidField>;
+    type Fruit = Vec<FieldId>;
 
     type Child = FieldUuidSegmentCollector;
 
@@ -160,19 +165,19 @@ impl Collector for FieldUuidCollector {
 
 struct FieldUuidSegmentCollectorV2 {
     encoded_field_id_reader: Column,
-    results: Vec<ValidField>,
+    results: Vec<FieldId>,
 }
 
 impl SegmentCollector for FieldUuidSegmentCollectorV2 {
-    type Fruit = Vec<ValidField>;
+    type Fruit = Vec<FieldId>;
 
     fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
         let mut data = Vec::new();
         self.encoded_field_id_reader.fill_vals(doc, &mut data);
         let (rid, fid) = decode_field_id(&data);
 
-        self.results.push(ValidField {
-            resource_id: rid.simple().to_string(),
+        self.results.push(FieldId {
+            resource_id: rid,
             field_id: fid,
         });
     }
@@ -185,7 +190,7 @@ impl SegmentCollector for FieldUuidSegmentCollectorV2 {
 struct FieldUuidCollectorV2;
 
 impl Collector for FieldUuidCollectorV2 {
-    type Fruit = Vec<ValidField>;
+    type Fruit = Vec<FieldId>;
 
     type Child = FieldUuidSegmentCollectorV2;
 
@@ -220,7 +225,7 @@ impl Collector for FieldUuidCollectorV2 {
 }
 
 impl TextReaderService {
-    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
+    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PrefilterResult> {
         let schema = &self.schema;
         let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
         let mut created_queries = Vec::new();
@@ -281,10 +286,21 @@ impl TextReaderService {
             subqueries.push(keywords_formula_query);
         }
 
+        if !request.key_filter.is_empty() {
+            let terms = request.key_filter.iter().map(|k| Term::from_field_bytes(schema.uuid, k.as_bytes()));
+            subqueries.push(Box::new(TermSetQuery::new(terms)));
+        }
+        if !request.field_filter.is_empty() {
+            let terms = request
+                .field_filter
+                .iter()
+                .filter_map(|key| Facet::from_text(&format!("/{key}")).ok())
+                .map(|facet| Term::from_facet(schema.field, &facet));
+            subqueries.push(Box::new(TermSetQuery::new(terms)));
+        }
+
         if subqueries.is_empty() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::All,
-            });
+            return Ok(PrefilterResult::All);
         }
 
         let prefilter_query: Box<dyn Query> = Box::new(BooleanQuery::intersection(subqueries));
@@ -297,22 +313,16 @@ impl TextReaderService {
 
         // If none of the fields match the pre-filter, thats all the query planner needs to know.
         if docs_fulfilled.is_empty() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::None,
-            });
+            return Ok(PrefilterResult::None);
         }
 
         // If all the fields match the pre-filter, thats all the query planner needs to know
         if docs_fulfilled.len() as u64 == searcher.num_docs() {
-            return Ok(PreFilterResponse {
-                valid_fields: ValidFieldCollector::All,
-            });
+            return Ok(PrefilterResult::All);
         }
 
         // The fields matching the pre-filter are a non-empty subset of all the fields
-        Ok(PreFilterResponse {
-            valid_fields: ValidFieldCollector::Some(docs_fulfilled),
-        })
+        Ok(PrefilterResult::Some(docs_fulfilled))
     }
 
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem>> {

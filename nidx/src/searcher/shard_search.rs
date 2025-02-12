@@ -122,9 +122,10 @@ fn blocking_search(
         move || text_searcher.unwrap().search(&request)
     });
 
+    let prefilter = &index_queries.prefilter_results;
     let paragraph_task = index_queries.paragraphs_request.map(|mut request| {
         request.id = search_id.clone();
-        move || paragraph_searcher.unwrap().search(&request)
+        move || paragraph_searcher.unwrap().search(&request, prefilter)
     });
 
     let relation_task =
@@ -132,7 +133,7 @@ fn blocking_search(
 
     let vector_task = index_queries.vectors_request.map(|mut request| {
         request.id = search_id.clone();
-        move || vector_searcher.unwrap().search(&request)
+        move || vector_searcher.unwrap().search(&request, prefilter)
     });
 
     let mut rtext = None;

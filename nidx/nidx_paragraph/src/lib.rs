@@ -34,7 +34,7 @@ use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
 };
-use nidx_types::OpenIndexMetadata;
+use nidx_types::{prefilter::PrefilterResult, OpenIndexMetadata};
 use reader::ParagraphReaderService;
 use resource_indexer::index_paragraphs;
 use schema::ParagraphSchema;
@@ -140,13 +140,21 @@ impl ParagraphSearcher {
     }
 
     #[instrument(name = "paragraph::search", skip_all)]
-    pub fn search(&self, request: &ParagraphSearchRequest) -> anyhow::Result<ParagraphSearchResponse> {
-        self.reader.search(request)
+    pub fn search(
+        &self,
+        request: &ParagraphSearchRequest,
+        prefilter: &PrefilterResult,
+    ) -> anyhow::Result<ParagraphSearchResponse> {
+        self.reader.search(request, prefilter)
     }
 
     #[instrument(name = "paragraph::suggest", skip_all)]
-    pub fn suggest(&self, request: &SuggestRequest) -> anyhow::Result<ParagraphSearchResponse> {
-        self.reader.suggest(request)
+    pub fn suggest(
+        &self,
+        request: &SuggestRequest,
+        prefilter: &PrefilterResult,
+    ) -> anyhow::Result<ParagraphSearchResponse> {
+        self.reader.suggest(request, prefilter)
     }
 
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = ParagraphItem>> {

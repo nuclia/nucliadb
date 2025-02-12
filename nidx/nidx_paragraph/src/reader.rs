@@ -23,6 +23,7 @@ use std::time::Instant;
 
 use nidx_protos::order_by::{OrderField, OrderType};
 use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest, SuggestRequest};
+use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
 use tantivy::{schema::*, DateTime, Order};
@@ -56,7 +57,11 @@ impl ParagraphReaderService {
         Ok(count)
     }
 
-    pub fn suggest(&self, request: &SuggestRequest) -> anyhow::Result<ParagraphSearchResponse> {
+    pub fn suggest(
+        &self,
+        request: &SuggestRequest,
+        prefilter: &PrefilterResult,
+    ) -> anyhow::Result<ParagraphSearchResponse> {
         let time = Instant::now();
         let id = Some(&request.shard);
 
@@ -65,7 +70,8 @@ impl ParagraphReaderService {
 
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let text = self.adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) = suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE);
+        let (original, termc, fuzzied) =
+            suggest_query(&parser, &text, request, prefilter, &self.schema, FUZZY_DISTANCE);
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating query: ends at {v} ms");
 
@@ -120,7 +126,11 @@ impl ParagraphReaderService {
         Ok(producer.flatten())
     }
 
-    pub fn search(&self, request: &ParagraphSearchRequest) -> anyhow::Result<ParagraphSearchResponse> {
+    pub fn search(
+        &self,
+        request: &ParagraphSearchRequest,
+        prefilter: &PrefilterResult,
+    ) -> anyhow::Result<ParagraphSearchResponse> {
         let time = Instant::now();
         let id = Some(&request.id);
 
@@ -151,6 +161,7 @@ impl ParagraphReaderService {
             &parser,
             &text,
             request,
+            prefilter,
             &self.schema,
             FUZZY_DISTANCE,
             advanced

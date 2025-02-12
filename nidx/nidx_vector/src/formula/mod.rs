@@ -26,33 +26,20 @@ use crate::data_point::{Address, DataRetriever};
 #[derive(Debug, Clone, PartialEq)]
 pub enum AtomClause {
     Label(String),
-    KeyPrefixSet((HashSet<String>, HashSet<String>)),
-    // A tuple containing field_type and field_name
-    KeyField((String, Option<String>)),
+    KeyPrefixSet(HashSet<String>),
 }
 impl AtomClause {
     pub fn label(value: String) -> AtomClause {
         Self::Label(value)
     }
-    pub fn key_set(resource_set: HashSet<String>, field_set: HashSet<String>) -> AtomClause {
-        Self::KeyPrefixSet((resource_set, field_set))
-    }
-    pub fn key_field(field_type: String, field_name: Option<String>) -> AtomClause {
-        Self::KeyField((field_type, field_name))
+    pub fn key_set(field_set: HashSet<String>) -> AtomClause {
+        Self::KeyPrefixSet(field_set)
     }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         match self {
             Self::Label(value) => retriever.has_label(x, value.as_bytes()),
-            Self::KeyPrefixSet((resource_set, field_set)) => {
+            Self::KeyPrefixSet(field_set) => {
                 let key = retriever.get_key(x);
-                let mut key_parts = key.split(|b| *b == b'/');
-
-                // Matches resource_id
-                let resource_id = std::str::from_utf8(key_parts.next().unwrap()).unwrap();
-                let matches_resource = resource_set.contains(resource_id);
-                if matches_resource {
-                    return true;
-                }
 
                 // Matches field_id (key up to the third slash)
                 let mut slash_count = 0;
@@ -72,29 +59,6 @@ impl AtomClause {
                 }
 
                 field_set.contains(std::str::from_utf8(&key[0..end_pos]).unwrap())
-            }
-            Self::KeyField((field_type, field_name)) => {
-                let key = retriever.get_key(x);
-                let mut key_parts = key.split(|b| *b == b'/');
-                // Skip resource_id, then try to parse field_type and field_name and check if they match
-                if key_parts.next().is_some() {
-                    if let Some(ftype) = key_parts.next() {
-                        let ftype_str = std::str::from_utf8(ftype).unwrap();
-                        let ftype_matches = ftype_str == field_type;
-
-                        if let Some(field_name) = field_name {
-                            if let Some(fname) = key_parts.next() {
-                                let fname_str = std::str::from_utf8(fname).unwrap();
-                                let fname_matches = fname_str == field_name;
-                                return ftype_matches && fname_matches;
-                            }
-                        } else {
-                            // field_type-only matches are allowed
-                            return ftype_matches;
-                        }
-                    }
-                }
-                false
             }
         }
     }
@@ -257,7 +221,6 @@ mod tests {
         const FIELD_ID: &str = "015163a0629e4f368aa9d54978d2a9ff/f/file1";
         let field_id = String::from(FIELD_ID);
 
-        let fake_resource_id = String::from("badcafe0badcafe0badcafe0badcafe0");
         let fake_field_id = format!("{resource_id}/f/not_a_field");
 
         const ADDRESS: Address = Address::dummy();
@@ -266,22 +229,13 @@ mod tests {
             labels: HashSet::new(),
         };
 
-        // Find by set of resource_ids
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::key_set([resource_id.clone()].into_iter().collect(), HashSet::new()));
-        assert!(formula.run(ADDRESS, &retriever));
-
-        let mut formula = Formula::new();
-        formula.extend(AtomClause::key_set([fake_resource_id.clone()].into_iter().collect(), HashSet::new()));
-        assert!(!formula.run(ADDRESS, &retriever));
-
         // Find by set of field_ids
         let mut formula = Formula::new();
-        formula.extend(AtomClause::key_set(HashSet::new(), [field_id.clone()].into_iter().collect()));
+        formula.extend(AtomClause::key_set([field_id.clone()].into_iter().collect()));
         assert!(formula.run(ADDRESS, &retriever));
 
         let mut formula = Formula::new();
-        formula.extend(AtomClause::key_set(HashSet::new(), [fake_field_id.clone()].into_iter().collect()));
+        formula.extend(AtomClause::key_set([fake_field_id.clone()].into_iter().collect()));
         assert!(!formula.run(ADDRESS, &retriever));
     }
 }

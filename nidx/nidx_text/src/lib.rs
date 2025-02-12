@@ -31,8 +31,9 @@ use std::path::Path;
 use nidx_protos::{DocumentItem, DocumentSearchResponse, StreamRequest};
 use nidx_tantivy::index_reader::{open_index_with_deletions, DeletionQueryBuilder};
 use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
+use nidx_types::prefilter::PrefilterResult;
 use nidx_types::OpenIndexMetadata;
-use prefilter::{PreFilterRequest, PreFilterResponse};
+use prefilter::PreFilterRequest;
 use reader::TextReaderService;
 use resource_indexer::index_document;
 use schema::TextSchema;
@@ -149,7 +150,7 @@ impl TextSearcher {
     }
 
     #[instrument(name = "text::prefilter", skip_all)]
-    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PreFilterResponse> {
+    pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PrefilterResult> {
         self.reader.prefilter(request)
     }
 

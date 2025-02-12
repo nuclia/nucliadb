@@ -282,7 +282,6 @@ message SuggestRequest {
     Filter filter = 3;
     Timestamps timestamps = 4;
     repeated string fields = 5;
-    repeated string key_filters = 7;
 }
 
 

@@ -72,15 +72,15 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
         page_number: 0,
         result_per_page: 1,
         min_score_semantic: -1.0,
-        paragraph: false,
+        paragraph: true,
         document: false,
+        body: "Dummy".to_string(),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
 
-    assert!(results.vector.is_some());
-    let vector_results = results.vector.unwrap();
-    assert_eq!(vector_results.documents.len(), 0);
+    assert!(results.vector.is_none());
+    assert!(results.paragraph.is_none());
 
     // Search filtering with a real field, to check that the vector is returned
     let search_request = nodereader::SearchRequest {
@@ -91,8 +91,9 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
         page_number: 0,
         result_per_page: 1,
         min_score_semantic: -1.0,
-        paragraph: false,
+        paragraph: true,
         document: false,
+        body: "Dummy".to_string(),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -100,6 +101,10 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
     assert!(results.vector.is_some());
     let vector_results = results.vector.unwrap();
     assert_eq!(vector_results.documents.len(), 1);
+
+    assert!(results.paragraph.is_some());
+    let paragraph_results = results.paragraph.unwrap();
+    assert_eq!(paragraph_results.total, 1);
 
     // Search filtering with multiple fields, to check that the OR is applied
     let search_request = nodereader::SearchRequest {
@@ -110,8 +115,9 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
         page_number: 0,
         result_per_page: 2,
         min_score_semantic: -1.0,
-        paragraph: false,
+        paragraph: true,
         document: false,
+        body: "Dummy".to_string(),
         ..Default::default()
     };
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
@@ -120,11 +126,15 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
     let vector_results = results.vector.unwrap();
     assert_eq!(vector_results.documents.len(), 2);
 
+    assert!(results.paragraph.is_some());
+    let paragraph_results = results.paragraph.unwrap();
+    assert_eq!(paragraph_results.total, 2);
+
     Ok(())
 }
 
 fn build_resource_with_field(shard_id: String, field_id: String) -> noderesources::Resource {
-    let rid = Uuid::new_v4().to_string();
+    let rid = Uuid::new_v4().simple().to_string();
 
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let timestamp = Timestamp {
@@ -142,10 +152,10 @@ fn build_resource_with_field(shard_id: String, field_id: String) -> noderesource
     );
 
     let mut field_paragraphs = HashMap::new();
-    for i in 1..=20 {
+    for i in 0..=1 {
         let mut sentences = HashMap::new();
-        let start = i;
-        let end = i + 1;
+        let start = i * 5;
+        let end = (i + 1) * 5;
         sentences.insert(
             format!("{rid}/{field_id}/{i}/{start}-{end}"),
             noderesources::VectorSentence {
@@ -156,8 +166,8 @@ fn build_resource_with_field(shard_id: String, field_id: String) -> noderesource
         field_paragraphs.insert(
             format!("{rid}/{field_id}/paragraph-{i}"),
             noderesources::IndexParagraph {
-                start: i,
-                end: i + 1,
+                start,
+                end,
                 sentences,
                 ..Default::default()
             },
@@ -165,7 +175,7 @@ fn build_resource_with_field(shard_id: String, field_id: String) -> noderesource
     }
     let mut resource_paragraphs = HashMap::new();
     resource_paragraphs.insert(
-        format!("{rid}/{field_id}"),
+        field_id.to_string(),
         noderesources::IndexParagraphs {
             paragraphs: field_paragraphs,
         },

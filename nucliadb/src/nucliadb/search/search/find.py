@@ -271,6 +271,7 @@ async def query_parser_from_find_request(
         kbid=kbid,
         features=item.features,
         query=item.query,
+        query_entities=item.query_entities,
         label_filters=item.filters,
         keyword_filters=item.keyword_filters,
         faceted=None,
