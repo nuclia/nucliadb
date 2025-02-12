@@ -174,6 +174,7 @@ def expected_find_response():
         "page_number": 0,
         "page_size": 20,
         "query": "How should I validate this?",
+        "rephrased_query": None,
         "relations": {"entities": {}},
         "resources": {
             "rid-1": {
