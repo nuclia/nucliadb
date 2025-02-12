@@ -68,6 +68,7 @@ class QueryInfo(BaseModel):
     entities: Optional[TokenSearch]
     sentence: Optional[SentenceSearch]
     query: str
+    rephrased_query: Optional[str] = None
 
 
 class RerankModel(BaseModel):

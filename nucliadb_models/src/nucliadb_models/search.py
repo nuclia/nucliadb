@@ -1802,6 +1802,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
     resources: dict[str, FindResource]
     relations: Optional[Relations] = None
     query: Optional[str] = None
+    rephrased_query: Optional[str] = None
     total: int = 0
     page_number: int = Field(
         default=0,

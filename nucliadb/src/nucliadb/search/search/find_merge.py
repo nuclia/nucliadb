@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Iterable, Union
+from typing import Iterable, Optional, Union
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
@@ -74,6 +74,7 @@ async def build_find_response(
     *,
     kbid: str,
     query: str,
+    rephrased_query: Optional[str],
     relation_subgraph_query: EntitiesSubgraphRequest,
     top_k: int,
     min_score_bm25: float,
@@ -143,6 +144,7 @@ async def build_find_response(
 
     find_results = KnowledgeboxFindResults(
         query=query,
+        rephrased_query=rephrased_query,
         resources=find_resources,
         best_matches=best_matches,
         relations=relations,

@@ -215,7 +215,7 @@ class QueryParser:
         if self.with_synonyms and self.query:
             asyncio.ensure_future(self.fetcher.get_synonyms())
 
-    async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str]]:
+    async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str], Optional[str]]:
         """
         :return: (request, incomplete, autofilters)
             where:
@@ -234,13 +234,13 @@ class QueryParser:
         await self.parse_filters(request)
         self.parse_document_search(request)
         self.parse_paragraph_search(request)
-        incomplete = await self.parse_vector_search(request)
+        incomplete, rephrased_query = await self.parse_vector_search(request)
         # BUG: autofilters are not used to filter, but we say we do
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
         await self.parse_min_score(request, incomplete)
         await self.adjust_page_size(request, self.rank_fusion, self.reranker)
-        return request, incomplete, autofilters
+        return request, incomplete, autofilters, rephrased_query
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.label_filters) > 0:
@@ -359,21 +359,24 @@ class QueryParser:
             request.paragraph = True
             node_features.inc({"type": "paragraphs"})
 
-    async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
+    async def parse_vector_search(
+        self, request: nodereader_pb2.SearchRequest
+    ) -> tuple[bool, Optional[str]]:
         if not self.has_vector_search:
-            return False
+            return False, None
 
         node_features.inc({"type": "vectors"})
 
         vectorset = await self.fetcher.get_vectorset()
         query_vector = await self.fetcher.get_query_vector()
+        rephrased_query = await self.fetcher.get_rephrased_query()
         incomplete = query_vector is None
 
         request.vectorset = vectorset
         if query_vector is not None:
             request.vector.extend(query_vector)
 
-        return incomplete
+        return incomplete, rephrased_query
 
     async def parse_relation_search(self, request: nodereader_pb2.SearchRequest) -> list[str]:
         autofilters = []
