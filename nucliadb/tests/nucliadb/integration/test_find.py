@@ -494,6 +494,7 @@ async def test_find_highlight(
                 "query": "Who was Marcus Aurelius?",
                 "features": ["keyword", "semantic", "relations"],
                 "highlight": True,
+                "reranker": "noop",
             },
         )
         assert resp.status_code == 200

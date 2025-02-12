@@ -854,18 +854,17 @@ async def test_ask_top_k(nucliadb_reader: AsyncClient, standalone_knowledgebox: 
 
 
 @pytest.mark.parametrize("relation_ranking", ["generative", "reranker"])
-@patch("nucliadb.search.search.graph_strategy.get_predict")
 @patch("nucliadb.search.search.graph_strategy.rank_relations_reranker")
 @patch("nucliadb.search.search.graph_strategy.rank_relations_generative")
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_graph_strategy(
     mocker_generative,
     mocker_reranker,
-    mocker_predict,
     relation_ranking: str,
     nucliadb_reader: AsyncClient,
     standalone_knowledgebox: str,
     graph_resource,
+    dummy_predict,
 ):
     # Mock the rank_relations functions to return the same relations with a score of 5 (no ranking)
     # This functions are unit tested and require connection to predict
@@ -956,20 +955,20 @@ async def test_ask_graph_strategy(
     await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
     # Setup a mock to test query entity extraction with predict
-    predict_mock = AsyncMock()
-    predict_mock.detect_entities.return_value = [
-        RelationNode(
-            value="DiCaprio",
-            ntype=RelationNode.NodeType.ENTITY,
-            subtype="ACTOR",
-        ),
-        RelationNode(
-            value="Joseph Gordon-Levitt",
-            ntype=RelationNode.NodeType.ENTITY,
-            subtype="ACTOR",
-        ),
-    ]
-    mocker_predict.return_value = predict_mock
+    dummy_predict.detect_entities = AsyncMock(
+        return_value=[
+            RelationNode(
+                value="DiCaprio",
+                ntype=RelationNode.NodeType.ENTITY,
+                subtype="ACTOR",
+            ),
+            RelationNode(
+                value="Joseph Gordon-Levitt",
+                ntype=RelationNode.NodeType.ENTITY,
+                subtype="ACTOR",
+            ),
+        ]
+    )
 
     # Run the same query but with query_entity_detection set to "predict"
     data["rag_strategies"][0]["query_entity_detection"] = "predict"  # type: ignore
