@@ -47,28 +47,6 @@ pub struct PreFilterRequest {
     pub security: Option<Security>,
     pub labels_formula: Option<BooleanExpression>,
     pub keywords_formula: Option<BooleanExpression>,
-}
-
-/// Represents a field that has met all of the
-/// pre-filtering requirements.
-#[derive(Debug, Clone)]
-pub struct ValidField {
-    pub resource_id: String,
-    pub field_id: String,
-}
-
-/// Utility type to identify and allow optimizations in filtering edge cases
-#[derive(Debug, Default, Clone)]
-pub enum ValidFieldCollector {
-    #[default]
-    None,
-    All,
-    Some(Vec<ValidField>),
-}
-
-/// Once a [`PreFilterRequest`] was successfully executed
-/// this type can be used to modify the rest of the query plan.
-#[derive(Debug, Default, Clone)]
-pub struct PreFilterResponse {
-    pub valid_fields: ValidFieldCollector,
+    pub key_filter: Vec<String>,
+    pub field_filter: Vec<String>,
 }

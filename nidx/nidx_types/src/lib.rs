@@ -19,6 +19,7 @@
 //
 use std::path::PathBuf;
 
+pub mod prefilter;
 pub mod query_language;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

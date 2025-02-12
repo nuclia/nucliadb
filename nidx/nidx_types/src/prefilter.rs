@@ -18,26 +18,21 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx_types::query_language::BooleanExpression;
+use uuid::Uuid;
 
-#[derive(Clone, Default)]
-pub struct ParagraphSearchRequest {
-    pub id: String,
-    pub uuid: String,
-    /// query this text in all the paragraphs
-    pub body: String,
-    pub filter: Option<nidx_protos::Filter>,
-    pub order: Option<nidx_protos::OrderBy>,
-    /// Faceted{ labels: Vec<String>}
-    pub faceted: Option<nidx_protos::Faceted>,
-    pub page_number: i32,
-    pub result_per_page: i32,
-    pub timestamps: Option<nidx_protos::Timestamps>,
-    pub with_duplicates: bool,
-    pub only_faceted: bool,
-    pub advanced_query: Option<String>,
-    pub min_score: f32,
-    pub security: Option<nidx_protos::utils::Security>,
+/// Represents a field that has met all of the
+/// pre-filtering requirements.
+#[derive(Debug, Clone)]
+pub struct FieldId {
+    pub resource_id: Uuid,
+    pub field_id: String,
+}
 
-    pub filtering_formula: Option<BooleanExpression>,
+/// Utility type to identify and allow optimizations in filtering edge cases
+#[derive(Debug, Default, Clone)]
+pub enum PrefilterResult {
+    #[default]
+    None,
+    All,
+    Some(Vec<FieldId>),
 }

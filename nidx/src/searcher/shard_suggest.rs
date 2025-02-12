@@ -23,11 +23,11 @@ use std::{collections::HashSet, sync::Arc};
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
-use nidx_text::{
-    prefilter::{PreFilterRequest, ValidFieldCollector},
-    TextSearcher,
+use nidx_text::{prefilter::PreFilterRequest, TextSearcher};
+use nidx_types::{
+    prefilter::PrefilterResult,
+    query_language::{BooleanExpression, BooleanOperation, Operator, QueryContext},
 };
-use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator, QueryContext};
 use tracing::{instrument, Span};
 
 use crate::errors::{NidxError, NidxResult};
@@ -95,6 +95,8 @@ fn blocking_suggest(
 
     let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
 
+    let mut prefiltered = PrefilterResult::All;
+
     if let Some(filter) = &mut request.filter {
         if !filter.field_labels.is_empty() && suggest_paragraphs {
             let labels_formula = if filter.labels_expression.is_empty() {
@@ -122,24 +124,23 @@ fn blocking_suggest(
                 security: None,
                 labels_formula,
                 keywords_formula: None,
+                key_filter: vec![],
+                field_filter: vec![],
             };
 
-            let prefiltered = text_searcher.prefilter(&prefilter)?;
+            prefiltered = text_searcher.prefilter(&prefilter)?;
 
             // Apply prefilter to paragraphs query and clear filters
-            match prefiltered.valid_fields {
-                ValidFieldCollector::All => {}
-                ValidFieldCollector::Some(keys) => {
-                    request.key_filters = keys.iter().map(|v| format!("{}{}", v.resource_id, v.field_id)).collect()
-                }
-                ValidFieldCollector::None => suggest_paragraphs = false,
-            }
             filter.labels_expression.clear();
             filter.field_labels.clear();
         }
     }
 
-    let paragraph_task = suggest_paragraphs.then_some(move || paragraph_searcher.suggest(&request));
+    if matches!(prefiltered, PrefilterResult::None) {
+        suggest_paragraphs = false;
+    }
+
+    let paragraph_task = suggest_paragraphs.then_some(move || paragraph_searcher.suggest(&request, &prefiltered));
 
     let relation_task = suggest_entities.then_some(move || relation_searcher.suggest(prefixes));
 

@@ -38,7 +38,6 @@ pub struct VectorSearchRequest {
     /// ID for the vector set.
     /// Empty for searching on the original index
     pub vector_set: String,
-    pub key_filters: Vec<String>,
     pub min_score: f32,
     pub field_filters: Vec<String>,
 
