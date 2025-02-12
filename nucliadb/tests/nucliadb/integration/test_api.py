@@ -813,10 +813,11 @@ async def test_question_answer_annotations(
                 ids_paragraphs=["id1/0", "id2/0"],
             ),
             answers=[
-                common.Answer(
+                common.Answers(
                     ids_paragraphs=["id1/00", "id2/00"],
                     language="catalan",
                     text="My answer 00",
+                    reason="reason 00",
                 )
             ],
         ),
