@@ -226,6 +226,12 @@ class Fetcher:
         self.cache.query_vector = query_vector
         return query_vector
 
+    async def get_rephrased_query(self) -> Optional[str]:
+        query_info = await self._predict_query_endpoint()
+        if query_info is None:
+            return None
+        return query_info.rephrased_query
+
     # Labels
 
     async def get_classification_labels(self) -> knowledgebox_pb2.Labels:

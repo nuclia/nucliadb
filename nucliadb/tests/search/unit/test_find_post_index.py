@@ -136,6 +136,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any]):
             search_responses,
             kbid="kbid",
             query=query,
+            rephrased_query=None,
             relation_subgraph_query=nodereader_pb2.EntitiesSubgraphRequest(),
             top_k=20,
             min_score_bm25=0.2,
