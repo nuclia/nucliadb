@@ -76,8 +76,8 @@ pub enum BooleanOperator {
 /// succeed in order for the overall conjuction to be satisfied.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompoundClause {
-    operator: BooleanOperator,
-    operands: Vec<Clause>,
+    pub operator: BooleanOperator,
+    pub operands: Vec<Clause>,
 }
 impl CompoundClause {
     pub fn is_empty(&self) -> bool {
@@ -135,7 +135,7 @@ impl From<CompoundClause> for Clause {
 /// expression that evaluates to whether the address is valid or not.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Formula {
-    clauses: Vec<Clause>,
+    pub clauses: Vec<Clause>,
 }
 impl Formula {
     pub fn new() -> Formula {

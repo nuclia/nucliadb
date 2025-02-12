@@ -30,21 +30,25 @@ mod tests;
 use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
-use crate::inverted_index::build_indexes;
+use crate::inverted_index::{build_indexes, InvertedIndexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
 use node::Node;
-use ops_hnsw::HnswOps;
+use ops_hnsw::{Cnx, HnswOps};
 use ram_hnsw::RAMHnsw;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io;
+use std::iter::empty;
 use std::path::Path;
 
 pub use ops_hnsw::DataRetriever;
+
+/// How much expensive is to find a node via HNSW compared to a simple brute force scan
+const HNSW_COST_FACTOR: usize = 200;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
@@ -66,10 +70,18 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    // Build the index at runtime if they do not exist. This can
+    // be removed once we have migrated all existing indexes
+    if !path.join("index.map").exists() {
+        build_indexes(path, &nodes)?;
+    }
+    let inverted_indexes = Some(InvertedIndexes::open(path)?);
+
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
+        inverted_indexes,
     })
 }
 
@@ -149,10 +161,14 @@ where
         },
     };
 
+    build_indexes(data_point_path, &nodes)?;
+    let inverted_indexes = Some(InvertedIndexes::open(data_point_path)?);
+
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
+        inverted_indexes,
     })
 }
 
@@ -211,10 +227,14 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         },
     };
 
+    build_indexes(path, &nodes)?;
+    let inverted_indexes = Some(InvertedIndexes::open(path)?);
+
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
+        inverted_indexes,
     })
 }
 
@@ -452,6 +472,7 @@ pub struct OpenDataPoint {
     metadata: VectorSegmentMetadata,
     nodes: Mmap,
     index: Mmap,
+    inverted_indexes: Option<InvertedIndexes>,
 }
 
 impl AsRef<OpenDataPoint> for OpenDataPoint {
@@ -479,15 +500,42 @@ impl OpenDataPoint {
         results: usize,
         config: &VectorConfig,
         min_score: f32,
-    ) -> impl Iterator<Item = Neighbour> + '_ {
+    ) -> Box<dyn Iterator<Item = Neighbour> + '_> {
         let encoded_query = config.vector_type.encode(query);
         let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
-        let filter = FormulaFilter::new(filter);
-        let ops = HnswOps::new(&tracker, true);
-        let neighbours =
-            ops.search(Address(self.metadata.records), self.index.as_ref(), results, filter, with_duplicates);
+        let query_address = Address(self.metadata.records);
 
-        neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
+        let bitset = self.inverted_indexes.as_ref().unwrap().filter(filter);
+        if let Some(bitset) = &bitset {
+            let count = bitset.iter().count();
+            if count == 0 {
+                return Box::new(empty());
+            }
+            let expected_traversal_scan = results * self.metadata.records / count;
+
+            if count < expected_traversal_scan * HNSW_COST_FACTOR {
+                let mut scored_results = Vec::new();
+                for address in bitset.iter() {
+                    let address = Address(address);
+                    if !tracker.is_deleted(address) {
+                        let score = tracker.similarity(query_address, address);
+                        if score >= min_score {
+                            scored_results.push(Cnx(address, score));
+                        }
+                    }
+                }
+                scored_results.sort();
+                return Box::new(
+                    scored_results.into_iter().map(|a| Neighbour::new(a.0, &self.nodes, a.1)).take(results),
+                );
+            }
+        }
+
+        let ops = HnswOps::new(&tracker, true);
+        let neighbours = ops.search(query_address, self.index.as_ref(), results, bitset, with_duplicates);
+        Box::new(
+            neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results),
+        )
     }
 }
 
@@ -533,7 +581,7 @@ mod test {
     }
 
     fn random_key(rng: &mut impl Rng) -> String {
-        format!("{:032x?}", rng.gen::<u128>())
+        format!("{:032x?}/f/file/0-100", rng.gen::<u128>())
     }
 
     fn random_string(rng: &mut impl Rng) -> String {

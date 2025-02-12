@@ -25,7 +25,7 @@ use tempfile::tempdir;
 
 use crate::config::{Similarity, VectorConfig};
 use crate::data_point::{self, DeleteLog, Elem, LabelDictionary};
-use crate::formula::{AtomClause, Formula};
+use crate::formula::{AtomClause, Clause, Formula};
 use crate::VectorR;
 
 const CONFIG: VectorConfig = VectorConfig {
@@ -67,7 +67,7 @@ fn simple_flow() {
     let mut expected_keys = vec![];
     let label_dictionary = LabelDictionary::new(labels.clone());
     for i in 0..50 {
-        let key = format!("KEY_{}", i);
+        let key = format!("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-{i}");
         let vector = vec![rand::random::<f32>(); 178];
         let labels = label_dictionary.clone();
         elems.push(Elem::new(key.clone(), vector, labels, None));
@@ -96,7 +96,7 @@ fn accuracy_test() {
     let labels_dictionary = LabelDictionary::new(labels.clone());
     let mut elems = Vec::new();
     for i in 0..100 {
-        let key = format!("KEY_{}", i);
+        let key = format!("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-{i}");
         let vector = create_query();
         let labels = labels_dictionary.clone();
         elems.push(Elem::new(key, vector, labels, None));
@@ -182,19 +182,15 @@ fn data_merge() -> anyhow::Result<()> {
 }
 
 #[test]
-fn prefiltering_test() {
+fn label_filtering_test() {
     let temp_dir = tempfile::tempdir().unwrap();
-    let mut labels = vec![];
     let mut queries = vec![];
-    for i in 0..100 {
-        labels.push(format!("LABEL_{}", i));
-    }
     for i in 0..5 {
         queries.push(AtomClause::label(format!("LABEL_{}", i)));
     }
     let mut elems = Vec::new();
     for i in 0..100 {
-        let key = format!("KEY_{}", i);
+        let key = format!("6e5a546a9a5c480f8579472016b1ee14/f/field/{}-{}", i, i + 1);
         let vector = create_query();
 
         let labels = LabelDictionary::new(vec![format!("LABEL_{}", i)]);
@@ -223,22 +219,84 @@ fn prefiltering_test() {
 }
 
 #[test]
+fn label_prefix_search_test() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let mut elems = Vec::new();
+    for i in 0..5 {
+        let key = format!("6e5a546a9a5c480f8579472016b1ee14/f/field/{}-{}", i, i + 1);
+        let vector = create_query();
+
+        let labels = LabelDictionary::new(vec![format!("/l/labelset/LABEL_{}", i)]);
+        elems.push(Elem::new(key, vector, labels, None));
+    }
+
+    let reader = data_point::create(temp_dir.path(), elems, &CONFIG, HashSet::new()).unwrap();
+    let query = create_query();
+
+    // Searching for the labelset, returns all results
+    let mut formula = Formula::new();
+    formula.extend(Clause::Atom(AtomClause::Label("/l/labelset".into())));
+    let result = reader.search(&HashSet::new(), &query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    assert_eq!(result.len(), 5);
+
+    // Searching for a label, returns one results
+    let mut formula = Formula::new();
+    formula.extend(Clause::Atom(AtomClause::Label("/l/labelset/LABEL_0".into())));
+    let result = reader.search(&HashSet::new(), &query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    assert_eq!(result.len(), 1);
+
+    // Searching for a label prefix, returns no results
+    let mut formula = Formula::new();
+    formula.extend(Clause::Atom(AtomClause::Label("/l/labelset/LABEL".into())));
+    let result = reader.search(&HashSet::new(), &query, &formula, true, 10, &CONFIG, -1.0).collect::<Vec<_>>();
+    assert_eq!(result.len(), 0);
+}
+
+#[test]
 fn fast_data_merge() -> VectorR<()> {
     let search_vectors = [create_query(), create_query(), create_query(), create_query()];
 
     let big_segment_dir = tempfile::tempdir()?;
-    let mut elems: Vec<_> =
-        (0..100).map(|k| Elem::new(format!("trash_{k}"), create_query(), LabelDictionary::default(), None)).collect();
-    elems.push(Elem::new("search_0".into(), search_vectors[0].clone(), LabelDictionary::default(), None));
-    elems.push(Elem::new("search_1".into(), search_vectors[1].clone(), LabelDictionary::default(), None));
+    let mut elems: Vec<_> = (0..100)
+        .map(|k| {
+            Elem::new(
+                format!("75a6eed3f94e456daa3f2d578a2254b7/t/trash/0-{k}"),
+                create_query(),
+                LabelDictionary::default(),
+                None,
+            )
+        })
+        .collect();
+    elems.push(Elem::new(
+        "00000000000000000000000000000000/f/file/0-100".into(),
+        search_vectors[0].clone(),
+        LabelDictionary::default(),
+        None,
+    ));
+    elems.push(Elem::new(
+        "00000000000000000000000000000001/f/file/0-100".into(),
+        search_vectors[1].clone(),
+        LabelDictionary::default(),
+        None,
+    ));
     let big_segment = data_point::create(big_segment_dir.path(), elems, &CONFIG, HashSet::new())?;
 
     let small_segment_dir = tempfile::tempdir()?;
     let small_segment = data_point::create(
         small_segment_dir.path(),
         vec![
-            Elem::new("search_2".into(), search_vectors[2].clone(), LabelDictionary::default(), None),
-            Elem::new("search_3".into(), search_vectors[3].clone(), LabelDictionary::default(), None),
+            Elem::new(
+                "00000000000000000000000000000002/f/file/0-100".into(),
+                search_vectors[2].clone(),
+                LabelDictionary::default(),
+                None,
+            ),
+            Elem::new(
+                "00000000000000000000000000000003/f/file/0-100".into(),
+                search_vectors[3].clone(),
+                LabelDictionary::default(),
+                None,
+            ),
         ],
         &CONFIG,
         HashSet::new(),
@@ -256,12 +314,12 @@ fn fast_data_merge() -> VectorR<()> {
         let result: Vec<_> = dp.search(&HashSet::new(), v, &formula, true, 1, &CONFIG, 0.999).collect();
         assert_eq!(result.len(), 1);
         assert!(result[0].score() >= 0.999);
-        assert!(result[0].id() == format!("search_{i}").as_bytes());
+        assert!(result[0].id() == format!("0000000000000000000000000000000{i}/f/file/0-100").as_bytes());
     }
 
     // Merge with deletions
-    work[0].0.insert("search_0".into());
-    work[1].0.insert("search_2".into());
+    work[0].0.insert("00000000000000000000000000000000/f/file/0-100".into());
+    work[1].0.insert("00000000000000000000000000000002/f/file/0-100".into());
     let output_dir = tempfile::tempdir()?;
     let t = Instant::now();
     let dp = data_point::merge(output_dir.path(), &work, &CONFIG)?;
@@ -276,7 +334,7 @@ fn fast_data_merge() -> VectorR<()> {
         } else {
             assert_eq!(result.len(), 1);
             assert!(result[0].score() >= 0.999);
-            assert!(result[0].id() == format!("search_{i}").as_bytes());
+            assert!(result[0].id() == format!("0000000000000000000000000000000{i}/f/file/0-100").as_bytes());
         }
     }
 
