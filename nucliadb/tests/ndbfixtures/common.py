@@ -26,7 +26,7 @@ from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.search.predict import DummyPredictEngine
+from nucliadb.search.predict import DummyPredictEngine, SendToPredictError
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -93,6 +93,10 @@ async def local_files():
 @pytest.fixture(scope="function")
 def predict_mock() -> Mock:  # type: ignore
     mock = AsyncMock()
+
+    # HACK raise a predict error so predict reranker ends up being noop
+    mock.rerank = AsyncMock(side_effect=SendToPredictError)
+
     with global_utility(Utility.PREDICT, mock):
         yield mock
 
@@ -105,8 +109,12 @@ async def dummy_predict() -> AsyncIterable[DummyPredictEngine]:
         predict_util = DummyPredictEngine()
         await predict_util.initialize()
 
-        with global_utility(Utility.PREDICT, predict_util):
-            yield predict_util
+        with (
+            # HACK raise a predict error so predict reranker ends up being noop
+            patch.object(predict_util, "rerank", AsyncMock(side_effect=SendToPredictError))
+        ):
+            with global_utility(Utility.PREDICT, predict_util):
+                yield predict_util
 
 
 # Shard manager
