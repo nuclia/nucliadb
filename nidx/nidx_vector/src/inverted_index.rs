@@ -17,10 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, path::Path, rc::Rc};
+use std::{collections::BTreeMap, path::Path};
 
-use fst_index::{FstIndexReader, FstIndexWriter};
-use map::{InvertedMapReader, InvertedMapWriter};
+use fst_index::FstIndexWriter;
+use map::InvertedMapWriter;
+use tracing::warn;
 
 use crate::{
     data_point::node::Node,
@@ -32,14 +33,25 @@ mod fst_index;
 mod map;
 
 /// The key for the field index. [uuid_as_bytes, field_type/field_name]
-fn field_id_key(paragraph_key: &str) -> Vec<u8> {
+fn field_id_key(paragraph_key: &str) -> Option<Vec<u8>> {
     let mut parts = paragraph_key.split('/');
-    let uuid = parts.next().unwrap();
-    let field_type = parts.next().unwrap();
-    let field_name = parts.next().unwrap();
-
-    [uuid::Uuid::parse_str(uuid).unwrap().as_bytes(), field_type.as_bytes(), "/".as_bytes(), field_name.as_bytes()]
-        .concat()
+    if let Some(uuid) = parts.next() {
+        if let Some(field_type) = parts.next() {
+            if let Some(field_name) = parts.next() {
+                return Some(
+                    [
+                        uuid::Uuid::parse_str(uuid).unwrap().as_bytes(),
+                        field_type.as_bytes(),
+                        "/".as_bytes(),
+                        field_name.as_bytes(),
+                    ]
+                    .concat(),
+                );
+            }
+        }
+    }
+    warn!(?paragraph_key, "Unable to parse field id from key");
+    None
 }
 
 /// The key for the labels, ending with a separator to allow for easy prefix search
@@ -84,7 +96,9 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
         let labels = Node::labels(node);
 
         let id = id as u32;
-        field_builder.insert(field_id_key(std::str::from_utf8(key).unwrap()), id);
+        if let Some(key) = field_id_key(std::str::from_utf8(key).unwrap()) {
+            field_builder.insert(key, id);
+        }
         for l in labels {
             label_builder.insert(labels_key(&l), id);
         }
@@ -102,22 +116,4 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
     map.finish()?;
 
     Ok(())
-}
-
-pub struct InvertedIndexes {
-    field_index: FstIndexReader,
-    label_index: FstIndexReader,
-}
-
-impl InvertedIndexes {
-    pub fn open(work_path: &Path) -> VectorR<Self> {
-        let map = Rc::new(InvertedMapReader::open(&work_path.join("index.map"))?);
-        let field_index = FstIndexReader::open(&work_path.join("field.fst"), map.clone())?;
-        let label_index = FstIndexReader::open(&work_path.join("label.fst"), map)?;
-
-        Ok(Self {
-            field_index,
-            label_index,
-        })
-    }
 }

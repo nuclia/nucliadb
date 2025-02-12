@@ -30,7 +30,7 @@ mod tests;
 use crate::config::{VectorConfig, VectorType};
 use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
 use crate::formula::Formula;
-use crate::inverted_index::{build_indexes, InvertedIndexes};
+use crate::inverted_index::build_indexes;
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use data_store::Interpreter;
 use disk_hnsw::DiskHnsw;
@@ -66,14 +66,10 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
         index.advise(memmap2::Advice::Sequential)?;
     }
 
-    build_indexes(path, &nodes)?;
-    let inverted_indexes = Some(InvertedIndexes::open(path)?);
-
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
-        inverted_indexes,
     })
 }
 
@@ -143,6 +139,8 @@ where
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    build_indexes(data_point_path, &nodes)?;
+
     let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
         records: no_nodes,
@@ -155,7 +153,6 @@ where
         metadata,
         nodes,
         index,
-        inverted_indexes: None,
     })
 }
 
@@ -204,6 +201,8 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    build_indexes(path, &nodes)?;
+
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
         records: no_nodes,
@@ -216,7 +215,6 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         metadata,
         nodes,
         index,
-        inverted_indexes: None,
     })
 }
 
@@ -454,7 +452,6 @@ pub struct OpenDataPoint {
     metadata: VectorSegmentMetadata,
     nodes: Mmap,
     index: Mmap,
-    inverted_indexes: Option<InvertedIndexes>,
 }
 
 impl AsRef<OpenDataPoint> for OpenDataPoint {
@@ -466,10 +463,6 @@ impl AsRef<OpenDataPoint> for OpenDataPoint {
 impl OpenDataPoint {
     pub fn into_metadata(self) -> VectorSegmentMetadata {
         self.metadata
-    }
-
-    pub fn no_nodes(&self) -> usize {
-        self.metadata.records
     }
 
     pub fn tags(&self) -> &HashSet<String> {

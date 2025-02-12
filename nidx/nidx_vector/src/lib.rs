@@ -109,13 +109,7 @@ impl VectorIndexer {
         let open_destination =
             data_point::merge(work_dir, &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(), &config)?;
 
-        Ok(VectorSegmentMetadata {
-            path: work_dir.to_path_buf(),
-            records: open_destination.no_nodes(),
-            index_metadata: VectorSegmentMeta {
-                tags: open_destination.tags().clone(),
-            },
-        })
+        Ok(open_destination.into_metadata())
     }
 }
 
