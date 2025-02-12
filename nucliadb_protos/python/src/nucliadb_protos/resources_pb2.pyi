@@ -552,6 +552,68 @@ class NestedListPosition(google.protobuf.message.Message):
 global___NestedListPosition = NestedListPosition
 
 @typing.final
+class RowsPreview(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class Sheet(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        @typing.final
+        class Row(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            CELL_FIELD_NUMBER: builtins.int
+            @property
+            def cell(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+            def __init__(
+                self,
+                *,
+                cell: collections.abc.Iterable[builtins.str] | None = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["cell", b"cell"]) -> None: ...
+
+        ROWS_FIELD_NUMBER: builtins.int
+        @property
+        def rows(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RowsPreview.Sheet.Row]: ...
+        def __init__(
+            self,
+            *,
+            rows: collections.abc.Iterable[global___RowsPreview.Sheet.Row] | None = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["rows", b"rows"]) -> None: ...
+
+    @typing.final
+    class SheetsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___RowsPreview.Sheet: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___RowsPreview.Sheet | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    SHEETS_FIELD_NUMBER: builtins.int
+    @property
+    def sheets(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___RowsPreview.Sheet]: ...
+    def __init__(
+        self,
+        *,
+        sheets: collections.abc.Mapping[builtins.str, global___RowsPreview.Sheet] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["sheets", b"sheets"]) -> None: ...
+
+global___RowsPreview = RowsPreview
+
+@typing.final
 class FileExtractedData(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -868,6 +930,25 @@ class ExtractedVectorsWrapper(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["file_or_data", b"file_or_data"]) -> typing.Literal["vectors", "file"] | None: ...
 
 global___ExtractedVectorsWrapper = ExtractedVectorsWrapper
+
+@typing.final
+class _Dummy(google.protobuf.message.Message):
+    """This message is just to trigger the utils.UserVectorsList import in protobuf_to_pydantic which does not trigger automatically when the type is inside a map"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VECTORS_FIELD_NUMBER: builtins.int
+    @property
+    def vectors(self) -> nucliadb_protos.utils_pb2.UserVectorsList: ...
+    def __init__(
+        self,
+        *,
+        vectors: nucliadb_protos.utils_pb2.UserVectorsList | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["vectors", b"vectors"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["vectors", b"vectors"]) -> None: ...
+
+global____Dummy = _Dummy
 
 @typing.final
 class UserVectorsWrapper(google.protobuf.message.Message):
@@ -2341,68 +2422,6 @@ class FilePages(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["pages", b"pages", "positions", b"positions", "structures", b"structures"]) -> None: ...
 
 global___FilePages = FilePages
-
-@typing.final
-class RowsPreview(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    @typing.final
-    class Sheet(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        @typing.final
-        class Row(google.protobuf.message.Message):
-            DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-            CELL_FIELD_NUMBER: builtins.int
-            @property
-            def cell(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-            def __init__(
-                self,
-                *,
-                cell: collections.abc.Iterable[builtins.str] | None = ...,
-            ) -> None: ...
-            def ClearField(self, field_name: typing.Literal["cell", b"cell"]) -> None: ...
-
-        ROWS_FIELD_NUMBER: builtins.int
-        @property
-        def rows(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RowsPreview.Sheet.Row]: ...
-        def __init__(
-            self,
-            *,
-            rows: collections.abc.Iterable[global___RowsPreview.Sheet.Row] | None = ...,
-        ) -> None: ...
-        def ClearField(self, field_name: typing.Literal["rows", b"rows"]) -> None: ...
-
-    @typing.final
-    class SheetsEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> global___RowsPreview.Sheet: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: global___RowsPreview.Sheet | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
-
-    SHEETS_FIELD_NUMBER: builtins.int
-    @property
-    def sheets(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___RowsPreview.Sheet]: ...
-    def __init__(
-        self,
-        *,
-        sheets: collections.abc.Mapping[builtins.str, global___RowsPreview.Sheet] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["sheets", b"sheets"]) -> None: ...
-
-global___RowsPreview = RowsPreview
 
 @typing.final
 class FieldID(google.protobuf.message.Message):

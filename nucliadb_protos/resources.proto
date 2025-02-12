@@ -171,6 +171,15 @@ message NestedPosition {
 message NestedListPosition {
     repeated NestedPosition positions = 1;
 }
+message RowsPreview {
+    message Sheet {
+        message Row {
+            repeated string cell = 1;
+        }
+        repeated Row rows = 1;
+    }
+    map<string, Sheet> sheets = 1;
+}
 
 message FileExtractedData {
     string language = 1;
@@ -230,7 +239,10 @@ message ExtractedVectorsWrapper {
     string vectorset_id = 4;
 }
 
-
+// This message is just to trigger the utils.UserVectorsList import in protobuf_to_pydantic which does not trigger automatically when the type is inside a map
+message _Dummy {
+    utils.UserVectorsList vectors = 1 [deprecated = true];
+}
 message UserVectorsWrapper {
     utils.UserVectorSet vectors = 1;
     map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
@@ -586,16 +598,6 @@ message FilePages {
     repeated CloudFile pages = 1;
     repeated PagePositions positions = 2;
     repeated PageStructure structures = 3;
-}
-
-message RowsPreview {
-    message Sheet {
-        message Row {
-            repeated string cell = 1;
-        }
-        repeated Row rows = 1;
-    }
-    map<string, Sheet> sheets = 1;
 }
 
 message FieldID {

@@ -181,6 +181,7 @@ from nucliadb_protos.resources_pb2 import (
     UserMetadata as UserMetadata,
     UserVectorsWrapper as UserVectorsWrapper,
     VisualSelection as VisualSelection,
+    _Dummy as _Dummy,
 )
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
