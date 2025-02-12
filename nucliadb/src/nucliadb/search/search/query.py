@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import Any, Awaitable, Optional, Union
 
 from nucliadb.common import datamanagers
+from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.filters import (
@@ -384,9 +385,7 @@ class QueryParser:
                     relation_node = utils_pb2.RelationNode()
                     relation_node.value = entity.name
                     if entity.type is not None:
-                        relation_node.ntype = utils_pb2.RelationNode.NodeType.Value(
-                            entity.type.value.upper()
-                        )
+                        relation_node.ntype = RelationNodeTypeMap[entity.type]
                     if entity.subtype is not None:
                         relation_node.subtype = entity.subtype
                     detected_entities.append(relation_node)
