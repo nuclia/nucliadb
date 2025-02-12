@@ -27,6 +27,7 @@ import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
+from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.utils import get_driver
@@ -803,6 +804,42 @@ async def test_search_automatic_relations(
         assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(  # type: ignore
             entities[entity]["related_to"], key=lambda x: x["entity"]
         )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_search_user_relations(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+    predict_mock: AsyncMock,
+    mocker: MockerFixture,
+):
+    kbid = standalone_knowledgebox
+
+    from nucliadb.search.search import find
+
+    spy = mocker.spy(find, "node_query")
+    with patch.object(predict_mock, "detect_entities", AsyncMock(return_value=[])):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": "What relates Newton and Becquer?",
+                "query_entities": [
+                    {"name": "Newton"},
+                    {"name": "Becquer", "type": "entity", "subtype": "person"},
+                ],
+                "features": ["relations"],
+            },
+        )
+        assert resp.status_code == 200
+
+    assert spy.call_count == 1
+    request = spy.call_args.args[2]
+    assert len(request.relation_subgraph.entry_points) == 2
+    assert request.relation_subgraph.entry_points[0].value == "Newton"
+    assert request.relation_subgraph.entry_points[1].value == "Becquer"
+    assert request.relation_subgraph.entry_points[1].subtype == "person"
 
 
 async def get_audit_messages(sub):

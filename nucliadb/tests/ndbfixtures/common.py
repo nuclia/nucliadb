@@ -19,7 +19,7 @@
 #
 from os.path import dirname
 from typing import AsyncIterable, AsyncIterator, Iterator
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from pytest_mock import MockerFixture
@@ -92,7 +92,7 @@ async def local_files():
 
 @pytest.fixture(scope="function")
 def predict_mock() -> Mock:  # type: ignore
-    mock = Mock()
+    mock = AsyncMock()
     with global_utility(Utility.PREDICT, mock):
         yield mock
 
