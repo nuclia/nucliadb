@@ -24,6 +24,7 @@ mod data_point_provider;
 mod data_types;
 mod formula;
 mod indexer;
+mod inverted_index;
 mod query_io;
 mod request_types;
 mod utils;
@@ -109,13 +110,7 @@ impl VectorIndexer {
         let open_destination =
             data_point::merge(work_dir, &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(), &config)?;
 
-        Ok(VectorSegmentMetadata {
-            path: work_dir.to_path_buf(),
-            records: open_destination.no_nodes(),
-            index_metadata: VectorSegmentMeta {
-                tags: open_destination.tags().clone(),
-            },
-        })
+        Ok(open_destination.into_metadata())
     }
 }
 
@@ -174,6 +169,8 @@ pub enum VectorErr {
     InconsistentMergeSegmentTags,
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(&'static str),
+    #[error("FST error: {0}")]
+    FstError(#[from] fst::Error),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

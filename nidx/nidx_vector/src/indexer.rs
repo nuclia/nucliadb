@@ -111,11 +111,9 @@ pub fn index_resource(
 
     let mut elems = Vec::new();
     let normalize_vectors = config.normalize_vectors;
-    for (field_id, field_paragraphs) in resource.fields() {
+    for (_, field_paragraphs) in resource.fields() {
         for paragraph in field_paragraphs {
-            let mut inner_labels = paragraph.labels.clone();
-            inner_labels.push(field_id.clone());
-            let labels = LabelDictionary::new(inner_labels);
+            let labels = LabelDictionary::new(paragraph.labels.clone());
 
             for (key, sentence) in paragraph.vectors.iter().clone() {
                 let key = key.to_string();
