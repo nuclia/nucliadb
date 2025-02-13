@@ -797,6 +797,23 @@ async def test_question_answer(
         ],
     }
 
+    # Test deletion of Q/A
+    bm = BrokerMessage()
+    bm.uuid = rid
+    bm.kbid = standalone_knowledgebox
+    field = FieldID()
+    field.CopyFrom(qaw.field)
+    bm.delete_question_answers.append(field)
+
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}?show=extracted&extracted=question_answers",
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["data"]["texts"]["text1"]["extracted"]["question_answers"] is None
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_question_answer_annotations(
