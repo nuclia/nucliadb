@@ -45,7 +45,6 @@ python-code-lint:
 	make -C nucliadb_dataset/ format
 	make -C nucliadb_models/ format
 	make -C nucliadb_sdk/ format
-	make -C nucliadb_sidecar/ format
 	make -C nucliadb_utils/ format
 	make -C nucliadb/ format
 	make -C nucliadb_telemetry/ format
@@ -56,7 +55,6 @@ python-code-lint:
 	make -C nucliadb_sdk/ lint
 	make -C nucliadb_dataset/ lint
 	make -C nucliadb_models/ lint
-	make -C nucliadb_sidecar/ lint
 
 
 rust-code-lint: fmt-all
@@ -94,10 +92,6 @@ build-node-prebuilt:
 	mkdir builds || true
 	cp target/release/node_*er builds
 	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node:latest -f Dockerfile.node_prebuilt .
-
-build-sidecar:
-	docker build -t europe-west4-docker.pkg.dev/nuclia-internal/nuclia/node_sidecar:latest -f Dockerfile.node_sidecar .
-
 
 debug-test-nucliadb:
 	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/tests -sxv

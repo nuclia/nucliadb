@@ -12,7 +12,6 @@ The Python based components also depend on various packaging requirements:
 Types of Dockerfiles:
 - Dockerfile: primary python component build that doesn't include rust bindings (to deploy in cluster mode with node services)
 - Dockerfile.withbinding: python component build that includes rust bindings that allow standalone serving
-- Dockerfile.node_sidecar: build of the python components of the node
 - Dockerfile.node: rust build for our Index Nodes
 - Dockerfile.node_prebuilt: allows building the node with prebuilt rust binaries
 

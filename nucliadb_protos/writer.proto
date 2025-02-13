@@ -138,6 +138,8 @@ message BrokerMessage {
     repeated Generator generated_by = 40;
 
     repeated FieldIDStatus field_statuses = 41;
+
+    repeated resources.FieldID delete_question_answers = 42;
 }
 
 message BrokerMessageBlobReference {
