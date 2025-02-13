@@ -74,7 +74,7 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
 
     // Build the index at runtime if they do not exist. This can
     // be removed once we have migrated all existing indexes
-    if !path.join("index.map").exists() {
+    if !InvertedIndexes::exists(path) {
         build_indexes(path, &nodes)?;
     }
     let inverted_indexes = InvertedIndexes::open(path)?;

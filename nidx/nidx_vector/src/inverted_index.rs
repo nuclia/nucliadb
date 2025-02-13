@@ -34,6 +34,12 @@ use crate::{
 mod fst_index;
 mod map;
 
+mod file {
+    pub const INDEX_MAP: &str = "index.map";
+    pub const FIELD_INDEX: &str = "field.fst";
+    pub const LABEL_INDEX: &str = "label.fst";
+}
+
 /// The key for the field index. [uuid_as_bytes, field_type/field_name]
 fn field_id_key(paragraph_key: &str) -> Option<Vec<u8>> {
     let mut parts = paragraph_key.split('/');
@@ -108,12 +114,12 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
         }
     }
 
-    let mut map = InvertedMapWriter::new(&work_path.join("index.map"))?;
-    let mut field_index = FstIndexWriter::new(&work_path.join("field.fst"), &mut map)?;
+    let mut map = InvertedMapWriter::new(&work_path.join(file::INDEX_MAP))?;
+    let mut field_index = FstIndexWriter::new(&work_path.join(file::FIELD_INDEX), &mut map)?;
     field_builder.write(&mut field_index)?;
     field_index.finish()?;
 
-    let mut label_index = FstIndexWriter::new(&work_path.join("label.fst"), &mut map)?;
+    let mut label_index = FstIndexWriter::new(&work_path.join(file::LABEL_INDEX), &mut map)?;
     label_builder.write(&mut label_index)?;
     label_index.finish()?;
 
@@ -128,10 +134,14 @@ pub struct InvertedIndexes {
 }
 
 impl InvertedIndexes {
+    pub fn exists(path: &Path) -> bool {
+        path.join(file::INDEX_MAP).exists()
+    }
+
     pub fn open(work_path: &Path) -> VectorR<Self> {
-        let map = Arc::new(InvertedMapReader::open(&work_path.join("index.map"))?);
-        let field_index = FstIndexReader::open(&work_path.join("field.fst"), map.clone())?;
-        let label_index = FstIndexReader::open(&work_path.join("label.fst"), map)?;
+        let map = Arc::new(InvertedMapReader::open(&work_path.join(file::INDEX_MAP))?);
+        let field_index = FstIndexReader::open(&work_path.join(file::FIELD_INDEX), map.clone())?;
+        let label_index = FstIndexReader::open(&work_path.join(file::LABEL_INDEX), map)?;
 
         Ok(Self {
             field_index,
