@@ -812,7 +812,7 @@ async def test_question_answer(
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["data"]["texts"]["text1"]["extracted"]["question_answers"] is None
+    assert data["data"]["texts"]["text1"]["extracted"].get("question_answers") is None
 
 
 @pytest.mark.deploy_modes("standalone")
