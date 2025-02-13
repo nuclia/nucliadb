@@ -19,19 +19,23 @@
 #
 
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from nucliadb.search.search.find_merge import build_find_response
-from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
+from nucliadb.search.search.rank_fusion import LegacyRankFusion
 from nucliadb.search.search.rerankers import PredictReranker
+from nucliadb_models.internal.predict import (
+    RerankModel,
+    RerankResponse,
+)
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import SCORE_TYPE, ResourceProperties
 from nucliadb_protos import nodereader_pb2, noderesources_pb2
 
 
-async def test_find_post_index_search(expected_find_response: dict[str, Any]):
+async def test_find_post_index_search(expected_find_response: dict[str, Any], predict_mock):
     query = "How should I validate this?"
     search_responses = [
         nodereader_pb2.SearchResponse(
@@ -121,6 +125,16 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any]):
     async def mock_hydrate_resource_metadata(kbid: str, rid: str, *args, **kwargs):
         return Resource(id=rid)
 
+    async def fake_reranking(kbid: str, item: RerankModel) -> RerankResponse:
+        return RerankResponse(
+            context_scores={
+                "rid-2/f/field-b/subfield-y/0-17": 10,
+                "rid-3/t/field-c/0-30": 8,
+                "rid-1/f/field-a/10-20": 4,
+                "rid-2/f/field-b/subfield-x/100-150": 1,
+            }
+        )
+
     with (
         patch("nucliadb.search.search.find.get_external_index_manager", return_value=None),
         patch(
@@ -131,6 +145,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any]):
             "nucliadb.search.search.hydrator.paragraphs.get_paragraph_text",
             return_value="extracted text",
         ),
+        patch.object(predict_mock, "rerank", AsyncMock(side_effect=fake_reranking)),
     ):
         find_response = await build_find_response(
             search_responses,
@@ -144,7 +159,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any]):
             field_type_filter=[],
             extracted=[],
             highlight=True,
-            rank_fusion_algorithm=ReciprocalRankFusion(window=20),
+            rank_fusion_algorithm=LegacyRankFusion(window=20),
             reranker=PredictReranker(window=20),
         )
         resp = find_response.model_dump()
@@ -201,8 +216,8 @@ def expected_find_response():
                                 },
                                 "reference": "",
                                 "relevant_relations": None,
-                                "score": 1.125,
-                                "score_type": SCORE_TYPE.BM25,
+                                "score": 4.0,
+                                "score_type": SCORE_TYPE.RERANKER,
                                 "text": "extracted text",
                             }
                         }
@@ -251,8 +266,8 @@ def expected_find_response():
                                 },
                                 "reference": "",
                                 "relevant_relations": None,
-                                "score": 0.6399999856948853,
-                                "score_type": SCORE_TYPE.BM25,
+                                "score": 1.0,
+                                "score_type": SCORE_TYPE.RERANKER,
                                 "text": "extracted text",
                             },
                             "rid-2/f/field-b/subfield-y/0-17": {
@@ -272,8 +287,8 @@ def expected_find_response():
                                 },
                                 "reference": "myfile.pdf",
                                 "relevant_relations": None,
-                                "score": 1.7799999713897705,
-                                "score_type": SCORE_TYPE.BOTH,
+                                "score": 10.0,
+                                "score_type": SCORE_TYPE.RERANKER,
                                 "text": "extracted text",
                             },
                         }
@@ -322,8 +337,8 @@ def expected_find_response():
                                 },
                                 "reference": "",
                                 "relevant_relations": None,
-                                "score": 1.5,
-                                "score_type": SCORE_TYPE.VECTOR,
+                                "score": 8.0,
+                                "score_type": SCORE_TYPE.RERANKER,
                                 "text": "extracted text",
                             }
                         }

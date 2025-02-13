@@ -887,6 +887,7 @@ async def test_ask_graph_strategy(
                 "relation_text_as_paragraphs": False,
             }
         ],
+        "reranker": "noop",
         "debug": True,
     }
     headers = {"X-Synchronous": "True"}
