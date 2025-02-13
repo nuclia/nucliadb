@@ -49,9 +49,9 @@ fn field_id_key(paragraph_key: &str) -> Option<Vec<u8>> {
                     ]
                     .concat(),
                 );
-            } else {
-                return Some(uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec());
             }
+        } else {
+            return Some(uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec());
         }
     }
     warn!(?paragraph_key, "Unable to parse field id from key");
