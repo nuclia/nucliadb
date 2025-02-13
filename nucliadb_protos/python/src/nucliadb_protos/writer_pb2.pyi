@@ -490,6 +490,7 @@ class BrokerMessage(google.protobuf.message.Message):
     SECURITY_FIELD_NUMBER: builtins.int
     GENERATED_BY_FIELD_NUMBER: builtins.int
     FIELD_STATUSES_FIELD_NUMBER: builtins.int
+    DELETE_QUESTION_ANSWERS_FIELD_NUMBER: builtins.int
     kbid: builtins.str
     uuid: builtins.str
     slug: builtins.str
@@ -567,6 +568,8 @@ class BrokerMessage(google.protobuf.message.Message):
     def generated_by(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Generator]: ...
     @property
     def field_statuses(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldIDStatus]: ...
+    @property
+    def delete_question_answers(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.FieldID]: ...
     def __init__(
         self,
         *,
@@ -606,9 +609,10 @@ class BrokerMessage(google.protobuf.message.Message):
         security: nucliadb_protos.utils_pb2.Security | None = ...,
         generated_by: collections.abc.Iterable[global___Generator] | None = ...,
         field_statuses: collections.abc.Iterable[global___FieldIDStatus] | None = ...,
+        delete_question_answers: collections.abc.Iterable[nucliadb_protos.resources_pb2.FieldID] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "extra", b"extra", "origin", b"origin", "security", b"security"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_statuses", b"field_statuses", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "generated_by", b"generated_by", "kbid", b"kbid", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "security", b"security", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "delete_fields", b"delete_fields", "delete_question_answers", b"delete_question_answers", "done_time", b"done_time", "errors", b"errors", "extra", b"extra", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_statuses", b"field_statuses", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "generated_by", b"generated_by", "kbid", b"kbid", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "question_answers", b"question_answers", "reindex", b"reindex", "relations", b"relations", "security", b"security", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
 
 global___BrokerMessage = BrokerMessage
 
