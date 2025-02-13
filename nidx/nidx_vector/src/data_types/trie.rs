@@ -85,10 +85,6 @@ pub fn serialize(trie: Trie) -> Vec<u8> {
     serialize_into(&mut buf, trie).unwrap();
     buf
 }
-pub fn has_word(trie: &[u8], word: &[u8]) -> bool {
-    let len = usize_from_slice_le(&trie[0..USIZE_LEN]);
-    search(&trie[0..len], 0, word)
-}
 
 pub fn decompress(trie: &[u8]) -> Vec<String> {
     let mut collector = vec![];
@@ -121,33 +117,6 @@ fn decompress_labels(trie: &[u8], node: usize, collector: &mut Vec<String>, curr
     }
 }
 
-fn search(trie: &[u8], node: usize, word: &[u8]) -> bool {
-    let node_ptr = get_node_ptr(trie, node);
-    match word {
-        [] => trie[node_ptr] == 1,
-        [head, tail @ ..] => {
-            let offset = &trie[node_ptr..];
-            let length = usize_from_slice_le(&offset[LENGTH.0..LENGTH.1]);
-            let adjacency = &offset[TABLE..];
-            let mut i = 0;
-            let mut goes_to = None;
-            while i < length && goes_to.is_none() {
-                let position = i * EDGE_LEN;
-                if *head == adjacency[position] {
-                    let number_s = position + 1;
-                    let number_e = number_s + USIZE_LEN;
-                    goes_to = Some(usize_from_slice_le(&adjacency[number_s..number_e]));
-                }
-                i += 1;
-            }
-            match goes_to {
-                Some(new_node) => search(trie, new_node, tail),
-                None => false,
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,13 +130,10 @@ mod tests {
             b"BAD".as_slice(),
             b"GOOD".as_slice(),
         ];
-        let not_in_dictionary = [b"WO1D1".as_slice(), b"LORD".as_slice(), b"BAF".as_slice(), b"WOR".as_slice()];
 
         let trie = create_trie(&dictionary);
         let trie = serialize(trie);
         let labels = super::decompress(&trie);
-        assert!(dictionary.iter().all(|w| has_word(&trie, w)));
-        assert!(not_in_dictionary.iter().all(|w| !has_word(&trie, w)));
 
         assert_eq!(labels.len(), dictionary.len());
         assert!(labels.iter().all(|w| dictionary.contains(&w.as_bytes())));

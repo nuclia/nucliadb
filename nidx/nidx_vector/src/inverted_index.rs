@@ -49,6 +49,8 @@ fn field_id_key(paragraph_key: &str) -> Option<Vec<u8>> {
                     ]
                     .concat(),
                 );
+            } else {
+                return Some(uuid::Uuid::parse_str(uuid).unwrap().as_bytes().to_vec());
             }
         }
     }
@@ -93,7 +95,7 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
     let mut label_builder = IndexBuilder::new();
 
     for id in 0..data_store::stored_elements(nodes) {
-        let node = data_store::get_value(Node, nodes, id);
+        let node = data_store::get_value(nodes, id);
         let key = Node::key(node);
         let labels = Node::labels(node);
 
@@ -137,6 +139,10 @@ impl InvertedIndexes {
         })
     }
 
+    pub fn ids_for_deletion_key(&self, key: &str) -> Option<impl Iterator<Item = u32>> {
+        field_id_key(key).map(|key| self.field_index.get_prefix(&key).into_iter())
+    }
+
     pub fn filter(&self, formula: &Formula) -> Option<BitSet> {
         formula.clauses.iter().map(|f| self.filter_clause(f)).reduce(|mut a, b| {
             a.intersect_with(&b);
@@ -149,7 +155,7 @@ impl InvertedIndexes {
             Clause::Atom(atom_clause) => {
                 let ids: &mut dyn Iterator<Item = u32> = match atom_clause {
                     crate::formula::AtomClause::Label(label) => {
-                        &mut self.label_index.get_prefix(std::str::from_utf8(&labels_key(label)).unwrap()).into_iter()
+                        &mut self.label_index.get_prefix(&labels_key(label)).into_iter()
                     }
                     crate::formula::AtomClause::KeyPrefixSet(field_ids) => &mut field_ids
                         .iter()

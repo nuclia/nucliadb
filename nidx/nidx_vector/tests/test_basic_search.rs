@@ -110,3 +110,57 @@ fn test_basic_search(
 
     Ok(())
 }
+
+#[test]
+fn test_deletions() -> anyhow::Result<()> {
+    use common::{resource, TestOpener};
+    use nidx_types::prefilter::PrefilterResult;
+    use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
+
+    let config = VectorConfig {
+        similarity: Similarity::Dot,
+        vector_type: VectorType::DenseF32 {
+            dimension: 4,
+        },
+        normalize_vectors: false,
+    };
+
+    // Creates a couple of resources
+    let resource1 = resource(vec![]);
+    let resource2 = resource(vec![]);
+
+    let segment1_dir = tempdir()?;
+    let segment2_dir = tempdir()?;
+    let segment1 = VectorIndexer.index_resource(segment1_dir.path(), &config, &resource1, "default", true)?.unwrap();
+    let segment2 = VectorIndexer.index_resource(segment2_dir.path(), &config, &resource2, "default", true)?.unwrap();
+
+    // Search initially returns both resources
+    let segments = vec![(segment1, 1i64.into()), (segment2, 2i64.into())];
+    let open_config = TestOpener::new(segments.clone(), vec![]);
+    let reader = VectorSearcher::open(config.clone(), open_config)?;
+    let search_request = &VectorSearchRequest {
+        vector: [0.0; 4].to_vec(),
+        result_per_page: 10,
+        min_score: -1.0,
+        ..Default::default()
+    };
+    let results = reader.search(search_request, &PrefilterResult::All)?;
+    assert_eq!(results.documents.len(), 2);
+
+    // Delete a full resource, it does not appear in search
+    let open_config = TestOpener::new(segments.clone(), vec![(resource1.resource.clone().unwrap().uuid, 3i64.into())]);
+    let reader = VectorSearcher::open(config.clone(), open_config)?;
+    let results = reader.search(search_request, &PrefilterResult::All)?;
+    assert_eq!(results.documents.len(), 1);
+    assert!(results.documents[0].doc_id.as_ref().unwrap().id.starts_with(&resource2.resource.as_ref().unwrap().uuid));
+
+    // Delete a field, it does not appear in search
+    let open_config =
+        TestOpener::new(segments, vec![(format!("{}/a/title", resource2.resource.unwrap().uuid), 3i64.into())]);
+    let reader = VectorSearcher::open(config.clone(), open_config)?;
+    let results = reader.search(search_request, &PrefilterResult::All)?;
+    assert_eq!(results.documents.len(), 1);
+    assert!(results.documents[0].doc_id.as_ref().unwrap().id.starts_with(&resource1.resource.as_ref().unwrap().uuid));
+
+    Ok(())
+}
