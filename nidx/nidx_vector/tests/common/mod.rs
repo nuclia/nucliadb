@@ -51,14 +51,14 @@ impl OpenIndexMetadata<VectorSegmentMeta> for TestOpener {
     }
 }
 
-pub fn resource(labels: Vec<String>) -> Resource {
+pub fn resource(resource_labels: Vec<String>, paragraph_labels: Vec<String>) -> Resource {
     let id = Uuid::new_v4().to_string();
     Resource {
         resource: Some(ResourceId {
             shard_id: String::new(),
             uuid: id.clone(),
         }),
-        labels,
+        labels: resource_labels,
         paragraphs: HashMap::from([(
             format!("{id}/a/title"),
             IndexParagraphs {
@@ -67,6 +67,7 @@ pub fn resource(labels: Vec<String>) -> Resource {
                     IndexParagraph {
                         start: 0,
                         end: 5,
+                        labels: paragraph_labels,
                         sentences: HashMap::from([(
                             format!("{id}/a/title/0-5"),
                             VectorSentence {

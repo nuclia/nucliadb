@@ -20,6 +20,7 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use bit_set::BitSet;
+use bit_vec::BitVec;
 use fst_index::{FstIndexReader, FstIndexWriter};
 use map::{InvertedMapReader, InvertedMapWriter};
 use tracing::warn;
@@ -131,6 +132,7 @@ pub fn build_indexes(work_path: &Path, nodes: &[u8]) -> VectorR<()> {
 pub struct InvertedIndexes {
     field_index: FstIndexReader,
     label_index: FstIndexReader,
+    records: usize,
 }
 
 impl InvertedIndexes {
@@ -138,7 +140,7 @@ impl InvertedIndexes {
         path.join(file::INDEX_MAP).exists()
     }
 
-    pub fn open(work_path: &Path) -> VectorR<Self> {
+    pub fn open(work_path: &Path, records: usize) -> VectorR<Self> {
         let map = Arc::new(InvertedMapReader::open(&work_path.join(file::INDEX_MAP))?);
         let field_index = FstIndexReader::open(&work_path.join(file::FIELD_INDEX), map.clone())?;
         let label_index = FstIndexReader::open(&work_path.join(file::LABEL_INDEX), map)?;
@@ -146,6 +148,7 @@ impl InvertedIndexes {
         Ok(Self {
             field_index,
             label_index,
+            records,
         })
     }
 
@@ -173,7 +176,7 @@ impl InvertedIndexes {
                         .flatten()
                         .flatten(),
                 };
-                let mut bitset = BitSet::new();
+                let mut bitset = BitSet::from_bit_vec(BitVec::from_elem(self.records, false));
                 ids.for_each(|id| {
                     bitset.insert(id as usize);
                 });

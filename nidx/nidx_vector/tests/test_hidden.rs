@@ -38,12 +38,12 @@ fn test_hidden_search() -> anyhow::Result<()> {
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];
-    let hidden_resource = resource(labels);
+    let hidden_resource = resource(labels, vec![]);
     let hidden_dir = tempdir()?;
     let hidden_segment =
         VectorIndexer.index_resource(hidden_dir.path(), &config, &hidden_resource, "default", true)?.unwrap();
 
-    let visible_resource = resource(vec![]);
+    let visible_resource = resource(vec![], vec![]);
     let visible_dir = tempdir()?;
     let visible_segment =
         VectorIndexer.index_resource(visible_dir.path(), &config, &visible_resource, "default", true)?.unwrap();

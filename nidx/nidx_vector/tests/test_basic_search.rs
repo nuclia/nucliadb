@@ -20,7 +20,10 @@
 
 mod common;
 
+use std::collections::HashSet;
+
 use nidx_protos::VectorSentence;
+use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
 use nidx_vector::config::*;
 use rstest::rstest;
 use tempfile::tempdir;
@@ -53,7 +56,7 @@ fn test_basic_search(
     };
 
     // Creates a resource with some orthogonal vectors, to test search
-    let mut resource = resource(vec![]);
+    let mut resource = resource(vec![], vec![]);
     let sentences =
         &mut resource.paragraphs.values_mut().next().unwrap().paragraphs.values_mut().next().unwrap().sentences;
     sentences.clear();
@@ -126,8 +129,8 @@ fn test_deletions() -> anyhow::Result<()> {
     };
 
     // Creates a couple of resources
-    let resource1 = resource(vec![]);
-    let resource2 = resource(vec![]);
+    let resource1 = resource(vec![], vec![]);
+    let resource2 = resource(vec![], vec![]);
 
     let segment1_dir = tempdir()?;
     let segment2_dir = tempdir()?;
@@ -161,6 +164,119 @@ fn test_deletions() -> anyhow::Result<()> {
     let results = reader.search(search_request, &PrefilterResult::All)?;
     assert_eq!(results.documents.len(), 1);
     assert!(results.documents[0].doc_id.as_ref().unwrap().id.starts_with(&resource1.resource.as_ref().unwrap().uuid));
+
+    Ok(())
+}
+
+#[test]
+fn test_filtered_search() -> anyhow::Result<()> {
+    use common::{resource, TestOpener};
+    use nidx_types::prefilter::PrefilterResult;
+    use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
+
+    let config = VectorConfig {
+        similarity: Similarity::Dot,
+        vector_type: VectorType::DenseF32 {
+            dimension: 4,
+        },
+        normalize_vectors: false,
+    };
+
+    // Create 4 resources
+    // 0 has label 0, 8
+    // 1 has labels 1, 9
+    // 2 has labels 2, 8
+    // 3 has labels 3, 9
+    let work_path = tempdir()?;
+    let segments = (0..4)
+        .map(|i| {
+            resource(vec![], vec![format!("/l/labelset/label_{}", i), format!("/l/labelset/label_{}", (i % 2) + 8)])
+        })
+        .enumerate()
+        .map(|(i, r)| {
+            let segment_path = &work_path.path().join(i.to_string());
+            std::fs::create_dir(segment_path).unwrap();
+            (
+                VectorIndexer.index_resource(segment_path, &config, &r, "default", true).unwrap().unwrap(),
+                (i as i64).into(),
+            )
+        })
+        .collect();
+
+    let open_config = TestOpener::new(segments, vec![]);
+    let reader = VectorSearcher::open(config, open_config)?;
+
+    let search = |filtering_formula| -> HashSet<u32> {
+        // Search initially returns both resources
+        let search_request = &VectorSearchRequest {
+            vector: [0.0; 4].to_vec(),
+            result_per_page: 10,
+            min_score: -1.0,
+            paragraph_labels: (0..4).map(|i| format!("/l/labelset/label_{i}")).collect(),
+            filtering_formula,
+            ..Default::default()
+        };
+        let results = reader.search(search_request, &PrefilterResult::All).unwrap();
+        results
+            .documents
+            .iter()
+            .map(|d| d.labels.iter().map(|l| l.split("_").last().unwrap().parse().unwrap()).min().unwrap())
+            .collect()
+    };
+
+    // All results
+    assert_eq!(search(None), [0, 1, 2, 3].into());
+
+    // Literal: Even
+    assert_eq!(search(Some(BooleanExpression::Literal("/l/labelset/label_8".into()))), [0, 2].into());
+
+    // OR: Even or 3
+    assert_eq!(
+        search(Some(BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::Or,
+            operands: vec![
+                BooleanExpression::Literal("/l/labelset/label_8".into()),
+                BooleanExpression::Literal("/l/labelset/label_3".into()),
+            ]
+        }))),
+        [0, 2, 3].into()
+    );
+
+    // AND: Even and 3
+    assert_eq!(
+        search(Some(BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::And,
+            operands: vec![
+                BooleanExpression::Literal("/l/labelset/label_8".into()),
+                BooleanExpression::Literal("/l/labelset/label_3".into()),
+            ]
+        }))),
+        [].into()
+    );
+
+    // NOT: Not 3
+    assert_eq!(
+        search(Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/l/labelset/label_3".into()))))),
+        [0, 1, 2].into()
+    );
+
+    // Combination: (even AND NOT 2) OR odd
+    assert_eq!(
+        search(Some(BooleanExpression::Operation(BooleanOperation {
+            operator: Operator::Or,
+            operands: vec![
+                BooleanExpression::Operation(BooleanOperation {
+                    operator: Operator::And,
+                    operands: vec![
+                        BooleanExpression::Literal("/l/labelset/label_8".into()),
+                        BooleanExpression::Not(Box::new(BooleanExpression::Literal("/l/labelset/label_2".into()))),
+                    ],
+                }),
+                BooleanExpression::Literal("/l/labelset/label_9".into()),
+            ],
+        }))),
+        [0, 1, 3].into()
+    );
 
     Ok(())
 }

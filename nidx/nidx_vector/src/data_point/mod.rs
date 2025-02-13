@@ -77,7 +77,7 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
     if !InvertedIndexes::exists(path) {
         build_indexes(path, &nodes)?;
     }
-    let inverted_indexes = InvertedIndexes::open(path)?;
+    let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
     let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
@@ -159,7 +159,7 @@ pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &Vecto
     };
 
     build_indexes(data_point_path, &nodes)?;
-    let inverted_indexes = InvertedIndexes::open(data_point_path)?;
+    let inverted_indexes = InvertedIndexes::open(data_point_path, no_nodes)?;
     let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
@@ -227,7 +227,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
     };
 
     build_indexes(path, &nodes)?;
-    let inverted_indexes = InvertedIndexes::open(path)?;
+    let inverted_indexes = InvertedIndexes::open(path, no_nodes)?;
     let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
 
     Ok(OpenDataPoint {
