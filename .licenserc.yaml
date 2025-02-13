@@ -51,7 +51,6 @@ header:
     - "nucliadb_dataset/**"
     - "nucliadb_node/**"
     - "nucliadb_paragraphs[0-9]*/**"
-    - "nucliadb_performance/**"
     - "nucliadb_protos/build.rs"
     - "nucliadb_protos/src/lib.rs"
     - "nucliadb_relations[0-9]*/**"
