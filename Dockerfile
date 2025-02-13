@@ -40,7 +40,6 @@ COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
 COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb /usr/src/app/nucliadb
-COPY nucliadb_performance /usr/src/app/nucliadb_performance
 COPY nidx/nidx_protos /usr/src/app/nidx/nidx_protos
 
 # Create a fake binding to avoid installing the real one

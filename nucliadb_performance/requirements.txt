@@ -1,8 +1,0 @@
-molotov
-nucliadb-sdk
-certifi
-faker
-httpx
-sentence-transformers
-tqdm
-types-tqdm
