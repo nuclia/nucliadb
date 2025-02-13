@@ -31,9 +31,8 @@ mod utils;
 mod vector_types;
 
 use config::VectorConfig;
-use data_point::open;
-use data_point_provider::reader::{Reader, TimeSensitiveDLog};
-use data_point_provider::DTrie;
+use data_point::OpenDataPoint;
+use data_point_provider::reader::Reader;
 use indexer::{index_resource, ResourceWrapper};
 use nidx_protos::{Resource, VectorSearchResponse};
 use nidx_types::prefilter::PrefilterResult;
@@ -87,28 +86,11 @@ impl VectorIndexer {
         config: VectorConfig,
         open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
-        let mut delete_log = data_point_provider::DTrie::new();
-        for (key, seq) in open_index.deletions() {
-            delete_log.insert(key.as_bytes(), seq);
-        }
-
-        let segment_ids: Vec<_> = open_index
-            .segments()
-            .map(|(meta, seq)| {
-                let open_dp = open(meta).unwrap();
-                (
-                    TimeSensitiveDLog {
-                        dlog: &delete_log,
-                        time: seq,
-                    },
-                    open_dp,
-                )
-            })
-            .collect();
+        let open_data_points = open_segments(open_index)?;
+        let open_data_points_ref = open_data_points.iter().collect::<Vec<_>>();
 
         // Do the merge
-        let open_destination =
-            data_point::merge(work_dir, &segment_ids.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>(), &config)?;
+        let open_destination = data_point::merge(work_dir, &open_data_points_ref, &config)?;
 
         Ok(open_destination.into_metadata())
     }
@@ -121,14 +103,8 @@ pub struct VectorSearcher {
 impl VectorSearcher {
     #[instrument(name = "vector::open", skip_all)]
     pub fn open(config: VectorConfig, open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> anyhow::Result<Self> {
-        let mut delete_log = DTrie::new();
-
-        for (key, seq) in open_index.deletions() {
-            delete_log.insert(key.as_bytes(), seq);
-        }
-
         Ok(VectorSearcher {
-            reader: Reader::open(open_index.segments().collect(), config, delete_log)?,
+            reader: Reader::open(open_segments(open_index)?, config)?,
         })
     }
 
@@ -140,6 +116,26 @@ impl VectorSearcher {
     ) -> anyhow::Result<VectorSearchResponse> {
         self.reader.search(request, prefilter)
     }
+}
+
+fn open_segments(open_index: impl OpenIndexMetadata<VectorSegmentMeta>) -> VectorR<Vec<OpenDataPoint>> {
+    let mut open_data_points = Vec::new();
+
+    for (metadata, seq) in open_index.segments() {
+        let open_data_point = data_point::open(metadata)?;
+
+        open_data_points.push((open_data_point, seq));
+    }
+
+    for (deletion, deletion_seq) in open_index.deletions() {
+        for (ref mut segment, ref segment_seq) in &mut open_data_points {
+            if deletion_seq > *segment_seq {
+                segment.apply_deletion(deletion.as_str());
+            }
+        }
+    }
+
+    Ok(open_data_points.into_iter().map(|(dp, _)| dp).collect())
 }
 
 #[derive(Debug, Error)]

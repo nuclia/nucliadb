@@ -32,9 +32,6 @@ use crate::data_point::params;
 
 /// Implementors of this trait can guide the hnsw search
 pub trait DataRetriever: std::marker::Sync {
-    fn get_key(&self, x: Address) -> &[u8];
-    fn is_deleted(&self, x: Address) -> bool;
-    fn has_label(&self, x: Address, label: &[u8]) -> bool;
     fn similarity(&self, x: Address, y: Address) -> f32;
     fn get_vector(&self, x: Address) -> &[u8];
     /// Embeddings with smaller similarity should not be considered.
@@ -59,7 +56,7 @@ pub trait Hnsw {
 /// implement [`Ord`]. [`Cnx`] is an application of the new-type pattern that lets us bypass the
 /// orphan rules and store such tuples in a [`BinaryHeap`].
 #[derive(Clone, Copy)]
-struct Cnx(Address, f32);
+pub struct Cnx(pub Address, pub f32);
 impl Eq for Cnx {}
 impl Ord for Cnx {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -83,21 +80,18 @@ pub type Neighbours = Vec<(Address, f32)>;
 /// Guides an algorithm to the valid nodes.
 struct NodeFilter<'a, DR> {
     tracker: &'a DR,
-    filter: &'a FormulaFilter<'a>,
+    filter: &'a BitSet,
     blocked_addresses: &'a FxHashSet<Address>,
     vec_counter: RepCounter<'a>,
 }
 
 impl<'a, DR: DataRetriever> NodeFilter<'a, DR> {
     pub fn passes_formula(&self, n: Address) -> bool {
-        // The vector satisfies the given filter
-        self.filter.run(n, self.tracker)
+        self.filter.contains(n.0)
     }
 
     pub fn is_valid(&self, n: Address, score: f32) -> bool {
         !score.is_nan()
-        // The vector was deleted at some point and will be removed in a future merge
-        && !self.tracker.is_deleted(n)
         // The vector is blocked, meaning that its key is part of the current version of the solution
         && !self.blocked_addresses.contains(&n)
         // The number of times this vector appears is 0
@@ -323,7 +317,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         query: Address,
         hnsw: H,
         k_neighbours: usize,
-        with_filter: FormulaFilter,
+        with_filter: &BitSet,
         with_duplicates: bool,
     ) -> Neighbours {
         if k_neighbours == 0 {
@@ -350,7 +344,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         let neighbors = self.layer_search(query, layer, k_neighbours, &entry_points);
 
         let filter = NodeFilter {
-            filter: &with_filter,
+            filter: with_filter,
             tracker: self.tracker,
             blocked_addresses: &Default::default(),
             vec_counter: RepCounter::new(!with_duplicates),
