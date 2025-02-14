@@ -30,7 +30,7 @@ use crate::{
     NidxMetadata, Settings,
 };
 use async_nats::jetstream::consumer::PullConsumer;
-use audit_task::audit_kb_storage;
+use audit_task::{audit_kb_storage, NatsSendReport};
 use merge_task::MergeScheduler;
 use metrics_task::update_merge_job_metric;
 use nidx_types::Seq;
@@ -176,7 +176,7 @@ pub async fn run_tasks(
         // we have been offline.
         let mut since = PrimitiveDateTime::MIN.replace_year(2000)?;
         loop {
-            match audit_kb_storage(&meta2, &audit_nats, since).await {
+            match audit_kb_storage(&meta2, NatsSendReport(&audit_nats), since).await {
                 Ok(Some(new_date)) => since = new_date,
                 Ok(None) => {}
                 Err(e) => warn!("Error auditing kb storage: {e:?}"),
