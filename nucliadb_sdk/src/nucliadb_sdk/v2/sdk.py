@@ -70,6 +70,8 @@ from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,
     AskResponseItem,
+    CatalogRequest,
+    CatalogResponse,
     CitationsAskResponseItem,
     DebugAskResponseItem,
     ErrorAskResponseItem,
@@ -190,6 +192,11 @@ SDK_DEFINITION = {
     "list_resources": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resources",
         method="GET",
+        path_params=("kbid",),
+    ),
+    "catalog": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/catalog",
+        method="POST",
         path_params=("kbid",),
     ),
     # reindex/reprocess
@@ -942,6 +949,7 @@ class NucliaDB(_NucliaDBBase):
     get_resource_by_slug = _request_sync_builder("get_resource_by_slug", type(None), Resource)
     get_resource_by_id = _request_sync_builder("get_resource_by_id", type(None), Resource)
     list_resources = _request_sync_builder("list_resources", type(None), ResourceList)
+    catalog = _request_sync_builder("catalog", CatalogRequest, CatalogResponse)
     # reindex/reprocess
     reindex_resource = _request_sync_builder("reindex_resource", type(None), type(None))
     reindex_resource_by_slug = _request_sync_builder("reindex_resource_by_slug", type(None), type(None))
@@ -1122,6 +1130,7 @@ class NucliaDBAsync(_NucliaDBBase):
     get_resource_by_slug = _request_async_builder("get_resource_by_slug", type(None), Resource)
     get_resource_by_id = _request_async_builder("get_resource_by_id", type(None), Resource)
     list_resources = _request_async_builder("list_resources", type(None), ResourceList)
+    catalog = _request_async_builder("catalog", CatalogRequest, CatalogResponse)
     # reindex/reprocess
     reindex_resource = _request_async_builder("reindex_resource", type(None), type(None))
     reindex_resource_by_slug = _request_async_builder("reindex_resource_by_slug", type(None), type(None))

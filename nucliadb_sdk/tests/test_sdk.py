@@ -75,6 +75,7 @@ def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.get_resource_by_id(kbid=kb.uuid, rid=resource.id)
     resources = sdk.list_resources(kbid=kb.uuid)
     assert len(resources.resources) == 1
+    sdk.catalog(kbid=kb.uuid, query="foo")
     sdk.update_resource(kbid=kb.uuid, rid=resource.id, title="Resource2")
     sdk.update_resource_by_slug(kbid=kb.uuid, rslug="resource", title="Resource3")
 
