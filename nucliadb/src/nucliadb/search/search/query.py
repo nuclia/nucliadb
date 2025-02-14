@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import Any, Awaitable, Optional, Union
 
 from nucliadb.common import datamanagers
+from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.filters import (
@@ -49,6 +50,7 @@ from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     Filter,
+    KnowledgeGraphEntity,
     MaxTokens,
     MinScore,
     SearchOptions,
@@ -94,6 +96,7 @@ class QueryParser:
         keyword_filters: Union[list[str], list[Filter]],
         top_k: int,
         min_score: MinScore,
+        query_entities: Optional[list[KnowledgeGraphEntity]] = None,
         faceted: Optional[list[str]] = None,
         sort: Optional[SortOptions] = None,
         range_creation_start: Optional[datetime] = None,
@@ -120,6 +123,7 @@ class QueryParser:
         self.kbid = kbid
         self.features = features
         self.query = query
+        self.query_entities = query_entities
         self.hidden = hidden
         if self.hidden is not None:
             if self.hidden:
@@ -211,7 +215,7 @@ class QueryParser:
         if self.with_synonyms and self.query:
             asyncio.ensure_future(self.fetcher.get_synonyms())
 
-    async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str]]:
+    async def parse(self) -> tuple[nodereader_pb2.SearchRequest, bool, list[str], Optional[str]]:
         """
         :return: (request, incomplete, autofilters)
             where:
@@ -230,12 +234,13 @@ class QueryParser:
         await self.parse_filters(request)
         self.parse_document_search(request)
         self.parse_paragraph_search(request)
-        incomplete = await self.parse_vector_search(request)
+        incomplete, rephrased_query = await self.parse_vector_search(request)
+        # BUG: autofilters are not used to filter, but we say we do
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
         await self.parse_min_score(request, incomplete)
         await self.adjust_page_size(request, self.rank_fusion, self.reranker)
-        return request, incomplete, autofilters
+        return request, incomplete, autofilters, rephrased_query
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.label_filters) > 0:
@@ -354,26 +359,41 @@ class QueryParser:
             request.paragraph = True
             node_features.inc({"type": "paragraphs"})
 
-    async def parse_vector_search(self, request: nodereader_pb2.SearchRequest) -> bool:
+    async def parse_vector_search(
+        self, request: nodereader_pb2.SearchRequest
+    ) -> tuple[bool, Optional[str]]:
         if not self.has_vector_search:
-            return False
+            return False, None
 
         node_features.inc({"type": "vectors"})
 
         vectorset = await self.fetcher.get_vectorset()
         query_vector = await self.fetcher.get_query_vector()
+        rephrased_query = await self.fetcher.get_rephrased_query()
         incomplete = query_vector is None
 
         request.vectorset = vectorset
         if query_vector is not None:
             request.vector.extend(query_vector)
 
-        return incomplete
+        return incomplete, rephrased_query
 
     async def parse_relation_search(self, request: nodereader_pb2.SearchRequest) -> list[str]:
         autofilters = []
+        # BUG: autofiler should autofilter, not enable relation search
         if self.has_relations_search or self.autofilter:
-            detected_entities = await self.fetcher.get_detected_entities()
+            if self.query_entities:
+                detected_entities = []
+                for entity in self.query_entities:
+                    relation_node = utils_pb2.RelationNode()
+                    relation_node.value = entity.name
+                    if entity.type is not None:
+                        relation_node.ntype = RelationNodeTypeMap[entity.type]
+                    if entity.subtype is not None:
+                        relation_node.subtype = entity.subtype
+                    detected_entities.append(relation_node)
+            else:
+                detected_entities = await self.fetcher.get_detected_entities()
             meta_cache = await self.fetcher.get_entities_meta_cache()
             detected_entities = expand_entities(meta_cache, detected_entities)
             if self.has_relations_search:

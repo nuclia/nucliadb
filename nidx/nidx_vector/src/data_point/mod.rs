@@ -28,22 +28,29 @@ mod params;
 mod tests;
 
 use crate::config::{VectorConfig, VectorType};
-use crate::data_types::{data_store, trie, trie_ram, DeleteLog};
+use crate::data_types::{data_store, trie, trie_ram};
 use crate::formula::Formula;
+use crate::inverted_index::{build_indexes, InvertedIndexes};
 use crate::{VectorR, VectorSegmentMeta, VectorSegmentMetadata};
-use data_store::Interpreter;
+use bit_set::BitSet;
+use bit_vec::BitVec;
 use disk_hnsw::DiskHnsw;
 use io::{BufWriter, Write};
 use memmap2::Mmap;
 use node::Node;
-use ops_hnsw::HnswOps;
+use ops_hnsw::{Cnx, HnswOps};
 use ram_hnsw::RAMHnsw;
+use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io;
+use std::iter::empty;
 use std::path::Path;
 
 pub use ops_hnsw::DataRetriever;
+
+/// How much expensive is to find a node via HNSW compared to a simple brute force scan
+const HNSW_COST_FACTOR: usize = 200;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
@@ -65,21 +72,24 @@ pub fn open(metadata: VectorSegmentMetadata) -> VectorR<OpenDataPoint> {
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    // Build the index at runtime if they do not exist. This can
+    // be removed once we have migrated all existing indexes
+    if !InvertedIndexes::exists(path) {
+        build_indexes(path, &nodes)?;
+    }
+    let inverted_indexes = InvertedIndexes::open(path, metadata.records)?;
+    let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
+
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
+        inverted_indexes,
+        alive_bitset,
     })
 }
 
-pub fn merge<Dlog>(
-    data_point_path: &Path,
-    operants: &[(Dlog, &OpenDataPoint)],
-    config: &VectorConfig,
-) -> VectorR<OpenDataPoint>
-where
-    Dlog: DeleteLog,
-{
+pub fn merge(data_point_path: &Path, operants: &[&OpenDataPoint], config: &VectorConfig) -> VectorR<OpenDataPoint> {
     let nodes_path = data_point_path.join(file_names::NODES);
     let mut nodes_file = File::options().read(true).write(true).create_new(true).open(nodes_path)?;
 
@@ -88,19 +98,19 @@ where
 
     // Sort largest operant first so we reuse as much of the HNSW as possible
     let mut operants = operants.iter().collect::<Vec<_>>();
-    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.1.metadata.records));
+    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.metadata.records));
 
     // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
-    let tags = &operants[0].1.metadata.index_metadata.tags;
-    for (_, dp) in &operants {
+    let tags = &operants[0].metadata.index_metadata.tags;
+    for dp in &operants {
         if &dp.metadata.index_metadata.tags != tags {
             return Err(crate::VectorErr::InconsistentMergeSegmentTags);
         }
     }
 
     // Creating the node store
-    let node_producers: Vec<_> = operants.iter().map(|dp| ((&dp.0, Node), dp.1.nodes.as_ref())).collect();
-    let has_deletions = data_store::merge(&mut nodes_file, &node_producers, config)?;
+    let mut node_producers: Vec<_> = operants.iter().map(|dp| (dp.alive_nodes(), &dp.nodes[..])).collect();
+    let has_deletions = data_store::merge(&mut nodes_file, node_producers.as_mut_slice(), config)?;
     let nodes = unsafe { Mmap::map(&nodes_file)? };
     let no_nodes = data_store::stored_elements(&nodes);
 
@@ -112,12 +122,12 @@ where
     } else {
         // If there are no deletions, we can reuse the first segment
         // HNSW since its indexes will match the the ones in data_store
-        index = DiskHnsw::deserialize(&operants[0].1.index);
-        start_node_index = data_store::stored_elements(&operants[0].1.nodes);
+        index = DiskHnsw::deserialize(&operants[0].index);
+        start_node_index = data_store::stored_elements(&operants[0].nodes);
     }
 
     // Creating the hnsw for the new node store.
-    let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
+    let tracker = Retriever::new(&[], &nodes, config, -1.0);
     let mut ops = HnswOps::new(&tracker, false);
     for id in start_node_index..no_nodes {
         ops.insert(Address(id), &mut index);
@@ -138,6 +148,8 @@ where
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    build_indexes(data_point_path, &nodes)?;
+
     let metadata = VectorSegmentMetadata {
         path: data_point_path.to_path_buf(),
         records: no_nodes,
@@ -146,10 +158,16 @@ where
         },
     };
 
+    build_indexes(data_point_path, &nodes)?;
+    let inverted_indexes = InvertedIndexes::open(data_point_path, no_nodes)?;
+    let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
+
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
+        inverted_indexes,
+        alive_bitset,
     })
 }
 
@@ -176,7 +194,7 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
 
     // Creating the HNSW using the mmaped nodes
     let mut index = RAMHnsw::new();
-    let tracker = Retriever::new(&[], &nodes, &NoDLog, config, -1.0);
+    let tracker = Retriever::new(&[], &nodes, config, -1.0);
     let mut ops = HnswOps::new(&tracker, false);
     for id in 0..no_nodes {
         ops.insert(Address(id), &mut index)
@@ -198,6 +216,8 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         index.advise(memmap2::Advice::Sequential)?;
     }
 
+    build_indexes(path, &nodes)?;
+
     let metadata = VectorSegmentMetadata {
         path: path.to_path_buf(),
         records: no_nodes,
@@ -206,67 +226,37 @@ pub fn create(path: &Path, elems: Vec<Elem>, config: &VectorConfig, tags: HashSe
         },
     };
 
+    build_indexes(path, &nodes)?;
+    let inverted_indexes = InvertedIndexes::open(path, no_nodes)?;
+    let alive_bitset = BitSet::from_bit_vec(BitVec::from_elem(metadata.records, true));
+
     Ok(OpenDataPoint {
         metadata,
         nodes,
         index,
+        inverted_indexes,
+        alive_bitset,
     })
-}
-
-pub struct NoDLog;
-impl DeleteLog for NoDLog {
-    fn is_deleted(&self, _: &[u8]) -> bool {
-        false
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Address(usize);
-impl Address {
-    #[cfg(test)]
-    pub const fn dummy() -> Address {
-        Address(0)
-    }
-}
 
-pub struct FormulaFilter<'a> {
-    filter: &'a Formula,
-}
-
-impl FormulaFilter<'_> {
-    pub fn new(filter: &Formula) -> FormulaFilter {
-        FormulaFilter {
-            filter,
-        }
-    }
-    pub fn run<DR: DataRetriever>(&self, address: Address, tracker: &DR) -> bool {
-        self.filter.run(address, tracker)
-    }
-}
-
-pub struct Retriever<'a, Dlog> {
+pub struct Retriever<'a> {
     similarity_function: fn(&[u8], &[u8]) -> f32,
     no_nodes: usize,
     temp: &'a [u8],
     nodes: &'a Mmap,
-    delete_log: &'a Dlog,
     min_score: f32,
     vector_len_bytes: usize,
 }
-impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
-    pub fn new(
-        temp: &'a [u8],
-        nodes: &'a Mmap,
-        delete_log: &'a Dlog,
-        config: &VectorConfig,
-        min_score: f32,
-    ) -> Retriever<'a, Dlog> {
+impl<'a> Retriever<'a> {
+    pub fn new(temp: &'a [u8], nodes: &'a Mmap, config: &VectorConfig, min_score: f32) -> Retriever<'a> {
         let no_nodes = data_store::stored_elements(nodes);
         let vector_len_bytes = config.vector_len_bytes();
         Retriever {
             temp,
             nodes,
-            delete_log,
             similarity_function: config.similarity_function(),
             no_nodes,
             min_score,
@@ -277,21 +267,12 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
         if x == self.no_nodes {
             self.temp
         } else {
-            data_store::get_value(Node, self.nodes, x)
+            data_store::get_value(self.nodes, x)
         }
     }
 }
 
-impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
-    fn get_key(&self, x @ Address(addr): Address) -> &[u8] {
-        if addr == self.no_nodes {
-            &[]
-        } else {
-            let x = self.find_node(x);
-            Node::key(x)
-        }
-    }
-
+impl<'a> DataRetriever for Retriever<'a> {
     fn will_need(&self, Address(x): Address) {
         data_store::will_need(self.nodes, x, self.vector_len_bytes);
     }
@@ -302,23 +283,6 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
         } else {
             let x = self.find_node(x);
             Node::vector(x)
-        }
-    }
-    fn is_deleted(&self, x @ Address(addr): Address) -> bool {
-        if addr == self.no_nodes {
-            false
-        } else {
-            let x = self.find_node(x);
-            let key = Node::key(x);
-            self.delete_log.is_deleted(key)
-        }
-    }
-    fn has_label(&self, Address(x): Address, label: &[u8]) -> bool {
-        if x == self.no_nodes {
-            false
-        } else {
-            let x = data_store::get_value(Node, self.nodes, x);
-            Node::has_label(x, label)
         }
     }
     fn similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
@@ -418,7 +382,7 @@ impl PartialEq for Neighbour {
 
 impl Neighbour {
     fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
-        let node = data_store::get_value(Node, data, addr);
+        let node = data_store::get_value(data, addr);
         let (exact, _) = Node.read_exact(node);
         Neighbour {
             score,
@@ -447,6 +411,8 @@ pub struct OpenDataPoint {
     metadata: VectorSegmentMetadata,
     nodes: Mmap,
     index: Mmap,
+    inverted_indexes: InvertedIndexes,
+    alive_bitset: BitSet,
 }
 
 impl AsRef<OpenDataPoint> for OpenDataPoint {
@@ -456,37 +422,72 @@ impl AsRef<OpenDataPoint> for OpenDataPoint {
 }
 
 impl OpenDataPoint {
-    pub fn into_metadata(self) -> VectorSegmentMetadata {
-        self.metadata
+    pub fn apply_deletion(&mut self, key: &str) {
+        if let Some(deleted_ids) = self.inverted_indexes.ids_for_deletion_key(key) {
+            for id in deleted_ids {
+                self.alive_bitset.remove(id as usize);
+            }
+        }
     }
 
-    pub fn no_nodes(&self) -> usize {
-        self.metadata.records
+    pub fn into_metadata(self) -> VectorSegmentMetadata {
+        self.metadata
     }
 
     pub fn tags(&self) -> &HashSet<String> {
         &self.metadata.index_metadata.tags
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn search<Dlog: DeleteLog>(
+    pub fn alive_nodes(&self) -> impl Iterator<Item = usize> + '_ {
+        self.alive_bitset.iter()
+    }
+
+    pub fn search(
         &self,
-        delete_log: &Dlog,
         query: &[f32],
         filter: &Formula,
         with_duplicates: bool,
         results: usize,
         config: &VectorConfig,
         min_score: f32,
-    ) -> impl Iterator<Item = Neighbour> + '_ {
+    ) -> Box<dyn Iterator<Item = Neighbour> + '_> {
         let encoded_query = config.vector_type.encode(query);
-        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, config, min_score);
-        let filter = FormulaFilter::new(filter);
-        let ops = HnswOps::new(&tracker, true);
-        let neighbours =
-            ops.search(Address(self.metadata.records), self.index.as_ref(), results, filter, with_duplicates);
+        let tracker = Retriever::new(&encoded_query, &self.nodes, config, min_score);
+        let query_address = Address(self.metadata.records);
 
-        neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results)
+        let mut filter_bitset = self.inverted_indexes.filter(filter);
+        if let Some(ref mut bitset) = filter_bitset {
+            bitset.intersect_with(&self.alive_bitset);
+        }
+        // If we have no filters, just the deletions
+        let bitset = filter_bitset.as_ref().unwrap_or(&self.alive_bitset);
+
+        let count = bitset.iter().count();
+        if count == 0 {
+            return Box::new(empty());
+        }
+        let expected_traversal_scan = results * self.metadata.records / count;
+
+        if count < expected_traversal_scan * HNSW_COST_FACTOR {
+            let mut scored_results = Vec::new();
+            for address in bitset.iter() {
+                let address = Address(address);
+                let score = tracker.similarity(query_address, address);
+                if score >= min_score {
+                    scored_results.push(Reverse(Cnx(address, score)));
+                }
+            }
+            scored_results.sort();
+            return Box::new(
+                scored_results.into_iter().map(|Reverse(a)| Neighbour::new(a.0, &self.nodes, a.1)).take(results),
+            );
+        }
+
+        let ops = HnswOps::new(&tracker, true);
+        let neighbours = ops.search(query_address, self.index.as_ref(), results, bitset, with_duplicates);
+        Box::new(
+            neighbours.into_iter().map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist))).take(results),
+        )
     }
 }
 
@@ -504,7 +505,7 @@ mod test {
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
 
-    use super::{create, merge, node::Node, Elem, LabelDictionary, NoDLog};
+    use super::{create, merge, node::Node, Elem, LabelDictionary};
     use nidx_protos::prost::*;
 
     const DIMENSION: usize = 128;
@@ -532,7 +533,7 @@ mod test {
     }
 
     fn random_key(rng: &mut impl Rng) -> String {
-        format!("{:032x?}", rng.gen::<u128>())
+        format!("{:032x?}/f/file/0-100", rng.gen::<u128>())
     }
 
     fn random_string(rng: &mut impl Rng) -> String {
@@ -591,7 +592,7 @@ mod test {
         let nodes = dp.nodes;
 
         for (i, (elem, mut labels)) in elems.into_iter().enumerate() {
-            let node = data_store::get_value(Node, &nodes, i);
+            let node = data_store::get_value(&nodes, i);
             assert_eq!(elem.key, Node::key(node));
             assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
 
@@ -633,11 +634,11 @@ mod test {
         let dp2 = create(path2.path(), elems2.iter().cloned().map(|x| x.0).collect(), &config, HashSet::new())?;
 
         let path_merged = tempdir()?;
-        let merged_dp = merge(path_merged.path(), &[(NoDLog, &dp1), (NoDLog, &dp2)], &config)?;
+        let merged_dp = merge(path_merged.path(), &[&dp1, &dp2], &config)?;
         let nodes = merged_dp.nodes;
 
         for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
-            let node = data_store::get_value(Node, &nodes, i);
+            let node = data_store::get_value(&nodes, i);
             assert_eq!(elem.key, Node::key(node));
             assert_eq!(config.vector_type.encode(&elem.vector), Node::vector(node));
 
@@ -708,7 +709,7 @@ mod test {
                 let mut similarities: Vec<_> = elems.iter().map(|(k, v)| (k, similarity(v, &query))).collect();
                 similarities.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
 
-                let results: Vec<_> = dp.search(&NoDLog, &query, &Default::default(), false, 5, &config, 0.0).collect();
+                let results: Vec<_> = dp.search(&query, &Default::default(), false, 5, &config, 0.0).collect();
 
                 let search: Vec<_> = results.iter().map(|r| String::from_utf8(r.id().to_vec()).unwrap()).collect();
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();

@@ -83,3 +83,10 @@ flag_management:
       statuses:
         - type: project
           target: 60%
+    - name: nidx
+      paths:
+        - nidx/**
+      carryforward: true
+      statuses:
+        - type: project
+          target: 70%

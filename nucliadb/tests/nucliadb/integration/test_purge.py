@@ -24,6 +24,7 @@ import uuid
 from typing import cast
 from unittest.mock import AsyncMock
 
+import pytest
 from httpx import AsyncClient
 
 import nucliadb.common.nidx
@@ -48,10 +49,12 @@ from nucliadb_utils.storages.storage import Storage
 from tests.utils.dirty_index import wait_for_sync
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_purge_deletes_everything_from_maindb(
     maindb_driver: Driver,
     storage: Storage,
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    nucliadb_reader_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
 ):
     """Create a KB and some resource and then purge it. Validate that purge
@@ -59,11 +62,11 @@ async def test_purge_deletes_everything_from_maindb(
 
     """
     kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_manager.post("/kbs", json={"slug": kb_slug})
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": kb_slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
-    resp = await nucliadb_manager.get("/kbs")
+    resp = await nucliadb_reader_manager.get("/kbs")
     body = resp.json()
     assert len(body["kbs"]) == 1
     assert body["kbs"][0]["uuid"] == kbid
@@ -84,10 +87,10 @@ async def test_purge_deletes_everything_from_maindb(
 
     assert await kb_catalog_entries_count(maindb_driver, kbid) > 0
 
-    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
     assert resp.status_code == 200
 
-    resp = await nucliadb_manager.get("/kbs")
+    resp = await nucliadb_reader_manager.get("/kbs")
     body = resp.json()
     assert len(body["kbs"]) == 0
 
@@ -111,10 +114,11 @@ async def test_purge_deletes_everything_from_maindb(
     assert len(keys_after_purge_storage) == 0
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_purge_orphan_shards(
     maindb_driver: Driver,
     storage: Storage,
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
 ):
     """Create a KB with some resource (hence a shard) and delete it. Simulate an
@@ -122,7 +126,7 @@ async def test_purge_orphan_shards(
 
     """
     kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_manager.post("/kbs", json={"slug": kb_slug})
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": kb_slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -143,7 +147,7 @@ async def test_purge_orphan_shards(
 
     with unittest.mock.patch.object(nucliadb.common.nidx.get_nidx(), "api_client"):
         nucliadb.common.nidx.get_nidx().api_client.DeleteShard = AsyncMock()
-        resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+        resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
         assert resp.status_code == 200, resp.text
         await purge_kb(maindb_driver)
 
@@ -170,10 +174,11 @@ async def test_purge_orphan_shards(
     assert len(shards) == 0
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_purge_orphan_shard_detection(
     maindb_driver: Driver,
     storage: Storage,
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
 ):
     """Prepare a situation where there are:
@@ -185,7 +190,7 @@ async def test_purge_orphan_shard_detection(
     """
     # Regular KB
     kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_manager.post("/kbs", json={"slug": kb_slug})
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": kb_slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -238,15 +243,16 @@ async def kb_catalog_entries_count(driver: Driver, kbid: str) -> int:
             return count[0]
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_purge_resources_deleted_storage(
     maindb_driver: Driver,
     storage: Storage,
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     nucliadb_writer: AsyncClient,
 ):
     # Create a KB
     kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_manager.post("/kbs", json={"slug": kb_slug})
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": kb_slug})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 

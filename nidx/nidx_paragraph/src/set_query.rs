@@ -36,8 +36,8 @@ pub struct SetQuery {
 
 impl SetQuery {
     /// Create a Term Set Query
-    pub fn new(field: Field, values: Vec<String>) -> Self {
-        let values = values.into_iter().collect();
+    pub fn new(field: Field, values: impl Iterator<Item = String>) -> Self {
+        let values = values.collect();
         let set = SetWeightWrapper::new(SetWeight {
             field,
             values,

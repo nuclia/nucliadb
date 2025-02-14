@@ -25,22 +25,6 @@ repos:
         types: ["python"]
         pass_filenames: false
 
-      - id: lint_nucliadb_node
-        name: Lint nucliadb_node
-        entry: make -C nucliadb_node lint
-        language: system
-        files: (^nucliadb_node/)
-        types: ["python"]
-        pass_filenames: false
-
-      - id: lint_nucliadb_performance
-        name: Lint nucliadb_performance
-        entry: make -C nucliadb_performance lint
-        language: system
-        files: (^nucliadb_performance/)
-        types: ["python"]
-        pass_filenames: false
-
       - id: lint_nucliadb_sdk
         name: Lint nucliadb_sdk
         entry: make -C nucliadb_sdk lint

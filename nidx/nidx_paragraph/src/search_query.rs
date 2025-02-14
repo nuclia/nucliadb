@@ -23,6 +23,7 @@ use crate::set_query::SetQuery;
 use itertools::Itertools;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::{StreamRequest, SuggestRequest};
+use nidx_types::prefilter::PrefilterResult;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::ops::Bound;
@@ -280,10 +281,27 @@ pub fn produce_date_range_query(
     Some(query)
 }
 
+fn apply_prefilter(
+    queries: &mut [&mut Vec<(Occur, Box<dyn Query>)>],
+    schema: &ParagraphSchema,
+    prefilter: &PrefilterResult,
+) {
+    if let PrefilterResult::Some(field_keys) = prefilter {
+        let set_query = Box::new(SetQuery::new(
+            schema.field_uuid,
+            field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
+        ));
+        for q in queries {
+            q.push((Occur::Must, set_query.clone()));
+        }
+    }
+}
+
 pub fn suggest_query(
     parser: &QueryParser,
     text: &str,
     request: &SuggestRequest,
+    prefilter: &PrefilterResult,
     schema: &ParagraphSchema,
     distance: u8,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
@@ -326,19 +344,7 @@ pub fn suggest_query(
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
 
-    if !request.key_filters.is_empty() {
-        let (field_ids, resource_ids) = request.key_filters.iter().cloned().partition::<Vec<_>, _>(|k| k.contains('/'));
-        if !field_ids.is_empty() {
-            let set_query = Box::new(SetQuery::new(schema.field_uuid, field_ids));
-            fuzzies.push((Occur::Must, set_query.clone()));
-            originals.push((Occur::Must, set_query.clone()));
-        }
-        if !resource_ids.is_empty() {
-            let set_query = Box::new(SetQuery::new(schema.uuid, resource_ids));
-            fuzzies.push((Occur::Must, set_query.clone()));
-            originals.push((Occur::Must, set_query.clone()));
-        }
-    }
+    apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter);
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
@@ -358,6 +364,7 @@ pub fn search_query(
     parser: &QueryParser,
     text: &str,
     search: &ParagraphSearchRequest,
+    prefilter: &PrefilterResult,
     schema: &ParagraphSchema,
     distance: u8,
     with_advance: Option<Box<dyn Query>>,
@@ -401,23 +408,6 @@ pub fn search_query(
             originals.push((Occur::Must, Box::new(created)));
         }
     }
-    // Fields
-    let mut field_filter: Vec<(Occur, Box<dyn Query>)> = vec![];
-    search
-        .fields
-        .iter()
-        .map(|value| format!("/{value}"))
-        .flat_map(|facet_key| Facet::from_text(&facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.field, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            field_filter.push((Occur::Should, Box::new(facet_term_query)));
-        });
-    if !field_filter.is_empty() {
-        let field_filter = Box::new(BooleanQuery::new(field_filter));
-        fuzzies.push((Occur::Must, field_filter.clone()));
-        originals.push((Occur::Must, field_filter));
-    }
 
     // Label filters
     if let Some(formula) = &search.filtering_formula {
@@ -426,19 +416,7 @@ pub fn search_query(
         originals.push((Occur::Must, query));
     }
 
-    if !search.key_filters.is_empty() {
-        let (field_ids, resource_ids) = search.key_filters.iter().cloned().partition::<Vec<_>, _>(|k| k.contains('/'));
-        if !field_ids.is_empty() {
-            let set_query = Box::new(SetQuery::new(schema.field_uuid, field_ids));
-            fuzzies.push((Occur::Must, set_query.clone()));
-            originals.push((Occur::Must, set_query.clone()));
-        }
-        if !resource_ids.is_empty() {
-            let set_query = Box::new(SetQuery::new(schema.uuid, resource_ids));
-            fuzzies.push((Occur::Must, set_query.clone()));
-            originals.push((Occur::Must, set_query.clone()));
-        }
-    }
+    apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter);
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;

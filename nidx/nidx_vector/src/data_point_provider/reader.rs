@@ -19,35 +19,21 @@
 //
 
 pub use crate::data_point::Neighbour;
-use crate::data_point::{self, OpenDataPoint};
+use crate::data_point::OpenDataPoint;
 use crate::data_point_provider::SearchRequest;
 use crate::data_point_provider::VectorConfig;
-use crate::data_types::dtrie_ram::DTrie;
-use crate::data_types::DeleteLog;
 use crate::request_types::VectorSearchRequest;
 use crate::utils;
-use crate::VectorSegmentMetadata;
 use crate::{formula::*, query_io};
 use crate::{VectorErr, VectorR};
 use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
+use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
-use nidx_types::Seq;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use tracing::*;
-
-#[derive(Clone, Copy)]
-pub struct TimeSensitiveDLog<'a> {
-    pub dlog: &'a DTrie,
-    pub time: Seq,
-}
-impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
-    fn is_deleted(&self, key: &[u8]) -> bool {
-        self.dlog.get(key).map(|t| t > self.time).unwrap_or_default()
-    }
-}
 
 // Fixed-sized sorted collection
 struct Fssc {
@@ -104,8 +90,7 @@ impl Fssc {
 
 pub struct Reader {
     config: VectorConfig,
-    open_data_points: Vec<(OpenDataPoint, Seq)>,
-    delete_log: DTrie,
+    open_data_points: Vec<OpenDataPoint>,
 }
 
 fn segment_matches(expression: &BooleanExpression, labels: &HashSet<String>) -> bool {
@@ -165,23 +150,10 @@ impl TryFrom<Neighbour> for DocumentScored {
 }
 
 impl Reader {
-    pub fn open(
-        segments: Vec<(VectorSegmentMetadata, Seq)>,
-        config: VectorConfig,
-        delete_log: DTrie,
-    ) -> VectorR<Reader> {
-        let mut open_data_points = Vec::new();
-
-        for (metadata, seq) in segments {
-            let open_data_point = data_point::open(metadata)?;
-
-            open_data_points.push((open_data_point, seq));
-        }
-
+    pub fn open(open_data_points: Vec<OpenDataPoint>, config: VectorConfig) -> VectorR<Reader> {
         Ok(Reader {
             config,
             open_data_points,
-            delete_log,
         })
     }
 
@@ -216,24 +188,13 @@ impl Reader {
         let min_score = request.min_score();
         let mut ffsv = Fssc::new(request.no_results(), with_duplicates);
 
-        for (open_data_point, seq) in &self.open_data_points {
+        for open_data_point in &self.open_data_points {
             // Skip this segment if it doesn't match the segment filter
             if !segment_filter.as_ref().map_or(true, |f| segment_matches(f, open_data_point.tags())) {
                 continue;
             }
-            let delete_log = TimeSensitiveDLog {
-                time: *seq,
-                dlog: &self.delete_log,
-            };
-            let partial_solution = open_data_point.search(
-                &delete_log,
-                query,
-                filter,
-                with_duplicates,
-                no_results,
-                &self.config,
-                min_score,
-            );
+            let partial_solution =
+                open_data_point.search(query, filter, with_duplicates, no_results, &self.config, min_score);
             for candidate in partial_solution {
                 ffsv.add(candidate);
             }
@@ -242,7 +203,11 @@ impl Reader {
         Ok(ffsv.into())
     }
 
-    pub fn search(&self, request: &VectorSearchRequest) -> anyhow::Result<VectorSearchResponse> {
+    pub fn search(
+        &self,
+        request: &VectorSearchRequest,
+        prefilter: &PrefilterResult,
+    ) -> anyhow::Result<VectorSearchResponse> {
         let time = Instant::now();
 
         let id = Some(&request.id);
@@ -260,24 +225,10 @@ impl Reader {
             formula.extend(field_clause);
         }
 
-        if !request.key_filters.is_empty() {
-            let (field_ids, resource_ids) = request.key_filters.iter().cloned().partition(|k| k.contains('/'));
-            let clause_labels = AtomClause::key_set(resource_ids, field_ids);
+        if let PrefilterResult::Some(valid_fields) = prefilter {
+            let field_ids = valid_fields.iter().map(|f| format!("{}{}", f.resource_id.simple(), f.field_id)).collect();
+            let clause_labels = AtomClause::key_set(field_ids);
             formula.extend(clause_labels);
-        }
-
-        if !request.field_filters.is_empty() {
-            let mut field_atoms: Vec<Clause> = vec![];
-            for field in request.field_filters.iter() {
-                // split "a/title" into "a" and "title"
-                let parts = field.split('/').collect::<Vec<&str>>();
-                let field_type = parts.first().unwrap_or(&"").to_string();
-                let field_name = parts.get(1).map(|s| s.to_string());
-                let atom_clause = Clause::Atom(AtomClause::key_field(field_type, field_name));
-                field_atoms.push(atom_clause);
-            }
-            let compound = CompoundClause::new(BooleanOperator::Or, field_atoms);
-            formula.extend(compound);
         }
 
         if let Some(filter) = request.filtering_formula.as_ref() {
@@ -323,10 +274,12 @@ mod tests {
 
     use nidx_protos::resource::ResourceStatus;
     use nidx_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorsetSentences};
+    use nidx_types::prefilter::FieldId;
     use tempfile::TempDir;
 
     use super::*;
     use crate::config::{Similarity, VectorConfig, VectorType};
+    use crate::data_point;
     use crate::indexer::{index_resource, ResourceWrapper};
 
     #[test]
@@ -341,14 +294,14 @@ mod tests {
             },
         };
         let raw_sentences = [
-            ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
-            ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
-            ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
-            ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
+            ("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/1".to_string(), vec![1.0, 3.0, 4.0]),
+            ("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/2".to_string(), vec![2.0, 4.0, 5.0]),
+            ("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/3".to_string(), vec![3.0, 5.0, 6.0]),
+            ("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1/4".to_string(), vec![3.0, 5.0, 6.0]),
         ];
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
-            uuid: "DOC/KEY".to_string(),
+            uuid: "6c5fc1f7a69042d4b24b7f18ea354b4a/f/field".to_string(),
         };
 
         let mut sentences = HashMap::new();
@@ -377,37 +330,40 @@ mod tests {
             metadata: None,
         };
         let paragraphs = IndexParagraphs {
-            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+            paragraphs: HashMap::from([("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1".to_string(), paragraph)]),
         };
         let resource = Resource {
             resource: Some(resource_id),
             texts: HashMap::with_capacity(0),
             status: ResourceStatus::Processed as i32,
             labels: vec!["2".to_string()],
-            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs: HashMap::from([("6c5fc1f7a69042d4b24b7f18ea354b4a/f/field1".to_string(), paragraphs)]),
             shard_id: "DOC".to_string(),
             ..Default::default()
         };
 
-        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
-        let mut request = VectorSearchRequest {
+        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
+        let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             field_labels: vec!["1".to_string()],
-            key_filters: vec!["DOC/KEY/1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let mut field_filter = FieldId {
+            resource_id: uuid::Uuid::parse_str("6c5fc1f7a69042d4b24b7f18ea354b4a").unwrap(),
+            field_id: "/f/field1".to_string(),
+        };
+        let result = reader.search(&request, &PrefilterResult::Some(vec![field_filter.clone()])).unwrap();
         assert_eq!(result.documents.len(), 4);
 
-        request.key_filters = vec!["DOC/KEY/0".to_string()];
-        let result = reader.search(&request).unwrap();
+        field_filter.field_id = "/f/field2".to_string();
+        let result = reader.search(&request, &PrefilterResult::Some(vec![field_filter])).unwrap();
         assert_eq!(result.documents.len(), 0);
 
         Ok(())
@@ -425,14 +381,14 @@ mod tests {
             },
         };
         let raw_sentences = [
-            ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
-            ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
-            ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
-            ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-1".to_string(), vec![1.0, 3.0, 4.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/1-2".to_string(), vec![2.0, 4.0, 5.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/2-3".to_string(), vec![3.0, 5.0, 6.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/3-4".to_string(), vec![3.0, 5.0, 6.0]),
         ];
         let resource_id = ResourceId {
-            shard_id: "DOC".to_string(),
-            uuid: "DOC/KEY".to_string(),
+            shard_id: "dec1c64b-06e5-419c-897a-72d8a39b799e".to_string(),
+            uuid: "9cb39c75f8d9498d8f82d92b173011f5".to_string(),
         };
 
         let mut sentences = HashMap::new();
@@ -473,9 +429,9 @@ mod tests {
             ..Default::default()
         };
 
-        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -486,7 +442,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 4);
 
         let request = VectorSearchRequest {
@@ -499,7 +455,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 3);
 
         // Check that min_score works
@@ -514,7 +470,7 @@ mod tests {
             min_score: 900.0,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 0);
 
         let bad_request = VectorSearchRequest {
@@ -527,7 +483,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        assert!(reader.search(&bad_request).is_err());
+        assert!(reader.search(&bad_request, &PrefilterResult::All).is_err());
 
         Ok(())
     }
@@ -543,11 +499,13 @@ mod tests {
                 dimension: 3,
             },
         };
-        let raw_sentences =
-            [("DOC/KEY/1/1".to_string(), vec![1.0, 2.0, 3.0]), ("DOC/KEY/1/2".to_string(), vec![1.0, 2.0, 3.0])];
+        let raw_sentences = [
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string(), vec![1.0, 2.0, 3.0]),
+            ("9cb39c75f8d9498d8f82d92b173011f5/f/field/100-200".to_string(), vec![1.0, 2.0, 3.0]),
+        ];
         let resource_id = ResourceId {
-            shard_id: "DOC".to_string(),
-            uuid: "DOC/KEY".to_string(),
+            shard_id: "dec1c64b-06e5-419c-897a-72d8a39b799e".to_string(),
+            uuid: "9cb39c75f8d9498d8f82d92b173011f5".to_string(),
         };
 
         let mut sentences = HashMap::new();
@@ -576,21 +534,21 @@ mod tests {
             metadata: None,
         };
         let paragraphs = IndexParagraphs {
-            paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),
+            paragraphs: HashMap::from([("9cb39c75f8d9498d8f82d92b173011f5/f/field/0-100".to_string(), paragraph)]),
         };
         let resource = Resource {
             resource: Some(resource_id),
             texts: HashMap::with_capacity(0),
             status: ResourceStatus::Processed as i32,
             labels: vec!["2".to_string()],
-            paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
+            paragraphs: HashMap::from([("f/field".to_string(), paragraphs)]),
             shard_id: "DOC".to_string(),
             ..Default::default()
         };
 
-        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?;
+        let segment = index_resource(ResourceWrapper::from(&resource), segment_path, &vsc)?.unwrap();
 
-        let reader = Reader::open(vec![(segment.unwrap(), 0i64.into())], vsc, DTrie::new()).unwrap();
+        let reader = Reader::open(vec![data_point::open(segment)?], vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector_set: "".to_string(),
@@ -601,7 +559,7 @@ mod tests {
             with_duplicates: true,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 2);
 
         let request = VectorSearchRequest {
@@ -614,7 +572,7 @@ mod tests {
             with_duplicates: false,
             ..Default::default()
         };
-        let result = reader.search(&request).unwrap();
+        let result = reader.search(&request, &PrefilterResult::All).unwrap();
         assert_eq!(result.documents.len(), 1);
 
         Ok(())

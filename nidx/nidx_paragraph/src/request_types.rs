@@ -24,7 +24,6 @@ use nidx_types::query_language::BooleanExpression;
 pub struct ParagraphSearchRequest {
     pub id: String,
     pub uuid: String,
-    pub fields: Vec<String>,
     /// query this text in all the paragraphs
     pub body: String,
     pub filter: Option<nidx_protos::Filter>,
@@ -37,7 +36,6 @@ pub struct ParagraphSearchRequest {
     pub with_duplicates: bool,
     pub only_faceted: bool,
     pub advanced_query: Option<String>,
-    pub key_filters: Vec<String>,
     pub min_score: f32,
     pub security: Option<nidx_protos::utils::Security>,
 

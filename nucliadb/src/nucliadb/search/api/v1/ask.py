@@ -36,7 +36,8 @@ from nucliadb_models.search import (
     SyncAskResponse,
     parse_max_tokens,
 )
-from nucliadb_utils.authentication import requires
+from nucliadb_models.security import RequestSecurity
+from nucliadb_utils.authentication import NucliaUser, requires
 
 
 @api.post(
@@ -62,6 +63,15 @@ async def ask_knowledgebox_endpoint(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> Union[StreamingResponse, HTTPClientError, Response]:
+    current_user: NucliaUser = request.user
+    # If present, security groups from AuthorizationBackend overrides any
+    # security group of the payload
+    if current_user.security_groups:
+        if item.security is None:
+            item.security = RequestSecurity(groups=current_user.security_groups)
+        else:
+            item.security.groups = current_user.security_groups
+
     return await create_ask_response(
         kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for, x_synchronous
     )

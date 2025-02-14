@@ -91,6 +91,16 @@ message Predict {
     uint32 num_predicts = 7;
 }
 
+enum ActivityLogMatchType {
+    TRACE_ID = 0;
+    PROCESSING_ID = 1;
+    ACTIVITY_LOG_ID = 2;
+}
+
+message ActivityLogMatch {
+    string id = 1;
+    ActivityLogMatchType type = 2;
+}
 
 message KbUsage {
     // Identifiers
@@ -99,6 +109,8 @@ message KbUsage {
     optional string account_id = 3;
     optional string kb_id = 4;
     KBSource kb_source = 5;
+
+    optional ActivityLogMatch activity_log_match = 10;
 
     // Data
     repeated Process processes = 6;

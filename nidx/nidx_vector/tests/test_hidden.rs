@@ -21,7 +21,7 @@
 mod common;
 
 use common::{resource, TestOpener};
-use nidx_types::query_language::BooleanExpression;
+use nidx_types::{prefilter::PrefilterResult, query_language::BooleanExpression};
 use nidx_vector::{config::VectorConfig, VectorIndexer, VectorSearchRequest, VectorSearcher};
 use std::collections::HashSet;
 use tempfile::tempdir;
@@ -38,12 +38,12 @@ fn test_hidden_search() -> anyhow::Result<()> {
 
     // Create two resources, one hidden and one not
     let labels = vec!["/q/h".to_string()];
-    let hidden_resource = resource(labels);
+    let hidden_resource = resource(labels, vec![]);
     let hidden_dir = tempdir()?;
     let hidden_segment =
         VectorIndexer.index_resource(hidden_dir.path(), &config, &hidden_resource, "default", true)?.unwrap();
 
-    let visible_resource = resource(vec![]);
+    let visible_resource = resource(vec![], vec![]);
     let visible_dir = tempdir()?;
     let visible_segment =
         VectorIndexer.index_resource(visible_dir.path(), &config, &visible_resource, "default", true)?.unwrap();
@@ -61,7 +61,7 @@ fn test_hidden_search() -> anyhow::Result<()> {
         segment_filtering_formula: None,
         ..Default::default()
     };
-    let all = reader.search(&request)?;
+    let all = reader.search(&request, &PrefilterResult::All)?;
     assert_eq!(
         HashSet::from_iter(all.documents.into_iter().map(|d| d.doc_id.unwrap().id)),
         HashSet::from([
@@ -73,7 +73,7 @@ fn test_hidden_search() -> anyhow::Result<()> {
     // Find only the visible resource
     request.segment_filtering_formula =
         Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/q/h".to_string()))));
-    let visible = reader.search(&request)?;
+    let visible = reader.search(&request, &PrefilterResult::All)?;
     assert_eq!(visible.documents.len(), 1);
     assert_eq!(
         visible.documents[0].clone().doc_id.unwrap().id,

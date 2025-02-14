@@ -20,7 +20,6 @@
 
 use std::io;
 
-use crate::data_types::data_store::Interpreter;
 use crate::data_types::trie;
 use crate::data_types::usize_utils::*;
 
@@ -137,17 +136,10 @@ impl Node {
         let xvec_start = xvec_ptr + 2 * U32_LEN + xvec_pad as usize;
         &x[xvec_start..(xvec_start + xvec_len)]
     }
-    // x must be serialized using Node, may have trailing bytes.
-    pub fn has_label(x: &[u8], label: &[u8]) -> bool {
-        let xlabel_ptr = usize_from_slice_le(&x[LABEL_START.0..LABEL_START.1]);
-        trie::has_word(&x[xlabel_ptr..], label)
-    }
-}
-impl Interpreter for Node {
-    fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
+    pub fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
         Self::key(x)
     }
-    fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
+    pub fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
         let len = usize_from_slice_le(&x[LEN.0..LEN.1]);
         (&x[0..len], &x[len..])
     }
@@ -209,7 +201,7 @@ mod tests {
         assert_eq!(&buf[skey], key.as_slice());
         assert_eq!(Node::vector(&buf), &vector);
         assert_eq!(Node::key(&buf), key);
-        assert!(LABELS.iter().all(|l| Node::has_label(&buf, l)));
+        assert!(LABELS.iter().all(|l| Node::labels(&buf).contains(&String::from_utf8_lossy(l).to_string())));
     }
 
     #[test]
@@ -229,8 +221,6 @@ mod tests {
         assert_eq!(Node::key(&buf[node2..]), key2);
         assert_eq!(Node::vector(&buf[node1..]), vector1);
         assert_eq!(Node::vector(&buf[node2..]), vector2);
-        assert!(Node.keep_in_merge(&buf[node1..]));
-        assert!(Node.keep_in_merge(&buf[node2..]));
         assert_eq!(Node::metadata(&buf[node1..]), metadata1);
         assert_eq!(Node::metadata(&buf[node2..]), metadata2);
         assert_eq!(Node.read_exact(&buf[node1..]), (&buf[node1..node2], &buf[node2..]));

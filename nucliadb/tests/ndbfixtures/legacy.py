@@ -16,36 +16,19 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
-from typing import Optional
+from typing import AsyncIterator
 
-from pydantic_settings import BaseSettings
+import pytest
 
+from nucliadb.common.maindb.driver import Driver, Transaction
 
-class Settings(BaseSettings):
-    main_api: str = "http://localhost:8080/api"
-    search_api: Optional[str] = None
-    reader_api: Optional[str] = None
-    predict_api: str = "http://predict.learning.svc.cluster.local:8080/api/internal/predict"
-    benchmark_output: Optional[str] = None
-    saved_requests_file: Optional[str] = None
-    exports_folder: str = "exports"
+# Dependents: search, nucliadb
 
 
-def get_benchmark_output_file():
-    return settings.benchmark_output or "benchmark.json"
-
-
-def get_search_api_url():
-    return settings.search_api or settings.main_api
-
-
-def get_reader_api_url():
-    return settings.reader_api or settings.main_api
-
-
-def get_predict_api_url():
-    return settings.predict_api
-
-
-settings = Settings()
+@pytest.fixture(scope="function")
+async def txn(maindb_driver: Driver) -> AsyncIterator[Transaction]:
+    async with maindb_driver.transaction() as txn:
+        yield txn
+        await txn.abort()

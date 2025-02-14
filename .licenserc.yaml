@@ -48,7 +48,6 @@ header:
   paths:
     - "nucliadb/**"
     - "nucliadb_dataset/**"
-    - "nucliadb_performance/**"
     - "nucliadb_protos/build.rs"
     - "nucliadb_protos/src/lib.rs"
     - "nucliadb_sdk/**"

@@ -30,7 +30,7 @@ from nucliadb_models.common import FieldTypeName, ParamDefault
 
 # Bw/c import to avoid breaking users
 # noqa isort: skip
-from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
+from nucliadb_models.metadata import RelationNodeType, RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.utils import DateTime
@@ -228,11 +228,8 @@ class RelationDirection(str, Enum):
     OUT = "out"
 
 
-class EntityType(str, Enum):
-    ENTITY = "entity"
-    LABEL = "label"
-    RESOURCE = "resource"
-    USER = "user"
+# Bw/c we use to have this model duplicated
+EntityType = RelationNodeType
 
 
 class DirectionalRelation(BaseModel):
@@ -1684,7 +1681,16 @@ class SummarizedResponse(BaseModel):
     )
 
 
+class KnowledgeGraphEntity(BaseModel):
+    name: str
+    type: Optional[RelationNodeType] = None
+    subtype: Optional[str] = None
+
+
 class FindRequest(BaseSearchRequest):
+    query_entities: SkipJsonSchema[Optional[list[KnowledgeGraphEntity]]] = Field(
+        default=None, title="Query entities", description="Entities to use in a knowledge graph search"
+    )
     features: list[SearchOptions] = SearchParamDefaults.search_features.to_pydantic_field(
         default=[
             SearchOptions.KEYWORD,
@@ -1796,6 +1802,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
     resources: dict[str, FindResource]
     relations: Optional[Relations] = None
     query: Optional[str] = None
+    rephrased_query: Optional[str] = None
     total: int = 0
     page_number: int = Field(
         default=0,

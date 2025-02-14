@@ -83,6 +83,10 @@ class Settings(DriverSettings, StorageSettings, ExtendedStorageSettings):
         default="X-NUCLIADB-ROLES",
         description="Only used for `upstream_naive` auth policy.",
     )
+    auth_policy_security_groups_header: str = pydantic.Field(
+        default="X-NUCLIADB-SECURITY_GROUPS",
+        description="Only used for `upstream_naive` auth policy.",
+    )
     auth_policy_user_default_roles: list[NucliaDBRoles] = pydantic.Field(
         default=[NucliaDBRoles.READER, NucliaDBRoles.WRITER, NucliaDBRoles.MANAGER],
         description="Default role to assign to user that is authenticated \

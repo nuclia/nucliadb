@@ -25,7 +25,7 @@ from httpx import AsyncClient
 
 @pytest.fixture(scope="function")
 async def ten_dummy_resources_kb(
-    nucliadb_manager: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
 ):
@@ -40,7 +40,7 @@ async def ten_dummy_resources_kb(
         for i in range(N_RESOURCES)
     ]
 
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "ten-dummy-resources"})
+    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": "ten-dummy-resources"})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -62,5 +62,5 @@ async def ten_dummy_resources_kb(
 
     yield kbid
 
-    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
+    resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
     assert resp.status_code == 200

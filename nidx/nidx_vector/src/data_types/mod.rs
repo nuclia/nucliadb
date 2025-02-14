@@ -19,7 +19,6 @@
 //
 
 pub mod data_store;
-pub mod dtrie_ram;
 pub mod trie;
 pub mod trie_ram;
 
@@ -35,34 +34,5 @@ pub mod usize_utils {
         let mut buff = [0; U32_LEN];
         buff.copy_from_slice(v);
         u32::from_le_bytes(buff)
-    }
-}
-
-pub trait DeleteLog: std::marker::Sync {
-    fn is_deleted(&self, _: &[u8]) -> bool;
-}
-
-impl<'a, D: DeleteLog> DeleteLog for &'a D {
-    fn is_deleted(&self, x: &[u8]) -> bool {
-        D::is_deleted(self, x)
-    }
-}
-
-impl DeleteLog for dtrie_ram::DTrie {
-    fn is_deleted(&self, key: &[u8]) -> bool {
-        self.get(key).is_some()
-    }
-}
-
-impl<Dl: DeleteLog, S: data_store::Interpreter> data_store::Interpreter for (Dl, S) {
-    fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
-        self.1.get_key(x)
-    }
-    fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
-        self.1.read_exact(x)
-    }
-    fn keep_in_merge(&self, x: &[u8]) -> bool {
-        let key = self.1.get_key(x);
-        !self.0.is_deleted(key)
     }
 }

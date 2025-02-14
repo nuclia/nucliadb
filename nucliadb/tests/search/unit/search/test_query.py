@@ -187,7 +187,7 @@ class TestVectorSetAndMatryoshkaParsing:
             patch("nucliadb.common.datamanagers.utils.get_driver"),
             patch("nucliadb.common.datamanagers.vectorsets.get_kv_pb"),
         ):
-            request, incomplete, _ = await parser.parse()
+            request, incomplete, _, _ = await parser.parse()
             assert not incomplete
 
             assert request.vectorset == expected_vectorset

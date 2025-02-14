@@ -29,13 +29,14 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_crud(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/{RESOURCES_PREFIX}",
         json={
             "slug": "mykb",
             "title": "My KB",
@@ -44,35 +45,36 @@ async def test_resource_crud(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     assert resp.json()["title"] == "My KB"
 
     resp = await nucliadb_writer.patch(
-        f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{rid}",
         json={
             "title": "My updated KB",
         },
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     assert resp.json()["title"] == "My updated KB"
 
     resp = await nucliadb_writer.delete(
-        f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{rid}",
     )
     assert resp.status_code == 204
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{rid}")
     assert resp.status_code == 404
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_list_resources(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     """
     - Create 20 resources
@@ -82,7 +84,7 @@ async def test_list_resources(
     rids = set()
     for _ in range(20):
         resp = await nucliadb_writer.post(
-            f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+            f"/{KB_PREFIX}/{standalone_knowledgebox}/{RESOURCES_PREFIX}",
             json={
                 "title": "My resource",
             },
@@ -91,12 +93,12 @@ async def test_list_resources(
         rids.add(resp.json()["uuid"])
 
     got_rids = set()
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=0")
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{standalone_knowledgebox}/resources?size=10&page=0")
     assert resp.status_code == 200
     for r in resp.json()["resources"]:
         got_rids.add(r["id"])
 
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=1")
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{standalone_knowledgebox}/resources?size=10&page=1")
     assert resp.status_code == 200
     for r in resp.json()["resources"]:
         got_rids.add(r["id"])
@@ -104,16 +106,17 @@ async def test_list_resources(
     assert got_rids == rids
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_get_resource_field(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     slug = "my-resource"
     field = "text-field"
 
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/{RESOURCES_PREFIX}",
         json={
             "slug": slug,
             "title": "My Resource",
@@ -123,29 +126,30 @@ async def test_get_resource_field(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/text/{field}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}/text/{field}")
     assert resp.status_code == 200
     body_by_slug = resp.json()
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/slug/{slug}/text/{field}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/slug/{slug}/text/{field}")
     assert resp.status_code == 200
     body_by_rid = resp.json()
 
     assert body_by_slug == body_by_rid
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_creation_slug_conflicts(
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
     philosophy_books_kb,
 ):
     """
     Test that creating two resources with the same slug raises a conflict error
     """
     slug = "myresource"
-    resources_path = f"/{KB_PREFIX}/{{knowledgebox}}/{RESOURCES_PREFIX}"
+    resources_path = f"/{KB_PREFIX}/{{standalone_knowledgebox}}/{RESOURCES_PREFIX}"
     resp = await nucliadb_writer.post(
-        resources_path.format(knowledgebox=knowledgebox),
+        resources_path.format(standalone_knowledgebox=standalone_knowledgebox),
         json={
             "slug": slug,
         },
@@ -153,7 +157,7 @@ async def test_resource_creation_slug_conflicts(
     assert resp.status_code == 201
 
     resp = await nucliadb_writer.post(
-        resources_path.format(knowledgebox=knowledgebox),
+        resources_path.format(standalone_knowledgebox=standalone_knowledgebox),
         json={
             "slug": slug,
         },
@@ -162,7 +166,7 @@ async def test_resource_creation_slug_conflicts(
 
     # Creating it in another KB should not raise conflict error
     resp = await nucliadb_writer.post(
-        resources_path.format(knowledgebox=philosophy_books_kb),
+        resources_path.format(standalone_knowledgebox=philosophy_books_kb),
         json={
             "slug": slug,
         },
@@ -170,13 +174,14 @@ async def test_resource_creation_slug_conflicts(
     assert resp.status_code == 201
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_title_is_set_automatically_if_not_provided(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/{RESOURCES_PREFIX}",
         json={
             "texts": {"text-field": {"body": "test1", "format": "PLAIN"}},
         },
@@ -184,22 +189,23 @@ async def test_title_is_set_automatically_if_not_provided(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["title"] == rid
 
 
 @pytest.mark.parametrize("update_by", ["slug", "uuid"])
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_modification(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
     update_by,
 ):
     old_slug = "my-resource"
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/{RESOURCES_PREFIX}",
         json={
             "title": "My Resource",
             "slug": old_slug,
@@ -208,14 +214,14 @@ async def test_resource_slug_modification(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    await check_resource(nucliadb_reader, knowledgebox, rid, old_slug)
+    await check_resource(nucliadb_reader, standalone_knowledgebox, rid, old_slug)
 
     # Update the slug
     new_slug = "my-resource-2"
     if update_by == "slug":
-        path = f"/{KB_PREFIX}/{knowledgebox}/slug/{old_slug}"
+        path = f"/{KB_PREFIX}/{standalone_knowledgebox}/slug/{old_slug}"
     else:
-        path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}"
+        path = f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{rid}"
     resp = await nucliadb_writer.patch(
         path,
         json={
@@ -225,10 +231,10 @@ async def test_resource_slug_modification(
     )
     assert resp.status_code == 200
 
-    await check_resource(nucliadb_reader, knowledgebox, rid, new_slug, title="New title")
+    await check_resource(nucliadb_reader, standalone_knowledgebox, rid, new_slug, title="New title")
 
 
-async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
+async def check_resource(nucliadb_reader: AsyncClient, kbid, rid, slug, **body_checks):
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
     assert resp.status_code == 200
     assert resp.json()["slug"] == slug
@@ -241,14 +247,15 @@ async def check_resource(nucliadb_reader, kbid, rid, slug, **body_checks):
         assert body[key] == value
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_modification_rollbacks(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
 ):
     old_slug = "my-resource"
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/{RESOURCES_PREFIX}",
         json={
             "title": "Old title",
             "slug": old_slug,
@@ -257,7 +264,7 @@ async def test_resource_slug_modification_rollbacks(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    await check_resource(nucliadb_reader, knowledgebox, rid, old_slug)
+    await check_resource(nucliadb_reader, standalone_knowledgebox, rid, old_slug)
 
     # Mock an error in the sending to process
     with mock.patch(
@@ -265,7 +272,7 @@ async def test_resource_slug_modification_rollbacks(
         side_effect=HTTPException(status_code=506),
     ):
         resp = await nucliadb_writer.patch(
-            f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
+            f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{rid}",
             json={
                 "slug": "my-resource-2",
                 "title": "New title",
@@ -274,12 +281,13 @@ async def test_resource_slug_modification_rollbacks(
         assert resp.status_code == 506
 
     # Check that slug and title were not updated
-    await check_resource(nucliadb_reader, knowledgebox, rid, old_slug, title="New title")
+    await check_resource(nucliadb_reader, standalone_knowledgebox, rid, old_slug, title="New title")
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_modification_handles_conflicts(
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
 ):
     rids = []
     slugs = []
@@ -287,7 +295,7 @@ async def test_resource_slug_modification_handles_conflicts(
         slug = f"my-resource-{i}"
         slugs.append(slug)
         resp = await nucliadb_writer.post(
-            f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+            f"/{KB_PREFIX}/{standalone_knowledgebox}/{RESOURCES_PREFIX}",
             json={
                 "title": "My Resource",
                 "slug": slug,
@@ -298,7 +306,7 @@ async def test_resource_slug_modification_handles_conflicts(
         rids.append(rid)
 
     # Check that conflicts on slug are detected
-    path = f"/{KB_PREFIX}/{knowledgebox}/resource/{rids[0]}"
+    path = f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{rids[0]}"
     resp = await nucliadb_writer.patch(
         path,
         json={
@@ -308,12 +316,13 @@ async def test_resource_slug_modification_handles_conflicts(
     assert resp.status_code == 409
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_resource_slug_modification_handles_unknown_resources(
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
 ):
     resp = await nucliadb_writer.patch(
-        f"/{KB_PREFIX}/{knowledgebox}/resource/foobar",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/foobar",
         json={
             "slug": "foo",
         },
@@ -321,9 +330,10 @@ async def test_resource_slug_modification_handles_unknown_resources(
     assert resp.status_code == 404
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_parallel_dup_resource_creation_raises_conflicts(
-    nucliadb_writer,
-    knowledgebox,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
 ):
     driver = get_driver()
     if not isinstance(driver, PGDriver):
@@ -344,7 +354,7 @@ async def test_parallel_dup_resource_creation_raises_conflicts(
     # Create 5 requests that attempt to create the same resource with the same slug simultaneously
     tasks = []
     for _ in range(5):
-        tasks.append(asyncio.create_task(create_resource(knowledgebox)))
+        tasks.append(asyncio.create_task(create_resource(standalone_knowledgebox)))
     status_codes = await asyncio.gather(*tasks)
 
     # Check that only one succeeded

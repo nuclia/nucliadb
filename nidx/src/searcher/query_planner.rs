@@ -22,6 +22,7 @@ use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::{RelationSearchRequest, SearchRequest};
 use nidx_text::prefilter::*;
 use nidx_text::DocumentSearchRequest;
+use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
 use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
@@ -32,6 +33,7 @@ use super::query_language::QueryAnalysis;
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
 pub struct IndexQueries {
+    pub prefilter_results: PrefilterResult,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
@@ -39,43 +41,26 @@ pub struct IndexQueries {
 }
 
 impl IndexQueries {
-    fn apply_to_vectors(request: &mut VectorSearchRequest, response: &PreFilterResponse) {
-        let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
+    fn apply_to_vectors(request: &mut VectorSearchRequest, response: &PrefilterResult) {
+        let PrefilterResult::Some(_) = &response else {
             return;
         };
-        // Add vectors key filters
-        for valid_field in valid_fields {
-            let resource_id = &valid_field.resource_id;
-            let field_id = &valid_field.field_id;
-            let as_vectors_key = format!("{resource_id}{field_id}");
-            request.key_filters.push(as_vectors_key);
-        }
+
         // Clear labels to avoid duplicate filtering
         request.field_labels.clear();
     }
 
-    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PreFilterResponse) {
-        if matches!(response.valid_fields, ValidFieldCollector::All) {
+    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PrefilterResult) {
+        if matches!(response, PrefilterResult::All) {
             // Since all the fields are matching there is no need to use this filter.
             request.timestamps = None;
-        }
-        let ValidFieldCollector::Some(valid_fields) = &response.valid_fields else {
-            return;
-        };
-
-        // Add key filters
-        for valid_field in valid_fields {
-            let resource_id = &valid_field.resource_id;
-            let field_id = &valid_field.field_id;
-            let unique_field_key = format!("{resource_id}{field_id}");
-            request.key_filters.push(unique_field_key);
         }
     }
 
     /// When a pre-filter is run, the result can be used to modify the queries
     /// that the indexes must resolve.
-    pub fn apply_prefilter(&mut self, prefiltered: PreFilterResponse) {
-        if matches!(prefiltered.valid_fields, ValidFieldCollector::None) {
+    pub fn apply_prefilter(&mut self, prefiltered: PrefilterResult) {
+        if matches!(prefiltered, PrefilterResult::None) {
             // There are no matches so there is no need to run the rest of the search
             self.vectors_request = None;
             self.paragraphs_request = None;
@@ -84,12 +69,14 @@ impl IndexQueries {
             return;
         }
 
+        self.prefilter_results = prefiltered;
+
         if let Some(vectors_request) = self.vectors_request.as_mut() {
-            IndexQueries::apply_to_vectors(vectors_request, &prefiltered);
+            IndexQueries::apply_to_vectors(vectors_request, &self.prefilter_results);
         };
 
         if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
-            IndexQueries::apply_to_paragraphs(paragraph_request, &prefiltered)
+            IndexQueries::apply_to_paragraphs(paragraph_request, &self.prefilter_results);
         }
     }
 }
@@ -128,6 +115,7 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
+            prefilter_results: PrefilterResult::All,
             vectors_request,
             paragraphs_request,
             texts_request,
@@ -146,6 +134,8 @@ fn compute_prefilters(
         labels_formula: labels,
         security: None,
         keywords_formula: keywords,
+        key_filter: search_request.key_filters.clone(),
+        field_filter: search_request.fields.clone(),
     };
 
     // Security filters
@@ -167,6 +157,8 @@ fn compute_prefilters(
         && !request_has_labels_filters
         && !request_has_keywords_filters
         && !request_has_security_filters
+        && prefilter_request.key_filter.is_empty()
+        && prefilter_request.field_filter.is_empty()
     {
         None
     } else {
@@ -204,12 +196,10 @@ fn compute_paragraphs_request(
         return None;
     }
 
-    #[allow(deprecated)]
     Some(ParagraphSearchRequest {
         uuid: "".to_string(),
         with_duplicates: search_request.with_duplicates,
         body: search_request.body.clone(),
-        fields: search_request.fields.clone(),
         order: search_request.order.clone(),
         faceted: search_request.faceted.clone(),
         page_number: search_request.page_number,
@@ -217,7 +207,6 @@ fn compute_paragraphs_request(
         timestamps: search_request.timestamps,
         only_faceted: search_request.only_faceted,
         advanced_query: search_request.advanced_query.clone(),
-        key_filters: search_request.key_filters.clone(),
         id: String::default(),
         filter: None,
         min_score: search_request.min_score_bm25,
@@ -234,7 +223,6 @@ fn compute_texts_request(
         return None;
     }
 
-    #[allow(deprecated)]
     Some(DocumentSearchRequest {
         id: search_request.shard.clone(),
         body: search_request.body.clone(),
@@ -261,7 +249,6 @@ fn compute_vectors_request(
         return None;
     }
 
-    #[allow(deprecated)]
     Some(VectorSearchRequest {
         id: search_request.shard.clone(),
         vector_set: search_request.vectorset.clone(),
@@ -269,7 +256,6 @@ fn compute_vectors_request(
         page_number: search_request.page_number,
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
-        key_filters: search_request.key_filters.clone(),
         min_score: search_request.min_score_semantic,
         field_labels: Vec::with_capacity(0),
         paragraph_labels: Vec::with_capacity(0),

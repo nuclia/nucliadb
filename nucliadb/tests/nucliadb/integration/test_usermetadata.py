@@ -17,20 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
 from httpx import AsyncClient
 
 
+@pytest.mark.deploy_modes("standalone")
 async def test_labels_sc_2053(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    standalone_knowledgebox,
 ):
     # PUBLIC API
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}")
     assert resp.status_code == 200
 
     resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
+        f"/kb/{standalone_knowledgebox}/resources",
         json={
             "slug": "myresource",
             "usermetadata": {"classifications": [{"labelset": "type", "label": "Book"}]},
@@ -39,14 +41,14 @@ async def test_labels_sc_2053(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["classifications"]) == 1
 
     # ADD A LABEL
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
         json={
             "usermetadata": {
                 "classifications": [
@@ -58,16 +60,16 @@ async def test_labels_sc_2053(
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["classifications"]) == 2
 
     resp = await nucliadb_writer.patch(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
         json={"usermetadata": {"classifications": []}},
     )
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["classifications"]) == 0

@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 
 [metadata]
-groups = ["default", "dev", "nidx", "sdk", "sidecar"]
+groups = ["default", "dev", "nidx", "sdk"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
 content_hash = "sha256:0a4f8b9b36780c8d289d883a42001c8c98dd1053b0dbb3c9be0bb671535d2b35"

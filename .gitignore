@@ -68,9 +68,6 @@ tmp/nucliadb
 data
 logs
 
-# KB exports used in performance tests
-nucliadb_performance/exports
-
 **/tikv-server
 **/pd-server
 **/nats-server
