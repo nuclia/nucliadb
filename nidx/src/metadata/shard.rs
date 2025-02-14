@@ -30,6 +30,11 @@ pub struct Shard {
     pub deleted_at: Option<PrimitiveDateTime>,
 }
 
+pub struct IndexStats {
+    pub records: i64,
+    pub size_bytes: i64,
+}
+
 impl Shard {
     pub async fn create(meta: impl Executor<'_, Database = Postgres>, kbid: Uuid) -> sqlx::Result<Shard> {
         sqlx::query_as!(Shard, "INSERT INTO shards (kbid) VALUES ($1) RETURNING *", kbid).fetch_one(meta).await
@@ -55,21 +60,34 @@ impl Shard {
         .await
     }
 
-    pub async fn stats(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<HashMap<IndexKind, i64>> {
+    pub async fn stats(
+        &self,
+        meta: impl Executor<'_, Database = Postgres>,
+    ) -> sqlx::Result<HashMap<IndexKind, IndexStats>> {
         let mut stats = HashMap::new();
         let mut results = sqlx::query!(
-            r#"SELECT kind as "kind: IndexKind", SUM(records)::bigint as "records!" FROM indexes
-              JOIN segments ON index_id = indexes.id
-              WHERE shard_id = $1
-              AND indexes.deleted_at IS NULL
-              AND segments.delete_at IS NULL
-              GROUP BY kind"#,
+            r#"SELECT
+                   kind as "kind: IndexKind",
+                   SUM(records)::bigint as "records!",
+                   SUM(size_bytes)::bigint as "size_bytes!"
+               FROM indexes
+               JOIN segments ON index_id = indexes.id
+               WHERE shard_id = $1
+               AND indexes.deleted_at IS NULL
+               AND segments.delete_at IS NULL
+               GROUP BY kind"#,
             self.id
         )
         .fetch(meta);
         while let Some(record) = results.next().await {
             let record = record?;
-            stats.insert(record.kind, record.records);
+            stats.insert(
+                record.kind,
+                IndexStats {
+                    records: record.records,
+                    size_bytes: record.size_bytes,
+                },
+            );
         }
 
         Ok(stats)

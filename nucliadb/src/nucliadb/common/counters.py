@@ -26,3 +26,4 @@ class IndexCounts:
     fields: int
     paragraphs: int
     sentences: int
+    size_bytes: int

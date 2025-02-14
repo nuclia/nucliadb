@@ -707,11 +707,7 @@ class PineconeIndexManager(ExternalIndexManager):
         if self.kbid in COUNTERS_CACHE:
             # Cache hit
             return COUNTERS_CACHE[self.kbid]
-        total = IndexCounts(
-            fields=0,
-            paragraphs=0,
-            sentences=0,
-        )
+        total = IndexCounts(fields=0, paragraphs=0, sentences=0, size_bytes=0)
         tasks = []
         vectorset_results: dict[str, IndexCounts] = {}
 
@@ -739,6 +735,7 @@ class PineconeIndexManager(ExternalIndexManager):
                 fields=0,
                 paragraphs=index_stats.totalVectorCount,
                 sentences=index_stats.totalVectorCount,
+                size_bytes=0,
             )
         except Exception:
             logger.exception(

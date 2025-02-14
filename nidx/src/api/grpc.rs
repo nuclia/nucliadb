@@ -83,9 +83,10 @@ impl NidxApi for ApiServer {
                 release_channel: 0,
             }),
             shard_id: shard_id.to_string(),
-            fields: *index_stats.get(&IndexKind::Text).unwrap_or(&0) as u64,
-            paragraphs: *index_stats.get(&IndexKind::Paragraph).unwrap_or(&0) as u64,
-            sentences: *index_stats.get(&IndexKind::Vector).unwrap_or(&0) as u64,
+            fields: index_stats.get(&IndexKind::Text).map(|s| s.records).unwrap_or(0) as u64,
+            paragraphs: index_stats.get(&IndexKind::Paragraph).map(|s| s.records).unwrap_or(0) as u64,
+            sentences: index_stats.get(&IndexKind::Vector).map(|s| s.records).unwrap_or(0) as u64,
+            size_bytes: index_stats.values().map(|i| i.size_bytes).sum::<i64>() as u64,
         }))
     }
 

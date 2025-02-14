@@ -59,4 +59,6 @@ async def test_counters(
     assert resp.json()["resources"] == 3
     assert resp.json()["paragraphs"] == 3
     assert resp.json()["fields"] == 3
-    assert resp.json()["index_size"] == 30_000
+
+    # This value depends on what nidx is indexing, so we just do a soft check to see it's not 0
+    assert resp.json()["index_size"] >= 50_000

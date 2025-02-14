@@ -64,6 +64,7 @@ message Shard {
     uint64 fields = 2;
     uint64 paragraphs = 3;
     uint64 sentences = 4;
+    uint64 size_bytes = 6;
 }
 
 message EmptyResponse {}
