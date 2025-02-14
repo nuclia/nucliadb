@@ -534,6 +534,7 @@ async def ask(
             ordered_paragraphs=[match.paragraph for match in retrieval_results.best_matches],
             resource=resource,
             user_context=user_context,
+            user_image_context=ask_request.extra_context_images,
             strategies=ask_request.rag_strategies,
             image_strategies=ask_request.rag_images_strategies,
             max_context_characters=tokens_to_chars(max_tokens_context),

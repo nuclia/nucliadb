@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import base64
 from unittest import mock
 from unittest.mock import AsyncMock, patch
 
@@ -524,3 +525,21 @@ async def test_prompt_context_image_context_builder():
             "both_id/f/file/1",
             "vecid/f/file/1",
         }
+
+
+async def test_prompt_context_builder_with_extra_image_context():
+    image_content = base64.b64encode(b"my-image")
+    user_image = Image(content_type="image/png", b64encoded=image_content)
+
+    builder = chat_prompt.PromptContextBuilder(
+        kbid="kbid",
+        ordered_paragraphs=[],
+        user_image_context=[user_image],
+    )
+    with patch("nucliadb.search.search.chat.prompt.default_prompt_context"):
+        # context = chat_prompt.CappedPromptContext(max_size=int(1e6))
+        _, _, context_images = await builder.build()
+
+    assert len(context_images) == 1
+    _, context_image = context_images.popitem()
+    assert context_image == user_image
