@@ -1434,6 +1434,12 @@ class AskRequest(AuditMetadataBase):
         description="""Additional context that is added to the retrieval context sent to the LLM.
         It allows extending the chat feature with content that may not be in the Knowledge Box.""",
     )
+    extra_context_images: Optional[list[Image]] = Field(
+        default=None,
+        title="Extra query context images",
+        description="""Additional images added to the retrieval context sent to the LLM."
+        It allows extending the chat feature with content that may not be in the Knowledge Box.""",
+    )
     autofilter: bool = SearchParamDefaults.autofilter.to_pydantic_field()
     highlight: bool = SearchParamDefaults.highlight.to_pydantic_field()
     resource_filters: list[str] = SearchParamDefaults.resource_filters.to_pydantic_field()
