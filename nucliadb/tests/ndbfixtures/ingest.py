@@ -84,7 +84,6 @@ async def ingest_grpc_server(
     maindb_driver: Driver,
     storage: Storage,
     shard_manager: KBShardManager,
-    pubsub,
 ) -> AsyncIterator[IngestGrpcServer]:
     """Ingest ORM gRPC server with dummy/mocked index."""
     servicer = WriterServicer()
