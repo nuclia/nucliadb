@@ -303,6 +303,11 @@ impl Default for SearcherSettings {
     }
 }
 
+#[derive(Deserialize, Clone, Debug)]
+pub struct AuditSettings {
+    pub nats_server: String,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct EnvSettings {
     /// Connection to the metadata database
@@ -328,6 +333,9 @@ pub struct EnvSettings {
     /// Telemetry configuration
     #[serde(default)]
     pub telemetry: TelemetrySettings,
+
+    #[serde(default)]
+    pub audit: Option<AuditSettings>,
 
     /// Work path, used by searcher/indexer/worker to create all local files
     /// If not specified, will work with temporary directories inside /tmp

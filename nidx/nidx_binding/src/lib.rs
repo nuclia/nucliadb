@@ -145,7 +145,7 @@ impl NidxBinding {
         tokio::task::spawn(scheduler::run_tasks(
             settings.metadata.clone(),
             settings.storage.as_ref().unwrap().object_store.clone(),
-            settings.merge.clone(),
+            settings.clone(),
             seq.clone(),
         ));
 
