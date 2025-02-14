@@ -38,9 +38,7 @@ impl SendReport for NatsSendReport<'_> {
     }
 }
 
-/// Purge segments that have not been ready for a while:
-/// - Uploads that failed
-/// - Recent deletions
+/// Send storage metrics to audit, only for KB's that have been recently updated
 pub async fn audit_kb_storage(
     meta: &NidxMetadata,
     nats: impl SendReport,
