@@ -51,6 +51,7 @@ from nucliadb_models.search import (
     FindParagraph,
     FullResourceStrategy,
     HierarchyResourceStrategy,
+    Image,
     ImageRagStrategy,
     ImageRagStrategyName,
     MetadataExtensionStrategy,
@@ -880,6 +881,7 @@ class PromptContextBuilder:
         ordered_paragraphs: list[FindParagraph],
         resource: Optional[str] = None,
         user_context: Optional[list[str]] = None,
+        user_image_context: Optional[list[Image]] = None,
         strategies: Optional[Sequence[RagStrategy]] = None,
         image_strategies: Optional[Sequence[ImageRagStrategy]] = None,
         max_context_characters: Optional[int] = None,
@@ -889,6 +891,7 @@ class PromptContextBuilder:
         self.ordered_paragraphs = ordered_paragraphs
         self.resource = resource
         self.user_context = user_context
+        self.user_image_context = user_image_context
         self.strategies = strategies
         self.image_strategies = image_strategies
         self.max_context_characters = max_context_characters
@@ -899,6 +902,8 @@ class PromptContextBuilder:
         # it is added first, followed by the found text blocks in order of relevance
         for i, text_block in enumerate(self.user_context or []):
             context[f"USER_CONTEXT_{i}"] = text_block
+        for i, image in enumerate(self.user_image_context or []):
+            context.images[f"USER_IMAGE_CONTEXT_{i}"] = image
 
     async def build(
         self,
