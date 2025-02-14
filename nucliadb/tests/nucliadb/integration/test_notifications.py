@@ -34,6 +34,7 @@ from nucliadb_models.notifications import (
     ResourceProcessedNotification,
     ResourceWrittenNotification,
 )
+from nucliadb_protos import writer_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
@@ -59,7 +60,7 @@ async def nucliadb_stream_reader(reader_api_server):
 
 @pytest.mark.deploy_modes("component")
 async def test_activity(
-    nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, nucliadb_stream_reader, knowledgebox: str
+    nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, nucliadb_stream_reader, knowledgebox: str, pubsub
 ):
     async def delayed_create_resource():
         await asyncio.sleep(0.1)
@@ -73,6 +74,13 @@ async def test_activity(
         bm = broker_resource(knowledgebox, rid)
         bm.source = BrokerMessage.MessageSource.PROCESSOR
         await inject_message(nucliadb_ingest_grpc, bm)
+
+        # Fake indexed notification (we are using dummy nidx in this test)
+        indexed = writer_pb2.Notification(
+            kbid=knowledgebox, uuid=rid, seqid=123, action=writer_pb2.Notification.Action.INDEXED
+        )
+        await pubsub.publish(f"notify.{knowledgebox}", indexed.SerializeToString())
+
         return rid
 
     # Create a resource on a delay so we get the chance to subscribe to the notifications stream
@@ -103,28 +111,12 @@ async def test_activity(
 
                 if notification_type == "resource_indexed":
                     notif = ResourceIndexedNotification.model_validate_json(line)  # type: ignore
-                    # assert notif.type == "resource_indexed"
-                    # assert notif.data.resource_uuid == "resource"
-                    # assert notif.data.resource_title == "Resource"
-                    # assert notif.data.seqid == 1
 
                 elif notification_type == "resource_written":
                     notif = ResourceWrittenNotification.model_validate_json(line)
-                    # assert notif.type == "resource_written"
-                    # assert notif.data.resource_uuid == "resource"
-                    # assert notif.data.resource_title == "Resource"
-                    # assert notif.data.seqid == 1
-                    # assert notif.data.operation == "created"
-                    # assert notif.data.error is False
 
                 elif notification_type == "resource_processed":
                     notif = ResourceProcessedNotification.model_validate_json(line)  # type: ignore
-                    # assert notif.type == "resource_processed"
-                    # assert notif.data.resource_uuid == "resource"
-                    # assert notif.data.resource_title == "Resource"
-                    # assert notif.data.seqid == 1
-                    # assert notif.data.ingestion_succeeded is True
-                    # assert notif.data.processing_errors is True
 
                 else:
                     assert False, "Unexpected notification type"
@@ -132,7 +124,7 @@ async def test_activity(
                 notifs.append(notif)
 
                 # Quick exit for faster testing
-                if len(notifs) == 2:
+                if len(notifs) == 3:
                     break
 
     except httpx.ReadTimeout:
@@ -140,7 +132,7 @@ async def test_activity(
 
     resource_id = await create_resource
 
-    assert len(notifs) == 2
+    assert len(notifs) == 3
 
     # Resource created
     assert isinstance(notifs[0], ResourceWrittenNotification)
@@ -158,4 +150,10 @@ async def test_activity(
     assert notifs[1].data.ingestion_succeeded is True
     assert notifs[1].data.processing_errors is False
 
-    # We should have a notification for resource indexed, but we are using a dummy nidx, so we don't get it
+    # We get a notification for resource indexed, but it's coming from dummy nidx
+    # Hard to do integration testing because currently we don't have a reader+nidx deploy mode
+    # (and it's very messy to do) and notifications don't work in standalone
+    assert isinstance(notifs[2], ResourceIndexedNotification)
+    assert notifs[2].type == "resource_indexed"
+    assert notifs[2].data.resource_uuid == resource_id
+    assert notifs[2].data.resource_title == "Resource 1"

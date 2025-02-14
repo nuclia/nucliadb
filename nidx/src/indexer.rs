@@ -185,7 +185,7 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
             indexer_storage.clone(),
             segment_storage.clone(),
             &work_path,
-            index_message,
+            index_message.clone(),
             seq,
         )
         .instrument(span)
@@ -200,6 +200,18 @@ pub async fn run_nats(settings: Settings, shutdown: CancellationToken) -> anyhow
         if let Err(e) = acker.double_ack().await {
             warn!("Error acking index message: {e:?}");
             continue;
+        }
+
+        // Send a notification to NucliaDB: the resource has been indexed
+        let notification = nidx_protos::nidx::Notification {
+            kbid: index_message.kbid.clone(),
+            uuid: index_message.resource.clone(),
+            seqid: index_message.txid as i64,
+            action: nidx_protos::nidx::notification::Action::Indexed.into(),
+        };
+        let channel = format!("notify.{}", notification.kbid);
+        if let Err(e) = jetstream.publish(channel, notification.encode_to_vec().into()).await {
+            warn!("Error sending indexed notification: {e:?}");
         }
     }
 

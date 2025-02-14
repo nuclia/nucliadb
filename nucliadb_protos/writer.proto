@@ -317,6 +317,7 @@ enum NotificationSource {
     PROCESSOR = 2;
 }
 
+// A subset of this message is copied to nidx_protos in order to send notifications
 message Notification {
     int32 partition = 1;
     string multi = 2;

@@ -31,3 +31,16 @@ service NidxSearcher {
 service NidxIndexer {
   rpc Index(nodewriter.IndexMessage) returns (nodewriter.OpStatus) {}
 }
+
+// This is a subset from writer.proto, with the things we need for notifications
+message Notification {
+    string uuid = 3;
+    string kbid = 4;
+    int64 seqid = 5;
+    enum Action {
+        COMMIT = 0;
+        ABORT = 1;
+        INDEXED = 2;
+    }
+    Action action = 6;
+}
