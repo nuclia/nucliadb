@@ -123,8 +123,9 @@ async def _kb_counters(
         counters.sentences = index_counts.sentences
         is_small_kb = index_counts.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
         resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
-        # TODO: Find a way to query the fields count from the external index provider or use the catalog
+        # TODO: Find a way to query the fields count and size from the external index provider or use the catalog
         counters.resources = counters.fields = resource_count
+        counters.index_size = counters.paragraphs * AVG_PARAGRAPH_SIZE_BYTES
     else:
         node_index_counts, queried_shards = await get_node_index_counts(kbid)
         counters.fields = node_index_counts.fields
@@ -133,7 +134,7 @@ async def _kb_counters(
         is_small_kb = node_index_counts.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
         resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
         counters.resources = resource_count
-    counters.index_size = counters.paragraphs * AVG_PARAGRAPH_SIZE_BYTES
+        counters.index_size = node_index_counts.size_bytes
     if debug and queried_shards is not None:
         counters.shards = queried_shards
     return counters
@@ -202,11 +203,7 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
     if results is None:
         raise HTTPException(status_code=503, detail=f"No shards found")
 
-    counts = IndexCounts(
-        fields=0,
-        paragraphs=0,
-        sentences=0,
-    )
+    counts = IndexCounts(fields=0, paragraphs=0, sentences=0, size_bytes=0)
     for shard in results:
         if isinstance(shard, Exception):
             logger.error("Error getting shard info", exc_info=shard)
@@ -215,4 +212,5 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
         counts.fields += shard.fields
         counts.paragraphs += shard.paragraphs
         counts.sentences += shard.sentences
+        counts.size_bytes += shard.size_bytes
     return counts, queried_shards
