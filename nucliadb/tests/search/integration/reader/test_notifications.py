@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
 import asyncio
 from typing import Union
 from unittest.mock import patch
@@ -26,8 +27,8 @@ import pytest
 import uvicorn
 from httpx import AsyncClient
 
+from nucliadb.common.nidx import NidxServiceUtility
 from nucliadb.reader.api.v1.router import KB_PREFIX
-from nucliadb.reader.app import create_application
 from nucliadb_models.notifications import (
     Notification,
     ResourceIndexedNotification,
@@ -35,23 +36,24 @@ from nucliadb_models.notifications import (
     ResourceWrittenNotification,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_utils.settings import transaction_settings
+from nucliadb_utils.utilities import MAIN, Utility
 from tests.ingest.fixtures import broker_resource
 
 
-# This is a clone of `reader_api_server` but using nidx instead of dummy_nidx_utility
+# `reader_api_server` depends on the dummy_nidx_utility fixture
+# This fixture overrides that with actual nidx running on docker
 @pytest.fixture(scope="function")
 async def nidx_reader_api_server(
-    storage,
-    maindb_driver,
-    local_files,
-    indexing_utility,
+    reader_api_server,
     nidx,
 ):
-    application = create_application()
-    with patch.object(transaction_settings, "transaction_local", True):
-        async with application.router.lifespan_context(application):
-            yield application
+    nidx_util = NidxServiceUtility()
+    await nidx_util.initialize()
+
+    with patch.dict(MAIN, values={Utility.NIDX: nidx_util}, clear=False):
+        yield reader_api_server
+
+    await nidx_util.finalize()
 
 
 @pytest.fixture(scope="function")
@@ -74,8 +76,11 @@ async def nucliadb_stream_reader(nidx_reader_api_server):
     task.cancel()
 
 
+# This is actually a test of the reader component
+# However, it sits here with search components for practical reasons:
+# it requires the nidx image which is only compiled for search tests on CI
 @pytest.mark.deploy_modes("component")
-async def test_activity(nucliadb_stream_reader, knowledgebox_ingest, processor):
+async def test_notification_stream(nucliadb_stream_reader, knowledgebox_ingest, processor):
     async def delayed_create_resource():
         await asyncio.sleep(0.1)
 
