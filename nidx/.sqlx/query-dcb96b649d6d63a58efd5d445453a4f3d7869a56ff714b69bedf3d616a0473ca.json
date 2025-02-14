@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            shards.kbid,\n            SUM(records) FILTER (WHERE kind = 'text')::bigint AS \"fields!\",\n            SUM(records) FILTER (WHERE kind = 'paragraph')::bigint AS \"paragraphs!\",\n            SUM(size_bytes)::bigint AS \"bytes!\",\n            MAX(updated_at) AS \"last_update!\"\n        FROM segments\n        JOIN indexes ON segments.index_id = indexes.id\n        JOIN shards ON indexes.shard_id = shards.id\n        WHERE shards.id IN (SELECT shard_id FROM indexes WHERE updated_at > $1)\n        GROUP BY shards.kbid;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kbid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "fields!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "paragraphs!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "bytes!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "last_update!",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamp"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "dcb96b649d6d63a58efd5d445453a4f3d7869a56ff714b69bedf3d616a0473ca"
+}

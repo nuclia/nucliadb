@@ -38,6 +38,10 @@ pub mod nidx {
     tonic::include_proto!("nidx");
 }
 
+pub mod kb_usage {
+    tonic::include_proto!("kb_usage");
+}
+
 pub use nodereader::*;
 pub use noderesources::*;
 pub use nodewriter::*;

@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+mod audit_task;
 mod log_merge;
 mod merge_task;
 mod metrics_task;
@@ -26,16 +27,17 @@ mod vector_merge;
 
 use crate::{
     metadata::{IndexRequest, MergeJob},
-    settings::MergeSettings,
     NidxMetadata, Settings,
 };
 use async_nats::jetstream::consumer::PullConsumer;
+use audit_task::{audit_kb_storage, NatsSendReport};
 use merge_task::MergeScheduler;
 use metrics_task::update_merge_job_metric;
 use nidx_types::Seq;
 use object_store::DynObjectStore;
 // TODO: This should not be public but it's used in tests
 pub use purge_tasks::*;
+use sqlx::types::time::PrimitiveDateTime;
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::{task::JoinSet, time::sleep};
 use tokio_util::sync::CancellationToken;
@@ -44,7 +46,6 @@ use tracing::*;
 pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Result<()> {
     let indexer_settings = settings.indexer.as_ref().unwrap();
     let storage_settings = settings.storage.as_ref().unwrap();
-    let merge_settings = settings.merge.clone();
     let meta = settings.metadata.clone();
 
     if let Some(nats_server) = &indexer_settings.nats_server {
@@ -52,12 +53,12 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         let jetstream = async_nats::jetstream::new(client);
         let consumer: PullConsumer = jetstream.get_consumer_from_stream("nidx", "nidx").await?;
         tokio::select! {
-            _ = run_tasks(meta, storage_settings.object_store.clone(), merge_settings, NatsAckFloor(consumer)) => {},
+            _ = run_tasks(meta, storage_settings.object_store.clone(), settings, NatsAckFloor(consumer)) => {},
             _ = shutdown.cancelled() => {}
         }
     } else {
         tokio::select! {
-            _ = run_tasks(meta.clone(), storage_settings.object_store.clone(), merge_settings, PgAckFloor(meta)) => {},
+            _ = run_tasks(meta.clone(), storage_settings.object_store.clone(), settings, PgAckFloor(meta)) => {},
             _ = shutdown.cancelled() => {}
         }
     };
@@ -90,7 +91,7 @@ impl GetAckFloor for PgAckFloor {
 pub async fn run_tasks(
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
-    merge_settings: MergeSettings,
+    settings: Settings,
     mut ack_floor: impl GetAckFloor + Clone + Send + 'static,
 ) -> anyhow::Result<()> {
     let mut tasks = JoinSet::new();
@@ -146,6 +147,7 @@ pub async fn run_tasks(
     });
 
     let meta2 = meta.clone();
+    let merge_settings = settings.merge.clone();
     tasks.spawn(async move {
         let merge_scheduler = MergeScheduler::from_settings(merge_settings);
         loop {
@@ -165,6 +167,24 @@ pub async fn run_tasks(
             sleep(Duration::from_secs(15)).await;
         }
     });
+
+    if let Some(audit_settings) = &settings.audit {
+        let audit_nats = async_nats::connect(&audit_settings.nats_server).await?;
+        let meta2 = meta.clone();
+
+        // Old date on startup to send all the reports, since we don't know how much time
+        // we have been offline.
+        let mut since = PrimitiveDateTime::MIN.replace_year(2000)?;
+        loop {
+            match audit_kb_storage(&meta2, NatsSendReport(&audit_nats), since).await {
+                Ok(Some(new_date)) => since = new_date,
+                Ok(None) => {}
+                Err(e) => warn!("Error auditing kb storage: {e:?}"),
+            };
+
+            sleep(Duration::from_secs(60)).await;
+        }
+    }
 
     let task = tasks.join_next().await;
     error!(?task, "A scheduling task finished, exiting");

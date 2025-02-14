@@ -66,6 +66,7 @@ impl NidxFixture {
                 work_path: None,
                 control_socket: None,
                 searcher: Default::default(),
+                audit: None,
             },
         };
         // API server

@@ -29,6 +29,7 @@ fn main() -> Result<()> {
             "../../nucliadb_protos/nodereader.proto",
             "../../nucliadb_protos/noderesources.proto",
             "../../nucliadb_protos/nodewriter.proto",
+            "../../nucliadb_protos/kb_usage.proto",
         ],
         &["../../", "src"],
     )?;
