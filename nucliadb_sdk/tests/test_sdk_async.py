@@ -60,6 +60,7 @@ async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.get_resource_by_id(kbid=kb.uuid, rid=resource.id)
     resources = await sdk_async.list_resources(kbid=kb.uuid)
     assert len(resources.resources) == 1
+    await sdk_async.catalog(kbid=kb.uuid, query="foo")
     await sdk_async.update_resource(kbid=kb.uuid, rid=resource.id, title="Resource2")
     await sdk_async.update_resource_by_slug(kbid=kb.uuid, rslug="resource", title="Resource3")
 
