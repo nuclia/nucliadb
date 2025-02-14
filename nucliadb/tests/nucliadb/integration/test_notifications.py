@@ -19,30 +19,46 @@
 #
 import asyncio
 from typing import Union
+from unittest.mock import patch
 
 import httpx
 import pytest
 import uvicorn
 from httpx import AsyncClient
-from tests.ingest.fixtures import broker_resource
-from tests.utils import inject_message
 
 from nucliadb.reader.api.v1.router import KB_PREFIX
+from nucliadb.reader.app import create_application
 from nucliadb_models.notifications import (
     Notification,
     ResourceIndexedNotification,
     ResourceProcessedNotification,
     ResourceWrittenNotification,
 )
-from nucliadb_protos import writer_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_utils.settings import transaction_settings
+from tests.ingest.fixtures import broker_resource
+
+
+# This is a clone of `reader_api_server` but using nidx instead of dummy_nidx_utility
+@pytest.fixture(scope="function")
+async def nidx_reader_api_server(
+    storage,
+    maindb_driver,
+    local_files,
+    indexing_utility,
+    nidx,
+):
+    application = create_application()
+    with patch.object(transaction_settings, "transaction_local", True):
+        async with application.router.lifespan_context(application):
+            yield application
 
 
 @pytest.fixture(scope="function")
-async def nucliadb_stream_reader(reader_api_server):
+async def nucliadb_stream_reader(nidx_reader_api_server):
     # Our normal nucliadb_reader uses ASGITransport which does not support streaming requests
     # Instead, this runs a full unicorn server and connects via socket to emulate the full thing
-    config = uvicorn.Config(reader_api_server, port=0, log_level="info")
+    config = uvicorn.Config(nidx_reader_api_server, port=0, log_level="info")
     server = uvicorn.Server(config)
     task = asyncio.create_task(server.serve())
 
@@ -59,29 +75,20 @@ async def nucliadb_stream_reader(reader_api_server):
 
 
 @pytest.mark.deploy_modes("component")
-async def test_activity(
-    nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, nucliadb_stream_reader, knowledgebox: str, pubsub
-):
+async def test_activity(nucliadb_stream_reader, knowledgebox_ingest, processor):
     async def delayed_create_resource():
         await asyncio.sleep(0.1)
-        resp = await nucliadb_writer.post(
-            f"/{KB_PREFIX}/{knowledgebox}/resources",
-            json={"slug": "resource1", "title": "Resource 1", "texts": {"text": {"body": "Hello!"}}},
-        )
-        assert resp.status_code == 201
-        rid = resp.json()["uuid"]
 
-        bm = broker_resource(knowledgebox, rid)
-        bm.source = BrokerMessage.MessageSource.PROCESSOR
-        await inject_message(nucliadb_ingest_grpc, bm)
+        message1 = broker_resource(knowledgebox_ingest, rid="68b6e3b747864293b71925b7bacaee7c")
+        await processor.process(message1, seqid=1)
 
-        # Fake indexed notification (we are using dummy nidx in this test)
-        indexed = writer_pb2.Notification(
-            kbid=knowledgebox, uuid=rid, seqid=123, action=writer_pb2.Notification.Action.INDEXED
-        )
-        await pubsub.publish(f"notify.{knowledgebox}", indexed.SerializeToString())
+        # Some time to allow nidx to process
+        await asyncio.sleep(1)
 
-        return rid
+        message1.source = BrokerMessage.MessageSource.PROCESSOR
+        await processor.process(message1, seqid=2)
+
+        return "68b6e3b747864293b71925b7bacaee7c"
 
     # Create a resource on a delay so we get the chance to subscribe to the notifications stream
     create_resource = asyncio.create_task(delayed_create_resource())
@@ -90,7 +97,7 @@ async def test_activity(
     try:
         async with nucliadb_stream_reader.stream(
             method="GET",
-            url=f"/{KB_PREFIX}/{knowledgebox}/notifications",
+            url=f"/{KB_PREFIX}/{knowledgebox_ingest}/notifications",
             timeout=5,
         ) as resp:
             assert resp.status_code == 200
@@ -124,7 +131,7 @@ async def test_activity(
                 notifs.append(notif)
 
                 # Quick exit for faster testing
-                if len(notifs) == 3:
+                if len(notifs) == 4:
                     break
 
     except httpx.ReadTimeout:
@@ -132,28 +139,34 @@ async def test_activity(
 
     resource_id = await create_resource
 
-    assert len(notifs) == 3
+    assert len(notifs) == 4
 
     # Resource created
     assert isinstance(notifs[0], ResourceWrittenNotification)
     assert notifs[0].type == "resource_written"
     assert notifs[0].data.resource_uuid == resource_id
-    assert notifs[0].data.resource_title == "Resource 1"
-    assert notifs[0].data.operation == "created"
-    assert notifs[0].data.error is False
+    assert notifs[0].data.resource_title == "Title Resource"
+    assert notifs[0].data.seqid == 1
+
+    # Resource indexed (from writer)
+    assert isinstance(notifs[1], ResourceIndexedNotification)
+    assert notifs[1].type == "resource_indexed"
+    assert notifs[1].data.resource_uuid == resource_id
+    assert notifs[1].data.resource_title == "Title Resource"
+    assert notifs[1].data.seqid == 1
 
     # Resource processed
-    assert isinstance(notifs[1], ResourceProcessedNotification)
-    assert notifs[1].type == "resource_processed"
-    assert notifs[1].data.resource_uuid == resource_id
-    assert notifs[1].data.resource_title == "Resource 1"
-    assert notifs[1].data.ingestion_succeeded is True
-    assert notifs[1].data.processing_errors is False
-
-    # We get a notification for resource indexed, but it's coming from dummy nidx
-    # Hard to do integration testing because currently we don't have a reader+nidx deploy mode
-    # (and it's very messy to do) and notifications don't work in standalone
-    assert isinstance(notifs[2], ResourceIndexedNotification)
-    assert notifs[2].type == "resource_indexed"
+    assert isinstance(notifs[2], ResourceProcessedNotification)
+    assert notifs[2].type == "resource_processed"
     assert notifs[2].data.resource_uuid == resource_id
-    assert notifs[2].data.resource_title == "Resource 1"
+    assert notifs[2].data.resource_title == "Title Resource"
+    assert notifs[2].data.ingestion_succeeded is True
+    assert notifs[2].data.processing_errors is False
+    assert notifs[2].data.seqid == 2
+
+    # Resource indexed (from processor)
+    assert isinstance(notifs[3], ResourceIndexedNotification)
+    assert notifs[3].type == "resource_indexed"
+    assert notifs[3].data.resource_uuid == resource_id
+    assert notifs[3].data.resource_title == "Title Resource"
+    assert notifs[3].data.seqid == 2
