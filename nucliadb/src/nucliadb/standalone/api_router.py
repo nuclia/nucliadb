@@ -17,14 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import datetime
 import logging
 import time
 
 import orjson
 import pydantic
 from fastapi import Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRouter
 from fastapi_versioning import version
 from jwcrypto import jwe, jwk  # type: ignore
@@ -33,7 +32,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.http_clients import processing
 from nucliadb.common.http_clients.auth import NucliaAuthHTTPClient
-from nucliadb.standalone import introspect, versions
+from nucliadb.standalone import versions
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.settings import nuclia_settings
@@ -143,17 +142,6 @@ async def versions_endpoint(request: Request) -> JSONResponse:
             }
             for package in versions.WatchedPackages
         }
-    )
-
-
-@standalone_api_router.get("/introspect")
-def introspect_endpoint(request: Request) -> StreamingResponse:
-    introspect_id = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    return StreamingResponse(
-        content=introspect.stream_tar(request.app),
-        status_code=200,
-        headers={"Content-Disposition": f"attachment; filename=introspect_{introspect_id}.tar.gz"},
-        media_type="application/octet-stream",
     )
 
 
