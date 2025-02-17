@@ -1281,6 +1281,8 @@ global___OpStatusWriter = OpStatusWriter
 
 @typing.final
 class Notification(google.protobuf.message.Message):
+    """A subset of this message is copied to nidx_protos in order to send notifications"""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _Action:
