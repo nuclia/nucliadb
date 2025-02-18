@@ -33,6 +33,7 @@ spec:
         heritage: "{{ .Release.Service }}"
         nidxMetrics: "enabled"
     spec:
+      subdomain: nidx-cluster
       {{- with .Values.searcher.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
