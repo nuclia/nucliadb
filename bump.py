@@ -40,6 +40,7 @@ def run(args):
     VERSION_UPDATES = [
         "nidx/nidx_binding/pyproject.toml",
         "nidx/nidx_protos/pyproject.toml",
+        "nucliadb/pyproject.toml",
         "nucliadb_dataset/pyproject.toml",
         "nucliadb_models/pyproject.toml",
         "nucliadb_protos/python/pyproject.toml",
