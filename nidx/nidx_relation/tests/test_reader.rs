@@ -73,6 +73,7 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 NodeType::Entity,
                 "ANIMALS".to_string(),
                 RelationType::Entity,
+                "IS".to_string(),
             ),
             common::create_relation(
                 "dolphin".to_string(),
@@ -82,6 +83,7 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 NodeType::Entity,
                 "ANIMALS".to_string(),
                 RelationType::Entity,
+                "IS".to_string(),
             ),
             common::create_relation(
                 "01808bbd8e784552967a4fb0d8b6e584".to_string(),
@@ -91,6 +93,7 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 NodeType::Entity,
                 "ANIMALS".to_string(),
                 RelationType::Entity,
+                "TALKS_ABOUT".to_string(),
             ),
             common::create_relation(
                 "01808bbd8e784552967a4fb0d8b6e584".to_string(),
@@ -100,6 +103,7 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 NodeType::Entity,
                 "ANIMALS".to_string(),
                 RelationType::Entity,
+                "TALKS_ABOUT".to_string(),
             ),
             common::create_relation(
                 "Anastasia".to_string(),
@@ -109,6 +113,7 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 NodeType::Entity,
                 "PEOPLE".to_string(),
                 RelationType::Entity,
+                "IS_FRIEND".to_string(),
             ),
             common::create_relation_with_metadata(
                 "Anthony".to_string(),
@@ -118,6 +123,7 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 NodeType::Entity,
                 "PLACES".to_string(),
                 RelationType::Entity,
+                "LIVES_IN".to_string(),
                 RelationMetadata {
                     paragraph_id: Some("myresource/0/myresource/100-200".to_string()),
                     source_start: Some(0),
@@ -135,6 +141,37 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 NodeType::Entity,
                 "PLACES".to_string(),
                 RelationType::Entity,
+                "LIVES_IN".to_string(),
+            ),
+            common::create_relation(
+                "Peter".to_string(),
+                NodeType::Entity,
+                "PEOPLE".to_string(),
+                "New York".to_string(),
+                NodeType::Entity,
+                "PLACES".to_string(),
+                RelationType::Entity,
+                "LIVES_IN".to_string(),
+            ),
+            common::create_relation(
+                "Anna".to_string(),
+                NodeType::Entity,
+                "PEOPLE".to_string(),
+                "cat".to_string(),
+                NodeType::Entity,
+                "ANIMAL".to_string(),
+                RelationType::Entity,
+                "LOVES".to_string(),
+            ),
+            common::create_relation(
+                "Peter".to_string(),
+                NodeType::Entity,
+                "PEOPLE".to_string(),
+                "New York".to_string(),
+                NodeType::Entity,
+                "PLACES".to_string(),
+                RelationType::Entity,
+                "LOVES".to_string(),
             ),
             common::create_relation(
                 "James Bond".to_string(),
@@ -144,6 +181,7 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
                 NodeType::Entity,
                 "PEOPLE".to_string(),
                 RelationType::Entity,
+                "KNOWS".to_string(),
             ),
         ],
         ..Default::default()

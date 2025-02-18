@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+#![allow(dead_code)] // clippy doesn't check for usage in other tests modules
+
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{Relation, RelationMetadata, RelationNode};
@@ -38,12 +40,13 @@ pub fn create_relation(
     to_node_type: NodeType,
     to_subtype: String,
     rel_type: RelationType,
+    rel_label: String,
 ) -> Relation {
     Relation {
         source: Some(create_relation_node(source, source_node_type, source_subtype)),
         to: Some(create_relation_node(to, to_node_type, to_subtype)),
         relation: rel_type.into(),
-        relation_label: "relation_label".to_string(),
+        relation_label: rel_label,
         metadata: Some(RelationMetadata {
             ..Default::default()
         }),
@@ -59,10 +62,11 @@ pub fn create_relation_with_metadata(
     to_node_type: NodeType,
     to_subtype: String,
     rel_type: RelationType,
+    rel_label: String,
     metadata: RelationMetadata,
 ) -> Relation {
     let mut relation =
-        create_relation(source, source_node_type, source_subtype, to, to_node_type, to_subtype, rel_type);
+        create_relation(source, source_node_type, source_subtype, to, to_node_type, to_subtype, rel_type, rel_label);
     relation.metadata = Some(metadata);
     relation
 }
