@@ -30,7 +30,7 @@ use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQ
 use tantivy::schema::IndexRecordOption;
 use tantivy::{Index, IndexReader, Term};
 
-use crate::graph_query_parser::{GraphQuery, GraphQueryParser, Node};
+use crate::graph_query_parser::{GraphQuery, GraphSearcher};
 use crate::schema::Schema;
 use crate::{io_maps, schema};
 
@@ -62,21 +62,8 @@ impl RelationsReaderService {
     }
 
     pub fn advanced_graph_query(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
-        let query_parser = GraphQueryParser::new();
-        let index_query: Box<dyn Query> = query_parser.parse_graph_query(query);
-        // println!("Index query: {index_query:#?}");
-
-        let searcher = self.reader.searcher();
-        let collector = TopDocs::with_limit(1000);
-        let matching_docs = searcher.search(&index_query, &collector)?;
-
-        let mut relations = Vec::with_capacity(matching_docs.len());
-        for (_, doc_addr) in matching_docs {
-            let doc = searcher.doc(doc_addr)?;
-            let relation = io_maps::doc_to_relation(&self.schema, &doc);
-            relations.push(relation);
-        }
-        Ok(relations)
+        let searcher = GraphSearcher::new(self.reader.searcher());
+        searcher.search(query)
     }
 }
 
