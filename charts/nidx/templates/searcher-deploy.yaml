@@ -33,7 +33,6 @@ spec:
         heritage: "{{ .Release.Service }}"
         nidxMetrics: "enabled"
     spec:
-      subdomain: nidx-cluster
       {{- with .Values.searcher.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -65,6 +64,10 @@ spec:
             value: "/data"
           - name: CONTROL_SOCKET
             value: "/run/nidx.sock"
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
         ports:
         - name: metrics
           containerPort: 10010

@@ -18,19 +18,3 @@ spec:
       port: 10001
       protocol: TCP
       appProtocol: grpc
----
-# Headless service for intra-cluster communication
-kind: Service
-apiVersion: v1
-metadata:
-  name: nidx-cluster
-  labels:
-    app: nidx-searcher
-    version: "{{ .Chart.Version | replace "+" "_" }}"
-    chart: "{{ .Chart.Name }}"
-    release: "{{ .Release.Name }}"
-    heritage: "{{ .Release.Service }}"
-spec:
-  clusterIP: None
-  selector:
-    app: nidx-searcher
