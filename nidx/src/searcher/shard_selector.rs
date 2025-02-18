@@ -57,15 +57,11 @@ pub struct KubernetesCluster {
     my_address: String,
 }
 
-fn pod_address(name: &String) -> String {
-    format!("{name}.nidx-cluster:10001")
-}
-
 impl KubernetesCluster {
     pub async fn new_cluster_and_task(
         shutdown: CancellationToken,
     ) -> anyhow::Result<(Self, impl Future<Output = anyhow::Result<()>>)> {
-        let my_address = pod_address(&std::env::var("HOSTNAME")?);
+        let my_address = Self::pod_address(&std::env::var("HOSTNAME")?);
 
         // Create a store that keeps an updated view of `nidx-searcher` pods
         let client = kube::Client::try_default().await?;
@@ -85,9 +81,11 @@ impl KubernetesCluster {
                         if let Err(e) = result {
                             return Err(e.into())
                         }
-                        let new_pods = task_reader.state()
+                        let new_pods = task_reader
+                            .state()
                             .iter()
-                            .filter_map(|pod| Self::pod_ready(pod).then(|| pod.metadata.name.as_ref().map(pod_address)).flatten())
+                            .filter(|pod| Self::pod_ready(pod))
+                            .filter_map(|pod| pod.metadata.name.as_ref().map(Self::pod_address))
                             .collect();
                         if new_pods != prev_pods {
                             info!(?prev_pods, ?new_pods, "Kubernetes detected cluster topology change");
@@ -139,6 +137,10 @@ impl KubernetesCluster {
         true
     }
 
+    fn pod_address(name: &String) -> String {
+        format!("{name}.nidx-cluster:10001")
+    }
+
     pub async fn wait_until_ready(&self) -> anyhow::Result<()> {
         Ok(self.pods.wait_until_ready().await?)
     }
@@ -149,7 +151,8 @@ impl ListNodes for KubernetesCluster {
             .pods
             .state()
             .iter()
-            .filter_map(|pod| Self::pod_ready(pod).then(|| pod.metadata.name.as_ref().map(pod_address)).flatten())
+            .filter(|pod| Self::pod_ready(pod))
+            .filter_map(|pod| pod.metadata.name.as_ref().map(Self::pod_address))
             .collect();
 
         // Always include ourselves, even if we are not ready
