@@ -54,13 +54,14 @@ impl ListNodes for SingleNodeCluster {
 #[derive(Clone)]
 pub struct KubernetesCluster {
     pods: kube::runtime::reflector::store::Store<Pod>,
-    hostname: String,
+    my_address: String,
 }
+
 impl KubernetesCluster {
     pub async fn new_cluster_and_task(
         shutdown: CancellationToken,
     ) -> anyhow::Result<(Self, impl Future<Output = anyhow::Result<()>>)> {
-        let hostname = std::env::var("HOSTNAME")?;
+        let my_address = Self::pod_address(&std::env::var("POD_IP")?);
 
         // Create a store that keeps an updated view of `nidx-searcher` pods
         let client = kube::Client::try_default().await?;
@@ -80,7 +81,13 @@ impl KubernetesCluster {
                         if let Err(e) = result {
                             return Err(e.into())
                         }
-                        let new_pods = task_reader.state().iter().filter_map(|pod| Self::pod_ready(pod).then(|| pod.metadata.name.as_ref().map(|name| format!("{name}:10001"))).flatten()).collect();
+                        let new_pods = task_reader
+                            .state()
+                            .iter()
+                            .filter(|pod| Self::pod_ready(pod))
+                            .filter_map(|pod| pod.status.as_ref().map(|s| s.host_ip.as_ref().map(Self::pod_address)))
+                            .flatten()
+                            .collect();
                         if new_pods != prev_pods {
                             info!(?prev_pods, ?new_pods, "Kubernetes detected cluster topology change");
                             prev_pods = new_pods;
@@ -94,7 +101,7 @@ impl KubernetesCluster {
         Ok((
             Self {
                 pods: store_reader,
-                hostname,
+                my_address,
             },
             task,
         ))
@@ -131,6 +138,10 @@ impl KubernetesCluster {
         true
     }
 
+    fn pod_address(ip: &String) -> String {
+        format!("{ip}:10001")
+    }
+
     pub async fn wait_until_ready(&self) -> anyhow::Result<()> {
         Ok(self.pods.wait_until_ready().await?)
     }
@@ -141,19 +152,21 @@ impl ListNodes for KubernetesCluster {
             .pods
             .state()
             .iter()
-            .filter_map(|pod| Self::pod_ready(pod).then(|| pod.metadata.name.clone()).flatten())
+            .filter(|pod| Self::pod_ready(pod))
+            .filter_map(|pod| pod.status.as_ref().map(|s| s.host_ip.as_ref().map(Self::pod_address)))
+            .flatten()
             .collect();
 
         // Always include ourselves, even if we are not ready
-        if !ready_pods.contains(&self.hostname) {
-            ready_pods.push(self.hostname.clone());
+        if !ready_pods.contains(&self.my_address) {
+            ready_pods.push(self.my_address.clone());
         }
 
         ready_pods
     }
 
     fn this_node(&self) -> String {
-        self.hostname.clone()
+        self.my_address.clone()
     }
 }
 
