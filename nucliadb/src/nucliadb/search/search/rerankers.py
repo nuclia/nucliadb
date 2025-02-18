@@ -169,58 +169,17 @@ class PredictReranker(Reranker):
         return best
 
 
-class MultiMatchBoosterReranker(Reranker):
-    """This reranker gives more value to items that come from different indices"""
-
-    @property
-    def window(self) -> Optional[int]:
-        return None
-
-    @reranker_observer.wrap({"type": "multi_match_booster"})
-    async def _rerank(self, items: list[RerankableItem], options: RerankingOptions) -> list[RankedItem]:
-        """Given a list of rerankable items, boost matches that appear multiple
-        times. The returned list can be smaller than the initial, as repeated
-        matches are deduplicated.
-        """
-        reranked_by_id = {}
-        for item in items:
-            if item.id not in reranked_by_id:
-                reranked_by_id[item.id] = RankedItem(
-                    id=item.id,
-                    score=item.score,
-                    score_type=item.score_type,
-                )
-            else:
-                # it's a mutiple match, boost the score
-                if reranked_by_id[item.id].score < item.score:
-                    # previous implementation noted that we are using vector
-                    # score x2 when we find a multiple match. However, this may
-                    # not be true, as the same paragraph could come in any
-                    # position in the rank fusioned result list
-                    reranked_by_id[item.id].score = item.score * 2
-
-                reranked_by_id[item.id].score_type = SCORE_TYPE.BOTH
-
-        reranked = list(reranked_by_id.values())
-        sort_by_score(reranked)
-        return reranked
-
-
 def get_reranker(reranker: parser_models.Reranker) -> Reranker:
     algorithm: Reranker
 
     if isinstance(reranker, parser_models.NoopReranker):
         algorithm = NoopReranker()
 
-    elif isinstance(reranker, parser_models.MultiMatchBoosterReranker):
-        algorithm = MultiMatchBoosterReranker()
-
     elif isinstance(reranker, parser_models.PredictReranker):
         algorithm = PredictReranker(reranker.window)
 
     else:
-        logger.warning(f"Unknown reranker requested: {reranker}. Using default instead")
-        algorithm = MultiMatchBoosterReranker()
+        raise ValueError(f"Unknown reranker requested: {reranker}")
 
     return algorithm
 

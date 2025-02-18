@@ -93,6 +93,7 @@ async def local_files():
 @pytest.fixture(scope="function")
 def predict_mock() -> Mock:  # type: ignore
     mock = AsyncMock()
+
     with global_utility(Utility.PREDICT, mock):
         yield mock
 

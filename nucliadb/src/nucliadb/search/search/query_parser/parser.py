@@ -31,7 +31,6 @@ from nucliadb.search.search.query_parser.models import (
     CatalogFilters,
     CatalogQuery,
     DateTimeFilter,
-    MultiMatchBoosterReranker,
     NoopReranker,
     PredictReranker,
     RankFusion,
@@ -122,9 +121,6 @@ class _FindParser:
         if isinstance(self.item.reranker, search_models.RerankerName):
             if self.item.reranker == search_models.RerankerName.NOOP:
                 reranking = NoopReranker()
-
-            elif self.item.reranker == search_models.RerankerName.MULTI_MATCH_BOOSTER:
-                reranking = MultiMatchBoosterReranker()
 
             elif self.item.reranker == search_models.RerankerName.PREDICT_RERANKER:
                 # for predict rearnker, by default, we want a x2 factor with a

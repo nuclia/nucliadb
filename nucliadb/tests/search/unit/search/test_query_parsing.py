@@ -63,6 +63,7 @@ async def test_find_query_parsing__rank_fusion(
     find = FindRequest(
         top_k=20,
         rank_fusion=rank_fusion,
+        reranker=search_models.RerankerName.NOOP,
     )
     parsed = await parse_find("kbid", find)
     assert parsed.rank_fusion == expected

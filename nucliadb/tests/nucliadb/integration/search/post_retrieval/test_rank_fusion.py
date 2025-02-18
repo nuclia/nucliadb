@@ -114,6 +114,7 @@ async def test_reciprocal_rank_fusion_requests_more_results(
             "name": "rrf",
             "window": 5,
         },
+        "reranker": "noop",
         "top_k": 3,
     }
 
