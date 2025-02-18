@@ -1,9 +1,0 @@
-include src/nucliadb_protos/*.pyi
-include src/*.rst
-include src/*.txt
-include src/VERSION
-include src/nucliadb/py.typed
-include src/nucliadb/standalone/static
-include src/nucliadb/standalone/static/*
-include src/**/*.pb
-include src/**/*.png

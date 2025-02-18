@@ -5,26 +5,31 @@
 groups = ["default", "dev", "nidx", "sdk"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:c015d3eef3dd194617a5abc49e814cfee671f8f582d506aea4fc89a3cbc4da84"
+content_hash = "sha256:0a4f8b9b36780c8d289d883a42001c8c98dd1053b0dbb3c9be0bb671535d2b35"
 
 [[metadata.targets]]
 requires_python = ">=3.9"
 
 [[package]]
 name = "aiobotocore"
-version = "2.15.2"
+version = "2.19.0"
 requires_python = ">=3.8"
 summary = "Async client for aws services using botocore and aiohttp"
 groups = ["default", "dev"]
 dependencies = [
     "aiohttp<4.0.0,>=3.9.2",
     "aioitertools<1.0.0,>=0.5.1",
-    "botocore<1.35.37,>=1.35.16",
+    "botocore<1.36.4,>=1.36.0",
+    "jmespath<2.0.0,>=0.7.1",
+    "multidict<7.0.0,>=6.0.0",
+    "python-dateutil<3.0.0,>=2.1",
+    "urllib3!=2.2.0,<3,>=1.25.4; python_version >= \"3.10\"",
+    "urllib3<1.27,>=1.25.4; python_version < \"3.10\"",
     "wrapt<2.0.0,>=1.10.10",
 ]
 files = [
-    {file = "aiobotocore-2.15.2-py3-none-any.whl", hash = "sha256:d4d3128b4b558e2b4c369bfa963b022d7e87303adb82eec623cec8aa77ae578a"},
-    {file = "aiobotocore-2.15.2.tar.gz", hash = "sha256:9ac1cfcaccccc80602968174aa032bf978abe36bd4e55e6781d6500909af1375"},
+    {file = "aiobotocore-2.19.0-py3-none-any.whl", hash = "sha256:12c2960a21472b8eb3452cde5eb31d541ca1464d236f4221556320fa8aed2ee8"},
+    {file = "aiobotocore-2.19.0.tar.gz", hash = "sha256:552d5756989621b5274f1b4a4840cd76ae83dd930d0b1839af6443743a893faf"},
 ]
 
 [[package]]
@@ -173,15 +178,16 @@ files = [
 
 [[package]]
 name = "aioresponses"
-version = "0.7.6"
+version = "0.7.8"
 summary = "Mock out requests made by ClientSession from aiohttp package"
 groups = ["dev"]
 dependencies = [
     "aiohttp<4.0.0,>=3.3.0",
+    "packaging>=22.0",
 ]
 files = [
-    {file = "aioresponses-0.7.6-py2.py3-none-any.whl", hash = "sha256:d2c26defbb9b440ea2685ec132e90700907fd10bcca3e85ec2f157219f0d26f7"},
-    {file = "aioresponses-0.7.6.tar.gz", hash = "sha256:f795d9dbda2d61774840e7e32f5366f45752d1adc1b74c9362afd017296c7ee1"},
+    {file = "aioresponses-0.7.8-py2.py3-none-any.whl", hash = "sha256:b73bd4400d978855e55004b23a3a84cb0f018183bcf066a85ad392800b5b9a94"},
+    {file = "aioresponses-0.7.8.tar.gz", hash = "sha256:b861cdfe5dc58f3b8afac7b0a6973d5d7b2cb608dd0f6253d16b8ee8eaf6df11"},
 ]
 
 [[package]]
@@ -363,7 +369,7 @@ files = [
 
 [[package]]
 name = "botocore"
-version = "1.35.36"
+version = "1.36.3"
 requires_python = ">=3.8"
 summary = "Low-level, data-driven core of boto 3."
 groups = ["default", "dev"]
@@ -374,8 +380,8 @@ dependencies = [
     "urllib3<1.27,>=1.25.4; python_version < \"3.10\"",
 ]
 files = [
-    {file = "botocore-1.35.36-py3-none-any.whl", hash = "sha256:64241c778bf2dc863d93abab159e14024d97a926a5715056ef6411418cb9ead3"},
-    {file = "botocore-1.35.36.tar.gz", hash = "sha256:354ec1b766f0029b5d6ff0c45d1a0f9e5007b7d2f3ec89bcdd755b208c5bc797"},
+    {file = "botocore-1.36.3-py3-none-any.whl", hash = "sha256:536ab828e6f90dbb000e3702ac45fd76642113ae2db1b7b1373ad24104e89255"},
+    {file = "botocore-1.36.3.tar.gz", hash = "sha256:775b835e979da5c96548ed1a0b798101a145aec3cd46541d62e27dda5a94d7f8"},
 ]
 
 [[package]]
@@ -872,7 +878,7 @@ files = [
 
 [[package]]
 name = "faker"
-version = "30.6.0"
+version = "35.2.0"
 requires_python = ">=3.8"
 summary = "Faker is a Python package that generates fake data for you."
 groups = ["dev"]
@@ -881,8 +887,8 @@ dependencies = [
     "typing-extensions",
 ]
 files = [
-    {file = "Faker-30.6.0-py3-none-any.whl", hash = "sha256:37b5ab951f7367ea93edb865120e9717a7a649d6a4b223f1e4a47a8a20d9e85f"},
-    {file = "faker-30.6.0.tar.gz", hash = "sha256:be0e548352c1be6f6d9c982003848a0d305868f160bb1fb7f945acffc347e676"},
+    {file = "Faker-35.2.0-py3-none-any.whl", hash = "sha256:609abe555761ff31b0e5e16f958696e9b65c9224a7ac612ac96bfc2b8f09fe35"},
+    {file = "faker-35.2.0.tar.gz", hash = "sha256:28c24061780f83b45d9cb15a72b8f143b09d276c9ff52eb557744b7a89e8ba19"},
 ]
 
 [[package]]
@@ -1014,13 +1020,13 @@ files = [
 
 [[package]]
 name = "fsspec"
-version = "2024.10.0"
+version = "2025.2.0"
 requires_python = ">=3.8"
 summary = "File-system specification"
 groups = ["dev"]
 files = [
-    {file = "fsspec-2024.10.0-py3-none-any.whl", hash = "sha256:03b9a6785766a4de40368b88906366755e2819e758b83705c88cd7cb5fe81871"},
-    {file = "fsspec-2024.10.0.tar.gz", hash = "sha256:eda2d8a4116d4f2429db8550f2457da57279247dd930bb12f821b58391359493"},
+    {file = "fsspec-2025.2.0-py3-none-any.whl", hash = "sha256:9de2ad9ce1f85e1931858535bc882543171d197001a0a5eb2ddc04f1781ab95b"},
+    {file = "fsspec-2025.2.0.tar.gz", hash = "sha256:1c24b16eaa0a1798afa0337aa0db9b256718ab2a89c425371f5628d22c3b6afd"},
 ]
 
 [[package]]
@@ -1643,7 +1649,7 @@ files = [
 
 [[package]]
 name = "maturin"
-version = "1.7.4"
+version = "1.8.1"
 requires_python = ">=3.7"
 summary = "Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages"
 groups = ["dev"]
@@ -1651,19 +1657,19 @@ dependencies = [
     "tomli>=1.1.0; python_version < \"3.11\"",
 ]
 files = [
-    {file = "maturin-1.7.4-py3-none-linux_armv6l.whl", hash = "sha256:eb7b7753b733ae302c08f80bca7b0c3fda1eea665c2b1922c58795f35a54c833"},
-    {file = "maturin-1.7.4-py3-none-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:0182a9638399c8835afd39d2aeacf56908e37cba3f7abb15816b9df6774fab81"},
-    {file = "maturin-1.7.4-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:41a29c5b23f3ebdfe7633637e3de256579a1b2700c04cd68c16ed46934440c5a"},
-    {file = "maturin-1.7.4-py3-none-manylinux_2_12_i686.manylinux2010_i686.musllinux_1_1_i686.whl", hash = "sha256:23fae44e345a2da5cb391ae878726fb793394826e2f97febe41710bd4099460e"},
-    {file = "maturin-1.7.4-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl", hash = "sha256:8b441521c151f0dbe70ed06fb1feb29b855d787bda038ff4330ca962e5d56641"},
-    {file = "maturin-1.7.4-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64.whl", hash = "sha256:7ccb66d0c5297cf06652c5f72cb398f447d3a332eccf5d1e73b3fe14dbc9498c"},
-    {file = "maturin-1.7.4-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.musllinux_1_1_armv7l.whl", hash = "sha256:71f668f19e719048605dbca6a1f4d0dc03b987c922ad9c4bf5be03b9b278e4c3"},
-    {file = "maturin-1.7.4-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.musllinux_1_1_ppc64le.whl", hash = "sha256:c179fcb2b494f19186781b667320e43d95b3e71fcb1c98fffad9ef6bd6e276b3"},
-    {file = "maturin-1.7.4-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:fd5b4b95286f2f376437340f8a4908f4761587212170263084455be8099099a7"},
-    {file = "maturin-1.7.4-py3-none-win32.whl", hash = "sha256:35487a424467d1fda4567cbb02d21f09febb10eda22f5fd647b130bc0767dc61"},
-    {file = "maturin-1.7.4-py3-none-win_amd64.whl", hash = "sha256:f70c1c8ec9bd4749a53c0f3ae8fdbb326ce45be4f1c5551985ee25a6d7150328"},
-    {file = "maturin-1.7.4-py3-none-win_arm64.whl", hash = "sha256:f3d38a6d0c7fd7b04bec30dd470b2173cf9bd184ab6220c1acaf49df6b48faf5"},
-    {file = "maturin-1.7.4.tar.gz", hash = "sha256:2b349d742a07527d236f0b4b6cab26f53ebecad0ceabfc09ec4c6a396e3176f9"},
+    {file = "maturin-1.8.1-py3-none-linux_armv6l.whl", hash = "sha256:7e590a23d9076b8a994f2e67bc63dc9a2d1c9a41b1e7b45ac354ba8275254e89"},
+    {file = "maturin-1.8.1-py3-none-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:8d8251a95682c83ea60988c804b620c181911cd824aa107b4a49ac5333c92968"},
+    {file = "maturin-1.8.1-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:b9fc1a4354cac5e32c190410208039812ea88c4a36bd2b6499268ec49ef5de00"},
+    {file = "maturin-1.8.1-py3-none-manylinux_2_12_i686.manylinux2010_i686.musllinux_1_1_i686.whl", hash = "sha256:621e171c6b39f95f1d0df69a118416034fbd59c0f89dcaea8c2ea62019deecba"},
+    {file = "maturin-1.8.1-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl", hash = "sha256:98f638739a5132962347871b85c91f525c9246ef4d99796ae98a2031e3df029f"},
+    {file = "maturin-1.8.1-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64.whl", hash = "sha256:f9f5c47521924b6e515cbc652a042fe5f17f8747445be9d931048e5d8ddb50a4"},
+    {file = "maturin-1.8.1-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.musllinux_1_1_armv7l.whl", hash = "sha256:0f4407c7353c31bfbb8cdeb82bc2170e474cbfb97b5ba27568f440c9d6c1fdd4"},
+    {file = "maturin-1.8.1-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.musllinux_1_1_ppc64le.whl", hash = "sha256:ec49cd70cad3c389946c6e2bc0bd50772a7fcb463040dd800720345897eec9bf"},
+    {file = "maturin-1.8.1-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:c08767d794de8f8a11c5c8b1b47a4ff9fb6ae2d2d97679e27030f2f509c8c2a0"},
+    {file = "maturin-1.8.1-py3-none-win32.whl", hash = "sha256:d678407713f3e10df33c5b3d7a343ec0551eb7f14d8ad9ba6febeb96f4e4c75c"},
+    {file = "maturin-1.8.1-py3-none-win_amd64.whl", hash = "sha256:a526f90fe0e5cb59ffb81f4ff547ddc42e823bbdeae4a31012c0893ca6dcaf46"},
+    {file = "maturin-1.8.1-py3-none-win_arm64.whl", hash = "sha256:e95f077fd2ddd2f048182880eed458c308571a534be3eb2add4d3dac55bf57f4"},
+    {file = "maturin-1.8.1.tar.gz", hash = "sha256:49cd964aabf59f8b0a6969f9860d2cdf194ac331529caae14c884f5659568857"},
 ]
 
 [[package]]
@@ -2007,19 +2013,20 @@ files = [
 
 [[package]]
 name = "nidx-binding"
-version = "0.1.0"
-requires_python = ">=3.8"
+version = "6.2.1"
+requires_python = ">=3.9, <4"
 editable = true
 path = "./nidx/nidx_binding"
-summary = ""
+summary = "Bindings for nidx (part of nucliadb)"
 groups = ["dev", "nidx"]
 
 [[package]]
 name = "nidx-protos"
-version = "0.0.1"
+version = "6.2.1"
+requires_python = ">=3.9, <4"
 editable = true
 path = "./nidx/nidx_protos"
-summary = ""
+summary = "Protobuf definitions for nucliadb/nidx"
 groups = ["default", "dev"]
 
 [[package]]
@@ -2066,7 +2073,7 @@ version = "6.2.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb"
-summary = ""
+summary = "NucliaDB"
 groups = ["default", "dev"]
 dependencies = [
     "aiobotocore>=2.9.0",
@@ -2100,6 +2107,7 @@ dependencies = [
     "lru-dict>=1.1.7",
     "mmh3>=3.0.0",
     "multidict>=6.0.4",
+    "nidx-protos",
     "nuclia-models>=0.24.2",
     "nucliadb-admin-assets>=1.0.0.post1224",
     "nucliadb-models",
@@ -2137,8 +2145,8 @@ files = [
 
 [[package]]
 name = "nucliadb-dataset"
-version = "5.2.1"
-requires_python = ">=3.9"
+version = "6.2.1"
+requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_dataset"
 summary = "NucliaDB Train Python client"
@@ -2159,7 +2167,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-models"
-version = "5.2.1"
+version = "6.2.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_models"
@@ -2171,10 +2179,11 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-protos"
-version = "5.2.1"
+version = "6.2.1"
+requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_protos/python"
-summary = "protos for nucliadb"
+summary = "Protobuf definitions for nucliadb"
 groups = ["default", "dev", "sdk"]
 dependencies = [
     "mypy-protobuf>=3.4.0",
@@ -2184,11 +2193,11 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-sdk"
-version = "5.2.1"
+version = "6.2.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_sdk"
-summary = ""
+summary = "NucliaDB SDK"
 groups = ["sdk"]
 dependencies = [
     "httpx",
@@ -2200,8 +2209,8 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "5.2.1"
-requires_python = ">=3.9"
+version = "6.2.1"
+requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_telemetry"
 summary = "NucliaDB Telemetry Library Python process"
@@ -2216,9 +2225,9 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-telemetry"
-version = "5.2.1"
+version = "6.2.1"
 extras = ["all"]
-requires_python = ">=3.9"
+requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_telemetry"
 summary = "NucliaDB Telemetry Library Python process"
@@ -2247,11 +2256,11 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-utils"
-version = "5.2.1"
+version = "6.2.1"
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_utils"
-summary = ""
+summary = "NucliaDB util library"
 groups = ["default", "dev"]
 dependencies = [
     "PyNaCl",
@@ -2271,12 +2280,12 @@ dependencies = [
 
 [[package]]
 name = "nucliadb-utils"
-version = "5.2.1"
+version = "6.2.1"
 extras = ["cache", "fastapi", "storages"]
 requires_python = ">=3.9, <4"
 editable = true
 path = "./nucliadb_utils"
-summary = ""
+summary = "NucliaDB util library"
 groups = ["default", "dev"]
 dependencies = [
     "-e file:///${PROJECT_ROOT}/nucliadb_utils#egg=nucliadb-utils",
@@ -3005,6 +3014,7 @@ files = [
     {file = "psycopg2_binary-2.9.10-cp313-cp313-musllinux_1_2_i686.whl", hash = "sha256:bb89f0a835bcfc1d42ccd5f41f04870c1b936d8507c6df12b7737febc40f0909"},
     {file = "psycopg2_binary-2.9.10-cp313-cp313-musllinux_1_2_ppc64le.whl", hash = "sha256:f0c2d907a1e102526dd2986df638343388b94c33860ff3bbe1384130828714b1"},
     {file = "psycopg2_binary-2.9.10-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:f8157bed2f51db683f31306aa497311b560f2265998122abe1dce6428bd86567"},
+    {file = "psycopg2_binary-2.9.10-cp313-cp313-win_amd64.whl", hash = "sha256:27422aa5f11fbcd9b18da48373eb67081243662f9b46e6fd07c3eb46e4535142"},
     {file = "psycopg2_binary-2.9.10-cp39-cp39-macosx_12_0_x86_64.whl", hash = "sha256:7a813c8bdbaaaab1f078014b9b0b13f5de757e2b5d9be6403639b298a04d218b"},
     {file = "psycopg2_binary-2.9.10-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d00924255d7fc916ef66e4bf22f354a940c67179ad3fd7067d7a0a9c84d2fbfc"},
     {file = "psycopg2_binary-2.9.10-cp39-cp39-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:7559bce4b505762d737172556a4e6ea8a9998ecac1e39b5233465093e8cee697"},
@@ -3447,19 +3457,19 @@ files = [
 
 [[package]]
 name = "pytest-benchmark"
-version = "4.0.0"
-requires_python = ">=3.7"
+version = "5.1.0"
+requires_python = ">=3.9"
 summary = "A ``pytest`` fixture for benchmarking code. It will group the tests into rounds that are calibrated to the chosen timer."
 groups = ["dev"]
 dependencies = [
     "pathlib2; python_version < \"3.4\"",
     "py-cpuinfo",
-    "pytest>=3.8",
+    "pytest>=8.1",
     "statistics; python_version < \"3.4\"",
 ]
 files = [
-    {file = "pytest-benchmark-4.0.0.tar.gz", hash = "sha256:fb0785b83efe599a6a956361c0691ae1dbb5318018561af10f3e915caa0048d1"},
-    {file = "pytest_benchmark-4.0.0-py3-none-any.whl", hash = "sha256:fdb7db64e31c8b277dff9850d2a2556d8b60bcb0ea6524e36e28ffd7c87f71d6"},
+    {file = "pytest-benchmark-5.1.0.tar.gz", hash = "sha256:9ea661cdc292e8231f7cd4c10b0319e56a2118e2c09d9f50e1b3d150d2aca105"},
+    {file = "pytest_benchmark-5.1.0-py3-none-any.whl", hash = "sha256:922de2dfa3033c227c96da942d1878191afa135a29485fb942e85dff1c592c89"},
 ]
 
 [[package]]
@@ -3493,7 +3503,7 @@ files = [
 
 [[package]]
 name = "pytest-lazy-fixtures"
-version = "1.1.1"
+version = "1.1.2"
 requires_python = "<4.0,>=3.8"
 summary = "Allows you to use fixtures in @pytest.mark.parametrize."
 groups = ["dev"]
@@ -3501,8 +3511,8 @@ dependencies = [
     "pytest>=7",
 ]
 files = [
-    {file = "pytest_lazy_fixtures-1.1.1-py3-none-any.whl", hash = "sha256:a4b396a361faf56c6305535fd0175ce82902ca7cf668c4d812a25ed2bcde8183"},
-    {file = "pytest_lazy_fixtures-1.1.1.tar.gz", hash = "sha256:0c561f0d29eea5b55cf29b9264a3241999ffdb74c6b6e8c4ccc0bd2c934d01ed"},
+    {file = "pytest_lazy_fixtures-1.1.2-py3-none-any.whl", hash = "sha256:e04c164d2caa5a6b9c846fa7559aad2ce0980a944daf4b75579f39920ae961e4"},
+    {file = "pytest_lazy_fixtures-1.1.2.tar.gz", hash = "sha256:14ba4154dab52066c1c4d6547cc40bbf60726445cb16f1d2dcc9485cdf38964d"},
 ]
 
 [[package]]
@@ -3668,7 +3678,7 @@ files = [
 
 [[package]]
 name = "redis"
-version = "5.1.1"
+version = "5.2.1"
 requires_python = ">=3.8"
 summary = "Python client for Redis database and key-value store"
 groups = ["default", "dev"]
@@ -3676,8 +3686,8 @@ dependencies = [
     "async-timeout>=4.0.3; python_full_version < \"3.11.3\"",
 ]
 files = [
-    {file = "redis-5.1.1-py3-none-any.whl", hash = "sha256:f8ea06b7482a668c6475ae202ed8d9bcaa409f6e87fb77ed1043d912afd62e24"},
-    {file = "redis-5.1.1.tar.gz", hash = "sha256:f6c997521fedbae53387307c5d0bf784d9acc28d9f1d058abeac566ec4dbed72"},
+    {file = "redis-5.2.1-py3-none-any.whl", hash = "sha256:ee7e1056b9aea0f04c6c2ed59452947f34c4940ee025f5dd83e6a6418b6989e4"},
+    {file = "redis-5.2.1.tar.gz", hash = "sha256:16f2e22dff21d5125e8481515e386711a34cbec50f0e44413dd7d9c060a54e0f"},
 ]
 
 [[package]]
@@ -3867,18 +3877,18 @@ files = [
 
 [[package]]
 name = "s3fs"
-version = "2024.10.0"
-requires_python = ">=3.8"
+version = "2025.2.0"
+requires_python = ">=3.9"
 summary = "Convenient Filesystem interface over S3"
 groups = ["dev"]
 dependencies = [
     "aiobotocore<3.0.0,>=2.5.4",
     "aiohttp!=4.0.0a0,!=4.0.0a1",
-    "fsspec==2024.10.0.*",
+    "fsspec==2025.2.0.*",
 ]
 files = [
-    {file = "s3fs-2024.10.0-py3-none-any.whl", hash = "sha256:7a2025d60d5b1a6025726b3a5e292a8e5aa713abc3b16fd1f81735181f7bb282"},
-    {file = "s3fs-2024.10.0.tar.gz", hash = "sha256:58b8c3650f8b99dbedf361543da3533aac8707035a104db5d80b094617ad4a3f"},
+    {file = "s3fs-2025.2.0-py3-none-any.whl", hash = "sha256:4b66b773519c1983e3071e13a42a2f2498d87da13dee40fda0622f4ed1b55664"},
+    {file = "s3fs-2025.2.0.tar.gz", hash = "sha256:d94b985f55add51c655e9ca9b4ceecb5c4b6389aecde162bdebc89f489a4e9f2"},
 ]
 
 [[package]]
@@ -4064,13 +4074,13 @@ files = [
 
 [[package]]
 name = "types-pyyaml"
-version = "6.0.12.20240917"
+version = "6.0.12.20241230"
 requires_python = ">=3.8"
 summary = "Typing stubs for PyYAML"
 groups = ["dev"]
 files = [
-    {file = "types-PyYAML-6.0.12.20240917.tar.gz", hash = "sha256:d1405a86f9576682234ef83bcb4e6fff7c9305c8b1fbad5e0bcd4f7dbdc9c587"},
-    {file = "types_PyYAML-6.0.12.20240917-py3-none-any.whl", hash = "sha256:392b267f1c0fe6022952462bf5d6523f31e37f6cea49b14cee7ad634b6301570"},
+    {file = "types_PyYAML-6.0.12.20241230-py3-none-any.whl", hash = "sha256:fa4d32565219b68e6dee5f67534c722e53c00d1cfc09c435ef04d7353e1e96e6"},
+    {file = "types_pyyaml-6.0.12.20241230.tar.gz", hash = "sha256:7f07622dbd34bb9c8b264fe860a17e0efcad00d50b5f27e93984909d9363498c"},
 ]
 
 [[package]]
@@ -4104,13 +4114,13 @@ files = [
 
 [[package]]
 name = "types-setuptools"
-version = "75.2.0.20241019"
+version = "75.8.0.20250110"
 requires_python = ">=3.8"
 summary = "Typing stubs for setuptools"
 groups = ["default", "dev"]
 files = [
-    {file = "types-setuptools-75.2.0.20241019.tar.gz", hash = "sha256:86ea31b5f6df2c6b8f2dc8ae3f72b213607f62549b6fa2ed5866e5299f968694"},
-    {file = "types_setuptools-75.2.0.20241019-py3-none-any.whl", hash = "sha256:2e48ff3acd4919471e80d5e3f049cce5c177e108d5d36d2d4cee3fa4d4104258"},
+    {file = "types_setuptools-75.8.0.20250110-py3-none-any.whl", hash = "sha256:a9f12980bbf9bcdc23ecd80755789085bad6bfce4060c2275bc2b4ca9f2bc480"},
+    {file = "types_setuptools-75.8.0.20250110.tar.gz", hash = "sha256:96f7ec8bbd6e0a54ea180d66ad68ad7a1d7954e7281a710ea2de75e355545271"},
 ]
 
 [[package]]
