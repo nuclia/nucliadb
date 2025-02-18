@@ -106,7 +106,7 @@ class Relation(BaseModel):
 class InputMetadata(BaseModel):
     metadata: Dict[str, str] = {}
     language: Optional[str] = None
-    languages: Optional[List[str]] = None
+    languages: Optional[List[str]] = Field(default=None, max_length=1024)
 
 
 class ResourceProcessingStatus(Enum):
