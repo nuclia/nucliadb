@@ -234,93 +234,96 @@ impl GraphQueryParser {
     }
 
     fn has_node_as_source(&self, query: &Node) -> Box<dyn Query> {
-        let node_value: Box<dyn Query> = match query.value {
-            Some(ref value) if !value.is_empty() => {
+        let mut subqueries: Vec<Box<dyn Query>> = vec![];
+
+        if let Some(ref value) = query.value {
+            if !value.is_empty() {
                 let normalized_value = schema::normalize(&value);
-                Box::new(TermQuery::new(
+                let node_value_query = Box::new(TermQuery::new(
                     Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
                     IndexRecordOption::Basic,
-                ))
+                ));
+                subqueries.push(node_value_query)
             }
-            Some(_) | None => Box::new(AllQuery),
-        };
+        }
 
-        let node_type: Box<dyn Query> = match query.node_type {
-            Some(node_type) => {
-                let node_type = io_maps::node_type_to_u64(node_type);
-                Box::new(TermQuery::new(
-                    Term::from_field_u64(self.schema.source_type, node_type),
-                    IndexRecordOption::Basic,
-                ))
-            }
-            None => Box::new(AllQuery),
-        };
-
-        let node_subtype: Box<dyn Query> = match query.node_subtype {
-            Some(ref node_subtype) => Box::new(TermQuery::new(
-                Term::from_field_text(self.schema.source_subtype, &node_subtype),
+        if let Some(node_type) = query.node_type {
+            let node_type = io_maps::node_type_to_u64(node_type);
+            let node_type_query = Box::new(TermQuery::new(
+                Term::from_field_u64(self.schema.source_type, node_type),
                 IndexRecordOption::Basic,
-            )),
-            None => Box::new(AllQuery),
-        };
+            ));
+            subqueries.push(node_type_query);
+        }
 
-        let query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-            (Occur::Must, node_value),
-            (Occur::Must, node_type),
-            (Occur::Must, node_subtype),
-        ]));
+        if let Some(ref node_subtype) = query.node_subtype {
+            if !node_subtype.is_empty() {
+                let node_subtype_query = Box::new(TermQuery::new(
+                    Term::from_field_text(self.schema.source_subtype, &node_subtype),
+                    IndexRecordOption::Basic,
+                ));
+                subqueries.push(node_subtype_query);
+            }
+        }
+
+        let query: Box<dyn Query> = if subqueries.len() > 0 {
+            Box::new(BooleanQuery::intersection(subqueries))
+        } else {
+            Box::new(AllQuery)
+        };
 
         query
     }
 
     fn has_node_as_destination(&self, query: &Node) -> Box<dyn Query> {
-        let node_value: Box<dyn Query> = match query.value {
-            Some(ref value) if !value.is_empty() => {
+        let mut subqueries: Vec<Box<dyn Query>> = vec![];
+
+        if let Some(ref value) = query.value {
+            if !value.is_empty() {
                 let normalized_value = schema::normalize(&value);
-                Box::new(TermQuery::new(
+                let node_value_query = Box::new(TermQuery::new(
                     Term::from_field_text(self.schema.normalized_target_value, &normalized_value),
                     IndexRecordOption::Basic,
-                ))
+                ));
+                subqueries.push(node_value_query)
             }
-            Some(_) | None => Box::new(AllQuery),
-        };
+        }
 
-        let node_type: Box<dyn Query> = match query.node_type {
-            Some(node_type) => {
-                let node_type = io_maps::node_type_to_u64(node_type);
-                Box::new(TermQuery::new(
-                    Term::from_field_u64(self.schema.target_type, node_type),
-                    IndexRecordOption::Basic,
-                ))
-            }
-            None => Box::new(AllQuery),
-        };
-
-        let node_subtype: Box<dyn Query> = match query.node_subtype {
-            Some(ref node_subtype) => Box::new(TermQuery::new(
-                Term::from_field_text(self.schema.target_subtype, &node_subtype),
+        if let Some(node_type) = query.node_type {
+            let node_type = io_maps::node_type_to_u64(node_type);
+            let node_type_query = Box::new(TermQuery::new(
+                Term::from_field_u64(self.schema.target_type, node_type),
                 IndexRecordOption::Basic,
-            )),
-            None => Box::new(AllQuery),
-        };
+            ));
+            subqueries.push(node_type_query);
+        }
 
-        let query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-            (Occur::Must, node_value),
-            (Occur::Must, node_type),
-            (Occur::Must, node_subtype),
-        ]));
+        if let Some(ref node_subtype) = query.node_subtype {
+            if !node_subtype.is_empty() {
+                let node_subtype_query = Box::new(TermQuery::new(
+                    Term::from_field_text(self.schema.target_subtype, &node_subtype),
+                    IndexRecordOption::Basic,
+                ));
+                subqueries.push(node_subtype_query);
+            }
+        }
+
+        let query: Box<dyn Query> = if subqueries.len() > 0 {
+            Box::new(BooleanQuery::intersection(subqueries))
+        } else {
+            Box::new(AllQuery)
+        };
 
         query
     }
 
     fn has_relation(&self, query: Relation) -> Box<dyn Query> {
-        let relation_label: Box<dyn Query> = match query.value {
-            Some(value) => {
-                Box::new(TermQuery::new(Term::from_field_text(self.schema.label, &value), IndexRecordOption::Basic))
-            }
-            None => Box::new(AllQuery),
-        };
-
-        Box::new(BooleanQuery::new(vec![(Occur::Should, relation_label)]))
+        match query.value {
+            Some(value) if !value.is_empty() => Box::new(BooleanQuery::new(vec![(
+                Occur::Should,
+                Box::new(TermQuery::new(Term::from_field_text(self.schema.label, &value), IndexRecordOption::Basic)),
+            )])),
+            Some(_) | None => Box::new(AllQuery),
+        }
     }
 }
