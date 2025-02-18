@@ -121,11 +121,11 @@ impl GraphQueryParser {
     }
 
     fn parse_relation_query(&self, query: RelationQuery) -> Box<dyn Query> {
-        self.parse_graph_query(GraphQuery::PathQuery(PathQuery::DirectedPath((
+        self.parse_path_query(PathQuery::DirectedPath((
             Expression::Value(Node::default()),
             query.0,
             Expression::Value(Node::default()),
-        ))))
+        )))
     }
 
     fn parse_path_query(&self, query: PathQuery) -> Box<dyn Query> {
