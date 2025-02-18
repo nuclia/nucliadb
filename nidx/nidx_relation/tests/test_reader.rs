@@ -28,33 +28,9 @@ use nidx_protos::{
     Resource, ResourceId,
 };
 use nidx_relation::{RelationIndexer, RelationSearcher};
-use nidx_tantivy::{TantivyMeta, TantivySegmentMetadata};
-use nidx_types::{OpenIndexMetadata, Seq};
 use tempfile::TempDir;
 
-pub struct TestOpener {
-    segments: Vec<(TantivySegmentMetadata, Seq)>,
-    deletions: Vec<(String, Seq)>,
-}
-
-impl TestOpener {
-    pub fn new(segments: Vec<(TantivySegmentMetadata, Seq)>, deletions: Vec<(String, Seq)>) -> Self {
-        Self {
-            segments,
-            deletions,
-        }
-    }
-}
-
-impl OpenIndexMetadata<TantivyMeta> for TestOpener {
-    fn segments(&self) -> impl Iterator<Item = (nidx_types::SegmentMetadata<TantivyMeta>, nidx_types::Seq)> {
-        self.segments.iter().cloned()
-    }
-
-    fn deletions(&self) -> impl Iterator<Item = (&String, nidx_types::Seq)> {
-        self.deletions.iter().map(|(key, seq)| (key, *seq))
-    }
-}
+use common::TestOpener;
 
 fn create_reader() -> anyhow::Result<RelationSearcher> {
     let dir = TempDir::new().unwrap();

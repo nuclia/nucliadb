@@ -23,6 +23,32 @@
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{Relation, RelationMetadata, RelationNode};
+use nidx_tantivy::{TantivyMeta, TantivySegmentMetadata};
+use nidx_types::{OpenIndexMetadata, Seq};
+
+pub struct TestOpener {
+    segments: Vec<(TantivySegmentMetadata, Seq)>,
+    deletions: Vec<(String, Seq)>,
+}
+
+impl TestOpener {
+    pub fn new(segments: Vec<(TantivySegmentMetadata, Seq)>, deletions: Vec<(String, Seq)>) -> Self {
+        Self {
+            segments,
+            deletions,
+        }
+    }
+}
+
+impl OpenIndexMetadata<TantivyMeta> for TestOpener {
+    fn segments(&self) -> impl Iterator<Item = (nidx_types::SegmentMetadata<TantivyMeta>, nidx_types::Seq)> {
+        self.segments.iter().cloned()
+    }
+
+    fn deletions(&self) -> impl Iterator<Item = (&String, nidx_types::Seq)> {
+        self.deletions.iter().map(|(key, seq)| (key, *seq))
+    }
+}
 
 pub fn create_relation_node(source: String, node_type: NodeType, subtype: String) -> RelationNode {
     RelationNode {
