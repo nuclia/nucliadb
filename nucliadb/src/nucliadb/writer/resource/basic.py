@@ -95,7 +95,8 @@ def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess
         if item.metadata.language:
             bm.basic.metadata.language = item.metadata.language
         if item.metadata.languages:
-            bm.basic.metadata.languages.extend(item.metadata.languages)
+            unique_languages = list(set(item.metadata.languages))
+            bm.basic.metadata.languages.extend(unique_languages)
 
     if item.fieldmetadata is not None:
         for fieldmetadata in item.fieldmetadata:
