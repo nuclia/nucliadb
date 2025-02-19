@@ -219,7 +219,6 @@ async def get_relations_results(
     *,
     kbid: str,
     text_answer: str,
-    target_shard_replicas: Optional[list[str]],
     timeout: Optional[float] = None,
     only_with_metadata: bool = False,
     only_agentic_relations: bool = False,
@@ -231,7 +230,6 @@ async def get_relations_results(
         return await get_relations_results_from_entities(
             kbid=kbid,
             entities=detected_entities,
-            target_shard_replicas=target_shard_replicas,
             timeout=timeout,
             only_with_metadata=only_with_metadata,
             only_agentic_relations=only_agentic_relations,
@@ -246,7 +244,6 @@ async def get_relations_results_from_entities(
     *,
     kbid: str,
     entities: Iterable[RelationNode],
-    target_shard_replicas: Optional[list[str]],
     timeout: Optional[float] = None,
     only_with_metadata: bool = False,
     only_agentic_relations: bool = False,
@@ -269,10 +266,7 @@ async def get_relations_results_from_entities(
         kbid,
         Method.SEARCH,
         request,
-        target_shard_replicas=target_shard_replicas,
         timeout=timeout,
-        use_read_replica_nodes=True,
-        retry_on_primary=False,
     )
     relations_results: list[RelationSearchResponse] = [result.relation for result in results]
     return await merge_relations_results(

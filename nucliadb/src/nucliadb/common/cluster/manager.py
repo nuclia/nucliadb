@@ -82,14 +82,12 @@ class KBShardManager:
         kbid: str,
         aw: Callable[[AbstractIndexNode, str], Awaitable[Any]],
         timeout: float,
-        *,
-        use_read_replica_nodes: bool = False,
     ) -> list[Any]:
         shards = await self.get_shards_by_kbid(kbid)
         ops = []
 
         for shard_obj in shards:
-            node, shard_id = choose_node(shard_obj, use_read_replica_nodes=use_read_replica_nodes)
+            node, shard_id = choose_node(shard_obj)
             if shard_id is None:
                 raise ShardNotFound("Found a node but not a shard")
 
@@ -280,9 +278,7 @@ class KBShardManager:
                     f"Unable to create vectorset {vectorset_id} in kb {kbid} shard {shard_id}"
                 )
 
-        await self.apply_for_all_shards(
-            kbid, _create_vectorset, timeout=10, use_read_replica_nodes=False
-        )
+        await self.apply_for_all_shards(kbid, _create_vectorset, timeout=10)
 
     async def delete_vectorset(self, kbid: str, vectorset_id: str):
         """Delete a vectorset from all KB shards"""
@@ -294,9 +290,7 @@ class KBShardManager:
                     f"Unable to delete vectorset {vectorset_id} in kb {kbid} shard {shard_id}"
                 )
 
-        await self.apply_for_all_shards(
-            kbid, _delete_vectorset, timeout=10, use_read_replica_nodes=False
-        )
+        await self.apply_for_all_shards(kbid, _delete_vectorset, timeout=10)
 
 
 class StandaloneKBShardManager(KBShardManager):
@@ -370,9 +364,6 @@ class StandaloneKBShardManager(KBShardManager):
 
 def choose_node(
     shard: writer_pb2.ShardObject,
-    *,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = False,
 ) -> tuple[AbstractIndexNode, str]:
     fake_node = get_nidx_fake_node()
     return fake_node, shard.nidx_shard_id
