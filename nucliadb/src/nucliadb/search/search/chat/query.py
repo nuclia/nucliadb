@@ -173,7 +173,6 @@ def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:
     find_request.range_modification_end = item.range_modification_end
     find_request.show = item.show
     find_request.extracted = item.extracted
-    find_request.shards = item.shards
     find_request.autofilter = item.autofilter
     find_request.highlight = item.highlight
     find_request.security = item.security

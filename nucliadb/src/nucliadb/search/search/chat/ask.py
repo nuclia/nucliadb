@@ -740,7 +740,6 @@ async def retrieval_in_kb(
                 origin=origin,
                 graph_strategy=graph_strategy,
                 metrics=metrics,
-                shards=ask_request.shards,
             )
 
             if prequeries_results is None:
