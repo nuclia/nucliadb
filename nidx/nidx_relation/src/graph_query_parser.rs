@@ -214,17 +214,26 @@ impl GraphQueryParser {
                 };
                 subqueries.push(source_query);
 
-                let relation_query = match relation_expression {
-                    Expression::Value(query) => (Occur::Must, self.has_relation(query)),
-                    Expression::Not(query) => (Occur::MustNot, self.has_relation(query)),
+                match relation_expression {
+                    Expression::Value(query) => {
+                        if let Some(query) = self.has_relation(query) {
+                            subqueries.push((Occur::Must, query));
+                        }
+                    }
+                    Expression::Not(query) => {
+                        if let Some(query) = self.has_relation(query) {
+                            subqueries.push((Occur::MustNot, query));
+                        }
+                    }
                     Expression::Or(nodes) => {
-                        let subquery: Box<dyn Query> = Box::new(BooleanQuery::union(
-                            nodes.into_iter().map(|node| self.has_relation(node)).collect(),
-                        ));
-                        (Occur::Must, subquery)
+                        let or_subqueries: Vec<_> =
+                            nodes.into_iter().flat_map(|node| self.has_relation(node)).collect();
+                        if or_subqueries.len() > 0 {
+                            let or_query = Box::new(BooleanQuery::union(or_subqueries));
+                            subqueries.push((Occur::Must, or_query));
+                        }
                     }
                 };
-                subqueries.push(relation_query);
 
                 let destination_query = match destination_expression {
                     Expression::Value(query) => (Occur::Must, self.has_node_as_destination(&query)),
@@ -364,16 +373,16 @@ impl GraphQueryParser {
         query
     }
 
-    fn has_relation(&self, query: Relation) -> Box<dyn Query> {
+    fn has_relation(&self, query: Relation) -> Option<Box<dyn Query>> {
         match query.value {
-            Some(value) if !value.is_empty() => Box::new(BooleanQuery::new(vec![(
+            Some(value) if !value.is_empty() => Some(Box::new(BooleanQuery::new(vec![(
                 Occur::Should,
                 Box::new(TermQuery::new(
                     tantivy::Term::from_field_text(self.schema.label, &value),
                     IndexRecordOption::Basic,
                 )),
-            )])),
-            Some(_) | None => Box::new(AllQuery),
+            )]))),
+            Some(_) | None => None,
         }
     }
 }
