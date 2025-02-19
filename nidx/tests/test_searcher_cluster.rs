@@ -106,6 +106,9 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
                 .await?
                 .search(Request::new(SearchRequest {
                     shard: shard.to_string(),
+                    result_per_page: 20,
+                    body: "Hola".into(),
+                    paragraph: true,
                     ..Default::default()
                 }))
                 .await?;
@@ -121,6 +124,9 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
                 .await?
                 .search(Request::new(SearchRequest {
                     shard: shard.to_string(),
+                    result_per_page: 20,
+                    body: "Hola".into(),
+                    paragraph: true,
                     ..Default::default()
                 }))
                 .await?;
@@ -193,6 +199,9 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
                 .await?
                 .search(Request::new(SearchRequest {
                     shard: shard.to_string(),
+                    result_per_page: 20,
+                    body: "Hola".into(),
+                    paragraph: true,
                     ..Default::default()
                 }))
                 .await;
@@ -220,6 +229,9 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
                 .await?
                 .search(Request::new(SearchRequest {
                     shard: shard.to_string(),
+                    result_per_page: 20,
+                    body: "Hola".into(),
+                    paragraph: true,
                     ..Default::default()
                 }))
                 .await;
@@ -255,6 +267,9 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
                 .await?
                 .search(Request::new(SearchRequest {
                     shard: shard.to_string(),
+                    result_per_page: 20,
+                    body: "Hola".into(),
+                    paragraph: true,
                     ..Default::default()
                 }))
                 .await;

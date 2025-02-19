@@ -165,6 +165,21 @@ impl Index {
         .await
     }
 
+    pub async fn for_shards(
+        meta: impl Executor<'_, Database = Postgres>,
+        shard_ids: &[Uuid],
+    ) -> sqlx::Result<Vec<Index>> {
+        sqlx::query_as!(
+            Index,
+            r#"SELECT id, shard_id, kind as "kind: IndexKind", name, configuration, updated_at, deleted_at
+               FROM indexes
+               WHERE shard_id = ANY($1) AND deleted_at IS NULL"#,
+            shard_ids
+        )
+        .fetch_all(meta)
+        .await
+    }
+
     pub async fn updated(meta: impl Executor<'_, Database = Postgres>, index_id: &IndexId) -> sqlx::Result<()> {
         sqlx::query!("UPDATE indexes SET updated_at = NOW() WHERE id = $1", index_id as &IndexId).execute(meta).await?;
         Ok(())
