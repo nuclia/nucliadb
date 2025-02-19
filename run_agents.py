@@ -27,18 +27,14 @@ async def main():
             user_id="user_id",
             fields=[
                 FieldInfo(
-                    text="The quick brown fox jumps over the lazy dog",
+                    text="The quick brown fox jumps over the lazy dog.",
                     field_id="1",
                     metadata=proto_to_base64(metadata)
                 )
             ]
         )
-        breakpoint()
         response = await predict.run_agents(kbid, item)
-        breakpoint()
-    except ProxiedPredictAPIError as e:
-        breakpoint()
-        pass
+        print(response)
     finally:
         await predict.finalize()
 
