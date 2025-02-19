@@ -167,33 +167,38 @@ impl GraphQueryParser {
     }
 
     fn parse_node_query(&self, query: NodeQuery) -> Box<dyn Query> {
-        match query {
-            NodeQuery::SourceNode(source) => self.parse_path_query(PathQuery::DirectedPath((
-                source,
-                Expression::Value(Relation::default()),
-                Expression::Value(Node::default()),
-            ))),
+        let equivalent_path_query = match query {
+            NodeQuery::SourceNode(source) => {
+                PathQuery::DirectedPath((
+                    source,
+                    Expression::Value(Relation::default()),
+                    Expression::Value(Node::default()),
+                ))
+            }
 
-            NodeQuery::DestinationNode(destination) => self.parse_path_query(PathQuery::DirectedPath((
-                Expression::Value(Node::default()),
-                Expression::Value(Relation::default()),
-                destination,
-            ))),
+            NodeQuery::DestinationNode(destination) => {
+                PathQuery::DirectedPath((
+                    Expression::Value(Node::default()),
+                    Expression::Value(Relation::default()),
+                    destination,
+                ))
+            }
 
-            NodeQuery::Node(node) => self.parse_path_query(PathQuery::UndirectedPath((
-                node,
-                Expression::Value(Relation::default()),
-                Expression::Value(Node::default()),
-            ))),
-        }
+            NodeQuery::Node(node) => {
+                PathQuery::UndirectedPath((
+                    node,
+                    Expression::Value(Relation::default()),
+                    Expression::Value(Node::default()),
+                ))
+            }
+        };
+        self.parse_path_query(equivalent_path_query)
     }
 
     fn parse_relation_query(&self, query: RelationQuery) -> Box<dyn Query> {
-        self.parse_path_query(PathQuery::DirectedPath((
-            Expression::Value(Node::default()),
-            query.0,
-            Expression::Value(Node::default()),
-        )))
+        let equivalent_path_query =
+            PathQuery::DirectedPath((Expression::Value(Node::default()), query.0, Expression::Value(Node::default())));
+        self.parse_path_query(equivalent_path_query)
     }
 
     fn parse_path_query(&self, query: PathQuery) -> Box<dyn Query> {
