@@ -21,7 +21,10 @@
 use std::{collections::HashSet, sync::Arc};
 
 use nidx_paragraph::ParagraphSearcher;
-use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
+use nidx_protos::{
+    filter_expression::{Expr, FacetFilter},
+    FilterExpression, RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse,
+};
 use nidx_relation::RelationSearcher;
 use nidx_text::{prefilter::PreFilterRequest, TextSearcher};
 use nidx_types::{
@@ -32,7 +35,7 @@ use tracing::{instrument, Span};
 
 use crate::errors::{NidxError, NidxResult};
 
-use super::{index_cache::IndexCache, query_language};
+use super::{index_cache::IndexCache, query_language, query_planner::old_filter_compatibility::bool_to_filter};
 
 /// Max number of words accepted as a suggest query. This is useful for
 /// compounds with semantic meaning (like a name and a surname) but can add
@@ -120,12 +123,14 @@ fn blocking_suggest(
             };
 
             let prefilter = PreFilterRequest {
-                timestamp_filters: vec![],
                 security: None,
-                labels_formula,
-                keywords_formula: None,
-                key_filter: vec![],
-                field_filter: vec![],
+                filter_expression: labels_formula.map(|f| {
+                    bool_to_filter(f, |facet| FilterExpression {
+                        expr: Some(Expr::Facet(FacetFilter {
+                            facet,
+                        })),
+                    })
+                }),
             };
 
             prefiltered = text_searcher.prefilter(&prefilter)?;

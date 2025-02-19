@@ -18,10 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::{query_io, DocumentSearchRequest};
+use crate::query_io::translate_keyword_to_text_query;
+use crate::DocumentSearchRequest;
+use nidx_protos::filter_expression::date_range_filter::DateField;
+use nidx_protos::filter_expression::FieldFilter;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::stream_filter::Conjunction;
-use nidx_protos::{StreamFilter, StreamRequest};
+use nidx_protos::{FilterExpression, StreamFilter, StreamRequest};
 use std::ops::Bound;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
@@ -72,46 +75,8 @@ pub fn create_query(
     };
     queries.push((Occur::Must, main_q));
 
-    // Field types filter
-    let field_filter: Vec<_> = search
-        .fields
-        .iter()
-        .map(|field_name| {
-            let facet_term = Term::from_facet(schema.field, &Facet::from(&format!("/{field_name}")));
-            let term_query: Box<dyn Query> = Box::new(TermQuery::new(facet_term, IndexRecordOption::Basic));
-            (Occur::Should, term_query)
-        })
-        .collect();
-    if !field_filter.is_empty() {
-        queries.push((Occur::Must, Box::new(BooleanQuery::new(field_filter))));
-    }
-
-    if let Some(expression) = &search.label_filtering_formula {
-        let query = query_io::translate_labels_expression(expression, schema);
-        queries.push((Occur::Must, query));
-    }
-
-    // Status filters
-    if let Some(status) = search.with_status.map(|status| status as u64) {
-        let term = Term::from_field_u64(schema.status, status);
-        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        queries.push((Occur::Must, Box::new(term_query)));
-    };
-
-    // Timestamp filters
-    if let Some(time_ranges) = search.timestamps.as_ref() {
-        let modified =
-            produce_date_range_query("modified", time_ranges.from_modified.as_ref(), time_ranges.to_modified.as_ref());
-        let created =
-            produce_date_range_query("created", time_ranges.from_created.as_ref(), time_ranges.to_created.as_ref());
-
-        if let Some(modified) = modified {
-            queries.push((Occur::Must, Box::new(modified)));
-        }
-
-        if let Some(created) = created {
-            queries.push((Occur::Must, Box::new(created)));
-        }
+    if let Some(filter_expression) = &search.filter_expression {
+        queries.push((Occur::Must, filter_to_query(schema, filter_expression)));
     }
 
     // Advance query
@@ -138,6 +103,60 @@ fn create_stream_filter_queries(schema: &TextSchema, filter: &StreamFilter) -> V
     });
 
     queries
+}
+
+fn field_key(field: &FieldFilter) -> String {
+    if let Some(field_name) = &field.field_id {
+        format!("/{}/{}", field.field_type, field_name)
+    } else {
+        format!("/{}", field.field_type.clone())
+    }
+}
+
+pub fn filter_to_query(schema: &TextSchema, expr: &FilterExpression) -> Box<dyn Query> {
+    let filter_to_query = |expr| filter_to_query(schema, expr);
+    match expr.expr.as_ref().unwrap() {
+        nidx_protos::filter_expression::Expr::And(e) => {
+            Box::new(BooleanQuery::intersection(e.expr.iter().map(filter_to_query).collect()))
+        }
+        nidx_protos::filter_expression::Expr::Or(e) => {
+            Box::new(BooleanQuery::union(e.expr.iter().map(filter_to_query).collect()))
+        }
+        nidx_protos::filter_expression::Expr::Not(e) => {
+            Box::new(BooleanQuery::new(vec![(Occur::Must, Box::new(AllQuery)), (Occur::MustNot, filter_to_query(e))]))
+        }
+        nidx_protos::filter_expression::Expr::Resource(resource_filter) => {
+            let mut key = resource_filter.resource_id.clone();
+            if let Some(field) = &resource_filter.field {
+                key.push('/');
+                key.push_str(&field_key(field));
+            };
+            Box::new(TermQuery::new(Term::from_field_bytes(schema.uuid, key.as_bytes()), IndexRecordOption::Basic))
+        }
+        nidx_protos::filter_expression::Expr::Field(field_filter) => Box::new(TermQuery::new(
+            Term::from_facet(schema.field, &Facet::from(&field_key(field_filter))),
+            IndexRecordOption::Basic,
+        )),
+        nidx_protos::filter_expression::Expr::Keyword(keyword_filter) => {
+            translate_keyword_to_text_query(&keyword_filter.keyword, schema)
+        }
+        nidx_protos::filter_expression::Expr::Date(range) => {
+            let field = match range.field() {
+                DateField::Created => "created",
+                DateField::Modified => "modified",
+            };
+            let maybe_query = produce_date_range_query(field, range.from.as_ref(), range.to.as_ref());
+            if let Some(query) = maybe_query {
+                Box::new(query)
+            } else {
+                Box::new(AllQuery)
+            }
+        }
+        nidx_protos::filter_expression::Expr::Facet(facet_filter) => Box::new(TermQuery::new(
+            Term::from_facet(schema.facets, &Facet::from(&facet_filter.facet)),
+            IndexRecordOption::Basic,
+        )),
+    }
 }
 
 trait IntoOccur {

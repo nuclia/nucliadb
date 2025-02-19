@@ -20,12 +20,12 @@
 
 mod common;
 
-use nidx_protos::Faceted;
+use nidx_protos::filter_expression::{FacetFilter, FieldFilter, FilterExpressionList, KeywordFilter};
 use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
+use nidx_protos::{Faceted, FilterExpression};
 use nidx_text::TextSearcher;
 use nidx_text::{prefilter::*, DocumentSearchRequest};
 use nidx_types::prefilter::PrefilterResult;
-use nidx_types::query_language::BooleanExpression;
 
 #[test]
 fn test_search_queries() {
@@ -78,11 +78,7 @@ fn test_prefilter_all_search() {
     let reader = common::test_reader();
     let request = PreFilterRequest {
         security: None,
-        labels_formula: None,
-        timestamp_filters: vec![],
-        keywords_formula: None,
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: None,
     };
     let response = reader.prefilter(&request).unwrap();
     assert!(matches!(response, PrefilterResult::All));
@@ -94,13 +90,14 @@ fn test_prefilter_not_search() {
 
     let request = PreFilterRequest {
         security: None,
-        timestamp_filters: vec![],
-        labels_formula: Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/l/mylabel".to_string())))),
-        keywords_formula: None,
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Not(Box::new(FilterExpression {
+                expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                    facet: "/l/mylabel".into(),
+                })),
+            }))),
+        }),
     };
-    println!("expression: {:?}", request.labels_formula);
     let response = reader.prefilter(&request).unwrap();
     let valid_fields = &response;
     let PrefilterResult::Some(fields) = valid_fields else {
@@ -115,11 +112,11 @@ fn test_labels_prefilter_search() {
 
     let request = PreFilterRequest {
         security: None,
-        timestamp_filters: vec![],
-        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
-        keywords_formula: None,
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/mylabel".into(),
+            })),
+        }),
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::Some(fields) = response else {
@@ -133,11 +130,22 @@ fn test_keywords_prefilter_search() {
     let reader = common::test_reader();
     let request = PreFilterRequest {
         security: None,
-        timestamp_filters: vec![],
-        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
-        keywords_formula: Some(BooleanExpression::Literal("foobar".to_string())),
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::And(FilterExpressionList {
+                expr: vec![
+                    FilterExpression {
+                        expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                            facet: "/l/mylabel".into(),
+                        })),
+                    },
+                    FilterExpression {
+                        expr: Some(nidx_protos::filter_expression::Expr::Keyword(KeywordFilter {
+                            keyword: "foobar".into(),
+                        })),
+                    },
+                ],
+            })),
+        }),
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::None = response else {
@@ -146,11 +154,11 @@ fn test_keywords_prefilter_search() {
 
     let request = PreFilterRequest {
         security: None,
-        timestamp_filters: vec![],
-        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
-        keywords_formula: None,
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/mylabel".into(),
+            })),
+        }),
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::Some(fields) = response else {
@@ -161,14 +169,14 @@ fn test_keywords_prefilter_search() {
 
 #[test]
 fn test_filtered_search() {
-    fn query(reader: &TextSearcher, query: impl Into<String>, label_filter: Option<BooleanExpression>, expected: i32) {
+    fn query(reader: &TextSearcher, query: impl Into<String>, expression: FilterExpression, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: query.clone(),
             page_number: 0,
             result_per_page: 20,
-            label_filtering_formula: label_filter,
+            filter_expression: Some(expression),
             ..Default::default()
         };
 
@@ -181,9 +189,36 @@ fn test_filtered_search() {
 
     let reader = common::test_reader();
 
-    query(&reader, "", Some(BooleanExpression::Literal("/l/mylabel".to_string())), 1);
-    query(&reader, "", Some(BooleanExpression::Literal("/e/myentity".to_string())), 1);
-    query(&reader, "", Some(BooleanExpression::Literal("/l/fakelabel".to_string())), 0);
+    query(
+        &reader,
+        "",
+        FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/mylabel".to_string(),
+            })),
+        },
+        1,
+    );
+    query(
+        &reader,
+        "",
+        FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/e/myentity".to_string(),
+            })),
+        },
+        1,
+    );
+    query(
+        &reader,
+        "",
+        FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/fakelabel".to_string(),
+            })),
+        },
+        0,
+    );
 }
 
 #[test]
@@ -195,7 +230,12 @@ fn test_search_by_field() {
         body: "".to_string(),
         page_number: 0,
         result_per_page: 20,
-        fields: vec!["title".to_string()],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Field(FieldFilter {
+                field_type: "a".into(),
+                field_id: Some("title".into()),
+            })),
+        }),
         ..Default::default()
     };
 

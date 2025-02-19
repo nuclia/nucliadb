@@ -18,8 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx_protos::{prost_types::Timestamp, Security};
-use nidx_types::query_language::BooleanExpression;
+use nidx_protos::{prost_types::Timestamp, FilterExpression, Security};
 
 /// A field has two dates
 #[derive(Debug, Clone, Copy)]
@@ -43,10 +42,6 @@ pub struct TimestampFilter {
 /// for the rest of the plan.
 #[derive(Debug, Clone)]
 pub struct PreFilterRequest {
-    pub timestamp_filters: Vec<TimestampFilter>,
     pub security: Option<Security>,
-    pub labels_formula: Option<BooleanExpression>,
-    pub keywords_formula: Option<BooleanExpression>,
-    pub key_filter: Vec<String>,
-    pub field_filter: Vec<String>,
+    pub filter_expression: Option<FilterExpression>,
 }
