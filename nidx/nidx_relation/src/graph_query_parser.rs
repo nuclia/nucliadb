@@ -241,6 +241,7 @@ impl GraphQueryParser {
                     }
                 };
 
+                // TODO: dynamically build queries
                 Box::new(BooleanQuery::new(vec![
                     (source_occur, source_node_query),
                     (relation_occur, relation_query),
@@ -285,6 +286,7 @@ impl GraphQueryParser {
     ) -> Box<dyn Query> {
         let mut subqueries: Vec<Box<dyn Query>> = vec![];
 
+        // TODO: refactor this unreadable fuzzy stuff
         if let Some(ref term) = query.value {
             match term {
                 Term::Exact(value)
