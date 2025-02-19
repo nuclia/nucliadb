@@ -1,4 +1,4 @@
-from nucliadb.search.predict import PredictEngine, ProxiedPredictAPIError
+from nucliadb.search.predict import PredictEngine
 import asyncio
 
 from nucliadb.search.predict_models import FieldInfo, RunAgentsRequest

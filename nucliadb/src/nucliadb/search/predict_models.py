@@ -1,7 +1,6 @@
 from base64 import b64decode, b64encode
-from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, TypedDict
 
 from google.protobuf.message import DecodeError, Message
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -54,13 +53,12 @@ class RunAgentsRequest(BaseModel):
     )
     user_id: str = Field(..., title="The user ID of the user making the request")
     filters: Optional[list[NameOperationFilter]] = Field(
-        default_factory=list,
+        default=None,
         title="Filters to select which Data Augmentation Agents are applied to the text. If empty, all configured agents for the Knowledge Box are applied.",
     )
 
 
-@dataclass
-class NewTextField:
+class NewTextField(TypedDict):
     text_field: FieldText
     destination: str
 
@@ -84,7 +82,7 @@ class AppliedDataAugmentation(BaseModel):
     )
 
     @field_validator("qas", mode="before")
-    def validate_qas(cls, qas: Optional[QuestionAnswers]) -> Optional[QuestionAnswers]:
+    def validate_qas(cls, qas: Optional[str]) -> Optional[QuestionAnswers]:
         if qas is None:
             return None
         try:
@@ -97,9 +95,10 @@ class AppliedDataAugmentation(BaseModel):
         try:
             return [
                 NewTextField(
-                    text_field=FieldText.FromString(b64decode(text_field["text_field"])),
+                    text_field=FieldText.FromString(b64decode(text_field["text_field"])),  # type: ignore
                     destination=text_field["destination"],
-                ) for text_field in new_text_fields
+                )
+                for text_field in new_text_fields
             ]
         except DecodeError:
             raise ValueError("Invalid NewTextField value")

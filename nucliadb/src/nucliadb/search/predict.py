@@ -56,10 +56,9 @@ from nucliadb_models.search import (
 from nucliadb_protos.resources_pb2 import FieldMetadata
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
-from nucliadb_utils.const import Features
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
-from nucliadb_utils.utilities import Utility, has_feature, set_utility
+from nucliadb_utils.utilities import Utility, set_utility
 
 
 class SendToPredictError(Exception):
