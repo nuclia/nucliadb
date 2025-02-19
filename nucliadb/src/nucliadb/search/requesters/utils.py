@@ -45,8 +45,6 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 
 class Method(Enum):
@@ -102,10 +100,6 @@ async def node_query(
     retry_on_primary: bool = True,
 ) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
     timeout = timeout or settings.search_timeout
-    use_read_replica_nodes = use_read_replica_nodes and has_feature(
-        const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
-    )
-
     shard_manager = get_shard_manager()
     try:
         shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
