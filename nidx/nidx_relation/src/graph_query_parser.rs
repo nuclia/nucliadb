@@ -168,29 +168,23 @@ impl GraphQueryParser {
 
     fn parse_node_query(&self, query: NodeQuery) -> Box<dyn Query> {
         let equivalent_path_query = match query {
-            NodeQuery::SourceNode(source) => {
-                PathQuery::DirectedPath((
-                    source,
-                    Expression::Value(Relation::default()),
-                    Expression::Value(Node::default()),
-                ))
-            }
+            NodeQuery::SourceNode(source) => PathQuery::DirectedPath((
+                source,
+                Expression::Value(Relation::default()),
+                Expression::Value(Node::default()),
+            )),
 
-            NodeQuery::DestinationNode(destination) => {
-                PathQuery::DirectedPath((
-                    Expression::Value(Node::default()),
-                    Expression::Value(Relation::default()),
-                    destination,
-                ))
-            }
+            NodeQuery::DestinationNode(destination) => PathQuery::DirectedPath((
+                Expression::Value(Node::default()),
+                Expression::Value(Relation::default()),
+                destination,
+            )),
 
-            NodeQuery::Node(node) => {
-                PathQuery::UndirectedPath((
-                    node,
-                    Expression::Value(Relation::default()),
-                    Expression::Value(Node::default()),
-                ))
-            }
+            NodeQuery::Node(node) => PathQuery::UndirectedPath((
+                node,
+                Expression::Value(Relation::default()),
+                Expression::Value(Node::default()),
+            )),
         };
         self.parse_path_query(equivalent_path_query)
     }
@@ -204,54 +198,47 @@ impl GraphQueryParser {
     fn parse_path_query(&self, query: PathQuery) -> Box<dyn Query> {
         match query {
             PathQuery::DirectedPath((source_expression, relation_expression, destination_expression)) => {
-                // NOT need special attention to flip the Occur type, as a Must { MustNot {
-                // X } } doesn't work as a Not inside the expression we mount
+                // NOT needs special attention to flip the Occur type, as a Must { MustNot { X } }
+                // doesn't work as a Not inside the expression we mount
+                let mut subqueries = vec![];
 
-                let mut source_occur = Occur::Must;
-                let source_node_query: Box<dyn Query> = match source_expression {
-                    Expression::Value(query) => self.has_node_as_source(&query),
-                    Expression::Not(query) => {
-                        source_occur = Occur::MustNot;
-                        self.has_node_as_source(&query)
-                    }
+                let source_query = match source_expression {
+                    Expression::Value(query) => (Occur::Must, self.has_node_as_source(&query)),
+                    Expression::Not(query) => (Occur::MustNot, self.has_node_as_source(&query)),
                     Expression::Or(nodes) => {
-                        let subqueries = nodes.into_iter().map(|node| self.has_node_as_source(&node));
-                        Box::new(BooleanQuery::union(subqueries.collect()))
+                        let subquery: Box<dyn Query> = Box::new(BooleanQuery::union(
+                            nodes.into_iter().map(|node| self.has_node_as_source(&node)).collect(),
+                        ));
+                        (Occur::Must, subquery)
                     }
                 };
+                subqueries.push(source_query);
 
-                let mut relation_occur = Occur::Must;
-                let relation_query: Box<dyn Query> = match relation_expression {
-                    Expression::Value(query) => self.has_relation(query),
-                    Expression::Not(query) => {
-                        relation_occur = Occur::MustNot;
-                        self.has_relation(query)
-                    }
-                    Expression::Or(queries) => {
-                        let subqueries = queries.into_iter().map(|query| self.has_relation(query));
-                        Box::new(BooleanQuery::union(subqueries.collect()))
+                let relation_query = match relation_expression {
+                    Expression::Value(query) => (Occur::Must, self.has_relation(query)),
+                    Expression::Not(query) => (Occur::MustNot, self.has_relation(query)),
+                    Expression::Or(nodes) => {
+                        let subquery: Box<dyn Query> = Box::new(BooleanQuery::union(
+                            nodes.into_iter().map(|node| self.has_relation(node)).collect(),
+                        ));
+                        (Occur::Must, subquery)
                     }
                 };
+                subqueries.push(relation_query);
 
-                let mut target_occur = Occur::Must;
-                let target_node_query: Box<dyn Query> = match destination_expression {
-                    Expression::Value(query) => self.has_node_as_destination(&query),
-                    Expression::Not(query) => {
-                        target_occur = Occur::MustNot;
-                        self.has_node_as_destination(&query)
-                    }
-                    Expression::Or(queries) => {
-                        let subqueries = queries.into_iter().map(|query| self.has_node_as_destination(&query));
-                        Box::new(BooleanQuery::union(subqueries.collect()))
+                let destination_query = match destination_expression {
+                    Expression::Value(query) => (Occur::Must, self.has_node_as_destination(&query)),
+                    Expression::Not(query) => (Occur::MustNot, self.has_node_as_destination(&query)),
+                    Expression::Or(nodes) => {
+                        let subquery: Box<dyn Query> = Box::new(BooleanQuery::union(
+                            nodes.into_iter().map(|node| self.has_node_as_destination(&node)).collect(),
+                        ));
+                        (Occur::Must, subquery)
                     }
                 };
+                subqueries.push(destination_query);
 
-                // TODO: dynamically build queries
-                Box::new(BooleanQuery::new(vec![
-                    (source_occur, source_node_query),
-                    (relation_occur, relation_query),
-                    (target_occur, target_node_query),
-                ]))
+                Box::new(BooleanQuery::new(subqueries))
             }
             PathQuery::UndirectedPath((source, relation, destination)) => Box::new(BooleanQuery::union(vec![
                 self.parse_path_query(PathQuery::DirectedPath((source.clone(), relation.clone(), destination.clone()))),
