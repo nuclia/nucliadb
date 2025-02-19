@@ -19,7 +19,7 @@
 //
 use nidx_protos::relation_node::NodeType;
 use tantivy::collector::TopDocs;
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
 use tantivy::{Searcher, Term};
 
@@ -37,6 +37,8 @@ pub struct Node {
     pub value: Option<String>,
     pub node_type: Option<NodeType>,
     pub node_subtype: Option<String>,
+    pub fuzzy_distance: Option<u8>,
+    pub fuzzy_prefix: bool,
 }
 
 #[derive(Default, Clone)]
@@ -272,10 +274,37 @@ impl GraphQueryParser {
         if let Some(ref value) = query.value {
             if !value.is_empty() {
                 let normalized_value = schema::normalize(&value);
-                let node_value_query = Box::new(TermQuery::new(
-                    Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
-                    IndexRecordOption::Basic,
-                ));
+
+                let node_value_query: Box<dyn Query> = match (query.fuzzy_distance, query.fuzzy_prefix) {
+                    (None, false) => {
+                        Box::new(TermQuery::new(
+                            Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
+                            IndexRecordOption::Basic,
+                        ))
+                    }
+                    (None, true) => {
+                        Box::new(FuzzyTermQuery::new_prefix(
+                            Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
+                            0,
+                            true,
+                        ))
+                    }
+                    (Some(distance), true) => {
+                        Box::new(FuzzyTermQuery::new(
+                            Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
+                            distance,
+                            true,
+                        ))
+                    }
+                    (Some(distance), false) => {
+                        Box::new(FuzzyTermQuery::new_prefix(
+                            Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
+                            distance,
+                            true,
+                        ))
+                    }
+                };
+
                 subqueries.push(node_value_query)
             }
         }
