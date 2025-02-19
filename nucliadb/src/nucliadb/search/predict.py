@@ -31,6 +31,12 @@ from pydantic import ValidationError
 
 from nucliadb.common import datamanagers
 from nucliadb.search import logger
+from nucliadb.search.predict_models import (
+    AppliedDataAugmentation,
+    AugmentedField,
+    RunAgentsRequest,
+    RunAgentsResponse,
+)
 from nucliadb.tests.vectors import Q, Qm2023
 from nucliadb_models.internal.predict import (
     Ner,
@@ -47,6 +53,7 @@ from nucliadb_models.search import (
     SummarizedResponse,
     SummarizeModel,
 )
+from nucliadb_protos.resources_pb2 import FieldMetadata
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.const import Features
@@ -89,7 +96,6 @@ DUMMY_LEARNING_MODEL = "chatgpt"
 
 PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
-VERSIONED_PRIVATE_PREDICT = "/api/v1/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
 QUERY = "/query"
@@ -199,10 +205,7 @@ class PredictEngine:
             # /api/v1/predict/rephrase/{kbid}
             return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}/{kbid}"
         else:
-            if has_feature(Features.VERSIONED_PRIVATE_PREDICT):
-                return f"{self.cluster_url}{VERSIONED_PRIVATE_PREDICT}{endpoint}"
-            else:
-                return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
+            return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
 
     def get_predict_headers(self, kbid: str) -> dict[str, str]:
         if self.onprem:
@@ -406,6 +409,24 @@ class PredictEngine:
         data = await resp.json()
         return RerankResponse.model_validate(data)
 
+    @predict_observer.wrap({"type": "run_agents"})
+    async def run_agents(self, kbid: str, item: RunAgentsRequest) -> RunAgentsResponse:
+        try:
+            self.check_nua_key_is_configured_for_onprem()
+        except NUAKeyMissingError:
+            error = "Nuclia Service account is not defined. Summarize operation could not be performed"
+            logger.warning(error)
+            raise SendToPredictError(error)
+        resp = await self.make_request(
+            "POST",
+            url=self.get_predict_url("/run-agents", kbid),
+            json=item.model_dump(),
+            headers=self.get_predict_headers(kbid),
+        )
+        await self.check_response(resp, expected_status=200)
+        data = await resp.json()
+        return RunAgentsResponse.model_validate(data)
+
 
 class DummyPredictEngine(PredictEngine):
     default_semantic_threshold = 0.7
@@ -532,6 +553,20 @@ class DummyPredictEngine(PredictEngine):
         response = RerankResponse(
             context_scores={paragraph_id: i for i, paragraph_id in enumerate(item.context.keys())}
         )
+        return response
+
+    async def run_agents(self, kbid: str, item: RunAgentsRequest) -> RunAgentsResponse:
+        self.calls.append(("run_agents", (kbid, item)))
+        fm = FieldMetadata()
+        ada = AppliedDataAugmentation()
+        augmented_field = AugmentedField(
+            metadata=fm,
+            applied_data_augmentation=ada,
+            input_nuclia_tokens=1.0,
+            output_nuclia_tokens=1.0,
+            time=1.0,
+        )
+        response = RunAgentsResponse(results={"field_id": augmented_field})
         return response
 
 

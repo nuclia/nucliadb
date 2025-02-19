@@ -73,7 +73,6 @@ class Streams:
 class Features:
     WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
     READ_REPLICA_SEARCHES = "nucliadb_read_replica_searches"
-    VERSIONED_PRIVATE_PREDICT = "nucliadb_versioned_private_predict"
     REBALANCE_KB = "nucliadb_rebalance_kb"
     SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
     NATS_SYNC_ACK = "nucliadb_nats_sync_ack"
