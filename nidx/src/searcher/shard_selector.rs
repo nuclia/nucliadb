@@ -85,7 +85,7 @@ impl KubernetesCluster {
                             .state()
                             .iter()
                             .filter(|pod| Self::pod_ready(pod))
-                            .filter_map(|pod| pod.status.as_ref().map(|s| s.host_ip.as_ref().map(Self::pod_address)))
+                            .filter_map(|pod| pod.status.as_ref().map(|s| s.pod_ip.as_ref().map(Self::pod_address)))
                             .flatten()
                             .collect();
                         if new_pods != prev_pods {
@@ -153,7 +153,7 @@ impl ListNodes for KubernetesCluster {
             .state()
             .iter()
             .filter(|pod| Self::pod_ready(pod))
-            .filter_map(|pod| pod.status.as_ref().map(|s| s.host_ip.as_ref().map(Self::pod_address)))
+            .filter_map(|pod| pod.status.as_ref().map(|s| s.pod_ip.as_ref().map(Self::pod_address)))
             .flatten()
             .collect();
 
