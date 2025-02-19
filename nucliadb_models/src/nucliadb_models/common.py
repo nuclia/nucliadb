@@ -230,6 +230,12 @@ class Representation(BaseModel):
     reference_file: Optional[str] = None
 
 
+class ParagraphRelations(BaseModel):
+    parents: list[str] = []
+    siblings: list[str] = []
+    replacements: list[str] = []
+
+
 class Paragraph(BaseModel):
     start: Optional[int] = None
     end: Optional[int] = None
@@ -251,6 +257,7 @@ class Paragraph(BaseModel):
     key: Optional[str] = None
     page: Optional[PageInformation] = None
     representation: Optional[Representation] = None
+    relations: Optional[ParagraphRelations] = None
 
 
 class Shards(BaseModel):
