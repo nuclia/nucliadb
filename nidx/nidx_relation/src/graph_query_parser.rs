@@ -113,9 +113,9 @@ pub enum GraphQuery {
     RelationQuery(RelationQuery),
     // (:A)-[:R]->(:B)
     PathQuery(PathQuery),
-    // // Combine queries with an OR
-    // // (:A)-[:R]->(:B), (:A)-[:R]->(:B)
-    // MultiStatement(Vec<PathQuery>),
+    // Combine queries with an OR
+    // (:A)-[:R]->(:B), (:A)-[:R]->(:B)
+    MultiStatement(Vec<PathQuery>),
 }
 
 pub struct GraphQueryParser {
@@ -162,6 +162,7 @@ impl GraphQueryParser {
             GraphQuery::NodeQuery(query) => self.parse_node_query(query),
             GraphQuery::RelationQuery(query) => self.parse_relation_query(query),
             GraphQuery::PathQuery(query) => self.parse_path_query(query),
+            GraphQuery::MultiStatement(queries) => self.parse_multi_statement(queries),
         }
     }
 
@@ -251,6 +252,10 @@ impl GraphQueryParser {
                 self.parse_path_query(PathQuery::DirectedPath((destination, relation, source))),
             ])),
         }
+    }
+
+    fn parse_multi_statement(&self, queries: Vec<PathQuery>) -> Box<dyn Query> {
+        Box::new(BooleanQuery::union(queries.into_iter().map(|query| self.parse_path_query(query)).collect()))
     }
 
     fn has_node_as_source(&self, query: &Node) -> Box<dyn Query> {

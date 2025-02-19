@@ -441,6 +441,47 @@ fn test_graph_undirected_path_query() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_multi_statement_graph_search() -> anyhow::Result<()> {
+    let reader = create_reader()?;
+
+    // (:Anna)-[:LIVE_IN]->(:PLACE) | (:Anna)-[:LIVE_IN]->(:PLACE)
+    let result = reader.reader.advanced_graph_query(GraphQuery::MultiStatement(vec![
+        PathQuery::DirectedPath((
+            Expression::Value(Node {
+                value: Some("Anna".into()),
+                ..Default::default()
+            }),
+            Expression::Value(Relation {
+                value: Some("LIVE_IN".to_string()),
+            }),
+            Expression::Value(Node {
+                node_subtype: Some("PLACE".to_string()),
+                ..Default::default()
+            }),
+        )),
+        PathQuery::DirectedPath((
+            Expression::Value(Node {
+                value: Some("Peter".into()),
+                ..Default::default()
+            }),
+            Expression::Value(Relation {
+                value: Some("LIVE_IN".to_string()),
+            }),
+            Expression::Value(Node {
+                node_subtype: Some("PLACE".to_string()),
+                ..Default::default()
+            }),
+        )),
+    ]))?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 2);
+    assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
+    assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
+
+    Ok(())
+}
+
+#[test]
 fn test_multi_hop_graph_search() -> anyhow::Result<()> {
     let reader = create_reader()?;
     // // anastasia - is friend -> anna - lives in -> New York
