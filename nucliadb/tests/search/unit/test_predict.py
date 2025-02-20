@@ -74,7 +74,7 @@ async def test_dummy_predict_engine():
             "X-STF-NUAKEY",
             "Bearer {service_account}",
         ),
-        (False, "{cluster}/api/v1/internal/predict/tokens", "X-STF-KBID", "{kbid}"),
+        (False, "{cluster}/api/internal/predict/tokens", "X-STF-KBID", "{kbid}"),
     ],
 )
 async def test_detect_entities_ok(onprem, expected_url, expected_header, expected_header_value):
@@ -194,7 +194,7 @@ async def test_rephrase():
     assert rephrased_query == "rephrased"
 
     pe.session.post.assert_awaited_once_with(
-        url="cluster/api/v1/internal/predict/rephrase",
+        url="cluster/api/internal/predict/rephrase",
         json=item.model_dump(),
         headers={"X-STF-KBID": "kbid"},
     )
@@ -245,7 +245,7 @@ async def test_parse_rephrase_response(content, exception):
 async def test_check_response_error():
     response = aiohttp.ClientResponse(
         "GET",
-        URL("http://predict:8080/api/v1/chat"),
+        URL("http://predict:8080/api/chat"),
         writer=None,
         continue100=Mock(),
         timer=Mock(),
@@ -285,7 +285,7 @@ async def test_summarize():
     assert summarize_response == summarized
 
     pe.session.post.assert_awaited_once_with(
-        url="cluster/api/v1/internal/predict/summarize",
+        url="cluster/api/internal/predict/summarize",
         json=item.model_dump(),
         headers={"X-STF-KBID": "kbid"},
         timeout=None,

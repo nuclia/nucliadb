@@ -42,7 +42,6 @@ from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import MessageProgressUpdater, NatsConnectionManager
 from nucliadb_utils.settings import nats_consumer_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import has_feature
 
 consumer_observer = metrics.Observer(
     "message_processor",
@@ -89,13 +88,7 @@ class IngestConsumer:
         self.subscription: Optional[JetStreamContext.PullSubscription] = None
 
     async def ack_message(self, msg: Msg, kbid: Optional[str] = None):
-        context = {}
-        if kbid:
-            context["kbid"] = kbid
-        if has_feature(const.Features.NATS_SYNC_ACK, default=False, context=context):
-            await msg.ack_sync(timeout=10)
-        else:
-            await msg.ack()
+        await msg.ack()
 
     async def initialize(self):
         await self.setup_nats_subscription()

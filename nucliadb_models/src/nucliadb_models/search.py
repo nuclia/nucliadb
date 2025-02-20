@@ -472,11 +472,6 @@ class SearchParamDefaults:
         description="The query to get a generative answer for",
         max_items=20_000,
     )
-    shards = ParamDefault(
-        default=[],
-        title="Shards",
-        description="The list of shard replicas to search in. If empty, random replicas will be selected.",
-    )
     catalog_page_number = ParamDefault(
         default=0,
         title="Page number",
@@ -675,7 +670,6 @@ class CatalogRequest(BaseModel):
     sort: Optional[SortOptions] = SearchParamDefaults.sort.to_pydantic_field()
     page_number: int = SearchParamDefaults.catalog_page_number.to_pydantic_field()
     page_size: int = SearchParamDefaults.catalog_page_size.to_pydantic_field()
-    shards: list[str] = SearchParamDefaults.shards.to_pydantic_field(deprecated=True)
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
     with_status: Optional[ResourceProcessingStatus] = Field(
         default=None,
@@ -777,7 +771,6 @@ class BaseSearchRequest(AuditMetadataBase):
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
     field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
-    shards: list[str] = SearchParamDefaults.shards.to_pydantic_field()
     vector: Optional[list[float]] = SearchParamDefaults.vector.to_pydantic_field()
     vectorset: Optional[str] = SearchParamDefaults.vectorset.to_pydantic_field()
     with_duplicates: bool = SearchParamDefaults.with_duplicates.to_pydantic_field()
@@ -1418,7 +1411,6 @@ class AskRequest(AuditMetadataBase):
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field()
     field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     extracted: list[ExtractedDataTypeName] = SearchParamDefaults.extracted.to_pydantic_field()
-    shards: list[str] = SearchParamDefaults.shards.to_pydantic_field()
     context: Optional[list[ChatContextMessage]] = SearchParamDefaults.chat_context.to_pydantic_field()
     extra_context: Optional[list[str]] = Field(
         default=None,

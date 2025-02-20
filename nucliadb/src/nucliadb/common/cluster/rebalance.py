@@ -28,9 +28,7 @@ from nucliadb_protos import nodereader_pb2, noderesources_pb2
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
-from nucliadb_utils import const
 from nucliadb_utils.fastapi.run import serve_metrics
-from nucliadb_utils.utilities import has_feature
 
 from .settings import settings
 from .utils import delete_resource_from_shard, index_resource_to_shard, wait_for_node
@@ -163,9 +161,6 @@ async def move_set_of_kb_resources(
 
 
 async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
-    if not has_feature(const.Features.REBALANCE_KB, context={"kbid": kbid}):
-        return
-
     await maybe_add_shard(kbid)
 
     shard_paragraphs = await get_shards_paragraphs(kbid)
