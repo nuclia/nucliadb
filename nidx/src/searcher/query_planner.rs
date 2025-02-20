@@ -19,6 +19,8 @@
 //
 
 use nidx_paragraph::ParagraphSearchRequest;
+use nidx_protos::filter_expression::Expr;
+use nidx_protos::FilterExpression;
 use nidx_protos::{RelationSearchRequest, SearchRequest};
 use nidx_text::prefilter::*;
 use nidx_text::DocumentSearchRequest;
@@ -26,9 +28,11 @@ use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
 use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
+use old_filter_compatibility::filter_from_search_request;
 
-use super::query_language;
-use super::query_language::QueryAnalysis;
+use super::query_language::extract_label_filters;
+
+pub mod old_filter_compatibility;
 
 /// The queries a [`QueryPlan`] has decided to send to each index.
 #[derive(Default, Clone)]
@@ -88,29 +92,25 @@ pub struct QueryPlan {
     pub index_queries: IndexQueries,
 }
 
-fn analyze_filter(search_request: &SearchRequest) -> anyhow::Result<query_language::QueryAnalysis> {
-    let Some(filter) = &search_request.filter else {
-        return Ok(Default::default());
-    };
-    let context = QueryContext {
-        field_labels: filter.field_labels.iter().cloned().collect(),
-        paragraph_labels: filter.paragraph_labels.iter().cloned().collect(),
-    };
-    query_language::translate(Some(&filter.labels_expression), Some(&filter.keywords_expression), &context)
-}
+pub fn build_query_plan(mut search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
+    // Backwards compatibility with old filters
+    let (field_filter, paragraph_filter) = filter_from_search_request(&search_request)?;
+    let has_old_filters = field_filter.is_some() || paragraph_filter.is_some();
+    let has_new_filters = search_request.field_filter.is_some() || search_request.paragraph_filter.is_some();
+    if has_old_filters && has_new_filters {
+        return Err(anyhow::anyhow!("Cannot specify old and new filters in the same request"));
+    }
+    if has_old_filters {
+        search_request.field_filter = field_filter;
+        search_request.paragraph_filter = paragraph_filter;
+    }
 
-pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
     let relations_request = compute_relations_request(&search_request);
-    let query_analysis = analyze_filter(&search_request)?;
-    let texts_request = compute_texts_request(&search_request, &query_analysis);
-    let vectors_request = compute_vectors_request(&search_request, &query_analysis);
-    let paragraphs_request = compute_paragraphs_request(&search_request, &query_analysis.search_query);
+    let texts_request = compute_texts_request(&search_request);
+    let vectors_request = compute_vectors_request(&search_request)?;
+    let paragraphs_request = compute_paragraphs_request(&search_request)?;
 
-    let prefilter = compute_prefilters(
-        &search_request,
-        query_analysis.labels_prefilter_query.clone(),
-        query_analysis.keywords_prefilter_query,
-    );
+    let prefilter = compute_prefilters(&search_request);
 
     Ok(QueryPlan {
         prefilter,
@@ -124,79 +124,25 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
     })
 }
 
-fn compute_prefilters(
-    search_request: &SearchRequest,
-    labels: Option<BooleanExpression>,
-    keywords: Option<BooleanExpression>,
-) -> Option<PreFilterRequest> {
-    let mut prefilter_request = PreFilterRequest {
-        timestamp_filters: vec![],
-        labels_formula: labels,
-        security: None,
-        keywords_formula: keywords,
-        key_filter: search_request.key_filters.clone(),
-        field_filter: search_request.fields.clone(),
+fn compute_prefilters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
+    let prefilter_request = PreFilterRequest {
+        security: search_request.security.clone(),
+        filter_expression: search_request.field_filter.clone(),
     };
 
-    // Security filters
-    let request_has_security_filters = search_request.security.is_some();
-    if request_has_security_filters {
-        prefilter_request.security = search_request.security.clone();
-    }
-
-    // Timestamp filters
-    let request_has_timestamp_filters = search_request.timestamps.as_ref().is_some();
-    if request_has_timestamp_filters {
-        let timestamp_filters = compute_timestamp_prefilters(search_request);
-        prefilter_request.timestamp_filters.extend(timestamp_filters);
-    }
-
-    let request_has_labels_filters = prefilter_request.labels_formula.is_some();
-    let request_has_keywords_filters = prefilter_request.keywords_formula.is_some();
-    if !request_has_timestamp_filters
-        && !request_has_labels_filters
-        && !request_has_keywords_filters
-        && !request_has_security_filters
-        && prefilter_request.key_filter.is_empty()
-        && prefilter_request.field_filter.is_empty()
-    {
-        None
-    } else {
+    if prefilter_request.security.is_some() || prefilter_request.filter_expression.is_some() {
         Some(prefilter_request)
+    } else {
+        None
     }
 }
 
-fn compute_timestamp_prefilters(search_request: &SearchRequest) -> Vec<TimestampFilter> {
-    let mut timestamp_prefilters = vec![];
-    let Some(request_timestamp_filters) = search_request.timestamps.as_ref() else {
-        return timestamp_prefilters;
-    };
-
-    let modified_filter = TimestampFilter {
-        applies_to: FieldDateType::Modified,
-        from: request_timestamp_filters.from_modified,
-        to: request_timestamp_filters.to_modified,
-    };
-    timestamp_prefilters.push(modified_filter);
-
-    let created_filter = TimestampFilter {
-        applies_to: FieldDateType::Created,
-        from: request_timestamp_filters.from_created,
-        to: request_timestamp_filters.to_created,
-    };
-    timestamp_prefilters.push(created_filter);
-    timestamp_prefilters
-}
-
-fn compute_paragraphs_request(
-    search_request: &SearchRequest,
-    search_query: &Option<BooleanExpression>,
-) -> Option<ParagraphSearchRequest> {
+fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<Option<ParagraphSearchRequest>> {
     if !search_request.paragraph {
-        return None;
+        return Ok(None);
     }
 
-    Some(ParagraphSearchRequest {
+    Ok(Some(ParagraphSearchRequest {
         uuid: "".to_string(),
         with_duplicates: search_request.with_duplicates,
         body: search_request.body.clone(),
@@ -204,21 +150,18 @@ fn compute_paragraphs_request(
         faceted: search_request.faceted.clone(),
         page_number: search_request.page_number,
         result_per_page: search_request.result_per_page,
-        timestamps: search_request.timestamps,
+        timestamps: None,
         only_faceted: search_request.only_faceted,
         advanced_query: search_request.advanced_query.clone(),
         id: String::default(),
         filter: None,
         min_score: search_request.min_score_bm25,
         security: search_request.security.clone(),
-        filtering_formula: search_query.clone(),
-    })
+        filtering_formula: search_request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
+    }))
 }
 
-fn compute_texts_request(
-    search_request: &SearchRequest,
-    query_analysis: &QueryAnalysis,
-) -> Option<DocumentSearchRequest> {
+fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearchRequest> {
     if !search_request.document {
         return None;
     }
@@ -226,30 +169,26 @@ fn compute_texts_request(
     Some(DocumentSearchRequest {
         id: search_request.shard.clone(),
         body: search_request.body.clone(),
-        fields: search_request.fields.clone(),
         order: search_request.order.clone(),
         faceted: search_request.faceted.clone(),
         page_number: search_request.page_number,
         result_per_page: search_request.result_per_page,
-        timestamps: search_request.timestamps,
         only_faceted: search_request.only_faceted,
         advanced_query: search_request.advanced_query.clone(),
-        with_status: search_request.with_status,
-        filter: search_request.filter.clone(),
         min_score: search_request.min_score_bm25,
-        label_filtering_formula: query_analysis.labels_prefilter_query.clone(),
+        filter_expression: search_request.field_filter.clone(),
     })
 }
 
-fn compute_vectors_request(
-    search_request: &SearchRequest,
-    query_analysis: &QueryAnalysis,
-) -> Option<VectorSearchRequest> {
+fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Option<VectorSearchRequest>> {
     if search_request.result_per_page == 0 || search_request.vector.is_empty() {
-        return None;
+        return Ok(None);
     }
 
-    Some(VectorSearchRequest {
+    let segment_filtering_formula =
+        search_request.field_filter.as_ref().and_then(|f| extract_label_filters(f, SEGMENT_TAGS));
+
+    Ok(Some(VectorSearchRequest {
         id: search_request.shard.clone(),
         vector_set: search_request.vectorset.clone(),
         vector: search_request.vector.clone(),
@@ -259,13 +198,10 @@ fn compute_vectors_request(
         min_score: search_request.min_score_semantic,
         field_labels: Vec::with_capacity(0),
         paragraph_labels: Vec::with_capacity(0),
-        field_filters: search_request.fields.clone(),
-        filtering_formula: query_analysis.search_query.clone(),
-        segment_filtering_formula: query_analysis
-            .labels_prefilter_query
-            .as_ref()
-            .and_then(|e| query_language::extract_label_filters(e, SEGMENT_TAGS)),
-    })
+        field_filters: Vec::with_capacity(0),
+        filtering_formula: search_request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
+        segment_filtering_formula,
+    }))
 }
 
 fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationSearchRequest> {
@@ -282,9 +218,39 @@ fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationS
     })
 }
 
+fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<BooleanExpression> {
+    match filter.expr.unwrap() {
+        Expr::BoolAnd(and) => {
+            let operands = and
+                .operands
+                .into_iter()
+                .map(filter_to_boolean_expression)
+                .collect::<anyhow::Result<Vec<BooleanExpression>>>()?;
+            Ok(BooleanExpression::Operation(BooleanOperation {
+                operator: Operator::And,
+                operands,
+            }))
+        }
+        Expr::BoolOr(or) => {
+            let operands = or
+                .operands
+                .into_iter()
+                .map(filter_to_boolean_expression)
+                .collect::<anyhow::Result<Vec<BooleanExpression>>>()?;
+            Ok(BooleanExpression::Operation(BooleanOperation {
+                operator: Operator::Or,
+                operands,
+            }))
+        }
+        Expr::BoolNot(not) => Ok(BooleanExpression::Not(Box::new(filter_to_boolean_expression(*not)?))),
+        Expr::Facet(facet_filter) => Ok(BooleanExpression::Literal(facet_filter.facet)),
+        _ => Err(anyhow::anyhow!("FilterExpression type not supported for conversion to BooleanExpression")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use nidx_protos::Filter;
+    use nidx_protos::{filter_expression::FacetFilter, Filter};
 
     use super::*;
     #[test]
@@ -296,6 +262,7 @@ mod tests {
                 { "literal": "that"},
             ],
         });
+        #[allow(deprecated)]
         let request = SearchRequest {
             filter: Some(Filter {
                 field_labels: vec!["this".to_string()],
@@ -312,10 +279,15 @@ mod tests {
         let Some(prefilter) = query_plan.prefilter else {
             panic!("There should be a prefilter");
         };
-        let Some(formula) = prefilter.labels_formula else {
+        let Some(formula) = prefilter.filter_expression else {
             panic!("The prefilter should have a formula");
         };
-        let BooleanExpression::Literal(literal) = &formula else {
+        let FilterExpression {
+            expr: Some(Expr::Facet(FacetFilter {
+                facet: literal,
+            })),
+        } = &formula
+        else {
             panic!("The formula should be a literal")
         };
         assert_eq!(literal, "this");
