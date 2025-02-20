@@ -126,11 +126,7 @@ pub fn filter_to_query(schema: &TextSchema, expr: &FilterExpression) -> Box<dyn 
             Box::new(BooleanQuery::new(vec![(Occur::Must, Box::new(AllQuery)), (Occur::MustNot, filter_to_query(e))]))
         }
         nidx_protos::filter_expression::Expr::Resource(resource_filter) => {
-            let mut key = resource_filter.resource_id.clone();
-            if let Some(field) = &resource_filter.field {
-                key.push('/');
-                key.push_str(&field_key(field));
-            };
+            let key = resource_filter.resource_id.clone();
             Box::new(TermQuery::new(Term::from_field_bytes(schema.uuid, key.as_bytes()), IndexRecordOption::Basic))
         }
         nidx_protos::filter_expression::Expr::Field(field_filter) => Box::new(TermQuery::new(

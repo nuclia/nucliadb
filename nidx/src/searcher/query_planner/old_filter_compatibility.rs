@@ -73,25 +73,37 @@ pub fn filter_from_request(
 
     // Key filters
     if !request.key_filters.is_empty() {
-        let resource_from_string = |key: &str| {
+        let filter_from_string = |key: &String| {
             let mut parts = key.split('/');
             let resource_id = parts.next().unwrap().into();
             let field = parts.next().map(|field_type| FieldFilter {
                 field_type: field_type.into(),
                 field_id: parts.next().map(str::to_string),
             });
-            ResourceFilter {
-                resource_id,
-                field,
+            if let Some(field) = field {
+                FilterExpression {
+                    expr: Some(Expr::And(FilterExpressionList {
+                        expr: vec![
+                            FilterExpression {
+                                expr: Some(Expr::Resource(ResourceFilter {
+                                    resource_id,
+                                })),
+                            },
+                            FilterExpression {
+                                expr: Some(Expr::Field(field)),
+                            },
+                        ],
+                    })),
+                }
+            } else {
+                FilterExpression {
+                    expr: Some(Expr::Resource(ResourceFilter {
+                        resource_id,
+                    })),
+                }
             }
         };
-        let resources = request
-            .key_filters
-            .iter()
-            .map(|f| FilterExpression {
-                expr: Some(Expr::Resource(resource_from_string(f))),
-            })
-            .collect();
+        let resources = request.key_filters.iter().map(filter_from_string).collect();
         field_filters.push(FilterExpression {
             expr: Some(Expr::Or(FilterExpressionList {
                 expr: resources,

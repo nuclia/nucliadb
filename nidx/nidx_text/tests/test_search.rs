@@ -20,7 +20,13 @@
 
 mod common;
 
-use nidx_protos::filter_expression::{FacetFilter, FieldFilter, FilterExpressionList, KeywordFilter};
+use std::time::SystemTime;
+
+use nidx_protos::filter_expression::date_range_filter::DateField;
+use nidx_protos::filter_expression::{
+    DateRangeFilter, Expr, FacetFilter, FieldFilter, FilterExpressionList, KeywordFilter, ResourceFilter,
+};
+use nidx_protos::prost_types::Timestamp;
 use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
 use nidx_protos::{Faceted, FilterExpression};
 use nidx_text::TextSearcher;
@@ -347,4 +353,101 @@ fn test_int_order_pagination() {
     assert!(response.next_page);
 }
 
-// TODO: order, timestamp filter, only_faceted, with_status
+#[test]
+fn test_timestamp_filtering() {
+    let reader = common::test_reader();
+
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+    let before = Timestamp {
+        seconds: now.as_secs() as i64 - 100,
+        nanos: 0,
+    };
+    let after = Timestamp {
+        seconds: now.as_secs() as i64 + 100,
+        nanos: 0,
+    };
+
+    let search = |date_range| {
+        let request = DocumentSearchRequest {
+            id: "shard".to_string(),
+            body: "".to_string(),
+            page_number: 0,
+            result_per_page: 10,
+            min_score: f32::MIN,
+            filter_expression: Some(FilterExpression {
+                expr: Some(Expr::Date(date_range)),
+            }),
+            ..Default::default()
+        };
+        let response = reader.search(&request).unwrap();
+        response.results.len()
+    };
+
+    for field in &[DateField::Created.into(), DateField::Modified.into()] {
+        assert_eq!(
+            search(DateRangeFilter {
+                field: *field,
+                from: Some(before),
+                to: Some(after)
+            }),
+            2
+        );
+
+        assert_eq!(
+            search(DateRangeFilter {
+                field: *field,
+                from: Some(after),
+                to: None
+            }),
+            0
+        );
+    }
+}
+
+#[test]
+fn test_key_filtering() {
+    let reader = common::test_reader();
+
+    let request = DocumentSearchRequest {
+        id: "shard".to_string(),
+        body: "".to_string(),
+        page_number: 0,
+        result_per_page: 1,
+        min_score: f32::MIN,
+        ..Default::default()
+    };
+    let response = reader.search(&request).unwrap();
+    let resource_id = &response.results[0].uuid;
+
+    let search = |resource| {
+        let request = DocumentSearchRequest {
+            id: "shard".to_string(),
+            body: "".to_string(),
+            page_number: 0,
+            result_per_page: 10,
+            min_score: f32::MIN,
+            filter_expression: Some(FilterExpression {
+                expr: Some(Expr::Resource(resource)),
+            }),
+            ..Default::default()
+        };
+        let response = reader.search(&request).unwrap();
+        response.results.len()
+    };
+
+    // By resource
+    assert_eq!(
+        search(ResourceFilter {
+            resource_id: resource_id.clone(),
+        }),
+        2
+    );
+    assert_eq!(
+        search(ResourceFilter {
+            resource_id: "fake".into(),
+        }),
+        0
+    );
+}
+
+// TODO: order, only_faceted, with_status

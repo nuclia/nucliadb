@@ -796,19 +796,13 @@ class FilterExpression(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         RESOURCE_ID_FIELD_NUMBER: builtins.int
-        FIELD_FIELD_NUMBER: builtins.int
         resource_id: builtins.str
-        @property
-        def field(self) -> global___FilterExpression.FieldFilter: ...
         def __init__(
             self,
             *,
             resource_id: builtins.str = ...,
-            field: global___FilterExpression.FieldFilter | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["_field", b"_field", "field", b"field"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["_field", b"_field", "field", b"field", "resource_id", b"resource_id"]) -> None: ...
-        def WhichOneof(self, oneof_group: typing.Literal["_field", b"_field"]) -> typing.Literal["field"] | None: ...
+        def ClearField(self, field_name: typing.Literal["resource_id", b"resource_id"]) -> None: ...
 
     @typing.final
     class FieldFilter(google.protobuf.message.Message):

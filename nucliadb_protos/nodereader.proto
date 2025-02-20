@@ -231,8 +231,6 @@ message FilterExpression {
     }
     message ResourceFilter {
         string resource_id = 1;
-        optional FieldFilter field = 2;
-
     }
     message FieldFilter {
         string field_type = 1;
