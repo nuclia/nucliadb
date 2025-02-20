@@ -97,9 +97,19 @@ fn blocking_suggest(
     if suggest_paragraphs {
         let filter_expression = filter_from_suggest_request(&request)?;
         if let Some(expr) = filter_expression {
+            if request.field_filter.is_some() {
+                return Err(anyhow::anyhow!("Cannot specify old and new filters in the same request"));
+            }
             let prefilter = PreFilterRequest {
                 security: None,
                 filter_expression: Some(expr),
+            };
+
+            prefiltered = text_searcher.prefilter(&prefilter)?;
+        } else if let Some(expr) = &request.field_filter {
+            let prefilter = PreFilterRequest {
+                security: None,
+                filter_expression: Some(expr.clone()),
             };
 
             prefiltered = text_searcher.prefilter(&prefilter)?;
