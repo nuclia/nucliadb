@@ -630,11 +630,9 @@ async def suggest_query_to_pb(
         rephrase_prompt=None,
         generative_model=None,
     )
-    field_expr, paragraph_expr = await parse_old_filters(old, fetcher)
+    field_expr, _ = await parse_old_filters(old, fetcher)
     if field_expr is not None:
         request.field_filter.CopyFrom(field_expr)
-    if paragraph_expr is not None:
-        request.paragraph_filter.CopyFrom(paragraph_expr)
 
     return request
 
