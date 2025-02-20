@@ -110,7 +110,7 @@ async def _index_node_retrieval(
 
     with metrics.time("node_query"):
         results, query_incomplete_results, queried_nodes = await node_query(
-            kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
+            kbid, Method.SEARCH, pb_query
         )
     incomplete_results = incomplete_results or query_incomplete_results
 

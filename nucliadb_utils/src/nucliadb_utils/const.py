@@ -71,12 +71,6 @@ class Streams:
 
 
 class Features:
-    WAIT_FOR_INDEX = "nucliadb_wait_for_resource_index"
-    READ_REPLICA_SEARCHES = "nucliadb_read_replica_searches"
-    REBALANCE_KB = "nucliadb_rebalance_kb"
     SKIP_EXTERNAL_INDEX = "nucliadb_skip_external_index"
-    NATS_SYNC_ACK = "nucliadb_nats_sync_ack"
     LOG_REQUEST_PAYLOADS = "nucliadb_log_request_payloads"
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
-    NIDX_READS = "nucliadb_nidx_reads"
-    FIELD_STATUS = "nucliadb_field_status"

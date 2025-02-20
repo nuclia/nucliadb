@@ -33,39 +33,15 @@ class Settings(pydantic_settings.BaseSettings):
 
 DEFAULT_FLAG_DATA: dict[str, Any] = {
     # These are just defaults to use for local dev and tests
-    const.Features.WAIT_FOR_INDEX: {
-        "rollout": 0,
-        "variants": {"environment": ["none"]},
-    },
-    const.Features.READ_REPLICA_SEARCHES: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
-    const.Features.REBALANCE_KB: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
     const.Features.SKIP_EXTERNAL_INDEX: {
         "rollout": 0,
         "variants": {"environment": ["none"]},
-    },
-    const.Features.NATS_SYNC_ACK: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
     },
     const.Features.LOG_REQUEST_PAYLOADS: {
         "rollout": 0,
         "variants": {"environment": ["none"]},
     },
     const.Features.IGNORE_EXTRACTED_IN_SEARCH: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
-    const.Features.NIDX_READS: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
-    const.Features.FIELD_STATUS: {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },

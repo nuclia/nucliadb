@@ -76,7 +76,6 @@ async def resource_search(
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
-    shards: list[str] = fastapi_query(SearchParamDefaults.shards),
 ) -> Union[ResourceSearchResults, HTTPClientError]:
     top_k = top_k or SearchParamDefaults.top_k  # type: ignore
     top_k = cast(int, top_k)
@@ -101,9 +100,7 @@ async def resource_search(
         except InvalidQueryError as exc:
             return HTTPClientError(status_code=412, detail=str(exc))
 
-        results, incomplete_results, queried_nodes = await node_query(
-            kbid, Method.SEARCH, pb_query, shards
-        )
+        results, incomplete_results, queried_nodes = await node_query(kbid, Method.SEARCH, pb_query)
 
         # We need to merge
         search_results = await merge_paragraphs_results(

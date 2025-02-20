@@ -45,8 +45,6 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 
 class Method(Enum):
@@ -73,10 +71,7 @@ async def node_query(
     kbid: str,
     method: Method,
     pb_query: SuggestRequest,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
-    retry_on_primary: bool = True,
 ) -> tuple[list[SuggestResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -85,10 +80,7 @@ async def node_query(
     kbid: str,
     method: Method,
     pb_query: SearchRequest,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
-    retry_on_primary: bool = True,
 ) -> tuple[list[SearchResponse], bool, list[tuple[AbstractIndexNode, str]]]: ...
 
 
@@ -96,16 +88,9 @@ async def node_query(
     kbid: str,
     method: Method,
     pb_query: REQUEST_TYPE,
-    target_shard_replicas: Optional[list[str]] = None,
-    use_read_replica_nodes: bool = True,
     timeout: Optional[float] = None,
-    retry_on_primary: bool = True,
 ) -> tuple[Sequence[Union[T, BaseException]], bool, list[tuple[AbstractIndexNode, str]]]:
     timeout = timeout or settings.search_timeout
-    use_read_replica_nodes = use_read_replica_nodes and has_feature(
-        const.Features.READ_REPLICA_SEARCHES, context={"kbid": kbid}
-    )
-
     shard_manager = get_shard_manager()
     try:
         shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
@@ -121,11 +106,7 @@ async def node_query(
 
     for shard_obj in shard_groups:
         try:
-            node, shard_id = cluster_manager.choose_node(
-                shard_obj,
-                use_read_replica_nodes=use_read_replica_nodes,
-                target_shard_replicas=target_shard_replicas,
-            )
+            node, shard_id = cluster_manager.choose_node(shard_obj)
         except KeyError:
             incomplete_results = True
         else:
@@ -166,29 +147,6 @@ async def node_query(
                 "query": json.dumps(query_dict),
             },
         )
-        if (
-            error.status_code >= 500
-            and use_read_replica_nodes
-            and any([node.is_read_replica() for node, _ in queried_nodes])
-            and retry_on_primary
-        ):
-            # We had an error querying a secondary node, instead of raising an
-            # error directly, retry query to primaries and hope it works
-            logger.warning(
-                "Query to read replica failed. Trying again with primary",
-                extra={"nodes": debug_nodes_info(queried_nodes)},
-            )
-
-            results, incomplete_results, primary_queried_nodes = await node_query(  # type: ignore
-                kbid,
-                method,
-                pb_query,
-                target_shard_replicas,
-                use_read_replica_nodes=False,
-            )
-            queried_nodes.extend(primary_queried_nodes)
-            return results, incomplete_results, queried_nodes
-
         raise error
 
     return results, incomplete_results, queried_nodes

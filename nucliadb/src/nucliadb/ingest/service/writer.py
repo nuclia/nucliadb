@@ -272,7 +272,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
                 return response
 
-            entities_manager = EntitiesManager(kbobj, txn, use_read_replica_nodes=True)
+            entities_manager = EntitiesManager(kbobj, txn)
             try:
                 entities_groups = await entities_manager.list_entities_groups()
             except Exception as e:
