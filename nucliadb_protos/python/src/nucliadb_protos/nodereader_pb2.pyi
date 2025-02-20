@@ -1055,6 +1055,7 @@ class SuggestRequest(google.protobuf.message.Message):
     FILTER_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     FIELDS_FIELD_NUMBER: builtins.int
+    FIELD_FILTER_FIELD_NUMBER: builtins.int
     shard: builtins.str
     body: builtins.str
     @property
@@ -1065,6 +1066,8 @@ class SuggestRequest(google.protobuf.message.Message):
     def timestamps(self) -> global___Timestamps: ...
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def field_filter(self) -> global___FilterExpression: ...
     def __init__(
         self,
         *,
@@ -1074,9 +1077,11 @@ class SuggestRequest(google.protobuf.message.Message):
         filter: global___Filter | None = ...,
         timestamps: global___Timestamps | None = ...,
         fields: collections.abc.Iterable[builtins.str] | None = ...,
+        field_filter: global___FilterExpression | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["filter", b"filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["body", b"body", "features", b"features", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "field_filter", b"field_filter", "filter", b"filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "body", b"body", "features", b"features", "field_filter", b"field_filter", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_field_filter", b"_field_filter"]) -> typing.Literal["field_filter"] | None: ...
 
 global___SuggestRequest = SuggestRequest
 

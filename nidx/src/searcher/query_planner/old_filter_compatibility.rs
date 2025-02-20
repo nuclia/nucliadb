@@ -22,16 +22,16 @@ use nidx_protos::filter_expression::date_range_filter::DateField;
 use nidx_protos::filter_expression::{
     DateRangeFilter, Expr, FacetFilter, FieldFilter, FilterExpressionList, KeywordFilter, ResourceFilter,
 };
-use nidx_protos::FilterExpression;
-use nidx_protos::SearchRequest;
+use nidx_protos::{Filter, SearchRequest, SuggestRequest};
+use nidx_protos::{FilterExpression, Timestamps};
 
 use nidx_types::query_language::*;
 
 use crate::searcher::query_language;
 
 #[allow(deprecated)]
-fn analyze_filter(search_request: &SearchRequest) -> anyhow::Result<query_language::QueryAnalysis> {
-    let Some(filter) = &search_request.filter else {
+fn analyze_filter(filter: &Option<Filter>) -> anyhow::Result<query_language::QueryAnalysis> {
+    let Some(filter) = filter else {
         return Ok(Default::default());
     };
     let context = QueryContext {
@@ -41,15 +41,30 @@ fn analyze_filter(search_request: &SearchRequest) -> anyhow::Result<query_langua
     query_language::translate(Some(&filter.labels_expression), Some(&filter.keywords_expression), &context)
 }
 
+#[allow(deprecated)]
+pub fn filter_from_search_request(
+    request: &SearchRequest,
+) -> anyhow::Result<(Option<FilterExpression>, Option<FilterExpression>)> {
+    expression_from_old_filters(&request.fields, &request.key_filters, &request.timestamps, &request.filter)
+}
+
+#[allow(deprecated)]
+pub fn filter_from_suggest_request(request: &SuggestRequest) -> anyhow::Result<Option<FilterExpression>> {
+    Ok(expression_from_old_filters(&request.fields, &[], &request.timestamps, &request.filter)?.0)
+}
+
 /// Builds a filter expression from the older filter fields
 #[allow(deprecated)]
-pub fn filter_from_request(
-    request: &SearchRequest,
+fn expression_from_old_filters(
+    fields: &[String],
+    key_filters: &[String],
+    timestamps: &Option<Timestamps>,
+    filter: &Option<Filter>,
 ) -> anyhow::Result<(Option<FilterExpression>, Option<FilterExpression>)> {
     let mut field_filters = vec![];
 
     // Fields
-    if !request.fields.is_empty() {
+    if !fields.is_empty() {
         let field_from_string = |field: &str| {
             let mut parts = field.split('/');
             FieldFilter {
@@ -57,8 +72,7 @@ pub fn filter_from_request(
                 field_id: parts.next().map(str::to_string),
             }
         };
-        let fields = request
-            .fields
+        let fields = fields
             .iter()
             .map(|f| FilterExpression {
                 expr: Some(Expr::Field(field_from_string(f))),
@@ -72,7 +86,7 @@ pub fn filter_from_request(
     }
 
     // Key filters
-    if !request.key_filters.is_empty() {
+    if !key_filters.is_empty() {
         let filter_from_string = |key: &String| {
             let mut parts = key.split('/');
             let resource_id = parts.next().unwrap().into();
@@ -103,7 +117,7 @@ pub fn filter_from_request(
                 }
             }
         };
-        let resources = request.key_filters.iter().map(filter_from_string).collect();
+        let resources = key_filters.iter().map(filter_from_string).collect();
         field_filters.push(FilterExpression {
             expr: Some(Expr::BoolOr(FilterExpressionList {
                 operands: resources,
@@ -112,7 +126,7 @@ pub fn filter_from_request(
     }
 
     // Timestamps
-    if let Some(ts) = request.timestamps {
+    if let Some(ts) = timestamps {
         if ts.from_created.is_some() || ts.to_created.is_some() {
             field_filters.push(FilterExpression {
                 expr: Some(Expr::Date(DateRangeFilter {
@@ -134,7 +148,7 @@ pub fn filter_from_request(
     }
 
     // Filters (keyword and label, for field and paragraph)
-    let query_analysis = analyze_filter(request)?;
+    let query_analysis = analyze_filter(filter)?;
     if let Some(facets_expression) = query_analysis.labels_prefilter_query {
         field_filters.push(bool_to_filter(facets_expression, |facet| FilterExpression {
             expr: Some(Expr::Facet(FacetFilter {
