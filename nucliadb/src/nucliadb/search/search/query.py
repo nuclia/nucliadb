@@ -21,7 +21,7 @@ import asyncio
 import json
 import string
 from datetime import datetime
-from typing import Any, Awaitable, Optional, Union
+from typing import Any, Awaitable, Optional
 
 from nucliadb.common import datamanagers
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
@@ -65,6 +65,7 @@ from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
+from .query_parser.old_filters import OldFilterParams, parse_old_filters
 
 INDEX_SORTABLE_FIELDS = [
     SortField.CREATED,
@@ -92,25 +93,18 @@ class QueryParser:
         kbid: str,
         features: list[SearchOptions],
         query: str,
-        label_filters: Union[list[str], list[Filter]],
-        keyword_filters: Union[list[str], list[Filter]],
         top_k: int,
         min_score: MinScore,
+        old_filters: OldFilterParams,
         query_entities: Optional[list[KnowledgeGraphEntity]] = None,
         faceted: Optional[list[str]] = None,
         sort: Optional[SortOptions] = None,
-        range_creation_start: Optional[datetime] = None,
-        range_creation_end: Optional[datetime] = None,
-        range_modification_start: Optional[datetime] = None,
-        range_modification_end: Optional[datetime] = None,
-        fields: Optional[list[str]] = None,
         user_vector: Optional[list[float]] = None,
         vectorset: Optional[str] = None,
         with_duplicates: bool = False,
         with_status: Optional[ResourceProcessingStatus] = None,
         with_synonyms: bool = False,
         autofilter: bool = False,
-        key_filters: Optional[list[str]] = None,
         security: Optional[RequestSecurity] = None,
         generative_model: Optional[str] = None,
         rephrase: bool = False,
@@ -127,40 +121,28 @@ class QueryParser:
         self.hidden = hidden
         if self.hidden is not None:
             if self.hidden:
-                label_filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
+                old_filters.label_filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
             else:
-                label_filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
-
-        self.label_filters: dict[str, Any] = convert_to_node_filters(label_filters)
-        self.flat_label_filters: list[str] = []
-        self.keyword_filters: dict[str, Any] = convert_to_node_filters(keyword_filters)
+                old_filters.label_filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
         self.faceted = faceted or []
         self.top_k = top_k
         self.min_score = min_score
         self.sort = sort
-        self.range_creation_start = range_creation_start
-        self.range_creation_end = range_creation_end
-        self.range_modification_start = range_modification_start
-        self.range_modification_end = range_modification_end
-        self.fields = fields or []
         self.user_vector = user_vector
         self.vectorset = vectorset
         self.with_duplicates = with_duplicates
         self.with_status = with_status
         self.with_synonyms = with_synonyms
         self.autofilter = autofilter
-        self.key_filters = key_filters
         self.security = security
         self.generative_model = generative_model
         self.rephrase = rephrase
         self.rephrase_prompt = rephrase_prompt
         self.query_endpoint_used = False
-        if len(self.label_filters) > 0:
-            self.label_filters = translate_label_filters(self.label_filters)
-            self.flat_label_filters = flatten_filter_literals(self.label_filters)
         self.max_tokens = max_tokens
         self.rank_fusion = rank_fusion
         self.reranker = reranker
+        self.old_filters = old_filters
         self.fetcher = Fetcher(
             kbid=kbid,
             query=query,
@@ -197,7 +179,7 @@ class QueryParser:
         This will schedule concurrent tasks for different data that needs to be pulled
         for the sake of the query being performed
         """
-        if len(self.label_filters) > 0 and has_classification_label_filters(self.flat_label_filters):
+        if len(self.old_filters.label_filters) > 0:
             asyncio.ensure_future(self.fetcher.get_classification_labels())
 
         if self.has_vector_search and self.user_vector is None:
@@ -243,25 +225,7 @@ class QueryParser:
         return request, incomplete, autofilters, rephrased_query
 
     async def parse_filters(self, request: nodereader_pb2.SearchRequest) -> None:
-        if len(self.label_filters) > 0:
-            field_labels = self.flat_label_filters
-            paragraph_labels: list[str] = []
-            if has_classification_label_filters(self.flat_label_filters):
-                classification_labels = await self.fetcher.get_classification_labels()
-                field_labels, paragraph_labels = split_labels_by_type(
-                    self.flat_label_filters, classification_labels
-                )
-                check_supported_filters(self.label_filters, paragraph_labels)
-
-            request.filter.field_labels.extend(field_labels)
-            request.filter.paragraph_labels.extend(paragraph_labels)
-            request.filter.labels_expression = json.dumps(self.label_filters)
-
-        if len(self.keyword_filters) > 0:
-            request.filter.keywords_expression = json.dumps(self.keyword_filters)
-
         request.faceted.labels.extend([translate_label(facet) for facet in self.faceted])
-        request.fields.extend(self.fields)
 
         if self.security is not None and len(self.security.groups) > 0:
             security_pb = utils_pb2.Security()
@@ -270,24 +234,15 @@ class QueryParser:
                     security_pb.access_groups.append(group_id)
             request.security.CopyFrom(security_pb)
 
-        if self.key_filters is not None and len(self.key_filters) > 0:
-            request.key_filters.extend(self.key_filters)
-            node_features.inc({"type": "key_filters"})
-
         if self.with_status is not None:
             request.with_status = PROCESSING_STATUS_TO_PB_MAP[self.with_status]
 
-        if self.range_creation_start is not None:
-            request.timestamps.from_created.FromDatetime(self.range_creation_start)
-
-        if self.range_creation_end is not None:
-            request.timestamps.to_created.FromDatetime(self.range_creation_end)
-
-        if self.range_modification_start is not None:
-            request.timestamps.from_modified.FromDatetime(self.range_modification_start)
-
-        if self.range_modification_end is not None:
-            request.timestamps.to_modified.FromDatetime(self.range_modification_end)
+        if self.old_filters:
+            field_expr, paragraph_expr = await parse_old_filters(self.old_filters, self.fetcher)
+            if field_expr is not None:
+                request.field_filter.CopyFrom(field_expr)
+            if paragraph_expr is not None:
+                request.paragraph_filter.CopyFrom(paragraph_expr)
 
     def parse_sorting(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.query) == 0:

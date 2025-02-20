@@ -39,6 +39,7 @@ from nucliadb.search.search.metrics import (
     RAGMetrics,
 )
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.search.search.query_parser.parser import parse_find
 from nucliadb.search.search.rank_fusion import (
     RankFusionAlgorithm,
@@ -272,23 +273,25 @@ async def query_parser_from_find_request(
         features=item.features,
         query=item.query,
         query_entities=item.query_entities,
-        label_filters=item.filters,
-        keyword_filters=item.keyword_filters,
         faceted=None,
         sort=None,
         top_k=item.top_k,
         min_score=item.min_score,
-        range_creation_start=item.range_creation_start,
-        range_creation_end=item.range_creation_end,
-        range_modification_start=item.range_modification_start,
-        range_modification_end=item.range_modification_end,
-        fields=item.fields,
+        old_filters=OldFilterParams(
+            label_filters=item.filters,
+            keyword_filters=item.keyword_filters,
+            range_creation_start=item.range_creation_start,
+            range_creation_end=item.range_creation_end,
+            range_modification_start=item.range_modification_start,
+            range_modification_end=item.range_modification_end,
+            fields=item.fields,
+            key_filters=item.resource_filters,
+        ),
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
         with_synonyms=item.with_synonyms,
         autofilter=item.autofilter,
-        key_filters=item.resource_filters,
         security=item.security,
         generative_model=generative_model,
         rephrase=item.rephrase,
