@@ -214,26 +214,7 @@ impl GraphQueryParser {
                 };
                 subqueries.push(source_query);
 
-                match relation_expression {
-                    Expression::Value(query) => {
-                        if let Some(query) = self.has_relation(query) {
-                            subqueries.push((Occur::Must, query));
-                        }
-                    }
-                    Expression::Not(query) => {
-                        if let Some(query) = self.has_relation(query) {
-                            subqueries.push((Occur::MustNot, query));
-                        }
-                    }
-                    Expression::Or(nodes) => {
-                        let or_subqueries: Vec<_> =
-                            nodes.into_iter().flat_map(|node| self.has_relation(node)).collect();
-                        if or_subqueries.len() > 0 {
-                            let or_query = Box::new(BooleanQuery::union(or_subqueries));
-                            subqueries.push((Occur::Must, or_query));
-                        }
-                    }
-                };
+                subqueries.extend(self.has_relation(relation_expression).into_iter());
 
                 let destination_query = match destination_expression {
                     Expression::Value(query) => (Occur::Must, self.has_node_as_destination(&query)),
@@ -387,17 +368,62 @@ impl GraphQueryParser {
         query
     }
 
-    fn has_relation(&self, query: Relation) -> Option<Box<dyn Query>> {
-        match query.value {
-            Some(value) if !value.is_empty() => Some(Box::new(BooleanQuery::new(vec![(
-                Occur::Should,
-                Box::new(TermQuery::new(
-                    tantivy::Term::from_field_text(self.schema.label, &value),
-                    IndexRecordOption::Basic,
-                )),
-            )]))),
-            Some(_) | None => None,
-        }
+    fn has_relation(&self, expression: Expression<Relation>) -> Vec<(Occur, Box<dyn Query>)> {
+        let mut subqueries = vec![];
+
+        match expression {
+            Expression::Value(Relation {
+                value: None,
+            }) => {}
+            Expression::Value(Relation {
+                value: Some(value),
+            }) if value.is_empty() => {}
+            Expression::Value(Relation {
+                value: Some(value),
+            }) => {
+                subqueries.push((Occur::Must, self.has_relation_label(&value)));
+            }
+
+            Expression::Not(Relation {
+                value: None,
+            }) => {}
+            Expression::Not(Relation {
+                value: Some(value),
+            }) if value.is_empty() => {}
+            Expression::Not(Relation {
+                value: Some(value),
+            }) => {
+                subqueries.push((Occur::MustNot, self.has_relation_label(&value)));
+            }
+
+            Expression::Or(relations) => {
+                let mut or_subqueries: Vec<_> = relations
+                    .into_iter()
+                    .flat_map(|relation| {
+                        if let Some(value) = relation.value {
+                            if !value.is_empty() {
+                                return Some((Occur::Should, self.has_relation_label(&value)));
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                match or_subqueries.len() {
+                    0 => {}
+                    1 => subqueries.push(or_subqueries.pop().unwrap()),
+                    _n => {
+                        let or_query: Box<dyn Query> = Box::new(BooleanQuery::new(or_subqueries));
+                        subqueries.push((Occur::Must, or_query));
+                    }
+                }
+            }
+        };
+
+        subqueries
+    }
+
+    fn has_relation_label(&self, label: &str) -> Box<dyn Query> {
+        Box::new(TermQuery::new(tantivy::Term::from_field_text(self.schema.label, &label), IndexRecordOption::Basic))
     }
 }
 
