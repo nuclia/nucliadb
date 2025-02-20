@@ -561,7 +561,7 @@ class DummyPredictEngine(PredictEngine):
         ada = AppliedDataAugmentation()
         serialized_fm = base64.b64encode(fm.SerializeToString()).decode("utf-8")
         augmented_field = AugmentedField(
-            metadata=serialized_fm,
+            metadata=serialized_fm,  # type: ignore
             applied_data_augmentation=ada,
             input_nuclia_tokens=1.0,
             output_nuclia_tokens=1.0,
