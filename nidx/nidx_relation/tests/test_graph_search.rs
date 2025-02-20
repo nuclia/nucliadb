@@ -334,6 +334,26 @@ fn test_graph_relation_query() -> anyhow::Result<()> {
 fn test_graph_directed_path_query() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
+    // (:Erin)-[]->(:UK)
+    let result = reader.reader.advanced_graph_query(GraphQuery::PathQuery(PathQuery::DirectedPath((
+        Expression::Value(Node {
+            value: Some("Erin".into()),
+            node_type: Some(NodeType::Entity),
+            node_subtype: Some("PERSON".to_string()),
+        }),
+        Expression::Value(Relation {
+            value: None,
+        }),
+        Expression::Value(Node {
+            value: Some("UK".into()),
+            node_type: Some(NodeType::Entity),
+            node_subtype: Some("PLACE".to_string()),
+        }),
+    ))))?;
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Erin", "BORN_IN", "UK")));
+
     // (:PERSON)-[]->(:PLACE)
     let result = reader.reader.advanced_graph_query(GraphQuery::PathQuery(PathQuery::DirectedPath((
         Expression::Value(Node {
