@@ -40,7 +40,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 
 
-@api.get(
+@api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/run-agents",
     status_code=200,
     summary="Run Agents on Resource",
@@ -62,7 +62,7 @@ async def run_agents_by_uuid(
     return await _run_agents_endpoint(kbid, rid, x_nucliadb_user, item)
 
 
-@api.get(
+@api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_SLUG_PREFIX}/{{slug}}/run-agents",
     status_code=200,
     summary="Run Agents on Resource (by slug)",

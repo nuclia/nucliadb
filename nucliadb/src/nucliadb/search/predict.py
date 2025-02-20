@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
 import json
 import os
 import random
@@ -558,8 +559,9 @@ class DummyPredictEngine(PredictEngine):
         self.calls.append(("run_agents", (kbid, item)))
         fm = FieldMetadata()
         ada = AppliedDataAugmentation()
+        serialized_fm = base64.b64encode(fm.SerializeToString()).decode("utf-8")
         augmented_field = AugmentedField(
-            metadata=fm,
+            metadata=serialized_fm,
             applied_data_augmentation=ada,
             input_nuclia_tokens=1.0,
             output_nuclia_tokens=1.0,
