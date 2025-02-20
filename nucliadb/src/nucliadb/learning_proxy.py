@@ -206,6 +206,7 @@ async def learning_config_proxy(
     method: str,
     url: str,
     extra_headers: Optional[dict[str, str]] = None,
+    json: Optional[dict[str, Any]] = None,
 ) -> Union[Response, StreamingResponse]:
     return await proxy(
         service=LearningService.CONFIG,
@@ -213,6 +214,7 @@ async def learning_config_proxy(
         method=method,
         url=url,
         extra_headers=extra_headers,
+        json=json,
     )
 
 
@@ -234,13 +236,10 @@ async def _retriable_proxied_request(
     content: bytes,
     headers: dict[str, str],
     params: dict[str, Any],
+    json: Optional[dict[str, Any]] = None,
 ) -> httpx.Response:
     return await client.request(
-        method=method.upper(),
-        url=url,
-        params=params,
-        content=content,
-        headers=headers,
+        method=method.upper(), url=url, params=params, content=content, headers=headers, json=json
     )
 
 
@@ -250,6 +249,7 @@ async def proxy(
     method: str,
     url: str,
     extra_headers: Optional[dict[str, str]] = None,
+    json: Optional[dict[str, Any]] = None,
 ) -> Union[Response, StreamingResponse]:
     """
     Proxy the request to a learning API.
@@ -280,6 +280,7 @@ async def proxy(
                 params=dict(request.query_params),
                 content=await request.body(),
                 headers=proxied_headers,
+                json=json,
             )
         except Exception as exc:
             errors.capture_exception(exc)
