@@ -114,8 +114,8 @@ pub enum GraphQuery {
     // (:A)-[:R]->(:B)
     PathQuery(PathQuery),
     // Combine queries with an OR
-    // (:A)-[:R]->(:B), (:A)-[:R]->(:B)
-    MultiStatement(Vec<PathQuery>),
+    // (:A)-[:R]->(:B), !(:A)-[:P]->(:B)
+    MultiStatement(Vec<Expression<PathQuery>>),
 }
 
 pub struct GraphQueryParser {
@@ -256,8 +256,22 @@ impl GraphQueryParser {
         }
     }
 
-    fn parse_multi_statement(&self, queries: Vec<PathQuery>) -> Box<dyn Query> {
-        Box::new(BooleanQuery::union(queries.into_iter().map(|query| self.parse_path_query(query)).collect()))
+    fn parse_multi_statement(&self, queries: Vec<Expression<PathQuery>>) -> Box<dyn Query> {
+        let mut subqueries = vec![];
+        for expression in queries {
+            let subquery = match expression {
+                Expression::Value(query) => (Occur::Should, self.parse_path_query(query) as Box<dyn Query>),
+                Expression::Not(query) => (Occur::MustNot, self.parse_path_query(query) as Box<dyn Query>),
+                Expression::Or(queries) => (
+                    Occur::Should,
+                    Box::new(BooleanQuery::union(
+                        queries.into_iter().map(|query| self.parse_path_query(query)).collect(),
+                    )) as Box<dyn Query>,
+                ),
+            };
+            subqueries.push(subquery);
+        }
+        Box::new(BooleanQuery::new(subqueries))
     }
 
     fn has_node_as_source(&self, query: &Node) -> Box<dyn Query> {
