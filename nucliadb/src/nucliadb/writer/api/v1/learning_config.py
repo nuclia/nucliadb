@@ -63,7 +63,7 @@ async def patch_configuration(
 
 @api.post(
     path=f"/{KB_PREFIX}/{{kbid}}/extract_strategies",
-    status_code=204,
+    status_code=200,
     summary="Add a extract strategy to a KB",
     description="Add a extract strategy to a KB",
     response_model=str,
