@@ -19,7 +19,7 @@
 #
 from fastapi import Request
 from fastapi_versioning import version
-from nuclia_models.config import ExtractConfig
+from nuclia_models.config.proto import ExtractConfig
 
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
