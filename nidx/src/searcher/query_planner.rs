@@ -30,6 +30,8 @@ use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
 use old_filter_compatibility::filter_from_request;
 
+use super::query_language::extract_label_filters;
+
 pub mod old_filter_compatibility;
 
 /// The queries a [`QueryPlan`] has decided to send to each index.
@@ -183,12 +185,8 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
         return Ok(None);
     }
 
-    // TODO
-    let segment_filtering_formula = None;
-    // query_analysis
-    //         .labels_prefilter_query
-    //         .as_ref()
-    //         .and_then(|e| query_language::extract_label_filters(e, SEGMENT_TAGS))
+    let segment_filtering_formula =
+        search_request.field_filter.as_ref().and_then(|f| extract_label_filters(f, SEGMENT_TAGS));
 
     Ok(Some(VectorSearchRequest {
         id: search_request.shard.clone(),
