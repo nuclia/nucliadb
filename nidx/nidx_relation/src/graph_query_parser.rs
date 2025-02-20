@@ -211,10 +211,12 @@ impl GraphQueryParser {
                 subqueries.extend(self.has_relation(relation_expression).into_iter());
                 subqueries.extend(self.has_node_expression_as_destination(&destination_expression));
 
-                // TODO: This is only necessary if everything is MustNot
-                // NOT needs special attention to flip the Occur type, as a Must { MustNot { X } }
-                // doesn't work as a Not inside the expression we mount
-                subqueries.push((Occur::Must, Box::new(AllQuery)));
+                // Due to implementation details on tantivy, a query containing
+                // only MustNot won't match anything. In this case, we need to
+                // add an AllQuery to get results
+                if subqueries.iter().all(|(occur, _)| *occur == Occur::MustNot) {
+                    subqueries.push((Occur::Must, Box::new(AllQuery)));
+                }
 
                 Box::new(BooleanQuery::new(subqueries))
             }
