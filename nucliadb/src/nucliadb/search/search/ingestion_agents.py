@@ -59,12 +59,11 @@ def _parse_filters(filters: Optional[list[AgentsFilter]]) -> Optional[list[NameO
 
 
 async def fetch_resource_fields(kbid: str, rid: str) -> list[FieldInfo]:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_ro_transaction() as txn:
         resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=rid)
         if resource is None:
             raise ResourceNotFoundError()
-
-    fields = await resource.get_fields(force=True)
+        fields = await resource.get_fields(force=True)
 
     tasks: list[asyncio.Task] = []
     for field in fields.values():

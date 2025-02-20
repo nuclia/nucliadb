@@ -33,7 +33,7 @@ from tests.utils import inject_message
 async def test_ingestion_agents_on_resource(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
+    standalone_nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox,
 ):
     kbid = standalone_knowledgebox
@@ -62,7 +62,7 @@ async def test_ingestion_agents_on_resource(
     bm.extracted_text.add()
     bm.extracted_text[0].field.CopyFrom(fieldid)
     bm.extracted_text[0].body.text = "Nietsche is a philosopher"
-    await inject_message(nucliadb_ingest_grpc, bm)
+    await inject_message(standalone_nucliadb_ingest_grpc, bm)
 
     # Run agents on the resource
     resp = await nucliadb_reader.post(
