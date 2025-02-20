@@ -32,6 +32,7 @@ from nucliadb.search.search.query import (
     check_supported_filters,
     parse_entities_to_filters,
 )
+from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.tests.vectors import Q
 from nucliadb_models.search import MinScore, SearchOptions
 from nucliadb_protos.knowledgebox_pb2 import Synonyms
@@ -85,8 +86,7 @@ class TestApplySynonymsToRequest:
             kbid="kbid",
             features=[],
             query="query",
-            label_filters=[],
-            keyword_filters=[],
+            old_filters=OldFilterParams(label_filters=[], keyword_filters=[]),
             faceted=[],
             top_k=10,
             min_score=MinScore(semantic=0.5),
@@ -169,8 +169,7 @@ class TestVectorSetAndMatryoshkaParsing:
             vectorset=vectorset,
             # irrelevant mandatory args
             query="my query",
-            label_filters=[],  # type: ignore
-            keyword_filters=[],  # type: ignore
+            old_filters=OldFilterParams(label_filters=[], keyword_filters=[]),
             top_k=20,
             min_score=MinScore(bm25=0, semantic=0),
         )

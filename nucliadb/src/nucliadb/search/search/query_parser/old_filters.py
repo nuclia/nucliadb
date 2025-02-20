@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
 
+from nucliadb.search.search.filters import translate_label
 from nucliadb_models.search import (
     Filter,
 )
@@ -66,7 +67,7 @@ async def parse_old_filters(
             paragraph_filter_expression = paragraph_exprs[0]
         elif len(paragraph_exprs) > 1:
             paragraph_filter_expression = FilterExpression()
-            paragraph_filter_expression.bool_or.operands.extend(paragraph_exprs)
+            paragraph_filter_expression.bool_and.operands.extend(paragraph_exprs)
 
     # Keywords
     if old.keyword_filters:
@@ -150,6 +151,7 @@ def convert_label_filter_to_expressions(
     fltr: Union[str, Filter], classification_labels: knowledgebox_pb2.Labels
 ) -> tuple[Optional[FilterExpression], Optional[FilterExpression]]:
     if isinstance(fltr, str):
+        fltr = translate_label(fltr)
         f = FilterExpression()
         f.facet.facet = fltr
         if is_paragraph_label(fltr, classification_labels):
@@ -175,6 +177,7 @@ def split_labels(
     field = []
     paragraph = []
     for label in labels:
+        label = translate_label(label)
         expr = FilterExpression()
         if negate:
             expr.bool_not.facet.facet = label
@@ -193,7 +196,7 @@ def split_labels(
     else:
         field_expr = FilterExpression()
         filter_list = getattr(field_expr, combinator)
-        filter_list.extend(field)
+        filter_list.operands.extend(field)
 
     if len(paragraph) > 0 and combinator == "bool_or":
         raise InvalidQueryError(
