@@ -141,6 +141,7 @@ impl GraphSearcher {
     pub fn search(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
         let index_query: Box<dyn Query> = self.parser.parse_graph_query(query);
 
+        // TODO: parametrize this magic constant
         let collector = TopDocs::with_limit(1000);
 
         let matching_docs = self.searcher.search(&index_query, &collector)?;
