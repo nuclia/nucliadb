@@ -28,7 +28,7 @@ use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::*;
 use nidx_vector::VectorSearchRequest;
 use nidx_vector::SEGMENT_TAGS;
-use old_filter_compatibility::filter_from_request;
+use old_filter_compatibility::filter_from_search_request;
 
 use super::query_language::extract_label_filters;
 
@@ -94,7 +94,7 @@ pub struct QueryPlan {
 
 pub fn build_query_plan(mut search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
     // Backwards compatibility with old filters
-    let (field_filter, paragraph_filter) = filter_from_request(&search_request)?;
+    let (field_filter, paragraph_filter) = filter_from_search_request(&search_request)?;
     let has_old_filters = field_filter.is_some() || paragraph_filter.is_some();
     let has_new_filters = search_request.field_filter.is_some() || search_request.paragraph_filter.is_some();
     if has_old_filters && has_new_filters {

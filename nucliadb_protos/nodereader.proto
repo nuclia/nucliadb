@@ -321,9 +321,11 @@ message SuggestRequest {
     string body = 2;
     repeated SuggestFeatures features = 6;
 
-    Filter filter = 3;
-    Timestamps timestamps = 4;
-    repeated string fields = 5;
+    Filter filter = 3 [deprecated = true];
+    Timestamps timestamps = 4 [deprecated = true];
+    repeated string fields = 5 [deprecated = true];
+
+    optional FilterExpression field_filter = 7;
 }
 
 

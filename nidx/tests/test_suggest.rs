@@ -105,6 +105,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
         .suggest(Request::new(SuggestRequest {
             filter: Some(Filter {
                 field_labels: vec!["/s/p/de".to_string()],
+                labels_expression: r#"{"literal": "/s/p/de"}"#.to_string(),
                 paragraph_labels: vec![],
                 ..Default::default()
             }),
