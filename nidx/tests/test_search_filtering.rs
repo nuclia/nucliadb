@@ -392,5 +392,22 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
     let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
     assert_eq!(results.paragraph.unwrap().results.len(), 1);
 
+    // With not keyword filter, finds the resource
+    let search_request = nodereader::SearchRequest {
+        shard: shard_id.clone(),
+        page_number: 0,
+        result_per_page: 10,
+        min_score_bm25: 0.0,
+        paragraph: true,
+        body: "Dummy".to_string(),
+        filter: Some(Filter {
+            keywords_expression: r#"{"or": [{"literal":"none"}, {"literal":"text"}]}"#.into(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let results = fixture.searcher_client.search(Request::new(search_request)).await?.into_inner();
+    assert_eq!(results.paragraph.unwrap().results.len(), 1);
+
     Ok(())
 }
