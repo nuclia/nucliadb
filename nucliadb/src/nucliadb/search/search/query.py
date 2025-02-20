@@ -28,17 +28,12 @@ from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search import logger
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.filters import (
-    convert_to_node_filters,
-    flatten_filter_literals,
-    has_classification_label_filters,
-    split_labels_by_type,
     translate_label,
-    translate_label_filters,
 )
 from nucliadb.search.search.metrics import (
     node_features,
 )
-from nucliadb.search.search.query_parser.fetcher import Fetcher, get_classification_labels
+from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.rank_fusion import (
     RankFusionAlgorithm,
 )
@@ -488,39 +483,30 @@ async def paragraph_query_to_pb(
 
     request.body = query
 
-    # we don't have a specific filter only for resource_ids but key_filters
-    # parse "rid" and "rid/field" like ids, so it does the job
-    request.key_filters.append(rid)
-
-    if len(filters) > 0:
-        field_labels = filters
-        paragraph_labels: list[str] = []
-        if has_classification_label_filters(filters):
-            classification_labels = await get_classification_labels(kbid)
-            field_labels, paragraph_labels = split_labels_by_type(filters, classification_labels)
-        request.filter.field_labels.extend(field_labels)
-        request.filter.paragraph_labels.extend(paragraph_labels)
-
-    request.faceted.labels.extend([translate_label(facet) for facet in faceted])
-    request.fields.extend(fields)
-
-    if sort:
-        request.order.field = sort
-        request.order.type = sort_ord  # type: ignore
-
-    request.with_duplicates = with_duplicates
-
-    if range_creation_start is not None:
-        request.timestamps.from_created.FromDatetime(range_creation_start)
-
-    if range_creation_end is not None:
-        request.timestamps.to_created.FromDatetime(range_creation_end)
-
-    if range_modification_start is not None:
-        request.timestamps.from_modified.FromDatetime(range_modification_start)
-
-    if range_modification_end is not None:
-        request.timestamps.to_modified.FromDatetime(range_modification_end)
+    old = OldFilterParams(
+        label_filters=filters,
+        keyword_filters=[],
+        range_creation_start=range_creation_start,
+        range_creation_end=range_creation_end,
+        range_modification_start=range_modification_start,
+        range_modification_end=range_modification_end,
+        key_filters=[rid],
+        fields=fields,
+    )
+    fetcher = Fetcher(
+        kbid,
+        query="",
+        user_vector=None,
+        vectorset=None,
+        rephrase=False,
+        rephrase_prompt=None,
+        generative_model=None,
+    )
+    field_expr, paragraph_expr = await parse_old_filters(old, fetcher)
+    if field_expr is not None:
+        request.field_filter.CopyFrom(field_expr)
+    if paragraph_expr is not None:
+        request.paragraph_filter.CopyFrom(paragraph_expr)
 
     return request
 
@@ -598,7 +584,8 @@ def parse_entities_to_filters(
     return added_filters
 
 
-def suggest_query_to_pb(
+async def suggest_query_to_pb(
+    kbid: str,
     features: list[SuggestOptions],
     query: str,
     fields: list[str],
@@ -618,29 +605,36 @@ def suggest_query_to_pb(
 
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
-        request.fields.extend(fields)
 
-        if hidden is not None:
-            if hidden:
-                filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
-            else:
-                filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
+    if hidden is not None:
+        if hidden:
+            filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
+        else:
+            filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
 
-        expression = convert_to_node_filters(filters)
-        if expression:
-            expression = translate_label_filters(expression)
-
-        request.filter.field_labels.extend(flatten_filter_literals(expression))
-        request.filter.labels_expression = json.dumps(expression)
-
-    if range_creation_start is not None:
-        request.timestamps.from_created.FromDatetime(range_creation_start)
-    if range_creation_end is not None:
-        request.timestamps.to_created.FromDatetime(range_creation_end)
-    if range_modification_start is not None:
-        request.timestamps.from_modified.FromDatetime(range_modification_start)
-    if range_modification_end is not None:
-        request.timestamps.to_modified.FromDatetime(range_modification_end)
+    old = OldFilterParams(
+        label_filters=filters,
+        keyword_filters=[],
+        range_creation_start=range_creation_start,
+        range_creation_end=range_creation_end,
+        range_modification_start=range_modification_start,
+        range_modification_end=range_modification_end,
+        fields=fields,
+    )
+    fetcher = Fetcher(
+        kbid,
+        query="",
+        user_vector=None,
+        vectorset=None,
+        rephrase=False,
+        rephrase_prompt=None,
+        generative_model=None,
+    )
+    field_expr, paragraph_expr = await parse_old_filters(old, fetcher)
+    if field_expr is not None:
+        request.field_filter.CopyFrom(field_expr)
+    if paragraph_expr is not None:
+        request.paragraph_filter.CopyFrom(paragraph_expr)
 
     return request
 
