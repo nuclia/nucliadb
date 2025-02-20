@@ -246,11 +246,11 @@ pub fn extract_label_filters(expression: &FilterExpression, labels: &[&str]) -> 
         Expr::Facet(FacetFilter {
             facet,
         }) if labels.contains(&facet.as_str()) => Some(BooleanExpression::Literal(facet.clone())),
-        Expr::Not(not_expr) => {
+        Expr::BoolNot(not_expr) => {
             extract_label_filters(not_expr.as_ref(), labels).map(|e| BooleanExpression::Not(Box::new(e)))
         }
-        Expr::And(FilterExpressionList {
-            expr: operands,
+        Expr::BoolAnd(FilterExpressionList {
+            operands,
         }) => {
             let relevant: Vec<_> = operands.iter().filter_map(|e| extract_label_filters(e, labels)).collect();
             match &relevant[..] {
@@ -535,7 +535,7 @@ mod tests {
         };
 
         let not = |e| FilterExpression {
-            expr: Some(Expr::Not(Box::new(e))),
+            expr: Some(Expr::BoolNot(Box::new(e))),
         };
 
         // Literal
@@ -552,16 +552,16 @@ mod tests {
 
         // Or (not supported)
         let or_expr = FilterExpression {
-            expr: Some(Expr::Or(FilterExpressionList {
-                expr: vec![a.clone(), v.clone(), not(w.clone())],
+            expr: Some(Expr::BoolOr(FilterExpressionList {
+                operands: vec![a.clone(), v.clone(), not(w.clone())],
             })),
         };
         assert_eq!(extract_label_filters(&or_expr, LABELS), None);
 
         // And
         let expr = FilterExpression {
-            expr: Some(Expr::And(FilterExpressionList {
-                expr: vec![a.clone(), v.clone(), not(w.clone())],
+            expr: Some(Expr::BoolAnd(FilterExpressionList {
+                operands: vec![a.clone(), v.clone(), not(w.clone())],
             })),
         };
         let expected = BooleanExpression::Operation(BooleanOperation {
@@ -575,8 +575,8 @@ mod tests {
 
         // Nested
         let expr = FilterExpression {
-            expr: Some(Expr::And(FilterExpressionList {
-                expr: vec![a, v, or_expr],
+            expr: Some(Expr::BoolAnd(FilterExpressionList {
+                operands: vec![a, v, or_expr],
             })),
         };
         assert_eq!(extract_label_filters(&expr, LABELS), Some(BooleanExpression::Literal("/v".into())));

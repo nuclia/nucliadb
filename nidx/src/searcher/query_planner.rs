@@ -220,9 +220,9 @@ fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationS
 
 fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<BooleanExpression> {
     match filter.expr.unwrap() {
-        Expr::And(and) => {
+        Expr::BoolAnd(and) => {
             let operands = and
-                .expr
+                .operands
                 .into_iter()
                 .map(filter_to_boolean_expression)
                 .collect::<anyhow::Result<Vec<BooleanExpression>>>()?;
@@ -231,9 +231,9 @@ fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<Bool
                 operands,
             }))
         }
-        Expr::Or(or) => {
+        Expr::BoolOr(or) => {
             let operands = or
-                .expr
+                .operands
                 .into_iter()
                 .map(filter_to_boolean_expression)
                 .collect::<anyhow::Result<Vec<BooleanExpression>>>()?;
@@ -242,7 +242,7 @@ fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<Bool
                 operands,
             }))
         }
-        Expr::Not(not) => Ok(BooleanExpression::Not(Box::new(filter_to_boolean_expression(*not)?))),
+        Expr::BoolNot(not) => Ok(BooleanExpression::Not(Box::new(filter_to_boolean_expression(*not)?))),
         Expr::Facet(facet_filter) => Ok(BooleanExpression::Literal(facet_filter.facet)),
         _ => Err(anyhow::anyhow!("FilterExpression type not supported for conversion to BooleanExpression")),
     }

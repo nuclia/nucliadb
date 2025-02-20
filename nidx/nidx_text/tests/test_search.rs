@@ -97,7 +97,7 @@ fn test_prefilter_not_search() {
     let request = PreFilterRequest {
         security: None,
         filter_expression: Some(FilterExpression {
-            expr: Some(nidx_protos::filter_expression::Expr::Not(Box::new(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::BoolNot(Box::new(FilterExpression {
                 expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
                     facet: "/l/mylabel".into(),
                 })),
@@ -137,8 +137,8 @@ fn test_keywords_prefilter_search() {
     let request = PreFilterRequest {
         security: None,
         filter_expression: Some(FilterExpression {
-            expr: Some(nidx_protos::filter_expression::Expr::And(FilterExpressionList {
-                expr: vec![
+            expr: Some(nidx_protos::filter_expression::Expr::BoolAnd(FilterExpressionList {
+                operands: vec![
                     FilterExpression {
                         expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
                             facet: "/l/mylabel".into(),
@@ -387,8 +387,8 @@ fn test_timestamp_filtering() {
         assert_eq!(
             search(DateRangeFilter {
                 field: *field,
-                from: Some(before),
-                to: Some(after)
+                since: Some(before),
+                until: Some(after)
             }),
             2
         );
@@ -396,8 +396,8 @@ fn test_timestamp_filtering() {
         assert_eq!(
             search(DateRangeFilter {
                 field: *field,
-                from: Some(after),
-                to: None
+                since: Some(after),
+                until: None
             }),
             0
         );

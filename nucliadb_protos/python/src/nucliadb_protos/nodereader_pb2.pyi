@@ -781,15 +781,15 @@ class FilterExpression(google.protobuf.message.Message):
     class FilterExpressionList(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        EXPR_FIELD_NUMBER: builtins.int
+        OPERANDS_FIELD_NUMBER: builtins.int
         @property
-        def expr(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FilterExpression]: ...
+        def operands(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FilterExpression]: ...
         def __init__(
             self,
             *,
-            expr: collections.abc.Iterable[global___FilterExpression] | None = ...,
+            operands: collections.abc.Iterable[global___FilterExpression] | None = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing.Literal["expr", b"expr"]) -> None: ...
+        def ClearField(self, field_name: typing.Literal["operands", b"operands"]) -> None: ...
 
     @typing.final
     class ResourceFilter(google.protobuf.message.Message):
@@ -840,23 +840,26 @@ class FilterExpression(google.protobuf.message.Message):
         MODIFIED: FilterExpression.DateRangeFilter.DateField.ValueType  # 1
 
         FIELD_FIELD_NUMBER: builtins.int
-        FROM_FIELD_NUMBER: builtins.int
-        TO_FIELD_NUMBER: builtins.int
+        SINCE_FIELD_NUMBER: builtins.int
+        UNTIL_FIELD_NUMBER: builtins.int
         field: global___FilterExpression.DateRangeFilter.DateField.ValueType
         @property
-        def to(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+        def since(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+        @property
+        def until(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
         def __init__(
             self,
             *,
             field: global___FilterExpression.DateRangeFilter.DateField.ValueType = ...,
-            to: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+            since: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+            until: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["_from", b"_from", "_to", b"_to", "from", b"from", "to", b"to"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["_from", b"_from", "_to", b"_to", "field", b"field", "from", b"from", "to", b"to"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["_since", b"_since", "_until", b"_until", "since", b"since", "until", b"until"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_since", b"_since", "_until", b"_until", "field", b"field", "since", b"since", "until", b"until"]) -> None: ...
         @typing.overload
-        def WhichOneof(self, oneof_group: typing.Literal["_from", b"_from"]) -> typing.Literal["from"] | None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["_since", b"_since"]) -> typing.Literal["since"] | None: ...
         @typing.overload
-        def WhichOneof(self, oneof_group: typing.Literal["_to", b"_to"]) -> typing.Literal["to"] | None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["_until", b"_until"]) -> typing.Literal["until"] | None: ...
 
     @typing.final
     class KeywordFilter(google.protobuf.message.Message):
@@ -884,14 +887,20 @@ class FilterExpression(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing.Literal["facet", b"facet"]) -> None: ...
 
-    AND_FIELD_NUMBER: builtins.int
-    OR_FIELD_NUMBER: builtins.int
-    NOT_FIELD_NUMBER: builtins.int
+    BOOL_AND_FIELD_NUMBER: builtins.int
+    BOOL_OR_FIELD_NUMBER: builtins.int
+    BOOL_NOT_FIELD_NUMBER: builtins.int
     RESOURCE_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
     KEYWORD_FIELD_NUMBER: builtins.int
     DATE_FIELD_NUMBER: builtins.int
     FACET_FIELD_NUMBER: builtins.int
+    @property
+    def bool_and(self) -> global___FilterExpression.FilterExpressionList: ...
+    @property
+    def bool_or(self) -> global___FilterExpression.FilterExpressionList: ...
+    @property
+    def bool_not(self) -> global___FilterExpression: ...
     @property
     def resource(self) -> global___FilterExpression.ResourceFilter: ...
     @property
@@ -905,15 +914,18 @@ class FilterExpression(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        bool_and: global___FilterExpression.FilterExpressionList | None = ...,
+        bool_or: global___FilterExpression.FilterExpressionList | None = ...,
+        bool_not: global___FilterExpression | None = ...,
         resource: global___FilterExpression.ResourceFilter | None = ...,
         field: global___FilterExpression.FieldFilter | None = ...,
         keyword: global___FilterExpression.KeywordFilter | None = ...,
         date: global___FilterExpression.DateRangeFilter | None = ...,
         facet: global___FilterExpression.FacetFilter | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["and", b"and", "date", b"date", "expr", b"expr", "facet", b"facet", "field", b"field", "keyword", b"keyword", "not", b"not", "or", b"or", "resource", b"resource"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["and", b"and", "date", b"date", "expr", b"expr", "facet", b"facet", "field", b"field", "keyword", b"keyword", "not", b"not", "or", b"or", "resource", b"resource"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["expr", b"expr"]) -> typing.Literal["and", "or", "not", "resource", "field", "keyword", "date", "facet"] | None: ...
+    def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "date", b"date", "expr", b"expr", "facet", b"facet", "field", b"field", "keyword", b"keyword", "resource", b"resource"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "date", b"date", "expr", b"expr", "facet", b"facet", "field", b"field", "keyword", b"keyword", "resource", b"resource"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["expr", b"expr"]) -> typing.Literal["bool_and", "bool_or", "bool_not", "resource", "field", "keyword", "date", "facet"] | None: ...
 
 global___FilterExpression = FilterExpression
 

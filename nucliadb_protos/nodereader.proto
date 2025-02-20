@@ -227,7 +227,7 @@ message RelationSearchResponse {
 
 message FilterExpression {
     message FilterExpressionList {
-        repeated FilterExpression expr = 1;
+        repeated FilterExpression operands = 1;
     }
     message ResourceFilter {
         string resource_id = 1;
@@ -242,8 +242,8 @@ message FilterExpression {
             MODIFIED = 1;
         }
         DateField field = 1;
-        optional google.protobuf.Timestamp from = 2;
-        optional google.protobuf.Timestamp to = 3;
+        optional google.protobuf.Timestamp since = 2;
+        optional google.protobuf.Timestamp until = 3;
     }
     message KeywordFilter {
         string keyword = 1;
@@ -253,9 +253,9 @@ message FilterExpression {
     }
 
     oneof expr {
-        FilterExpressionList and = 1;
-        FilterExpressionList or = 2;
-        FilterExpression not = 3;
+        FilterExpressionList bool_and = 1;
+        FilterExpressionList bool_or = 2;
+        FilterExpression bool_not = 3;
 
         ResourceFilter resource = 4;
         FieldFilter field = 5;

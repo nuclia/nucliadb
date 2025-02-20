@@ -116,13 +116,13 @@ fn field_key(field: &FieldFilter) -> String {
 pub fn filter_to_query(schema: &TextSchema, expr: &FilterExpression) -> Box<dyn Query> {
     let filter_to_query = |expr| filter_to_query(schema, expr);
     match expr.expr.as_ref().unwrap() {
-        nidx_protos::filter_expression::Expr::And(e) => {
-            Box::new(BooleanQuery::intersection(e.expr.iter().map(filter_to_query).collect()))
+        nidx_protos::filter_expression::Expr::BoolAnd(e) => {
+            Box::new(BooleanQuery::intersection(e.operands.iter().map(filter_to_query).collect()))
         }
-        nidx_protos::filter_expression::Expr::Or(e) => {
-            Box::new(BooleanQuery::union(e.expr.iter().map(filter_to_query).collect()))
+        nidx_protos::filter_expression::Expr::BoolOr(e) => {
+            Box::new(BooleanQuery::union(e.operands.iter().map(filter_to_query).collect()))
         }
-        nidx_protos::filter_expression::Expr::Not(e) => {
+        nidx_protos::filter_expression::Expr::BoolNot(e) => {
             Box::new(BooleanQuery::new(vec![(Occur::Must, Box::new(AllQuery)), (Occur::MustNot, filter_to_query(e))]))
         }
         nidx_protos::filter_expression::Expr::Resource(resource_filter) => {
@@ -141,7 +141,7 @@ pub fn filter_to_query(schema: &TextSchema, expr: &FilterExpression) -> Box<dyn 
                 DateField::Created => "created",
                 DateField::Modified => "modified",
             };
-            let maybe_query = produce_date_range_query(field, range.from.as_ref(), range.to.as_ref());
+            let maybe_query = produce_date_range_query(field, range.since.as_ref(), range.until.as_ref());
             if let Some(query) = maybe_query {
                 Box::new(query)
             } else {

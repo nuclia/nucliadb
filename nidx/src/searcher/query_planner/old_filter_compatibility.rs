@@ -65,8 +65,8 @@ pub fn filter_from_request(
             })
             .collect();
         field_filters.push(FilterExpression {
-            expr: Some(Expr::Or(FilterExpressionList {
-                expr: fields,
+            expr: Some(Expr::BoolOr(FilterExpressionList {
+                operands: fields,
             })),
         });
     }
@@ -82,8 +82,8 @@ pub fn filter_from_request(
             });
             if let Some(field) = field {
                 FilterExpression {
-                    expr: Some(Expr::And(FilterExpressionList {
-                        expr: vec![
+                    expr: Some(Expr::BoolAnd(FilterExpressionList {
+                        operands: vec![
                             FilterExpression {
                                 expr: Some(Expr::Resource(ResourceFilter {
                                     resource_id,
@@ -105,8 +105,8 @@ pub fn filter_from_request(
         };
         let resources = request.key_filters.iter().map(filter_from_string).collect();
         field_filters.push(FilterExpression {
-            expr: Some(Expr::Or(FilterExpressionList {
-                expr: resources,
+            expr: Some(Expr::BoolOr(FilterExpressionList {
+                operands: resources,
             })),
         });
     }
@@ -117,8 +117,8 @@ pub fn filter_from_request(
             field_filters.push(FilterExpression {
                 expr: Some(Expr::Date(DateRangeFilter {
                     field: DateField::Created.into(),
-                    from: ts.from_created,
-                    to: ts.to_created,
+                    since: ts.from_created,
+                    until: ts.to_created,
                 })),
             });
         }
@@ -126,8 +126,8 @@ pub fn filter_from_request(
             field_filters.push(FilterExpression {
                 expr: Some(Expr::Date(DateRangeFilter {
                     field: DateField::Modified.into(),
-                    from: ts.from_modified,
-                    to: ts.to_modified,
+                    since: ts.from_modified,
+                    until: ts.to_modified,
                 })),
             });
         }
@@ -163,8 +163,8 @@ pub fn filter_from_request(
         Some(field_filters.pop().unwrap())
     } else {
         Some(FilterExpression {
-            expr: Some(Expr::And(FilterExpressionList {
-                expr: field_filters,
+            expr: Some(Expr::BoolAnd(FilterExpressionList {
+                operands: field_filters,
             })),
         })
     };
@@ -176,22 +176,22 @@ pub fn bool_to_filter(bool: BooleanExpression, map_literal: fn(String) -> Filter
     match bool {
         BooleanExpression::Literal(l) => map_literal(l),
         BooleanExpression::Not(not) => FilterExpression {
-            expr: Some(Expr::Not(Box::new(bool_to_filter(*not, map_literal)))),
+            expr: Some(Expr::BoolNot(Box::new(bool_to_filter(*not, map_literal)))),
         },
         BooleanExpression::Operation(BooleanOperation {
             operator: Operator::And,
             operands,
         }) => FilterExpression {
-            expr: Some(Expr::And(FilterExpressionList {
-                expr: operands.into_iter().map(|a| bool_to_filter(a, map_literal)).collect(),
+            expr: Some(Expr::BoolAnd(FilterExpressionList {
+                operands: operands.into_iter().map(|a| bool_to_filter(a, map_literal)).collect(),
             })),
         },
         BooleanExpression::Operation(BooleanOperation {
             operator: Operator::Or,
             operands,
         }) => FilterExpression {
-            expr: Some(Expr::Or(FilterExpressionList {
-                expr: operands.into_iter().map(|a| bool_to_filter(a, map_literal)).collect(),
+            expr: Some(Expr::BoolOr(FilterExpressionList {
+                operands: operands.into_iter().map(|a| bool_to_filter(a, map_literal)).collect(),
             })),
         },
     }
