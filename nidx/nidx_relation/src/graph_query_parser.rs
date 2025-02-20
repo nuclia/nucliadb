@@ -140,7 +140,6 @@ impl GraphSearcher {
 
     pub fn search(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
         let index_query: Box<dyn Query> = self.parser.parse_graph_query(query);
-        // println!("Index query: {index_query:#?}");
 
         let collector = TopDocs::with_limit(1000);
 
@@ -211,9 +210,8 @@ impl GraphQueryParser {
                 subqueries.extend(self.has_relation(relation_expression).into_iter());
                 subqueries.extend(self.has_node_expression_as_destination(&destination_expression));
 
-                // Due to implementation details on tantivy, a query containing
-                // only MustNot won't match anything. In this case, we need to
-                // add an AllQuery to get results
+                // Due to implementation details on tantivy, a query containing only MustNot won't
+                // match anything. In this case, we need to add an AllQuery to get results
                 if subqueries.iter().all(|(occur, _)| *occur == Occur::MustNot) {
                     subqueries.push((Occur::Must, Box::new(AllQuery)));
                 }
@@ -242,6 +240,13 @@ impl GraphQueryParser {
             };
             subqueries.push(subquery);
         }
+
+        // Due to implementation details on tantivy, a query containing only MustNot won't match
+        // anything. In this case, we need to add an AllQuery to get results
+        if subqueries.iter().all(|(occur, _)| *occur == Occur::MustNot) {
+            subqueries.push((Occur::Must, Box::new(AllQuery)));
+        }
+
         Box::new(BooleanQuery::new(subqueries))
     }
 
