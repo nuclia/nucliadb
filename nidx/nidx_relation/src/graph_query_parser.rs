@@ -118,6 +118,13 @@ pub enum GraphQuery {
     MultiStatement(Vec<Expression<PathQuery>>),
 }
 
+#[derive(Clone, Copy)]
+struct NodeSchemaFields {
+    normalized_value: Field,
+    node_type: Field,
+    node_subtype: Field,
+}
+
 pub struct GraphQueryParser {
     schema: Schema,
 }
@@ -198,24 +205,16 @@ impl GraphQueryParser {
     fn parse_path_query(&self, query: PathQuery) -> Box<dyn Query> {
         match query {
             PathQuery::DirectedPath((source_expression, relation_expression, destination_expression)) => {
-                // NOT needs special attention to flip the Occur type, as a Must { MustNot { X } }
-                // doesn't work as a Not inside the expression we mount
                 let mut subqueries = vec![];
 
-                subqueries.extend(self.has_node_as_source(&source_expression));
+                subqueries.extend(self.has_node_expression_as_source(&source_expression));
                 subqueries.extend(self.has_relation(relation_expression).into_iter());
+                subqueries.extend(self.has_node_expression_as_destination(&destination_expression));
 
-                let destination_query = match destination_expression {
-                    Expression::Value(query) => (Occur::Must, self.has_node_as_destination(&query)),
-                    Expression::Not(query) => (Occur::MustNot, self.has_node_as_destination(&query)),
-                    Expression::Or(nodes) => {
-                        let subquery: Box<dyn Query> = Box::new(BooleanQuery::union(
-                            nodes.into_iter().map(|node| self.has_node_as_destination(&node)).collect(),
-                        ));
-                        (Occur::Must, subquery)
-                    }
-                };
-                subqueries.push(destination_query);
+                // TODO: This is only necessary if everything is MustNot
+                // NOT needs special attention to flip the Occur type, as a Must { MustNot { X } }
+                // doesn't work as a Not inside the expression we mount
+                subqueries.push((Occur::Must, Box::new(AllQuery)));
 
                 Box::new(BooleanQuery::new(subqueries))
             }
@@ -244,46 +243,50 @@ impl GraphQueryParser {
         Box::new(BooleanQuery::new(subqueries))
     }
 
-    fn has_node_as_source(&self, expression: &Expression<Node>) -> Vec<(Occur, Box<dyn Query>)> {
+    #[inline]
+    fn has_node_expression_as_source(&self, expression: &Expression<Node>) -> Vec<(Occur, Box<dyn Query>)> {
+        self.has_node_expression(
+            expression,
+            NodeSchemaFields {
+                normalized_value: self.schema.normalized_source_value,
+                node_type: self.schema.source_type,
+                node_subtype: self.schema.source_subtype,
+            },
+        )
+    }
+
+    #[inline]
+    fn has_node_expression_as_destination(&self, expression: &Expression<Node>) -> Vec<(Occur, Box<dyn Query>)> {
+        self.has_node_expression(
+            expression,
+            NodeSchemaFields {
+                normalized_value: self.schema.normalized_target_value,
+                node_type: self.schema.target_type,
+                node_subtype: self.schema.target_subtype,
+            },
+        )
+    }
+
+    fn has_node_expression(
+        &self,
+        expression: &Expression<Node>,
+        fields: NodeSchemaFields,
+    ) -> Vec<(Occur, Box<dyn Query>)> {
         let mut subqueries = vec![];
 
         match expression {
             Expression::Value(query) => {
-                subqueries.extend(
-                    self.has_node_as(
-                        &query,
-                        self.schema.normalized_source_value,
-                        self.schema.source_type,
-                        self.schema.source_subtype,
-                    )
-                    .into_iter()
-                    .map(|query| (Occur::Must, query)),
-                );
+                subqueries.extend(self.has_node(query, fields).into_iter().map(|query| (Occur::Must, query)));
             }
             Expression::Not(query) => {
                 // NOT granularity is a node, so we to use a Must { MustNot { X } } instead of
                 // unnest it in multiple MustNot { x }
-                let subquery: Box<dyn Query> = Box::new(BooleanQuery::intersection(self.has_node_as(
-                    &query,
-                    self.schema.normalized_source_value,
-                    self.schema.source_type,
-                    self.schema.source_subtype,
-                )));
+                let subquery: Box<dyn Query> = Box::new(BooleanQuery::intersection(self.has_node(&query, fields)));
                 subqueries.push((Occur::MustNot, subquery));
             }
             Expression::Or(nodes) => {
                 let subquery: Box<dyn Query> = Box::new(BooleanQuery::union(
-                    nodes
-                        .into_iter()
-                        .flat_map(|node| {
-                            self.has_node_as(
-                                &node,
-                                self.schema.normalized_source_value,
-                                self.schema.source_type,
-                                self.schema.source_subtype,
-                            )
-                        })
-                        .collect(),
+                    nodes.into_iter().flat_map(|node| self.has_node(&node, fields)).collect(),
                 ));
                 subqueries.push((Occur::Must, subquery));
             }
@@ -292,56 +295,77 @@ impl GraphQueryParser {
         subqueries
     }
 
-    fn has_node_as_destination(&self, query: &Node) -> Box<dyn Query> {
-        let subqueries = self.has_node_as(
-            query,
-            self.schema.normalized_target_value,
-            self.schema.target_type,
-            self.schema.target_subtype,
-        );
-
-        let query: Box<dyn Query> = if subqueries.len() > 0 {
-            Box::new(BooleanQuery::intersection(subqueries))
-        } else {
-            Box::new(AllQuery)
-        };
-
-        query
-    }
-
-    fn has_node_as(
-        &self,
-        query: &Node,
-        normalized_node_value_field: Field,
-        node_type_field: Field,
-        node_subtype_field: Field,
-    ) -> Vec<Box<dyn Query>> {
+    fn has_node(&self, node: &Node, fields: NodeSchemaFields) -> Vec<Box<dyn Query>> {
         let mut subqueries = vec![];
 
-        if let Some(ref term) = query.value {
-            if let Some(query) = self.has_node_value(term, normalized_node_value_field) {
-                subqueries.push(query);
-            }
+        let value_query = node.value.as_ref().and_then(|value| self.has_node_value(value, fields.normalized_value));
+        if let Some(query) = value_query {
+            subqueries.push(query);
         }
 
-        if let Some(node_type) = query.node_type {
-            let node_type = io_maps::node_type_to_u64(node_type);
-            let node_type_query = Box::new(TermQuery::new(
-                tantivy::Term::from_field_u64(node_type_field, node_type),
-                IndexRecordOption::Basic,
-            ));
-            subqueries.push(node_type_query);
+        if let Some(node_type) = node.node_type {
+            subqueries.push(self.has_node_type(node_type, fields.node_type));
         }
 
-        if let Some(ref node_subtype) = query.node_subtype {
+        if let Some(ref node_subtype) = node.node_subtype {
             if !node_subtype.is_empty() {
-                let node_subtype_query = Box::new(TermQuery::new(
-                    tantivy::Term::from_field_text(node_subtype_field, &node_subtype),
-                    IndexRecordOption::Basic,
-                ));
-                subqueries.push(node_subtype_query);
+                subqueries.push(self.has_node_subtype(node_subtype, fields.node_subtype));
             }
         }
+
+        subqueries
+    }
+
+    fn has_relation(&self, expression: Expression<Relation>) -> Vec<(Occur, Box<dyn Query>)> {
+        let mut subqueries = vec![];
+
+        match expression {
+            Expression::Value(Relation {
+                value: None,
+            }) => {}
+            Expression::Value(Relation {
+                value: Some(value),
+            }) if value.is_empty() => {}
+            Expression::Value(Relation {
+                value: Some(value),
+            }) => {
+                subqueries.push((Occur::Must, self.has_relation_label(&value)));
+            }
+
+            Expression::Not(Relation {
+                value: None,
+            }) => {}
+            Expression::Not(Relation {
+                value: Some(value),
+            }) if value.is_empty() => {}
+            Expression::Not(Relation {
+                value: Some(value),
+            }) => {
+                subqueries.push((Occur::MustNot, self.has_relation_label(&value)));
+            }
+
+            Expression::Or(relations) => {
+                let mut or_subqueries: Vec<_> = relations
+                    .into_iter()
+                    .flat_map(|relation| {
+                        if let Some(value) = relation.value {
+                            if !value.is_empty() {
+                                return Some((Occur::Should, self.has_relation_label(&value)));
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                match or_subqueries.len() {
+                    0 => {}
+                    1 => subqueries.push(or_subqueries.pop().unwrap()),
+                    _n => {
+                        let or_query: Box<dyn Query> = Box::new(BooleanQuery::new(or_subqueries));
+                        subqueries.push((Occur::Must, or_query));
+                    }
+                }
+            }
+        };
 
         subqueries
     }
@@ -415,58 +439,13 @@ impl GraphQueryParser {
         }
     }
 
-    fn has_relation(&self, expression: Expression<Relation>) -> Vec<(Occur, Box<dyn Query>)> {
-        let mut subqueries = vec![];
+    fn has_node_type(&self, node_type: NodeType, field: Field) -> Box<dyn Query> {
+        let node_type = io_maps::node_type_to_u64(node_type);
+        Box::new(TermQuery::new(tantivy::Term::from_field_u64(field, node_type), IndexRecordOption::Basic))
+    }
 
-        match expression {
-            Expression::Value(Relation {
-                value: None,
-            }) => {}
-            Expression::Value(Relation {
-                value: Some(value),
-            }) if value.is_empty() => {}
-            Expression::Value(Relation {
-                value: Some(value),
-            }) => {
-                subqueries.push((Occur::Must, self.has_relation_label(&value)));
-            }
-
-            Expression::Not(Relation {
-                value: None,
-            }) => {}
-            Expression::Not(Relation {
-                value: Some(value),
-            }) if value.is_empty() => {}
-            Expression::Not(Relation {
-                value: Some(value),
-            }) => {
-                subqueries.push((Occur::MustNot, self.has_relation_label(&value)));
-            }
-
-            Expression::Or(relations) => {
-                let mut or_subqueries: Vec<_> = relations
-                    .into_iter()
-                    .flat_map(|relation| {
-                        if let Some(value) = relation.value {
-                            if !value.is_empty() {
-                                return Some((Occur::Should, self.has_relation_label(&value)));
-                            }
-                        }
-                        None
-                    })
-                    .collect();
-                match or_subqueries.len() {
-                    0 => {}
-                    1 => subqueries.push(or_subqueries.pop().unwrap()),
-                    _n => {
-                        let or_query: Box<dyn Query> = Box::new(BooleanQuery::new(or_subqueries));
-                        subqueries.push((Occur::Must, or_query));
-                    }
-                }
-            }
-        };
-
-        subqueries
+    fn has_node_subtype(&self, node_subtype: &str, field: Field) -> Box<dyn Query> {
+        Box::new(TermQuery::new(tantivy::Term::from_field_text(field, node_subtype), IndexRecordOption::Basic))
     }
 
     fn has_relation_label(&self, label: &str) -> Box<dyn Query> {
