@@ -384,7 +384,6 @@ class AskResult:
                 self._relations = await get_relations_results(
                     kbid=self.kbid,
                     text_answer=self._answer_text,
-                    target_shard_replicas=self.ask_request.shards,
                     timeout=5.0,
                 )
         return self._relations
@@ -742,7 +741,6 @@ async def retrieval_in_kb(
                 origin=origin,
                 graph_strategy=graph_strategy,
                 metrics=metrics,
-                shards=ask_request.shards,
             )
 
             if prequeries_results is None:

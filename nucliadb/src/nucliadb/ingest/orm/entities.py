@@ -65,12 +65,10 @@ class EntitiesManager:
         self,
         knowledgebox: KnowledgeBox,
         txn: Transaction,
-        use_read_replica_nodes: bool = False,
     ):
         self.kb = knowledgebox
         self.txn = txn
         self.kbid = self.kb.kbid
-        self.use_read_replica_nodes = use_read_replica_nodes
 
     async def create_entities_group(self, group: str, entities: EntitiesGroup):
         if await self.entities_group_exists(group):
@@ -222,7 +220,6 @@ class EntitiesManager:
             self.kbid,
             do_entities_search,
             settings.relation_search_timeout,
-            use_read_replica_nodes=self.use_read_replica_nodes,
         )
 
         entities = {}
@@ -318,10 +315,7 @@ class EntitiesManager:
                 return {facet.tag.split("/")[-1] for facet in facetresults}
 
         results = await shard_manager.apply_for_all_shards(
-            self.kbid,
-            query_indexed_entities_group_names,
-            settings.relation_types_timeout,
-            use_read_replica_nodes=self.use_read_replica_nodes,
+            self.kbid, query_indexed_entities_group_names, settings.relation_types_timeout
         )
 
         if not results:

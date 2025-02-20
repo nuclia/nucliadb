@@ -67,24 +67,6 @@ async def test_wait_for_commited(txn: TransactionUtility, pubsub):
     await (await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)).wait()
 
 
-async def test_wait_for_indexed(txn: TransactionUtility, pubsub):
-    waiting_for = WaitFor(uuid="foo")
-    request_id = "request1"
-    kbid = "kbid"
-    notification = Notification()
-    notification.uuid = waiting_for.uuid
-    notification.action = Notification.Action.INDEXED
-
-    async def _subscribe(handler, key, subscription_id):
-        # call it immediately
-        handler(mock.Mock(data=notification.SerializeToString()))
-
-    pubsub.subscribe.side_effect = _subscribe
-
-    with mock.patch("nucliadb_utils.transaction.has_feature", return_value=True):
-        await (await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)).wait()
-
-
 async def test_wait_for_commit_stop_waiting(txn: TransactionUtility, pubsub):
     pubsub.unsubscribe.side_effect = [
         "sub_id",
