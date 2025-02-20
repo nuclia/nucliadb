@@ -18,21 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
 use nidx_text::{prefilter::PreFilterRequest, TextSearcher};
-use nidx_types::{
-    prefilter::PrefilterResult,
-    query_language::{BooleanExpression, BooleanOperation, Operator, QueryContext},
-};
+use nidx_types::prefilter::PrefilterResult;
 use tracing::{instrument, Span};
 
 use crate::errors::{NidxError, NidxResult};
 
-use super::{index_cache::IndexCache, query_language};
+use super::{index_cache::IndexCache, query_planner::old_filter_compatibility::filter_from_suggest_request};
 
 /// Max number of words accepted as a suggest query. This is useful for
 /// compounds with semantic meaning (like a name and a surname) but can add
@@ -85,7 +82,7 @@ pub async fn suggest(index_cache: Arc<IndexCache>, request: SuggestRequest) -> N
 }
 
 fn blocking_suggest(
-    mut request: SuggestRequest,
+    request: SuggestRequest,
     text_searcher: &TextSearcher,
     paragraph_searcher: &ParagraphSearcher,
     relation_searcher: &RelationSearcher,
@@ -97,42 +94,25 @@ fn blocking_suggest(
 
     let mut prefiltered = PrefilterResult::All;
 
-    if let Some(filter) = &mut request.filter {
-        if !filter.field_labels.is_empty() && suggest_paragraphs {
-            let labels_formula = if filter.labels_expression.is_empty() {
-                // Backwards compatibility, take all labels to be AND'ed together
-                let labels = std::mem::take(&mut filter.field_labels);
-                let operands = labels.into_iter().map(BooleanExpression::Literal).collect();
-                let op = BooleanOperation {
-                    operator: Operator::And,
-                    operands,
-                };
-
-                Some(BooleanExpression::Operation(op))
-            } else {
-                // Parse the formula for labels, suggest only supports resource labels
-                let context = QueryContext {
-                    field_labels: filter.field_labels.iter().cloned().collect(),
-                    paragraph_labels: HashSet::new(),
-                };
-                let analysis = query_language::translate(Some(&filter.labels_expression), None, &context)?;
-                analysis.labels_prefilter_query
-            };
-
+    if suggest_paragraphs {
+        let filter_expression = filter_from_suggest_request(&request)?;
+        if let Some(expr) = filter_expression {
+            if request.field_filter.is_some() {
+                return Err(anyhow::anyhow!("Cannot specify old and new filters in the same request"));
+            }
             let prefilter = PreFilterRequest {
-                timestamp_filters: vec![],
                 security: None,
-                labels_formula,
-                keywords_formula: None,
-                key_filter: vec![],
-                field_filter: vec![],
+                filter_expression: Some(expr),
             };
 
             prefiltered = text_searcher.prefilter(&prefilter)?;
+        } else if let Some(expr) = &request.field_filter {
+            let prefilter = PreFilterRequest {
+                security: None,
+                filter_expression: Some(expr.clone()),
+            };
 
-            // Apply prefilter to paragraphs query and clear filters
-            filter.labels_expression.clear();
-            filter.field_labels.clear();
+            prefiltered = text_searcher.prefilter(&prefilter)?;
         }
     }
 

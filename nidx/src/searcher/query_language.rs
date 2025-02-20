@@ -18,6 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use anyhow::anyhow;
+use nidx_protos::{
+    filter_expression::{Expr, FacetFilter, FilterExpressionList},
+    FilterExpression,
+};
 use nidx_types::query_language::*;
 use serde_json::Value as Json;
 
@@ -237,14 +241,15 @@ pub fn translate(
 }
 
 /// Extract an expression only involving some labels if it's an AND subset of the total expression
-pub fn extract_label_filters(expression: &BooleanExpression, labels: &[&str]) -> Option<BooleanExpression> {
-    match expression {
-        BooleanExpression::Literal(label) if labels.contains(&label.as_str()) => Some(expression.clone()),
-        BooleanExpression::Not(not_expression) => {
-            extract_label_filters(not_expression, labels).map(|e| BooleanExpression::Not(Box::new(e)))
+pub fn extract_label_filters(expression: &FilterExpression, labels: &[&str]) -> Option<BooleanExpression> {
+    match expression.expr.as_ref().unwrap() {
+        Expr::Facet(FacetFilter {
+            facet,
+        }) if labels.contains(&facet.as_str()) => Some(BooleanExpression::Literal(facet.clone())),
+        Expr::BoolNot(not_expr) => {
+            extract_label_filters(not_expr.as_ref(), labels).map(|e| BooleanExpression::Not(Box::new(e)))
         }
-        BooleanExpression::Operation(BooleanOperation {
-            operator: Operator::And,
+        Expr::BoolAnd(FilterExpressionList {
             operands,
         }) => {
             let relevant: Vec<_> = operands.iter().filter_map(|e| extract_label_filters(e, labels)).collect();
@@ -513,44 +518,67 @@ mod tests {
     fn test_extract_label_filters() {
         const LABELS: &[&str] = &["/v", "/w"];
 
-        let a: BooleanExpression = BooleanExpression::Literal("/a".to_string());
-        let v: BooleanExpression = BooleanExpression::Literal("/v".to_string());
-        let w: BooleanExpression = BooleanExpression::Literal("/w".to_string());
+        let a = FilterExpression {
+            expr: Some(Expr::Facet(FacetFilter {
+                facet: "/a".into(),
+            })),
+        };
+        let v = FilterExpression {
+            expr: Some(Expr::Facet(FacetFilter {
+                facet: "/v".into(),
+            })),
+        };
+        let w = FilterExpression {
+            expr: Some(Expr::Facet(FacetFilter {
+                facet: "/w".into(),
+            })),
+        };
+
+        let not = |e| FilterExpression {
+            expr: Some(Expr::BoolNot(Box::new(e))),
+        };
 
         // Literal
         assert_eq!(extract_label_filters(&a, LABELS), None);
-        assert_eq!(extract_label_filters(&v, LABELS), Some(v.clone()));
+        assert_eq!(extract_label_filters(&v, LABELS), Some(BooleanExpression::Literal("/v".into())));
 
         // Not literal
-        let expr = BooleanExpression::Not(Box::new(a.clone()));
-        assert_eq!(extract_label_filters(&expr, LABELS), None);
+        assert_eq!(extract_label_filters(&not(a.clone()), LABELS), None);
 
-        let expr = BooleanExpression::Not(Box::new(v.clone()));
-        assert_eq!(extract_label_filters(&expr, LABELS), Some(expr));
+        assert_eq!(
+            extract_label_filters(&not(v.clone()), LABELS),
+            Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/v".into()))))
+        );
 
         // Or (not supported)
-        let or_expr = BooleanExpression::Operation(BooleanOperation {
-            operator: Operator::Or,
-            operands: vec![a.clone(), v.clone(), BooleanExpression::Not(Box::new(w.clone()))],
-        });
+        let or_expr = FilterExpression {
+            expr: Some(Expr::BoolOr(FilterExpressionList {
+                operands: vec![a.clone(), v.clone(), not(w.clone())],
+            })),
+        };
         assert_eq!(extract_label_filters(&or_expr, LABELS), None);
 
         // And
-        let expr = BooleanExpression::Operation(BooleanOperation {
-            operator: Operator::And,
-            operands: vec![a.clone(), v.clone(), BooleanExpression::Not(Box::new(w.clone()))],
-        });
+        let expr = FilterExpression {
+            expr: Some(Expr::BoolAnd(FilterExpressionList {
+                operands: vec![a.clone(), v.clone(), not(w.clone())],
+            })),
+        };
         let expected = BooleanExpression::Operation(BooleanOperation {
             operator: Operator::And,
-            operands: vec![v.clone(), BooleanExpression::Not(Box::new(w.clone()))],
+            operands: vec![
+                BooleanExpression::Literal("/v".into()),
+                BooleanExpression::Not(Box::new(BooleanExpression::Literal("/w".into()))),
+            ],
         });
         assert_eq!(extract_label_filters(&expr, LABELS), Some(expected));
 
         // Nested
-        let expr = BooleanExpression::Operation(BooleanOperation {
-            operator: Operator::And,
-            operands: vec![a.clone(), v.clone(), or_expr],
-        });
-        assert_eq!(extract_label_filters(&expr, LABELS), Some(v));
+        let expr = FilterExpression {
+            expr: Some(Expr::BoolAnd(FilterExpressionList {
+                operands: vec![a, v, or_expr],
+            })),
+        };
+        assert_eq!(extract_label_filters(&expr, LABELS), Some(BooleanExpression::Literal("/v".into())));
     }
 }

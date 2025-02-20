@@ -774,6 +774,162 @@ class RelationSearchResponse(google.protobuf.message.Message):
 global___RelationSearchResponse = RelationSearchResponse
 
 @typing.final
+class FilterExpression(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class FilterExpressionList(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        OPERANDS_FIELD_NUMBER: builtins.int
+        @property
+        def operands(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FilterExpression]: ...
+        def __init__(
+            self,
+            *,
+            operands: collections.abc.Iterable[global___FilterExpression] | None = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["operands", b"operands"]) -> None: ...
+
+    @typing.final
+    class ResourceFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        RESOURCE_ID_FIELD_NUMBER: builtins.int
+        resource_id: builtins.str
+        def __init__(
+            self,
+            *,
+            resource_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["resource_id", b"resource_id"]) -> None: ...
+
+    @typing.final
+    class FieldFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        FIELD_TYPE_FIELD_NUMBER: builtins.int
+        FIELD_ID_FIELD_NUMBER: builtins.int
+        field_type: builtins.str
+        field_id: builtins.str
+        def __init__(
+            self,
+            *,
+            field_type: builtins.str = ...,
+            field_id: builtins.str | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["_field_id", b"_field_id", "field_id", b"field_id"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_field_id", b"_field_id", "field_id", b"field_id", "field_type", b"field_type"]) -> None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["_field_id", b"_field_id"]) -> typing.Literal["field_id"] | None: ...
+
+    @typing.final
+    class DateRangeFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class _DateField:
+            ValueType = typing.NewType("ValueType", builtins.int)
+            V: typing_extensions.TypeAlias = ValueType
+
+        class _DateFieldEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FilterExpression.DateRangeFilter._DateField.ValueType], builtins.type):
+            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+            CREATED: FilterExpression.DateRangeFilter._DateField.ValueType  # 0
+            MODIFIED: FilterExpression.DateRangeFilter._DateField.ValueType  # 1
+
+        class DateField(_DateField, metaclass=_DateFieldEnumTypeWrapper): ...
+        CREATED: FilterExpression.DateRangeFilter.DateField.ValueType  # 0
+        MODIFIED: FilterExpression.DateRangeFilter.DateField.ValueType  # 1
+
+        FIELD_FIELD_NUMBER: builtins.int
+        SINCE_FIELD_NUMBER: builtins.int
+        UNTIL_FIELD_NUMBER: builtins.int
+        field: global___FilterExpression.DateRangeFilter.DateField.ValueType
+        @property
+        def since(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+        @property
+        def until(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+        def __init__(
+            self,
+            *,
+            field: global___FilterExpression.DateRangeFilter.DateField.ValueType = ...,
+            since: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+            until: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["_since", b"_since", "_until", b"_until", "since", b"since", "until", b"until"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["_since", b"_since", "_until", b"_until", "field", b"field", "since", b"since", "until", b"until"]) -> None: ...
+        @typing.overload
+        def WhichOneof(self, oneof_group: typing.Literal["_since", b"_since"]) -> typing.Literal["since"] | None: ...
+        @typing.overload
+        def WhichOneof(self, oneof_group: typing.Literal["_until", b"_until"]) -> typing.Literal["until"] | None: ...
+
+    @typing.final
+    class KeywordFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEYWORD_FIELD_NUMBER: builtins.int
+        keyword: builtins.str
+        def __init__(
+            self,
+            *,
+            keyword: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["keyword", b"keyword"]) -> None: ...
+
+    @typing.final
+    class FacetFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        FACET_FIELD_NUMBER: builtins.int
+        facet: builtins.str
+        def __init__(
+            self,
+            *,
+            facet: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["facet", b"facet"]) -> None: ...
+
+    BOOL_AND_FIELD_NUMBER: builtins.int
+    BOOL_OR_FIELD_NUMBER: builtins.int
+    BOOL_NOT_FIELD_NUMBER: builtins.int
+    RESOURCE_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    KEYWORD_FIELD_NUMBER: builtins.int
+    DATE_FIELD_NUMBER: builtins.int
+    FACET_FIELD_NUMBER: builtins.int
+    @property
+    def bool_and(self) -> global___FilterExpression.FilterExpressionList: ...
+    @property
+    def bool_or(self) -> global___FilterExpression.FilterExpressionList: ...
+    @property
+    def bool_not(self) -> global___FilterExpression: ...
+    @property
+    def resource(self) -> global___FilterExpression.ResourceFilter: ...
+    @property
+    def field(self) -> global___FilterExpression.FieldFilter: ...
+    @property
+    def keyword(self) -> global___FilterExpression.KeywordFilter: ...
+    @property
+    def date(self) -> global___FilterExpression.DateRangeFilter: ...
+    @property
+    def facet(self) -> global___FilterExpression.FacetFilter: ...
+    def __init__(
+        self,
+        *,
+        bool_and: global___FilterExpression.FilterExpressionList | None = ...,
+        bool_or: global___FilterExpression.FilterExpressionList | None = ...,
+        bool_not: global___FilterExpression | None = ...,
+        resource: global___FilterExpression.ResourceFilter | None = ...,
+        field: global___FilterExpression.FieldFilter | None = ...,
+        keyword: global___FilterExpression.KeywordFilter | None = ...,
+        date: global___FilterExpression.DateRangeFilter | None = ...,
+        facet: global___FilterExpression.FacetFilter | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "date", b"date", "expr", b"expr", "facet", b"facet", "field", b"field", "keyword", b"keyword", "resource", b"resource"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["bool_and", b"bool_and", "bool_not", b"bool_not", "bool_or", b"bool_or", "date", b"date", "expr", b"expr", "facet", b"facet", "field", b"field", "keyword", b"keyword", "resource", b"resource"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["expr", b"expr"]) -> typing.Literal["bool_and", "bool_or", "bool_not", "resource", "field", "keyword", "date", "facet"] | None: ...
+
+global___FilterExpression = FilterExpression
+
+@typing.final
 class SearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -801,6 +957,8 @@ class SearchRequest(google.protobuf.message.Message):
     MIN_SCORE_SEMANTIC_FIELD_NUMBER: builtins.int
     MIN_SCORE_BM25_FIELD_NUMBER: builtins.int
     SECURITY_FIELD_NUMBER: builtins.int
+    FIELD_FILTER_FIELD_NUMBER: builtins.int
+    PARAGRAPH_FILTER_FIELD_NUMBER: builtins.int
     shard: builtins.str
     body: builtins.str
     """query this text in all the paragraphs"""
@@ -838,6 +996,10 @@ class SearchRequest(google.protobuf.message.Message):
     def key_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
     def security(self) -> nucliadb_protos.utils_pb2.Security: ...
+    @property
+    def field_filter(self) -> global___FilterExpression: ...
+    @property
+    def paragraph_filter(self) -> global___FilterExpression: ...
     def __init__(
         self,
         *,
@@ -865,11 +1027,17 @@ class SearchRequest(google.protobuf.message.Message):
         min_score_semantic: builtins.float = ...,
         min_score_bm25: builtins.float = ...,
         security: nucliadb_protos.utils_pb2.Security | None = ...,
+        field_filter: global___FilterExpression | None = ...,
+        paragraph_filter: global___FilterExpression | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "security", b"security", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "key_filters", b"key_filters", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "reload", b"reload", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "field_filter", b"field_filter", "filter", b"filter", "order", b"order", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "security", b"security", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "fields", b"fields", "filter", b"filter", "key_filters", b"key_filters", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "reload", b"reload", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_advanced_query", b"_advanced_query"]) -> typing.Literal["advanced_query"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_field_filter", b"_field_filter"]) -> typing.Literal["field_filter"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_paragraph_filter", b"_paragraph_filter"]) -> typing.Literal["paragraph_filter"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_security", b"_security"]) -> typing.Literal["security"] | None: ...
     @typing.overload
@@ -887,6 +1055,7 @@ class SuggestRequest(google.protobuf.message.Message):
     FILTER_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     FIELDS_FIELD_NUMBER: builtins.int
+    FIELD_FILTER_FIELD_NUMBER: builtins.int
     shard: builtins.str
     body: builtins.str
     @property
@@ -897,6 +1066,8 @@ class SuggestRequest(google.protobuf.message.Message):
     def timestamps(self) -> global___Timestamps: ...
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def field_filter(self) -> global___FilterExpression: ...
     def __init__(
         self,
         *,
@@ -906,9 +1077,11 @@ class SuggestRequest(google.protobuf.message.Message):
         filter: global___Filter | None = ...,
         timestamps: global___Timestamps | None = ...,
         fields: collections.abc.Iterable[builtins.str] | None = ...,
+        field_filter: global___FilterExpression | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["filter", b"filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["body", b"body", "features", b"features", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "field_filter", b"field_filter", "filter", b"filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "body", b"body", "features", b"features", "field_filter", b"field_filter", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_field_filter", b"_field_filter"]) -> typing.Literal["field_filter"] | None: ...
 
 global___SuggestRequest = SuggestRequest
 
