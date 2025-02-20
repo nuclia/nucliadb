@@ -95,8 +95,8 @@ pub fn create_resource(shard_id: String) -> Resource {
     };
 
     let mut texts = HashMap::new();
-    texts.insert("title".to_string(), ti_title);
-    texts.insert("body".to_string(), ti_body);
+    texts.insert("a/title".to_string(), ti_title);
+    texts.insert("a/body".to_string(), ti_body);
 
     Resource {
         resource: Some(resource_id),

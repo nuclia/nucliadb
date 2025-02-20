@@ -20,12 +20,18 @@
 
 mod common;
 
-use nidx_protos::Faceted;
+use std::time::SystemTime;
+
+use nidx_protos::filter_expression::date_range_filter::DateField;
+use nidx_protos::filter_expression::{
+    DateRangeFilter, Expr, FacetFilter, FieldFilter, FilterExpressionList, KeywordFilter, ResourceFilter,
+};
+use nidx_protos::prost_types::Timestamp;
 use nidx_protos::{order_by::OrderField, order_by::OrderType, OrderBy};
+use nidx_protos::{Faceted, FilterExpression};
 use nidx_text::TextSearcher;
 use nidx_text::{prefilter::*, DocumentSearchRequest};
 use nidx_types::prefilter::PrefilterResult;
-use nidx_types::query_language::BooleanExpression;
 
 #[test]
 fn test_search_queries() {
@@ -78,11 +84,7 @@ fn test_prefilter_all_search() {
     let reader = common::test_reader();
     let request = PreFilterRequest {
         security: None,
-        labels_formula: None,
-        timestamp_filters: vec![],
-        keywords_formula: None,
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: None,
     };
     let response = reader.prefilter(&request).unwrap();
     assert!(matches!(response, PrefilterResult::All));
@@ -94,13 +96,14 @@ fn test_prefilter_not_search() {
 
     let request = PreFilterRequest {
         security: None,
-        timestamp_filters: vec![],
-        labels_formula: Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal("/l/mylabel".to_string())))),
-        keywords_formula: None,
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::BoolNot(Box::new(FilterExpression {
+                expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                    facet: "/l/mylabel".into(),
+                })),
+            }))),
+        }),
     };
-    println!("expression: {:?}", request.labels_formula);
     let response = reader.prefilter(&request).unwrap();
     let valid_fields = &response;
     let PrefilterResult::Some(fields) = valid_fields else {
@@ -115,11 +118,11 @@ fn test_labels_prefilter_search() {
 
     let request = PreFilterRequest {
         security: None,
-        timestamp_filters: vec![],
-        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
-        keywords_formula: None,
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/mylabel".into(),
+            })),
+        }),
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::Some(fields) = response else {
@@ -133,11 +136,22 @@ fn test_keywords_prefilter_search() {
     let reader = common::test_reader();
     let request = PreFilterRequest {
         security: None,
-        timestamp_filters: vec![],
-        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
-        keywords_formula: Some(BooleanExpression::Literal("foobar".to_string())),
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::BoolAnd(FilterExpressionList {
+                operands: vec![
+                    FilterExpression {
+                        expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                            facet: "/l/mylabel".into(),
+                        })),
+                    },
+                    FilterExpression {
+                        expr: Some(nidx_protos::filter_expression::Expr::Keyword(KeywordFilter {
+                            keyword: "foobar".into(),
+                        })),
+                    },
+                ],
+            })),
+        }),
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::None = response else {
@@ -146,11 +160,11 @@ fn test_keywords_prefilter_search() {
 
     let request = PreFilterRequest {
         security: None,
-        timestamp_filters: vec![],
-        labels_formula: Some(BooleanExpression::Literal("/l/mylabel".to_string())),
-        keywords_formula: None,
-        key_filter: vec![],
-        field_filter: vec![],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/mylabel".into(),
+            })),
+        }),
     };
     let response = reader.prefilter(&request).unwrap();
     let PrefilterResult::Some(fields) = response else {
@@ -161,14 +175,14 @@ fn test_keywords_prefilter_search() {
 
 #[test]
 fn test_filtered_search() {
-    fn query(reader: &TextSearcher, query: impl Into<String>, label_filter: Option<BooleanExpression>, expected: i32) {
+    fn query(reader: &TextSearcher, query: impl Into<String>, expression: FilterExpression, expected: i32) {
         let query = query.into();
         let request = DocumentSearchRequest {
             id: "shard".to_string(),
             body: query.clone(),
             page_number: 0,
             result_per_page: 20,
-            label_filtering_formula: label_filter,
+            filter_expression: Some(expression),
             ..Default::default()
         };
 
@@ -181,9 +195,36 @@ fn test_filtered_search() {
 
     let reader = common::test_reader();
 
-    query(&reader, "", Some(BooleanExpression::Literal("/l/mylabel".to_string())), 1);
-    query(&reader, "", Some(BooleanExpression::Literal("/e/myentity".to_string())), 1);
-    query(&reader, "", Some(BooleanExpression::Literal("/l/fakelabel".to_string())), 0);
+    query(
+        &reader,
+        "",
+        FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/mylabel".to_string(),
+            })),
+        },
+        1,
+    );
+    query(
+        &reader,
+        "",
+        FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/e/myentity".to_string(),
+            })),
+        },
+        1,
+    );
+    query(
+        &reader,
+        "",
+        FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Facet(FacetFilter {
+                facet: "/l/fakelabel".to_string(),
+            })),
+        },
+        0,
+    );
 }
 
 #[test]
@@ -195,7 +236,12 @@ fn test_search_by_field() {
         body: "".to_string(),
         page_number: 0,
         result_per_page: 20,
-        fields: vec!["title".to_string()],
+        filter_expression: Some(FilterExpression {
+            expr: Some(nidx_protos::filter_expression::Expr::Field(FieldFilter {
+                field_type: "a".into(),
+                field_id: Some("title".into()),
+            })),
+        }),
         ..Default::default()
     };
 
@@ -307,4 +353,101 @@ fn test_int_order_pagination() {
     assert!(response.next_page);
 }
 
-// TODO: order, timestamp filter, only_faceted, with_status
+#[test]
+fn test_timestamp_filtering() {
+    let reader = common::test_reader();
+
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+    let before = Timestamp {
+        seconds: now.as_secs() as i64 - 100,
+        nanos: 0,
+    };
+    let after = Timestamp {
+        seconds: now.as_secs() as i64 + 100,
+        nanos: 0,
+    };
+
+    let search = |date_range| {
+        let request = DocumentSearchRequest {
+            id: "shard".to_string(),
+            body: "".to_string(),
+            page_number: 0,
+            result_per_page: 10,
+            min_score: f32::MIN,
+            filter_expression: Some(FilterExpression {
+                expr: Some(Expr::Date(date_range)),
+            }),
+            ..Default::default()
+        };
+        let response = reader.search(&request).unwrap();
+        response.results.len()
+    };
+
+    for field in &[DateField::Created.into(), DateField::Modified.into()] {
+        assert_eq!(
+            search(DateRangeFilter {
+                field: *field,
+                since: Some(before),
+                until: Some(after)
+            }),
+            2
+        );
+
+        assert_eq!(
+            search(DateRangeFilter {
+                field: *field,
+                since: Some(after),
+                until: None
+            }),
+            0
+        );
+    }
+}
+
+#[test]
+fn test_key_filtering() {
+    let reader = common::test_reader();
+
+    let request = DocumentSearchRequest {
+        id: "shard".to_string(),
+        body: "".to_string(),
+        page_number: 0,
+        result_per_page: 1,
+        min_score: f32::MIN,
+        ..Default::default()
+    };
+    let response = reader.search(&request).unwrap();
+    let resource_id = &response.results[0].uuid;
+
+    let search = |resource| {
+        let request = DocumentSearchRequest {
+            id: "shard".to_string(),
+            body: "".to_string(),
+            page_number: 0,
+            result_per_page: 10,
+            min_score: f32::MIN,
+            filter_expression: Some(FilterExpression {
+                expr: Some(Expr::Resource(resource)),
+            }),
+            ..Default::default()
+        };
+        let response = reader.search(&request).unwrap();
+        response.results.len()
+    };
+
+    // By resource
+    assert_eq!(
+        search(ResourceFilter {
+            resource_id: resource_id.clone(),
+        }),
+        2
+    );
+    assert_eq!(
+        search(ResourceFilter {
+            resource_id: "fake".into(),
+        }),
+        0
+    );
+}
+
+// TODO: order, only_faceted, with_status

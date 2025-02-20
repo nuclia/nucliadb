@@ -225,15 +225,54 @@ message RelationSearchResponse {
     EntitiesSubgraphResponse subgraph = 12;
 }
 
+message FilterExpression {
+    message FilterExpressionList {
+        repeated FilterExpression operands = 1;
+    }
+    message ResourceFilter {
+        string resource_id = 1;
+    }
+    message FieldFilter {
+        string field_type = 1;
+        optional string field_id = 2;
+    }
+    message DateRangeFilter {
+        enum DateField {
+            CREATED = 0;
+            MODIFIED = 1;
+        }
+        DateField field = 1;
+        optional google.protobuf.Timestamp since = 2;
+        optional google.protobuf.Timestamp until = 3;
+    }
+    message KeywordFilter {
+        string keyword = 1;
+    }
+    message FacetFilter {
+        string facet = 1;
+    }
+
+    oneof expr {
+        FilterExpressionList bool_and = 1;
+        FilterExpressionList bool_or = 2;
+        FilterExpression bool_not = 3;
+
+        ResourceFilter resource = 4;
+        FieldFilter field = 5;
+        KeywordFilter keyword = 6;
+        DateRangeFilter date = 7;
+        FacetFilter facet = 8;
+    }
+}
 
 message SearchRequest {
     string shard = 1;
 
-    repeated string fields = 2;
+    repeated string fields = 2 [deprecated = true];
     // query this text in all the paragraphs
     string body = 3;
 
-    Filter filter = 4;
+    Filter filter = 4 [deprecated = true];
 
     OrderBy order = 5;
 
@@ -242,7 +281,7 @@ message SearchRequest {
     int32 page_number = 7;
     int32 result_per_page = 8;
 
-    Timestamps timestamps = 9;
+    Timestamps timestamps = 9 [deprecated = true];
 
     repeated float vector = 10; // Embedded vector search.
 
@@ -256,16 +295,19 @@ message SearchRequest {
     bool only_faceted = 16;
 
     optional string advanced_query = 18;
-    optional noderesources.Resource.ResourceStatus with_status = 17;
+    optional noderesources.Resource.ResourceStatus with_status = 17 [deprecated = true];
 
     RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
-    repeated string key_filters = 22;
+    repeated string key_filters = 22 [deprecated = true];
 
     float min_score_semantic = 23;
     float min_score_bm25 = 25;
 
     optional utils.Security security = 24;
+
+    optional FilterExpression field_filter = 26;
+    optional FilterExpression paragraph_filter = 27;
 }
 
 enum SuggestFeatures {
