@@ -22,7 +22,7 @@ use crate::request_types::ParagraphSearchRequest;
 use crate::set_query::SetQuery;
 use itertools::Itertools;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
-use nidx_protos::{StreamRequest, SuggestRequest};
+use nidx_protos::StreamRequest;
 use nidx_types::prefilter::PrefilterResult;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -300,7 +300,6 @@ fn apply_prefilter(
 pub fn suggest_query(
     parser: &QueryParser,
     text: &str,
-    request: &SuggestRequest,
     prefilter: &PrefilterResult,
     schema: &ParagraphSchema,
     distance: u8,
@@ -316,33 +315,6 @@ pub fn suggest_query(
     let term_query = TermQuery::new(term, IndexRecordOption::Basic);
     fuzzies.push((Occur::Must, Box::new(term_query.clone())));
     originals.push((Occur::Must, Box::new(term_query)));
-
-    // Fields
-    request
-        .fields
-        .iter()
-        .map(|value| format!("/{value}"))
-        .flat_map(|facet_key| Facet::from_text(&facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.field, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
-            originals.push((Occur::Must, Box::new(facet_term_query)));
-        });
-
-    // WARNING: this only works due to constraints outside the node's control.
-    // Suggest is assuming that filters work like they did in the beginning.
-    request
-        .filter
-        .iter()
-        .flat_map(|f| f.field_labels.iter())
-        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
-        .for_each(|facet| {
-            let facet_term = Term::from_facet(schema.facets, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
-            originals.push((Occur::Must, Box::new(facet_term_query)));
-        });
 
     apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter);
 
