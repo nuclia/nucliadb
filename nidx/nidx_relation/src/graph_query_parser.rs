@@ -274,6 +274,8 @@ impl GraphQueryParser {
         )
     }
 
+    // Generic version of has_node_expression_as_X to avoid code duplication for source and
+    // destination node queries
     fn has_node_expression(
         &self,
         expression: &Expression<Node>,
@@ -302,6 +304,7 @@ impl GraphQueryParser {
         subqueries
     }
 
+    // Return a list of queries needed to match a triplet such node expression
     fn has_node(&self, node: &Node, fields: NodeSchemaFields) -> Vec<Box<dyn Query>> {
         let mut subqueries = vec![];
 
@@ -323,6 +326,7 @@ impl GraphQueryParser {
         subqueries
     }
 
+    // Return a list of queries needed to match a triplet containing such relation expression
     fn has_relation(&self, expression: Expression<Relation>) -> Vec<(Occur, Box<dyn Query>)> {
         let mut subqueries = vec![];
 
