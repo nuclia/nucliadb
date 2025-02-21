@@ -220,7 +220,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
         reader.reader.advanced_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "Anastas".to_string(),
-                fuzzy_distance: Some(2),
+                fuzzy_distance: 2,
                 is_prefix: false,
             })),
             ..Default::default()
@@ -234,7 +234,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
         reader.reader.advanced_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "AnXstXsia".to_string(),
-                fuzzy_distance: Some(1),
+                fuzzy_distance: 1,
                 is_prefix: false,
             })),
             ..Default::default()
@@ -247,7 +247,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
         reader.reader.advanced_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "AnXstXsia".to_string(),
-                fuzzy_distance: Some(2),
+                fuzzy_distance: 2,
                 is_prefix: false,
             })),
             ..Default::default()
@@ -261,7 +261,7 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
         reader.reader.advanced_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "Anas".to_string(),
-                fuzzy_distance: None,
+                fuzzy_distance: 0,
                 is_prefix: true,
             })),
             ..Default::default()
@@ -275,13 +275,14 @@ fn test_graph_fuzzy_node_query() -> anyhow::Result<()> {
         reader.reader.advanced_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
             value: Some(Term::Fuzzy(FuzzyTerm {
                 value: "Anas".to_string(),
-                fuzzy_distance: Some(2),
+                fuzzy_distance: 2,
                 is_prefix: true,
             })),
             ..Default::default()
         }))))?;
     let relations = friendly_parse(&result);
-    assert_eq!(relations.len(), 4);
+    assert_eq!(relations.len(), 5);
+    assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
     assert!(relations.contains(&("Anna", "FOLLOW", "Erin")));
     assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
     assert!(relations.contains(&("Anna", "LOVE", "Cat")));
@@ -502,7 +503,7 @@ fn test_multi_statement_graph_search() -> anyhow::Result<()> {
             Expression::Value(Node {
                 value: Some(Term::Fuzzy(FuzzyTerm {
                     value: "A".to_string(),
-                    fuzzy_distance: None,
+                    fuzzy_distance: 0,
                     is_prefix: true,
                 })),
                 ..Default::default()
@@ -549,7 +550,7 @@ fn test_multi_statement_graph_search() -> anyhow::Result<()> {
             Expression::Not(Node {
                 value: Some(Term::Fuzzy(FuzzyTerm {
                     value: "M".to_string(),
-                    fuzzy_distance: None,
+                    fuzzy_distance: 0,
                     is_prefix: true,
                 })),
                 ..Default::default()

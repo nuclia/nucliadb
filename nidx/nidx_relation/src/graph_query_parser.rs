@@ -35,7 +35,7 @@ pub struct GraphSearcher {
 #[derive(Clone)]
 pub struct FuzzyTerm {
     pub value: String,
-    pub fuzzy_distance: Option<u8>,
+    pub fuzzy_distance: u8,
     pub is_prefix: bool,
 }
 
@@ -414,12 +414,7 @@ impl GraphQueryParser {
 
     fn has_node_value(&self, value: &Term, field: Field) -> Option<Box<dyn Query>> {
         match value {
-            Term::Exact(value)
-            | Term::Fuzzy(FuzzyTerm {
-                value,
-                fuzzy_distance: None,
-                is_prefix: false,
-            }) => {
+            Term::Exact(value) => {
                 if value.is_empty() {
                     return None;
                 }
@@ -440,38 +435,20 @@ impl GraphQueryParser {
                     } if value.is_empty() => None,
 
                     FuzzyTerm {
-                        fuzzy_distance: None,
-                        is_prefix: false,
-                        ..
-                    } => {
-                        unreachable!("Already matched as exact match")
-                    }
-
-                    FuzzyTerm {
-                        fuzzy_distance: None,
+                        fuzzy_distance: distance,
                         is_prefix: true,
                         ..
                     } => Some(Box::new(FuzzyTermQuery::new_prefix(
-                        tantivy::Term::from_field_text(field, &normalized_value),
-                        0,
-                        true,
-                    ))),
-
-                    FuzzyTerm {
-                        fuzzy_distance: Some(distance),
-                        is_prefix: true,
-                        ..
-                    } => Some(Box::new(FuzzyTermQuery::new(
                         tantivy::Term::from_field_text(field, &normalized_value),
                         *distance,
                         true,
                     ))),
 
                     FuzzyTerm {
-                        fuzzy_distance: Some(distance),
+                        fuzzy_distance: distance,
                         is_prefix: false,
                         ..
-                    } => Some(Box::new(FuzzyTermQuery::new_prefix(
+                    } => Some(Box::new(FuzzyTermQuery::new(
                         tantivy::Term::from_field_text(field, &normalized_value),
                         *distance,
                         true,
