@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import json
 import string
 from datetime import datetime
 from typing import Any, Awaitable, Optional
@@ -210,7 +209,6 @@ class QueryParser:
         self.parse_document_search(request)
         self.parse_paragraph_search(request)
         incomplete, rephrased_query = await self.parse_vector_search(request)
-        # BUG: autofilters are not used to filter, but we say we do
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
         await self.parse_min_score(request, incomplete)
@@ -386,7 +384,7 @@ class QueryParser:
                     )
                 node_features.inc({"type": "relations"})
             if self.autofilter:
-                entity_filters = parse_entities_to_filters(request, detected_entities)
+                entity_filters = apply_entities_filter(request, detected_entities)
                 autofilters.extend([translate_system_to_alias_label(e) for e in entity_filters])
         return autofilters
 
@@ -584,7 +582,7 @@ def expand_entities(
     return list(result_entities.values())
 
 
-def parse_entities_to_filters(
+def apply_entities_filter(
     request: nodereader_pb2.SearchRequest,
     detected_entities: list[utils_pb2.RelationNode],
 ) -> list[str]:
@@ -594,19 +592,13 @@ def parse_entities_to_filters(
         for entity in detected_entities
         if entity.ntype == utils_pb2.RelationNode.NodeType.ENTITY
     ]:
-        if entity_filter not in request.filter.field_labels:
-            request.filter.field_labels.append(entity_filter)
+        if entity_filter not in added_filters:
             added_filters.append(entity_filter)
+            # Add the entity to the filter expression (with AND)
+            entity_expr = nodereader_pb2.FilterExpression()
+            entity_expr.facet.facet = translate_label(entity_filter)
+            add_and_expression(request.field_filter, entity_expr)
 
-    # We need to expand the filter expression with the automatically detected entities.
-    if len(added_filters) > 0:
-        # So far, autofilters feature will only yield 'and' expressions with the detected entities.
-        # More complex autofilters can be added here if we leverage the query endpoint.
-        expanded_expression = {"and": [{"literal": entity} for entity in added_filters]}
-        if request.filter.labels_expression:
-            expression = json.loads(request.filter.labels_expression)
-            expanded_expression["and"].append(expression)
-        request.filter.labels_expression = json.dumps(expanded_expression)
     return added_filters
 
 

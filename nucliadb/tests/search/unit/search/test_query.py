@@ -29,8 +29,8 @@ from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.query import (
     QueryParser,
+    apply_entities_filter,
     check_supported_filters,
-    parse_entities_to_filters,
 )
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.tests.vectors import Q
@@ -48,7 +48,7 @@ def test_parse_entities_to_filters():
     request = SearchRequest()
     request.filter.field_labels.append("/e/person/Austin")
     request.filter.labels_expression = json.dumps({"and": [{"literal": "/e/person/Austin"}]})
-    assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
+    assert apply_entities_filter(request, detected_entities) == ["/e/person/John"]
     assert request.filter.field_labels == ["/e/person/Austin", "/e/person/John"]
     assert json.loads(request.filter.labels_expression) == {
         "and": [
@@ -57,7 +57,7 @@ def test_parse_entities_to_filters():
         ]
     }
 
-    assert parse_entities_to_filters(request, detected_entities) == []
+    assert apply_entities_filter(request, detected_entities) == []
     assert request.filter.field_labels == ["/e/person/Austin", "/e/person/John"]
 
 
