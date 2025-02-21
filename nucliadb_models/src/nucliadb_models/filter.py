@@ -236,7 +236,9 @@ class Kind(BaseModel, extra=pydantic.Extra.forbid):
     kind: Paragraph.TypeParagraph = pydantic.Field(description="The kind of paragraph to match")
 
 
-def filter_discriminator(v: Any) -> str:
+# The discriminator function is optional, everything works without it.
+# We implement it because it makes pydantic produce more user-friendly errors
+def filter_discriminator(v: Any) -> Optional[str]:
     if isinstance(v, dict):
         if "and" in v:
             return "and"

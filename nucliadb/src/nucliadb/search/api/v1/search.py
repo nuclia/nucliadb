@@ -103,6 +103,9 @@ async def search_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
+    filter_expression: Optional[str] = fastapi_query(
+        SearchParamDefaults.filter_expression, include_in_schema=False
+    ),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
@@ -158,11 +161,14 @@ async def search_knowledgebox(
     x_forwarded_for: str = Header(""),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
     try:
+        expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
+
         security = None
         if len(security_groups) > 0:
             security = RequestSecurity(groups=security_groups)
         item = SearchRequest(
             query=query,
+            filter_expression=expr,
             fields=fields,
             filters=filters,
             faceted=faceted,
