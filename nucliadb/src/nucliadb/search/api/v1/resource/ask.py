@@ -17,14 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional, Union
+from typing import Union
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
-from nucliadb.common import datamanagers
 from nucliadb.models.responses import HTTPClientError
+from nucliadb.search.api.v1.resource.utils import get_resource_uuid_by_slug
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_SLUG_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, NucliaDBClientType, SyncAskResponse
@@ -104,8 +104,3 @@ async def resource_ask_endpoint_by_slug(
         x_synchronous,
         resource=resource_id,
     )
-
-
-async def get_resource_uuid_by_slug(kbid: str, slug: str) -> Optional[str]:
-    async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug=slug)

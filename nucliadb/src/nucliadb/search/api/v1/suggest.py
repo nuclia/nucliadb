@@ -133,7 +133,8 @@ async def suggest(
 ) -> KnowledgeboxSuggestResults:
     with cache.request_caches():
         hidden = await filter_hidden_resources(kbid, show_hidden)
-        pb_query = suggest_query_to_pb(
+        pb_query = await suggest_query_to_pb(
+            kbid,
             features,
             query,
             fields,

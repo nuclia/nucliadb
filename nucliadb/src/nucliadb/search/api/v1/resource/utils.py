@@ -17,16 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import ask  # noqa
-from . import catalog  # noqa
-from . import feedback  # noqa
-from . import find  # noqa
-from . import knowledgebox  # noqa
-from . import predict_proxy  # noqa
-from . import search  # noqa
-from . import suggest  # noqa
-from . import summarize  # noqa
-from .resource import ask as ask_resource  # noqa
-from .resource import search as search_resource  # noqa
-from .resource import ingestion_agents as ingestion_agents_resource  # noqa
-from .router import api  # noqa
+
+from typing import Optional
+
+from nucliadb.common import datamanagers
+
+
+async def get_resource_uuid_by_slug(kbid: str, slug: str) -> Optional[str]:
+    async with datamanagers.with_ro_transaction() as txn:
+        return await datamanagers.resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug=slug)
