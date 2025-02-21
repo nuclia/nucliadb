@@ -229,17 +229,17 @@ impl GraphQueryParser {
     fn parse_multi_statement(&self, queries: Vec<Expression<PathQuery>>) -> Box<dyn Query> {
         let mut subqueries = vec![];
         for expression in queries {
-            let subquery = match expression {
-                Expression::Value(query) => (Occur::Should, self.parse_path_query(query) as Box<dyn Query>),
-                Expression::Not(query) => (Occur::MustNot, self.parse_path_query(query) as Box<dyn Query>),
-                Expression::Or(queries) => (
-                    Occur::Should,
-                    Box::new(BooleanQuery::union(
-                        queries.into_iter().map(|query| self.parse_path_query(query)).collect(),
-                    )) as Box<dyn Query>,
-                ),
+            match expression {
+                Expression::Value(query) => {
+                    subqueries.push((Occur::Should, self.parse_path_query(query) as Box<dyn Query>));
+                }
+                Expression::Not(query) => {
+                    subqueries.push((Occur::MustNot, self.parse_path_query(query) as Box<dyn Query>));
+                }
+                Expression::Or(queries) => {
+                    subqueries.extend(queries.into_iter().map(|query| (Occur::Should, self.parse_path_query(query))));
+                }
             };
-            subqueries.push(subquery);
         }
 
         // Due to implementation details on tantivy, a query containing only MustNot won't match
@@ -277,32 +277,70 @@ impl GraphQueryParser {
 
     // Generic version of has_node_expression_as_X to avoid code duplication for source and
     // destination node queries
+    //
+    // Return a list of queries to match documents fulfilling a node expression.
     fn has_node_expression(
         &self,
         expression: &Expression<Node>,
         fields: NodeSchemaFields,
     ) -> Vec<(Occur, Box<dyn Query>)> {
-        let mut subqueries = vec![];
+        let mut queries = vec![];
 
         match expression {
             Expression::Value(query) => {
-                subqueries.extend(self.has_node(query, fields).into_iter().map(|query| (Occur::Must, query)));
+                queries.extend(self.has_node(query, fields).into_iter().map(|query| (Occur::Must, query)));
             }
             Expression::Not(query) => {
                 // NOT granularity is a node, so we to use a Must { MustNot { X } } instead of
                 // unnest it in multiple MustNot { x }
                 let subquery: Box<dyn Query> = Box::new(BooleanQuery::intersection(self.has_node(&query, fields)));
-                subqueries.push((Occur::MustNot, subquery));
+                queries.push((Occur::MustNot, subquery));
             }
             Expression::Or(nodes) => {
-                let subquery: Box<dyn Query> = Box::new(BooleanQuery::union(
-                    nodes.into_iter().flat_map(|node| self.has_node(&node, fields)).collect(),
-                ));
-                subqueries.push((Occur::Must, subquery));
+                // OR needs careful treatment. If there's only one node query matching, we can
+                // behave as it was a Value(Node). Otherwise we need a nested query with its parts
+                let mut subqueries: Vec<_> = nodes
+                    .into_iter()
+                    .flat_map(|node| {
+                        let node_queries = self.has_node(&node, fields);
+                        if node_queries.is_empty() {
+                            // We don't care about nodes that match everything as they don't provide any
+                            // filtering value
+                            None
+                        } else {
+                            Some(node_queries)
+                        }
+                    })
+                    .collect();
+
+                match subqueries.len() {
+                    0 => {}
+                    1 => {
+                        // Only one node to match, this is equivalent to a Value(None), so we can
+                        // add the node attribute queries together
+                        queries.extend(subqueries.pop().unwrap().into_iter().map(|query| (Occur::Must, query)));
+                    }
+                    _ => {
+                        // When there's multiple nodes to match, we must do a nested query and force
+                        // that any of these matches
+                        let or_subqueries = subqueries.into_iter().map(|mut node_queries| {
+                            debug_assert!(node_queries.len() > 0, "already validated above");
+                            let node_query: (Occur, Box<dyn Query>) = if node_queries.len() == 1 {
+                                // To avoid a nested boolean query for a node matching only in
+                                // one field, we can directly add a subquery
+                                (Occur::Should, node_queries.pop().unwrap())
+                            } else {
+                                (Occur::Must, Box::new(BooleanQuery::union(node_queries)))
+                            };
+                            node_query
+                        });
+                        queries.push((Occur::Must, Box::new(BooleanQuery::new(or_subqueries.collect()))));
+                    }
+                }
             }
         };
 
-        subqueries
+        queries
     }
 
     // Return a list of queries needed to match a triplet such node expression
@@ -357,25 +395,17 @@ impl GraphQueryParser {
             }
 
             Expression::Or(relations) => {
-                let mut or_subqueries: Vec<_> = relations
-                    .into_iter()
-                    .flat_map(|relation| {
-                        if let Some(value) = relation.value {
-                            if !value.is_empty() {
-                                return Some((Occur::Should, self.has_relation_label(&value)));
-                            }
+                subqueries.extend(relations.into_iter().flat_map(|relation| {
+                    if let Some(label) = relation.value {
+                        if label.is_empty() {
+                            None
+                        } else {
+                            Some((Occur::Should, self.has_relation_label(&label)))
                         }
+                    } else {
                         None
-                    })
-                    .collect();
-                match or_subqueries.len() {
-                    0 => {}
-                    1 => subqueries.push(or_subqueries.pop().unwrap()),
-                    _n => {
-                        let or_query: Box<dyn Query> = Box::new(BooleanQuery::new(or_subqueries));
-                        subqueries.push((Occur::Must, or_query));
                     }
-                }
+                }));
             }
         };
 
