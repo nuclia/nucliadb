@@ -7,20 +7,22 @@
 # This is to improve caching, `pdm.lock` changes when our components
 # are updated. The generated requirements.txt does not, so it is
 # more cacheable.
-FROM python:3.12 AS requirements
+FROM python:3.12-slim-bookworm AS requirements
 RUN pip install pdm==2.22.1
 COPY pdm.lock pyproject.toml .
 RUN pdm export --prod --no-hashes | grep -v ^-e > requirements.lock.txt
 
-FROM python:3.12
+#
+# This stage builds a virtual env with all dependencies
+#
+FROM python:3.12-slim-bookworm AS builder
 RUN mkdir -p /usr/src/app
 RUN pip install pdm==2.22.1
 
 # Install Python dependencies
 WORKDIR /usr/src/app
 COPY --from=requirements requirements.lock.txt /tmp
-RUN python -m venv .venv && \
-    .venv/bin/pip install -r /tmp/requirements.lock.txt
+RUN python -m venv /app && /app/bin/pip install -r /tmp/requirements.lock.txt
 
 # Copy application
 COPY VERSION pyproject.toml pdm.lock /usr/src/app
@@ -32,19 +34,13 @@ COPY nucliadb /usr/src/app/nucliadb
 COPY nidx/nidx_protos /usr/src/app/nidx/nidx_protos
 
 # Install our packages to the virtualenv
-RUN pdm sync --prod --no-editable
+RUN pdm use -f /app && pdm sync --prod --no-editable
 
-RUN mkdir -p /data
-
-ENV NUA_ZONE=europe-1
-ENV NUA_API_KEY=
-ENV NUCLIA_PUBLIC_URL=https://{zone}.nuclia.cloud
-ENV PYTHONUNBUFFERED=1
-ENV DRIVER=LOCAL
-ENV HTTP_PORT=8080
-ENV INGEST_GRPC_PORT=8060
-ENV TRAIN_GRPC_PORT=8040
-ENV LOG_OUTPUT_TYPE=stdout
+#
+# This is the main image, it just copies the virtual env into the base image
+#
+FROM python:3.12-slim-bookworm
+COPY --from=builder /app /app
 
 # HTTP
 EXPOSE 8080/tcp
@@ -53,5 +49,6 @@ EXPOSE 8060/tcp
 # GRPC - TRAIN
 EXPOSE 8040/tcp
 
-ENV PATH="/usr/src/app/.venv/bin:$PATH"
+ENV PATH="/app/bin:$PATH"
+WORKDIR /app
 CMD ["nucliadb"]
