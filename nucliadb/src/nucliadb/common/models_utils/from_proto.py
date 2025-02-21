@@ -23,12 +23,13 @@ from typing import Any
 
 from google.protobuf.json_format import MessageToDict
 
-from nucliadb_models.common import Classification, FieldID, FieldTypeName
+from nucliadb_models.common import Classification, FieldID, FieldTypeName, QuestionAnswers
 from nucliadb_models.conversation import Conversation, FieldConversation
 from nucliadb_models.entities import EntitiesGroup, EntitiesGroupSummary, Entity
 from nucliadb_models.extracted import (
     ExtractedText,
     FieldComputedMetadata,
+    FieldMetadata,
     FieldQuestionAnswers,
     FileExtractedData,
     LargeComputedMetadata,
@@ -236,6 +237,15 @@ def field_question_answers(
     return FieldQuestionAnswers(**value)
 
 
+def question_answers(message: resources_pb2.QuestionAnswers) -> QuestionAnswers:
+    value = MessageToDict(
+        message,
+        preserving_proto_field_name=True,
+        including_default_value_fields=True,
+    )
+    return QuestionAnswers(**value)
+
+
 def extracted_text(message: resources_pb2.ExtractedText) -> ExtractedText:
     return ExtractedText(
         **MessageToDict(
@@ -304,10 +314,9 @@ def field_computed_metadata(
 ) -> FieldComputedMetadata:
     if shortened:
         shorten_fieldmetadata(message)
-    metadata = convert_fieldmetadata_pb_to_dict(message.metadata)
+    metadata = field_metadata(message.metadata)
     split_metadata = {
-        split: convert_fieldmetadata_pb_to_dict(metadata_split)
-        for split, metadata_split in message.split_metadata.items()
+        split: field_metadata(metadata_split) for split, metadata_split in message.split_metadata.items()
     }
     value = MessageToDict(
         message,
@@ -319,9 +328,9 @@ def field_computed_metadata(
     return FieldComputedMetadata(**value)
 
 
-def convert_fieldmetadata_pb_to_dict(
+def field_metadata(
     message: resources_pb2.FieldMetadata,
-) -> dict[str, Any]:
+) -> FieldMetadata:
     # Backwards compatibility with old entities format
     # TODO: Remove once deprecated fields are removed
     # If we recieved processor entities in the new field and the old field is empty, we copy them to the old field
@@ -347,7 +356,7 @@ def convert_fieldmetadata_pb_to_dict(
     value["relations"] = [
         convert_pb_relation_to_api(rel) for relations in message.relations for rel in relations.relations
     ]
-    return value
+    return FieldMetadata(**value)
 
 
 def conversation(message: resources_pb2.Conversation) -> Conversation:

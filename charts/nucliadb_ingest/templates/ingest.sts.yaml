@@ -66,8 +66,8 @@ spec:
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+          grpc:
+            port: {{ .Values.serving.grpc }}
           initialDelaySeconds: 60
           periodSeconds: 120
           timeoutSeconds: 10

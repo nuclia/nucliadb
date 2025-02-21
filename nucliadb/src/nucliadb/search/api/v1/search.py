@@ -37,6 +37,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import QueryParser
+from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.search.search.utils import (
     filter_hidden_resources,
     min_score_from_payload,
@@ -269,17 +270,19 @@ async def search(
         kbid=kbid,
         features=item.features,
         query=item.query,
-        label_filters=item.filters,
-        keyword_filters=[],
         faceted=item.faceted,
         sort=item.sort,
         top_k=item.top_k,
         min_score=item.min_score,
-        range_creation_start=item.range_creation_start,
-        range_creation_end=item.range_creation_end,
-        range_modification_start=item.range_modification_start,
-        range_modification_end=item.range_modification_end,
-        fields=item.fields,
+        old_filters=OldFilterParams(
+            label_filters=item.filters,
+            keyword_filters=[],
+            range_creation_start=item.range_creation_start,
+            range_creation_end=item.range_creation_end,
+            range_modification_start=item.range_modification_start,
+            range_modification_end=item.range_modification_end,
+            fields=item.fields,
+        ),
         user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
