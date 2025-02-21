@@ -445,12 +445,6 @@ def dummy_predict():
     clean_utility(Utility.PREDICT)
 
 
-# Overwrite indexing_utility and make sure we use the dummy one
-@pytest.fixture(scope="function")
-async def indexing_utility(dummy_indexing_utility):
-    yield dummy_indexing_utility
-
-
 def create_broker_message_with_vectorsets(
     kbid: str,
     rid: str,
