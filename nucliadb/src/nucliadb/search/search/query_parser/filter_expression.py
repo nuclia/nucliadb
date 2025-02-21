@@ -130,3 +130,16 @@ async def parse_expression(
         _a: int = "a"
 
     return f
+
+
+def add_and_expression(dest: PBFilterExpression, add: PBFilterExpression):
+    dest_expr_type = dest.WhichOneof("expr")
+    if dest_expr_type is None:
+        dest.CopyFrom(add)
+    elif dest_expr_type == "bool_and":
+        dest.bool_and.operands.append(add)
+    else:
+        and_expr = PBFilterExpression()
+        and_expr.bool_and.operands.append(dest)
+        and_expr.bool_and.operands.append(add)
+        dest.CopyFrom(and_expr)

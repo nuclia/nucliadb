@@ -45,7 +45,6 @@ from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
-    Filter,
     KnowledgeGraphEntity,
     MaxTokens,
     MinScore,
@@ -61,7 +60,7 @@ from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
-from .query_parser.filter_expression import parse_expression
+from .query_parser.filter_expression import add_and_expression, parse_expression
 from .query_parser.old_filters import OldFilterParams, parse_old_filters
 
 INDEX_SORTABLE_FIELDS = [
@@ -117,11 +116,6 @@ class QueryParser:
         self.query = query
         self.query_entities = query_entities
         self.hidden = hidden
-        if self.hidden is not None:
-            if self.hidden:
-                old_filters.label_filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
-            else:
-                old_filters.label_filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
         self.faceted = faceted or []
         self.top_k = top_k
         self.min_score = min_score
@@ -260,7 +254,16 @@ class QueryParser:
                 if expr:
                     request.paragraph_filter.CopyFrom(expr)
 
-            # Pass operator to PB
+            # TODO: Pass operator to PB
+
+        if self.hidden is not None:
+            expr = nodereader_pb2.FilterExpression()
+            if self.hidden:
+                expr.facet.facet = LABEL_HIDDEN
+            else:
+                expr.bool_not.facet.facet = LABEL_HIDDEN
+
+            add_and_expression(request.field_filter, expr)
 
     def parse_sorting(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.query) == 0:
@@ -629,12 +632,6 @@ async def suggest_query_to_pb(
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
 
-    if hidden is not None:
-        if hidden:
-            filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
-        else:
-            filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
-
     old = OldFilterParams(
         label_filters=filters,
         keyword_filters=[],
@@ -656,6 +653,15 @@ async def suggest_query_to_pb(
     field_expr, _ = await parse_old_filters(old, fetcher)
     if field_expr is not None:
         request.field_filter.CopyFrom(field_expr)
+
+    if hidden is not None:
+        expr = nodereader_pb2.FilterExpression()
+        if hidden:
+            expr.facet.facet = LABEL_HIDDEN
+        else:
+            expr.bool_not.facet.facet = LABEL_HIDDEN
+
+        add_and_expression(request.field_filter, expr)
 
     return request
 
