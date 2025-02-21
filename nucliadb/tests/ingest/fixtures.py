@@ -234,13 +234,14 @@ async def nats_manager(nats_server: str) -> AsyncIterator[NatsConnectionManager]
 
 
 @pytest.fixture(scope="function")
-async def _clean_natsd(nats_ingest_stream, nats_ingest_processed_stream, nats_index_stream):
+async def _clean_natsd(nats_server, nats_ingest_stream, nats_ingest_processed_stream):
     # XXX Legacy fixture that should be replaced.
     #
     # Although the name was clean, it in fact was deleting and recreating
     # streams/consumers used in nucliadb. So, in fact, this fixture was
     # responsible of streams/consumers creation
-    yield
+    with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
+        yield
 
 
 @pytest.fixture(scope="function")
@@ -265,20 +266,6 @@ async def nats_ingest_processed_stream(nats_server: str):
     ]
     async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
         yield
-
-
-@pytest.fixture(scope="function")
-async def nats_index_stream(nats_server: str):
-    streams = [
-        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
-    ]
-    consumers = [
-        (const.Streams.INDEX.name, const.Streams.INDEX.group.format(node="1")),
-    ]
-    # Do not clean consumers after the fixture, since search tests uses a session level sidecar that will reuse it
-    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers, clean=False):
-        with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
-            yield
 
 
 @asynccontextmanager
