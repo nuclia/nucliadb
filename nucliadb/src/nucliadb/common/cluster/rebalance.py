@@ -31,7 +31,7 @@ from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 
 from .settings import settings
-from .utils import delete_resource_from_shard, index_resource_to_shard, wait_for_node
+from .utils import delete_resource_from_shard, index_resource_to_shard
 
 logger = logging.getLogger(__name__)
 

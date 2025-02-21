@@ -39,7 +39,6 @@ from .utils import (
     get_resource,
     get_resource_index_message,
     index_resource_to_shard,
-    wait_for_node,
 )
 
 logger = logging.getLogger(__name__)
