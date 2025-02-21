@@ -146,7 +146,6 @@ async def search_knowledgebox(
         SearchParamDefaults.field_type_filter, alias="field_type"
     ),
     extracted: list[ExtractedDataTypeName] = fastapi_query(SearchParamDefaults.extracted),
-    shards: list[str] = fastapi_query(SearchParamDefaults.shards),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
     autofilter: bool = fastapi_query(SearchParamDefaults.autofilter),
@@ -183,7 +182,6 @@ async def search_knowledgebox(
             show=show,
             field_type_filter=field_type_filter,
             extracted=extracted,
-            shards=shards,
             with_duplicates=with_duplicates,
             with_synonyms=with_synonyms,
             autofilter=autofilter,
@@ -295,9 +293,7 @@ async def search(
     )
     pb_query, incomplete_results, autofilters, _ = await query_parser.parse()
 
-    results, query_incomplete_results, queried_nodes = await node_query(
-        kbid, Method.SEARCH, pb_query, target_shard_replicas=item.shards
-    )
+    results, query_incomplete_results, queried_nodes = await node_query(kbid, Method.SEARCH, pb_query)
 
     incomplete_results = incomplete_results or query_incomplete_results
 

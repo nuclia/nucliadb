@@ -18,23 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx_types::query_language::BooleanExpression;
+use nidx_protos::FilterExpression;
 
 #[derive(Clone, Default)]
 pub struct DocumentSearchRequest {
     pub id: String,
     pub body: String,
-    pub fields: Vec<String>,
-    pub filter: Option<nidx_protos::Filter>,
     pub order: Option<nidx_protos::OrderBy>,
     pub faceted: Option<nidx_protos::Faceted>,
     pub page_number: i32,
     pub result_per_page: i32,
-    pub timestamps: Option<nidx_protos::Timestamps>,
     pub only_faceted: bool,
-    pub with_status: Option<i32>,
     pub advanced_query: Option<String>,
     pub min_score: f32,
-
-    pub label_filtering_formula: Option<BooleanExpression>,
+    pub filter_expression: Option<FilterExpression>,
 }

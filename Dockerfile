@@ -10,7 +10,7 @@
 FROM python:3.12 AS requirements
 RUN pip install pdm==2.22.1
 COPY pdm.lock pyproject.toml .
-RUN pdm export --prod --no-hashes | grep -v ^-e | grep -v nidx_protos > requirements.lock.txt
+RUN pdm export --prod --no-hashes | grep -v ^-e > requirements.lock.txt
 
 FROM python:3.12
 RUN mkdir -p /usr/src/app
@@ -30,10 +30,6 @@ COPY nucliadb_protos /usr/src/app/nucliadb_protos
 COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb /usr/src/app/nucliadb
 COPY nidx/nidx_protos /usr/src/app/nidx/nidx_protos
-
-# Create a fake binding to avoid installing the real one
-RUN mkdir nucliadb_node_binding && \
-    touch nucliadb_node_binding/pyproject.toml
 
 # Install our packages to the virtualenv
 RUN pdm sync --prod --no-editable

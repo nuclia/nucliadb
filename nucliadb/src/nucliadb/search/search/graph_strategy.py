@@ -368,7 +368,6 @@ async def get_graph_results(
                 new_relations = await get_relations_results_from_entities(
                     kbid=kbid,
                     entities=entities_to_explore,
-                    target_shard_replicas=shards,
                     timeout=5.0,
                     only_with_metadata=True,
                     only_agentic_relations=graph_strategy.agentic_graph_only,
@@ -455,8 +454,6 @@ async def fuzzy_search_entities(
             kbid,
             Method.SEARCH,
             request,
-            use_read_replica_nodes=True,
-            retry_on_primary=False,
         )
         return merge_relation_prefix_results(results)
     except Exception as e:

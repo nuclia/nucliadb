@@ -1,11 +1,9 @@
 [project]
 name = "nucliadb_workspace"
 requires-python = ">=3.9"
-version = "0.0.0"
+version = "6.2.1"
 dependencies = [
     "nucliadb @ file:///${PROJECT_ROOT}/nucliadb",
-    # TODO: We don't want to add nidx-protos as a nucliadb dependency yet
-    "nidx-protos @ file:///${PROJECT_ROOT}/nidx/nidx_protos",
 ]
 
 [project.optional-dependencies]

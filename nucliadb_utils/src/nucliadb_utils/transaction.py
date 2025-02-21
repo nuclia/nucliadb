@@ -39,7 +39,7 @@ from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_utils import const, logger
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.nats import get_traced_jetstream
-from nucliadb_utils.utilities import get_pubsub, has_feature
+from nucliadb_utils.utilities import get_pubsub
 
 
 class WaitFor:
@@ -128,8 +128,6 @@ class TransactionUtility:
         )
 
     def _get_notification_action_type(self):
-        if has_feature(const.Features.WAIT_FOR_INDEX):
-            return Notification.Action.INDEXED
         return Notification.Action.COMMIT  # currently do not handle ABORT!
 
     async def wait_for_commited(

@@ -70,8 +70,7 @@ impl ParagraphReaderService {
 
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let text = self.adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) =
-            suggest_query(&parser, &text, request, prefilter, &self.schema, FUZZY_DISTANCE);
+        let (original, termc, fuzzied) = suggest_query(&parser, &text, prefilter, &self.schema, FUZZY_DISTANCE);
         let v = time.elapsed().as_millis();
         debug!("{id:?} - Creating query: ends at {v} ms");
 

@@ -49,10 +49,9 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
-from nucliadb_utils.const import Features
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
-from nucliadb_utils.utilities import Utility, has_feature, set_utility
+from nucliadb_utils.utilities import Utility, set_utility
 
 
 class SendToPredictError(Exception):
@@ -89,7 +88,6 @@ DUMMY_LEARNING_MODEL = "chatgpt"
 
 PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
-VERSIONED_PRIVATE_PREDICT = "/api/v1/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
 QUERY = "/query"
@@ -199,10 +197,7 @@ class PredictEngine:
             # /api/v1/predict/rephrase/{kbid}
             return f"{self.public_url}{PUBLIC_PREDICT}{endpoint}/{kbid}"
         else:
-            if has_feature(Features.VERSIONED_PRIVATE_PREDICT):
-                return f"{self.cluster_url}{VERSIONED_PRIVATE_PREDICT}{endpoint}"
-            else:
-                return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
+            return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
 
     def get_predict_headers(self, kbid: str) -> dict[str, str]:
         if self.onprem:

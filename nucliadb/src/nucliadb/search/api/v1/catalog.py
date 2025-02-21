@@ -79,7 +79,6 @@ async def catalog_get(
     sort_order: SortOrder = fastapi_query(SearchParamDefaults.sort_order),
     page_number: int = fastapi_query(SearchParamDefaults.catalog_page_number),
     page_size: int = fastapi_query(SearchParamDefaults.catalog_page_size),
-    shards: list[str] = fastapi_query(SearchParamDefaults.shards, deprecated=True),
     with_status: Optional[ResourceProcessingStatus] = fastapi_query(
         SearchParamDefaults.with_status, deprecated="Use filters instead"
     ),
@@ -100,7 +99,6 @@ async def catalog_get(
         faceted=faceted,
         page_number=page_number,
         page_size=page_size,
-        shards=shards,
         debug=debug,
         with_status=with_status,
         range_creation_start=range_creation_start,

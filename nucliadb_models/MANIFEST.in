@@ -1,4 +1,0 @@
-include *.rst
-include *.txt
-include VERSION
-include nucliadb_models/py.typed

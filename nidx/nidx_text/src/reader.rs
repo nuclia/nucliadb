@@ -22,7 +22,8 @@ use std::fmt::Debug;
 use std::time::*;
 
 use crate::schema::decode_field_id;
-use crate::{prefilter::*, query_io, DocumentSearchRequest};
+use crate::search_query::filter_to_query;
+use crate::{prefilter::*, DocumentSearchRequest};
 
 use super::schema::TextSchema;
 use super::search_query;
@@ -36,7 +37,7 @@ use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::{BytesColumn, Column};
 use tantivy::fastfield::FacetReader;
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery, TermSetQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::Value;
 use tantivy::schema::*;
 use tantivy::{DocAddress, Index, IndexReader, Searcher};
@@ -228,8 +229,6 @@ impl TextReaderService {
     pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PrefilterResult> {
         let schema = &self.schema;
         let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
-        let mut created_queries = Vec::new();
-        let mut modified_queries = Vec::new();
 
         if let Some(security) = request.security.as_ref() {
             for group_id in security.access_groups.iter() {
@@ -245,19 +244,6 @@ impl TextReaderService {
             }
         }
 
-        for timestamp_query in request.timestamp_filters.iter() {
-            let from = timestamp_query.from.as_ref();
-            let to = timestamp_query.to.as_ref();
-            let (field, add_to) = match timestamp_query.applies_to {
-                FieldDateType::Created => ("created", &mut created_queries),
-                FieldDateType::Modified => ("modified", &mut modified_queries),
-            };
-            if let Some(query) = search_query::produce_date_range_query(field, from, to) {
-                let query: Box<dyn Query> = Box::new(query);
-                add_to.push((Occur::Should, query));
-            }
-        }
-
         let mut subqueries = vec![];
         if !access_groups_queries.is_empty() {
             let public_fields_query = Box::new(TermQuery::new(
@@ -268,35 +254,9 @@ impl TextReaderService {
             let access_groups_query: Box<dyn Query> = Box::new(BooleanQuery::union(access_groups_queries));
             subqueries.push(access_groups_query);
         }
-        if !created_queries.is_empty() {
-            let created_query: Box<dyn Query> = Box::new(BooleanQuery::new(created_queries));
-            subqueries.push(created_query);
-        }
-        if !modified_queries.is_empty() {
-            let modified_query: Box<dyn Query> = Box::new(BooleanQuery::new(modified_queries));
-            subqueries.push(modified_query);
-        }
-        if let Some(labels_formula) = request.labels_formula.as_ref() {
-            let labels_formula_query = query_io::translate_labels_expression(labels_formula, schema);
-            subqueries.push(labels_formula_query);
-        }
 
-        if let Some(keywords_formula) = request.keywords_formula.as_ref() {
-            let keywords_formula_query = query_io::translate_keywords_expression(keywords_formula, schema);
-            subqueries.push(keywords_formula_query);
-        }
-
-        if !request.key_filter.is_empty() {
-            let terms = request.key_filter.iter().map(|k| Term::from_field_bytes(schema.uuid, k.as_bytes()));
-            subqueries.push(Box::new(TermSetQuery::new(terms)));
-        }
-        if !request.field_filter.is_empty() {
-            let terms = request
-                .field_filter
-                .iter()
-                .filter_map(|key| Facet::from_text(&format!("/{key}")).ok())
-                .map(|facet| Term::from_facet(schema.field, &facet));
-            subqueries.push(Box::new(TermSetQuery::new(terms)));
+        if let Some(expr) = &request.filter_expression {
+            subqueries.push(filter_to_query(schema, expr));
         }
 
         if subqueries.is_empty() {

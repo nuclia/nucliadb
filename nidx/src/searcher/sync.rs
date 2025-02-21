@@ -86,9 +86,9 @@ pub async fn run_sync(
             let t = Instant::now();
             let all_shards = Shard::list_ids(&meta.pool).await?;
             let selected_shards: Vec<_> = shard_selector.select_shards(all_shards);
-            let (index_ids_to_sync, indexes_to_delete) = index_metadata.set_synced_shards(&selected_shards).await;
-            let indexes_to_sync = if !index_ids_to_sync.is_empty() {
-                Index::get_many(&meta.pool, &index_ids_to_sync.iter().collect::<Vec<_>>()).await?
+            let (shard_ids_to_sync, indexes_to_delete) = index_metadata.set_synced_shards(&selected_shards).await;
+            let indexes_to_sync = if !shard_ids_to_sync.is_empty() {
+                Index::for_shards(&meta.pool, &shard_ids_to_sync).await?
             } else {
                 Vec::new()
             };
@@ -498,7 +498,7 @@ impl SyncMetadata {
         self.shard_metadata.read().await.get(shard_id).cloned()
     }
 
-    pub async fn set_synced_shards(&self, shards: &[Uuid]) -> (Vec<IndexId>, Vec<(Uuid, IndexId)>) {
+    pub async fn set_synced_shards(&self, shards: &[Uuid]) -> (Vec<Uuid>, Vec<(Uuid, IndexId)>) {
         let shards: HashSet<Uuid> = HashSet::from_iter(shards.iter().copied());
 
         let mut shard_metadata = self.shard_metadata.write().await;
@@ -506,21 +506,20 @@ impl SyncMetadata {
         let synced_shards = shard_metadata.keys().copied().collect();
 
         // New shards to sync
-        let mut indexes_to_sync = Vec::new();
+        let mut shards_to_sync = Vec::new();
         let mut count_new_shards = 0;
         let mut count_recovered_shards = 0;
         for new_shard in shards.difference(&synced_shards) {
-            // If the shard was being evicted, recover it and force sync its indexes
             if let Some((_, evicted_indexes)) = evicted_shards.remove(new_shard) {
-                for index in &evicted_indexes.0 {
-                    indexes_to_sync.push(index.id);
-                }
+                // If the shard was being evicted, recover it but still force sync its indexes
                 shard_metadata.insert(*new_shard, evicted_indexes);
                 count_recovered_shards += 1;
             } else {
+                // If the shard is new add it to the list to be forcibly synced (it may not have been recently updated)
                 shard_metadata.insert(*new_shard, ShardIndexes(Vec::new()));
                 count_new_shards += 1;
             }
+            shards_to_sync.push(*new_shard);
         }
         if count_new_shards > 0 || count_recovered_shards > 0 {
             info!(new = count_new_shards, recovered = count_recovered_shards, "New shards added to sync");
@@ -562,7 +561,7 @@ impl SyncMetadata {
         ACTIVE_SHARDS.set(shard_metadata.values().filter(|v| !v.is_empty()).count() as i64);
         EVICTED_SHARDS.set(evicted_shards.len() as i64);
 
-        (indexes_to_sync, indexes_to_delete)
+        (shards_to_sync, indexes_to_delete)
     }
 }
 
