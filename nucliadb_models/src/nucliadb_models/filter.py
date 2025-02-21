@@ -302,9 +302,9 @@ class FilterExpression(BaseModel, extra=pydantic.Extra.forbid):
     `fields`, `filters`, `range_*`, `resource_filters`, `keyword_filters`.
     """
 
-    class Operator(str, Enum):
-        AND = "and"
-        OR = "or"
+    # class Operator(str, Enum):
+    #     AND = "and"
+    #     OR = "or"
 
     field: Optional[FieldFilterExpression] = pydantic.Field(
         default=None, description="Filter to apply to fields"
@@ -312,11 +312,13 @@ class FilterExpression(BaseModel, extra=pydantic.Extra.forbid):
     paragraph: Optional[ParagraphFilterExpression] = pydantic.Field(
         default=None, description="Filter to apply to each text block"
     )
-    operator: Operator = pydantic.Field(
-        default=Operator.AND,
-        description=(
-            "How to combine field and paragraph filters (default is AND)."
-            "AND returns text blocks that match both filters."
-            "OR returns text_blocks that match one of the two filters"
-        ),
-    )
+
+    # TODO: Not exposed until implemented in nidx
+    # operator: Operator = pydantic.Field(
+    #     default=Operator.AND,
+    #     description=(
+    #         "How to combine field and paragraph filters (default is AND)."
+    #         "AND returns text blocks that match both filters."
+    #         "OR returns text_blocks that match one of the two filters"
+    #     ),
+    # )

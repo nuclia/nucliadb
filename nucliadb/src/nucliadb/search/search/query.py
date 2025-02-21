@@ -656,11 +656,14 @@ async def suggest_query_to_pb(
             if expr:
                 request.field_filter.CopyFrom(expr)
 
-        # TODO: Suggest implement paragraph filtering
-        # if filter_expression.paragraph:
-        #     expr = await parse_expression(filter_expression.paragraph, kbid)
-        #     if expr:
-        #         request.paragraph_filter.CopyFrom(expr)
+        if filter_expression.paragraph:
+            raise InvalidQueryError(
+                "filter_expression", "paragraph filters not yet available in suggest"
+            )
+            # TODO
+            # expr = await parse_expression(filter_expression.paragraph, kbid)
+            # if expr:
+            #     request.paragraph_filter.CopyFrom(expr)
 
         # TODO: Pass operator to PB
 
