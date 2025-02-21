@@ -231,7 +231,6 @@ async def test_querying_kb_with_vectorsets(
     maindb_driver: Driver,
     shard_manager,
     learning_config,
-    indexing_utility,
     nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     dummy_predict: DummyPredictEngine,
