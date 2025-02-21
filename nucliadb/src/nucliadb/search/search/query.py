@@ -61,6 +61,7 @@ from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
+from .query_parser.filter_expression import parse_filter_expression
 from .query_parser.old_filters import OldFilterParams, parse_old_filters
 
 INDEX_SORTABLE_FIELDS = [
@@ -139,6 +140,7 @@ class QueryParser:
         self.max_tokens = max_tokens
         self.rank_fusion = rank_fusion
         self.reranker = reranker
+        self.filter_expression = filter_expression
         self.old_filters = old_filters
         self.fetcher = Fetcher(
             kbid=kbid,
@@ -234,12 +236,29 @@ class QueryParser:
         if self.with_status is not None:
             request.with_status = PROCESSING_STATUS_TO_PB_MAP[self.with_status]
 
+        has_old_filters = False
         if self.old_filters:
             field_expr, paragraph_expr = await parse_old_filters(self.old_filters, self.fetcher)
             if field_expr is not None:
                 request.field_filter.CopyFrom(field_expr)
+                has_old_filters = True
             if paragraph_expr is not None:
                 request.paragraph_filter.CopyFrom(paragraph_expr)
+                has_old_filters = True
+
+        if self.filter_expression and has_old_filters:
+            raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
+
+        if self.filter_expression:
+            if self.filter_expression.field:
+                request.field_filter.CopyFrom(parse_filter_expression(self.filter_expression.field))
+
+            if self.filter_expression.paragraph:
+                request.paragraph_filter.CopyFrom(
+                    parse_filter_expression(self.filter_expression.paragraph)
+                )
+
+            # Pass operator to PB
 
     def parse_sorting(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.query) == 0:
