@@ -415,12 +415,7 @@ class DummyClient(httpx.AsyncClient):
         return self.get_config(*args, **kwargs)
 
     async def request(  # type: ignore
-        self,
-        method: str,
-        url: str,
-        params=None,
-        content=None,
-        headers=None,
+        self, method: str, url: str, params=None, content=None, headers=None, *args, **kwargs
     ) -> httpx.Response:
         return self._handle_request(method, url, params=params, content=content, headers=headers)
 
