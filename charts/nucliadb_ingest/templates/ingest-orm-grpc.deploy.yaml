@@ -52,15 +52,15 @@ spec:
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         readinessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+          grpc:
+            port: {{ .Values.serving.grpc }}
           initialDelaySeconds: 10
           periodSeconds: 20
           timeoutSeconds: 5
           failureThreshold: 3
         livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+          grpc:
+            port: {{ .Values.serving.grpc }}
           initialDelaySeconds: 10
           periodSeconds: 20
           timeoutSeconds: 5
