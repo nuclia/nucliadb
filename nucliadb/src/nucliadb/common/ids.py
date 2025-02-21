@@ -26,6 +26,7 @@ paragraphs... Avoiding spread of id construction and parsing everywhere
 from dataclasses import dataclass
 from typing import Optional
 
+from nucliadb_models.common import FieldTypeName
 from nucliadb_protos.resources_pb2 import FieldType
 
 FIELD_TYPE_STR_TO_PB: dict[str, FieldType.ValueType] = {
@@ -37,6 +38,14 @@ FIELD_TYPE_STR_TO_PB: dict[str, FieldType.ValueType] = {
 }
 
 FIELD_TYPE_PB_TO_STR = {v: k for k, v in FIELD_TYPE_STR_TO_PB.items()}
+
+FIELD_TYPE_NAME_TO_STR = {
+    FieldTypeName.TEXT: "t",
+    FieldTypeName.FILE: "f",
+    FieldTypeName.LINK: "u",
+    FieldTypeName.GENERIC: "a",
+    FieldTypeName.CONVERSATION: "c",
+}
 
 
 @dataclass

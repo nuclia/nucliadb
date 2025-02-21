@@ -21,6 +21,7 @@
 from typing import Union
 
 from nucliadb.common import datamanagers
+from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb_models.filter import (
     And,
@@ -72,7 +73,7 @@ async def parse_expression(
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
             f.resource.resource_id = rid
     elif isinstance(expr, Field):
-        f.field.field_type = expr.type
+        f.field.field_type = FIELD_TYPE_NAME_TO_STR[expr.type]
         if expr.name:
             f.field.field_id = expr.name
     elif isinstance(expr, Keyword):

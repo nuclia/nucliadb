@@ -606,6 +606,7 @@ async def suggest_query_to_pb(
     kbid: str,
     features: list[SuggestOptions],
     query: str,
+    filter_expression: Optional[FilterExpression],
     fields: list[str],
     filters: list[str],
     faceted: list[str],
@@ -643,8 +644,25 @@ async def suggest_query_to_pb(
         generative_model=None,
     )
     field_expr, _ = await parse_old_filters(old, fetcher)
+    if field_expr is not None and filter_expression is not None:
+        raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
+
     if field_expr is not None:
         request.field_filter.CopyFrom(field_expr)
+
+    if filter_expression:
+        if filter_expression.field:
+            expr = await parse_expression(filter_expression.field, kbid)
+            if expr:
+                request.field_filter.CopyFrom(expr)
+
+        # TODO: Suggest implement paragraph filtering
+        # if filter_expression.paragraph:
+        #     expr = await parse_expression(filter_expression.paragraph, kbid)
+        #     if expr:
+        #         request.paragraph_filter.CopyFrom(expr)
+
+        # TODO: Pass operator to PB
 
     if hidden is not None:
         expr = nodereader_pb2.FilterExpression()
