@@ -26,11 +26,11 @@ use nidx_protos::{
     EntitiesSubgraphResponse, RelationNode, RelationPrefixSearchResponse, RelationSearchRequest, RelationSearchResponse,
 };
 use tantivy::collector::TopDocs;
-use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
+use tantivy::query::{BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
 use tantivy::{Index, IndexReader, Term};
 
-use crate::graph_query_parser::{GraphQuery, GraphSearcher};
+use crate::graph_query_parser::{Expression, GraphQuery, GraphQueryParser, GraphSearcher, Node, PathQuery, Relation};
 use crate::schema::Schema;
 use crate::{io_maps, schema};
 
@@ -97,131 +97,75 @@ impl RelationsReaderService {
             return Ok(Some(EntitiesSubgraphResponse::default()));
         }
 
-        let mut queries = Vec::new();
+        let mut statements = vec![];
 
-        for node in bfs_request.entry_points.iter() {
-            let normalized_value = schema::normalize(&node.value);
-            let node_subtype = &node.subtype;
-            let node_type = io_maps::node_type_to_u64(node.ntype());
+        // Entry points are source or target nodes we want to search for. We want any undirected
+        // path containing any entry point
+        statements.push(Expression::Or(
+            bfs_request
+                .entry_points
+                .iter()
+                .map(|entry_point| {
+                    PathQuery::UndirectedPath((
+                        Expression::Value(Node {
+                            value: Some(entry_point.value.clone().into()),
+                            node_type: Some(entry_point.ntype()),
+                            node_subtype: Some(entry_point.subtype.clone()),
+                        }),
+                        Expression::Value(Relation::default()),
+                        Expression::Value(Node::default()),
+                    ))
+                })
+                .collect(),
+        ));
 
-            // Out relations
-            let source_value_term = TermQuery::new(
-                Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
-                IndexRecordOption::Basic,
-            );
-            let source_type_term =
-                TermQuery::new(Term::from_field_u64(self.schema.source_type, node_type), IndexRecordOption::Basic);
-            let source_subtype_term: Box<dyn Query> = if node_subtype.is_empty() {
-                Box::new(AllQuery)
-            } else {
-                Box::new(TermQuery::new(
-                    Term::from_field_text(self.schema.source_subtype, node_subtype),
-                    IndexRecordOption::Basic,
-                ))
-            };
-            let out_relations_query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-                (Occur::Must, Box::new(source_value_term)),
-                (Occur::Must, Box::new(source_type_term)),
-                (Occur::Must, Box::new(source_subtype_term)),
-            ]));
-
-            // In relations
-            let target_value_term = TermQuery::new(
-                Term::from_field_text(self.schema.normalized_target_value, &normalized_value),
-                IndexRecordOption::Basic,
-            );
-            let target_type_term =
-                TermQuery::new(Term::from_field_u64(self.schema.target_type, node_type), IndexRecordOption::Basic);
-            let target_subtype_term: Box<dyn Query> = if node_subtype.is_empty() {
-                Box::new(AllQuery)
-            } else {
-                Box::new(TermQuery::new(
-                    Term::from_field_text(self.schema.target_subtype, node_subtype),
-                    IndexRecordOption::Basic,
-                ))
-            };
-            let in_relations_query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-                (Occur::Must, Box::new(target_value_term)),
-                (Occur::Must, Box::new(target_type_term)),
-                (Occur::Must, Box::new(target_subtype_term)),
-            ]));
-
-            queries.push((Occur::Should, out_relations_query));
-            queries.push((Occur::Should, in_relations_query));
-        }
-
-        // filter out deletions
+        // A query can specifiy nodes marked as deleted in the db (but not removed from the index).
+        // We want to exclude any path containing any of those nodes.
+        //
+        // The request groups values per subtype (to optimize request size) but, as we don't support
+        // OR at node value level, we'll split them.
         for deleted_nodes in bfs_request.deleted_entities.iter() {
             if deleted_nodes.node_values.is_empty() {
                 continue;
             }
 
-            let source_subtype_filter: Box<dyn Query> = if deleted_nodes.node_subtype.is_empty() {
-                Box::new(AllQuery)
-            } else {
-                Box::new(TermQuery::new(
-                    Term::from_field_text(self.schema.source_subtype, &deleted_nodes.node_subtype),
-                    IndexRecordOption::Basic,
-                ))
-            };
-            let target_subtype_filter: Box<dyn Query> = if deleted_nodes.node_subtype.is_empty() {
-                Box::new(AllQuery)
-            } else {
-                Box::new(TermQuery::new(
-                    Term::from_field_text(self.schema.target_subtype, &deleted_nodes.node_subtype),
-                    IndexRecordOption::Basic,
-                ))
-            };
-
-            let mut source_value_subqueries = Vec::new();
-            let mut target_value_subqueries = Vec::new();
-            for deleted_entity_value in deleted_nodes.node_values.iter() {
-                let normalized_value = schema::normalize(deleted_entity_value);
-                let exclude_source_value: Box<dyn Query> = Box::new(TermQuery::new(
-                    Term::from_field_text(self.schema.normalized_source_value, &normalized_value),
-                    IndexRecordOption::Basic,
-                ));
-                let exclude_target_value: Box<dyn Query> = Box::new(TermQuery::new(
-                    Term::from_field_text(self.schema.normalized_target_value, &normalized_value),
-                    IndexRecordOption::Basic,
-                ));
-
-                source_value_subqueries.push((Occur::Should, exclude_source_value));
-                target_value_subqueries.push((Occur::Should, exclude_target_value));
-            }
-
-            let source_value_filter: Box<dyn Query> = Box::new(BooleanQuery::new(source_value_subqueries));
-            let source_exclusion_query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-                (Occur::Must, source_subtype_filter),
-                (Occur::Must, source_value_filter),
-            ]));
-            queries.push((Occur::MustNot, source_exclusion_query));
-
-            let target_value_filter: Box<dyn Query> = Box::new(BooleanQuery::new(target_value_subqueries));
-            let target_exclusion_query: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
-                (Occur::Must, target_subtype_filter),
-                (Occur::Must, target_value_filter),
-            ]));
-            queries.push((Occur::MustNot, target_exclusion_query));
+            statements.push(Expression::Not(PathQuery::UndirectedPath((
+                Expression::Or(
+                    deleted_nodes
+                        .node_values
+                        .iter()
+                        .map(|deleted_entity_value| Node {
+                            value: Some(deleted_entity_value.clone().into()),
+                            node_subtype: Some(deleted_nodes.node_subtype.clone()),
+                            ..Default::default()
+                        })
+                        .collect(),
+                ),
+                Expression::Value(Relation::default()),
+                Expression::Value(Node::default()),
+            ))));
         }
 
-        let mut excluded_subtype_queries = Vec::new();
-        for deleted_subtype in bfs_request.deleted_groups.iter() {
-            let exclude_from_source: Box<dyn Query> = Box::new(TermQuery::new(
-                Term::from_field_text(self.schema.source_subtype, deleted_subtype),
-                IndexRecordOption::Basic,
-            ));
-            let exclude_from_target: Box<dyn Query> = Box::new(TermQuery::new(
-                Term::from_field_text(self.schema.target_subtype, deleted_subtype),
-                IndexRecordOption::Basic,
-            ));
-            excluded_subtype_queries.push((Occur::Should, exclude_from_source));
-            excluded_subtype_queries.push((Occur::Should, exclude_from_target));
+        // Subtypes can also be marked as deleted in the db (but kept in the index). We also want to
+        // exclude any triplet containg a node with such subtypes
+        let excluded_subtypes: Vec<_> = bfs_request
+            .deleted_groups
+            .iter()
+            .map(|deleted_subtype| Node {
+                node_subtype: Some(deleted_subtype.clone()),
+                ..Default::default()
+            })
+            .collect();
+        if excluded_subtypes.len() > 0 {
+            statements.push(Expression::Not(PathQuery::UndirectedPath((
+                Expression::Or(excluded_subtypes),
+                Expression::Value(Relation::default()),
+                Expression::Value(Node::default()),
+            ))));
         }
-        let excluded_subtypes: Box<dyn Query> = Box::new(BooleanQuery::new(excluded_subtype_queries));
-        queries.push((Occur::MustNot, excluded_subtypes));
 
-        let query = BooleanQuery::from(queries);
+        let query_parser = GraphQueryParser::new();
+        let query = query_parser.parse_graph_query(GraphQuery::MultiStatement(statements));
         let searcher = self.reader.searcher();
 
         let topdocs = TopDocs::with_limit(MAX_NUM_RELATIONS_RESULTS);
