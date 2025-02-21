@@ -61,7 +61,7 @@ from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
-from .query_parser.filter_expression import parse_filter_expression
+from .query_parser.filter_expression import parse_expression
 from .query_parser.old_filters import OldFilterParams, parse_old_filters
 
 INDEX_SORTABLE_FIELDS = [
@@ -251,12 +251,14 @@ class QueryParser:
 
         if self.filter_expression:
             if self.filter_expression.field:
-                request.field_filter.CopyFrom(parse_filter_expression(self.filter_expression.field))
+                expr = await parse_expression(self.filter_expression.field, self.kbid)
+                if expr:
+                    request.field_filter.CopyFrom(expr)
 
             if self.filter_expression.paragraph:
-                request.paragraph_filter.CopyFrom(
-                    parse_filter_expression(self.filter_expression.paragraph)
-                )
+                expr = await parse_expression(self.filter_expression.paragraph, self.kbid)
+                if expr:
+                    request.paragraph_filter.CopyFrom(expr)
 
             # Pass operator to PB
 

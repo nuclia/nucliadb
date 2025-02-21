@@ -20,6 +20,8 @@
 
 from typing import Union
 
+from nucliadb.common import datamanagers
+from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb_models.filter import (
     And,
     DateCreated,
@@ -45,23 +47,30 @@ from nucliadb_models.filter import (
 from nucliadb_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
 
 
-def parse_filter_expression(
+async def parse_expression(
     expr: Union[FieldFilterExpression, ParagraphFilterExpression],
+    kbid: str,
 ) -> PBFilterExpression:
     f = PBFilterExpression()
 
     if isinstance(expr, And):
-        f.bool_and.operands.extend((parse_filter_expression(e) for e in expr.operands))
+        for op in expr.operands:
+            f.bool_and.operands.append(await parse_expression(op, kbid))
     elif isinstance(expr, Or):
-        f.bool_or.operands.extend((parse_filter_expression(e) for e in expr.operands))
+        for op in expr.operands:
+            f.bool_or.operands.append(await parse_expression(op, kbid))
     elif isinstance(expr, Not):
-        f.bool_not.CopyFrom(parse_filter_expression(expr.operand))
+        f.bool_not.CopyFrom(await parse_expression(expr.operand, kbid))
     elif isinstance(expr, Resource):
         if expr.id:
             f.resource.resource_id = expr.id
         else:
-            # TODO: Slug
-            raise Exception("Slug not implemented")
+            rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+                kbid=kbid, slug=expr.slug
+            )
+            if rid is None:
+                raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
+            f.resource.resource_id = rid
     elif isinstance(expr, Field):
         f.field.field_type = expr.type
         if expr.name:
@@ -83,7 +92,7 @@ def parse_filter_expression(
     elif isinstance(expr, OriginTag):
         f.facet.facet = f"/t/{expr.tag}"
     elif isinstance(expr, Label):
-        f.facet.facet = f"/t/{expr.labelset}"
+        f.facet.facet = f"/l/{expr.labelset}"
         if expr.label:
             f.facet.facet += f"/{expr.label}"
     elif isinstance(expr, ResourceMimetype):
