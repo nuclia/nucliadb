@@ -22,7 +22,6 @@ import importlib.metadata
 from typing import Awaitable, Callable
 
 from nucliadb import health
-from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.nidx import start_nidx_utility
@@ -38,15 +37,13 @@ from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 from nucliadb_utils.run import run_until_exit
-from nucliadb_utils.settings import indexing_settings, transaction_settings
+from nucliadb_utils.settings import transaction_settings
 from nucliadb_utils.utilities import (
     start_audit_utility,
-    start_indexing_utility,
     start_nats_manager,
     start_partitioning_utility,
     start_transaction_utility,
     stop_audit_utility,
-    stop_indexing_utility,
     stop_nats_manager,
     stop_partitioning_utility,
     stop_transaction_utility,
@@ -58,8 +55,6 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
 
     await setup_cluster()
     await start_transaction_utility(SERVICE_NAME)
-    if not cluster_settings.standalone_mode and indexing_settings.index_jetstream_servers is not None:
-        await start_indexing_utility(SERVICE_NAME)
 
     start_partitioning_utility()
 
@@ -70,7 +65,6 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     finalizers = [
         stop_partitioning_utility,
         stop_transaction_utility,
-        stop_indexing_utility,
         stop_audit_utility,
         teardown_cluster,
     ]

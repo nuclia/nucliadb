@@ -38,13 +38,11 @@ from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.encryption import EndecryptorUtility
 from nucliadb_utils.encryption.settings import settings as encryption_settings
 from nucliadb_utils.exceptions import ConfigurationError
-from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     FileBackendConfig,
     audit_settings,
-    indexing_settings,
     nuclia_settings,
     storage_settings,
     transaction_settings,
@@ -309,27 +307,6 @@ async def stop_transaction_utility() -> None:
     if transaction_utility:
         await transaction_utility.finalize()
         clean_utility(Utility.TRANSACTION)
-
-
-async def start_indexing_utility(service_name: Optional[str] = None) -> IndexingUtility:
-    indexing_utility = IndexingUtility(
-        nats_creds=indexing_settings.index_jetstream_auth,
-        nats_servers=indexing_settings.index_jetstream_servers,
-    )
-    await indexing_utility.initialize(service_name)
-    set_utility(Utility.INDEXING, indexing_utility)
-    return indexing_utility
-
-
-async def stop_indexing_utility():
-    indexing_utility = get_indexing()
-    if indexing_utility:
-        clean_utility(Utility.INDEXING)
-        await indexing_utility.finalize()
-
-
-def get_indexing() -> IndexingUtility:
-    return get_utility(Utility.INDEXING)
 
 
 def get_audit() -> Optional[AuditStorage]:

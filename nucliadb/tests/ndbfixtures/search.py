@@ -58,7 +58,6 @@ async def cluster_nucliadb_search(
     nidx,
     maindb_driver: Driver,
     transaction_utility: TransactionUtility,
-    nats_indexing_utility,
 ):
     with (
         patch.object(cache_settings, "cache_pubsub_nats_url", [nats_server]),
@@ -87,7 +86,6 @@ async def cluster_nucliadb_search(
 
 @pytest.fixture(scope="function")
 async def test_search_resource(
-    indexing_utility_registered,
     processor,
     knowledgebox_ingest,
 ):
@@ -105,7 +103,6 @@ async def test_search_resource(
 
 @pytest.fixture(scope="function")
 async def multiple_search_resource(
-    indexing_utility_registered,
     processor,
     knowledgebox_ingest,
 ):

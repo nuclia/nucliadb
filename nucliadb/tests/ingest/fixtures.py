@@ -47,7 +47,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
@@ -94,7 +93,6 @@ async def ingest_consumers(
     transaction_utility: TransactionUtility,
     storage: Storage,
     dummy_nidx_utility,
-    indexing_utility,
     nats_manager: NatsConnectionManager,
 ):
     ingest_consumers_finalizer = await consumer_service.start_ingest_consumers()
@@ -111,7 +109,6 @@ async def ingest_processed_consumer(
     transaction_utility: TransactionUtility,
     storage: Storage,
     dummy_nidx_utility,
-    indexing_utility,
     nats_manager: NatsConnectionManager,
 ):
     ingest_consumer_finalizer = await consumer_service.start_ingest_processed_consumer()
@@ -195,51 +192,6 @@ async def knowledgebox_with_vectorsets(
     yield kbid
 
     await KnowledgeBox.delete(maindb_driver, kbid)
-
-
-@pytest.fixture(scope="function")
-async def indexing_utility(
-    dummy_indexing_utility: IndexingUtility,
-    # TODO: too many tests depend on this to be true.
-    # Remove when everyone asks for what they really need
-    natsd: str,
-    _clean_natsd,
-) -> AsyncIterator[IndexingUtility]:
-    yield dummy_indexing_utility
-
-
-@pytest.fixture(scope="function")
-async def dummy_indexing_utility() -> AsyncIterator[IndexingUtility]:
-    # as it's a dummy utility, we don't need to provide real nats servers or
-    # creds. Anyway, this should be a different class instead of a parameter
-    indexing_utility = IndexingUtility(
-        nats_creds=None,
-        nats_servers=[],
-        dummy=True,
-    )
-    await indexing_utility.initialize()
-    set_utility(Utility.INDEXING, indexing_utility)
-
-    yield indexing_utility
-
-    clean_utility(Utility.INDEXING)
-    await indexing_utility.finalize()
-
-
-@pytest.fixture(scope="function")
-async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator[IndexingUtility]:
-    indexing_utility = IndexingUtility(
-        nats_creds=indexing_settings.index_jetstream_auth,
-        nats_servers=indexing_settings.index_jetstream_servers,
-        dummy=False,
-    )
-    await indexing_utility.initialize()
-    set_utility(Utility.INDEXING, indexing_utility)
-
-    yield indexing_utility
-
-    clean_utility(Utility.INDEXING)
-    await indexing_utility.finalize()
 
 
 @pytest.fixture(scope="function")
