@@ -151,14 +151,6 @@ async def move_set_of_kb_resources(
                     extra={"kbid": kbid, "resource_id": resource_id},
                 )
 
-    node_ids = set()
-    for replica in from_shard.replicas:
-        node_ids.add(replica.node)
-    for replica in to_shard.replicas:
-        node_ids.add(replica.node)
-    for node_id in node_ids:
-        await wait_for_node(context, node_id)
-
 
 async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:
     await maybe_add_shard(kbid)

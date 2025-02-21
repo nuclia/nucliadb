@@ -76,34 +76,6 @@ def get_shard_manager() -> KBShardManager:
     return get_utility(Utility.SHARD_MANAGER)  # type: ignore
 
 
-async def wait_for_node(app_context: ApplicationContext, node_id: str) -> None:
-    if is_onprem_nucliadb():
-        # On onprem deployments indexing is synchronous right now, so we don't need to wait
-        return
-
-    logged = False
-    while True:
-        # get raw js client
-        js = app_context.nats_manager.js
-        consumer_info = await js.consumer_info(
-            const.Streams.INDEX.name, const.Streams.INDEX.group.format(node=node_id)
-        )
-        if consumer_info.num_pending < 5:
-            return
-
-        if not logged:
-            logger.info(
-                f"Waiting for node to consume messages. {consumer_info.num_pending} messages left.",
-                extra={"node": node_id},
-            )
-            logged = True
-        # usually we consume around 3-4 messages/s with some eventual peaks of
-        # 10-30. If there are too many pending messages, we can wait more.
-        # We suppose 5 messages/s and don't wait more than 60s
-        sleep = min(max(2, consumer_info.num_pending / 5), 60)
-        await asyncio.sleep(sleep)
-
-
 async def get_resource(kbid: str, resource_id: str) -> Optional[Resource]:
     async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.resources.get_resource(txn, kbid=kbid, rid=resource_id)

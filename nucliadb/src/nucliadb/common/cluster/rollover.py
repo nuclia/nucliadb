@@ -232,7 +232,6 @@ async def index_to_rollover_index(
         return
 
     logger.info("Indexing to rollover index", extra=extra)
-    wait_index_batch: list[writer_pb2.ShardObject] = []
     # now index on all new shards only
     while True:
         async with datamanagers.with_transaction() as txn:
@@ -288,16 +287,6 @@ async def index_to_rollover_index(
                 modification_time=_to_ts(resource.basic.modified.ToDatetime()),  # type: ignore
             )
             await txn.commit()
-        wait_index_batch.append(shard)
-
-        if len(wait_index_batch) > 10:
-            node_ids = set()
-            for shard_batch in wait_index_batch:
-                for replica in shard_batch.replicas:
-                    node_ids.add(replica.node)
-            for node_id in node_ids:
-                await wait_for_node(app_context, node_id)
-            wait_index_batch = []
 
     async with datamanagers.with_transaction() as txn:
         state.resources_indexed = True
