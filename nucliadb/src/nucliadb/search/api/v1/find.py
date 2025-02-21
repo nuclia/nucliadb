@@ -35,6 +35,7 @@ from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.utils import maybe_log_request_payload, min_score_from_query_params
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.filter import FilterExpression
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     FindRequest,
@@ -80,6 +81,9 @@ async def find_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
+    filter_expression: Optional[FilterExpression] = fastapi_query(
+        SearchParamDefaults.filter_expression, include_in_schema=False
+    ),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     top_k: Optional[int] = fastapi_query(SearchParamDefaults.top_k),
@@ -137,6 +141,7 @@ async def find_knowledgebox(
             security = RequestSecurity(groups=security_groups)
         item = FindRequest(
             query=query,
+            filter_expression=filter_expression,
             fields=fields,
             filters=filters,
             top_k=top_k,  # type: ignore

@@ -273,6 +273,7 @@ async def query_parser_from_find_request(
         features=item.features,
         query=item.query,
         query_entities=item.query_entities,
+        filter_expression=item.filter_expression,
         faceted=None,
         sort=None,
         top_k=item.top_k,

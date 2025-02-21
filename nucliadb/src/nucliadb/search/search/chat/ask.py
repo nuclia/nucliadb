@@ -788,6 +788,7 @@ async def retrieval_in_resource(
                 kbid=kbid,
                 features=[],
                 query="",
+                filter_expression=ask_request.filter_expression,
                 old_filters=OldFilterParams(
                     label_filters=ask_request.filters,
                     keyword_filters=ask_request.keyword_filters,

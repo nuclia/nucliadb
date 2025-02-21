@@ -40,6 +40,7 @@ from nucliadb.search.search.rank_fusion import (
 from nucliadb.search.search.rerankers import (
     Reranker,
 )
+from nucliadb_models.filter import FilterExpression
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -91,6 +92,7 @@ class QueryParser:
         top_k: int,
         min_score: MinScore,
         old_filters: OldFilterParams,
+        filter_expression: Optional[FilterExpression] = None,
         query_entities: Optional[list[KnowledgeGraphEntity]] = None,
         faceted: Optional[list[str]] = None,
         sort: Optional[SortOptions] = None,

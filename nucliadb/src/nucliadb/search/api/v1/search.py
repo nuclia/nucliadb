@@ -45,6 +45,7 @@ from nucliadb.search.search.utils import (
     should_disable_vector_search,
 )
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.filter import FilterExpression
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -102,6 +103,9 @@ async def search_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
+    filter_expression: Optional[FilterExpression] = fastapi_query(
+        SearchParamDefaults.filter_expression, include_in_schema=False
+    ),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
@@ -162,6 +166,7 @@ async def search_knowledgebox(
             security = RequestSecurity(groups=security_groups)
         item = SearchRequest(
             query=query,
+            filter_expression=filter_expression,
             fields=fields,
             filters=filters,
             faceted=faceted,
@@ -270,6 +275,7 @@ async def search(
         kbid=kbid,
         features=item.features,
         query=item.query,
+        filter_expression=item.filter_expression,
         faceted=item.faceted,
         sort=item.sort,
         top_k=item.top_k,
