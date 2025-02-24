@@ -55,9 +55,7 @@ async def test_selection_labelsets(
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/labelset/myselections")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["labels"] == []
+    assert resp.status_code == 404
 
 
 @pytest.mark.deploy_modes("standalone")
