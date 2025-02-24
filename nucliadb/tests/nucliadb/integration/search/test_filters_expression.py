@@ -146,11 +146,17 @@ async def test_filtering_expression(
             json={
                 "title": title,
                 "slug": slug,
+                "icon": "application/pdf",
                 "origin": {
                     "path": path,
                     "tags": [tag],
+                    "metadata": {
+                        "custom_tag": tag,
+                    },
                     "created": created,
+                    "modified": created,
                 },
+                "metadata": {"language": "en", "languages": ["en", "es", "gl"]},
             },
         )
         assert resp.status_code == 201
@@ -262,6 +268,31 @@ async def test_filtering_expression(
             ["resource2"],
         ),
         ({"prop": "created"}, None),
+        ({"prop": "modified", "since": "2000-01-01T00:00:00"}, ["resource1", "resource2", "resource3"]),
+        ({"prop": "modified", "until": "2023-01-01T00:00:00"}, ["resource1", "resource2"]),
+        (
+            {"prop": "modified", "since": "2022-01-01T00:00:00", "until": "2023-01-01T00:00:00"},
+            ["resource2"],
+        ),
+        ({"prop": "modified"}, None),
+        # Origin metadata
+        ({"not": {"prop": "origin_metadata", "field": "custom_tag"}}, []),
+        ({"prop": "origin_metadata", "field": "custom_tag", "value": "poetry"}, ["resource2"]),
+        # Icon (resource mimetype)
+        ({"prop": "resource_mimetype", "type": "application"}, ["resource1", "resource2", "resource3"]),
+        (
+            {"prop": "resource_mimetype", "type": "application", "subtype": "pdf"},
+            ["resource1", "resource2", "resource3"],
+        ),
+        ({"prop": "resource_mimetype", "type": "foo", "subtype": "pdf"}, []),
+        # Language
+        ({"prop": "language", "language": "en"}, ["resource1", "resource2", "resource3"]),
+        ({"prop": "language", "language": "es"}, ["resource1", "resource2", "resource3"]),
+        ({"prop": "language", "language": "es", "only_primary": True}, []),
+        (
+            {"prop": "language", "language": "en", "only_primary": True},
+            ["resource1", "resource2", "resource3"],
+        ),
     ]:
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",

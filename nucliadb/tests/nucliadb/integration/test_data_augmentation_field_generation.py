@@ -315,3 +315,32 @@ async def test_data_augmentation_field_generation_and_search(
     filtered_out = resp.json()
     assert filtered_out["total"] == 1
     assert filtered_out["resources"][rid]["fields"].keys() == {f"/t/{field_id}"}
+
+    # Test for filter expression filters
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "text",
+            "filter_expression": {"field": {"not": {"prop": "generated", "by": "data-augmentation"}}},
+            "min_score": {"bm25": 0.0},
+        },
+    )
+    assert resp.status_code == 200
+    filtered_out = resp.json()
+    assert filtered_out["total"] == 1
+    assert filtered_out["resources"][rid]["fields"].keys() == {f"/t/{field_id}"}
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "text",
+            "filter_expression": {
+                "field": {"not": {"prop": "generated", "by": "data-augmentation", "da_task": "author"}}
+            },
+            "min_score": {"bm25": 0.0},
+        },
+    )
+    assert resp.status_code == 200
+    filtered_out = resp.json()
+    assert filtered_out["total"] == 1
+    assert filtered_out["resources"][rid]["fields"].keys() == {f"/t/{field_id}"}
