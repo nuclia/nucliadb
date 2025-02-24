@@ -283,9 +283,9 @@ FieldFilterExpression = Annotated[
 
 ParagraphFilterExpression = Annotated[
     Union[
-        Annotated[And["FieldFilterExpression"], Tag("and")],
-        Annotated[Or["FieldFilterExpression"], Tag("or")],
-        Annotated[Not["FieldFilterExpression"], Tag("not")],
+        Annotated[And["ParagraphFilterExpression"], Tag("and")],
+        Annotated[Or["ParagraphFilterExpression"], Tag("or")],
+        Annotated[Not["ParagraphFilterExpression"], Tag("not")],
         Annotated[Label, Tag("label")],
         Annotated[Kind, Tag("kind")],
     ],
