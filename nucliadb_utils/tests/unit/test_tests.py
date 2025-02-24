@@ -19,7 +19,6 @@
 
 from nucliadb_utils.tests import (  # noqa: F401
     asyncbenchmark,
-    indexing,
     nats,
 )
 

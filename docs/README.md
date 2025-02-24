@@ -26,7 +26,7 @@ documentation.
 
 Let's install everything with:
 ``` shell
-pdm sync -d -G :all --clean
+pdm sync -d --clean
 ```
 
 Activate the virtual environment and have fun! You can test the installation by

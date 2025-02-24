@@ -25,18 +25,15 @@ from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
-from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     get_storage,
-    start_indexing_utility,
     start_nats_manager,
     start_partitioning_utility,
     start_transaction_utility,
-    stop_indexing_utility,
     stop_nats_manager,
     stop_partitioning_utility,
     stop_transaction_utility,
@@ -49,7 +46,6 @@ class ApplicationContext:
     shard_manager: KBShardManager
     blob_storage: Storage
     partitioning: PartitionUtility
-    indexing: IndexingUtility
     nats_manager: NatsConnectionManager
 
     def __init__(self, service_name: str = "service") -> None:
@@ -77,7 +73,6 @@ class ApplicationContext:
                 indexing_settings.index_jetstream_servers,
                 indexing_settings.index_jetstream_auth,
             )
-            self.indexing = await start_indexing_utility()
         self.transaction = await start_transaction_utility(self.service_name)
         self.nidx = await start_nidx_utility()
 
@@ -88,7 +83,6 @@ class ApplicationContext:
         await stop_nidx_utility()
         await stop_transaction_utility()
         if not in_standalone_mode():
-            await stop_indexing_utility()
             await stop_nats_manager()
 
         stop_partitioning_utility()
