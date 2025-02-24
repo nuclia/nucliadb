@@ -16,11 +16,11 @@ on:
     branches:
       - main
     paths:
-      - 'VERSION'
+      - "VERSION"
 
 permissions:
-  id-token: write   # This is required for requesting the JWT
-  contents: write   # This is required to create the release
+  id-token: write # This is required for requesting the JWT
+  contents: write # This is required to create the release
 
 jobs:
   release:
@@ -129,7 +129,7 @@ jobs:
           docker push nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
 
   docs:
-    name: 'Upload API specs'
+    name: "Upload API specs"
     runs-on: ubuntu-24.04
     if: github.event_name == 'push'
 
@@ -168,8 +168,8 @@ jobs:
           service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
           token_format: access_token
 
-      - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v2'
+      - name: "Set up Cloud SDK"
+        uses: "google-github-actions/setup-gcloud@v2"
 
       - name: Upload docs
         run: |
