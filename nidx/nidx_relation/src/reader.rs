@@ -26,12 +26,11 @@ use nidx_protos::{
     EntitiesSubgraphResponse, RelationNode, RelationPrefixSearchResponse, RelationSearchRequest, RelationSearchResponse,
 };
 use tantivy::collector::TopDocs;
-use tantivy::query::{BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
-use tantivy::schema::IndexRecordOption;
-use tantivy::{Index, IndexReader, Term};
+use tantivy::query::{BooleanQuery, Occur, Query};
+use tantivy::{Index, IndexReader};
 
 use crate::graph_query_parser::{
-    self, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, GraphSearcher, Node, NodeQuery, PathQuery, Relation,
+    Expression, FuzzyTerm, GraphQuery, GraphQueryParser, GraphSearcher, Node, NodeQuery, PathQuery, Relation, Term,
 };
 use crate::schema::Schema;
 use crate::{io_maps, schema};
@@ -234,8 +233,8 @@ impl RelationsReaderService {
                 // This search is intended to do a normal tokenized search on entities names. However, since we
                 // do some custom normalization for these fields, we need to do some custom handling here.
                 // Feel free to replace this with something better if we start indexing entities name with tokenization.
-                let mut source_prefix_q = Vec::new();
-                let mut target_prefix_q = Vec::new();
+                let mut prefix_nodes_q = Vec::new();
+
                 // Search for all groups of words in the query, e.g:
                 // query "Films with James Bond"
                 // returns:
@@ -249,16 +248,39 @@ impl RelationsReaderService {
                             break;
                         }
                         let start = end - len;
-                        self.add_fuzzy_prefix_query(&mut source_prefix_q, &mut target_prefix_q, &words[start..end]);
+                        let prefix = &words[start..end];
+
+                        let normalized_prefix = schema::normalize_words(prefix.iter().copied());
+                        prefix_nodes_q.push(Node {
+                            value: Some(Term::Fuzzy(FuzzyTerm {
+                                value: normalized_prefix,
+                                fuzzy_distance: FUZZY_DISTANCE,
+                                // BUG: this should be true if we want prefix search
+                                is_prefix: false,
+                            })),
+                            ..Default::default()
+                        });
                     }
                 }
-                source_q.push((Occur::Must, Box::new(BooleanQuery::new(source_prefix_q))));
-                target_q.push((Occur::Must, Box::new(BooleanQuery::new(target_prefix_q))));
+
+                // add fuzzy query for all prefixes
+                source_q.push((
+                    Occur::Must,
+                    query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
+                        prefix_nodes_q.clone(),
+                    )))),
+                ));
+                target_q.push((
+                    Occur::Must,
+                    query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(
+                        prefix_nodes_q,
+                    )))),
+                ));
             }
             Search::Prefix(prefix) => {
                 let normalized_prefix = schema::normalize(prefix);
                 let node_filter = Node {
-                    value: Some(graph_query_parser::Term::Fuzzy(FuzzyTerm {
+                    value: Some(Term::Fuzzy(FuzzyTerm {
                         value: normalized_prefix.clone(),
                         fuzzy_distance: FUZZY_DISTANCE,
                         is_prefix: true,
@@ -267,19 +289,15 @@ impl RelationsReaderService {
                 };
                 source_q.push((
                     Occur::Must,
-                    query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::DirectedPath((
-                        Expression::Value(node_filter.clone()),
-                        Expression::Value(Relation::default()),
-                        Expression::Value(Node::default()),
+                    query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(
+                        node_filter.clone(),
                     )))),
                 ));
                 target_q.push((
                     Occur::Must,
-                    query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::DirectedPath((
-                        Expression::Value(Node::default()),
-                        Expression::Value(Relation::default()),
+                    query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::DestinationNode(
                         Expression::Value(node_filter),
-                    )))),
+                    ))),
                 ));
             }
         }
@@ -301,31 +319,6 @@ impl RelationsReaderService {
         }
         response.nodes = results.into_iter().map(Into::into).collect();
         Ok(Some(response))
-    }
-
-    fn add_fuzzy_prefix_query(
-        &self,
-        source_queries: &mut Vec<(Occur, Box<dyn Query>)>,
-        target_queries: &mut Vec<(Occur, Box<dyn Query>)>,
-        prefix: &[&str],
-    ) {
-        let normalized_prefix = schema::normalize_words(prefix.iter().copied());
-        source_queries.push((
-            Occur::Should,
-            Box::new(FuzzyTermQuery::new(
-                Term::from_field_text(self.schema.normalized_source_value, &normalized_prefix),
-                FUZZY_DISTANCE,
-                true,
-            )),
-        ));
-        target_queries.push((
-            Occur::Should,
-            Box::new(FuzzyTermQuery::new(
-                Term::from_field_text(self.schema.normalized_target_value, &normalized_prefix),
-                FUZZY_DISTANCE,
-                true,
-            )),
-        ));
     }
 }
 
