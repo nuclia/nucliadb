@@ -30,7 +30,9 @@ use tantivy::query::{BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
 use tantivy::{Index, IndexReader, Term};
 
-use crate::graph_query_parser::{self, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, GraphSearcher, Node, PathQuery, Relation};
+use crate::graph_query_parser::{
+    self, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, GraphSearcher, Node, PathQuery, Relation,
+};
 use crate::schema::Schema;
 use crate::{io_maps, schema};
 
@@ -194,14 +196,20 @@ impl RelationsReaderService {
         let mut source_statements = vec![];
         let mut target_statements = vec![];
 
-        // Filter only nodes with with specified types/subtypes
-        for node_filter in prefix_request.node_filters.iter() {
+        // Node filters: only search nodes with the specified type/subtype
+        let node_filters: Vec<Node> = prefix_request
+            .node_filters
+            .iter()
+            .map(|node_filter| Node {
+                node_type: Some(node_filter.node_type()),
+                node_subtype: node_filter.node_subtype.clone(),
+                ..Default::default()
+            })
+            .collect();
+
+        if !node_filters.is_empty() {
             source_statements.push(Expression::Value(PathQuery::DirectedPath((
-                Expression::Value(Node {
-                    node_type: Some(node_filter.node_type()),
-                    node_subtype: node_filter.node_subtype.clone(),
-                    ..Default::default()
-                }),
+                Expression::Or(node_filters.clone()),
                 Expression::Value(Relation::default()),
                 Expression::Value(Node::default()),
             ))));
@@ -209,11 +217,7 @@ impl RelationsReaderService {
             target_statements.push(Expression::Value(PathQuery::DirectedPath((
                 Expression::Value(Node::default()),
                 Expression::Value(Relation::default()),
-                Expression::Value(Node {
-                    node_type: Some(node_filter.node_type()),
-                    node_subtype: node_filter.node_subtype.clone(),
-                    ..Default::default()
-                }),
+                Expression::Or(node_filters),
             ))));
         }
 
