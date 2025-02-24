@@ -31,7 +31,7 @@ use tantivy::schema::IndexRecordOption;
 use tantivy::{Index, IndexReader, Term};
 
 use crate::graph_query_parser::{
-    self, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, GraphSearcher, Node, PathQuery, Relation,
+    self, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, GraphSearcher, Node, NodeQuery, PathQuery, Relation,
 };
 use crate::schema::Schema;
 use crate::{io_maps, schema};
@@ -99,27 +99,25 @@ impl RelationsReaderService {
             return Ok(Some(EntitiesSubgraphResponse::default()));
         }
 
+        let query_parser = GraphQueryParser::new();
         let mut statements = vec![];
 
         // Entry points are source or target nodes we want to search for. We want any undirected
         // path containing any entry point
-        statements.push(Expression::Or(
-            bfs_request
-                .entry_points
-                .iter()
-                .map(|entry_point| {
-                    PathQuery::UndirectedPath((
-                        Expression::Value(Node {
-                            value: Some(entry_point.value.clone().into()),
-                            node_type: Some(entry_point.ntype()),
-                            node_subtype: Some(entry_point.subtype.clone()),
-                        }),
-                        Expression::Value(Relation::default()),
-                        Expression::Value(Node::default()),
-                    ))
-                })
-                .collect(),
-        ));
+        for entry_point in bfs_request.entry_points.iter() {
+            statements.push((
+                Occur::Should,
+                query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::UndirectedPath((
+                    Expression::Value(Node {
+                        value: Some(entry_point.value.clone().into()),
+                        node_type: Some(entry_point.ntype()),
+                        node_subtype: Some(entry_point.subtype.clone()),
+                    }),
+                    Expression::Value(Relation::default()),
+                    Expression::Value(Node::default()),
+                )))),
+            ));
+        }
 
         // A query can specifiy nodes marked as deleted in the db (but not removed from the index).
         // We want to exclude any path containing any of those nodes.
@@ -130,22 +128,24 @@ impl RelationsReaderService {
             if deleted_nodes.node_values.is_empty() {
                 continue;
             }
-
-            statements.push(Expression::Not(PathQuery::UndirectedPath((
-                Expression::Or(
-                    deleted_nodes
-                        .node_values
-                        .iter()
-                        .map(|deleted_entity_value| Node {
-                            value: Some(deleted_entity_value.clone().into()),
-                            node_subtype: Some(deleted_nodes.node_subtype.clone()),
-                            ..Default::default()
-                        })
-                        .collect(),
-                ),
-                Expression::Value(Relation::default()),
-                Expression::Value(Node::default()),
-            ))));
+            statements.push((
+                Occur::MustNot,
+                query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::UndirectedPath((
+                    Expression::Or(
+                        deleted_nodes
+                            .node_values
+                            .iter()
+                            .map(|deleted_entity_value| Node {
+                                value: Some(deleted_entity_value.clone().into()),
+                                node_subtype: Some(deleted_nodes.node_subtype.clone()),
+                                ..Default::default()
+                            })
+                            .collect(),
+                    ),
+                    Expression::Value(Relation::default()),
+                    Expression::Value(Node::default()),
+                )))),
+            ));
         }
 
         // Subtypes can also be marked as deleted in the db (but kept in the index). We also want to
@@ -158,16 +158,19 @@ impl RelationsReaderService {
                 ..Default::default()
             })
             .collect();
+
         if excluded_subtypes.len() > 0 {
-            statements.push(Expression::Not(PathQuery::UndirectedPath((
-                Expression::Or(excluded_subtypes),
-                Expression::Value(Relation::default()),
-                Expression::Value(Node::default()),
-            ))));
+            statements.push((
+                Occur::MustNot,
+                query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::UndirectedPath((
+                    Expression::Or(excluded_subtypes),
+                    Expression::Value(Relation::default()),
+                    Expression::Value(Node::default()),
+                )))),
+            ))
         }
 
-        let query_parser = GraphQueryParser::new();
-        let query = query_parser.parse_graph_query(GraphQuery::MultiStatement(statements));
+        let query: Box<dyn Query> = Box::new(BooleanQuery::new(statements));
         let searcher = self.reader.searcher();
 
         let topdocs = TopDocs::with_limit(MAX_NUM_RELATIONS_RESULTS);
@@ -193,8 +196,9 @@ impl RelationsReaderService {
         };
 
         let query_parser = GraphQueryParser::new();
-        let mut source_statements = vec![];
-        let mut target_statements = vec![];
+
+        let mut source_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+        let mut target_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
 
         // Node filters: only search nodes with the specified type/subtype
         let node_filters: Vec<Node> = prefix_request
@@ -208,21 +212,18 @@ impl RelationsReaderService {
             .collect();
 
         if !node_filters.is_empty() {
-            source_statements.push(Expression::Value(PathQuery::DirectedPath((
-                Expression::Or(node_filters.clone()),
-                Expression::Value(Relation::default()),
-                Expression::Value(Node::default()),
-            ))));
-
-            target_statements.push(Expression::Value(PathQuery::DirectedPath((
-                Expression::Value(Node::default()),
-                Expression::Value(Relation::default()),
-                Expression::Or(node_filters),
-            ))));
+            source_q.push((
+                Occur::Must,
+                query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
+                    node_filters.clone(),
+                )))),
+            ));
+            target_q.push((
+                Occur::Must,
+                query_parser
+                    .parse_graph_query(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(node_filters)))),
+            ))
         }
-
-        let mut source_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
-        let mut target_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
 
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
@@ -282,14 +283,6 @@ impl RelationsReaderService {
                 ));
             }
         }
-
-        if !source_statements.is_empty() {
-            source_q.push((Occur::Must, query_parser.parse_graph_query(GraphQuery::MultiStatement(source_statements))));
-        };
-
-        if !target_statements.is_empty() {
-            target_q.push((Occur::Must, query_parser.parse_graph_query(GraphQuery::MultiStatement(target_statements))));
-        };
 
         let source_prefix_query = BooleanQuery::new(source_q);
         let target_prefix_query = BooleanQuery::new(target_q);

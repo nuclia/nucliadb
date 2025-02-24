@@ -111,9 +111,6 @@ pub enum GraphQuery {
     RelationQuery(RelationQuery),
     // (:A)-[:R]->(:B)
     PathQuery(PathQuery),
-    // Combine queries with an OR
-    // (:A)-[:R]->(:B), !(:A)-[:P]->(:B)
-    MultiStatement(Vec<Expression<PathQuery>>),
 }
 
 #[derive(Clone, Copy)]
@@ -167,7 +164,6 @@ impl GraphQueryParser {
             GraphQuery::NodeQuery(query) => self.parse_node_query(query),
             GraphQuery::RelationQuery(query) => self.parse_relation_query(query),
             GraphQuery::PathQuery(query) => self.parse_path_query(query),
-            GraphQuery::MultiStatement(queries) => self.parse_multi_statement(queries),
         }
     }
 
@@ -222,31 +218,6 @@ impl GraphQueryParser {
                 self.parse_path_query(PathQuery::DirectedPath((destination, relation, source))),
             ])),
         }
-    }
-
-    fn parse_multi_statement(&self, queries: Vec<Expression<PathQuery>>) -> Box<dyn Query> {
-        let mut subqueries = vec![];
-        for expression in queries {
-            match expression {
-                Expression::Value(query) => {
-                    subqueries.push((Occur::Should, self.parse_path_query(query) as Box<dyn Query>));
-                }
-                Expression::Not(query) => {
-                    subqueries.push((Occur::MustNot, self.parse_path_query(query) as Box<dyn Query>));
-                }
-                Expression::Or(queries) => {
-                    subqueries.extend(queries.into_iter().map(|query| (Occur::Should, self.parse_path_query(query))));
-                }
-            };
-        }
-
-        // Due to implementation details on tantivy, a query containing only MustNot won't match
-        // anything. In this case, we need to add an AllQuery to get results
-        if subqueries.iter().all(|(occur, _)| *occur == Occur::MustNot) {
-            subqueries.push((Occur::Must, Box::new(AllQuery)));
-        }
-
-        Box::new(BooleanQuery::new(subqueries))
     }
 
     #[inline]
