@@ -30,6 +30,7 @@ use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQ
 use tantivy::schema::IndexRecordOption;
 use tantivy::{Index, IndexReader, Term};
 
+use crate::graph_query_parser::{GraphQuery, GraphSearcher};
 use crate::schema::Schema;
 use crate::{io_maps, schema};
 
@@ -58,6 +59,11 @@ impl RelationsReaderService {
             subgraph: self.graph_search(request)?,
             prefix: self.prefix_search(request)?,
         })
+    }
+
+    pub fn advanced_graph_query(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
+        let searcher = GraphSearcher::new(self.reader.searcher());
+        searcher.search(query)
     }
 }
 
