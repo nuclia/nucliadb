@@ -17,10 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from typing import Optional, Union, cast
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
+from pydantic import ValidationError
 
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
@@ -106,6 +108,9 @@ async def resource_search(
             )
         except InvalidQueryError as exc:
             return HTTPClientError(status_code=412, detail=str(exc))
+        except ValidationError as exc:
+            detail = json.loads(exc.json())
+            return HTTPClientError(status_code=422, detail=detail)
 
         results, incomplete_results, queried_nodes = await node_query(kbid, Method.SEARCH, pb_query)
 
