@@ -30,7 +30,7 @@ use tantivy::query::{BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
 use tantivy::schema::IndexRecordOption;
 use tantivy::{Index, IndexReader, Term};
 
-use crate::graph_query_parser::{Expression, GraphQuery, GraphQueryParser, GraphSearcher, Node, PathQuery, Relation};
+use crate::graph_query_parser::{self, Expression, FuzzyTerm, GraphQuery, GraphQueryParser, GraphSearcher, Node, PathQuery, Relation};
 use crate::schema::Schema;
 use crate::{io_maps, schema};
 
@@ -190,59 +190,39 @@ impl RelationsReaderService {
             return Err(anyhow::anyhow!("Search terms needed"));
         };
 
-        // if prefix_request.prefix.is_empty() {
-        //     return Ok(Some(RelationPrefixSearchResponse::default()));
-        // }
+        let query_parser = GraphQueryParser::new();
+        let mut source_statements = vec![];
+        let mut target_statements = vec![];
 
-        let searcher = self.reader.searcher();
-        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
-        let schema = &self.schema;
-
-        let mut source_types = vec![];
-        let mut target_types = vec![];
-
+        // Filter only nodes with with specified types/subtypes
         for node_filter in prefix_request.node_filters.iter() {
-            let mut source_clause = vec![];
-            let mut target_clause = vec![];
-            let node_subtype = node_filter.node_subtype();
-            let node_type = io_maps::node_type_to_u64(node_filter.node_type());
+            source_statements.push(Expression::Value(PathQuery::DirectedPath((
+                Expression::Value(Node {
+                    node_type: Some(node_filter.node_type()),
+                    node_subtype: node_filter.node_subtype.clone(),
+                    ..Default::default()
+                }),
+                Expression::Value(Relation::default()),
+                Expression::Value(Node::default()),
+            ))));
 
-            let source_type_query: Box<dyn Query> =
-                Box::new(TermQuery::new(Term::from_field_u64(schema.source_type, node_type), IndexRecordOption::Basic));
-            let target_type_query: Box<dyn Query> =
-                Box::new(TermQuery::new(Term::from_field_u64(schema.target_type, node_type), IndexRecordOption::Basic));
-            source_clause.push((Occur::Must, source_type_query));
-            target_clause.push((Occur::Must, target_type_query));
-
-            if !node_subtype.is_empty() {
-                let subtype_source: Box<dyn Query> = Box::new(TermQuery::new(
-                    Term::from_field_text(schema.source_subtype, node_subtype),
-                    IndexRecordOption::Basic,
-                ));
-                let subtype_target: Box<dyn Query> = Box::new(TermQuery::new(
-                    Term::from_field_text(schema.target_subtype, node_subtype),
-                    IndexRecordOption::Basic,
-                ));
-                source_clause.push((Occur::Must, subtype_source));
-                target_clause.push((Occur::Must, subtype_target));
-            }
-
-            let source_clause: Box<dyn Query> = Box::new(BooleanQuery::new(source_clause));
-            let target_clause: Box<dyn Query> = Box::new(BooleanQuery::new(target_clause));
-            source_types.push((Occur::Should, source_clause));
-            target_types.push((Occur::Should, target_clause));
+            target_statements.push(Expression::Value(PathQuery::DirectedPath((
+                Expression::Value(Node::default()),
+                Expression::Value(Relation::default()),
+                Expression::Value(Node {
+                    node_type: Some(node_filter.node_type()),
+                    node_subtype: node_filter.node_subtype.clone(),
+                    ..Default::default()
+                }),
+            ))));
         }
 
         let mut source_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
         let mut target_q: Vec<(Occur, Box<dyn Query>)> = Vec::new();
 
-        if !source_types.is_empty() {
-            source_q.push((Occur::Must, Box::new(BooleanQuery::new(source_types))));
-        };
-
-        if !target_types.is_empty() {
-            target_q.push((Occur::Must, Box::new(BooleanQuery::new(target_types))));
-        };
+        let searcher = self.reader.searcher();
+        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
+        let schema = &self.schema;
 
         match search {
             Search::Query(query) => {
@@ -290,6 +270,14 @@ impl RelationsReaderService {
                 ));
             }
         }
+
+        if !source_statements.is_empty() {
+            source_q.push((Occur::Must, query_parser.parse_graph_query(GraphQuery::MultiStatement(source_statements))));
+        };
+
+        if !target_statements.is_empty() {
+            target_q.push((Occur::Must, query_parser.parse_graph_query(GraphQuery::MultiStatement(target_statements))));
+        };
 
         let source_prefix_query = BooleanQuery::new(source_q);
         let target_prefix_query = BooleanQuery::new(target_q);
