@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod graph_query_parser;
 mod io_maps;
 mod reader;
 mod resource_indexer;

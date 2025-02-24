@@ -41,6 +41,7 @@ fn test_index_docs() -> anyhow::Result<()> {
                 NodeType::Entity,
                 "ANIMALS".to_string(),
                 RelationType::Entity,
+                "IS".to_string(),
             ),
             common::create_relation_with_metadata(
                 "01808bbd8e784552967a4fb0d8b6e584".to_string(),
@@ -50,6 +51,7 @@ fn test_index_docs() -> anyhow::Result<()> {
                 NodeType::Entity,
                 "ANIMALS".to_string(),
                 RelationType::Entity,
+                "IS".to_string(),
                 RelationMetadata {
                     paragraph_id: Some("myresource/0/myresource/100-200".to_string()),
                     source_start: Some(0),
