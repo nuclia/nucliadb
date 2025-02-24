@@ -164,6 +164,7 @@ async def get_labelsets(kbid: str) -> KnowledgeBoxLabels:
     summary="Get a Knowledge Box Label Set",
     response_model=LabelSet,
     tags=["Knowledge Box Services"],
+    responses={"404": {"description": "Knowledge Box or Label Set not found"}},
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
