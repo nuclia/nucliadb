@@ -115,7 +115,7 @@ jobs:
           max_attempts: 2
           retry_on: error
           timeout_minutes: 20
-          command: pdm sync -d --clean --no-editable -G nidx
+          command: pdm sync -d --clean --no-editable
       - name: Clean build
         run: find . -name build | xargs rm -r || true
       - name: Lint source code
@@ -266,7 +266,7 @@ jobs:
           max_attempts: 2
           retry_on: error
           timeout_minutes: 20
-          command: pdm sync -d --clean --no-editable -G nidx
+          command: pdm sync -d --clean --no-editable
       - name: Upload virtualenv to cache
         uses: actions/cache/save@v4
         with:

@@ -8,16 +8,16 @@
 # are updated. The generated requirements.txt does not, so it is
 # more cacheable.
 FROM python:3.12-slim-bookworm AS requirements
-RUN pip install pdm==2.22.1
+RUN pip install pdm>=2.22.3
 COPY pdm.lock pyproject.toml .
-RUN pdm export --prod --no-hashes | grep -v ^-e > requirements.lock.txt
+RUN pdm export -G nucliadb --no-hashes | grep -v ^-e > requirements.lock.txt
 
 #
 # This stage builds a virtual env with all dependencies
 #
 FROM python:3.12-slim-bookworm AS builder
 RUN mkdir -p /usr/src/app
-RUN pip install pdm==2.22.1
+RUN pip install pdm>=2.22.3
 
 # Install Python dependencies
 WORKDIR /usr/src/app
@@ -34,7 +34,7 @@ COPY nucliadb /usr/src/app/nucliadb
 COPY nidx/nidx_protos /usr/src/app/nidx/nidx_protos
 
 # Install our packages to the virtualenv
-RUN pdm use -f /app && pdm sync --prod --no-editable
+RUN pdm use -f /app && pdm sync -G nucliadb --no-editable
 
 #
 # This is the main image, it just copies the virtual env into the base image
