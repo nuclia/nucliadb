@@ -234,10 +234,9 @@ async def _retriable_proxied_request(
     content: bytes,
     headers: dict[str, str],
     params: dict[str, Any],
-    json: Optional[str] = None,
 ) -> httpx.Response:
     return await client.request(
-        method=method.upper(), url=url, params=params, content=content, headers=headers, json=json
+        method=method.upper(), url=url, params=params, content=content, headers=headers
     )
 
 
