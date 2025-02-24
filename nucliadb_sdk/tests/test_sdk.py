@@ -19,7 +19,6 @@
 #
 import httpx
 import pytest
-from nuclia_models.predict.run_agents import RunTextAgentsRequest
 
 import nucliadb_sdk
 from nucliadb_models.conversation import InputMessage, InputMessageContent
@@ -160,12 +159,6 @@ def test_predict_proxied_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
             "user_id": "foo",
         },
     )
-    req = RunTextAgentsRequest(
-        user_id="foo",
-        filters=[],
-        texts=["Is Barcelona bigger than Mallorca?"],
-    )
-    sdk.run_text_agents(kbid=kb.uuid, content=req)
 
 
 def test_check_response():

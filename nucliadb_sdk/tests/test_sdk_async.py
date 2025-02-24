@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from nuclia_models.predict.run_agents import RunTextAgentsRequest
 
 import nucliadb_sdk
 from nucliadb_models.search import FeedbackTasks
@@ -118,9 +117,3 @@ async def test_predict_proxied_endpoints(sdk_async: nucliadb_sdk.NucliaDB, kb):
             "user_id": "foo",
         },
     )
-    req = RunTextAgentsRequest(
-        user_id="foo",
-        filters=[],
-        texts=["Is Barcelona bigger than Mallorca?"],
-    )
-    await sdk_async.run_text_agents(kbid=kb.uuid, content=req)
