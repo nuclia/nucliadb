@@ -236,11 +236,7 @@ async def _retriable_proxied_request(
     params: dict[str, Any],
 ) -> httpx.Response:
     return await client.request(
-        method=method.upper(),
-        url=url,
-        params=params,
-        content=content,
-        headers=headers,
+        method=method.upper(), url=url, params=params, content=content, headers=headers
     )
 
 
@@ -414,12 +410,7 @@ class DummyClient(httpx.AsyncClient):
         return self.get_config(*args, **kwargs)
 
     async def request(  # type: ignore
-        self,
-        method: str,
-        url: str,
-        params=None,
-        content=None,
-        headers=None,
+        self, method: str, url: str, params=None, content=None, headers=None, *args, **kwargs
     ) -> httpx.Response:
         return self._handle_request(method, url, params=params, content=content, headers=headers)
 
