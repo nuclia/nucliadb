@@ -76,9 +76,7 @@ async def add_strategy(
     kbid: str,
     item: ExtractConfig,
 ):
-    return await learning_config_proxy(
-        request, "POST", f"/extract_strategies/{kbid}", json=item.model_dump_json()
-    )
+    return await learning_config_proxy(request, "POST", f"/extract_strategies/{kbid}")
 
 
 @api.delete(

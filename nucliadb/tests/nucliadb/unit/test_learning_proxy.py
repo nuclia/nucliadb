@@ -165,7 +165,6 @@ async def test_proxy(async_client):
         params={"some": "data"},
         content=b"some data",
         headers={"foo": "bar", "x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
-        json=None,
     )
 
 
@@ -192,7 +191,6 @@ async def test_proxy_stream_response(async_client, config_stream_response):
         params={"some": "data"},
         content=b"some data",
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
-        json=None,
     )
 
 
@@ -220,7 +218,6 @@ async def test_proxy_error(async_client):
         params={"some": "data"},
         content=b"some data",
         headers={},
-        json=None,
     )
 
 
@@ -244,5 +241,4 @@ async def test_proxy_headers(async_client):
         params={},
         content=b"",
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
-        json=None,
     )
