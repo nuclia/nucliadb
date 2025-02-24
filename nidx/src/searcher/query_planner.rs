@@ -124,6 +124,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<
         faceted: search_request.faceted.clone(),
         page_number: search_request.page_number,
         result_per_page: search_request.result_per_page,
+        with_duplicates: search_request.with_duplicates,
         only_faceted: search_request.only_faceted,
         advanced_query: search_request.advanced_query.clone(),
         id: String::default(),

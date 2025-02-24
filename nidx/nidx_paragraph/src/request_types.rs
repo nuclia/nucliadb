@@ -29,6 +29,7 @@ pub struct ParagraphSearchRequest {
     pub faceted: Option<nidx_protos::Faceted>,
     pub page_number: i32,
     pub result_per_page: i32,
+    pub with_duplicates: bool,
     pub only_faceted: bool,
     pub advanced_query: Option<String>,
     pub min_score: f32,

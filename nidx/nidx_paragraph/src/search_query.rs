@@ -365,6 +365,13 @@ pub fn search_query(
         fuzzies.push((Occur::Must, query));
     }
 
+    if !search.with_duplicates {
+        let term = Term::from_field_u64(schema.repeated_in_field, 0);
+        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+        fuzzies.push((Occur::Must, Box::new(term_query.clone())));
+        originals.push((Occur::Must, Box::new(term_query)))
+    }
+
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
         let fuzzy = Box::new(BooleanQuery::new(vec![]));
