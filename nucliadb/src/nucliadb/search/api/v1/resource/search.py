@@ -30,6 +30,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
+from nucliadb_models.filter import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     NucliaDBClientType,
@@ -59,6 +60,9 @@ async def resource_search(
     kbid: str,
     query: str,
     rid: str,
+    filter_expression: Optional[str] = fastapi_query(
+        SearchParamDefaults.filter_expression, include_in_schema=False
+    ),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
@@ -82,10 +86,13 @@ async def resource_search(
 
     with cache.request_caches():
         try:
+            expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
+
             pb_query = await paragraph_query_to_pb(
                 kbid,
                 rid,
                 query,
+                expr,
                 fields,
                 filters,
                 faceted,
