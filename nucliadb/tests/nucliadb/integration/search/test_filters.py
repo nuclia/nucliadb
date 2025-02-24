@@ -349,6 +349,29 @@ async def test_filtering_before_and_after_reindexing(
         await _test_filtering(nucliadb_reader, kbid, f)
 
 
+def apply_old_filters(request, filters):
+    request["filters"] = filters
+
+
+def convert_filter(f):
+    parts = f.split("/")
+    if parts[1] == "entities":
+        return {"prop": "entity", "subtype": parts[2], "value": parts[3]}
+    else:
+        return {"prop": "label", "labelset": parts[2], "label": parts[3]}
+
+
+def apply_new_filters(request, filters):
+    expr = {}
+    request["filter_expression"] = expr
+    paragraph_filters = [f for f in filters if "paragraph" in f]
+    if paragraph_filters:
+        expr["paragraph"] = {"and": [convert_filter(f) for f in paragraph_filters]}
+    field_filters = [f for f in filters if "paragraph" not in f]
+    if field_filters:
+        expr["field"] = {"and": [convert_filter(f) for f in field_filters]}
+
+
 async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
     # The set of expected results is always the AND of the filters
     filter_paragraphs = []
@@ -357,41 +380,46 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         filter_paragraphs.append(FILTERS_TO_PARAGRAPHS.get(fltr, set()))
     expected_paragraphs = set.intersection(*filter_paragraphs)
 
-    with patch(
-        "nucliadb.search.search.find.get_rank_fusion", return_value=ReciprocalRankFusion(window=20)
-    ):
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json=dict(
+    # Run tests with old filters and new filter_expression
+    for apply_filters in [apply_old_filters, apply_new_filters]:
+        with patch(
+            "nucliadb.search.search.find.get_rank_fusion", return_value=ReciprocalRankFusion(window=20)
+        ):
+            request = dict(
                 query="",
-                filters=filters,
                 features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
                 vector=Q,
                 min_score=MinScore(semantic=-1).model_dump(),
                 reranker=RerankerName.NOOP,
-            ),
-        )
-    assert resp.status_code == 200, resp.text
-    content = resp.json()
+            )
+            apply_filters(request, filters)
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/find",
+                json=request,
+            )
+        assert resp.status_code == 200, resp.text
+        content = resp.json()
 
-    # Collect all paragraphs from the response
-    paragraphs = [
-        paragraph
-        for resource in content["resources"].values()
-        for field in resource["fields"].values()
-        for paragraph in field["paragraphs"].values()
-    ]
+        # Collect all paragraphs from the response
+        paragraphs = [
+            paragraph
+            for resource in content["resources"].values()
+            for field in resource["fields"].values()
+            for paragraph in field["paragraphs"].values()
+        ]
 
-    # Check that only the expected paragraphs were returned
-    assert len(paragraphs) == len(expected_paragraphs), f"{filters}\n{paragraphs}\n{expected_paragraphs}"
-    not_yet_found = expected_paragraphs.copy()
-    for par in paragraphs:
-        if par["text"] not in expected_paragraphs:
-            raise AssertionError(f"Paragraph not expected: {par['text']}")
-        if par["text"] in not_yet_found:
-            assert par["score_type"] == "BOTH", f"Score type not expected with filters {filters}"
-            not_yet_found.remove(par["text"])
-    assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
+        # Check that only the expected paragraphs were returned
+        assert len(paragraphs) == len(
+            expected_paragraphs
+        ), f"{filters}\n{paragraphs}\n{expected_paragraphs}"
+        not_yet_found = expected_paragraphs.copy()
+        for par in paragraphs:
+            if par["text"] not in expected_paragraphs:
+                raise AssertionError(f"Paragraph not expected: {par['text']}")
+            if par["text"] in not_yet_found:
+                assert par["score_type"] == "BOTH", f"Score type not expected with filters {filters}"
+                not_yet_found.remove(par["text"])
+        assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
 
 
 @pytest.fixture()

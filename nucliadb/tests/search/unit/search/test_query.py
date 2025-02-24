@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-import json
 import unittest
 from typing import Optional
 from unittest.mock import AsyncMock, Mock, patch
@@ -29,8 +28,8 @@ from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.query import (
     QueryParser,
+    apply_entities_filter,
     check_supported_filters,
-    parse_entities_to_filters,
 )
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.tests.vectors import Q
@@ -46,19 +45,12 @@ def test_parse_entities_to_filters():
     ]
 
     request = SearchRequest()
-    request.filter.field_labels.append("/e/person/Austin")
-    request.filter.labels_expression = json.dumps({"and": [{"literal": "/e/person/Austin"}]})
-    assert parse_entities_to_filters(request, detected_entities) == ["/e/person/John"]
-    assert request.filter.field_labels == ["/e/person/Austin", "/e/person/John"]
-    assert json.loads(request.filter.labels_expression) == {
-        "and": [
-            {"literal": "/e/person/John"},
-            {"and": [{"literal": "/e/person/Austin"}]},
-        ]
-    }
-
-    assert parse_entities_to_filters(request, detected_entities) == []
-    assert request.filter.field_labels == ["/e/person/Austin", "/e/person/John"]
+    request.field_filter.facet.facet = "/e/person/Austin"
+    assert apply_entities_filter(request, detected_entities) == ["/e/person/John"]
+    assert [x.facet.facet for x in request.field_filter.bool_and.operands] == [
+        "/e/person/Austin",
+        "/e/person/John",
+    ]
 
 
 @pytest.fixture()

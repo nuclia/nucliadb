@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import json
 import string
 from datetime import datetime
 from typing import Any, Awaitable, Optional
@@ -40,11 +39,11 @@ from nucliadb.search.search.rank_fusion import (
 from nucliadb.search.search.rerankers import (
     Reranker,
 )
+from nucliadb_models.filter import FilterExpression
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
-    Filter,
     KnowledgeGraphEntity,
     MaxTokens,
     MinScore,
@@ -60,6 +59,7 @@ from nucliadb_protos import nodereader_pb2, utils_pb2
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from .exceptions import InvalidQueryError
+from .query_parser.filter_expression import add_and_expression, parse_expression
 from .query_parser.old_filters import OldFilterParams, parse_old_filters
 
 INDEX_SORTABLE_FIELDS = [
@@ -91,6 +91,7 @@ class QueryParser:
         top_k: int,
         min_score: MinScore,
         old_filters: OldFilterParams,
+        filter_expression: Optional[FilterExpression] = None,
         query_entities: Optional[list[KnowledgeGraphEntity]] = None,
         faceted: Optional[list[str]] = None,
         sort: Optional[SortOptions] = None,
@@ -114,11 +115,6 @@ class QueryParser:
         self.query = query
         self.query_entities = query_entities
         self.hidden = hidden
-        if self.hidden is not None:
-            if self.hidden:
-                old_filters.label_filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
-            else:
-                old_filters.label_filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
         self.faceted = faceted or []
         self.top_k = top_k
         self.min_score = min_score
@@ -137,6 +133,7 @@ class QueryParser:
         self.max_tokens = max_tokens
         self.rank_fusion = rank_fusion
         self.reranker = reranker
+        self.filter_expression = filter_expression
         self.old_filters = old_filters
         self.fetcher = Fetcher(
             kbid=kbid,
@@ -212,7 +209,6 @@ class QueryParser:
         self.parse_document_search(request)
         self.parse_paragraph_search(request)
         incomplete, rephrased_query = await self.parse_vector_search(request)
-        # BUG: autofilters are not used to filter, but we say we do
         autofilters = await self.parse_relation_search(request)
         await self.parse_synonyms(request)
         await self.parse_min_score(request, incomplete)
@@ -232,12 +228,40 @@ class QueryParser:
         if self.with_status is not None:
             request.with_status = PROCESSING_STATUS_TO_PB_MAP[self.with_status]
 
+        has_old_filters = False
         if self.old_filters:
             field_expr, paragraph_expr = await parse_old_filters(self.old_filters, self.fetcher)
             if field_expr is not None:
                 request.field_filter.CopyFrom(field_expr)
+                has_old_filters = True
             if paragraph_expr is not None:
                 request.paragraph_filter.CopyFrom(paragraph_expr)
+                has_old_filters = True
+
+        if self.filter_expression and has_old_filters:
+            raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
+
+        if self.filter_expression:
+            if self.filter_expression.field:
+                expr = await parse_expression(self.filter_expression.field, self.kbid)
+                if expr:
+                    request.field_filter.CopyFrom(expr)
+
+            if self.filter_expression.paragraph:
+                expr = await parse_expression(self.filter_expression.paragraph, self.kbid)
+                if expr:
+                    request.paragraph_filter.CopyFrom(expr)
+
+            # TODO: Pass operator to PB
+
+        if self.hidden is not None:
+            expr = nodereader_pb2.FilterExpression()
+            if self.hidden:
+                expr.facet.facet = LABEL_HIDDEN
+            else:
+                expr.bool_not.facet.facet = LABEL_HIDDEN
+
+            add_and_expression(request.field_filter, expr)
 
     def parse_sorting(self, request: nodereader_pb2.SearchRequest) -> None:
         if len(self.query) == 0:
@@ -360,7 +384,7 @@ class QueryParser:
                     )
                 node_features.inc({"type": "relations"})
             if self.autofilter:
-                entity_filters = parse_entities_to_filters(request, detected_entities)
+                entity_filters = apply_entities_filter(request, detected_entities)
                 autofilters.extend([translate_system_to_alias_label(e) for e in entity_filters])
         return autofilters
 
@@ -558,7 +582,7 @@ def expand_entities(
     return list(result_entities.values())
 
 
-def parse_entities_to_filters(
+def apply_entities_filter(
     request: nodereader_pb2.SearchRequest,
     detected_entities: list[utils_pb2.RelationNode],
 ) -> list[str]:
@@ -568,19 +592,13 @@ def parse_entities_to_filters(
         for entity in detected_entities
         if entity.ntype == utils_pb2.RelationNode.NodeType.ENTITY
     ]:
-        if entity_filter not in request.filter.field_labels:
-            request.filter.field_labels.append(entity_filter)
+        if entity_filter not in added_filters:
             added_filters.append(entity_filter)
+            # Add the entity to the filter expression (with AND)
+            entity_expr = nodereader_pb2.FilterExpression()
+            entity_expr.facet.facet = translate_label(entity_filter)
+            add_and_expression(request.field_filter, entity_expr)
 
-    # We need to expand the filter expression with the automatically detected entities.
-    if len(added_filters) > 0:
-        # So far, autofilters feature will only yield 'and' expressions with the detected entities.
-        # More complex autofilters can be added here if we leverage the query endpoint.
-        expanded_expression = {"and": [{"literal": entity} for entity in added_filters]}
-        if request.filter.labels_expression:
-            expression = json.loads(request.filter.labels_expression)
-            expanded_expression["and"].append(expression)
-        request.filter.labels_expression = json.dumps(expanded_expression)
     return added_filters
 
 
@@ -588,6 +606,7 @@ async def suggest_query_to_pb(
     kbid: str,
     features: list[SuggestOptions],
     query: str,
+    filter_expression: Optional[FilterExpression],
     fields: list[str],
     filters: list[str],
     faceted: list[str],
@@ -605,12 +624,6 @@ async def suggest_query_to_pb(
 
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
-
-    if hidden is not None:
-        if hidden:
-            filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
-        else:
-            filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
 
     old = OldFilterParams(
         label_filters=filters,
@@ -631,8 +644,37 @@ async def suggest_query_to_pb(
         generative_model=None,
     )
     field_expr, _ = await parse_old_filters(old, fetcher)
+    if field_expr is not None and filter_expression is not None:
+        raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
+
     if field_expr is not None:
         request.field_filter.CopyFrom(field_expr)
+
+    if filter_expression:
+        if filter_expression.field:
+            expr = await parse_expression(filter_expression.field, kbid)
+            if expr:
+                request.field_filter.CopyFrom(expr)
+
+        if filter_expression.paragraph:
+            raise InvalidQueryError(
+                "filter_expression", "paragraph filters not yet available in suggest"
+            )
+            # TODO
+            # expr = await parse_expression(filter_expression.paragraph, kbid)
+            # if expr:
+            #     request.paragraph_filter.CopyFrom(expr)
+
+        # TODO: Pass operator to PB
+
+    if hidden is not None:
+        expr = nodereader_pb2.FilterExpression()
+        if hidden:
+            expr.facet.facet = LABEL_HIDDEN
+        else:
+            expr.bool_not.facet.facet = LABEL_HIDDEN
+
+        add_and_expression(request.field_filter, expr)
 
     return request
 

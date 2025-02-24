@@ -45,7 +45,7 @@ from nucliadb_models.internal.shards import (  # noqa isort: skip
     ShardReplica,
     KnowledgeboxShards,
 )
-
+from nucliadb_models.filter import FilterExpression
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
     "name": "structred_response",
@@ -644,6 +644,16 @@ class SearchParamDefaults:
         title="Filter resources by hidden",
         description="Set to filter only hidden or only non-hidden resources. Default is to return everything",
     )
+    filter_expression = ParamDefault(
+        default=None,
+        title="Filter resource by an expression",
+        description=(
+            "Returns only documents that match this filter expression."
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"
+            "This allows building complex filtering expressions and replaces the following parameters:"
+            "`fields`, `filters`, `range_*`, `resource_filters`, `keyword_filters`."
+        ),
+    )
 
 
 class Filter(BaseModel):
@@ -737,6 +747,9 @@ class AuditMetadataBase(BaseModel):
 
 class BaseSearchRequest(AuditMetadataBase):
     query: str = SearchParamDefaults.query.to_pydantic_field()
+    filter_expression: SkipJsonSchema[Optional[FilterExpression]] = (
+        SearchParamDefaults.filter_expression.to_pydantic_field()
+    )
     fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
@@ -1369,6 +1382,9 @@ class AskRequest(AuditMetadataBase):
         ge=1,
         le=200,
         description="The top most relevant results to fetch at the retrieval step. The maximum number of results allowed is 200.",
+    )
+    filter_expression: SkipJsonSchema[Optional[FilterExpression]] = (
+        SearchParamDefaults.filter_expression.to_pydantic_field()
     )
     fields: list[str] = SearchParamDefaults.fields.to_pydantic_field()
     filters: Union[list[str], list[Filter]] = Field(

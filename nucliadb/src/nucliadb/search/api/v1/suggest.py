@@ -33,6 +33,7 @@ from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
 from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.filter import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxSuggestResults,
@@ -61,6 +62,9 @@ async def suggest_knowledgebox(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.suggest_query),
+    filter_expression: Optional[str] = fastapi_query(
+        SearchParamDefaults.filter_expression, include_in_schema=False
+    ),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
@@ -85,10 +89,13 @@ async def suggest_knowledgebox(
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
 ) -> Union[KnowledgeboxSuggestResults, HTTPClientError]:
     try:
+        expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
+
         return await suggest(
             response,
             kbid,
             query,
+            expr,
             fields,
             filters,
             faceted,
@@ -114,6 +121,7 @@ async def suggest(
     response,
     kbid: str,
     query: str,
+    filter_expression: Optional[FilterExpression],
     fields: list[str],
     filters: list[str],
     faceted: list[str],
@@ -137,6 +145,7 @@ async def suggest(
             kbid,
             features,
             query,
+            filter_expression,
             fields,
             filters,
             faceted,
