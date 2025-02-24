@@ -30,7 +30,7 @@ use tantivy::query::{BooleanQuery, Occur, Query};
 use tantivy::{Index, IndexReader};
 
 use crate::graph_query_parser::{
-    Expression, FuzzyTerm, GraphQuery, GraphQueryParser, GraphSearcher, Node, NodeQuery, PathQuery, Relation, Term,
+    Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, PathQuery, Relation, Term,
 };
 use crate::schema::Schema;
 use crate::{io_maps, schema};
@@ -55,16 +55,29 @@ impl Debug for RelationsReaderService {
 }
 
 impl RelationsReaderService {
-    pub fn search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
+    pub fn relation_search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
         Ok(RelationSearchResponse {
-            subgraph: self.graph_search(request)?,
+            subgraph: self.entities_subgraph_search(request)?,
             prefix: self.prefix_search(request)?,
         })
     }
 
-    pub fn advanced_graph_query(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
-        let searcher = GraphSearcher::new(self.reader.searcher());
-        searcher.search(query)
+    pub fn graph_search(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
+        let parser = GraphQueryParser::new();
+        let index_query: Box<dyn Query> = parser.parse(query);
+
+        // TODO: parametrize this magic constant
+        let collector = TopDocs::with_limit(1000);
+
+        let searcher = self.reader.searcher();
+        let matching_docs = searcher.search(&index_query, &collector)?;
+        let mut relations = Vec::with_capacity(matching_docs.len());
+        for (_, doc_addr) in matching_docs {
+            let doc = searcher.doc(doc_addr)?;
+            let relation = io_maps::doc_to_relation(&self.schema, &doc);
+            relations.push(relation);
+        }
+        Ok(relations)
     }
 }
 
@@ -85,7 +98,10 @@ impl RelationsReaderService {
         })
     }
 
-    fn graph_search(&self, request: &RelationSearchRequest) -> anyhow::Result<Option<EntitiesSubgraphResponse>> {
+    fn entities_subgraph_search(
+        &self,
+        request: &RelationSearchRequest,
+    ) -> anyhow::Result<Option<EntitiesSubgraphResponse>> {
         let Some(bfs_request) = request.subgraph.as_ref() else {
             return Ok(None);
         };
@@ -213,14 +229,11 @@ impl RelationsReaderService {
         if !node_filters.is_empty() {
             source_q.push((
                 Occur::Must,
-                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
-                    node_filters.clone(),
-                )))),
+                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(node_filters.clone())))),
             ));
             target_q.push((
                 Occur::Must,
-                query_parser
-                    .parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(node_filters)))),
+                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(node_filters)))),
             ))
         }
 
@@ -266,15 +279,13 @@ impl RelationsReaderService {
                 // add fuzzy query for all prefixes
                 source_q.push((
                     Occur::Must,
-                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
-                        prefix_nodes_q.clone(),
-                    )))),
+                    query_parser
+                        .parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(prefix_nodes_q.clone())))),
                 ));
                 target_q.push((
                     Occur::Must,
-                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(
-                        prefix_nodes_q,
-                    )))),
+                    query_parser
+                        .parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(prefix_nodes_q)))),
                 ));
             }
             Search::Prefix(prefix) => {
@@ -289,15 +300,13 @@ impl RelationsReaderService {
                 };
                 source_q.push((
                     Occur::Must,
-                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(
-                        node_filter.clone(),
-                    )))),
+                    query_parser
+                        .parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(node_filter.clone())))),
                 ));
                 target_q.push((
                     Occur::Must,
-                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(
-                        Expression::Value(node_filter),
-                    ))),
+                    query_parser
+                        .parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Value(node_filter)))),
                 ));
             }
         }
