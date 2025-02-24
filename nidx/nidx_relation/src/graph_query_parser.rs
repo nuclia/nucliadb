@@ -54,10 +54,8 @@ pub struct Node {
 
 #[derive(Default, Clone)]
 pub struct Relation {
+    // TODO: fuzzy
     pub value: Option<String>,
-    // TODO: fuzzy distance and fuzzy_prefix
-    // pub fuzzy_distance: Option<u8>,
-    // pub fuzzy_prefix: bool,
 }
 
 // Generic (simple) boolean expression for graph querying
