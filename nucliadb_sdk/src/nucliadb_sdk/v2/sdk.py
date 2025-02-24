@@ -422,16 +422,6 @@ SDK_DEFINITION = {
         path_params=("kbid",),
     ),
     # Predict proxy endpoints
-    "predict_get": SdkEndpointDefinition(
-        path_template="/v1/kb/{kbid}/predict/{endpoint}",
-        method="GET",
-        path_params=("kbid", "endpoint"),
-    ),
-    "predict_post": SdkEndpointDefinition(
-        path_template="/v1/kb/{kbid}/predict/{endpoint}",
-        method="POST",
-        path_params=("kbid", "endpoint"),
-    ),
     "run_text_agents": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/predict/run-agents-text",
         method="POST",
@@ -1039,8 +1029,6 @@ class NucliaDB(_NucliaDBBase):
     list_vector_sets = _request_sync_builder("list_vector_sets", type(None), VectorSetList)
 
     # Predict proxy endpoints
-    predict_get = _request_json_sync_builder("predict_get")
-    predict_post = _request_json_sync_builder("predict_post")
     run_text_agents = _request_sync_builder(
         "run_text_agents", RunTextAgentsRequest, RunTextAgentsResponse
     )
@@ -1227,8 +1215,6 @@ class NucliaDBAsync(_NucliaDBBase):
     list_vector_sets = _request_async_builder("list_vector_sets", type(None), VectorSetList)
 
     # Predict proxy endpoints
-    predict_get = _request_json_async_builder("predict_get")
-    predict_post = _request_json_async_builder("predict_post")
     run_text_agents = _request_async_builder(
         "run_text_agents", RunTextAgentsRequest, RunTextAgentsResponse
     )

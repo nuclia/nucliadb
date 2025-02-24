@@ -147,20 +147,6 @@ def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.get_configuration_schema(kbid=kb.uuid)
 
 
-def test_predict_proxied_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
-    sdk.predict_get(
-        kbid=kb.uuid, endpoint="tokens", query_params={"text": "Is Barcelona bigger than Mallorca?"}
-    )
-    sdk.predict_post(
-        kbid=kb.uuid,
-        endpoint="chat",
-        content={
-            "question": "Is Barcelona bigger than Mallorca?",
-            "user_id": "foo",
-        },
-    )
-
-
 def test_check_response():
     sdk = nucliadb_sdk.NucliaDB(region="europe-1")
 

@@ -103,17 +103,3 @@ async def test_learning_config_endpoints(sdk_async: nucliadb_sdk.NucliaDB, kb):
     await sdk_async.get_models(kbid=kb.uuid)
     await sdk_async.get_model(kbid=kb.uuid, model_id="foo")
     await sdk_async.get_configuration_schema(kbid=kb.uuid)
-
-
-async def test_predict_proxied_endpoints(sdk_async: nucliadb_sdk.NucliaDB, kb):
-    await sdk_async.predict_get(
-        kbid=kb.uuid, endpoint="tokens", query_params={"text": "Is Barcelona bigger than Mallorca?"}
-    )
-    await sdk_async.predict_post(
-        kbid=kb.uuid,
-        endpoint="chat",
-        content={
-            "question": "Is Barcelona bigger than Mallorca?",
-            "user_id": "foo",
-        },
-    )
