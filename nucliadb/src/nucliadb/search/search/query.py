@@ -518,7 +518,6 @@ async def paragraph_query_to_pb(
         range_creation_end=range_creation_end,
         range_modification_start=range_modification_start,
         range_modification_end=range_modification_end,
-        key_filters=[rid],
         fields=fields,
     )
     fetcher = Fetcher(
@@ -554,6 +553,10 @@ async def paragraph_query_to_pb(
             request.filter_operator = nodereader_pb2.FilterOperator.OR
         else:
             request.filter_operator = nodereader_pb2.FilterOperator.AND
+
+    key_filter = nodereader_pb2.FilterExpression()
+    key_filter.resource.resource_id = rid
+    add_and_expression(request.field_filter, key_filter)
 
     return request
 
