@@ -19,6 +19,7 @@
 #
 import httpx
 import pytest
+from nuclia_models.predict.run_agents import RunTextAgentsRequest
 
 import nucliadb_sdk
 from nucliadb_models.conversation import InputMessage, InputMessageContent
@@ -145,6 +146,26 @@ def test_learning_config_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.get_models(kbid=kb.uuid)
     sdk.get_model(kbid=kb.uuid, model_id="foo")
     sdk.get_configuration_schema(kbid=kb.uuid)
+
+
+def test_predict_proxied_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
+    sdk.predict_get(
+        kbid=kb.uuid, endpoint="tokens", query_params={"text": "Is Barcelona bigger than Mallorca?"}
+    )
+    sdk.predict_post(
+        kbid=kb.uuid,
+        endpoint="chat",
+        content={
+            "question": "Is Barcelona bigger than Mallorca?",
+            "user_id": "foo",
+        },
+    )
+    req = RunTextAgentsRequest(
+        user_id="foo",
+        filters=[],
+        texts=["Is Barcelona bigger than Mallorca?"],
+    )
+    sdk.run_text_agents(kbid=kb.uuid, content=req)
 
 
 def test_check_response():
