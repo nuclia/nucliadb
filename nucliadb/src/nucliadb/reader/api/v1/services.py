@@ -164,6 +164,7 @@ async def get_labelsets(kbid: str) -> KnowledgeBoxLabels:
     summary="Get a Knowledge Box Label Set",
     response_model=LabelSet,
     tags=["Knowledge Box Services"],
+    responses={"404": {"description": "Knowledge Box or Label Set not found"}},
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -172,6 +173,12 @@ async def get_labelset_endpoint(request: Request, kbid: str, labelset: str) -> L
         return await get_labelset(kbid, labelset)
     except KnowledgeBoxNotFound:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    except LabelSetNotFound:
+        raise HTTPException(status_code=404, detail="Label Set does not exist")
+
+
+class LabelSetNotFound(Exception):
+    pass
 
 
 async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
@@ -182,15 +189,14 @@ async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
         kbid=kbid, labelset_id=labelset_id
     )
     if labelset is None:
-        response = LabelSet()
-    else:
-        response = LabelSet(
-            **MessageToDict(
-                labelset,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
+        raise LabelSetNotFound()
+    response = LabelSet(
+        **MessageToDict(
+            labelset,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+    )
     return response
 
 
