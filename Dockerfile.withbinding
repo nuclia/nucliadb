@@ -51,7 +51,7 @@ RUN set -eux; \
 # are updated. The generated requirements.txt does not, so it is
 # more cacheable.
 FROM python:3.12-slim-bookworm AS requirements
-RUN pip install pdm==2.22.1
+RUN pip install pdm>=2.22.3
 COPY pdm.lock pyproject.toml .
 RUN pdm export -G nucliadb --no-hashes | grep -v ^-e | grep -v nidx_protos > requirements.lock.txt
 
@@ -59,7 +59,7 @@ RUN pdm export -G nucliadb --no-hashes | grep -v ^-e | grep -v nidx_protos > req
 # This stage builds a virtual env with all dependencies
 #
 FROM python:3.12-slim-bookworm AS builder
-RUN pip install pdm==2.22.1
+RUN pip install pdm>=2.22.3
 
 # Install Python dependencies
 WORKDIR /usr/src/app
