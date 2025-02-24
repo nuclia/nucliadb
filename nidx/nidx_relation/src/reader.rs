@@ -256,21 +256,29 @@ impl RelationsReaderService {
             }
             Search::Prefix(prefix) => {
                 let normalized_prefix = schema::normalize(prefix);
+                let node_filter = Node {
+                    value: Some(graph_query_parser::Term::Fuzzy(FuzzyTerm {
+                        value: normalized_prefix.clone(),
+                        fuzzy_distance: FUZZY_DISTANCE,
+                        is_prefix: true,
+                    })),
+                    ..Default::default()
+                };
                 source_q.push((
                     Occur::Must,
-                    Box::new(FuzzyTermQuery::new_prefix(
-                        Term::from_field_text(self.schema.normalized_source_value, &normalized_prefix),
-                        FUZZY_DISTANCE,
-                        true,
-                    )),
+                    query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::DirectedPath((
+                        Expression::Value(node_filter.clone()),
+                        Expression::Value(Relation::default()),
+                        Expression::Value(Node::default()),
+                    )))),
                 ));
                 target_q.push((
                     Occur::Must,
-                    Box::new(FuzzyTermQuery::new_prefix(
-                        Term::from_field_text(self.schema.normalized_target_value, &normalized_prefix),
-                        FUZZY_DISTANCE,
-                        true,
-                    )),
+                    query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::DirectedPath((
+                        Expression::Value(Node::default()),
+                        Expression::Value(Relation::default()),
+                        Expression::Value(node_filter),
+                    )))),
                 ));
             }
         }
