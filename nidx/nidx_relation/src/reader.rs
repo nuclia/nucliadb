@@ -106,7 +106,7 @@ impl RelationsReaderService {
         for entry_point in bfs_request.entry_points.iter() {
             statements.push((
                 Occur::Should,
-                query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::UndirectedPath((
+                query_parser.parse(GraphQuery::PathQuery(PathQuery::UndirectedPath((
                     Expression::Value(Node {
                         value: Some(entry_point.value.clone().into()),
                         node_type: Some(entry_point.ntype()),
@@ -129,7 +129,7 @@ impl RelationsReaderService {
             }
             statements.push((
                 Occur::MustNot,
-                query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::UndirectedPath((
+                query_parser.parse(GraphQuery::PathQuery(PathQuery::UndirectedPath((
                     Expression::Or(
                         deleted_nodes
                             .node_values
@@ -161,7 +161,7 @@ impl RelationsReaderService {
         if excluded_subtypes.len() > 0 {
             statements.push((
                 Occur::MustNot,
-                query_parser.parse_graph_query(GraphQuery::PathQuery(PathQuery::UndirectedPath((
+                query_parser.parse(GraphQuery::PathQuery(PathQuery::UndirectedPath((
                     Expression::Or(excluded_subtypes),
                     Expression::Value(Relation::default()),
                     Expression::Value(Node::default()),
@@ -213,14 +213,14 @@ impl RelationsReaderService {
         if !node_filters.is_empty() {
             source_q.push((
                 Occur::Must,
-                query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
+                query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
                     node_filters.clone(),
                 )))),
             ));
             target_q.push((
                 Occur::Must,
                 query_parser
-                    .parse_graph_query(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(node_filters)))),
+                    .parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(node_filters)))),
             ))
         }
 
@@ -266,13 +266,13 @@ impl RelationsReaderService {
                 // add fuzzy query for all prefixes
                 source_q.push((
                     Occur::Must,
-                    query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
+                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Or(
                         prefix_nodes_q.clone(),
                     )))),
                 ));
                 target_q.push((
                     Occur::Must,
-                    query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(
+                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(Expression::Or(
                         prefix_nodes_q,
                     )))),
                 ));
@@ -289,13 +289,13 @@ impl RelationsReaderService {
                 };
                 source_q.push((
                     Occur::Must,
-                    query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(
+                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(
                         node_filter.clone(),
                     )))),
                 ));
                 target_q.push((
                     Occur::Must,
-                    query_parser.parse_graph_query(GraphQuery::NodeQuery(NodeQuery::DestinationNode(
+                    query_parser.parse(GraphQuery::NodeQuery(NodeQuery::DestinationNode(
                         Expression::Value(node_filter),
                     ))),
                 ));
