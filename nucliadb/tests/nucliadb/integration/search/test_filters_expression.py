@@ -23,7 +23,7 @@ from httpx import AsyncClient
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_filtering_expression(
+async def test_old_filtering_expression(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, standalone_knowledgebox: str
 ):
     kbid = standalone_knowledgebox
@@ -126,3 +126,152 @@ async def test_filtering_expression_validation(
         json={"query": "", "filters": [{"all": ["/origin.path/folder1"], "any": None}]},
     )
     assert resp.status_code != 422
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_filtering_expression(
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, standalone_knowledgebox: str
+):
+    kbid = standalone_knowledgebox
+
+    slug_to_uuid = {}
+    # Create 3 resources in different folders
+    for title, slug, path, tag, created in [
+        ("Resource1", "resource1", "folder1", "news", "2021-01-01"),
+        ("Resource2", "resource2", "folder2", "poetry", "2022-02-02"),
+        ("Resource3", "resource3", "folder3", "scientific", "2023-03-03"),
+    ]:
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/resources",
+            json={
+                "title": title,
+                "slug": slug,
+                "origin": {
+                    "path": path,
+                    "tags": [tag],
+                    "created": created,
+                },
+            },
+        )
+        assert resp.status_code == 201
+        slug_to_uuid[slug] = resp.json()["uuid"]
+
+    for filters, expected_slugs in [
+        # all: [a, b] == (a && b)
+        (
+            {
+                "and": [
+                    {"prop": "origin_path", "prefix": "folder1"},
+                    {"prop": "origin_path", "prefix": "folder2"},
+                ]
+            },
+            [],
+        ),
+        (
+            {
+                "and": [
+                    {"prop": "origin_path", "prefix": "folder1"},
+                    {"prop": "origin_tag", "tag": "news"},
+                ]
+            },
+            ["resource1"],
+        ),
+        # any: [a, b] == (a || b)
+        (
+            {
+                "or": [
+                    {"prop": "origin_path", "prefix": "folder1"},
+                    {"prop": "origin_path", "prefix": "folder2"},
+                ]
+            },
+            ["resource1", "resource2"],
+        ),
+        (
+            {
+                "or": [
+                    {"prop": "origin_path", "prefix": "folder1"},
+                    {"prop": "keyword", "word": "inexisting"},
+                ]
+            },
+            ["resource1"],
+        ),
+        # none: [a, b] == !(a || b)
+        ({"not": {"or": [{"prop": "origin_path", "prefix": "folder1"}]}}, ["resource2", "resource3"]),
+        (
+            {
+                "not": {
+                    "or": [
+                        {"prop": "origin_path", "prefix": "folder1"},
+                        {"prop": "origin_path", "prefix": "folder2"},
+                    ]
+                }
+            },
+            ["resource3"],
+        ),
+        # not_all: [a, b] == !(a && b)
+        (
+            {
+                "not": {
+                    "and": [
+                        {"prop": "origin_path", "prefix": "folder1"},
+                        {"prop": "origin_path", "prefix": "folder2"},
+                    ]
+                }
+            },
+            ["resource1", "resource2", "resource3"],
+        ),
+        (
+            {
+                "not": {
+                    "and": [
+                        {"prop": "origin_path", "prefix": "folder1"},
+                        {"prop": "origin_tag", "tag": "news"},
+                    ]
+                }
+            },
+            ["resource2", "resource3"],
+        ),
+        # combined expressions
+        (
+            {
+                "and": [
+                    {
+                        "or": [
+                            {"prop": "origin_path", "prefix": "folder1"},
+                            {"prop": "origin_path", "prefix": "folder2"},
+                            {"prop": "origin_path", "prefix": "folder3"},
+                        ]
+                    },
+                    {"not": {"prop": "origin_tag", "tag": "news"}},
+                ]
+            },
+            ["resource2", "resource3"],
+        ),
+        # By resource_id / slug
+        ({"prop": "resource", "id": slug_to_uuid["resource1"]}, ["resource1"]),
+        ({"prop": "resource", "slug": "resource2"}, ["resource2"]),
+        (
+            {"prop": "resource", "id": slug_to_uuid["resource1"], "slug": "resource2"},
+            None,
+        ),
+        # By date
+        ({"prop": "created", "since": "2000-01-01T00:00:00"}, ["resource1", "resource2", "resource3"]),
+        ({"prop": "created", "until": "2023-01-01T00:00:00"}, ["resource1", "resource2"]),
+        (
+            {"prop": "created", "since": "2022-01-01T00:00:00", "until": "2023-01-01T00:00:00"},
+            ["resource2"],
+        ),
+        ({"prop": "created"}, None),
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={"query": "", "filter_expression": {"field": filters}},
+        )
+        if expected_slugs is None:
+            assert resp.status_code == 422
+        else:
+            assert resp.status_code == 200, resp.text
+            body = resp.json()
+            expected_uuids = {slug_to_uuid[slug] for slug in expected_slugs}
+            found_uuids = set(body["resources"].keys())
+            assert found_uuids == expected_uuids
