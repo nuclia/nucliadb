@@ -95,5 +95,5 @@ async def delete_strategy(
     strategy_id: str,
 ):
     return await learning_config_proxy(
-        request, "POST", f"/extract_strategies/{kbid}/strategies/{strategy_id}"
+        request, "DELETE", f"/extract_strategies/{kbid}/strategies/{strategy_id}"
     )
