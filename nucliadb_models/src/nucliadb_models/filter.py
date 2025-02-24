@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from enum import Enum
 from typing import Any, Generic, Literal, Optional, TypeVar, Union
 
 import pydantic
@@ -301,9 +302,9 @@ class FilterExpression(BaseModel, extra="forbid"):
     `fields`, `filters`, `range_*`, `resource_filters`, `keyword_filters`.
     """
 
-    # class Operator(str, Enum):
-    #     AND = "and"
-    #     OR = "or"
+    class Operator(str, Enum):
+        AND = "and"
+        OR = "or"
 
     field: Optional[FieldFilterExpression] = pydantic.Field(
         default=None, description="Filter to apply to fields"
@@ -312,12 +313,11 @@ class FilterExpression(BaseModel, extra="forbid"):
         default=None, description="Filter to apply to each text block"
     )
 
-    # TODO: Not exposed until implemented in nidx
-    # operator: Operator = pydantic.Field(
-    #     default=Operator.AND,
-    #     description=(
-    #         "How to combine field and paragraph filters (default is AND)."
-    #         "AND returns text blocks that match both filters."
-    #         "OR returns text_blocks that match one of the two filters"
-    #     ),
-    # )
+    operator: Operator = pydantic.Field(
+        default=Operator.AND,
+        description=(
+            "How to combine field and paragraph filters (default is AND)."
+            "AND returns text blocks that match both filters."
+            "OR returns text_blocks that match one of the two filters"
+        ),
+    )

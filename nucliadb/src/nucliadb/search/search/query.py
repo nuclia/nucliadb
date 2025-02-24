@@ -252,7 +252,10 @@ class QueryParser:
                 if expr:
                     request.paragraph_filter.CopyFrom(expr)
 
-            # TODO: Pass operator to PB
+            if self.filter_expression.operator == FilterExpression.Operator.OR:
+                request.filter_operator = nodereader_pb2.FilterOperator.OR
+            else:
+                request.filter_operator = nodereader_pb2.FilterOperator.AND
 
         if self.hidden is not None:
             expr = nodereader_pb2.FilterExpression()
@@ -660,12 +663,14 @@ async def suggest_query_to_pb(
             raise InvalidQueryError(
                 "filter_expression", "paragraph filters not yet available in suggest"
             )
-            # TODO
-            # expr = await parse_expression(filter_expression.paragraph, kbid)
-            # if expr:
-            #     request.paragraph_filter.CopyFrom(expr)
+            expr = await parse_expression(filter_expression.paragraph, kbid)
+            if expr:
+                request.paragraph_filter.CopyFrom(expr)
 
-        # TODO: Pass operator to PB
+        if filter_expression.operator == FilterExpression.Operator.OR:
+            request.filter_operator = nodereader_pb2.FilterOperator.OR
+        else:
+            request.filter_operator = nodereader_pb2.FilterOperator.AND
 
     if hidden is not None:
         expr = nodereader_pb2.FilterExpression()

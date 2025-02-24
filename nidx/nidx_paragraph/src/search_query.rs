@@ -23,6 +23,7 @@ use crate::set_query::SetQuery;
 use itertools::Itertools;
 use nidx_protos::StreamRequest;
 use nidx_types::prefilter::PrefilterResult;
+use nidx_types::query_language::BooleanExpression;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -262,20 +263,38 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
     }
 }
 
-fn apply_prefilter(
-    queries: &mut [&mut Vec<(Occur, Box<dyn Query>)>],
+fn filter_query(
     schema: &ParagraphSchema,
     prefilter: &PrefilterResult,
-    operator: Occur,
-) {
+    paragraph_formula: &Option<BooleanExpression>,
+    filter_or: bool,
+) -> Option<Box<dyn Query>> {
+    let mut filter_terms = vec![];
+    let operator = if filter_or {
+        Occur::Should
+    } else {
+        Occur::Must
+    };
+
+    // Paragraph filter
+    if let Some(formula) = &paragraph_formula {
+        let query = translate_expression(formula, schema);
+        filter_terms.push((operator, query));
+    }
+
+    // Prefilter
     if let PrefilterResult::Some(field_keys) = prefilter {
         let set_query = Box::new(SetQuery::new(
             schema.field_uuid,
             field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
         ));
-        for q in queries {
-            q.push((operator, set_query.clone()));
-        }
+        filter_terms.push((operator, set_query));
+    }
+
+    if !filter_terms.is_empty() {
+        Some(Box::new(BooleanQuery::new(filter_terms)))
+    } else {
+        None
     }
 }
 
@@ -299,16 +318,10 @@ pub fn suggest_query(
     fuzzies.push((Occur::Must, Box::new(term_query.clone())));
     originals.push((Occur::Must, Box::new(term_query)));
 
-    let operator = if request.filter_or {
-        Occur::Should
-    } else {
-        Occur::Must
-    };
-    apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter, operator);
-    if let Some(paragraph_filter) = &request.filtering_formula {
-        let query = translate_expression(paragraph_filter, schema);
-        fuzzies.push((operator, query.box_clone()));
-        originals.push((operator, query));
+    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_or);
+    if let Some(query) = filter_query {
+        originals.push((Occur::Must, query.box_clone()));
+        fuzzies.push((Occur::Must, query));
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
@@ -346,16 +359,10 @@ pub fn search_query(
         fuzzies.push((Occur::Must, advance));
     }
 
-    let operator = if search.filter_or {
-        Occur::Should
-    } else {
-        Occur::Must
-    };
-    apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter, operator);
-    if let Some(formula) = &search.filtering_formula {
-        let query = translate_expression(formula, schema);
-        fuzzies.push((operator, query.box_clone()));
-        originals.push((operator, query));
+    let filter_query = filter_query(schema, prefilter, &search.filtering_formula, search.filter_or);
+    if let Some(query) = filter_query {
+        originals.push((Occur::Must, query.box_clone()));
+        fuzzies.push((Occur::Must, query));
     }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
