@@ -1135,6 +1135,59 @@ async def test_ask_rag_strategy_prequeries_with_prefilter(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_ask_rag_strategy_prequeries_with_prefilter_and_expression(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    resources,
+):
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/ask",
+        headers={"X-Synchronous": "True"},
+        json={
+            "query": "",
+            "rag_strategies": [
+                {
+                    "name": "prequeries",
+                    "queries": [
+                        {
+                            "request": {"query": '"The title 0"', "fields": ["a/title"]},
+                            "weight": 20,
+                            "id": "prefilter_query",
+                            "prefilter": True,
+                        },
+                        {
+                            "request": {
+                                "query": "summary",
+                                "filter_expression": {
+                                    "field": {"not": {"prop": "label", "labelset": "empty"}}
+                                },
+                            },
+                            "weight": 1,
+                            "id": "prequery",
+                        },
+                    ],
+                },
+            ],
+            "debug": True,
+        },
+    )
+    expected_rid = resources[0]
+    assert resp.status_code == 200, resp.text
+    content = resp.json()
+    ask_response = SyncAskResponse.model_validate(content)
+    assert ask_response.prequeries is not None
+    assert len(ask_response.prequeries) == 2
+
+    # Check that the prefilter query found the right resource
+    assert len(ask_response.prequeries["prefilter_query"].resources) == 1
+    assert expected_rid in ask_response.prequeries["prefilter_query"].resources
+
+    # Check that the other prequery was executed and only matched one resource (due to the prefilter)
+    assert len(ask_response.prequeries["prequery"].resources) == 1
+    assert ask_response.prequeries["prequery"].resources[expected_rid].title == "The title 0"
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_ask_on_resource_with_json_schema_automatic_prequeries(
     nucliadb_reader: AsyncClient,
     standalone_knowledgebox: str,

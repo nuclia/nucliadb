@@ -20,7 +20,7 @@
 import dataclasses
 import functools
 import json
-from typing import AsyncGenerator, Optional, Union, cast
+from typing import AsyncGenerator, Optional, cast
 
 from nuclia_models.predict.generative_responses import (
     CitationsGenerativeResponse,
@@ -47,6 +47,7 @@ from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
+    add_resource_filter,
     get_find_results,
     get_relations_results,
     maybe_audit_chat,
@@ -63,7 +64,6 @@ from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams
 from nucliadb.search.utilities import get_predict
-from nucliadb_models import filter
 from nucliadb_models.search import (
     AnswerAskResponseItem,
     AskRequest,
@@ -805,7 +805,7 @@ async def retrieval_in_resource(
         prequeries = calculate_prequeries_for_json_schema(ask_request)
 
     # Make sure the retrieval is scoped to the resource if provided
-    add_resource_filter(ask_request, resource)
+    add_resource_filter(ask_request, [resource])
     if prequeries is not None:
         for prequery in prequeries.queries:
             if prequery.prefilter is True:
@@ -813,7 +813,7 @@ async def retrieval_in_resource(
                     "rag_strategies",
                     "Prequeries with prefilter are not supported when asking on a resource",
                 )
-            add_resource_filter(prequery.request, resource)
+            add_resource_filter(prequery.request, [resource])
 
     with metrics.time("retrieval"):
         main_results, prequeries_results, query_parser = await get_find_results(
@@ -843,20 +843,6 @@ async def retrieval_in_resource(
         main_query_weight=main_query_weight,
         best_matches=best_matches,
     )
-
-
-def add_resource_filter(request: Union[FindRequest, AskRequest], rid: str):
-    if request.filter_expression is not None:
-        # Add to filter expression if set
-        if request.filter_expression.field is None:
-            request.filter_expression.field = filter.Resource(prop="resource", id=rid)
-        else:
-            request.filter_expression.field = filter.And.model_validate(
-                {"and": [request.filter_expression.field, filter.Resource(prop="resource", id=rid)]}
-            )
-    else:
-        # Add to old key filters instead
-        request.resource_filters = [rid]
 
 
 def compute_best_matches(
