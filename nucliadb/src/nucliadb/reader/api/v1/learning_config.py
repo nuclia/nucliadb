@@ -17,8 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Dict
+
 from fastapi import Request
 from fastapi_versioning import version
+from nuclia_models.config.proto import ExtractConfig
 
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.models.responses import HTTPClientError
@@ -143,3 +146,40 @@ async def get_schema_for_configuration_creation(
     if not is_onprem_nucliadb():
         return HTTPClientError(status_code=404, detail="Endpoint not available for Hosted NucliaDB")
     return await learning_config_proxy(request, "GET", f"/schema")
+
+
+@api.get(
+    path=f"/{KB_PREFIX}/{{kbid}}/extract_strategies",
+    status_code=200,
+    summary="Learning extract strategies",
+    description="Get available extract strategies ",
+    response_model=Dict[str, ExtractConfig],
+    tags=["Extract Strategies"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_extract_strategies(
+    request: Request,
+    kbid: str,
+):
+    return await learning_config_proxy(request, "GET", f"/extract_strategies/{kbid}")
+
+
+@api.get(
+    path=f"/{KB_PREFIX}/{{kbid}}/extract_strategies/strategy/{{strategy_id}}",
+    status_code=200,
+    summary="Extract strategy configuration",
+    description="Get extract strategy for a given id",
+    response_model=None,
+    tags=["Extract Strategies"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_extract_strategy_from_id(
+    request: Request,
+    kbid: str,
+    strategy_id: str,
+):
+    return await learning_config_proxy(
+        request, "GET", f"/extract_strategies/{kbid}/strategies/{strategy_id}"
+    )
