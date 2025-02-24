@@ -74,7 +74,7 @@ async def test_predict_proxy_not_proxied_returns_422(
 ):
     kbid = standalone_knowledgebox
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/predict/summarize",
+        f"/kb/{kbid}/predict/not-proxied-endpoint",
         json={"resources": {"foo": "bar"}},
     )
     assert resp.status_code == 422

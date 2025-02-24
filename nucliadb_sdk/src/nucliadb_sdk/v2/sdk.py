@@ -42,6 +42,7 @@ from typing import (
 
 import httpx
 import orjson
+from nuclia_models.predict.run_agents import RunTextAgentsRequest, RunTextAgentsResponse
 from pydantic import BaseModel, ValidationError
 
 from nucliadb_models.conversation import InputMessage
@@ -418,6 +419,12 @@ SDK_DEFINITION = {
     "list_vector_sets": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/vectorsets",
         method="GET",
+        path_params=("kbid",),
+    ),
+    # Predict proxy endpoints
+    "run_text_agents": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/predict/run-agents-text",
+        method="POST",
         path_params=("kbid",),
     ),
 }
@@ -1021,6 +1028,11 @@ class NucliaDB(_NucliaDBBase):
     delete_vector_set = _request_sync_builder("delete_vector_set", type(None), CreatedVectorSet)
     list_vector_sets = _request_sync_builder("list_vector_sets", type(None), VectorSetList)
 
+    # Predict proxy endpoints
+    run_text_agents = _request_sync_builder(
+        "run_text_agents", RunTextAgentsRequest, RunTextAgentsResponse
+    )
+
 
 class NucliaDBAsync(_NucliaDBBase):
     """
@@ -1201,3 +1213,8 @@ class NucliaDBAsync(_NucliaDBBase):
     add_vector_set = _request_async_builder("add_vector_set", type(None), CreatedVectorSet)
     delete_vector_set = _request_async_builder("delete_vector_set", type(None), CreatedVectorSet)
     list_vector_sets = _request_async_builder("list_vector_sets", type(None), VectorSetList)
+
+    # Predict proxy endpoints
+    run_text_agents = _request_async_builder(
+        "run_text_agents", RunTextAgentsRequest, RunTextAgentsResponse
+    )

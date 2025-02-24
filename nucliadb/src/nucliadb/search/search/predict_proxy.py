@@ -36,6 +36,10 @@ class PredictProxiedEndpoints(str, Enum):
     TOKENS = "tokens"
     CHAT = "chat"
     REPHRASE = "rephrase"
+    RUN_AGENTS_TEXT = "run-agents-text"
+    SUMMARIZE = "summarize"
+    RERANK = "rerank"
+    REMI = "remi"
 
 
 async def predict_proxy(
