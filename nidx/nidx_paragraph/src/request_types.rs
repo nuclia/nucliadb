@@ -24,20 +24,22 @@ use nidx_types::query_language::BooleanExpression;
 pub struct ParagraphSearchRequest {
     pub id: String,
     pub uuid: String,
-    /// query this text in all the paragraphs
     pub body: String,
-    pub filter: Option<nidx_protos::Filter>,
     pub order: Option<nidx_protos::OrderBy>,
-    /// Faceted{ labels: Vec<String>}
     pub faceted: Option<nidx_protos::Faceted>,
     pub page_number: i32,
     pub result_per_page: i32,
-    pub timestamps: Option<nidx_protos::Timestamps>,
-    pub with_duplicates: bool,
     pub only_faceted: bool,
     pub advanced_query: Option<String>,
     pub min_score: f32,
     pub security: Option<nidx_protos::utils::Security>,
 
     pub filtering_formula: Option<BooleanExpression>,
+    pub filter_or: bool,
+}
+
+pub struct ParagraphSuggestRequest {
+    pub body: String,
+    pub filtering_formula: Option<BooleanExpression>,
+    pub filter_or: bool,
 }

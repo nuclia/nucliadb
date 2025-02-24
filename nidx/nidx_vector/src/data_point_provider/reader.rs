@@ -216,14 +216,7 @@ impl Reader {
         let offset = offset as usize;
         let total_to_get = total_to_get as usize;
 
-        let field_labels = request.field_labels.iter().cloned().map(AtomClause::label);
         let mut formula = Formula::new();
-
-        if !request.field_labels.is_empty() {
-            let field_atoms = field_labels.map(Clause::Atom).collect();
-            let field_clause = CompoundClause::new(BooleanOperator::And, field_atoms);
-            formula.extend(field_clause);
-        }
 
         if let PrefilterResult::Some(valid_fields) = prefilter {
             let field_ids = valid_fields.iter().map(|f| format!("{}{}", f.resource_id.simple(), f.field_id)).collect();
@@ -234,6 +227,10 @@ impl Reader {
         if let Some(filter) = request.filtering_formula.as_ref() {
             let clause = query_io::map_expression(filter);
             formula.extend(clause);
+        }
+
+        if request.filter_or {
+            formula.operator = BooleanOperator::Or;
         }
 
         let search_request = (total_to_get, request, formula);
@@ -349,7 +346,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -436,7 +432,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -449,7 +444,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -463,7 +457,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -477,7 +470,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0],
-            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,
@@ -553,7 +545,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: true,
@@ -566,7 +557,6 @@ mod tests {
             id: "".to_string(),
             vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
-            field_labels: vec!["1".to_string()],
             page_number: 0,
             result_per_page: 20,
             with_duplicates: false,

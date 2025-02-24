@@ -265,6 +265,11 @@ message FilterExpression {
     }
 }
 
+enum FilterOperator {
+    AND = 0;
+    OR = 1;
+}
+
 message SearchRequest {
     string shard = 1;
 
@@ -308,6 +313,7 @@ message SearchRequest {
 
     optional FilterExpression field_filter = 26;
     optional FilterExpression paragraph_filter = 27;
+    FilterOperator filter_operator = 28;
 }
 
 enum SuggestFeatures {
@@ -326,6 +332,8 @@ message SuggestRequest {
     repeated string fields = 5 [deprecated = true];
 
     optional FilterExpression field_filter = 7;
+    optional FilterExpression paragraph_filter = 8;
+    FilterOperator filter_operator = 9;
 }
 
 
