@@ -613,6 +613,22 @@ async def test_ask_on_resource(nucliadb_reader: AsyncClient, standalone_knowledg
     assert resp.status_code == 200
     SyncAskResponse.model_validate_json(resp.content)
 
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/resource/{resource}/ask",
+        json={"query": "title", "fields": ["t"]},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    SyncAskResponse.model_validate_json(resp.content)
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/resource/{resource}/ask",
+        json={"query": "title", "filter_expression": {"field": {"prop": "field", "type": "text"}}},
+        headers={"X-Synchronous": "True"},
+    )
+    assert resp.status_code == 200
+    SyncAskResponse.model_validate_json(resp.content)
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_handles_stream_errors_on_predict(
