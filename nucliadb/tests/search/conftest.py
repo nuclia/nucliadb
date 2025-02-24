@@ -31,5 +31,4 @@ pytest_plugins = [
     "nucliadb_utils.tests.azure",
     "nucliadb_utils.tests.nats",
     "nucliadb_utils.tests.asyncbenchmark",
-    "nucliadb_utils.tests.indexing",
 ]

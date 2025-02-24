@@ -47,7 +47,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import const
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
@@ -199,47 +198,17 @@ async def knowledgebox_with_vectorsets(
 
 @pytest.fixture(scope="function")
 async def indexing_utility(
-    dummy_indexing_utility: IndexingUtility,
     # TODO: too many tests depend on this to be true.
     # Remove when everyone asks for what they really need
     natsd: str,
     _clean_natsd,
-) -> AsyncIterator[IndexingUtility]:
-    yield dummy_indexing_utility
+) -> AsyncIterator[None]:
+    yield
 
 
 @pytest.fixture(scope="function")
-async def dummy_indexing_utility() -> AsyncIterator[IndexingUtility]:
-    # as it's a dummy utility, we don't need to provide real nats servers or
-    # creds. Anyway, this should be a different class instead of a parameter
-    indexing_utility = IndexingUtility(
-        nats_creds=None,
-        nats_servers=[],
-        dummy=True,
-    )
-    await indexing_utility.initialize()
-    set_utility(Utility.INDEXING, indexing_utility)
-
-    yield indexing_utility
-
-    clean_utility(Utility.INDEXING)
-    await indexing_utility.finalize()
-
-
-@pytest.fixture(scope="function")
-async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator[IndexingUtility]:
-    indexing_utility = IndexingUtility(
-        nats_creds=indexing_settings.index_jetstream_auth,
-        nats_servers=indexing_settings.index_jetstream_servers,
-        dummy=False,
-    )
-    await indexing_utility.initialize()
-    set_utility(Utility.INDEXING, indexing_utility)
-
-    yield indexing_utility
-
-    clean_utility(Utility.INDEXING)
-    await indexing_utility.finalize()
+async def nats_indexing_utility(nats_server: str, _clean_natsd) -> AsyncIterator[None]:
+    yield
 
 
 @pytest.fixture(scope="function")
@@ -265,13 +234,14 @@ async def nats_manager(nats_server: str) -> AsyncIterator[NatsConnectionManager]
 
 
 @pytest.fixture(scope="function")
-async def _clean_natsd(nats_ingest_stream, nats_ingest_processed_stream, nats_index_stream):
+async def _clean_natsd(nats_server, nats_ingest_stream, nats_ingest_processed_stream):
     # XXX Legacy fixture that should be replaced.
     #
     # Although the name was clean, it in fact was deleting and recreating
     # streams/consumers used in nucliadb. So, in fact, this fixture was
     # responsible of streams/consumers creation
-    yield
+    with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
+        yield
 
 
 @pytest.fixture(scope="function")
@@ -296,20 +266,6 @@ async def nats_ingest_processed_stream(nats_server: str):
     ]
     async with _nats_streams_and_consumers_setup(nats_server, streams, consumers):
         yield
-
-
-@pytest.fixture(scope="function")
-async def nats_index_stream(nats_server: str):
-    streams = [
-        (const.Streams.INDEX.name, const.Streams.INDEX.subject.format(node="*")),
-    ]
-    consumers = [
-        (const.Streams.INDEX.name, const.Streams.INDEX.group.format(node="1")),
-    ]
-    # Do not clean consumers after the fixture, since search tests uses a session level sidecar that will reuse it
-    async with _nats_streams_and_consumers_setup(nats_server, streams, consumers, clean=False):
-        with patch.object(indexing_settings, "index_jetstream_servers", [nats_server]):
-            yield
 
 
 @asynccontextmanager

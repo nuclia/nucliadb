@@ -42,15 +42,6 @@ class Streams:
         subject = "ndb.consumer.processed"
         group = "nucliadb-pull-processed"
 
-    class INDEX:
-        """
-        Indexing resources on the IndexNode
-        """
-
-        name = "node"
-        subject = "node.{node}"
-        group = "node-{node}"
-
     class KB_EXPORTS:
         """
         Exporting kbs

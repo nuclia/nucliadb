@@ -31,7 +31,7 @@ from nucliadb_telemetry.utils import setup_telemetry
 from nucliadb_utils.fastapi.run import serve_metrics
 
 from .settings import settings
-from .utils import delete_resource_from_shard, index_resource_to_shard, wait_for_node
+from .utils import delete_resource_from_shard, index_resource_to_shard
 
 logger = logging.getLogger(__name__)
 
@@ -150,14 +150,6 @@ async def move_set_of_kb_resources(
                     "Failed to revert move resource. Hopefully you never see this message.",
                     extra={"kbid": kbid, "resource_id": resource_id},
                 )
-
-    node_ids = set()
-    for replica in from_shard.replicas:
-        node_ids.add(replica.node)
-    for replica in to_shard.replicas:
-        node_ids.add(replica.node)
-    for node_id in node_ids:
-        await wait_for_node(context, node_id)
 
 
 async def rebalance_kb(context: ApplicationContext, kbid: str) -> None:

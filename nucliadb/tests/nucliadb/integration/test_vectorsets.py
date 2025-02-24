@@ -231,7 +231,6 @@ async def test_querying_kb_with_vectorsets(
     maindb_driver: Driver,
     shard_manager,
     learning_config,
-    indexing_utility,
     nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     dummy_predict: DummyPredictEngine,
@@ -443,12 +442,6 @@ def dummy_predict():
     set_utility(Utility.PREDICT, predict)
     yield predict
     clean_utility(Utility.PREDICT)
-
-
-# Overwrite indexing_utility and make sure we use the dummy one
-@pytest.fixture(scope="function")
-async def indexing_utility(dummy_indexing_utility):
-    yield dummy_indexing_utility
 
 
 def create_broker_message_with_vectorsets(
