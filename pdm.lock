@@ -820,7 +820,7 @@ name = "dnspython"
 version = "2.7.0"
 requires_python = ">=3.9"
 summary = "DNS toolkit"
-groups = ["nucliadb"]
+groups = ["nucliadb", "sdk"]
 files = [
     {file = "dnspython-2.7.0-py3-none-any.whl", hash = "sha256:b4c34b7d10b51bcc3a5071e7b8dee77939f1e878477eeecc965e9835f63c6c86"},
     {file = "dnspython-2.7.0.tar.gz", hash = "sha256:ce9c432eda0dc91cf618a5cedf1a4e142651196bbcd2c80e89ed5a907e5cfaf1"},
@@ -847,7 +847,7 @@ name = "email-validator"
 version = "2.2.0"
 requires_python = ">=3.8"
 summary = "A robust email address syntax and deliverability validation library."
-groups = ["nucliadb"]
+groups = ["nucliadb", "sdk"]
 dependencies = [
     "dnspython>=2.0.0",
     "idna>=2.0.0",
@@ -2062,7 +2062,7 @@ name = "nuclia-models"
 version = "0.28.1"
 requires_python = ">=3.9"
 summary = ""
-groups = ["nucliadb"]
+groups = ["nucliadb", "sdk"]
 dependencies = [
     "pydantic[email]>=2.9.2",
 ]
@@ -2205,6 +2205,7 @@ summary = "NucliaDB SDK"
 groups = ["sdk"]
 dependencies = [
     "httpx",
+    "nuclia-models>=0.24.2",
     "nucliadb-models",
     "orjson",
     "pydantic>=2.6",
@@ -3325,7 +3326,7 @@ version = "2.10.4"
 extras = ["email"]
 requires_python = ">=3.8"
 summary = "Data validation using Python type hints"
-groups = ["nucliadb"]
+groups = ["nucliadb", "sdk"]
 dependencies = [
     "email-validator>=2.0.0",
     "pydantic==2.10.4",
