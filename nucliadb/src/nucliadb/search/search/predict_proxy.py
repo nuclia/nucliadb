@@ -37,7 +37,6 @@ class PredictProxiedEndpoints(str, Enum):
     CHAT = "chat"
     REPHRASE = "rephrase"
     RUN_AGENTS_TEXT = "run-agents-text"
-    SUMMARIZE = "summarize"
     RERANK = "rerank"
     REMI = "remi"
 
