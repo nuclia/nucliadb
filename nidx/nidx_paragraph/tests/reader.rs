@@ -21,13 +21,13 @@
 mod common;
 
 use common::test_reader;
-use nidx_paragraph::{ParagraphSearchRequest, ParagraphSearcher};
+use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::order_by::OrderField;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::resource::ResourceStatus;
 use nidx_protos::{
     Faceted, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId, StreamRequest,
-    TextInformation, Timestamps,
+    TextInformation,
 };
 use nidx_types::prefilter::PrefilterResult;
 use nidx_types::query_language::{self, BooleanExpression};
@@ -172,13 +172,10 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -190,13 +187,10 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 0,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -225,13 +219,10 @@ fn test_filtered_search() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -293,13 +284,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -311,13 +299,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -329,13 +314,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "should enough".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         min_score: 30.0,
         ..Default::default()
@@ -348,13 +330,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "shoupd enaugh".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -366,13 +345,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: UUID.to_string(),
         body: "\"should\" enaugh".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -384,13 +360,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: "".to_string(),
         body: "shoupd enaugh".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -402,13 +375,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: "".to_string(),
         body: "shoupd + enaugh\"".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -421,13 +391,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: "".to_string(),
         body: "shoupd + enaugh".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -440,13 +407,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: "".to_string(),
         body: "".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: true,
         only_faceted: false,
         ..Default::default()
     };
@@ -458,13 +422,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: "".to_string(),
         body: "this is the".to_string(),
-        filter: None,
         faceted: Some(faceted.clone()),
         order: Some(order),
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -476,13 +437,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
         id: "shard1".to_string(),
         uuid: "".to_string(),
         body: "\"shoupd\"".to_string(),
-        filter: None,
         faceted: None,
         order: None,
         page_number: 0,
         result_per_page: 20,
-        timestamps: None,
-        with_duplicates: false,
         only_faceted: false,
         ..Default::default()
     };
@@ -491,186 +449,10 @@ fn test_new_paragraph() -> anyhow::Result<()> {
 
     let request = StreamRequest {
         shard_id: None,
-        filter: None,
         ..Default::default()
     };
     let iter = paragraph_reader_service.iterator(&request).unwrap();
     let count = iter.count();
     assert_eq!(count, 4);
-    Ok(())
-}
-
-#[test]
-fn test_search_paragraph_with_timestamps() -> anyhow::Result<()> {
-    let time_baseline = Timestamp {
-        seconds: 2,
-        nanos: 0,
-    };
-
-    let resource1 = create_resource("shard1".to_string(), time_baseline);
-    let paragraph_reader_service = test_reader(&resource1);
-
-    fn do_search(paragraph_reader_service: &ParagraphSearcher, timestamps: Timestamps) -> i32 {
-        let search = ParagraphSearchRequest {
-            id: "shard1".to_string(),
-            uuid: "".to_string(),
-            body: "this is the".to_string(),
-            filter: None,
-            faceted: None,
-            order: None, // Some(order),
-            page_number: 0,
-            result_per_page: 20,
-            timestamps: Some(timestamps),
-            with_duplicates: false,
-            only_faceted: false,
-            ..Default::default()
-        };
-        let result = paragraph_reader_service.search(&search, &PrefilterResult::All).unwrap();
-        result.total
-    }
-
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: Some(Timestamp {
-                seconds: time_baseline.seconds - 1,
-                nanos: time_baseline.nanos,
-            }),
-            to_modified: Some(Timestamp {
-                seconds: time_baseline.seconds + 1,
-                nanos: time_baseline.nanos,
-            }),
-            from_created: Some(Timestamp {
-                seconds: time_baseline.seconds - 1,
-                nanos: time_baseline.nanos,
-            }),
-            to_created: Some(Timestamp {
-                seconds: time_baseline.seconds + 1,
-                nanos: time_baseline.nanos,
-            }),
-        },
-    );
-    assert_eq!(total, 3);
-
-    // only from modified before, all matches
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: Some(Timestamp {
-                seconds: time_baseline.seconds - 1,
-                nanos: time_baseline.nanos,
-            }),
-            to_modified: None,
-            from_created: None,
-            to_created: None,
-        },
-    );
-    assert_eq!(total, 3);
-
-    // only from modified after, no matches
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: Some(Timestamp {
-                seconds: time_baseline.seconds + 1,
-                nanos: time_baseline.nanos,
-            }),
-            to_modified: None,
-            from_created: None,
-            to_created: None,
-        },
-    );
-    assert_eq!(total, 0);
-
-    // only to modified after, all matches
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: None,
-            to_modified: Some(Timestamp {
-                seconds: time_baseline.seconds + 1,
-                nanos: time_baseline.nanos,
-            }),
-            from_created: None,
-            to_created: None,
-        },
-    );
-    assert_eq!(total, 3);
-
-    // only to modified before, no matches
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: None,
-            to_modified: Some(Timestamp {
-                seconds: time_baseline.seconds - 1,
-                nanos: time_baseline.nanos,
-            }),
-            from_created: None,
-            to_created: None,
-        },
-    );
-    assert_eq!(total, 0);
-
-    // only from created before, all matches
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: None,
-            to_modified: None,
-            from_created: Some(Timestamp {
-                seconds: time_baseline.seconds - 1,
-                nanos: time_baseline.nanos,
-            }),
-            to_created: None,
-        },
-    );
-    assert_eq!(total, 3);
-
-    // only from created after, no matches
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: None,
-            to_modified: None,
-            from_created: Some(Timestamp {
-                seconds: time_baseline.seconds + 1,
-                nanos: time_baseline.nanos,
-            }),
-            to_created: None,
-        },
-    );
-    assert_eq!(total, 0);
-
-    // only to created after, all matches
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: None,
-            to_modified: None,
-            from_created: None,
-            to_created: Some(Timestamp {
-                seconds: time_baseline.seconds + 1,
-                nanos: time_baseline.nanos,
-            }),
-        },
-    );
-    assert_eq!(total, 3);
-
-    // only to created before, no matches
-    let total = do_search(
-        &paragraph_reader_service,
-        Timestamps {
-            from_modified: None,
-            to_modified: None,
-            from_created: None,
-            to_created: Some(Timestamp {
-                seconds: time_baseline.seconds - 1,
-                nanos: time_baseline.nanos,
-            }),
-        },
-    );
-    assert_eq!(total, 0);
-
     Ok(())
 }

@@ -28,7 +28,7 @@ use tracing::warn;
 use crate::{
     data_point::node::Node,
     data_types::data_store::{self},
-    formula::{Clause, Formula},
+    formula::{BooleanOperator, Clause, Formula},
     VectorR,
 };
 
@@ -158,7 +158,11 @@ impl InvertedIndexes {
 
     pub fn filter(&self, formula: &Formula) -> Option<BitSet> {
         formula.clauses.iter().map(|f| self.filter_clause(f)).reduce(|mut a, b| {
-            a.intersect_with(&b);
+            if formula.operator == BooleanOperator::And {
+                a.intersect_with(&b)
+            } else {
+                a.union_with(&b)
+            }
             a
         })
     }

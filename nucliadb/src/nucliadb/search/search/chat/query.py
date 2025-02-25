@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
@@ -32,6 +32,7 @@ from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
+from nucliadb_models import filter
 from nucliadb_models.search import (
     AskRequest,
     ChatContextMessage,
@@ -119,9 +120,10 @@ async def get_find_results(
                     raise NoRetrievalResultsError()
                 # Make sure the main query and prequeries use the same resource filters.
                 # This is important to avoid returning results that don't match the prefilter.
-                item.resource_filters = list(prefilter_matching_resources)
+                matching_resources = list(prefilter_matching_resources)
+                add_resource_filter(item, matching_resources)
                 for prequery in prequeries:
-                    prequery.request.resource_filters = list(prefilter_matching_resources)
+                    add_resource_filter(prequery.request, matching_resources)
                     prequery.request.show_hidden = item.show_hidden
 
         if prequeries:
@@ -149,6 +151,30 @@ async def get_find_results(
             metrics=metrics,
         )
     return main_results, prequeries_results, query_parser
+
+
+def add_resource_filter(request: Union[FindRequest, AskRequest], resources: list[str]):
+    if len(resources) == 0:
+        return
+
+    if request.filter_expression is not None:
+        if len(resources) > 1:
+            resource_filter: filter.FieldFilterExpression = filter.Or.model_validate(
+                {"or": [filter.Resource(prop="resource", id=rid) for rid in resources]}
+            )
+        else:
+            resource_filter = filter.Resource(prop="resource", id=resources[0])
+
+        # Add to filter expression if set
+        if request.filter_expression.field is None:
+            request.filter_expression.field = resource_filter
+        else:
+            request.filter_expression.field = filter.And.model_validate(
+                {"and": [request.filter_expression.field, resource_filter]}
+            )
+    else:
+        # Add to old key filters instead
+        request.resource_filters = resources
 
 
 def find_request_from_ask_request(item: AskRequest, query: str) -> FindRequest:

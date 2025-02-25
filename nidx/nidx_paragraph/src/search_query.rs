@@ -17,23 +17,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::query_io;
-use crate::request_types::ParagraphSearchRequest;
+use crate::query_io::translate_expression;
+use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::set_query::SetQuery;
 use itertools::Itertools;
-use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::StreamRequest;
 use nidx_types::prefilter::PrefilterResult;
+use nidx_types::query_language::BooleanExpression;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::ops::Bound;
 use std::sync::{Arc, Mutex};
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
 
 use crate::fuzzy_query::FuzzyTermQuery;
-use crate::schema::{self, ParagraphSchema};
+use crate::schema::ParagraphSchema;
 use crate::stop_words::is_stop_word;
 type QueryP = (Occur, Box<dyn Query>);
 
@@ -264,42 +263,45 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
     }
 }
 
-pub fn produce_date_range_query(
-    field: &str,
-    from: Option<&ProstTimestamp>,
-    to: Option<&ProstTimestamp>,
-) -> Option<RangeQuery> {
-    if from.is_none() && to.is_none() {
-        return None;
-    }
-
-    let left_date_time = from.map(schema::timestamp_to_datetime_utc);
-    let right_date_time = to.map(schema::timestamp_to_datetime_utc);
-    let left_bound = left_date_time.map(Bound::Included).unwrap_or(Bound::Unbounded);
-    let right_bound = right_date_time.map(Bound::Included).unwrap_or(Bound::Unbounded);
-    let query = RangeQuery::new_date_bounds(field.to_string(), left_bound, right_bound);
-    Some(query)
-}
-
-fn apply_prefilter(
-    queries: &mut [&mut Vec<(Occur, Box<dyn Query>)>],
+fn filter_query(
     schema: &ParagraphSchema,
     prefilter: &PrefilterResult,
-) {
+    paragraph_formula: &Option<BooleanExpression>,
+    filter_or: bool,
+) -> Option<Box<dyn Query>> {
+    let mut filter_terms = vec![];
+    let operator = if filter_or {
+        Occur::Should
+    } else {
+        Occur::Must
+    };
+
+    // Paragraph filter
+    if let Some(formula) = &paragraph_formula {
+        let query = translate_expression(formula, schema);
+        filter_terms.push((operator, query));
+    }
+
+    // Prefilter
     if let PrefilterResult::Some(field_keys) = prefilter {
         let set_query = Box::new(SetQuery::new(
             schema.field_uuid,
             field_keys.iter().map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
         ));
-        for q in queries {
-            q.push((Occur::Must, set_query.clone()));
-        }
+        filter_terms.push((operator, set_query));
+    }
+
+    if !filter_terms.is_empty() {
+        Some(Box::new(BooleanQuery::new(filter_terms)))
+    } else {
+        None
     }
 }
 
 pub fn suggest_query(
     parser: &QueryParser,
     text: &str,
+    request: &ParagraphSuggestRequest,
     prefilter: &PrefilterResult,
     schema: &ParagraphSchema,
     distance: u8,
@@ -316,7 +318,11 @@ pub fn suggest_query(
     fuzzies.push((Occur::Must, Box::new(term_query.clone())));
     originals.push((Occur::Must, Box::new(term_query)));
 
-    apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter);
+    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_or);
+    if let Some(query) = filter_query {
+        originals.push((Occur::Must, query.box_clone()));
+        fuzzies.push((Occur::Must, query));
+    }
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
@@ -352,43 +358,19 @@ pub fn search_query(
         originals.push((Occur::Must, advance.box_clone()));
         fuzzies.push((Occur::Must, advance));
     }
-    if !search.uuid.is_empty() {
-        let term = Term::from_field_text(schema.uuid, &search.uuid);
-        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        fuzzies.push((Occur::Must, Box::new(term_query.clone())));
-        originals.push((Occur::Must, Box::new(term_query)))
+
+    let filter_query = filter_query(schema, prefilter, &search.filtering_formula, search.filter_or);
+    if let Some(query) = filter_query {
+        originals.push((Occur::Must, query.box_clone()));
+        fuzzies.push((Occur::Must, query));
     }
+
     if !search.with_duplicates {
         let term = Term::from_field_u64(schema.repeated_in_field, 0);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         fuzzies.push((Occur::Must, Box::new(term_query.clone())));
         originals.push((Occur::Must, Box::new(term_query)))
     }
-    if let Some(time_ranges) = search.timestamps.as_ref() {
-        let modified =
-            produce_date_range_query("modified", time_ranges.from_modified.as_ref(), time_ranges.to_modified.as_ref());
-        let created =
-            produce_date_range_query("created", time_ranges.from_created.as_ref(), time_ranges.to_created.as_ref());
-
-        if let Some(modified) = modified {
-            fuzzies.push((Occur::Must, Box::new(modified.clone())));
-            originals.push((Occur::Must, Box::new(modified)));
-        }
-
-        if let Some(created) = created {
-            fuzzies.push((Occur::Must, Box::new(created.clone())));
-            originals.push((Occur::Must, Box::new(created)));
-        }
-    }
-
-    // Label filters
-    if let Some(formula) = &search.filtering_formula {
-        let query = query_io::translate_expression(formula, schema);
-        fuzzies.push((Occur::Must, query.box_clone()));
-        originals.push((Occur::Must, query));
-    }
-
-    apply_prefilter(&mut [&mut fuzzies, &mut originals], schema, prefilter);
 
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;

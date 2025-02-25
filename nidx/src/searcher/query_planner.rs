@@ -20,8 +20,7 @@
 
 use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::filter_expression::Expr;
-use nidx_protos::FilterExpression;
-use nidx_protos::{RelationSearchRequest, SearchRequest};
+use nidx_protos::{FilterExpression, FilterOperator, RelationSearchRequest, SearchRequest};
 use nidx_text::prefilter::*;
 use nidx_text::DocumentSearchRequest;
 use nidx_types::prefilter::PrefilterResult;
@@ -45,22 +44,6 @@ pub struct IndexQueries {
 }
 
 impl IndexQueries {
-    fn apply_to_vectors(request: &mut VectorSearchRequest, response: &PrefilterResult) {
-        let PrefilterResult::Some(_) = &response else {
-            return;
-        };
-
-        // Clear labels to avoid duplicate filtering
-        request.field_labels.clear();
-    }
-
-    fn apply_to_paragraphs(request: &mut ParagraphSearchRequest, response: &PrefilterResult) {
-        if matches!(response, PrefilterResult::All) {
-            // Since all the fields are matching there is no need to use this filter.
-            request.timestamps = None;
-        }
-    }
-
     /// When a pre-filter is run, the result can be used to modify the queries
     /// that the indexes must resolve.
     pub fn apply_prefilter(&mut self, prefiltered: PrefilterResult) {
@@ -74,14 +57,6 @@ impl IndexQueries {
         }
 
         self.prefilter_results = prefiltered;
-
-        if let Some(vectors_request) = self.vectors_request.as_mut() {
-            IndexQueries::apply_to_vectors(vectors_request, &self.prefilter_results);
-        };
-
-        if let Some(paragraph_request) = self.paragraphs_request.as_mut() {
-            IndexQueries::apply_to_paragraphs(paragraph_request, &self.prefilter_results);
-        }
     }
 }
 
@@ -144,20 +119,19 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<
 
     Ok(Some(ParagraphSearchRequest {
         uuid: "".to_string(),
-        with_duplicates: search_request.with_duplicates,
         body: search_request.body.clone(),
         order: search_request.order.clone(),
         faceted: search_request.faceted.clone(),
         page_number: search_request.page_number,
         result_per_page: search_request.result_per_page,
-        timestamps: None,
+        with_duplicates: search_request.with_duplicates,
         only_faceted: search_request.only_faceted,
         advanced_query: search_request.advanced_query.clone(),
         id: String::default(),
-        filter: None,
         min_score: search_request.min_score_bm25,
         security: search_request.security.clone(),
         filtering_formula: search_request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
+        filter_or: search_request.filter_operator == FilterOperator::Or as i32,
     }))
 }
 
@@ -196,11 +170,9 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
         result_per_page: search_request.result_per_page,
         with_duplicates: search_request.with_duplicates,
         min_score: search_request.min_score_semantic,
-        field_labels: Vec::with_capacity(0),
-        paragraph_labels: Vec::with_capacity(0),
-        field_filters: Vec::with_capacity(0),
         filtering_formula: search_request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
         segment_filtering_formula,
+        filter_or: search_request.filter_operator == FilterOperator::Or as i32,
     }))
 }
 
@@ -218,7 +190,7 @@ fn compute_relations_request(search_request: &SearchRequest) -> Option<RelationS
     })
 }
 
-fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<BooleanExpression> {
+pub fn filter_to_boolean_expression(filter: FilterExpression) -> anyhow::Result<BooleanExpression> {
     match filter.expr.unwrap() {
         Expr::BoolAnd(and) => {
             let operands = and

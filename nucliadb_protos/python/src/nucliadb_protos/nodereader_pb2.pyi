@@ -67,6 +67,21 @@ from nucliadb_protos.utils_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _FilterOperator:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _FilterOperatorEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_FilterOperator.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    AND: _FilterOperator.ValueType  # 0
+    OR: _FilterOperator.ValueType  # 1
+
+class FilterOperator(_FilterOperator, metaclass=_FilterOperatorEnumTypeWrapper): ...
+
+AND: FilterOperator.ValueType  # 0
+OR: FilterOperator.ValueType  # 1
+global___FilterOperator = FilterOperator
+
 class _SuggestFeatures:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
@@ -959,6 +974,7 @@ class SearchRequest(google.protobuf.message.Message):
     SECURITY_FIELD_NUMBER: builtins.int
     FIELD_FILTER_FIELD_NUMBER: builtins.int
     PARAGRAPH_FILTER_FIELD_NUMBER: builtins.int
+    FILTER_OPERATOR_FIELD_NUMBER: builtins.int
     shard: builtins.str
     body: builtins.str
     """query this text in all the paragraphs"""
@@ -974,6 +990,7 @@ class SearchRequest(google.protobuf.message.Message):
     with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
     min_score_semantic: builtins.float
     min_score_bm25: builtins.float
+    filter_operator: global___FilterOperator.ValueType
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
@@ -1029,9 +1046,10 @@ class SearchRequest(google.protobuf.message.Message):
         security: nucliadb_protos.utils_pb2.Security | None = ...,
         field_filter: global___FilterExpression | None = ...,
         paragraph_filter: global___FilterExpression | None = ...,
+        filter_operator: global___FilterOperator.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "field_filter", b"field_filter", "filter", b"filter", "order", b"order", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "security", b"security", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "fields", b"fields", "filter", b"filter", "key_filters", b"key_filters", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "reload", b"reload", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_advanced_query", b"_advanced_query", "_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "_security", b"_security", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "field_filter", b"field_filter", "fields", b"fields", "filter", b"filter", "filter_operator", b"filter_operator", "key_filters", b"key_filters", "min_score_bm25", b"min_score_bm25", "min_score_semantic", b"min_score_semantic", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "paragraph_filter", b"paragraph_filter", "relation_prefix", b"relation_prefix", "relation_subgraph", b"relation_subgraph", "reload", b"reload", "result_per_page", b"result_per_page", "security", b"security", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_advanced_query", b"_advanced_query"]) -> typing.Literal["advanced_query"] | None: ...
     @typing.overload
@@ -1056,8 +1074,11 @@ class SuggestRequest(google.protobuf.message.Message):
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     FIELDS_FIELD_NUMBER: builtins.int
     FIELD_FILTER_FIELD_NUMBER: builtins.int
+    PARAGRAPH_FILTER_FIELD_NUMBER: builtins.int
+    FILTER_OPERATOR_FIELD_NUMBER: builtins.int
     shard: builtins.str
     body: builtins.str
+    filter_operator: global___FilterOperator.ValueType
     @property
     def features(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[global___SuggestFeatures.ValueType]: ...
     @property
@@ -1068,6 +1089,8 @@ class SuggestRequest(google.protobuf.message.Message):
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
     def field_filter(self) -> global___FilterExpression: ...
+    @property
+    def paragraph_filter(self) -> global___FilterExpression: ...
     def __init__(
         self,
         *,
@@ -1078,10 +1101,15 @@ class SuggestRequest(google.protobuf.message.Message):
         timestamps: global___Timestamps | None = ...,
         fields: collections.abc.Iterable[builtins.str] | None = ...,
         field_filter: global___FilterExpression | None = ...,
+        paragraph_filter: global___FilterExpression | None = ...,
+        filter_operator: global___FilterOperator.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "field_filter", b"field_filter", "filter", b"filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "body", b"body", "features", b"features", "field_filter", b"field_filter", "fields", b"fields", "filter", b"filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "field_filter", b"field_filter", "filter", b"filter", "paragraph_filter", b"paragraph_filter", "timestamps", b"timestamps"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_field_filter", b"_field_filter", "_paragraph_filter", b"_paragraph_filter", "body", b"body", "features", b"features", "field_filter", b"field_filter", "fields", b"fields", "filter", b"filter", "filter_operator", b"filter_operator", "paragraph_filter", b"paragraph_filter", "shard", b"shard", "timestamps", b"timestamps"]) -> None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_field_filter", b"_field_filter"]) -> typing.Literal["field_filter"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_paragraph_filter", b"_paragraph_filter"]) -> typing.Literal["paragraph_filter"] | None: ...
 
 global___SuggestRequest = SuggestRequest
 

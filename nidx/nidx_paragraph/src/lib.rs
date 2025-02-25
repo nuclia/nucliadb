@@ -29,7 +29,7 @@ mod search_response;
 mod set_query;
 mod stop_words;
 
-use nidx_protos::{ParagraphItem, ParagraphSearchResponse, StreamRequest, SuggestRequest};
+use nidx_protos::{ParagraphItem, ParagraphSearchResponse, StreamRequest};
 use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
@@ -48,7 +48,7 @@ use tantivy::{
 };
 use tracing::instrument;
 
-pub use request_types::ParagraphSearchRequest;
+pub use request_types::*;
 
 pub struct ParagraphIndexer;
 
@@ -151,7 +151,7 @@ impl ParagraphSearcher {
     #[instrument(name = "paragraph::suggest", skip_all)]
     pub fn suggest(
         &self,
-        request: &SuggestRequest,
+        request: &ParagraphSuggestRequest,
         prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
         self.reader.suggest(request, prefilter)

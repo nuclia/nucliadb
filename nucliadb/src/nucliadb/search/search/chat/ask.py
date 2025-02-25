@@ -47,6 +47,7 @@ from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
     ChatAuditor,
+    add_resource_filter,
     get_find_results,
     get_relations_results,
     maybe_audit_chat,
@@ -804,7 +805,7 @@ async def retrieval_in_resource(
         prequeries = calculate_prequeries_for_json_schema(ask_request)
 
     # Make sure the retrieval is scoped to the resource if provided
-    ask_request.resource_filters = [resource]
+    add_resource_filter(ask_request, [resource])
     if prequeries is not None:
         for prequery in prequeries.queries:
             if prequery.prefilter is True:
@@ -812,7 +813,7 @@ async def retrieval_in_resource(
                     "rag_strategies",
                     "Prequeries with prefilter are not supported when asking on a resource",
                 )
-            prequery.request.resource_filters = [resource]
+            add_resource_filter(prequery.request, [resource])
 
     with metrics.time("retrieval"):
         main_results, prequeries_results, query_parser = await get_find_results(

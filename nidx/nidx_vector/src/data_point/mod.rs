@@ -502,6 +502,7 @@ mod test {
     use crate::{
         config::{Similarity, VectorConfig},
         data_types::data_store,
+        formula::Formula,
         vector_types::dense_f32::{dot_similarity, encode_vector},
     };
 
@@ -709,7 +710,7 @@ mod test {
                 let mut similarities: Vec<_> = elems.iter().map(|(k, v)| (k, similarity(v, &query))).collect();
                 similarities.sort_unstable_by(|a, b| a.1.total_cmp(&b.1).reverse());
 
-                let results: Vec<_> = dp.search(&query, &Default::default(), false, 5, &config, 0.0).collect();
+                let results: Vec<_> = dp.search(&query, &Formula::new(), false, 5, &config, 0.0).collect();
 
                 let search: Vec<_> = results.iter().map(|r| String::from_utf8(r.id().to_vec()).unwrap()).collect();
                 let brute_force: Vec<_> = similarities.iter().take(5).map(|r| r.0.clone()).collect();

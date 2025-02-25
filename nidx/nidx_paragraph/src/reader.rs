@@ -22,7 +22,7 @@ use std::fmt::Debug;
 use std::time::Instant;
 
 use nidx_protos::order_by::{OrderField, OrderType};
-use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest, SuggestRequest};
+use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest};
 use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser};
@@ -31,7 +31,7 @@ use tantivy::{DocAddress, Index, IndexReader};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
-use crate::request_types::ParagraphSearchRequest;
+use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::search_query::{search_query, streaming_query, suggest_query, SharedTermC};
 use crate::search_response::{extract_labels, SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
@@ -59,44 +59,25 @@ impl ParagraphReaderService {
 
     pub fn suggest(
         &self,
-        request: &SuggestRequest,
+        request: &ParagraphSuggestRequest,
         prefilter: &PrefilterResult,
     ) -> anyhow::Result<ParagraphSearchResponse> {
-        let time = Instant::now();
-        let id = Some(&request.shard);
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating query: starts at {v} ms");
-
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let text = self.adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) = suggest_query(&parser, &text, prefilter, &self.schema, FUZZY_DISTANCE);
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Creating query: ends at {v} ms");
-
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: starts at {v} ms");
+        let (original, termc, fuzzied) =
+            suggest_query(&parser, &text, request, prefilter, &self.schema, FUZZY_DISTANCE);
 
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
         let mut results = searcher.search(&original, &topdocs)?;
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Searching: ends at {v} ms");
 
         if results.is_empty() {
-            let v = time.elapsed().as_millis();
-            debug!("{id:?} - Trying fuzzy: starts at {v} ms");
-
             let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
             match searcher.search(&fuzzied, &topdocs) {
                 Ok(mut fuzzied) => results.append(&mut fuzzied),
                 Err(err) => error!("{err:?} during suggest"),
             }
-            let v = time.elapsed().as_millis();
-            debug!("{id:?} - Trying fuzzy: ends at {v} ms");
         }
-        let v = time.elapsed().as_millis();
-        debug!("{id:?} - Ending at: {v} ms");
 
         Ok(ParagraphSearchResponse::from(SearchBm25Response {
             total: results.len(),

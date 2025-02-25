@@ -252,7 +252,10 @@ class QueryParser:
                 if expr:
                     request.paragraph_filter.CopyFrom(expr)
 
-            # TODO: Pass operator to PB
+            if self.filter_expression.operator == FilterExpression.Operator.OR:
+                request.filter_operator = nodereader_pb2.FilterOperator.OR
+            else:
+                request.filter_operator = nodereader_pb2.FilterOperator.AND
 
         if self.hidden is not None:
             expr = nodereader_pb2.FilterExpression()
@@ -486,6 +489,7 @@ async def paragraph_query_to_pb(
     kbid: str,
     rid: str,
     query: str,
+    filter_expression: Optional[FilterExpression],
     fields: list[str],
     filters: list[str],
     faceted: list[str],
@@ -514,7 +518,6 @@ async def paragraph_query_to_pb(
         range_creation_end=range_creation_end,
         range_modification_start=range_modification_start,
         range_modification_end=range_modification_end,
-        key_filters=[rid],
         fields=fields,
     )
     fetcher = Fetcher(
@@ -531,6 +534,29 @@ async def paragraph_query_to_pb(
         request.field_filter.CopyFrom(field_expr)
     if paragraph_expr is not None:
         request.paragraph_filter.CopyFrom(paragraph_expr)
+
+    if (field_expr is not None or paragraph_expr is not None) and filter_expression is not None:
+        raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
+
+    if filter_expression:
+        if filter_expression.field:
+            expr = await parse_expression(filter_expression.field, kbid)
+            if expr:
+                request.field_filter.CopyFrom(expr)
+
+        if filter_expression.paragraph:
+            expr = await parse_expression(filter_expression.paragraph, kbid)
+            if expr:
+                request.paragraph_filter.CopyFrom(expr)
+
+        if filter_expression.operator == FilterExpression.Operator.OR:
+            request.filter_operator = nodereader_pb2.FilterOperator.OR
+        else:
+            request.filter_operator = nodereader_pb2.FilterOperator.AND
+
+    key_filter = nodereader_pb2.FilterExpression()
+    key_filter.resource.resource_id = rid
+    add_and_expression(request.field_filter, key_filter)
 
     return request
 
@@ -657,15 +683,14 @@ async def suggest_query_to_pb(
                 request.field_filter.CopyFrom(expr)
 
         if filter_expression.paragraph:
-            raise InvalidQueryError(
-                "filter_expression", "paragraph filters not yet available in suggest"
-            )
-            # TODO
-            # expr = await parse_expression(filter_expression.paragraph, kbid)
-            # if expr:
-            #     request.paragraph_filter.CopyFrom(expr)
+            expr = await parse_expression(filter_expression.paragraph, kbid)
+            if expr:
+                request.paragraph_filter.CopyFrom(expr)
 
-        # TODO: Pass operator to PB
+        if filter_expression.operator == FilterExpression.Operator.OR:
+            request.filter_operator = nodereader_pb2.FilterOperator.OR
+        else:
+            request.filter_operator = nodereader_pb2.FilterOperator.AND
 
     if hidden is not None:
         expr = nodereader_pb2.FilterExpression()
