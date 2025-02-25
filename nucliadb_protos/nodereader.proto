@@ -186,6 +186,27 @@ message EntitiesSubgraphResponse {
 }
 
 
+message GraphSearchResponse {
+    message Relation {
+        utils.Relation.RelationType relation_type = 1;
+        string label = 2;
+        utils.RelationMetadata metadata = 3;
+    }
+
+    // To optimize proto size, paths are built using pointers to nodes and
+    // relations. This avoid repetition of nodes/relations and allow smaller
+    // protos for big graphs.
+    message Path {
+        uint32 source = 1;
+        uint32 relation = 2;
+        uint32 destination = 3;
+    }
+
+    repeated utils.RelationNode nodes = 1;
+    repeated Relation relations = 2;
+    repeated Path graph = 3;
+}
+
 // Query relation index to obtain different information about the
 // knowledge graph. It can be queried using the following strategies:
 //

@@ -102,3 +102,11 @@ pub fn doc_to_relation(schema: &Schema, doc: &TantivyDocument) -> ProtosRelation
         to: Some(target_to_relation_node(schema, doc)),
     }
 }
+
+pub fn doc_to_graph_relation(schema: &Schema, doc: &TantivyDocument) -> nidx_protos::graph_search_response::Relation {
+    nidx_protos::graph_search_response::Relation {
+        relation_type: u64_to_relation_type::<i32>(schema.relationship(doc)),
+        label: schema.relationship_label(doc),
+        metadata: decode_metadata(schema, doc),
+    }
+}

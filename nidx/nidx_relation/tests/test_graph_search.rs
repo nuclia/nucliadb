@@ -129,13 +129,15 @@ fn friendly_print(result: &[nidx_protos::Relation]) {
     println!();
 }
 
-fn friendly_parse<'a>(relations: &'a Vec<nidx_protos::Relation>) -> Vec<(&'a str, &'a str, &'a str)> {
+fn friendly_parse<'a>(relations: &'a nidx_protos::GraphSearchResponse) -> Vec<(&'a str, &'a str, &'a str)> {
     relations
+        .graph
         .iter()
-        .map(|relation| {
-            let source = relation.source.as_ref().unwrap();
-            let destination = relation.to.as_ref().unwrap();
-            (source.value.as_str(), relation.relation_label.as_str(), destination.value.as_str())
+        .map(|path| {
+            let source = relations.nodes.get(path.source as usize).unwrap();
+            let relation = relations.relations.get(path.relation as usize).unwrap();
+            let destination = relations.nodes.get(path.destination as usize).unwrap();
+            (source.value.as_str(), relation.label.as_str(), destination.value.as_str())
         })
         .collect()
 }
@@ -151,7 +153,7 @@ fn test_graph_node_query() -> anyhow::Result<()> {
         node_subtype: None,
         ..Default::default()
     }))))?;
-    assert_eq!(result.len(), 16);
+    assert_eq!(result.graph.len(), 16);
 
     // (:PERSON)-[]->()
     let result = reader.reader.graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
@@ -160,7 +162,7 @@ fn test_graph_node_query() -> anyhow::Result<()> {
         node_subtype: Some("PERSON".to_string()),
         ..Default::default()
     }))))?;
-    assert_eq!(result.len(), 12);
+    assert_eq!(result.graph.len(), 12);
 
     // (:Anna)-[]->()
     let result = reader.reader.graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
