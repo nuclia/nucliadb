@@ -676,6 +676,75 @@ class EntitiesSubgraphResponse(google.protobuf.message.Message):
 global___EntitiesSubgraphResponse = EntitiesSubgraphResponse
 
 @typing.final
+class GraphSearchResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class Relation(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        RELATION_TYPE_FIELD_NUMBER: builtins.int
+        LABEL_FIELD_NUMBER: builtins.int
+        METADATA_FIELD_NUMBER: builtins.int
+        relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
+        label: builtins.str
+        @property
+        def metadata(self) -> nucliadb_protos.utils_pb2.RelationMetadata: ...
+        def __init__(
+            self,
+            *,
+            relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
+            label: builtins.str = ...,
+            metadata: nucliadb_protos.utils_pb2.RelationMetadata | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["metadata", b"metadata"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["label", b"label", "metadata", b"metadata", "relation_type", b"relation_type"]) -> None: ...
+
+    @typing.final
+    class Path(google.protobuf.message.Message):
+        """To optimize proto size, paths are built using pointers to nodes and
+        relations. This avoid repetition of nodes/relations and allow smaller
+        protos for big graphs.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        SOURCE_FIELD_NUMBER: builtins.int
+        RELATION_FIELD_NUMBER: builtins.int
+        DESTINATION_FIELD_NUMBER: builtins.int
+        source: builtins.int
+        relation: builtins.int
+        destination: builtins.int
+        def __init__(
+            self,
+            *,
+            source: builtins.int = ...,
+            relation: builtins.int = ...,
+            destination: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["destination", b"destination", "relation", b"relation", "source", b"source"]) -> None: ...
+
+    NODES_FIELD_NUMBER: builtins.int
+    RELATIONS_FIELD_NUMBER: builtins.int
+    GRAPH_FIELD_NUMBER: builtins.int
+    @property
+    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
+    @property
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___GraphSearchResponse.Relation]: ...
+    @property
+    def graph(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___GraphSearchResponse.Path]: ...
+    def __init__(
+        self,
+        *,
+        nodes: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
+        relations: collections.abc.Iterable[global___GraphSearchResponse.Relation] | None = ...,
+        graph: collections.abc.Iterable[global___GraphSearchResponse.Path] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["graph", b"graph", "nodes", b"nodes", "relations", b"relations"]) -> None: ...
+
+global___GraphSearchResponse = GraphSearchResponse
+
+@typing.final
 class RelationSearchRequest(google.protobuf.message.Message):
     """Query relation index to obtain different information about the
     knowledge graph. It can be queried using the following strategies:
