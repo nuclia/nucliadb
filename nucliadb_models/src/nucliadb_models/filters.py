@@ -283,12 +283,12 @@ FieldFilterExpression = Annotated[
         Annotated[Keyword, Tag("keyword")],
         Annotated[DateCreated, Tag("created")],
         Annotated[DateModified, Tag("modified")],
-        Annotated[OriginTag, Tag("origin_tag")],
         Annotated[Label, Tag("label")],
         Annotated[ResourceMimetype, Tag("resource_mimetype")],
         Annotated[FieldMimetype, Tag("field_mimetype")],
         Annotated[Entity, Tag("entity")],
         Annotated[Language, Tag("language")],
+        Annotated[OriginTag, Tag("origin_tag")],
         Annotated[OriginMetadata, Tag("origin_metadata")],
         Annotated[OriginPath, Tag("origin_path")],
         Annotated[OriginSource, Tag("origin_source")],
@@ -309,10 +309,30 @@ ParagraphFilterExpression = Annotated[
     Discriminator(filter_discriminator),
 ]
 
+ResourceFilterExpression = Annotated[
+    Union[
+        Annotated[And["ResourceFilterExpression"], Tag("and")],
+        Annotated[Or["ResourceFilterExpression"], Tag("or")],
+        Annotated[Not["ResourceFilterExpression"], Tag("not")],
+        Annotated[Resource, Tag("resource")],
+        Annotated[DateCreated, Tag("created")],
+        Annotated[DateModified, Tag("modified")],
+        Annotated[Label, Tag("label")],
+        Annotated[ResourceMimetype, Tag("resource_mimetype")],
+        Annotated[Language, Tag("language")],
+        Annotated[OriginTag, Tag("origin_tag")],
+        Annotated[OriginMetadata, Tag("origin_metadata")],
+        Annotated[OriginPath, Tag("origin_path")],
+        Annotated[OriginSource, Tag("origin_source")],
+        Annotated[OriginCollaborator, Tag("origin_collaborator")],
+    ],
+    Discriminator(filter_discriminator),
+]
+
 
 class FilterExpression(BaseModel, extra="forbid"):
     """Returns only documents that match this filter expression.
-    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters
+    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters
 
     This allows building complex filtering expressions and replaces the following parameters:
     `fields`, `filters`, `range_*`, `resource_filters`, `keyword_filters`.
@@ -336,4 +356,17 @@ class FilterExpression(BaseModel, extra="forbid"):
             "AND returns text blocks that match both filters."
             "OR returns text_blocks that match one of the two filters"
         ),
+    )
+
+
+class CatalogFilterExpression(BaseModel, extra="forbid"):
+    """Returns only documents that match this filter expression.
+    Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters
+
+    This allows building complex filtering expressions and replaces the following parameters:
+    `filters`, `range_*`.
+    """
+
+    resource: Optional[ResourceFilterExpression] = pydantic.Field(
+        default=None, description="Filter to apply to resources"
     )
