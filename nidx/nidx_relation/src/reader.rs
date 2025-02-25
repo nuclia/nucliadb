@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::path::Path;
 
@@ -72,6 +72,8 @@ impl RelationsReaderService {
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
 
+        let mut node_ids = HashMap::new();
+
         let mut nodes = Vec::new();
         let mut relations = Vec::new();
         let mut graph = Vec::new();
@@ -83,12 +85,28 @@ impl RelationsReaderService {
             let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
             let destination = io_maps::target_to_relation_node(&self.schema, &doc);
 
-            let source_idx = nodes.len();
-            nodes.push(source);
+            let source_key = (source.value.clone(), source.ntype, source.subtype.clone());
+            let source_idx = if !node_ids.contains_key(&source_key) {
+                let next_id = node_ids.len();
+                node_ids.insert(source_key, next_id);
+                nodes.push(source);
+                next_id
+            } else {
+                *node_ids.get(&source_key).unwrap()
+            };
+
             let relation_idx = relations.len();
             relations.push(relation);
-            let destination_idx = nodes.len();
-            nodes.push(destination);
+
+            let destination_key = (destination.value.clone(), destination.ntype, destination.subtype.clone());
+            let destination_idx = if !node_ids.contains_key(&destination_key) {
+                let next_id = node_ids.len();
+                node_ids.insert(destination_key, next_id);
+                nodes.push(destination);
+                next_id
+            } else {
+                *node_ids.get(&destination_key).unwrap()
+            };
 
             graph.push(nidx_protos::graph_search_response::Path {
                 source: source_idx as u32,
