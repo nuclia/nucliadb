@@ -62,7 +62,7 @@ impl RelationsReaderService {
         })
     }
 
-    pub fn graph_search(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
+    pub fn graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
         let parser = GraphQueryParser::new();
         let index_query: Box<dyn Query> = parser.parse(query);
 
@@ -71,13 +71,38 @@ impl RelationsReaderService {
 
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
-        let mut relations = Vec::with_capacity(matching_docs.len());
-        for (_, doc_addr) in matching_docs {
-            let doc = searcher.doc(doc_addr)?;
-            let relation = io_maps::doc_to_relation(&self.schema, &doc);
+
+        let mut nodes = Vec::new();
+        let mut relations = Vec::new();
+        let mut graph = Vec::new();
+
+        for (_, doc_address) in matching_docs {
+            let doc = searcher.doc(doc_address)?;
+
+            let source = io_maps::source_to_relation_node(&self.schema, &doc);
+            let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
+            let destination = io_maps::target_to_relation_node(&self.schema, &doc);
+
+            let source_idx = nodes.len();
+            nodes.push(source);
+            let relation_idx = relations.len();
             relations.push(relation);
+            let destination_idx = nodes.len();
+            nodes.push(destination);
+
+            graph.push(nidx_protos::graph_search_response::Path {
+                source: source_idx as u32,
+                relation: relation_idx as u32,
+                destination: destination_idx as u32,
+            })
         }
-        Ok(relations)
+
+        let response = nidx_protos::GraphSearchResponse {
+            nodes,
+            relations,
+            graph,
+        };
+        Ok(response)
     }
 }
 
