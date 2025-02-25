@@ -134,6 +134,7 @@ async def import_binary(
     bucket_name = context.blob_storage.get_bucket_name(kbid)
     new_cf.bucket_name = bucket_name
 
+    # Replace the source kbid with the destination kbid
     src_kb = cf.uri.split("/")[1]
     new_cf.uri = new_cf.uri.replace(src_kb, kbid, 1)
 
@@ -235,7 +236,8 @@ def _clone_collect_cf(binaries: list[resources_pb2.CloudFile], origin: resources
 async def download_binary(
     context: ApplicationContext, cf: resources_pb2.CloudFile
 ) -> AsyncGenerator[bytes, None]:
-    async for data in context.blob_storage.download(cf.bucket_name, cf.uri):
+    bucket_name = context.blob_storage.get_bucket_name_from_cf(cf)
+    async for data in context.blob_storage.download(bucket_name, cf.uri):
         yield data
 
 

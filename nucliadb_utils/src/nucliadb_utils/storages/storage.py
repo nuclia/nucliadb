@@ -441,23 +441,9 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         return result
 
     async def downloadbytescf(self, cf: CloudFile) -> BytesIO:  # pragma: no cover
-        # this is covered by other tests
         result = BytesIO()
-        if cf.source == self.source:
-            async for data in self.download(cf.bucket_name, cf.uri):
-                if data is not None:
-                    result.write(data)
-        elif cf.source == CloudFile.FLAPS:
-            flaps_storage = await get_nuclia_storage()
-            async for data in flaps_storage.download(cf):
-                if data is not None:
-                    result.write(data)
-        elif cf.source == CloudFile.LOCAL:
-            local_storage = get_local_storage()
-            async for data in local_storage.download(cf.bucket_name, cf.uri):
-                if data is not None:
-                    result.write(data)
-
+        async for data in self.downloadbytescf_iterator(cf):
+            result.write(data)
         result.seek(0)
         return result
 
@@ -498,6 +484,16 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def get_bucket_name(self, kbid: str) -> str: ...
+
+    def get_bucket_name_from_cf(self, cf: CloudFile) -> str:
+        """
+        We need this because some CloudFile objects have the `bucket_name` attribute pointing to old/incorrect bucket names.
+        Doing a migration is not feasible, so we need to dynamically get the bucket name from the uri.
+        We assume that all uris have the following prefix:
+            kbs/{kbid}/...
+        """
+        kbid = cf.uri.split("/")[1]
+        return self.get_bucket_name(kbid)
 
     @abc.abstractmethod
     async def initialize(self) -> None: ...
