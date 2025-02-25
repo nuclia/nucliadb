@@ -38,8 +38,10 @@ from nucliadb_models.filter import (
     Language,
     Not,
     Or,
+    OriginCollaborator,
     OriginMetadata,
     OriginPath,
+    OriginSource,
     OriginTag,
     ParagraphFilterExpression,
     Resource,
@@ -125,6 +127,10 @@ async def parse_expression(
             f.facet.facet += f"/{expr.da_task}"
     elif isinstance(expr, Kind):
         f.facet.facet = f"/k/{expr.kind.lower()}"
+    elif isinstance(expr, OriginCollaborator):
+        f.facet.facet = f"/u/o/{expr.collaborator}"
+    elif isinstance(expr, OriginSource):
+        f.facet.facet = f"/u/s/{expr.id}"
     else:
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
