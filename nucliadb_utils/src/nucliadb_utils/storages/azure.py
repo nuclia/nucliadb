@@ -65,8 +65,8 @@ class AzureStorageField(StorageField):
 
     async def iter_data(self, range: Optional[Range] = None) -> AsyncGenerator[bytes, None]:
         if self.field is not None:
-            bucket = self.field.bucket_name
             key = self.field.uri
+            bucket = self.storage.get_bucket_name_from_cf(self.field)
         else:
             bucket = self.bucket
             key = self.key
@@ -80,8 +80,11 @@ class AzureStorageField(StorageField):
         """
         if self.field is not None and self.field.upload_uri != "":
             # If there is a temporal url, delete it
-            await self.storage.delete_upload(self.field.upload_uri, self.field.bucket_name)
+            bucket_name = self.storage.get_bucket_name_from_cf(self.field)
+            await self.storage.delete_upload(self.field.upload_uri, bucket_name)
+
         if self.field is not None and self.field.uri != "":
+            old_bucket = self.storage.get_bucket_name_from_cf(self.field)
             field: CloudFile = CloudFile(
                 filename=cf.filename,
                 size=cf.size,
@@ -90,7 +93,7 @@ class AzureStorageField(StorageField):
                 md5=cf.md5,
                 source=CloudFile.AZURE,
                 old_uri=self.field.uri,
-                old_bucket=self.field.bucket_name,
+                old_bucket=old_bucket,
             )
             upload_uri = f"{self.key}-{datetime.now().isoformat()}"
         else:
@@ -119,8 +122,9 @@ class AzureStorageField(StorageField):
     async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int:
         if self.field is None:
             raise AttributeError()
+        bucket_name = self.storage.get_bucket_name_from_cf(self.field)
         return await self.storage.object_store.upload_multipart_append(
-            self.field.bucket_name, self.field.upload_uri, iterable
+            bucket_name, self.field.upload_uri, iterable
         )
 
     async def finish(self):
@@ -135,7 +139,7 @@ class AzureStorageField(StorageField):
         bucket = None
         if self.field is not None and self.field.uri != "":
             key = self.field.uri
-            bucket = self.field.bucket_name
+            bucket = self.storage.get_bucket_name_from_cf(self.field)
         elif self.key != "":
             key = self.key
             bucket = self.bucket

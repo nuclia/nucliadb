@@ -333,6 +333,7 @@ class ProcessingEngine:
     @processing_observer.wrap({"type": "file_field_upload_internal"})
     async def convert_internal_filefield_to_str(self, file: FieldFilePB, storage: Storage) -> str:
         """It's already an internal file that needs to be uploaded"""
+        file.file.bucket_name = storage.get_bucket_name_from_cf(file.file)
         if self.onprem is False:
             # Upload the file to processing upload
             jwttoken = self.generate_file_token_from_fieldfile(file)
@@ -371,6 +372,7 @@ class ProcessingEngine:
     )
     @processing_observer.wrap({"type": "cloud_file_upload"})
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
+        cf.bucket_name = storage.get_bucket_name_from_cf(cf)
         if self.onprem is False:
             # Upload the file to processing upload
             jwttoken = self.generate_file_token_from_cloudfile(cf)

@@ -310,6 +310,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             new_cf.CopyFrom(file)
         else:
             raise InvalidCloudFile()
+        new_cf.bucket_name = self.get_bucket_name_from_cf(new_cf)
         return new_cf
 
     def conversation_field(
@@ -443,8 +444,9 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
     async def downloadbytescf(self, cf: CloudFile) -> BytesIO:  # pragma: no cover
         # this is covered by other tests
         result = BytesIO()
+        bucket_name = self.get_bucket_name_from_cf(cf)
         if cf.source == self.source:
-            async for data in self.download(cf.bucket_name, cf.uri):
+            async for data in self.download(bucket_name, cf.uri):
                 if data is not None:
                     result.write(data)
         elif cf.source == CloudFile.FLAPS:
@@ -454,7 +456,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
                     result.write(data)
         elif cf.source == CloudFile.LOCAL:
             local_storage = get_local_storage()
-            async for data in local_storage.download(cf.bucket_name, cf.uri):
+            async for data in local_storage.download(bucket_name, cf.uri):
                 if data is not None:
                     result.write(data)
 
@@ -465,8 +467,9 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         self, cf: CloudFile
     ) -> AsyncGenerator[bytes, None]:  # pragma: no cover
         # this is covered by other tests
+        bucket_name = self.get_bucket_name_from_cf(cf)
         if cf.source == self.source:
-            async for data in self.download(cf.bucket_name, cf.uri):
+            async for data in self.download(bucket_name, cf.uri):
                 if data is not None:
                     yield data
         elif cf.source == CloudFile.FLAPS:
@@ -476,7 +479,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
                     yield data
         elif cf.source == CloudFile.LOCAL:
             local_storage = get_local_storage()
-            async for data in local_storage.download(cf.bucket_name, cf.uri):
+            async for data in local_storage.download(bucket_name, cf.uri):
                 if data is not None:
                     yield data
 
@@ -498,6 +501,17 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def get_bucket_name(self, kbid: str) -> str: ...
+
+    def get_bucket_name_from_cf(self, cf: CloudFile) -> str:
+        """
+        We need this because some CloudFile objects have the `bucket_name` attribute pointing to old/incorrect bucket names.
+        Doing a migration is not feasible, so we need to dynamically get the bucket name from the uri.
+
+        We assume that all uris have the following prefix:
+            kbs/{kbid}/...
+        """
+        kbid = cf.uri.split("/")[1]
+        return self.get_bucket_name(kbid)
 
     @abc.abstractmethod
     async def initialize(self) -> None: ...

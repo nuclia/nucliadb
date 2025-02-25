@@ -109,7 +109,7 @@ class S3StorageField(StorageField):
         if self.field is None:
             bucket = self.bucket
         else:
-            bucket = self.field.bucket_name
+            bucket = self.storage.get_bucket_name_from_cf(self.field)
         downloader = await self._download(uri, bucket, range=range)
         stream = downloader["Body"]
         data = await stream.read(CHUNK_SIZE)
@@ -124,7 +124,7 @@ class S3StorageField(StorageField):
         try:
             mpu = self.field.resumable_uri
             upload_file_id = self.field.upload_uri
-            bucket_name = self.field.bucket_name
+            bucket_name = self.storage.get_bucket_name_from_cf(self.field)
             await self.storage._s3aioclient.abort_multipart_upload(
                 Bucket=bucket_name, Key=upload_file_id, UploadId=mpu["UploadId"]
             )
@@ -139,6 +139,7 @@ class S3StorageField(StorageField):
 
         if self.field is not None and self.field.uri != "":
             # If exist the file copy the old url to delete
+            old_bucket_name = self.storage.get_bucket_name_from_cf(self.field)
             field = CloudFile(
                 filename=cf.filename,
                 size=cf.size,
@@ -147,7 +148,7 @@ class S3StorageField(StorageField):
                 md5=cf.md5,
                 source=CloudFile.S3,
                 old_uri=self.field.uri,
-                old_bucket=self.field.bucket_name,
+                old_bucket=old_bucket_name,
             )
             upload_uri = f"{self.key}-{datetime.now().isoformat()}"
         else:
@@ -217,8 +218,9 @@ class S3StorageField(StorageField):
     async def _upload_part(self, cf: CloudFile, data: bytes):
         if self.field is None:
             raise AttributeError("No field configured")
+        bucket_name = self.storage.get_bucket_name_from_cf(self.field)
         return await self.storage._s3aioclient.upload_part(
-            Bucket=self.field.bucket_name,
+            Bucket=bucket_name,
             Key=self.field.upload_uri,
             PartNumber=self.field.offset,
             UploadId=self.field.resumable_uri,
@@ -269,8 +271,9 @@ class S3StorageField(StorageField):
                 {"PartNumber": part + 1, "ETag": etag} for part, etag in enumerate(self.field.parts)
             ]
         }
+        bucket_name = self.storage.get_bucket_name_from_cf(self.field)
         await self.storage._s3aioclient.complete_multipart_upload(
-            Bucket=self.field.bucket_name,
+            Bucket=bucket_name,
             Key=self.field.upload_uri,
             UploadId=self.field.resumable_uri,
             MultipartUpload=part_info,
@@ -286,8 +289,8 @@ class S3StorageField(StorageField):
         key = None
         bucket = None
         if self.field is not None and self.field.uri != "":
+            bucket = self.storage.get_bucket_name_from_cf(self.field)
             key = self.field.uri
-            bucket = self.field.bucket_name
         elif self.key != "":
             key = self.key
             bucket = self.bucket

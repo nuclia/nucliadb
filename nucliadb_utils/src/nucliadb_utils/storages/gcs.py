@@ -195,7 +195,7 @@ class GCSStorageField(StorageField):
         if self.field is None:
             bucket = self.bucket
         else:
-            bucket = self.field.bucket_name
+            bucket = self.storage.get_bucket_name_from_cf(self.field)
         url = "{}/{}/o/{}".format(
             self.storage.object_base_url,
             bucket,
@@ -239,6 +239,7 @@ class GCSStorageField(StorageField):
             await self.storage.delete_upload(self.field.upload_uri, self.field.bucket_name)
 
         if self.field is not None and self.field.uri != "":
+            old_bucket_name = self.storage.get_bucket_name_from_cf(self.field)
             field: CloudFile = CloudFile(
                 filename=cf.filename,
                 size=cf.size,
@@ -247,7 +248,7 @@ class GCSStorageField(StorageField):
                 md5=cf.md5,
                 source=CloudFile.GCS,
                 old_uri=self.field.uri,
-                old_bucket=self.field.bucket_name,
+                old_bucket=old_bucket_name,
             )
             upload_uri = f"{self.key}-{datetime.now().isoformat()}"
         else:
@@ -400,7 +401,7 @@ class GCSStorageField(StorageField):
         bucket = None
         if self.field is not None and self.field.uri != "":
             key = self.field.uri
-            bucket = self.field.bucket_name
+            bucket = self.storage.get_bucket_name_from_cf(self.field)
         elif self.key != "":
             key = self.key
             bucket = self.bucket
