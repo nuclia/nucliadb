@@ -661,7 +661,7 @@ class SearchParamDefaults:
             "Returns only documents that match this filter expression."
             "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters"
             "This allows building complex filtering expressions and replaces the following parameters:"
-            "`filters`, `range_*`."
+            "`filters`, `range_*`, `with_status`."
         ),
     )
 

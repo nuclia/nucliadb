@@ -36,7 +36,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import fetch_resources
 from nucliadb.search.search.pgcatalog import pgcatalog_search
-from nucliadb.search.search.query_parser.parser import parse_catalog
+from nucliadb.search.search.query_parser.catalog import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
 )
@@ -162,7 +162,7 @@ async def catalog(
     start_time = time()
     try:
         with cache.request_caches():
-            query_parser = parse_catalog(kbid, item)
+            query_parser = await parse_catalog(kbid, item)
 
             catalog_results = CatalogResponse()
             catalog_results.fulltext = await pgcatalog_search(query_parser)

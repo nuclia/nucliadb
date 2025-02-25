@@ -64,7 +64,7 @@ async def test_catalog_pagination(
                 "page_size": page_size,
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.text
         body = resp.json()
         assert len(body["resources"]) <= page_size
         assert body["fulltext"]["page_number"] == page_number
@@ -319,3 +319,130 @@ async def test_catalog_by_path_filter(
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_catalog_filter_expression(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"My resource 1",
+            "summary": "Some summary",
+            "origin": {"path": "/folder/file1", "tags": ["wadus", "wadus1"]},
+        },
+    )
+    assert resp.status_code == 201
+    resource1 = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"My resource 2",
+            "summary": "Some summary",
+            "origin": {"path": "/folder/file2", "tags": ["wadus", "wadus2"]},
+        },
+    )
+    assert resp.status_code == 201
+    resource2 = resp.json()["uuid"]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": f"My resource 3",
+            "summary": "Some summary",
+        },
+    )
+    assert resp.status_code == 201
+    resource3 = resp.json()["uuid"]
+
+    # Mixing with old filters not allowed
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filters": ["/l/abc"],
+            "filter_expression": {"resource": {"prop": "resource", "id": resource3}},
+        },
+    )
+    assert resp.status_code == 412
+
+    # By prefix
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filter_expression": {"resource": {"prop": "origin_path", "prefix": "folder"}},
+        },
+    )
+    assert resp.status_code == 200
+    assert set(resp.json()["resources"].keys()) == {resource1, resource2}
+
+    # And
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filter_expression": {
+                "resource": {
+                    "and": [
+                        {"prop": "origin_tag", "tag": "wadus"},
+                        {"prop": "origin_path", "prefix": "folder/file2"},
+                    ]
+                }
+            },
+        },
+    )
+    assert resp.status_code == 200
+    assert set(resp.json()["resources"].keys()) == {resource2}
+
+    # Or
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filter_expression": {
+                "resource": {
+                    "or": [
+                        {"prop": "origin_tag", "tag": "wadus1"},
+                        {"prop": "origin_tag", "tag": "wadus2"},
+                    ]
+                }
+            },
+        },
+    )
+    assert resp.status_code == 200
+    assert set(resp.json()["resources"].keys()) == {resource1, resource2}
+
+    # Not
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filter_expression": {"resource": {"not": {"prop": "origin_tag", "tag": "wadus"}}},
+        },
+    )
+    assert resp.status_code == 200
+    assert set(resp.json()["resources"].keys()) == {resource3}
+
+    # Combining everything
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filter_expression": {
+                "resource": {
+                    "or": [
+                        {
+                            "and": [
+                                {"prop": "origin_tag", "tag": "wadus"},
+                                {"prop": "origin_path", "prefix": "folder/file1"},
+                                {"not": {"prop": "modified", "until": "2019-01-01T11:00:00"}},
+                            ]
+                        },
+                        {"prop": "resource", "id": resource3},
+                    ]
+                }
+            }
+        },
+    )
+    assert resp.status_code == 200
+    assert set(resp.json()["resources"].keys()) == {resource1, resource3}

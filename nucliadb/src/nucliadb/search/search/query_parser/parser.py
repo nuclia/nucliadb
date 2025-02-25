@@ -18,19 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Any
 
 from pydantic import ValidationError
 
-from nucliadb.search.search.filters import (
-    convert_to_node_filters,
-    translate_label_filters,
-)
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.models import (
-    CatalogFilters,
-    CatalogQuery,
-    DateTimeFilter,
     NoopReranker,
     PredictReranker,
     RankFusion,
@@ -39,13 +31,8 @@ from nucliadb.search.search.query_parser.models import (
     UnitRetrieval,
 )
 from nucliadb_models import search as search_models
-from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_models.search import (
-    Filter,
     FindRequest,
-    SortField,
-    SortOptions,
-    SortOrder,
 )
 
 
@@ -138,47 +125,3 @@ class _FindParser:
             raise InternalParserError(f"Unknown reranker {self.item.reranker}")
 
         return reranking
-
-
-def parse_catalog(kbid: str, item: search_models.CatalogRequest) -> CatalogQuery:
-    filters = item.filters
-
-    if item.hidden is not None:
-        if item.hidden:
-            filters.append(Filter(all=[LABEL_HIDDEN]))  # type: ignore
-        else:
-            filters.append(Filter(none=[LABEL_HIDDEN]))  # type: ignore
-
-    label_filters: dict[str, Any] = convert_to_node_filters(item.filters)
-    if len(label_filters) > 0:
-        label_filters = translate_label_filters(label_filters)
-
-    sort = item.sort
-    if sort is None:
-        # By default we sort by creation date (most recent first)
-        sort = SortOptions(
-            field=SortField.CREATED,
-            order=SortOrder.DESC,
-            limit=None,
-        )
-
-    return CatalogQuery(
-        kbid=kbid,
-        query=item.query,
-        filters=CatalogFilters(
-            labels=label_filters,
-            creation=DateTimeFilter(
-                after=item.range_creation_start,
-                before=item.range_creation_end,
-            ),
-            modification=DateTimeFilter(
-                after=item.range_modification_start,
-                before=item.range_modification_end,
-            ),
-            with_status=item.with_status,
-        ),
-        sort=sort,
-        faceted=item.faceted,
-        page_number=item.page_number,
-        page_size=item.page_size,
-    )

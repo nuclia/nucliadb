@@ -26,6 +26,7 @@ from pydantic import BaseModel, Discriminator, Tag, model_validator
 from typing_extensions import Annotated, Self
 
 from .common import FieldTypeName, Paragraph
+from .metadata import ResourceProcessingStatus
 from .utils import DateTime
 
 F = TypeVar("F")
@@ -250,6 +251,13 @@ class Kind(BaseModel, extra="forbid"):
     kind: Paragraph.TypeParagraph = pydantic.Field(description="The kind of paragraph to match")
 
 
+class Status(BaseModel, extra="forbid"):
+    """Matches resource in a certain processing status"""
+
+    prop: Literal["status"]
+    status: ResourceProcessingStatus = pydantic.Field(description="The status of the resource")
+
+
 # The discriminator function is optional, everything works without it.
 # We implement it because it makes pydantic produce more user-friendly errors
 def filter_discriminator(v: Any) -> Optional[str]:
@@ -325,6 +333,7 @@ ResourceFilterExpression = Annotated[
         Annotated[OriginPath, Tag("origin_path")],
         Annotated[OriginSource, Tag("origin_source")],
         Annotated[OriginCollaborator, Tag("origin_collaborator")],
+        Annotated[Status, Tag("status")],
     ],
     Discriminator(filter_discriminator),
 ]
@@ -364,9 +373,7 @@ class CatalogFilterExpression(BaseModel, extra="forbid"):
     Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters
 
     This allows building complex filtering expressions and replaces the following parameters:
-    `filters`, `range_*`.
+    `filters`, `range_*`, `with_status`.
     """
 
-    resource: Optional[ResourceFilterExpression] = pydantic.Field(
-        default=None, description="Filter to apply to resources"
-    )
+    resource: ResourceFilterExpression = pydantic.Field(description="Filter to apply to resources")
