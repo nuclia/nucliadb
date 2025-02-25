@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -29,6 +28,7 @@ from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
 from pytest_mock import MockerFixture
+from tests.utils import broker_resource, inject_message
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.utils import get_driver
@@ -49,7 +49,6 @@ from nucliadb_utils.utilities import (
     get_storage,
     set_utility,
 )
-from tests.utils import broker_resource, inject_message
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -350,54 +349,6 @@ async def test_paragraph_search_with_filters(
     paragraph_results = body["paragraphs"]["results"]
     assert len(paragraph_results) == 1
     assert paragraph_results[0]["field"] == "summary"
-
-
-@pytest.mark.skip(reason="Needs sc-5626")
-@pytest.mark.deploy_modes("standalone")
-async def test_(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    standalone_knowledgebox,
-):
-    resp = await nucliadb_writer.post(
-        f"/kb/{standalone_knowledgebox}/resources",
-        json={
-            "title": "Rust for dummies",
-        },
-    )
-    assert resp.status_code == 201
-    rust_for_dummies = resp.json()["uuid"]
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{standalone_knowledgebox}/resources",
-        json={
-            "title": "Introduction to Python",
-        },
-    )
-    assert resp.status_code == 201
-    intro_to_python = resp.json()["uuid"]
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        params={
-            "query": "Rust",
-        },
-    )
-    assert resp.status_code == 200
-    resources = resp.json()["resources"]
-    assert len(resources) == 1
-    assert rust_for_dummies in resources
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        params={
-            "query": "Intro",
-        },
-    )
-    assert resp.status_code == 200
-    resources = resp.json()["resources"]
-    assert len(resources) == 1
-    assert intro_to_python in resources
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -1307,27 +1258,6 @@ async def test_search_handles_limits_exceeded_error(
     assert resp.json() == {"detail": "over the quota"}
 
 
-@pytest.mark.deploy_modes("standalone")
-async def test_catalog_post(
-    nucliadb_reader: AsyncClient,
-    standalone_knowledgebox,
-):
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        json={
-            "query": "",
-            "filters": [
-                {"any": ["/foo", "/bar"]},
-            ],
-            "with_status": "PROCESSED",
-            "sort": {
-                "field": "created",
-            },
-        },
-    )
-    assert resp.status_code == 200
-
-
 @pytest.fixture()
 def not_debug():
     from nucliadb_utils.settings import running_settings
@@ -1347,233 +1277,3 @@ async def test_api_does_not_show_tracebacks_on_api_errors(not_debug, nucliadb_re
         resp = await nucliadb_reader.get("/kb/foobar/search", timeout=None)
         assert resp.status_code == 500
         assert resp.json() == {"detail": "Something went wrong, please contact your administrator"}
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_catalog_pagination(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    standalone_knowledgebox,
-):
-    n_resources = 35
-    for i in range(n_resources):
-        resp = await nucliadb_writer.post(
-            f"/kb/{standalone_knowledgebox}/resources",
-            json={
-                "title": f"Resource {i}",
-                "texts": {
-                    "text": {
-                        "body": f"Text for resource {i}",
-                    }
-                },
-            },
-        )
-        assert resp.status_code == 201
-
-    # Give some time for the resources to be refreshed in the index
-    await asyncio.sleep(1)
-
-    resource_uuids = []
-    creation_dates = []
-    page_size = 10
-    page_number = 0
-    while True:
-        resp = await nucliadb_reader.get(
-            f"/kb/{standalone_knowledgebox}/catalog",
-            params={
-                "page_number": page_number,
-                "page_size": page_size,
-            },
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert len(body["resources"]) <= page_size
-        assert body["fulltext"]["page_number"] == page_number
-        for resource_id, resource_data in body["resources"].items():
-            resource_created_date = datetime.fromisoformat(resource_data["created"]).timestamp()
-            if resource_id in resource_uuids:
-                assert False, f"Resource {resource_id} already seen"
-            resource_uuids.append(resource_id)
-            creation_dates.append(resource_created_date)
-        if not body["fulltext"]["next_page"]:
-            break
-        page_number += 1
-    assert len(resource_uuids) == n_resources
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_catalog_date_range_filtering(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    standalone_knowledgebox,
-):
-    now = datetime.now()
-    resp = await nucliadb_writer.post(
-        f"/kb/{standalone_knowledgebox}/resources",
-        json={
-            "title": f"Resource",
-            "texts": {
-                "text": {
-                    "body": f"Text for resource",
-                }
-            },
-        },
-    )
-    assert resp.status_code == 201
-
-    one_hour_ago = now - timedelta(hours=1)
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        params={
-            "range_creation_start": one_hour_ago.isoformat(),
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 1
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        json={
-            "range_creation_end": one_hour_ago.isoformat(),
-        },
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 0
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_catalog_faceted(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    standalone_knowledgebox,
-):
-    valid_status = ["PROCESSED", "PENDING", "ERROR"]
-
-    for status_name, status_value in rpb.Metadata.Status.items():
-        if status_name not in valid_status:
-            continue
-        bm = broker_resource(standalone_knowledgebox)
-        bm.basic.metadata.status = status_value
-        await inject_message(nucliadb_ingest_grpc, bm)
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog?faceted=/metadata.status",
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 3
-    facets = body["fulltext"]["facets"]["/metadata.status"]
-    assert len(facets) == 3
-    for facet, count in facets.items():
-        assert facet.split("/")[-1] in valid_status
-        assert count == 1
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_catalog_faceted_labels(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    standalone_knowledgebox,
-):
-    # 4 resources:
-    # 1 with /l/labelset0/label0
-    # 2 with /l/labelset0/label1
-    # 1 with /l/labelset1/label0
-    for label in range(2):
-        for count in range(label + 1):
-            bm = broker_resource(standalone_knowledgebox)
-            c = rpb.Classification()
-            c.labelset = f"labelset0"
-            c.label = f"label{label}"
-            bm.basic.usermetadata.classifications.append(c)
-            await inject_message(nucliadb_ingest_grpc, bm)
-
-    bm = broker_resource(standalone_knowledgebox)
-    c = rpb.Classification()
-    c.labelset = "labelset1"
-    c.label = "label0"
-    bm.basic.usermetadata.classifications.append(c)
-    await inject_message(nucliadb_ingest_grpc, bm)
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels/labelset0",
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["fulltext"]["facets"] == {
-        "/classification.labels/labelset0": {
-            "/classification.labels/labelset0/label0": 1,
-            "/classification.labels/labelset0/label1": 2,
-        }
-    }
-
-    # This is used by the check missing labels button in dashboard
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog?faceted=/classification.labels",
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["fulltext"]["facets"] == {
-        "/classification.labels": {
-            "/classification.labels/labelset0": 3,
-            "/classification.labels/labelset1": 1,
-        }
-    }
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_catalog_filters(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    standalone_knowledgebox,
-):
-    valid_status = ["PROCESSED", "PENDING", "ERROR"]
-
-    for status_name, status_value in rpb.Metadata.Status.items():
-        if status_name not in valid_status:
-            continue
-        bm = broker_resource(standalone_knowledgebox)
-        bm.basic.metadata.status = status_value
-        await inject_message(nucliadb_ingest_grpc, bm)
-
-    # No filters
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog",
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 3
-
-    # Simple filter
-    resp = await nucliadb_reader.get(
-        f"/kb/{standalone_knowledgebox}/catalog?filters=/metadata.status/PENDING",
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 1
-    assert list(body["resources"].values())[0]["metadata"]["status"] == "PENDING"
-
-    # AND filter
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        json={"filters": [{"all": ["/metadata.status/PENDING", "/metadata.status/ERROR"]}]},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 0
-
-    # OR filter
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/catalog",
-        json={"filters": [{"any": ["/metadata.status/PENDING", "/metadata.status/ERROR"]}]},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["resources"]) == 2
-    for resource in body["resources"].values():
-        assert resource["metadata"]["status"] in ["PENDING", "ERROR"]

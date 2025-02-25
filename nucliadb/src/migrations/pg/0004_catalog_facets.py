@@ -33,7 +33,7 @@ async def migrate(txn: PGTransaction) -> None:
                                 SELECT string_agg(part, '/') OVER(ROWS UNBOUNDED PRECEDING) AS prefix
                                 FROM regexp_split_to_table(facet, '/') AS part
                             ) AS p
-                    )
+                    ) AS s
                     WHERE prefix != '';
             $$ LANGUAGE SQL IMMUTABLE;
         """)
