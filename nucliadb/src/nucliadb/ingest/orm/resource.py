@@ -176,6 +176,16 @@ class Resource:
 
             self.basic.MergeFrom(payload)
 
+            # Prevent duplicated languages
+            unique_languages = set(self.basic.metadata.languages)
+            self.basic.metadata.ClearField("languages")
+            self.basic.metadata.languages.extend(unique_languages)
+
+            # Prevent duplicated labels
+            unique_labels = set(self.basic.labels)
+            self.basic.ClearField("labels")
+            self.basic.labels.extend(unique_labels)
+
             self.set_processing_status(self.basic, payload)
 
             # We force the usermetadata classification to be the one defined
