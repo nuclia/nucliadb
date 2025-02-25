@@ -38,5 +38,6 @@ pub struct VectorSearchRequest {
 
     pub filtering_formula: Option<BooleanExpression>,
     pub segment_filtering_formula: Option<BooleanExpression>,
+    /// Whether to do an OR/AND between prefilter results and filtering_formula
     pub filter_or: bool,
 }
