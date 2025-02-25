@@ -440,26 +440,30 @@ fn test_graph_undirected_path_query() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_graph_response() -> anyhow::Result<()> {
+fn test_graph_response_size_optimizations() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
-    // (:Anna)-[]->()
-    let result = reader.reader.graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
-        value: Some("Anna".into()),
-        node_type: Some(NodeType::Entity),
-        node_subtype: Some("PERSON".to_string()),
-        ..Default::default()
-    }))))?;
+    // ()-[:LIVE_IN]->()
+    let result = reader.reader.graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Or(vec![
+        Relation {
+            value: Some("LIVE_IN".to_string()),
+        },
+        Relation {
+            value: Some("WORK_IN".to_string()),
+        },
+    ]))))?;
+    friendly_print(&result);
     let relations = friendly_parse(&result);
     assert_eq!(relations.len(), 4);
-    assert!(relations.contains(&("Anna", "FOLLOW", "Erin")));
     assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
-    assert!(relations.contains(&("Anna", "LOVE", "Cat")));
     assert!(relations.contains(&("Anna", "WORK_IN", "New York")));
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+    assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
+
     // Validate we are compressing the graph and retuning deduplicated nodes
     assert_eq!(result.graph.len(), 4);
-    assert_eq!(result.nodes.len(), 4);
-    assert_eq!(result.relations.len(), 4);
+    assert_eq!(result.nodes.len(), 5);
+    assert_eq!(result.relations.len(), 2);
 
     Ok(())
 }

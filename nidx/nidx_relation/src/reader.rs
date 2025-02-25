@@ -73,6 +73,7 @@ impl RelationsReaderService {
         let matching_docs = searcher.search(&index_query, &collector)?;
 
         let mut node_ids = HashMap::new();
+        let mut relation_ids = HashMap::new();
 
         let mut nodes = Vec::new();
         let mut relations = Vec::new();
@@ -86,26 +87,34 @@ impl RelationsReaderService {
             let destination = io_maps::target_to_relation_node(&self.schema, &doc);
 
             let source_key = (source.value.clone(), source.ntype, source.subtype.clone());
-            let source_idx = if !node_ids.contains_key(&source_key) {
+            let source_idx = if let Some(idx) = node_ids.get(&source_key) {
+                *idx
+            } else {
                 let next_id = node_ids.len();
                 node_ids.insert(source_key, next_id);
                 nodes.push(source);
                 next_id
-            } else {
-                *node_ids.get(&source_key).unwrap()
             };
 
-            let relation_idx = relations.len();
-            relations.push(relation);
+            // TODO: include metadata in key
+            let relation_key = (relation.relation_type, relation.label.clone());
+            let relation_idx = if let Some(idx) = relation_ids.get(&relation_key) {
+                *idx
+            } else {
+                let next_id = relation_ids.len();
+                relation_ids.insert(relation_key, next_id);
+                relations.push(relation);
+                next_id
+            };
 
             let destination_key = (destination.value.clone(), destination.ntype, destination.subtype.clone());
-            let destination_idx = if !node_ids.contains_key(&destination_key) {
+            let destination_idx = if let Some(idx) = node_ids.get(&destination_key) {
+                *idx
+            } else {
                 let next_id = node_ids.len();
                 node_ids.insert(destination_key, next_id);
                 nodes.push(destination);
                 next_id
-            } else {
-                *node_ids.get(&destination_key).unwrap()
             };
 
             graph.push(nidx_protos::graph_search_response::Path {
