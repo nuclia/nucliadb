@@ -19,6 +19,7 @@
 #
 from uuid import uuid4
 
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_utils.storages.azure import AzureStorage
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
@@ -39,6 +40,10 @@ async def test_s3_driver(s3_storage: S3Storage):
 async def test_gcs_driver(gcs_storage: GCSStorage):
     assert isinstance(gcs_storage, GCSStorage)
     await storage_test(gcs_storage)
+
+    kbid = "kbid"
+    cf = CloudFile(bucket_name="foo", uri=f"kbs/{kbid}/foo/bar")
+    assert gcs_storage.get_bucket_name_from_cf(cf).startswith(f"test_{kbid}")
 
 
 async def test_local_driver(local_storage: LocalStorage):
