@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import json
 from datetime import datetime, timedelta
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
@@ -327,6 +328,22 @@ async def test_paragraph_search_with_filters(
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/resource/{rid}/search",
         params={"query": "mushrooms", "fields": ["a/summary"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    paragraph_results = body["paragraphs"]["results"]
+    assert len(paragraph_results) == 1
+    assert paragraph_results[0]["field"] == "summary"
+
+    # Check that you can filter results by field
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/search",
+        params={
+            "query": "mushrooms",
+            "filter_expression": json.dumps(
+                {"field": {"prop": "field", "type": "generic", "name": "summary"}}
+            ),
+        },
     )
     assert resp.status_code == 200
     body = resp.json()

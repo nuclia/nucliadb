@@ -23,7 +23,10 @@ mod common;
 use std::collections::HashSet;
 
 use nidx_protos::VectorSentence;
-use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
+use nidx_types::{
+    prefilter::FieldId,
+    query_language::{BooleanExpression, BooleanOperation, Operator},
+};
 use nidx_vector::config::*;
 use rstest::rstest;
 use tempfile::tempdir;
@@ -188,16 +191,19 @@ fn test_filtered_search() -> anyhow::Result<()> {
     // 2 has labels 2, 8
     // 3 has labels 3, 9
     let work_path = tempdir()?;
-    let segments = (0..4)
+    let resources: Vec<_> = (0..4)
         .map(|i| {
             resource(vec![], vec![format!("/l/labelset/label_{}", i), format!("/l/labelset/label_{}", (i % 2) + 8)])
         })
+        .collect();
+    let segments = resources
+        .iter()
         .enumerate()
         .map(|(i, r)| {
             let segment_path = &work_path.path().join(i.to_string());
             std::fs::create_dir(segment_path).unwrap();
             (
-                VectorIndexer.index_resource(segment_path, &config, &r, "default", true).unwrap().unwrap(),
+                VectorIndexer.index_resource(segment_path, &config, r, "default", true).unwrap().unwrap(),
                 (i as i64).into(),
             )
         })
@@ -212,7 +218,6 @@ fn test_filtered_search() -> anyhow::Result<()> {
             vector: [0.0; 4].to_vec(),
             result_per_page: 10,
             min_score: -1.0,
-            paragraph_labels: (0..4).map(|i| format!("/l/labelset/label_{i}")).collect(),
             filtering_formula,
             ..Default::default()
         };
@@ -276,6 +281,52 @@ fn test_filtered_search() -> anyhow::Result<()> {
             ],
         }))),
         [0, 1, 3].into()
+    );
+
+    // Combinations with prefilter
+    let search = |filtering_formula, prefilter, filter_or| -> HashSet<u32> {
+        let search_request = &VectorSearchRequest {
+            vector: [0.0; 4].to_vec(),
+            result_per_page: 10,
+            min_score: -1.0,
+            filtering_formula,
+            filter_or,
+            ..Default::default()
+        };
+        let results = reader.search(search_request, &prefilter).unwrap();
+        results
+            .documents
+            .iter()
+            .map(|d| d.labels.iter().map(|l| l.split("_").last().unwrap().parse().unwrap()).min().unwrap())
+            .collect()
+    };
+
+    let resource = |r: usize| FieldId {
+        resource_id: resources[r].resource.as_ref().unwrap().uuid.parse().unwrap(),
+        field_id: "/a/title".into(),
+    };
+
+    // Prefilter only
+    assert_eq!(search(None, PrefilterResult::Some(vec![resource(0)]), false), [0].into());
+
+    // Prefilter AND labels
+    assert_eq!(
+        search(
+            Some(BooleanExpression::Literal("/l/labelset/label_1".into())),
+            PrefilterResult::Some(vec![resource(0), resource(1)]),
+            false
+        ),
+        [1].into()
+    );
+
+    // Prefilter OR labels
+    assert_eq!(
+        search(
+            Some(BooleanExpression::Literal("/l/labelset/label_3".into())),
+            PrefilterResult::Some(vec![resource(1)]),
+            true
+        ),
+        [1, 3].into()
     );
 
     Ok(())

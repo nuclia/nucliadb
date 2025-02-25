@@ -132,7 +132,7 @@ impl RelationSearcher {
 
     #[instrument(name = "relation::search", skip_all)]
     pub fn search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
-        self.reader.search(request)
+        self.reader.relation_search(request)
     }
 
     #[instrument(name = "relation::suggest", skip_all)]

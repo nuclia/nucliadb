@@ -422,6 +422,68 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
         assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_filtering_field_and_paragraph(app_context, nucliadb_reader: AsyncClient, kbid: str):
+    async def test_search(filter_expression, expected_paragraphs):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json=dict(
+                query="",
+                features=[SearchOptions.KEYWORD, SearchOptions.SEMANTIC],
+                vector=Q,
+                min_score=MinScore(semantic=-1).model_dump(),
+                reranker=RerankerName.NOOP,
+                filter_expression=filter_expression,
+            ),
+        )
+        assert resp.status_code == 200, resp.text
+        content = resp.json()
+
+        # Collect all paragraphs from the response
+        paragraphs = [
+            paragraph
+            for resource in content["resources"].values()
+            for field in resource["fields"].values()
+            for paragraph in field["paragraphs"].values()
+        ]
+        print("found", paragraphs)
+        print("expected", expected_paragraphs)
+
+        # Check that only the expected paragraphs were returned
+        assert len(paragraphs) == len(
+            expected_paragraphs
+        ), f"{filter_expression}\n{paragraphs}\n{expected_paragraphs}"
+        not_yet_found = expected_paragraphs.copy()
+        for par in paragraphs:
+            if par["text"] not in expected_paragraphs:
+                raise AssertionError(f"Paragraph not expected: {par['text']}")
+            if par["text"] in not_yet_found:
+                assert (
+                    par["score_type"] == "BOTH"
+                ), f"Score type not expected with filters {filter_expression}"
+                not_yet_found.remove(par["text"])
+        assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
+
+    resource_label = label_filter(ClassificationLabels.RESOURCE_ANNOTATED)
+    paragraph_label = label_filter(ClassificationLabels.PARAGRAPH_ANNOTATED)
+    await test_search(
+        {
+            "field": convert_filter(resource_label),
+            "paragraph": convert_filter(paragraph_label),
+        },
+        set.intersection(FILTERS_TO_PARAGRAPHS[resource_label], FILTERS_TO_PARAGRAPHS[paragraph_label]),
+    )
+
+    await test_search(
+        {
+            "field": convert_filter(resource_label),
+            "paragraph": convert_filter(paragraph_label),
+            "operator": "or",
+        },
+        set.union(FILTERS_TO_PARAGRAPHS[resource_label], FILTERS_TO_PARAGRAPHS[paragraph_label]),
+    )
+
+
 @pytest.fixture()
 async def app_context(natsd, storage, nucliadb):
     ctx = ApplicationContext()

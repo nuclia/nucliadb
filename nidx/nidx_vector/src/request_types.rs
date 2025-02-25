@@ -26,10 +26,6 @@ pub struct VectorSearchRequest {
     pub id: String,
     /// Embedded vector search.
     pub vector: Vec<f32>,
-    /// labels to filter
-    pub field_labels: Vec<String>,
-    /// paragraph labels to filter
-    pub paragraph_labels: Vec<String>,
     /// What page is the answer.
     pub page_number: i32,
     /// How many results are in this page.
@@ -39,8 +35,9 @@ pub struct VectorSearchRequest {
     /// Empty for searching on the original index
     pub vector_set: String,
     pub min_score: f32,
-    pub field_filters: Vec<String>,
 
     pub filtering_formula: Option<BooleanExpression>,
     pub segment_filtering_formula: Option<BooleanExpression>,
+    /// Whether to do an OR/AND between prefilter results and filtering_formula
+    pub filter_or: bool,
 }

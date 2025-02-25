@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import json
+
 import pytest
 from httpx import AsyncClient
 
@@ -148,6 +150,43 @@ async def test_suggest_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 0
+
+    # filter by language (filtering expression)
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/suggest",
+        params={
+            "query": "prince",
+            "filter_expression": json.dumps(
+                {"field": {"prop": "language", "only_primary": True, "language": "en"}}
+            ),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 2
+    assert {"summary", "title"} == {result["field"] for result in body["paragraphs"]["results"]}
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/suggest",
+        params={
+            "query": "prince",
+            "filter_expression": json.dumps({"paragraph": {"prop": "kind", "kind": "OCR"}}),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 0
+
+    # filter by expression and old filters (error)
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/suggest",
+        params={
+            "query": "prince",
+            "filters": "/metadata.language/de",
+            "filter_expression": json.dumps({"field": {"prop": "language", "language": "en"}}),
+        },
+    )
+    assert resp.status_code == 412
 
 
 @pytest.mark.deploy_modes("standalone")

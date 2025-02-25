@@ -80,13 +80,17 @@ impl From<CompoundClause> for Clause {
 
 /// Once applied to a given address, the formula becomes a boolean
 /// expression that evaluates to whether the address is valid or not.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Formula {
     pub clauses: Vec<Clause>,
+    pub operator: BooleanOperator,
 }
 impl Formula {
     pub fn new() -> Formula {
-        Formula::default()
+        Formula {
+            operator: BooleanOperator::And,
+            clauses: Vec::new(),
+        }
     }
     pub fn extend<C>(&mut self, clause: C)
     where

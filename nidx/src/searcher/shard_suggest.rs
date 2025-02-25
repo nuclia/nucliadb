@@ -20,8 +20,8 @@
 
 use std::sync::Arc;
 
-use nidx_paragraph::ParagraphSearcher;
-use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
+use nidx_paragraph::{ParagraphSearcher, ParagraphSuggestRequest};
+use nidx_protos::{FilterOperator, RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
 use nidx_text::{prefilter::PreFilterRequest, TextSearcher};
 use nidx_types::prefilter::PrefilterResult;
@@ -29,7 +29,10 @@ use tracing::{instrument, Span};
 
 use crate::errors::{NidxError, NidxResult};
 
-use super::{index_cache::IndexCache, query_planner::old_filter_compatibility::filter_from_suggest_request};
+use super::{
+    index_cache::IndexCache,
+    query_planner::{filter_to_boolean_expression, old_filter_compatibility::filter_from_suggest_request},
+};
 
 /// Max number of words accepted as a suggest query. This is useful for
 /// compounds with semantic meaning (like a name and a surname) but can add
@@ -87,13 +90,14 @@ fn blocking_suggest(
     paragraph_searcher: &ParagraphSearcher,
     relation_searcher: &RelationSearcher,
 ) -> anyhow::Result<SuggestResponse> {
-    let mut suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
+    let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
     let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
 
     let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
 
     let mut prefiltered = PrefilterResult::All;
 
+    let mut paragraph_request = None;
     if suggest_paragraphs {
         let filter_expression = filter_from_suggest_request(&request)?;
         if let Some(expr) = filter_expression {
@@ -114,13 +118,18 @@ fn blocking_suggest(
 
             prefiltered = text_searcher.prefilter(&prefilter)?;
         }
+        paragraph_request = Some(ParagraphSuggestRequest {
+            body: request.body,
+            filtering_formula: request.paragraph_filter.clone().map(filter_to_boolean_expression).transpose()?,
+            filter_or: request.filter_operator == FilterOperator::Or as i32,
+        })
     }
 
     if matches!(prefiltered, PrefilterResult::None) {
-        suggest_paragraphs = false;
+        paragraph_request = None;
     }
 
-    let paragraph_task = suggest_paragraphs.then_some(move || paragraph_searcher.suggest(&request, &prefiltered));
+    let paragraph_task = paragraph_request.map(|req| move || paragraph_searcher.suggest(&req, &prefiltered));
 
     let relation_task = suggest_entities.then_some(move || relation_searcher.suggest(prefixes));
 
