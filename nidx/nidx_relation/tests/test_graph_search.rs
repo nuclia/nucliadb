@@ -38,8 +38,6 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
     let entities = HashMap::from([
         ("Anastasia", "PERSON"),
         ("Anna", "PERSON"),
-        ("Anastasia", "PERSON"),
-        ("Anna", "PERSON"),
         ("Apollo", "PROJECT"),
         ("Cat", "ANIMAL"),
         ("Climbing", "ACTIVITY"),
