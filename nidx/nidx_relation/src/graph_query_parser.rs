@@ -18,19 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use nidx_protos::relation_node::NodeType;
-use tantivy::collector::TopDocs;
 use tantivy::query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery};
 use tantivy::schema::{Field, IndexRecordOption};
-use tantivy::Searcher;
 
 use crate::schema::Schema;
 use crate::{io_maps, schema};
-
-pub struct GraphSearcher {
-    schema: Schema,
-    parser: GraphQueryParser,
-    searcher: Searcher,
-}
 
 #[derive(Clone)]
 pub struct FuzzyTerm {
@@ -54,10 +46,8 @@ pub struct Node {
 
 #[derive(Default, Clone)]
 pub struct Relation {
+    // TODO: fuzzy
     pub value: Option<String>,
-    // TODO: fuzzy distance and fuzzy_prefix
-    // pub fuzzy_distance: Option<u8>,
-    // pub fuzzy_prefix: bool,
 }
 
 // Generic (simple) boolean expression for graph querying
@@ -113,9 +103,6 @@ pub enum GraphQuery {
     RelationQuery(RelationQuery),
     // (:A)-[:R]->(:B)
     PathQuery(PathQuery),
-    // Combine queries with an OR
-    // (:A)-[:R]->(:B), !(:A)-[:P]->(:B)
-    MultiStatement(Vec<Expression<PathQuery>>),
 }
 
 #[derive(Clone, Copy)]
@@ -129,32 +116,6 @@ pub struct GraphQueryParser {
     schema: Schema,
 }
 
-impl GraphSearcher {
-    pub fn new(searcher: Searcher) -> Self {
-        Self {
-            schema: Schema::new(),
-            parser: GraphQueryParser::new(),
-            searcher,
-        }
-    }
-
-    pub fn search(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
-        let index_query: Box<dyn Query> = self.parser.parse_graph_query(query);
-
-        // TODO: parametrize this magic constant
-        let collector = TopDocs::with_limit(1000);
-
-        let matching_docs = self.searcher.search(&index_query, &collector)?;
-        let mut relations = Vec::with_capacity(matching_docs.len());
-        for (_, doc_addr) in matching_docs {
-            let doc = self.searcher.doc(doc_addr)?;
-            let relation = io_maps::doc_to_relation(&self.schema, &doc);
-            relations.push(relation);
-        }
-        Ok(relations)
-    }
-}
-
 impl GraphQueryParser {
     pub fn new() -> Self {
         Self {
@@ -162,14 +123,13 @@ impl GraphQueryParser {
         }
     }
 
-    pub fn parse_graph_query(&self, query: GraphQuery) -> Box<dyn Query> {
+    pub fn parse(&self, query: GraphQuery) -> Box<dyn Query> {
         // REVIEW: if at some point we only want to return what the query really asks (nodes,
         // relations or paths), we may want to return the query and some kind of response builder
         match query {
             GraphQuery::NodeQuery(query) => self.parse_node_query(query),
             GraphQuery::RelationQuery(query) => self.parse_relation_query(query),
             GraphQuery::PathQuery(query) => self.parse_path_query(query),
-            GraphQuery::MultiStatement(queries) => self.parse_multi_statement(queries),
         }
     }
 
@@ -224,31 +184,6 @@ impl GraphQueryParser {
                 self.parse_path_query(PathQuery::DirectedPath((destination, relation, source))),
             ])),
         }
-    }
-
-    fn parse_multi_statement(&self, queries: Vec<Expression<PathQuery>>) -> Box<dyn Query> {
-        let mut subqueries = vec![];
-        for expression in queries {
-            match expression {
-                Expression::Value(query) => {
-                    subqueries.push((Occur::Should, self.parse_path_query(query) as Box<dyn Query>));
-                }
-                Expression::Not(query) => {
-                    subqueries.push((Occur::MustNot, self.parse_path_query(query) as Box<dyn Query>));
-                }
-                Expression::Or(queries) => {
-                    subqueries.extend(queries.into_iter().map(|query| (Occur::Should, self.parse_path_query(query))));
-                }
-            };
-        }
-
-        // Due to implementation details on tantivy, a query containing only MustNot won't match
-        // anything. In this case, we need to add an AllQuery to get results
-        if subqueries.iter().all(|(occur, _)| *occur == Occur::MustNot) {
-            subqueries.push((Occur::Must, Box::new(AllQuery)));
-        }
-
-        Box::new(BooleanQuery::new(subqueries))
     }
 
     #[inline]
