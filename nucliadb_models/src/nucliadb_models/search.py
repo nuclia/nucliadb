@@ -45,7 +45,7 @@ from nucliadb_models.internal.shards import (  # noqa isort: skip
     ShardReplica,
     KnowledgeboxShards,
 )
-from nucliadb_models.filter import FilterExpression
+from nucliadb_models.filters import FilterExpression
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
     "name": "structred_response",

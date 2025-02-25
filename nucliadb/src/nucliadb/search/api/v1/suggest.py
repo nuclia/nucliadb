@@ -35,7 +35,7 @@ from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
 from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.filter import FilterExpression
+from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxSuggestResults,

@@ -32,7 +32,7 @@ from nucliadb.search.search.metrics import RAGMetrics
 from nucliadb.search.search.query import QueryParser
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_predict
-from nucliadb_models import filter
+from nucliadb_models import filters
 from nucliadb_models.search import (
     AskRequest,
     ChatContextMessage,
@@ -159,17 +159,17 @@ def add_resource_filter(request: Union[FindRequest, AskRequest], resources: list
 
     if request.filter_expression is not None:
         if len(resources) > 1:
-            resource_filter: filter.FieldFilterExpression = filter.Or.model_validate(
-                {"or": [filter.Resource(prop="resource", id=rid) for rid in resources]}
+            resource_filter: filters.FieldFilterExpression = filters.Or.model_validate(
+                {"or": [filters.Resource(prop="resource", id=rid) for rid in resources]}
             )
         else:
-            resource_filter = filter.Resource(prop="resource", id=resources[0])
+            resource_filter = filters.Resource(prop="resource", id=resources[0])
 
         # Add to filter expression if set
         if request.filter_expression.field is None:
             request.filter_expression.field = resource_filter
         else:
-            request.filter_expression.field = filter.And.model_validate(
+            request.filter_expression.field = filters.And.model_validate(
                 {"and": [request.filter_expression.field, resource_filter]}
             )
     else:

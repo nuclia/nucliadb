@@ -23,7 +23,7 @@ from typing import Union
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
 from nucliadb.search.search.exceptions import InvalidQueryError
-from nucliadb_models.filter import (
+from nucliadb_models.filters import (
     And,
     DateCreated,
     DateModified,
