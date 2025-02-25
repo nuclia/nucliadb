@@ -30,7 +30,7 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.storages.storage import Storage, StorageField
 
 MAINDB_EXPORT_KEY = "/kbs/{kbid}/exports/{id}"
-MAINDB_IMPORT_KY = "/kbs/{kbid}/imports/{id}"
+MAINDB_IMPORT_KEY = "/kbs/{kbid}/imports/{id}"
 STORAGE_EXPORT_KEY = "exports/{export_id}"
 STORAGE_IMPORT_KEY = "imports/{import_id}"
 
@@ -49,7 +49,7 @@ class ExportImportDataManager:
     def _get_maindb_metadata_key(self, type: str, kbid: str, id: str) -> str:
         if type not in ("export", "import"):
             raise ValueError(f"Invalid type: {type}")
-        key = MAINDB_EXPORT_KEY if type == "export" else MAINDB_IMPORT_KY
+        key = MAINDB_EXPORT_KEY if type == "export" else MAINDB_IMPORT_KEY
         return key.format(kbid=kbid, id=id)
 
     async def get_metadata(self, type: str, kbid: str, id: str) -> Metadata:
