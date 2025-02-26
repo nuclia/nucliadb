@@ -392,6 +392,15 @@ async def test_catalog_filter_expression(
     assert resp.status_code == 200
     assert set(resp.json()["resources"].keys()) == {resource1, resource2}
 
+    resp = await nucliadb_reader.post(
+        f"/kb/{standalone_knowledgebox}/catalog",
+        json={
+            "filter_expression": {"resource": {"not": {"prop": "origin_path"}}},
+        },
+    )
+    assert resp.status_code == 200
+    assert set(resp.json()["resources"].keys()) == {resource3}
+
     # And
     resp = await nucliadb_reader.post(
         f"/kb/{standalone_knowledgebox}/catalog",
