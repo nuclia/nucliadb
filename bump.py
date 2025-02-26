@@ -51,7 +51,6 @@ def run(args):
     ]
     for filename in VERSION_UPDATES:
         update_version(filename, python_version)
-    update_version("nidx/nidx_binding/Cargo.toml", version)
 
     # we only freeze dependency versions if we are not bumping a sem version
     if args.sem:

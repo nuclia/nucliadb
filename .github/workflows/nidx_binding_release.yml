@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths:
-      - "nidx"
-      - "nucliadb_protos"
+      - "nidx/**"
+      - "nucliadb_protos/**"
   push:
     branches:
       - main
     paths:
-      - "nidx"
-      - "nucliadb_protos"
+      - "nidx/**"
+      - "nucliadb_protos/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -67,7 +67,7 @@ jobs:
           before-script-linux: scripts/install-protoc.sh
           target: ${{ matrix.target }}
           manylinux: 2_34
-          args: -m nidx/nidx_binding/Cargo.toml --release --out dist --profile release-wheel
+          args: -m nidx/nidx_binding/Cargo.toml --release --out dist
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
@@ -75,7 +75,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pypi_files
+          name: pypi_files-${{ matrix.os }}-${{ matrix.target }}
           path: dist
 
   list-pypi-files:
@@ -89,7 +89,8 @@ jobs:
       - name: get dist artifacts
         uses: actions/download-artifact@v4
         with:
-          name: pypi_files
+          pattern: pypi_files-*
+          merge-multiple: true
           path: dist
 
       - run: ls -lh dist/
@@ -113,7 +114,8 @@ jobs:
       - name: get dist artifacts
         uses: actions/download-artifact@v4
         with:
-          name: pypi_files
+          pattern: pypi_files-*
+          merge-multiple: true
           path: dist
 
       - run: twine check dist/*
