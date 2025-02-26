@@ -102,40 +102,32 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
 
 // Debug function, useful while developing
 #[allow(dead_code)]
-fn friendly_print(result: &[nidx_protos::Relation]) {
-    println!("Matched {} results", result.len());
-    for relation in result {
-        let source = relation.source.as_ref().unwrap();
-        let destination = relation.to.as_ref().unwrap();
+fn friendly_print(result: &nidx_protos::GraphSearchResponse) {
+    println!("Matched {} paths in {} nodes and {}", result.graph.len(), result.nodes.len(), result.relations.len());
+    for path in result.graph.iter() {
+        let source = result.nodes.get(path.source as usize).unwrap();
+        let relation = result.relations.get(path.relation as usize).unwrap();
+        let destination = result.nodes.get(path.destination as usize).unwrap();
 
         println!(
             "({:?})-[{:?}]->({:?})",
-            (
-                &source.value,
-                // io_maps::u64_to_node_type::<NodeType>(source_node.ntype as u64),
-                &source.subtype
-            ),
-            (
-                // io_maps::u64_to_relation_type::<RelationType>(relation.relation as u64),
-                &relation.relation_label,
-            ),
-            (
-                &destination.value,
-                // io_maps::u64_to_node_type::<NodeType>(destination_node.ntype as u64),
-                &destination.subtype
-            )
+            (&source.value, &source.subtype),
+            &relation.label,
+            (&destination.value, &destination.subtype)
         );
     }
     println!();
 }
 
-fn friendly_parse<'a>(relations: &'a Vec<nidx_protos::Relation>) -> Vec<(&'a str, &'a str, &'a str)> {
+fn friendly_parse<'a>(relations: &'a nidx_protos::GraphSearchResponse) -> Vec<(&'a str, &'a str, &'a str)> {
     relations
+        .graph
         .iter()
-        .map(|relation| {
-            let source = relation.source.as_ref().unwrap();
-            let destination = relation.to.as_ref().unwrap();
-            (source.value.as_str(), relation.relation_label.as_str(), destination.value.as_str())
+        .map(|path| {
+            let source = relations.nodes.get(path.source as usize).unwrap();
+            let relation = relations.relations.get(path.relation as usize).unwrap();
+            let destination = relations.nodes.get(path.destination as usize).unwrap();
+            (source.value.as_str(), relation.label.as_str(), destination.value.as_str())
         })
         .collect()
 }
@@ -151,7 +143,7 @@ fn test_graph_node_query() -> anyhow::Result<()> {
         node_subtype: None,
         ..Default::default()
     }))))?;
-    assert_eq!(result.len(), 16);
+    assert_eq!(result.graph.len(), 16);
 
     // (:PERSON)-[]->()
     let result = reader.reader.graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
@@ -160,7 +152,7 @@ fn test_graph_node_query() -> anyhow::Result<()> {
         node_subtype: Some("PERSON".to_string()),
         ..Default::default()
     }))))?;
-    assert_eq!(result.len(), 12);
+    assert_eq!(result.graph.len(), 12);
 
     // (:Anna)-[]->()
     let result = reader.reader.graph_search(GraphQuery::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node {
@@ -447,142 +439,31 @@ fn test_graph_undirected_path_query() -> anyhow::Result<()> {
     Ok(())
 }
 
-// #[test]
-// fn test_multi_statement_graph_search() -> anyhow::Result<()> {
-//     let reader = create_reader()?;
+#[test]
+fn test_graph_response_size_optimizations() -> anyhow::Result<()> {
+    let reader = create_reader()?;
 
-//     // (:Anna)-[:LIVE_IN]->(:PLACE) | (:Peter)-[:LIVE_IN]->(:PLACE)
-//     let result = reader.reader.advanced_graph_query(GraphQuery::MultiStatement(vec![Expression::Or(vec![
-//         PathQuery::DirectedPath((
-//             Expression::Value(Node {
-//                 value: Some("Anna".into()),
-//                 ..Default::default()
-//             }),
-//             Expression::Value(Relation {
-//                 value: Some("LIVE_IN".to_string()),
-//             }),
-//             Expression::Value(Node {
-//                 node_subtype: Some("PLACE".to_string()),
-//                 ..Default::default()
-//             }),
-//         )),
-//         PathQuery::DirectedPath((
-//             Expression::Value(Node {
-//                 value: Some("Peter".into()),
-//                 ..Default::default()
-//             }),
-//             Expression::Value(Relation {
-//                 value: Some("LIVE_IN".to_string()),
-//             }),
-//             Expression::Value(Node {
-//                 node_subtype: Some("PLACE".to_string()),
-//                 ..Default::default()
-//             }),
-//         )),
-//     ])]))?;
-//     let relations = friendly_parse(&result);
-//     assert_eq!(relations.len(), 2);
-//     assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
-//     assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
+    // ()-[:LIVE_IN]->()
+    let result = reader.reader.graph_search(GraphQuery::RelationQuery(RelationQuery(Expression::Or(vec![
+        Relation {
+            value: Some("LIVE_IN".to_string()),
+        },
+        Relation {
+            value: Some("WORK_IN".to_string()),
+        },
+    ]))))?;
+    friendly_print(&result);
+    let relations = friendly_parse(&result);
+    assert_eq!(relations.len(), 4);
+    assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
+    assert!(relations.contains(&("Anna", "WORK_IN", "New York")));
+    assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
+    assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
 
-//     let result = reader.reader.advanced_graph_query(GraphQuery::MultiStatement(vec![
-//         // !(:^A)-[]->()
-//         Expression::Not(PathQuery::DirectedPath((
-//             Expression::Value(Node {
-//                 value: Some(Term::Fuzzy(FuzzyTerm {
-//                     value: "A".to_string(),
-//                     fuzzy_distance: 0,
-//                     is_prefix: true,
-//                 })),
-//                 ..Default::default()
-//             }),
-//             Expression::Value(Relation::default()),
-//             Expression::Value(Node::default()),
-//         ))),
-//         // ()-[:LIVE_IN|WORK_IN]->()
-//         Expression::Value(PathQuery::DirectedPath((
-//             Expression::Value(Node::default()),
-//             Expression::Or(vec![
-//                 Relation {
-//                     value: Some("LIVE_IN".to_string()),
-//                 },
-//                 Relation {
-//                     value: Some("WORK_IN".to_string()),
-//                 },
-//             ]),
-//             Expression::Value(Node::default()),
-//         ))),
-//         // (:PERSON)-[:LOVE]->()
-//         Expression::Value(PathQuery::DirectedPath((
-//             Expression::Value(Node {
-//                 node_subtype: Some("PERSON".to_string()),
-//                 ..Default::default()
-//             }),
-//             Expression::Value(Relation {
-//                 value: Some("LOVE".to_string()),
-//             }),
-//             Expression::Value(Node::default()),
-//         ))),
-//     ]))?;
-//     friendly_print(&result);
-//     let relations = friendly_parse(&result);
-//     assert_eq!(relations.len(), 4);
-//     assert!(relations.contains(&("Dimitri", "LOVE", "Anastasia")));
-//     assert!(relations.contains(&("Erin", "LOVE", "Climbing")));
-//     assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
-//     assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
+    // Validate we are compressing the graph and retuning deduplicated nodes
+    assert_eq!(result.graph.len(), 4);
+    assert_eq!(result.nodes.len(), 5);
+    assert_eq!(result.relations.len(), 2);
 
-//     // Double negation expression -- Only entities starting with M
-//     // !(:!^M)-[]->()
-//     let result = reader.reader.advanced_graph_query(GraphQuery::MultiStatement(vec![Expression::Not(
-//         PathQuery::DirectedPath((
-//             Expression::Not(Node {
-//                 value: Some(Term::Fuzzy(FuzzyTerm {
-//                     value: "M".to_string(),
-//                     fuzzy_distance: 0,
-//                     is_prefix: true,
-//                 })),
-//                 ..Default::default()
-//             }),
-//             Expression::Value(Relation::default()),
-//             Expression::Value(Node::default()),
-//         )),
-//     )]))?;
-//     let relations = friendly_parse(&result);
-//     assert_eq!(relations.len(), 2);
-//     assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
-//     assert!(relations.contains(&("Margaret", "DEVELOPED", "Apollo")));
-
-//     // Double negation AND
-//     let result = reader.reader.advanced_graph_query(GraphQuery::MultiStatement(vec![
-//         Expression::Not(
-//             PathQuery::DirectedPath((
-//                 Expression::Not(Node {
-//                     value: Some(Term::Fuzzy(FuzzyTerm {
-//                         value: "M".to_string(),
-//                         fuzzy_distance: 0,
-//                         is_prefix: true,
-//                     })),
-//                     ..Default::default()
-//                 }),
-//                 Expression::Value(Relation::default()),
-//                 Expression::Value(Node::default()),
-//             )),
-//         ),
-//         Expression::Value(
-//             PathQuery::DirectedPath((
-//                 Expression::Value(Node::default()),
-//                 Expression::Value(Relation {
-//                     value: Some("WORK_IN".to_string()),
-//                 }),
-//                 Expression::Value(Node::default()),
-//             ))
-//         )
-//     ]))?;
-//     friendly_print(&result);
-//     let relations = friendly_parse(&result);
-//     assert_eq!(relations.len(), 1);
-//     assert!(relations.contains(&("Margaret", "WORK_IN", "Computer science")));
-
-//     Ok(())
-// }
+    Ok(())
+}

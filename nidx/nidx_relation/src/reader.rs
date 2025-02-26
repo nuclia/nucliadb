@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::path::Path;
 
@@ -62,7 +62,7 @@ impl RelationsReaderService {
         })
     }
 
-    pub fn graph_search(&self, query: GraphQuery) -> anyhow::Result<Vec<nidx_protos::Relation>> {
+    pub fn graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
         let parser = GraphQueryParser::new();
         let index_query: Box<dyn Query> = parser.parse(query);
 
@@ -71,13 +71,72 @@ impl RelationsReaderService {
 
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
-        let mut relations = Vec::with_capacity(matching_docs.len());
-        for (_, doc_addr) in matching_docs {
-            let doc = searcher.doc(doc_addr)?;
-            let relation = io_maps::doc_to_relation(&self.schema, &doc);
-            relations.push(relation);
+
+        // Build graph response
+        //
+        // The idea here is to minimize response size by deduplicating any node/relation. To detect
+        // duplication, we use a hash of the value computed directly from the tantivy doc. As paths
+        // (triplets) are built from pointers to nodes and relations lists, we don't even need to
+        // serialize parts of the document we won't use
+
+        let mut node_ids = HashMap::new();
+        let mut relation_ids = HashMap::new();
+
+        let mut nodes = Vec::new();
+        let mut relations = Vec::new();
+        let mut graph = Vec::new();
+
+        for (_, doc_address) in matching_docs {
+            let doc = searcher.doc(doc_address)?;
+
+            let source_key = self.schema.source_node_hash(&doc);
+            let relation_key = self.schema.relation_hash(&doc);
+            let destination_key = self.schema.target_node_hash(&doc);
+
+            let source_idx = match node_ids.get(&source_key) {
+                Some(idx) => *idx,
+                None => {
+                    let idx = node_ids.len();
+                    node_ids.insert(source_key, idx);
+                    let source = io_maps::source_to_relation_node(&self.schema, &doc);
+                    nodes.push(source);
+                    idx
+                }
+            };
+            let relation_idx = match relation_ids.get(&relation_key) {
+                Some(idx) => *idx,
+                None => {
+                    let idx = relation_ids.len();
+                    relation_ids.insert(relation_key, idx);
+                    let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
+                    relations.push(relation);
+                    idx
+                }
+            };
+            let destination_idx = match node_ids.get(&destination_key) {
+                Some(idx) => *idx,
+                None => {
+                    let idx = node_ids.len();
+                    node_ids.insert(destination_key, idx);
+                    let destination = io_maps::target_to_relation_node(&self.schema, &doc);
+                    nodes.push(destination);
+                    idx
+                }
+            };
+
+            graph.push(nidx_protos::graph_search_response::Path {
+                source: source_idx as u32,
+                relation: relation_idx as u32,
+                destination: destination_idx as u32,
+            });
         }
-        Ok(relations)
+
+        let response = nidx_protos::GraphSearchResponse {
+            nodes,
+            relations,
+            graph,
+        };
+        Ok(response)
     }
 }
 

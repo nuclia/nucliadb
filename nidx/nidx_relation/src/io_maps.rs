@@ -80,16 +80,17 @@ where
 
 pub fn source_to_relation_node(schema: &Schema, doc: &TantivyDocument) -> RelationNode {
     RelationNode {
-        value: schema.source_value(doc),
+        value: schema.source_value(doc).to_string(),
         ntype: u64_to_node_type::<i32>(schema.source_type(doc)),
-        subtype: schema.source_subtype(doc),
+        subtype: schema.source_subtype(doc).to_string(),
     }
 }
+
 pub fn target_to_relation_node(schema: &Schema, doc: &TantivyDocument) -> RelationNode {
     RelationNode {
-        value: schema.target_value(doc),
+        value: schema.target_value(doc).to_string(),
         ntype: u64_to_node_type::<i32>(schema.target_type(doc)),
-        subtype: schema.target_subtype(doc),
+        subtype: schema.target_subtype(doc).to_string(),
     }
 }
 
@@ -97,8 +98,16 @@ pub fn doc_to_relation(schema: &Schema, doc: &TantivyDocument) -> ProtosRelation
     ProtosRelation {
         metadata: decode_metadata(schema, doc),
         relation: u64_to_relation_type::<i32>(schema.relationship(doc)),
-        relation_label: schema.relationship_label(doc),
+        relation_label: schema.relationship_label(doc).to_string(),
         source: Some(source_to_relation_node(schema, doc)),
         to: Some(target_to_relation_node(schema, doc)),
+    }
+}
+
+pub fn doc_to_graph_relation(schema: &Schema, doc: &TantivyDocument) -> nidx_protos::graph_search_response::Relation {
+    nidx_protos::graph_search_response::Relation {
+        relation_type: u64_to_relation_type::<i32>(schema.relationship(doc)),
+        label: schema.relationship_label(doc).to_string(),
+        metadata: decode_metadata(schema, doc),
     }
 }
