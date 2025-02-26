@@ -64,10 +64,16 @@ impl MergeScheduler {
 
             -- Deletions that apply to each segment (so we know which segments we need to merge to allow purging deletions)
             ), deletions_per_segment AS (
-                SELECT segments.id, COUNT(deletions) AS deletions
+                SELECT
+                    segments.id,
+                    (
+                        SELECT COUNT(*)
+                        FROM deletions
+                        WHERE deletions.index_id = segments.index_id
+                        AND deletions.seq > segments.seq
+                    ) AS deletions
                 FROM segments
                 NATURAL JOIN indexes_with_many_deletions
-                LEFT JOIN deletions ON segments.index_id = deletions.index_id AND segments.seq < deletions.seq
                 GROUP BY segments.id
             )
 

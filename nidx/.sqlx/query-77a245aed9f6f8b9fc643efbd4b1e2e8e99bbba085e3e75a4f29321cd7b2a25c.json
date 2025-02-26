@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            -- Only gather deletion information for indexes with many deletions since it's expensive and often not needed\n            WITH indexes_with_many_deletions AS (\n                SELECT index_id FROM deletions GROUP BY index_id HAVING COUNT(*) > $2\n\n            -- Deletions that apply to each segment (so we know which segments we need to merge to allow purging deletions)\n            ), deletions_per_segment AS (\n                SELECT\n                    segments.id,\n                    (\n                        SELECT COUNT(*)\n                        FROM deletions\n                        WHERE deletions.index_id = segments.index_id\n                        AND deletions.seq > segments.seq\n                    ) AS deletions\n                FROM segments\n                NATURAL JOIN indexes_with_many_deletions\n                GROUP BY segments.id\n            )\n\n            -- For each index, a list of mergeable segments with amount of records and deletions\n            SELECT\n                indexes.id AS \"id: IndexId\",\n                indexes.kind AS \"kind: IndexKind\",\n                array_agg(\n                    (segments.id, records, COALESCE(deletions, 0) > $2)\n                    ORDER BY records DESC\n                ) AS \"segments!: Vec<(SegmentId, i64, bool)>\"\n            FROM segments\n            JOIN indexes ON segments.index_id = indexes.id\n            LEFT JOIN deletions_per_segment ON segments.id = deletions_per_segment.id\n            WHERE\n                delete_at IS NULL AND merge_job_id IS NULL\n                AND seq <= $1\n            GROUP BY\n                indexes.id,\n                indexes.kind,\n                -- Only merge vector segments with same tags\n                CASE WHEN kind = 'vector' THEN index_metadata::text ELSE NULL END\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: IndexId",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind: IndexKind",
+        "type_info": {
+          "Custom": {
+            "name": "index_kind",
+            "kind": {
+              "Enum": [
+                "text",
+                "paragraph",
+                "vector",
+                "relation"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "segments!: Vec<(SegmentId, i64, bool)>",
+        "type_info": "RecordArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "77a245aed9f6f8b9fc643efbd4b1e2e8e99bbba085e3e75a4f29321cd7b2a25c"
+}
