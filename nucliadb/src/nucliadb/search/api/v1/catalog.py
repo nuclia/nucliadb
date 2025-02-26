@@ -103,28 +103,28 @@ async def catalog_get(
         expr = (
             CatalogFilterExpression.model_validate_json(filter_expression) if filter_expression else None
         )
-
-        item = CatalogRequest(
-            query=query,
-            filter_expression=expr,
-            filters=filters,
-            faceted=faceted,
-            page_number=page_number,
-            page_size=page_size,
-            debug=debug,
-            with_status=with_status,
-            range_creation_start=range_creation_start,
-            range_creation_end=range_creation_end,
-            range_modification_start=range_modification_start,
-            range_modification_end=range_modification_end,
-            hidden=hidden,
-        )
-        if sort_field:
-            item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-        return await catalog(kbid, item)
     except ValidationError as exc:
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
+
+    item = CatalogRequest(
+        query=query,
+        filter_expression=expr,
+        filters=filters,
+        faceted=faceted,
+        page_number=page_number,
+        page_size=page_size,
+        debug=debug,
+        with_status=with_status,
+        range_creation_start=range_creation_start,
+        range_creation_end=range_creation_end,
+        range_modification_start=range_modification_start,
+        range_modification_end=range_modification_end,
+        hidden=hidden,
+    )
+    if sort_field:
+        item.sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
+    return await catalog(kbid, item)
 
 
 @api.post(

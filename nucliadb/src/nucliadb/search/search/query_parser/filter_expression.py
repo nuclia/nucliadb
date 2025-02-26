@@ -178,7 +178,7 @@ def facet_from_filter(expr: FacetFilter) -> str:
     elif isinstance(expr, OriginSource):
         facet = f"/u/s/{expr.id}"
     elif isinstance(expr, Status):
-        facet = f"/n/s/{expr.status}"
+        facet = f"/n/s/{expr.status.value}"
     else:
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs

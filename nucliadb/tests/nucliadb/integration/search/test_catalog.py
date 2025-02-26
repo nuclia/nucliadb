@@ -123,13 +123,14 @@ async def test_catalog_date_range_filtering(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_catalog_faceted(
+async def test_catalog_status_faceted(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox,
 ):
     valid_status = ["PROCESSED", "PENDING", "ERROR"]
+    resources = {}
 
     for status_name, status_value in rpb.Metadata.Status.items():
         if status_name not in valid_status:
@@ -137,6 +138,7 @@ async def test_catalog_faceted(
         bm = broker_resource(standalone_knowledgebox)
         bm.basic.metadata.status = status_value
         await inject_message(nucliadb_ingest_grpc, bm)
+        resources[status_name] = bm.uuid
 
     resp = await nucliadb_reader.get(
         f"/kb/{standalone_knowledgebox}/catalog?faceted=/metadata.status",
@@ -149,6 +151,15 @@ async def test_catalog_faceted(
     for facet, count in facets.items():
         assert facet.split("/")[-1] in valid_status
         assert count == 1
+
+    for status in valid_status:
+        resource = resources[status]
+        resp = await nucliadb_reader.post(
+            f"/kb/{standalone_knowledgebox}/catalog",
+            json={"filter_expression": {"resource": {"prop": "status", "status": status}}},
+        )
+        assert resp.status_code == 200
+        assert set(resp.json()["resources"].keys()) == {resource}
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -355,6 +366,7 @@ async def test_catalog_filter_expression(
         json={
             "title": f"My resource 3",
             "summary": "Some summary",
+            "origin": {"collaborators": ["Anna", "Peter"], "source_id": "internet"},
         },
     )
     assert resp.status_code == 201
@@ -405,14 +417,14 @@ async def test_catalog_filter_expression(
                 "resource": {
                     "or": [
                         {"prop": "origin_tag", "tag": "wadus1"},
-                        {"prop": "origin_tag", "tag": "wadus2"},
+                        {"prop": "origin_collaborator", "collaborator": "Peter"},
                     ]
                 }
             },
         },
     )
     assert resp.status_code == 200
-    assert set(resp.json()["resources"].keys()) == {resource1, resource2}
+    assert set(resp.json()["resources"].keys()) == {resource1, resource3}
 
     # Not
     resp = await nucliadb_reader.post(
@@ -438,7 +450,7 @@ async def test_catalog_filter_expression(
                                 {"not": {"prop": "modified", "until": "2019-01-01T11:00:00"}},
                             ]
                         },
-                        {"prop": "resource", "id": resource3},
+                        {"prop": "origin_source", "id": "internet"},
                     ]
                 }
             }
