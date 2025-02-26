@@ -120,13 +120,21 @@ jobs:
           VERSION=`cat VERSION`
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Tag it
+      - name: Tag it (nucliadb)
         run: |-
           docker pull nuclia/nucliadb:latest
           docker tag nuclia/nucliadb:latest nuclia/nucliadb:stable
           docker tag nuclia/nucliadb:latest nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
           docker push nuclia/nucliadb:stable
           docker push nuclia/nucliadb:${{ steps.version_step.outputs.version_number }}
+
+      - name: Tag it (nidx)
+        run: |-
+          docker pull nuclia/nidx:latest
+          docker tag nuclia/nidx:latest nuclia/nidx:stable
+          docker tag nuclia/nidx:latest nuclia/nidx:${{ steps.version_step.outputs.version_number }}
+          docker push nuclia/nidx:stable
+          docker push nuclia/nidx:${{ steps.version_step.outputs.version_number }}
 
   docs:
     name: "Upload API specs"
