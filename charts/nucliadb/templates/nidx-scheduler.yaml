@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nidx-scheduler
+  labels:
+    app: nidx-scheduler
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      app: nidx-scheduler
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      name: nidx-scheduler
+      labels:
+        app: nidx-scheduler
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      topologySpreadConstraints:
+{{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      dnsPolicy: ClusterFirst
+{{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+{{- end }}
+      serviceAccountName:  {{ .Values.serviceAccount | default "default" }}
+      containers:
+      - name: app
+        image: "{{ .Values.nidx.image }}:{{ .Values.nidx.imageVersion | default .Chart.AppVersion }}"
+        securityContext:
+          privileged: false
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        livenessProbe:
+          exec:
+            command: ["nidx", "ctl", "alive"]
+        readinessProbe:
+          exec:
+            command: ["nidx", "ctl", "ready"]
+        command: [
+          "nidx",
+          "scheduler"
+        ]
+        env:
+          - name: CONTROL_SOCKET
+            value: "/run/nidx.sock"
+          {{- range $key, $value := .Values.nidx.env }}
+          - name: "{{ $key }}"
+            value: {{ tpl $value $ | toJson }}
+          {{- end }}
+          {{- if .Values.nidx.envSecrets }}
+{{ toYaml .Values.nidx.envSecrets | indent 10 }}
+          {{- end }}
+          - name: DATA_PATH
+            value: "/data"
+        {{- if .Values.nidx.envFrom }}
+        envFrom:
+          {{- toYaml .Values.nidx.envFrom | nindent 10 }}
+        {{- end }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
