@@ -20,7 +20,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import (
     BaseModel,
@@ -77,21 +77,26 @@ class UnitRetrieval:
 
 
 ### Catalog
+@dataclass
+class CatalogExpression:
+    @dataclass
+    class Date:
+        field: Union[Literal["created_at"], Literal["modified_at"]]
+        since: Optional[datetime]
+        until: Optional[datetime]
 
-
-class CatalogFilters(BaseModel):
-    labels: dict[str, Any] = Field(
-        default_factory=dict, description="Labels filter expression, like, `{and: {not: ...}, ...}`"
-    )
-    creation: DateTimeFilter
-    modification: DateTimeFilter
-    with_status: Optional[search_models.ResourceProcessingStatus] = None
+    bool_and: Optional[list["CatalogExpression"]] = None
+    bool_or: Optional[list["CatalogExpression"]] = None
+    bool_not: Optional["CatalogExpression"] = None
+    date: Optional[Date] = None
+    facet: Optional[str] = None
+    resource_id: Optional[str] = None
 
 
 class CatalogQuery(BaseModel):
     kbid: str
     query: str
-    filters: CatalogFilters
+    filters: Optional[CatalogExpression]
     sort: search_models.SortOptions
     faceted: list[str]
     page_size: int

@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from time import time
 from typing import Optional, Union
 
 from fastapi import Request, Response
 from fastapi_versioning import version
+from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.pg import PGDriver
@@ -34,11 +36,12 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import fetch_resources
 from nucliadb.search.search.pgcatalog import pgcatalog_search
-from nucliadb.search.search.query_parser.parser import parse_catalog
+from nucliadb.search.search.query_parser.catalog import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
 )
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.filters import CatalogFilterExpression
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -72,6 +75,9 @@ async def catalog_get(
     response: Response,
     kbid: str,
     query: str = fastapi_query(SearchParamDefaults.query),
+    filter_expression: Optional[str] = fastapi_query(
+        SearchParamDefaults.catalog_filter_expression, include_in_schema=False
+    ),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     sort_field: SortField = fastapi_query(SearchParamDefaults.sort_field),
@@ -93,8 +99,17 @@ async def catalog_get(
     ),
     hidden: Optional[bool] = fastapi_query(SearchParamDefaults.hidden),
 ) -> Union[KnowledgeboxSearchResults, HTTPClientError]:
+    try:
+        expr = (
+            CatalogFilterExpression.model_validate_json(filter_expression) if filter_expression else None
+        )
+    except ValidationError as exc:
+        detail = json.loads(exc.json())
+        return HTTPClientError(status_code=422, detail=detail)
+
     item = CatalogRequest(
         query=query,
+        filter_expression=expr,
         filters=filters,
         faceted=faceted,
         page_number=page_number,
@@ -147,7 +162,7 @@ async def catalog(
     start_time = time()
     try:
         with cache.request_caches():
-            query_parser = parse_catalog(kbid, item)
+            query_parser = await parse_catalog(kbid, item)
 
             catalog_results = CatalogResponse()
             catalog_results.fulltext = await pgcatalog_search(query_parser)

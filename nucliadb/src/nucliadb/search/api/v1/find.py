@@ -35,7 +35,7 @@ from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.find import find
 from nucliadb.search.search.utils import maybe_log_request_payload, min_score_from_query_params
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.filter import FilterExpression
+from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     FindRequest,

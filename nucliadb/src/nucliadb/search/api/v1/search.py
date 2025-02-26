@@ -45,7 +45,7 @@ from nucliadb.search.search.utils import (
     should_disable_vector_search,
 )
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.filter import FilterExpression
+from nucliadb_models.filters import FilterExpression
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (

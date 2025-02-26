@@ -20,15 +20,14 @@
 
 import logging
 from collections import defaultdict
-from typing import Any, cast
+from typing import Any, Literal, Union, cast
 
 from psycopg.rows import dict_row
 
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.search.search.query_parser.models import CatalogQuery
+from nucliadb.search.search.query_parser.models import CatalogExpression, CatalogQuery
 from nucliadb_models.labels import translate_system_to_alias_label
-from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     ResourceResult,
     Resources,
@@ -43,40 +42,73 @@ observer = metrics.Observer("pg_catalog_search", labels={"op": ""})
 logger = logging.getLogger(__name__)
 
 
-def _filter_operands(operands):
-    literals = []
-    nonliterals = []
-    for operand in operands:
-        op, params = next(iter(operand.items()))
-        if op == "literal":
-            literals.append(params)
+def _filter_operands(operands: list[CatalogExpression]) -> tuple[list[str], list[CatalogExpression]]:
+    facets = []
+    nonfacets = []
+    for op in operands:
+        if op.facet:
+            facets.append(op.facet)
         else:
-            nonliterals.append(operand)
+            nonfacets.append(op)
 
-    return literals, nonliterals
+    return facets, nonfacets
 
 
-def _convert_filter(filter, filter_params):
-    op, operands = next(iter(filter.items()))
-    if op == "literal":
+def _convert_filter(expr: CatalogExpression, filter_params: dict[str, Any]) -> str:
+    if expr.bool_and:
+        return _convert_boolean_op(expr.bool_and, "and", filter_params)
+    elif expr.bool_or:
+        return _convert_boolean_op(expr.bool_or, "or", filter_params)
+    elif expr.bool_not:
+        return f"(NOT {_convert_filter(expr.bool_not, filter_params)})"
+    elif expr.date:
+        return _convert_date_filter(expr.date, filter_params)
+    elif expr.facet:
         param_name = f"param{len(filter_params)}"
-        filter_params[param_name] = [operands]
+        filter_params[param_name] = [expr.facet]
         return f"extract_facets(labels) @> %({param_name})s"
-    elif op in ("and", "or"):
-        array_op = "@>" if op == "and" else "&&"
-        sql = []
-        literals, nonliterals = _filter_operands(operands)
-        if literals:
-            param_name = f"param{len(filter_params)}"
-            filter_params[param_name] = literals
-            sql.append(f"extract_facets(labels) {array_op} %({param_name})s")
-        for nonlit in nonliterals:
-            sql.append(_convert_filter(nonlit, filter_params))
-        return "(" + f" {op.upper()} ".join(sql) + ")"
-    elif op == "not":
-        return f"(NOT {_convert_filter(operands, filter_params)})"
+    elif expr.resource_id:
+        param_name = f"param{len(filter_params)}"
+        filter_params[param_name] = [expr.resource_id]
+        return f"rid = %({param_name})s"
     else:
-        raise ValueError(f"Invalid operator {op}")
+        return ""
+
+
+def _convert_boolean_op(
+    operands: list[CatalogExpression],
+    op: Union[Literal["and"], Literal["or"]],
+    filter_params: dict[str, Any],
+) -> str:
+    array_op = "@>" if op == "and" else "&&"
+    sql = []
+    facets, nonfacets = _filter_operands(operands)
+    if facets:
+        param_name = f"param{len(filter_params)}"
+        filter_params[param_name] = facets
+        sql.append(f"extract_facets(labels) {array_op} %({param_name})s")
+    for nonfacet in nonfacets:
+        sql.append(_convert_filter(nonfacet, filter_params))
+    return "(" + f" {op.upper()} ".join(sql) + ")"
+
+
+def _convert_date_filter(date: CatalogExpression.Date, filter_params: dict[str, Any]) -> str:
+    if date.since and date.until:
+        since_name = f"param{len(filter_params)}"
+        filter_params[since_name] = date.since
+        until_name = f"param{len(filter_params)}"
+        filter_params[until_name] = date.until
+        return f"{date.field} BETWEEN %({since_name})s AND %({until_name})s"
+    elif date.since:
+        since_name = f"param{len(filter_params)}"
+        filter_params[since_name] = date.since
+        return f"{date.field} > %({since_name})s"
+    elif date.until:
+        until_name = f"param{len(filter_params)}"
+        filter_params[until_name] = date.until
+        return f"{date.field} < %({until_name})s"
+    else:
+        raise ValueError(f"Invalid date operator")
 
 
 def _prepare_query(catalog_query: CatalogQuery):
@@ -92,24 +124,8 @@ def _prepare_query(catalog_query: CatalogQuery):
         )
         filter_params["query"] = catalog_query.query
 
-    if catalog_query.filters.creation.after:
-        filter_sql.append("created_at > %(created_at_start)s")
-        filter_params["created_at_start"] = catalog_query.filters.creation.after
-
-    if catalog_query.filters.creation.before:
-        filter_sql.append("created_at < %(created_at_end)s")
-        filter_params["created_at_end"] = catalog_query.filters.creation.before
-
-    if catalog_query.filters.modification.after:
-        filter_sql.append("modified_at > %(modified_at_start)s")
-        filter_params["modified_at_start"] = catalog_query.filters.modification.after
-
-    if catalog_query.filters.modification.before:
-        filter_sql.append("modified_at < %(modified_at_end)s")
-        filter_params["modified_at_end"] = catalog_query.filters.modification.before
-
-    if catalog_query.filters.labels:
-        filter_sql.append(_convert_filter(catalog_query.filters.labels, filter_params))
+    if catalog_query.filters:
+        filter_sql.append(_convert_filter(catalog_query.filters, filter_params))
 
     order_sql = ""
     if catalog_query.sort:
@@ -129,13 +145,6 @@ def _prepare_query(catalog_query: CatalogQuery):
             order_dir = "DESC"
 
         order_sql = f" ORDER BY {order_field} {order_dir}"
-
-    if catalog_query.filters.with_status:
-        filter_sql.append("labels && %(status)s")
-        if catalog_query.filters.with_status == ResourceProcessingStatus.PROCESSED:
-            filter_params["status"] = ["/n/s/PROCESSED", "/n/s/ERROR"]
-        else:
-            filter_params["status"] = ["/n/s/PENDING"]
 
     return (
         f"SELECT * FROM catalog WHERE {' AND '.join(filter_sql)}{order_sql}",

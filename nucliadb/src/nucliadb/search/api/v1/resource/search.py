@@ -32,7 +32,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.exceptions import InvalidQueryError
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
-from nucliadb_models.filter import FilterExpression
+from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     NucliaDBClientType,

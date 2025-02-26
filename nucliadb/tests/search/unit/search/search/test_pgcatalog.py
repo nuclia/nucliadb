@@ -17,9 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
 
 from nucliadb.search.search.pgcatalog import _convert_filter, _prepare_query
-from nucliadb.search.search.query_parser.parser import parse_catalog
+from nucliadb.search.search.query_parser.catalog import parse_catalog
+from nucliadb.search.search.query_parser.models import CatalogExpression
+from nucliadb_models.filters import CatalogFilterExpression
 from nucliadb_models.search import (
     CatalogRequest,
     SortField,
@@ -28,60 +31,96 @@ from nucliadb_models.search import (
 )
 
 
-def test_simple_filter():
+async def test_simple_filter():
     filter_params = {}
-    query = _convert_filter({"literal": "/l/vegetable/potato"}, filter_params)
+    query = _convert_filter(CatalogExpression(facet="/l/vegetable/potato"), filter_params)
     assert query == "extract_facets(labels) @> %(param0)s"
     assert filter_params == {"param0": ["/l/vegetable/potato"]}
 
 
-def test_any_filter():
+async def test_any_filter():
     filter_params = {}
     query = _convert_filter(
-        {"or": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]}, filter_params
+        CatalogExpression(
+            bool_or=[
+                CatalogExpression(facet="/l/vegetable/potato"),
+                CatalogExpression(facet="/l/vegetable/carrot"),
+            ]
+        ),
+        filter_params,
     )
     assert query == "(extract_facets(labels) && %(param0)s)"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
-def test_all_filter():
+async def test_all_filter():
     filter_params = {}
     query = _convert_filter(
-        {"and": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]}, filter_params
+        CatalogExpression(
+            bool_and=[
+                CatalogExpression(facet="/l/vegetable/potato"),
+                CatalogExpression(facet="/l/vegetable/carrot"),
+            ]
+        ),
+        filter_params,
     )
     assert query == "(extract_facets(labels) @> %(param0)s)"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
-def test_none_filter():
+async def test_none_filter():
     filter_params = {}
     query = _convert_filter(
-        {"not": {"or": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]}},
+        CatalogExpression(
+            bool_not=CatalogExpression(
+                bool_or=[
+                    CatalogExpression(facet="/l/vegetable/potato"),
+                    CatalogExpression(facet="/l/vegetable/carrot"),
+                ]
+            )
+        ),
         filter_params,
     )
     assert query == "(NOT (extract_facets(labels) && %(param0)s))"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
-def test_not_all_filter():
+async def test_not_all_filter():
     filter_params = {}
     query = _convert_filter(
-        {"not": {"and": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]}},
+        CatalogExpression(
+            bool_not=CatalogExpression(
+                bool_and=[
+                    CatalogExpression(facet="/l/vegetable/potato"),
+                    CatalogExpression(facet="/l/vegetable/carrot"),
+                ]
+            )
+        ),
         filter_params,
     )
     assert query == "(NOT (extract_facets(labels) @> %(param0)s))"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
-def test_catalog_filter():
+async def test_catalog_filter():
     filter_params = {}
     query = _convert_filter(
-        {
-            "and": [
-                {"or": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]},
-                {"or": [{"literal": "/n/s/PENDING"}, {"literal": "/n/s/PROCESSED"}]},
+        CatalogExpression(
+            bool_and=[
+                CatalogExpression(
+                    bool_or=[
+                        CatalogExpression(facet="/l/vegetable/potato"),
+                        CatalogExpression(facet="/l/vegetable/carrot"),
+                    ]
+                ),
+                CatalogExpression(
+                    bool_or=[
+                        CatalogExpression(facet="/n/s/PENDING"),
+                        CatalogExpression(facet="/n/s/PROCESSED"),
+                    ]
+                ),
             ]
-        },
+        ),
         filter_params,
     )
     assert query == "((extract_facets(labels) && %(param0)s) AND (extract_facets(labels) && %(param1)s))"
@@ -91,69 +130,125 @@ def test_catalog_filter():
     }
 
 
-def test_prepare_query_sort():
+async def test_prepare_query_sort():
     kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
     request = CatalogRequest(
         features=[],  # Ignored by pgcatalog
         query="",
-        label_filters=[],
-        keyword_filters=[],
         page_number=0,
         page_size=25,
         sort=SortOptions(field=SortField.CREATED, order=SortOrder.ASC),
         min_score=0,  # Ignored by pgcatalog
     )
-    parsed = parse_catalog(kbid, request)
+    parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
     assert "ORDER BY created_at ASC" in query
 
     request = CatalogRequest(
         features=[],  # Ignored by pgcatalog
         query="",
-        label_filters=[],
-        keyword_filters=[],
         page_number=0,
         page_size=25,
         sort=SortOptions(field=SortField.MODIFIED, order=SortOrder.DESC),
         min_score=0,  # Ignored by pgcatalog
     )
-    parsed = parse_catalog(kbid, request)
+    parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
     assert "ORDER BY modified_at DESC" in query
 
 
-def test_prepare_query_filters_kbid():
+async def test_prepare_query_filters_kbid():
     kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
     request = CatalogRequest(
         features=[],  # Ignored by pgcatalog
         query="",
-        label_filters=[],
-        keyword_filters=[],
         page_number=0,
         page_size=25,
         min_score=0,  # Ignored by pgcatalog
     )
-    parsed = parse_catalog(kbid, request)
+    parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
     assert "kbid = %(kbid)s" in query
     assert params["kbid"] == parsed.kbid
 
 
-def test_prepare_query_fulltext():
+async def test_prepare_query_fulltext():
     kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
     request = CatalogRequest(
         features=[],  # Ignored by pgcatalog
         query="This is my query",
-        label_filters=[],
-        keyword_filters=[],
         page_number=0,
         page_size=25,
         min_score=0,  # Ignored by pgcatalog
     )
-    parsed = parse_catalog(kbid, request)
+    parsed = await parse_catalog(kbid, request)
     query, params = _prepare_query(parsed)
     assert (
         "regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W')"
         in query
     )
     assert params["query"] == parsed.query
+
+
+async def test_old_filters():
+    kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
+    request = CatalogRequest(
+        features=[],  # Ignored by pgcatalog
+        query="This is my query",
+        filters=["/classification.labels/topic/boats"],
+        range_creation_start=datetime.fromisoformat("2020-01-01T00:00:00"),
+        page_number=0,
+        page_size=25,
+        min_score=0,  # Ignored by pgcatalog
+    )
+    parsed = await parse_catalog(kbid, request)
+    query, params = _prepare_query(parsed)
+    assert "created_at > " in query
+    param_values = list(params.values())
+    assert datetime.fromisoformat("2020-01-01T00:00:00") in param_values
+    assert ["/l/topic/boats"] in param_values
+
+
+async def test_filter_expression():
+    kbid = "84ed9257-04ef-41d1-b1d2-26286b92777f"
+    request = CatalogRequest(
+        query="This is my query",
+        filter_expression=CatalogFilterExpression.model_validate(
+            {
+                "resource": {
+                    "or": [
+                        {
+                            "and": [
+                                {"prop": "label", "labelset": "topic", "label": "boats"},
+                                {"prop": "origin_path", "prefix": "folder"},
+                                {"not": {"prop": "modified", "since": "2019-01-01T11:00:00"}},
+                            ]
+                        },
+                        {"prop": "resource", "id": "00112233445566778899aabbccddeeff"},
+                    ]
+                }
+            }
+        ),
+        page_number=0,
+        page_size=25,
+    )
+    parsed = await parse_catalog(kbid, request)
+    query, params = _prepare_query(parsed)
+
+    # This test is very sensitive to query generation changes
+    assert query == (
+        "SELECT * FROM catalog "
+        "WHERE kbid = %(kbid)s AND regexp_split_to_array(lower(title), '\\W') @> regexp_split_to_array(lower(%(query)s), '\\W') "
+        "AND ("
+        "(extract_facets(labels) @> %(param2)s AND (NOT modified_at > %(param3)s)) "
+        "OR rid = %(param4)s"
+        ") "
+        "ORDER BY created_at DESC"
+    )
+    assert params == {
+        "kbid": "84ed9257-04ef-41d1-b1d2-26286b92777f",
+        "param2": ["/l/topic/boats", "/p/folder"],
+        "param3": datetime(2019, 1, 1, 11, 0),
+        "param4": ["00112233445566778899aabbccddeeff"],
+        "query": "This is my query",
+    }

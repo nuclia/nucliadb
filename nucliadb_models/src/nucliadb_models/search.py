@@ -45,7 +45,7 @@ from nucliadb_models.internal.shards import (  # noqa isort: skip
     ShardReplica,
     KnowledgeboxShards,
 )
-from nucliadb_models.filter import FilterExpression
+from nucliadb_models.filters import CatalogFilterExpression, FilterExpression
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
     "name": "structred_response",
@@ -649,9 +649,19 @@ class SearchParamDefaults:
         title="Filter resource by an expression",
         description=(
             "Returns only documents that match this filter expression."
-            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search/#filters"
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters"
             "This allows building complex filtering expressions and replaces the following parameters:"
             "`fields`, `filters`, `range_*`, `resource_filters`, `keyword_filters`."
+        ),
+    )
+    catalog_filter_expression = ParamDefault(
+        default=None,
+        title="Filter resource by an expression",
+        description=(
+            "Returns only documents that match this filter expression."
+            "Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search_filters"
+            "This allows building complex filtering expressions and replaces the following parameters:"
+            "`filters`, `range_*`, `with_status`."
         ),
     )
 
@@ -671,6 +681,9 @@ class Filter(BaseModel):
 
 class CatalogRequest(BaseModel):
     query: str = SearchParamDefaults.query.to_pydantic_field()
+    filter_expression: SkipJsonSchema[Optional[CatalogFilterExpression]] = (
+        SearchParamDefaults.catalog_filter_expression.to_pydantic_field()
+    )
     filters: Union[list[str], list[Filter]] = Field(
         default=[],
         title="Filters",

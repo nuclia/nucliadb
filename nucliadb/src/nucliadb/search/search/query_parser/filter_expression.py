@@ -23,7 +23,7 @@ from typing import Union
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
 from nucliadb.search.search.exceptions import InvalidQueryError
-from nucliadb_models.filter import (
+from nucliadb_models.filters import (
     And,
     DateCreated,
     DateModified,
@@ -38,14 +38,51 @@ from nucliadb_models.filter import (
     Language,
     Not,
     Or,
+    OriginCollaborator,
     OriginMetadata,
     OriginPath,
+    OriginSource,
     OriginTag,
     ParagraphFilterExpression,
     Resource,
     ResourceMimetype,
+    Status,
 )
 from nucliadb_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
+
+# Filters that end up as a facet
+FacetFilter = Union[
+    OriginTag,
+    Label,
+    ResourceMimetype,
+    FieldMimetype,
+    Entity,
+    Language,
+    OriginMetadata,
+    OriginPath,
+    Generated,
+    Kind,
+    OriginCollaborator,
+    OriginSource,
+    Status,
+]
+# In Python 3.9 we cannot do isinstance against an union
+# Once we support only 3.10+, we can remove this
+FacetFilterTypes = (
+    OriginTag,
+    Label,
+    ResourceMimetype,
+    FieldMimetype,
+    Entity,
+    Language,
+    OriginMetadata,
+    OriginPath,
+    Generated,
+    Kind,
+    OriginCollaborator,
+    OriginSource,
+    Status,
+)
 
 
 async def parse_expression(
@@ -90,47 +127,64 @@ async def parse_expression(
             f.date.since.FromDatetime(expr.since)
         if expr.until:
             f.date.until.FromDatetime(expr.until)
-    elif isinstance(expr, OriginTag):
-        f.facet.facet = f"/t/{expr.tag}"
-    elif isinstance(expr, Label):
-        f.facet.facet = f"/l/{expr.labelset}"
-        if expr.label:
-            f.facet.facet += f"/{expr.label}"
-    elif isinstance(expr, ResourceMimetype):
-        f.facet.facet = f"/n/i/{expr.type}"
-        if expr.subtype:
-            f.facet.facet += f"/{expr.subtype}"
-    elif isinstance(expr, FieldMimetype):
-        f.facet.facet = f"/mt/{expr.type}"
-        if expr.subtype:
-            f.facet.facet += f"/{expr.subtype}"
-    elif isinstance(expr, Entity):
-        f.facet.facet = f"/e/{expr.subtype}"
-        if expr.value:
-            f.facet.facet += f"/{expr.value}"
-    elif isinstance(expr, Language):
-        if expr.only_primary:
-            f.facet.facet = f"/s/p/{expr.language}"
-        else:
-            f.facet.facet = f"/s/s/{expr.language}"
-    elif isinstance(expr, OriginMetadata):
-        f.facet.facet = f"/m/{expr.field}"
-        if expr.value:
-            f.facet.facet += f"/{expr.value}"
-    elif isinstance(expr, OriginPath):
-        f.facet.facet = f"/p/{expr.prefix}"
-    elif isinstance(expr, Generated):
-        f.facet.facet = "/g/da"
-        if expr.da_task:
-            f.facet.facet += f"/{expr.da_task}"
-    elif isinstance(expr, Kind):
-        f.facet.facet = f"/k/{expr.kind.lower()}"
+    elif isinstance(expr, FacetFilterTypes):
+        f.facet.facet = facet_from_filter(expr)
     else:
         # This is a trick so mypy generates an error if this branch can be reached,
         # that is, if we are missing some ifs
         _a: int = "a"
 
     return f
+
+
+def facet_from_filter(expr: FacetFilter) -> str:
+    if isinstance(expr, OriginTag):
+        facet = f"/t/{expr.tag}"
+    elif isinstance(expr, Label):
+        facet = f"/l/{expr.labelset}"
+        if expr.label:
+            facet += f"/{expr.label}"
+    elif isinstance(expr, ResourceMimetype):
+        facet = f"/n/i/{expr.type}"
+        if expr.subtype:
+            facet += f"/{expr.subtype}"
+    elif isinstance(expr, FieldMimetype):
+        facet = f"/mt/{expr.type}"
+        if expr.subtype:
+            facet += f"/{expr.subtype}"
+    elif isinstance(expr, Entity):
+        facet = f"/e/{expr.subtype}"
+        if expr.value:
+            facet += f"/{expr.value}"
+    elif isinstance(expr, Language):
+        if expr.only_primary:
+            facet = f"/s/p/{expr.language}"
+        else:
+            facet = f"/s/s/{expr.language}"
+    elif isinstance(expr, OriginMetadata):
+        facet = f"/m/{expr.field}"
+        if expr.value:
+            facet += f"/{expr.value}"
+    elif isinstance(expr, OriginPath):
+        facet = f"/p/{expr.prefix}"
+    elif isinstance(expr, Generated):
+        facet = "/g/da"
+        if expr.da_task:
+            facet += f"/{expr.da_task}"
+    elif isinstance(expr, Kind):
+        facet = f"/k/{expr.kind.lower()}"
+    elif isinstance(expr, OriginCollaborator):
+        facet = f"/u/o/{expr.collaborator}"
+    elif isinstance(expr, OriginSource):
+        facet = f"/u/s/{expr.id}"
+    elif isinstance(expr, Status):
+        facet = f"/n/s/{expr.status.value}"
+    else:
+        # This is a trick so mypy generates an error if this branch can be reached,
+        # that is, if we are missing some ifs
+        _a: int = "a"
+
+    return facet
 
 
 def add_and_expression(dest: PBFilterExpression, add: PBFilterExpression):

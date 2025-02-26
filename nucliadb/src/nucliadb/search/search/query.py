@@ -39,7 +39,7 @@ from nucliadb.search.search.rank_fusion import (
 from nucliadb.search.search.rerankers import (
     Reranker,
 )
-from nucliadb_models.filter import FilterExpression
+from nucliadb_models.filters import FilterExpression
 from nucliadb_models.internal.predict import QueryInfo
 from nucliadb_models.labels import LABEL_HIDDEN, translate_system_to_alias_label
 from nucliadb_models.metadata import ResourceProcessingStatus
