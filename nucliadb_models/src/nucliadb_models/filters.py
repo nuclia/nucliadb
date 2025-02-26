@@ -120,13 +120,6 @@ class DateModified(BaseModel, extra="forbid"):
         return self
 
 
-class OriginTag(BaseModel, extra="forbid"):
-    """Matches all fields with a given origin tag"""
-
-    prop: Literal["origin_tag"]
-    tag: str = pydantic.Field(description="The tag to match")
-
-
 class Label(BaseModel, extra="forbid"):
     """Matches fields/paragraphs with a label (or labelset)"""
 
@@ -195,6 +188,13 @@ class Language(BaseModel, extra="forbid"):
     language: str = pydantic.Field(description="The code of the language to match, e.g: en")
 
 
+class OriginTag(BaseModel, extra="forbid"):
+    """Matches all fields with a given origin tag"""
+
+    prop: Literal["origin_tag"]
+    tag: str = pydantic.Field(description="The tag to match")
+
+
 class OriginMetadata(BaseModel, extra="forbid"):
     """Matches metadata from the origin"""
 
@@ -210,11 +210,12 @@ class OriginPath(BaseModel, extra="forbid"):
     """Matches the origin path"""
 
     prop: Literal["origin_path"]
-    prefix: str = pydantic.Field(
+    prefix: Optional[str] = pydantic.Field(
+        default=None,
         description=(
             "Prefix of the path, matches all paths under this prefix"
             "e.g: `prefix=/dir/` matches `/dir` and `/dir/a/b` but not `/dirrrr`"
-        )
+        ),
     )
 
 
@@ -222,7 +223,7 @@ class OriginSource(BaseModel, extra="forbid"):
     """Matches the origin source id"""
 
     prop: Literal["origin_source"]
-    id: str = pydantic.Field(description=("Source ID"))
+    id: Optional[str] = pydantic.Field(default=None, description=("Source ID"))
 
 
 class OriginCollaborator(BaseModel, extra="forbid"):
