@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::path::Path;
 
@@ -72,63 +72,34 @@ impl RelationsReaderService {
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
 
-        // Build graph response
-        //
-        // The idea here is to minimize response size by deduplicating any node/relation. To detect
-        // duplication, we use a hash of the value computed directly from the tantivy doc. As paths
-        // (triplets) are built from pointers to nodes and relations lists, we don't even need to
-        // serialize parts of the document we won't use
-
-        let mut node_ids = HashMap::new();
-        let mut relation_ids = HashMap::new();
+        // Build graph response.
+        // We are being very naive and writing everything to the proto response. We could be smarter
+        // and deduplicates nodes and relations. As paths are pointers, this would improve proto
+        // size and ser/de time at expenses of deduplication effort.
 
         let mut nodes = Vec::new();
         let mut relations = Vec::new();
         let mut graph = Vec::new();
 
-        for (_, doc_address) in matching_docs {
-            let doc = searcher.doc(doc_address)?;
+        for (_, doc_address) in &matching_docs {
+            let doc = searcher.doc(*doc_address)?;
 
-            let source_key = self.schema.source_node_hash(&doc);
-            let relation_key = self.schema.relation_hash(&doc);
-            let destination_key = self.schema.target_node_hash(&doc);
+            let source = io_maps::source_to_relation_node(&self.schema, &doc);
+            let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
+            let destination = io_maps::target_to_relation_node(&self.schema, &doc);
 
-            let source_idx = match node_ids.get(&source_key) {
-                Some(idx) => *idx,
-                None => {
-                    let idx = node_ids.len();
-                    node_ids.insert(source_key, idx);
-                    let source = io_maps::source_to_relation_node(&self.schema, &doc);
-                    nodes.push(source);
-                    idx
-                }
-            };
-            let relation_idx = match relation_ids.get(&relation_key) {
-                Some(idx) => *idx,
-                None => {
-                    let idx = relation_ids.len();
-                    relation_ids.insert(relation_key, idx);
-                    let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
-                    relations.push(relation);
-                    idx
-                }
-            };
-            let destination_idx = match node_ids.get(&destination_key) {
-                Some(idx) => *idx,
-                None => {
-                    let idx = node_ids.len();
-                    node_ids.insert(destination_key, idx);
-                    let destination = io_maps::target_to_relation_node(&self.schema, &doc);
-                    nodes.push(destination);
-                    idx
-                }
-            };
+            let source_idx = nodes.len();
+            nodes.push(source);
+            let relation_idx = relations.len();
+            relations.push(relation);
+            let destination_idx = nodes.len();
+            nodes.push(destination);
 
             graph.push(nidx_protos::graph_search_response::Path {
                 source: source_idx as u32,
                 relation: relation_idx as u32,
                 destination: destination_idx as u32,
-            });
+            })
         }
 
         let response = nidx_protos::GraphSearchResponse {

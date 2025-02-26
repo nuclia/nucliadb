@@ -103,7 +103,6 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
 // Debug function, useful while developing
 #[allow(dead_code)]
 fn friendly_print(result: &nidx_protos::GraphSearchResponse) {
-    println!("Matched {} paths in {} nodes and {}", result.graph.len(), result.nodes.len(), result.relations.len());
     for path in result.graph.iter() {
         let source = result.nodes.get(path.source as usize).unwrap();
         let relation = result.relations.get(path.relation as usize).unwrap();
@@ -116,6 +115,12 @@ fn friendly_print(result: &nidx_protos::GraphSearchResponse) {
             (&destination.value, &destination.subtype)
         );
     }
+    println!(
+        "Matched {} paths in {} nodes and {} relations",
+        result.graph.len(),
+        result.nodes.len(),
+        result.relations.len()
+    );
     println!();
 }
 
@@ -440,7 +445,7 @@ fn test_graph_undirected_path_query() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_graph_response_size_optimizations() -> anyhow::Result<()> {
+fn test_graph_response() -> anyhow::Result<()> {
     let reader = create_reader()?;
 
     // ()-[:LIVE_IN]->()
@@ -462,8 +467,8 @@ fn test_graph_response_size_optimizations() -> anyhow::Result<()> {
 
     // Validate we are compressing the graph and retuning deduplicated nodes
     assert_eq!(result.graph.len(), 4);
-    assert_eq!(result.nodes.len(), 5);
-    assert_eq!(result.relations.len(), 2);
+    assert_eq!(result.nodes.len(), 8); // this could be 5 with dedup
+    assert_eq!(result.relations.len(), 4); // this could be 2 with dedup
 
     Ok(())
 }
