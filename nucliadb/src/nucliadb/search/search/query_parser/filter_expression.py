@@ -166,12 +166,11 @@ def facet_from_filter(expr: FacetFilter) -> str:
         if expr.value:
             facet += f"/{expr.value}"
     elif isinstance(expr, OriginPath):
+        facet = "/p"
         if expr.prefix:
             # Remove leading/trailing slashes for better compatibility
             clean_prefix = expr.prefix.strip("/")
-            facet = f"/p/{clean_prefix}"
-        else:
-            facet = f"/p"
+            facet += f"/{clean_prefix}"
     elif isinstance(expr, Generated):
         facet = "/g/da"
         if expr.da_task:
@@ -181,10 +180,9 @@ def facet_from_filter(expr: FacetFilter) -> str:
     elif isinstance(expr, OriginCollaborator):
         facet = f"/u/o/{expr.collaborator}"
     elif isinstance(expr, OriginSource):
+        facet = "/u/s"
         if expr.id:
-            facet = f"/u/s/{expr.id}"
-        else:
-            facet = f"/u/s"
+            facet += f"/{expr.id}"
     elif isinstance(expr, Status):
         facet = f"/n/s/{expr.status.value}"
     else:
