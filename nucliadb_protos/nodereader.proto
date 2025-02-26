@@ -186,6 +186,61 @@ message EntitiesSubgraphResponse {
 }
 
 
+message GraphQuery {
+    message Node {
+        optional string value = 1;
+        optional utils.RelationNode.NodeType node_type = 2;
+        optional string node_subtype = 3;
+        bool as_fuzzy = 4;
+        bool as_prefix = 5;
+    }
+
+    message Relation {
+        optional string value = 1;
+    }
+
+    message Path {
+        optional Node source = 1;
+        optional Relation relation = 2;
+        optional Node destination = 3;
+        bool undirected = 4;
+    }
+
+    message BoolQuery {
+        repeated GraphQuery operands = 1;
+    }
+
+    oneof query {
+        // Search a node in any position
+        Node node = 1;
+        // Search for relations
+        Relation relation = 2;
+        // Search for directed/undirected paths. It can also express
+        // source/destination node queries
+        Path path = 3;
+
+        // Boolean combinations
+        BoolQuery bool_and = 4;
+        BoolQuery bool_or = 5;
+        BoolQuery bool_not = 6;
+    }
+}
+
+message GraphSearchRequest {
+    GraphQuery query = 1;
+
+    // decides what do we want in return: paths (triplets), nodes or relations.
+    // Returning paths implies returning nodes and relations.
+    enum QueryKind {
+        PATH = 0;
+        NODES = 1;
+        RELATIONS = 2;
+    }
+    QueryKind kind = 2;
+
+    uint32 top_k = 3;
+}
+
 message GraphSearchResponse {
     message Relation {
         utils.Relation.RelationType relation_type = 1;
