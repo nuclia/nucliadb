@@ -31,7 +31,7 @@ from nucliadb_models.search import (
 def test_simple_filter():
     filter_params = {}
     query = _convert_filter({"literal": "/l/vegetable/potato"}, filter_params)
-    assert query == "labels @> %(param0)s"
+    assert query == "extract_facets(labels) @> %(param0)s"
     assert filter_params == {"param0": ["/l/vegetable/potato"]}
 
 
@@ -40,7 +40,7 @@ def test_any_filter():
     query = _convert_filter(
         {"or": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]}, filter_params
     )
-    assert query == "(labels && %(param0)s)"
+    assert query == "(extract_facets(labels) && %(param0)s)"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
@@ -49,7 +49,7 @@ def test_all_filter():
     query = _convert_filter(
         {"and": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]}, filter_params
     )
-    assert query == "(labels @> %(param0)s)"
+    assert query == "(extract_facets(labels) @> %(param0)s)"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
@@ -59,7 +59,7 @@ def test_none_filter():
         {"not": {"or": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]}},
         filter_params,
     )
-    assert query == "(NOT (labels && %(param0)s))"
+    assert query == "(NOT (extract_facets(labels) && %(param0)s))"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
@@ -69,7 +69,7 @@ def test_not_all_filter():
         {"not": {"and": [{"literal": "/l/vegetable/potato"}, {"literal": "/l/vegetable/carrot"}]}},
         filter_params,
     )
-    assert query == "(NOT (labels @> %(param0)s))"
+    assert query == "(NOT (extract_facets(labels) @> %(param0)s))"
     assert filter_params == {"param0": ["/l/vegetable/potato", "/l/vegetable/carrot"]}
 
 
@@ -84,7 +84,7 @@ def test_catalog_filter():
         },
         filter_params,
     )
-    assert query == "((labels && %(param0)s) AND (labels && %(param1)s))"
+    assert query == "((extract_facets(labels) && %(param0)s) AND (extract_facets(labels) && %(param1)s))"
     assert filter_params == {
         "param0": ["/l/vegetable/potato", "/l/vegetable/carrot"],
         "param1": ["/n/s/PENDING", "/n/s/PROCESSED"],

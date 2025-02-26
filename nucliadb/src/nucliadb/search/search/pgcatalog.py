@@ -61,7 +61,7 @@ def _convert_filter(filter, filter_params):
     if op == "literal":
         param_name = f"param{len(filter_params)}"
         filter_params[param_name] = [operands]
-        return f"labels @> %({param_name})s"
+        return f"extract_facets(labels) @> %({param_name})s"
     elif op in ("and", "or"):
         array_op = "@>" if op == "and" else "&&"
         sql = []
@@ -69,7 +69,7 @@ def _convert_filter(filter, filter_params):
         if literals:
             param_name = f"param{len(filter_params)}"
             filter_params[param_name] = literals
-            sql.append(f"labels {array_op} %({param_name})s")
+            sql.append(f"extract_facets(labels) {array_op} %({param_name})s")
         for nonlit in nonliterals:
             sql.append(_convert_filter(nonlit, filter_params))
         return "(" + f" {op.upper()} ".join(sql) + ")"
