@@ -22,7 +22,7 @@ spec:
       heritage: "{{ .Release.Service }}"
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
+      {{- with .Values.nidx.scheduler.podAnnotations }}
       annotations:
 {{ toYaml . | indent 8 }}
       {{- end }}
@@ -35,15 +35,15 @@ spec:
         heritage: "{{ .Release.Service }}"
     spec:
       nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
+{{ toYaml .Values.nidx.scheduler.nodeSelector | indent 8 }}
       topologySpreadConstraints:
-{{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+{{ toYaml .Values.nidx.scheduler.topologySpreadConstraints | indent 8 }}
       affinity:
-{{ toYaml .Values.affinity | indent 8 }}
+{{ toYaml .Values.nidx.scheduler.affinity | indent 8 }}
       tolerations:
-{{ toYaml .Values.tolerations | indent 8 }}
+{{ toYaml .Values.nidx.scheduler.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
-{{- with .Values.priorityClassName }}
+{{- with .Values.nidx.scheduler.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
       serviceAccountName:  {{ .Values.serviceAccount | default "default" }}
@@ -73,11 +73,9 @@ spec:
           {{- if .Values.nidx.envSecrets }}
 {{ toYaml .Values.nidx.envSecrets | indent 10 }}
           {{- end }}
-          - name: DATA_PATH
-            value: "/data"
         {{- if .Values.nidx.envFrom }}
         envFrom:
           {{- toYaml .Values.nidx.envFrom | nindent 10 }}
         {{- end }}
         resources:
-{{ toYaml .Values.resources | indent 10 }}
+{{ toYaml .Values.nidx.scheduler.resources | indent 10 }}

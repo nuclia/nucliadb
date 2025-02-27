@@ -1,44 +1,44 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nidx
+  name: nidx-worker
   labels:
-    app: nidx
+    app: nidx-worker
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: {{ .Values.nidx.replicas }}
+  replicas: {{ .Values.nidx.worker.replicas }}
   selector:
     matchLabels:
-      app: nidx
+      app: nidx-worker
       release: "{{ .Release.Name }}"
       heritage: "{{ .Release.Service }}"
   template:
     metadata:
-      {{- with .Values.nidx.podAnnotations }}
+      {{- with .Values.nidx.worker.podAnnotations }}
       annotations:
 {{ toYaml . | indent 8 }}
       {{- end }}
-      name: nidx
+      name: nidx-worker
       labels:
-        app: nidx
+        app: nidx-worker
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
     spec:
       nodeSelector:
-{{ toYaml .Values.nidx.nodeSelector | indent 8 }}
+{{ toYaml .Values.nidx.worker.nodeSelector | indent 8 }}
       topologySpreadConstraints:
-{{ toYaml .Values.nidx.topologySpreadConstraints | indent 8 }}
+{{ toYaml .Values.nidx.worker.topologySpreadConstraints | indent 8 }}
       affinity:
-{{ toYaml .Values.nidx.affinity | indent 8 }}
+{{ toYaml .Values.nidx.worker.affinity | indent 8 }}
       tolerations:
-{{ toYaml .Values.nidx.tolerations | indent 8 }}
+{{ toYaml .Values.nidx.worker.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
-{{- with .Values.nidx.priorityClassName }}
+{{- with .Values.nidx.worker.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
       serviceAccountName:  {{ .Values.serviceAccount | default "default" }}
@@ -56,8 +56,8 @@ spec:
             command: ["nidx", "ctl", "ready"]
         command: [
           "nidx",
-          "api",
-          "searcher"
+          "indexer",
+          "worker"
         ]
         env:
           - name: CONTROL_SOCKET
@@ -76,8 +76,4 @@ spec:
           {{- toYaml .Values.nidx.envFrom | nindent 10 }}
         {{- end }}
         resources:
-{{ toYaml .Values.nidx.resources | indent 10 }}
-        volumeMounts:
-{{ toYaml .Values.nidx.volumeMounts | indent 10 }}
-      volumes:
-{{ toYaml .Values.nidx.volumes | indent 8 }}
+{{ toYaml .Values.nidx.worker.resources | indent 10 }}
