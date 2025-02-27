@@ -45,10 +45,15 @@ jobs:
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
           echo "hash=$HASH" >> $GITHUB_OUTPUT
 
-      - name: Update image version
+      - name: Update nucliadb image version
         uses: mikefarah/yq@master
         with:
           cmd: yq -i '.imageVersion = "${{ steps.version_step.outputs.hash }}"' 'charts/nucliadb/values.yaml'
+
+      - name: Update nidx image version
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i '.nidx.imageVersion = "${{ steps.version_step.outputs.hash }}"' 'charts/nucliadb/values.yaml'
 
       - name: Set chart version
         uses: mikefarah/yq@master
