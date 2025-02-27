@@ -191,7 +191,7 @@ message GraphQuery {
         optional string value = 1;
         optional utils.RelationNode.NodeType node_type = 2;
         optional string node_subtype = 3;
-        bool as_fuzzy = 4;
+        uint32 fuzzy_distance = 4;
         bool as_prefix = 5;
     }
 
@@ -227,7 +227,8 @@ message GraphQuery {
 }
 
 message GraphSearchRequest {
-    GraphQuery query = 1;
+    string shard = 1;
+    GraphQuery query = 2;
 
     // decides what do we want in return: paths (triplets), nodes or relations.
     // Returning paths implies returning nodes and relations.
@@ -236,9 +237,9 @@ message GraphSearchRequest {
         NODES = 1;
         RELATIONS = 2;
     }
-    QueryKind kind = 2;
+    QueryKind kind = 3;
 
-    uint32 top_k = 3;
+    uint32 top_k = 4;
 }
 
 message GraphSearchResponse {

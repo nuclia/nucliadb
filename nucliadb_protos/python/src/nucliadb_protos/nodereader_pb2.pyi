@@ -686,12 +686,12 @@ class GraphQuery(google.protobuf.message.Message):
         VALUE_FIELD_NUMBER: builtins.int
         NODE_TYPE_FIELD_NUMBER: builtins.int
         NODE_SUBTYPE_FIELD_NUMBER: builtins.int
-        AS_FUZZY_FIELD_NUMBER: builtins.int
+        FUZZY_DISTANCE_FIELD_NUMBER: builtins.int
         AS_PREFIX_FIELD_NUMBER: builtins.int
         value: builtins.str
         node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
         node_subtype: builtins.str
-        as_fuzzy: builtins.bool
+        fuzzy_distance: builtins.int
         as_prefix: builtins.bool
         def __init__(
             self,
@@ -699,11 +699,11 @@ class GraphQuery(google.protobuf.message.Message):
             value: builtins.str | None = ...,
             node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType | None = ...,
             node_subtype: builtins.str | None = ...,
-            as_fuzzy: builtins.bool = ...,
+            fuzzy_distance: builtins.int = ...,
             as_prefix: builtins.bool = ...,
         ) -> None: ...
         def HasField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "as_fuzzy", b"as_fuzzy", "as_prefix", b"as_prefix", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> None: ...
+        def ClearField(self, field_name: typing.Literal["_node_subtype", b"_node_subtype", "_node_type", b"_node_type", "_value", b"_value", "as_prefix", b"as_prefix", "fuzzy_distance", b"fuzzy_distance", "node_subtype", b"node_subtype", "node_type", b"node_type", "value", b"value"]) -> None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["_node_subtype", b"_node_subtype"]) -> typing.Literal["node_subtype"] | None: ...
         @typing.overload
@@ -839,9 +839,11 @@ class GraphSearchRequest(google.protobuf.message.Message):
     NODES: GraphSearchRequest.QueryKind.ValueType  # 1
     RELATIONS: GraphSearchRequest.QueryKind.ValueType  # 2
 
+    SHARD_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
     KIND_FIELD_NUMBER: builtins.int
     TOP_K_FIELD_NUMBER: builtins.int
+    shard: builtins.str
     kind: global___GraphSearchRequest.QueryKind.ValueType
     top_k: builtins.int
     @property
@@ -849,12 +851,13 @@ class GraphSearchRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        shard: builtins.str = ...,
         query: global___GraphQuery | None = ...,
         kind: global___GraphSearchRequest.QueryKind.ValueType = ...,
         top_k: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["query", b"query"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["kind", b"kind", "query", b"query", "top_k", b"top_k"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["kind", b"kind", "query", b"query", "shard", b"shard", "top_k", b"top_k"]) -> None: ...
 
 global___GraphSearchRequest = GraphSearchRequest
 
