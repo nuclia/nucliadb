@@ -23,11 +23,12 @@ use std::path::Path;
 
 use nidx_protos::relation_prefix_search_request::Search;
 use nidx_protos::{
-    EntitiesSubgraphResponse, RelationNode, RelationPrefixSearchResponse, RelationSearchRequest, RelationSearchResponse,
+    EntitiesSubgraphResponse, GraphSearchRequest, GraphSearchResponse, RelationNode, RelationPrefixSearchResponse,
+    RelationSearchRequest, RelationSearchResponse,
 };
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, Occur, Query};
-use tantivy::{Index, IndexReader};
+use tantivy::{DocAddress, Index, IndexReader, Searcher};
 
 use crate::graph_query_parser::{
     Expression, FuzzyTerm, GraphQuery, GraphQueryParser, Node, NodeQuery, PathQuery, Relation, Term,
@@ -73,6 +74,11 @@ impl RelationsReaderService {
         let matching_docs = searcher.search(&index_query, &collector)?;
 
         // Build graph response.
+    fn build_graph_response(
+        &self,
+        searcher: &Searcher,
+        docs: impl Iterator<Item = DocAddress>,
+    ) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
         // We are being very naive and writing everything to the proto response. We could be smarter
         // and deduplicates nodes and relations. As paths are pointers, this would improve proto
         // size and ser/de time at expenses of deduplication effort.
@@ -81,8 +87,8 @@ impl RelationsReaderService {
         let mut relations = Vec::new();
         let mut graph = Vec::new();
 
-        for (_, doc_address) in &matching_docs {
-            let doc = searcher.doc(*doc_address)?;
+        for doc_address in docs {
+            let doc = searcher.doc(doc_address)?;
 
             let source = io_maps::source_to_relation_node(&self.schema, &doc);
             let relation = io_maps::doc_to_graph_relation(&self.schema, &doc);
@@ -108,6 +114,19 @@ impl RelationsReaderService {
             graph,
         };
         Ok(response)
+    }
+
+    pub fn inner_graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
+        let parser = GraphQueryParser::new();
+        let index_query: Box<dyn Query> = parser.parse(query);
+
+        // TODO: parametrize this magic constant
+        let collector = TopDocs::with_limit(1000);
+
+        let searcher = self.reader.searcher();
+        let matching_docs = searcher.search(&index_query, &collector)?;
+
+        self.build_graph_response(&searcher, matching_docs.into_iter().map(|(_score, doc_address)| doc_address))
     }
 }
 
