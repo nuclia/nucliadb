@@ -68,6 +68,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
 
 pub trait GetAckFloor {
     fn get(&mut self) -> impl Future<Output = anyhow::Result<i64>> + Send;
+    fn cleanup(&self) -> impl Future<Output = anyhow::Result<()>> + Send;
 }
 
 #[derive(Clone)]
@@ -77,6 +78,10 @@ impl GetAckFloor for NatsAckFloor {
     async fn get(&mut self) -> anyhow::Result<i64> {
         Ok(self.0.info().await?.ack_floor.stream_sequence as i64)
     }
+
+    async fn cleanup(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -85,6 +90,11 @@ struct PgAckFloor(NidxMetadata);
 impl GetAckFloor for PgAckFloor {
     async fn get(&mut self) -> anyhow::Result<i64> {
         Ok(IndexRequest::last_ack_seq(&self.0.pool).await?)
+    }
+
+    async fn cleanup(&self) -> anyhow::Result<()> {
+        IndexRequest::delete_old(&self.0.pool).await?;
+        Ok(())
     }
 }
 
@@ -122,6 +132,16 @@ pub async fn run_tasks(
         loop {
             if let Err(e) = purge_deleted_shards_and_indexes(&meta2).await {
                 warn!("Error purging deleted shards and indexes: {e:?}");
+            }
+            sleep(Duration::from_secs(60)).await;
+        }
+    });
+
+    let ack_floor_copy = ack_floor.clone();
+    tasks.spawn(async move {
+        loop {
+            if let Err(e) = ack_floor_copy.cleanup().await {
+                warn!("Error cleaning up AckFloor: {e:?}");
             }
             sleep(Duration::from_secs(60)).await;
         }

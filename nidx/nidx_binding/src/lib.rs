@@ -49,6 +49,10 @@ impl GetAckFloor for SeqSource {
         let seq = self.0.load(std::sync::atomic::Ordering::Relaxed);
         Ok(seq)
     }
+
+    async fn cleanup(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 #[pyclass]

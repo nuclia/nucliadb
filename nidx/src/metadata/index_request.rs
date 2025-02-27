@@ -43,7 +43,7 @@ impl IndexRequest {
         Ok(())
     }
 
-    pub async fn delete_old(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
+    pub async fn delete_old(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
         sqlx::query!("DELETE FROM index_requests WHERE received_at < NOW() - INTERVAL '1 minute'")
             .execute(meta)
             .await?;
@@ -52,7 +52,8 @@ impl IndexRequest {
 
     pub async fn last_ack_seq(meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<i64> {
         sqlx::query_scalar!(
-            "SELECT COALESCE(MIN(seq) - 1, (SELECT last_value FROM index_requests_seq_seq)) AS \"seq!\" FROM index_requests"
+            "SELECT COALESCE(MIN(seq) - 1, (SELECT last_value FROM index_requests_seq_seq)) AS \"seq!\"
+             FROM index_requests WHERE received_at > NOW() - INTERVAL '1 minute'"
         )
         .fetch_one(meta)
         .await
