@@ -1,9 +1,9 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: nidx
+  name: nidx-worker
   labels:
-    app: nidx
+    app: nidx-worker
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
@@ -11,13 +11,9 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    app: nidx
+    app: nidx-worker
   ports:
-    - name: nidx-api
-      port: 10000
-      protocol: TCP
-      appProtocol: grpc
-    - name: nidx-searcher
-      port: 10001
+    - name: nidx-indexer
+      port: 10002
       protocol: TCP
       appProtocol: grpc

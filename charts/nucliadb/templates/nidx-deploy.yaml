@@ -77,3 +77,7 @@ spec:
         {{- end }}
         resources:
 {{ toYaml .Values.nidx.resources | indent 10 }}
+        volumeMounts:
+{{ toYaml .Values.nidx.volumeMounts | indent 10 }}
+      volumes:
+{{ toYaml .Values.nidx.volumes | indent 8 }}
