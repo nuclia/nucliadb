@@ -19,6 +19,7 @@
 //
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
@@ -26,7 +27,7 @@ use nidx::indexer::index_resource;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::shard_selector::ShardSelector;
 use nidx::searcher::{SyncStatus, SyncedSearcher};
-use nidx::settings::{EnvSettings, MetadataSettings, SearcherSettings, StorageSettings};
+use nidx::settings::{EnvSettings, MetadataSettings, StorageSettings};
 use nidx::{NidxMetadata, Settings};
 use nidx_protos::nidx::nidx_api_client::NidxApiClient;
 use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
@@ -34,6 +35,7 @@ use nidx_protos::Resource;
 use object_store::memory::InMemory;
 use sqlx::PgPool;
 use tempfile::tempdir;
+use tokio::sync::mpsc;
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
@@ -44,6 +46,7 @@ pub struct NidxFixture {
     pub settings: Settings,
     seq: i64,
     sync_watcher: watch::Receiver<SyncStatus>,
+    request_sync: mpsc::Sender<()>,
 }
 
 impl NidxFixture {
@@ -66,11 +69,7 @@ impl NidxFixture {
                 telemetry: Default::default(),
                 work_path: None,
                 control_socket: None,
-                searcher: Some(SearcherSettings {
-                    // Reduced refresh interval for faster testing
-                    metadata_refresh_interval: 0.1,
-                    ..Default::default()
-                }),
+                searcher: Default::default(),
                 audit: None,
             },
         };
@@ -89,6 +88,7 @@ impl NidxFixture {
         tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
         let settings_copy = settings.clone();
         let (sync_reporter, sync_watcher) = watch::channel(SyncStatus::Syncing);
+        let (request_sync, sync_requested) = mpsc::channel(2);
         tokio::task::spawn(async move {
             searcher
                 .run(
@@ -97,7 +97,7 @@ impl NidxFixture {
                     shutdown.clone(),
                     ShardSelector::new_single(),
                     Some(sync_reporter),
-                    None,
+                    Some(sync_requested),
                 )
                 .await
         });
@@ -112,6 +112,7 @@ impl NidxFixture {
             settings,
             seq: 1,
             sync_watcher,
+            request_sync,
         })
     }
 
@@ -130,9 +131,13 @@ impl NidxFixture {
     }
 
     pub async fn wait_sync(&mut self) {
+        let _ = self.request_sync.try_send(());
         // Wait for a new sync to start
         self.sync_watcher.wait_for(|s| matches!(s, SyncStatus::Syncing)).await.unwrap();
         // Wait for it to finish
         self.sync_watcher.wait_for(|s| matches!(s, SyncStatus::Synced)).await.unwrap();
+
+        // Some wait time for the refresher to reload the index
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 }
