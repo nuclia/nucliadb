@@ -54,16 +54,13 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let synced_searcher = SyncedSearcher::new(meta.clone(), work_dir.path());
     let index_cache = synced_searcher.index_cache();
     let storage_copy = storage.clone();
+    let settings = SearcherSettings {
+        metadata_refresh_interval: 0.1,
+        ..Default::default()
+    };
     let search_task = tokio::spawn(async move {
         synced_searcher
-            .run(
-                storage_copy,
-                SearcherSettings::default(),
-                CancellationToken::new(),
-                ShardSelector::new_single(),
-                None,
-                None,
-            )
+            .run(storage_copy, settings, CancellationToken::new(), ShardSelector::new_single(), None, None)
             .await
     });
 
@@ -96,7 +93,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     )
     .await?;
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     // TODO: Test with shard_search once we have more indexes. We can make IndexSearch enum private again
     let searcher = index_cache.get(&index.id).await?;
@@ -115,7 +112,7 @@ async fn test_synchronization(pool: sqlx::PgPool) -> anyhow::Result<()> {
     process_index_message(&meta, storage.clone(), storage.clone(), &tempfile::env::temp_dir(), deletion, 2i64.into())
         .await?;
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     let searcher = index_cache.get(&index.id).await?;
     let vector_searcher: &VectorSearcher = searcher.as_ref().into();
