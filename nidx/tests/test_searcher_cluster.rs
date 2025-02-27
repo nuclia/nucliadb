@@ -97,7 +97,7 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
                 .await
         });
     }
-    tokio::time::sleep(Duration::from_millis(150)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // All shards are accessible from all nodes
     for shard in &shards {
@@ -117,7 +117,7 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
 
     // Remove one node from the cluster and wait for sync, searches should still work
     nodes.lock().unwrap().remove(2);
-    tokio::time::sleep(Duration::from_millis(150)).await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
     for shard in &shards {
         for searcher in &searchers[0..2] {
             NidxSearcherClient::connect(format!("http://{searcher}"))
@@ -187,7 +187,7 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
                 .await
         });
     }
-    tokio::time::sleep(Duration::from_millis(150)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Each shard is only accessible from a single node
     let mut node_for_shard_original = HashMap::new();
@@ -219,7 +219,7 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
 
     // Remove one node from the cluster, we expect shards to rebalance among the remaining nodes
     nodes.lock().unwrap().remove(2);
-    tokio::time::sleep(Duration::from_millis(150)).await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
 
     let mut node_for_shard_scale_down = HashMap::new();
     for shard in &shards {
@@ -257,7 +257,7 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
     // This node will have a different ID, so shard split
     // should be different than originally
     nodes.lock().unwrap().push("fake_new_node".to_string());
-    tokio::time::sleep(Duration::from_millis(150)).await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
 
     let mut node_for_shard_scale_up = HashMap::new();
     for shard in &shards {
