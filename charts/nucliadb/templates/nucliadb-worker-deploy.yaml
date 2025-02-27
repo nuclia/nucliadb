@@ -9,7 +9,12 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: {{ .Values.workerReplicas }}
+  replicas: {{ .Values.worker.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -18,7 +23,7 @@ spec:
       heritage: "{{ .Release.Service }}"
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
+      {{- with .Values.worker.podAnnotations }}
       annotations:
 {{ toYaml . | indent 8 }}
       {{- end }}
@@ -31,13 +36,13 @@ spec:
         heritage: "{{ .Release.Service }}"
     spec:
       topologySpreadConstraints:
-{{ toYaml .Values.topologySpreadConstraints | indent 8 }}
+{{ toYaml .Values.worker.topologySpreadConstraints | indent 8 }}
       nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
+{{ toYaml .Values.worker.nodeSelector | indent 8 }}
       affinity:
-{{ toYaml .Values.affinity | indent 8 }}
+{{ toYaml .Values.worker.affinity | indent 8 }}
       tolerations:
-{{ toYaml .Values.tolerations | indent 8 }}
+{{ toYaml .Values.worker.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
       serviceAccountName:  {{ .Values.serviceAccount | default "default" }}
       containers:
@@ -75,8 +80,6 @@ spec:
           {{- if .Values.envSecrets }}
 {{ toYaml .Values.envSecrets | indent 10 }}
           {{- end }}
-          - name: DATA_PATH
-            value: "/data"
           - name: standalone_node_role
             value: "worker"
           - name: NAMESPACE
@@ -95,4 +98,4 @@ spec:
         - name: grpc
           containerPort: 8060
         resources:
-{{ toYaml .Values.workerResources | indent 10 }}
+{{ toYaml .Values.worker.resources | indent 10 }}

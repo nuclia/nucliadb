@@ -8,7 +8,6 @@ imageVersion:
 
 # Defines the number of NucliaDB pods to run.
 replicas: 2
-workerReplicas: 1
 podAnnotations: {}
 
 # App settings: These are the settings that are passed to the NucliaDB application via environment variables.
@@ -46,22 +45,22 @@ tolerations: []
 topologySpreadConstraints: []
 
 resources: {}
-#  limits:
-#    memory: "2600Mi"
-#  requests:
-#    memory: "600Mi"
-#    cpu: 1
-workerResources: {}
-
-storage:
-  class: <replace-with-storage-class>
-  size: 100Gi
 
 # Service settings
 service:
   # Tune this to have the k8s service expose a different port. By default is 8080
   #   http_port: 80
   http_port: 8080
+
+# Configuration for nucliadb worker
+worker:
+  replicas: 1
+  podAnnotations: {}
+  topologySpreadConstraints: []
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  resources: {}
 
 # Configuration for the index node
 nidx:
@@ -70,3 +69,28 @@ nidx:
   env: {}
   envSecrets: {}
   envFrom: {}
+
+  replicas: 2
+  podAnnotations: {}
+  topologySpreadConstraints: []
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  resources: {}
+
+  worker:
+    replicas: 1
+    podAnnotations: {}
+    topologySpreadConstraints: []
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    resources: {}
+
+  scheduler:
+    podAnnotations: {}
+    topologySpreadConstraints: []
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    resources: {}

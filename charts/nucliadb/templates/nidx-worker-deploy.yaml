@@ -1,49 +1,44 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nidx-scheduler
+  name: nidx-worker
   labels:
-    app: nidx-scheduler
+    app: nidx-worker
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 0
+  replicas: {{ .Values.nidx.worker.replicas }}
   selector:
     matchLabels:
-      app: nidx-scheduler
+      app: nidx-worker
       release: "{{ .Release.Name }}"
       heritage: "{{ .Release.Service }}"
   template:
     metadata:
-      {{- with .Values.nidx.scheduler.podAnnotations }}
+      {{- with .Values.nidx.worker.podAnnotations }}
       annotations:
 {{ toYaml . | indent 8 }}
       {{- end }}
-      name: nidx-scheduler
+      name: nidx-worker
       labels:
-        app: nidx-scheduler
+        app: nidx-worker
         version: "{{ .Chart.Version | replace "+" "_" }}"
         chart: "{{ .Chart.Name }}"
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
     spec:
       nodeSelector:
-{{ toYaml .Values.nidx.scheduler.nodeSelector | indent 8 }}
+{{ toYaml .Values.nidx.worker.nodeSelector | indent 8 }}
       topologySpreadConstraints:
-{{ toYaml .Values.nidx.scheduler.topologySpreadConstraints | indent 8 }}
+{{ toYaml .Values.nidx.worker.topologySpreadConstraints | indent 8 }}
       affinity:
-{{ toYaml .Values.nidx.scheduler.affinity | indent 8 }}
+{{ toYaml .Values.nidx.worker.affinity | indent 8 }}
       tolerations:
-{{ toYaml .Values.nidx.scheduler.tolerations | indent 8 }}
+{{ toYaml .Values.nidx.worker.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
-{{- with .Values.nidx.scheduler.priorityClassName }}
+{{- with .Values.nidx.worker.priorityClassName }}
       priorityClassName: {{ . }}
 {{- end }}
       serviceAccountName:  {{ .Values.serviceAccount | default "default" }}
@@ -61,7 +56,8 @@ spec:
             command: ["nidx", "ctl", "ready"]
         command: [
           "nidx",
-          "scheduler"
+          "indexer",
+          "worker"
         ]
         env:
           - name: CONTROL_SOCKET
@@ -73,9 +69,11 @@ spec:
           {{- if .Values.nidx.envSecrets }}
 {{ toYaml .Values.nidx.envSecrets | indent 10 }}
           {{- end }}
+          - name: WORK_PATH
+            value: "/data"
         {{- if .Values.nidx.envFrom }}
         envFrom:
           {{- toYaml .Values.nidx.envFrom | nindent 10 }}
         {{- end }}
         resources:
-{{ toYaml .Values.nidx.scheduler.resources | indent 10 }}
+{{ toYaml .Values.nidx.worker.resources | indent 10 }}
