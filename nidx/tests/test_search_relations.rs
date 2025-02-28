@@ -750,6 +750,182 @@ async fn test_graph_search__relation_query(pool: PgPool) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[sqlx::test]
+#[allow(non_snake_case)]
+async fn test_graph_search__directed_path_query(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let shard_id = setup_knowledge_graph(&mut fixture).await?;
+
+    // (:Erin)-[]->(:UK)
+    let response = fixture.searcher_client.graph_search(
+        GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(
+                GraphQuery {
+                    query: Some(
+                        graph_query::Query::Path(graph_query::Path {
+                            source: Some(
+                                graph_query::Node {
+                                    value: Some("Erin".to_string()),
+                                    node_type: Some(NodeType::Entity.into()),
+                                    node_subtype: Some("PERSON".to_string()),
+                                    ..Default::default()
+                                }
+                            ),
+                            relation: None,
+                            destination: Some(
+                                graph_query::Node {
+                                    value: Some("UK".to_string()),
+                                    node_type: Some(NodeType::Entity.into()),
+                                    node_subtype: Some("PLACE".to_string()),
+                                    ..Default::default()
+                                }
+                            ),
+                            ..Default::default()
+                        })
+                    )
+                }
+            ),
+            top_k: 100,
+            ..Default::default()
+        }
+    ).await?.into_inner();
+    friendly_print(&response);
+    let relations = friendly_parse(&response);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Erin", "BORN_IN", "UK")));
+
+    // (:PERSON)-[]->(:PLACE)
+    let response = fixture.searcher_client.graph_search(
+        GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(
+                GraphQuery {
+                    query: Some(
+                        graph_query::Query::Path(graph_query::Path {
+                            source: Some(
+                                graph_query::Node {
+                                    node_type: Some(NodeType::Entity.into()),
+                                    node_subtype: Some("PERSON".to_string()),
+                                    ..Default::default()
+                                }
+                            ),
+                            relation: None,
+                            destination: Some(
+                                graph_query::Node {
+                                    node_subtype: Some("PLACE".to_string()),
+                                    ..Default::default()
+                                }
+                            ),
+                            ..Default::default()
+                        })
+                    )
+                }
+            ),
+            top_k: 100,
+            ..Default::default()
+        }
+    ).await?.into_inner();
+    friendly_print(&response);
+    let relations = friendly_parse(&response);
+    assert_eq!(relations.len(), 4);
+    assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
+    assert!(relations.contains(&("Anna", "WORK_IN", "New York")));
+    assert!(relations.contains(&("Erin", "BORN_IN", "UK")));
+    assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
+
+    // (:PERSON)-[:LIVE_IN]->(:PLACE)
+    let response = fixture.searcher_client.graph_search(
+        GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(
+                GraphQuery {
+                    query: Some(
+                        graph_query::Query::Path(graph_query::Path {
+                            source: Some(
+                                graph_query::Node {
+                                    node_type: Some(NodeType::Entity.into()),
+                                    node_subtype: Some("PERSON".to_string()),
+                                    ..Default::default()
+                                }
+                            ),
+                            relation: Some(
+                                graph_query::Relation {
+                                    value: Some("LIVE_IN".to_string())
+                                }
+                            ),
+                            destination: Some(
+                                graph_query::Node {
+                                    node_subtype: Some("PLACE".to_string()),
+                                    ..Default::default()
+                                }
+                            ),
+                            ..Default::default()
+                        })
+                    )
+                }
+            ),
+            top_k: 100,
+            ..Default::default()
+        }
+    ).await?.into_inner();
+    friendly_print(&response);
+    let relations = friendly_parse(&response);
+    assert_eq!(relations.len(), 2);
+    assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
+    assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
+
+    // TODO: OR and NOT expressions
+
+    Ok(())
+}
+
+#[sqlx::test]
+#[allow(non_snake_case)]
+async fn test_graph_search__undirected_path_query(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let shard_id = setup_knowledge_graph(&mut fixture).await?;
+
+    // (:Anna)-[:IS_FRIEND]-()
+    let response = fixture.searcher_client.graph_search(
+        GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(
+                GraphQuery {
+                    query: Some(
+                        graph_query::Query::Path(graph_query::Path {
+                            source: Some(
+                                graph_query::Node {
+                                    value: Some("Anna".to_string()),
+                                    node_type: Some(NodeType::Entity.into()),
+                                    node_subtype: Some("PERSON".to_string()),
+                                    ..Default::default()
+                                }
+                            ),
+                            relation: Some(
+                                graph_query::Relation {
+                                    value: Some("IS_FRIEND".to_string())
+                                }
+                            ),
+                            destination: Some(graph_query::Node::default()),
+                            undirected: true,
+                        })
+                    )
+                }
+            ),
+            top_k: 100,
+            ..Default::default()
+        }
+    ).await?.into_inner();
+    friendly_print(&response);
+    let relations = friendly_parse(&response);
+    assert_eq!(relations.len(), 1);
+    assert!(relations.contains(&("Anastasia", "IS_FRIEND", "Anna")));
+
+
+    Ok(())
+}
+
 async fn create_shard(fixture: &mut NidxFixture) -> anyhow::Result<String> {
     let new_shard_response = fixture
         .api_client
