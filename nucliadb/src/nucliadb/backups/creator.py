@@ -17,11 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
 from nucliadb.backups.models import CreateBackupRequest
 from nucliadb.common.context import ApplicationContext
 
 
 async def backup_kb(context: ApplicationContext, msg: CreateBackupRequest):
+    kbid = msg.kbid
+    backup_id = msg.backup_id
+
+    # Check if the backup is already ongoing and we're resuming it
+    # Export some resources in parallel, saving checkpoints
+    # Export labels, entities and learning config
     pass
