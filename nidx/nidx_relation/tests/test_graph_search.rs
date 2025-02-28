@@ -19,9 +19,8 @@
 //
 mod common;
 
-use std::collections::HashMap;
-
-use nidx_protos::relation::RelationType;
+use nidx_tests::graph::friendly_parse;
+use nidx_tests::graph::friendly_print;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{Resource, ResourceId};
 use nidx_relation::graph_query_parser::{
@@ -31,111 +30,6 @@ use nidx_relation::{RelationIndexer, RelationSearcher};
 use tempfile::TempDir;
 
 use common::TestOpener;
-
-fn create_reader() -> anyhow::Result<RelationSearcher> {
-    let dir = TempDir::new().unwrap();
-
-    let entities = HashMap::from([
-        ("Anastasia", "PERSON"),
-        ("Anna", "PERSON"),
-        ("Apollo", "PROJECT"),
-        ("Cat", "ANIMAL"),
-        ("Climbing", "ACTIVITY"),
-        ("Computer science", "STUDY_FIELD"),
-        ("Dimitri", "PERSON"),
-        ("Erin", "PERSON"),
-        ("Jerry", "ANIMAL"),
-        ("Margaret", "PERSON"),
-        ("Mouse", "ANIMAL"),
-        ("New York", "PLACE"),
-        ("Olympic athlete", "SPORT"),
-        ("Peter", "PERSON"),
-        ("Rocket", "VEHICLE"),
-        ("Tom", "ANIMAL"),
-        ("UK", "PLACE"),
-    ]);
-    let graph = vec![
-        ("Anastasia", "IS_FRIEND", "Anna"),
-        ("Anna", "FOLLOW", "Erin"),
-        ("Anna", "LIVE_IN", "New York"),
-        ("Anna", "WORK_IN", "New York"),
-        ("Anna", "LOVE", "Cat"),
-        ("Apollo", "IS", "Rocket"),
-        ("Dimitri", "LOVE", "Anastasia"),
-        ("Erin", "BORN_IN", "UK"),
-        ("Erin", "IS", "Olympic athlete"),
-        ("Erin", "LOVE", "Climbing"),
-        ("Jerry", "IS", "Mouse"),
-        ("Margaret", "DEVELOPED", "Apollo"),
-        ("Margaret", "WORK_IN", "Computer science"),
-        ("Peter", "LIVE_IN", "New York"),
-        ("Tom", "CHASE", "Jerry"),
-        ("Tom", "IS", "Cat"),
-    ];
-
-    let mut relations = vec![];
-    for (source, relation, target) in graph {
-        relations.push(common::create_relation(
-            source.to_string(),
-            NodeType::Entity,
-            entities.get(source).unwrap().to_string(),
-            target.to_string(),
-            NodeType::Entity,
-            entities.get(target).unwrap().to_string(),
-            RelationType::Entity,
-            relation.to_string(),
-        ))
-    }
-
-    let resource = Resource {
-        resource: Some(ResourceId {
-            uuid: "uuid".to_string(),
-            shard_id: "shard_id".to_string(),
-        }),
-        relations: relations,
-        ..Default::default()
-    };
-
-    let segment_meta = RelationIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
-    RelationSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))
-}
-
-// Debug function, useful while developing
-#[allow(dead_code)]
-fn friendly_print(result: &nidx_protos::GraphSearchResponse) {
-    for path in result.graph.iter() {
-        let source = result.nodes.get(path.source as usize).unwrap();
-        let relation = result.relations.get(path.relation as usize).unwrap();
-        let destination = result.nodes.get(path.destination as usize).unwrap();
-
-        println!(
-            "({:?})-[{:?}]->({:?})",
-            (&source.value, &source.subtype),
-            &relation.label,
-            (&destination.value, &destination.subtype)
-        );
-    }
-    println!(
-        "Matched {} paths in {} nodes and {} relations",
-        result.graph.len(),
-        result.nodes.len(),
-        result.relations.len()
-    );
-    println!();
-}
-
-fn friendly_parse<'a>(relations: &'a nidx_protos::GraphSearchResponse) -> Vec<(&'a str, &'a str, &'a str)> {
-    relations
-        .graph
-        .iter()
-        .map(|path| {
-            let source = relations.nodes.get(path.source as usize).unwrap();
-            let relation = relations.relations.get(path.relation as usize).unwrap();
-            let destination = relations.nodes.get(path.destination as usize).unwrap();
-            (source.value.as_str(), relation.label.as_str(), destination.value.as_str())
-        })
-        .collect()
-}
 
 #[test]
 fn test_graph_node_query() -> anyhow::Result<()> {
@@ -482,4 +376,21 @@ fn test_graph_response() -> anyhow::Result<()> {
     assert_eq!(result.relations.len(), 4); // this could be 2 with dedup
 
     Ok(())
+}
+
+fn create_reader() -> anyhow::Result<RelationSearcher> {
+    let dir = TempDir::new().unwrap();
+
+    let relations = nidx_tests::graph::knowledge_graph_as_relations();
+    let resource = Resource {
+        resource: Some(ResourceId {
+            uuid: "uuid".to_string(),
+            shard_id: "shard_id".to_string(),
+        }),
+        relations: relations,
+        ..Default::default()
+    };
+
+    let segment_meta = RelationIndexer.index_resource(dir.path(), &resource).unwrap().unwrap();
+    RelationSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]))
 }
