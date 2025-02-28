@@ -24,8 +24,6 @@ import pytest
 from grpc_health.v1 import health_pb2
 
 from nucliadb import health
-from nucliadb.common.cluster import manager
-from nucliadb.ingest.settings import DriverConfig, settings
 
 
 @pytest.fixture(autouse=True)
@@ -44,25 +42,20 @@ def nats_manager():
 
 async def test_grpc_health_check():
     servicer = AsyncMock()
-    with (
-        patch.object(manager, "INDEX_NODES", {"node1": "node1"}),
-        patch.object(settings, "driver", DriverConfig.PG),
-    ):
-        task = asyncio.create_task(health.grpc_health_check(servicer))
-        await asyncio.sleep(0.05)
+    task = asyncio.create_task(health.grpc_health_check(servicer))
+    await asyncio.sleep(0.05)
 
-        servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.SERVING)
+    servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.SERVING)
 
-        task.cancel()
+    task.cancel()
 
 
 async def test_health_check_fail_unhealthy_nats(nats_manager):
     nats_manager.healthy.return_value = False
     servicer = AsyncMock()
-    with patch.object(manager, "INDEX_NODES", {"node1": "node1"}):  # has nodes
-        task = asyncio.create_task(health.grpc_health_check(servicer))
-        await asyncio.sleep(0.05)
+    task = asyncio.create_task(health.grpc_health_check(servicer))
+    await asyncio.sleep(0.05)
 
-        servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)
+    servicer.set.assert_called_with("", health_pb2.HealthCheckResponse.NOT_SERVING)
 
-        task.cancel()
+    task.cancel()

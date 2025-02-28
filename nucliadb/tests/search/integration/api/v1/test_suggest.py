@@ -21,9 +21,9 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.common.cluster.manager import INDEX_NODES
 from nucliadb.common.datamanagers.cluster import KB_SHARDS
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.nidx import get_nidx_fake_node
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_protos.nodereader_pb2 import SuggestFeatures, SuggestRequest
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -47,15 +47,14 @@ async def test_suggest_resource_all(
     driver = get_driver()
     async with driver.transaction(read_only=True) as txn:
         key = KB_SHARDS.format(kbid=kbid)
+        node_obj = get_nidx_fake_node()
         async for key in txn.keys(key):
             value = await txn.get(key)
             assert value is not None
             shards = PBShards()
             shards.ParseFromString(value)
             for replica in shards.shards[0].replicas:
-                node_obj = INDEX_NODES.get(replica.node)
-
-                if node_obj is not None:
+                if True:
                     shard = await node_obj.get_shard(replica.shard.id)
                     assert shard.shard_id == replica.shard.id
                     assert shard.fields == 3

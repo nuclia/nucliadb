@@ -22,8 +22,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nucliadb.common.cluster import manager
-from nucliadb.common.cluster.manager import KBShardManager, get_index_node
+from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
@@ -70,7 +69,6 @@ async def cluster_nucliadb_search(
         patch.object(nuclia_settings, "dummy_learning_services", True),
         patch.object(ingest_settings, "grpc_port", free_port()),
         patch.object(nucliadb_settings, "nucliadb_ingest", f"localhost:{ingest_settings.grpc_port}"),
-        patch.dict(manager.INDEX_NODES, clear=True),
     ):
         async with application.router.lifespan_context(application):
             client_factory = create_api_client_factory(application)
@@ -138,37 +136,15 @@ async def wait_for_shard(knowledgebox_ingest: str, count: int) -> str:
 
     checks: dict[str, bool] = {}
     nidx_api = get_nidx_api_client()
-    if nidx_api:
-        checks[""] = False
-        req = GetShardRequest()
-        req.shard_id.id = shard.nidx_shard_id
-        for i in range(30):
-            count_shard: Shard = await nidx_api.GetShard(req)  # type: ignore
-            if count_shard.fields >= count:
-                checks[""] = True
-                break
-            await asyncio.sleep(1)
-    else:
-        for replica in shard.replicas:
-            if replica.shard.id not in checks:
-                checks[replica.shard.id] = False
-
-        for i in range(30):
-            for replica in shard.replicas:
-                node_obj = get_index_node(replica.node)
-                if node_obj is not None:
-                    req = GetShardRequest()
-                    req.shard_id.id = replica.shard.id
-                    count_shard: Shard = await node_obj.reader.GetShard(req)  # type: ignore
-                    if count_shard.fields >= count:
-                        checks[replica.shard.id] = True
-                    else:
-                        checks[replica.shard.id] = False
-
-            if all(checks.values()):
-                break
-            await asyncio.sleep(1)
-
+    checks[""] = False
+    req = GetShardRequest()
+    req.shard_id.id = shard.nidx_shard_id
+    for i in range(30):
+        count_shard: Shard = await nidx_api.GetShard(req)  # type: ignore
+        if count_shard.fields >= count:
+            checks[""] = True
+            break
+        await asyncio.sleep(1)
     assert all(checks.values())
     # Wait an extra couple of seconds for reader/searcher to catch up
     await asyncio.sleep(2)

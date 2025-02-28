@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import random
 import unittest
 import uuid
 from typing import cast
@@ -32,6 +31,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.pg import PGTransaction
+from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
@@ -45,6 +45,7 @@ from nucliadb.purge import (
 )
 from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
 from nucliadb_protos import nodewriter_pb2, utils_pb2, writer_pb2
+from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_utils.storages.storage import Storage
 from tests.utils.dirty_index import wait_for_sync
 
@@ -114,6 +115,11 @@ async def test_purge_deletes_everything_from_maindb(
     assert len(keys_after_purge_storage) == 0
 
 
+async def list_shards() -> list[ShardId]:
+    nidx = get_nidx_api_client()
+    return list((await nidx.ListShards(EmptyQuery())).ids)
+
+
 @pytest.mark.deploy_modes("standalone")
 async def test_purge_orphan_shards(
     maindb_driver: Driver,
@@ -140,9 +146,7 @@ async def test_purge_orphan_shards(
     )
     assert resp.status_code == 201
 
-    shards = []
-    for node in manager.get_index_nodes():
-        shards.extend(await node.list_shards())
+    shards = await list_shards()
     assert len(shards) > 0
 
     with unittest.mock.patch.object(nucliadb.common.nidx.get_nidx(), "api_client"):
@@ -157,9 +161,7 @@ async def test_purge_orphan_shards(
         maindb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
         assert maindb_shards is None
 
-    shards = []
-    for node in manager.get_index_nodes():
-        shards.extend(await node.list_shards())
+    shards = await list_shards()
     assert len(shards) > 0
 
     orphan_shards = await detect_orphan_shards(maindb_driver)
@@ -168,9 +170,7 @@ async def test_purge_orphan_shards(
     # Purge orphans and validate
     await purge_orphan_shards(maindb_driver)
 
-    shards = []
-    for node in manager.get_index_nodes():
-        shards.extend(await node.list_shards())
+    shards = await list_shards()
     assert len(shards) == 0
 
 
@@ -195,8 +195,7 @@ async def test_purge_orphan_shard_detection(
     kbid = resp.json().get("uuid")
 
     # Orphan shard
-    available_nodes = manager.get_index_nodes()
-    node = random.choice(available_nodes)
+    node = manager.get_nidx_fake_node()
     orphan_shard = await node.new_shard_with_vectorsets(
         kbid=str(uuid.uuid4()),
         vectorsets_configs={

@@ -48,17 +48,6 @@ from .settings import settings
 
 logger = logging.getLogger(__name__)
 
-INDEX_NODES: dict[str, AbstractIndexNode] = {}
-READ_REPLICA_INDEX_NODES: dict[str, set[str]] = {}
-
-
-def get_index_nodes(include_secondary: bool = False) -> list[AbstractIndexNode]:
-    return [get_nidx_fake_node()]
-
-
-def get_index_node(node_id: str) -> Optional[AbstractIndexNode]:
-    return get_nidx_fake_node()
-
 
 class KBShardManager:
     # TODO: move to data manager
