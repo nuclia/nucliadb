@@ -434,23 +434,26 @@ impl TryFrom<&nidx_protos::graph_query::Query> for GraphQuery {
             }
 
             nidx_protos::graph_query::Query::Path(path) => {
-                match (&path.source, &path.relation, &path.destination) {
-                    (None, None, None) => {
-                        // (Node::default(), Relation::default(), Node::default())
-                        unimplemented!()
-                    }
-                    (Some(source), None, None) => {
-                        Self::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node::try_from(source)?)))
-                    }
-                    (None, Some(relation), None) => {
-                        Self::RelationQuery(RelationQuery(Expression::Value(Relation::try_from(relation)?)))
-                    }
-                    (None, None, Some(destination)) => {
-                        Self::NodeQuery(NodeQuery::DestinationNode(Expression::Value(Node::try_from(destination)?)))
-                    }
-                    _ => unimplemented!(),
+                let source = match &path.source {
+                    Some(source_pb) => Node::try_from(source_pb)?,
+                    None => Node::default(),
+                };
+                let relation = match &path.relation {
+                    Some(relation_pb) => Relation::try_from(relation_pb)?,
+                    None => Relation::default(),
+                };
+                let destination = match &path.destination {
+                    Some(destination_pb) => Node::try_from(destination_pb)?,
+                    None => Node::default(),
+                };
+
+                if path.undirected {
+                    Self::PathQuery(PathQuery::UndirectedPath((Expression::Value(source), Expression::Value(relation), Expression::Value(destination))))
+                } else {
+                    Self::PathQuery(PathQuery::DirectedPath((Expression::Value(source), Expression::Value(relation), Expression::Value(destination))))
                 }
             }
+
             nidx_protos::graph_query::Query::BoolAnd(_expression) => {
                 unimplemented!()
             }
