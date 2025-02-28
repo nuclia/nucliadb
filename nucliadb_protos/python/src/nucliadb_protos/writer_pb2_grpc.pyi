@@ -256,6 +256,17 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexStatus,
     ]
 
+    BackupCreate: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.BackupCreateRequest,
+        nucliadb_protos.writer_pb2.BackupCreateResponse,
+    ]
+    """Backups"""
+
+    BackupRestore: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.BackupRestoreRequest,
+        nucliadb_protos.writer_pb2.BackupRestoreResponse,
+    ]
+
 class WriterAsyncStub:
     NewKnowledgeBoxV2: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.NewKnowledgeBoxV2Request,
@@ -331,6 +342,17 @@ class WriterAsyncStub:
     ReIndex: grpc.aio.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus,
+    ]
+
+    BackupCreate: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.BackupCreateRequest,
+        nucliadb_protos.writer_pb2.BackupCreateResponse,
+    ]
+    """Backups"""
+
+    BackupRestore: grpc.aio.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.BackupRestoreRequest,
+        nucliadb_protos.writer_pb2.BackupRestoreResponse,
     ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
@@ -439,5 +461,20 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: _ServicerContext,
     ) -> typing.Union[nucliadb_protos.writer_pb2.IndexStatus, collections.abc.Awaitable[nucliadb_protos.writer_pb2.IndexStatus]]: ...
+
+    @abc.abstractmethod
+    def BackupCreate(
+        self,
+        request: nucliadb_protos.writer_pb2.BackupCreateRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.writer_pb2.BackupCreateResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.BackupCreateResponse]]:
+        """Backups"""
+
+    @abc.abstractmethod
+    def BackupRestore(
+        self,
+        request: nucliadb_protos.writer_pb2.BackupRestoreRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[nucliadb_protos.writer_pb2.BackupRestoreResponse, collections.abc.Awaitable[nucliadb_protos.writer_pb2.BackupRestoreResponse]]: ...
 
 def add_WriterServicer_to_server(servicer: WriterServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

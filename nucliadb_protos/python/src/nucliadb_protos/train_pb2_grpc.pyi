@@ -129,6 +129,10 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import (
     Audit as Audit,
+    BackupCreateRequest as BackupCreateRequest,
+    BackupCreateResponse as BackupCreateResponse,
+    BackupRestoreRequest as BackupRestoreRequest,
+    BackupRestoreResponse as BackupRestoreResponse,
     BrokerMessage as BrokerMessage,
     BrokerMessageBlobReference as BrokerMessageBlobReference,
     DelEntitiesRequest as DelEntitiesRequest,

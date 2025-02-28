@@ -1690,6 +1690,117 @@ class NewKnowledgeBoxV2Response(google.protobuf.message.Message):
 global___NewKnowledgeBoxV2Response = NewKnowledgeBoxV2Response
 
 @typing.final
+class BackupCreateRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KB_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["kb", b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["kb", b"kb"]) -> None: ...
+
+global___BackupCreateRequest = BackupCreateRequest
+
+@typing.final
+class BackupCreateResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[BackupCreateResponse._Status.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: BackupCreateResponse._Status.ValueType  # 0
+        ERROR: BackupCreateResponse._Status.ValueType  # 1
+        KB_NOT_FOUND: BackupCreateResponse._Status.ValueType  # 2
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    OK: BackupCreateResponse.Status.ValueType  # 0
+    ERROR: BackupCreateResponse.Status.ValueType  # 1
+    KB_NOT_FOUND: BackupCreateResponse.Status.ValueType  # 2
+
+    STATUS_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+    BACKUP_ID_FIELD_NUMBER: builtins.int
+    status: global___BackupCreateResponse.Status.ValueType
+    error_message: builtins.str
+    backup_id: builtins.str
+    def __init__(
+        self,
+        *,
+        status: global___BackupCreateResponse.Status.ValueType = ...,
+        error_message: builtins.str = ...,
+        backup_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "error_message", b"error_message", "status", b"status"]) -> None: ...
+
+global___BackupCreateResponse = BackupCreateResponse
+
+@typing.final
+class BackupRestoreRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KB_FIELD_NUMBER: builtins.int
+    BACKUP_ID_FIELD_NUMBER: builtins.int
+    backup_id: builtins.str
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+        backup_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["kb", b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["backup_id", b"backup_id", "kb", b"kb"]) -> None: ...
+
+global___BackupRestoreRequest = BackupRestoreRequest
+
+@typing.final
+class BackupRestoreResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[BackupRestoreResponse._Status.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: BackupRestoreResponse._Status.ValueType  # 0
+        ERROR: BackupRestoreResponse._Status.ValueType  # 1
+        BACKUP_NOT_FOUND: BackupRestoreResponse._Status.ValueType  # 2
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    OK: BackupRestoreResponse.Status.ValueType  # 0
+    ERROR: BackupRestoreResponse.Status.ValueType  # 1
+    BACKUP_NOT_FOUND: BackupRestoreResponse.Status.ValueType  # 2
+
+    STATUS_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+    KB_FIELD_NUMBER: builtins.int
+    status: global___BackupRestoreResponse.Status.ValueType
+    error_message: builtins.str
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    def __init__(
+        self,
+        *,
+        status: global___BackupRestoreResponse.Status.ValueType = ...,
+        error_message: builtins.str = ...,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["kb", b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["error_message", b"error_message", "kb", b"kb", "status", b"status"]) -> None: ...
+
+global___BackupRestoreResponse = BackupRestoreResponse
+
+@typing.final
 class FieldError(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

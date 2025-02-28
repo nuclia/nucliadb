@@ -17,13 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Callable, Coroutine, TypeVar
 
-import pydantic
 
+from nucliadb.backups.models import CreateBackupRequest
 from nucliadb.common.context import ApplicationContext
 
-MsgType = TypeVar("MsgType", bound=pydantic.BaseModel)
 
-# async def callback(context: ApplicationContext, msg: MyPydanticModel):
-Callback = Callable[[ApplicationContext, MsgType], Coroutine[Any, Any, Any]]
+async def backup_kb(context: ApplicationContext, msg: CreateBackupRequest):
+    pass

@@ -456,6 +456,38 @@ message NewKnowledgeBoxV2Response {
 }
 
 
+message BackupCreateRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+}
+
+message BackupCreateResponse {
+    enum Status {
+        OK = 0;
+        ERROR = 1;
+        KB_NOT_FOUND = 2;
+    }
+    Status status = 1;
+    string error_message = 2;
+    string backup_id = 3;
+}
+
+message BackupRestoreRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string backup_id = 2;
+}
+
+message BackupRestoreResponse {
+    enum Status {
+        OK = 0;
+        ERROR = 1;
+        BACKUP_NOT_FOUND = 2;
+    }
+    Status status = 1;
+    string error_message = 2;
+    knowledgebox.KnowledgeBoxID kb = 3;
+}
+
+
 service Writer {
     rpc NewKnowledgeBoxV2(NewKnowledgeBoxV2Request) returns (NewKnowledgeBoxV2Response) {}
     rpc DeleteKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.DeleteKnowledgeBoxResponse) {}
@@ -478,6 +510,10 @@ service Writer {
 
     rpc Index(IndexResource) returns (IndexStatus) {}
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
+
+    // Backups
+    rpc BackupCreate(BackupCreateRequest) returns (BackupCreateResponse) {}
+    rpc BackupRestore(BackupRestoreRequest) returns (BackupRestoreResponse) {}
 }
 
 message FieldError {

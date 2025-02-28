@@ -46,6 +46,9 @@ from nucliadb_protos.knowledgebox_pb2 import (
     UpdateKnowledgeBoxResponse,
 )
 from nucliadb_protos.writer_pb2 import (
+    BackupCreateRequest,
+    BackupCreateResponse,
+    BackupRestoreRequest,
     BrokerMessage,
     DelEntitiesRequest,
     GetEntitiesGroupRequest,
@@ -467,3 +470,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             raise
+
+    async def BackupCreate(self, request: BackupCreateRequest, context=None) -> BackupCreateResponse:  # type: ignore
+        response = BackupCreateResponse(status=BackupCreateResponse.Status.OK)
+        return response
+
+    async def BackupRestore(self, request: BackupRestoreRequest, context=None) -> BackupRestoreRequest:  # type: ignore
+        response = BackupRestoreRequest()
+        return response
