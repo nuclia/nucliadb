@@ -287,7 +287,11 @@ impl RelationsReaderService {
         }
 
         let searcher = self.reader.searcher();
-        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
+        // FIXME: we are using a topdocs collector to get prefix results from source and target
+        // nodes. However, we are deduplicating afterwards, and this means we could end up with less
+        // results although results may exist. As a quick fix, we increase here the limit of the
+        // collector. The proper solution would be implementing a custom collector for this task
+        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST * 2);
         let schema = &self.schema;
 
         match search {
@@ -370,16 +374,17 @@ impl RelationsReaderService {
             let relation_node = io_maps::source_to_relation_node(schema, &source_res_doc);
             results.insert(HashedRelationNode(relation_node));
         }
-        for (_, source_res_addr) in searcher.search(&target_prefix_query, &topdocs)? {
-            let source_res_doc = searcher.doc(source_res_addr)?;
-            let relation_node = io_maps::target_to_relation_node(schema, &source_res_doc);
+        for (_, target_res_addr) in searcher.search(&target_prefix_query, &topdocs)? {
+            let target_res_doc = searcher.doc(target_res_addr)?;
+            let relation_node = io_maps::target_to_relation_node(schema, &target_res_doc);
             results.insert(HashedRelationNode(relation_node));
         }
-        response.nodes = results.into_iter().map(Into::into).collect();
+        response.nodes = results.into_iter().take(NUMBER_OF_RESULTS_SUGGEST).map(Into::into).collect();
         Ok(Some(response))
     }
 }
 
+#[derive(Debug)]
 pub struct HashedRelationNode(pub RelationNode);
 
 impl From<HashedRelationNode> for RelationNode {
