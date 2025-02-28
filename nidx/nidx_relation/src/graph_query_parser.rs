@@ -442,7 +442,9 @@ impl TryFrom<&nidx_protos::graph_query::Query> for GraphQuery {
                     (Some(source), None, None) => {
                         Self::NodeQuery(NodeQuery::SourceNode(Expression::Value(Node::try_from(source)?)))
                     }
-                    (None, Some(relation), None) => unimplemented!(),
+                    (None, Some(relation), None) => {
+                        Self::RelationQuery(RelationQuery(Expression::Value(Relation::try_from(relation)?)))
+                    }
                     (None, None, Some(destination)) => {
                         Self::NodeQuery(NodeQuery::DestinationNode(Expression::Value(Node::try_from(destination)?)))
                     }
@@ -486,6 +488,18 @@ impl TryFrom<&nidx_protos::graph_query::Node> for Node {
             value,
             node_type,
             node_subtype,
+        })
+    }
+}
+
+impl TryFrom<&nidx_protos::graph_query::Relation> for Relation {
+    type Error = anyhow::Error;
+
+    fn try_from(relation_pb: &nidx_protos::graph_query::Relation) -> Result<Self, Self::Error> {
+        let value = relation_pb.value.clone();
+
+        Ok(Relation {
+            value,
         })
     }
 }
