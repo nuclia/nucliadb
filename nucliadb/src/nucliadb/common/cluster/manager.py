@@ -22,13 +22,10 @@ import logging
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
-import backoff
-
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.base import AbstractIndexNode
 from nucliadb.common.cluster.exceptions import (
     NodeError,
-    NodesUnsync,
     ShardNotFound,
     ShardsNotFound,
 )
@@ -289,7 +286,6 @@ class StandaloneKBShardManager(KBShardManager):
         self._lock = asyncio.Lock()
         self._change_count: dict[tuple[str, str], int] = {}
 
-    @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
     async def delete_resource(
         self,
         shard: writer_pb2.ShardObject,
@@ -309,7 +305,6 @@ class StandaloneKBShardManager(KBShardManager):
             indexpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
             await nidx.index(indexpb)
 
-    @backoff.on_exception(backoff.expo, NodesUnsync, jitter=backoff.random_jitter, max_tries=5)
     async def add_resource(
         self,
         shard: writer_pb2.ShardObject,
