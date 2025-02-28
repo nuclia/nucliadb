@@ -25,8 +25,9 @@ mod resource_indexer;
 mod schema;
 
 use nidx_protos::{
-    relation_node::NodeType, relation_prefix_search_request::Search, resource::ResourceStatus, RelationNode,
-    RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
+    relation_node::NodeType, relation_prefix_search_request::Search, resource::ResourceStatus, GraphSearchRequest,
+    GraphSearchResponse, RelationNode, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
+    RelationSearchResponse,
 };
 use nidx_tantivy::{
     index_reader::{open_index_with_deletions, DeletionQueryBuilder},
@@ -133,6 +134,11 @@ impl RelationSearcher {
     #[instrument(name = "relation::search", skip_all)]
     pub fn search(&self, request: &RelationSearchRequest) -> anyhow::Result<RelationSearchResponse> {
         self.reader.relation_search(request)
+    }
+
+    #[instrument(name = "relation::graph_searcher", skip_all)]
+    pub fn graph_search(&self, request: &GraphSearchRequest) -> anyhow::Result<GraphSearchResponse> {
+        self.reader.graph_search(request)
     }
 
     #[instrument(name = "relation::suggest", skip_all)]

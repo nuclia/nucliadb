@@ -63,17 +63,29 @@ impl RelationsReaderService {
         })
     }
 
-    pub fn graph_search(&self, query: GraphQuery) -> anyhow::Result<nidx_protos::GraphSearchResponse> {
-        let parser = GraphQueryParser::new();
-        let index_query: Box<dyn Query> = parser.parse(query);
+    pub fn graph_search(&self, request: &GraphSearchRequest) -> anyhow::Result<GraphSearchResponse> {
+        // No query? Empty graph
+        let Some(query) = &request.query else {
+            return Ok(GraphSearchResponse::default());
+        };
+        let Some(query) = &query.query else {
+            return Ok(GraphSearchResponse::default());
+        };
 
-        // TODO: parametrize this magic constant
-        let collector = TopDocs::with_limit(1000);
+        // Convert proto to tantivy query
+        let query = GraphQuery::try_from(query)?;
+        let parser = GraphQueryParser::new();
+        let index_query = parser.parse(query);
+
+        // Tantivy searcher query
+        let collector = TopDocs::with_limit(request.top_k as usize);
 
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
 
-        // Build graph response.
+        self.build_graph_response(&searcher, matching_docs.into_iter().map(|(_score, doc_address)| doc_address))
+    }
+
     fn build_graph_response(
         &self,
         searcher: &Searcher,

@@ -21,7 +21,7 @@
 use std::sync::Arc;
 
 use nidx_paragraph::ParagraphSearcher;
-use nidx_protos::{SearchRequest, SearchResponse};
+use nidx_protos::{SearchRequest, SearchResponse, GraphSearchResponse, GraphSearchRequest};
 use nidx_relation::RelationSearcher;
 use nidx_text::TextSearcher;
 use nidx_vector::VectorSearcher;
@@ -173,4 +173,28 @@ fn blocking_search(
         vector: rvector.transpose()?,
         relation: rrelation.transpose()?,
     })
+}
+
+#[instrument(skip_all, fields(shard_id = graph_request.shard))]
+pub async fn graph_search(index_cache: Arc<IndexCache>, graph_request: GraphSearchRequest) -> NidxResult<GraphSearchResponse> {
+    let shard_id = uuid::Uuid::parse_str(&graph_request.shard)?;
+
+    let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await  else {
+        return Err(NidxError::NotFound);
+    };
+
+    let Some(index_id) = indexes.relation_index() else {
+        return Err(NidxError::NotFound);
+    };
+
+    let relation_searcher = index_cache.get(&index_id).await?;
+
+    let current = Span::current();
+    let results = tokio::task::spawn_blocking(move || {
+        current.in_scope(|| {
+            let searcher: &RelationSearcher = relation_searcher.as_ref().into();
+            searcher.graph_search(&graph_request)
+        })
+    }).await??;
+    Ok(results)
 }

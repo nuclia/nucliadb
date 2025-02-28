@@ -19,14 +19,14 @@
 //
 mod common;
 
-use nidx_tests::graph::friendly_parse;
-use nidx_tests::graph::friendly_print;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{Resource, ResourceId};
 use nidx_relation::graph_query_parser::{
     Expression, FuzzyTerm, GraphQuery, Node, NodeQuery, PathQuery, Relation, RelationQuery, Term,
 };
 use nidx_relation::{RelationIndexer, RelationSearcher};
+use nidx_tests::graph::friendly_parse;
+use nidx_tests::graph::friendly_print;
 use tempfile::TempDir;
 
 use common::TestOpener;
