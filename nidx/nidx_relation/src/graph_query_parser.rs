@@ -429,8 +429,8 @@ impl TryFrom<&nidx_protos::graph_query::Query> for GraphQuery {
                 Self::NodeQuery(NodeQuery::Node(Expression::Value(node)))
             }
 
-            nidx_protos::graph_query::Query::Relation(_relation) => {
-                unimplemented!()
+            nidx_protos::graph_query::Query::Relation(relation) => {
+                Self::RelationQuery(RelationQuery(Expression::Value(Relation::try_from(relation)?)))
             }
 
             nidx_protos::graph_query::Query::Path(path) => {

@@ -699,6 +699,31 @@ async fn test_graph_search__relation_query(pool: PgPool) -> anyhow::Result<()> {
             query: Some(
                 GraphQuery {
                     query: Some(
+                        graph_query::Query::Relation(graph_query::Relation {
+                            value: Some("LIVE_IN".to_string())
+                        }
+                        ),
+                    )
+                }
+            ),
+            top_k: 100,
+            ..Default::default()
+        }
+    ).await?.into_inner();
+    friendly_print(&response);
+    let relations = friendly_parse(&response);
+    assert_eq!(relations.len(), 2);
+    // TODO: this shoulnd't contain the paths, as we are asking only for relations
+    assert!(relations.contains(&("Anna", "LIVE_IN", "New York")));
+    assert!(relations.contains(&("Peter", "LIVE_IN", "New York")));
+
+    // ()-[:LIVE_IN]->()
+    let response = fixture.searcher_client.graph_search(
+        GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(
+                GraphQuery {
+                    query: Some(
                         graph_query::Query::Path(graph_query::Path {
                             relation: Some(
                                 graph_query::Relation {
