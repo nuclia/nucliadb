@@ -22,14 +22,13 @@ import sys
 from functools import partial
 from typing import Awaitable, Callable, Optional
 
-from nucliadb.common.cluster import manager
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.consumer.consumer import IngestConsumer, IngestProcessedConsumer
 from nucliadb.ingest.consumer.pull import PullWorker
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.exceptions import ConfigurationError
-from nucliadb_utils.settings import running_settings, transaction_settings
+from nucliadb_utils.settings import transaction_settings
 from nucliadb_utils.utilities import (
     get_audit,
     get_nats_manager,
@@ -85,13 +84,6 @@ async def start_ingest_consumers(
     if transaction_settings.transaction_local:
         raise ConfigurationError("Can not start ingest consumers in local mode")
 
-    while len(manager.get_index_nodes()) == 0 and running_settings.running_environment not in (
-        "local",
-        "test",
-    ):
-        logger.warning("Initializion delayed 1s to receive some Nodes on the cluster")
-        await asyncio.sleep(1)
-
     driver = await setup_driver()
     pubsub = await get_pubsub()
     storage = await get_storage(service_name=service_name or SERVICE_NAME)
@@ -134,13 +126,6 @@ async def start_ingest_processed_consumer(
     """
     if transaction_settings.transaction_local:
         raise ConfigurationError("Can not start ingest consumers in local mode")
-
-    while len(manager.get_index_nodes()) == 0 and running_settings.running_environment not in (
-        "local",
-        "test",
-    ):
-        logger.warning("Initializion delayed 1s to receive some Nodes on the cluster")
-        await asyncio.sleep(1)
 
     driver = await setup_driver()
     pubsub = await get_pubsub()
