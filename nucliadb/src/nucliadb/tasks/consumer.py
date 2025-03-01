@@ -145,7 +145,7 @@ class NatsTaskConsumer(Generic[MsgType]):
 
             logger.info(f"Starting task consumption", extra={"consumer_name": self.name})
             try:
-                await self.callback(self.context, task_msg)  # type: ignore
+                await self.callback(self.context, task_msg)
             except asyncio.CancelledError:
                 logger.debug(
                     f"Task cancelled. Naking and exiting...",
