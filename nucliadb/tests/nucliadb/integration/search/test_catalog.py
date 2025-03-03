@@ -24,8 +24,37 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos import writer_pb2 as wpb
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
+
+
+async def create_resource_with_all_status(standalone_knowledgebox, nucliadb_ingest_grpc):
+    resources = {}
+
+    for status_name, status_value in wpb.FieldStatus.Status.items():
+        bm = broker_resource(standalone_knowledgebox)
+        bm.basic.metadata.status = status_value
+        bm.texts["my_text"].CopyFrom(rpb.FieldText(body="Hi!", format=rpb.FieldText.Format.PLAIN))
+        bm.field_statuses.append(
+            wpb.FieldIDStatus(
+                id=rpb.FieldID(field_type=rpb.FieldType.TEXT, field="my_text"),
+                status=status_value,
+            )
+        )
+        if status_name == "ERROR":
+            bm.errors.append(
+                wpb.Error(
+                    field_type=rpb.FieldType.TEXT,
+                    field="my_text",
+                    error="Processor failed",
+                    code=wpb.Error.ErrorCode.EXTRACT,
+                )
+            )
+        await inject_message(nucliadb_ingest_grpc, bm)
+        resources[status_name] = bm.uuid
+
+    return resources
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -130,15 +159,7 @@ async def test_catalog_status_faceted(
     standalone_knowledgebox,
 ):
     valid_status = ["PROCESSED", "PENDING", "ERROR"]
-    resources = {}
-
-    for status_name, status_value in rpb.Metadata.Status.items():
-        if status_name not in valid_status:
-            continue
-        bm = broker_resource(standalone_knowledgebox)
-        bm.basic.metadata.status = status_value
-        await inject_message(nucliadb_ingest_grpc, bm)
-        resources[status_name] = bm.uuid
+    resources = await create_resource_with_all_status(standalone_knowledgebox, nucliadb_ingest_grpc)
 
     resp = await nucliadb_reader.get(
         f"/kb/{standalone_knowledgebox}/catalog?faceted=/metadata.status",
@@ -216,20 +237,13 @@ async def test_catalog_faceted_labels(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_catalog_filters(
+async def test_catalog_status_filters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox,
 ):
-    valid_status = ["PROCESSED", "PENDING", "ERROR"]
-
-    for status_name, status_value in rpb.Metadata.Status.items():
-        if status_name not in valid_status:
-            continue
-        bm = broker_resource(standalone_knowledgebox)
-        bm.basic.metadata.status = status_value
-        await inject_message(nucliadb_ingest_grpc, bm)
+    await create_resource_with_all_status(standalone_knowledgebox, nucliadb_ingest_grpc)
 
     # No filters
     resp = await nucliadb_reader.get(
