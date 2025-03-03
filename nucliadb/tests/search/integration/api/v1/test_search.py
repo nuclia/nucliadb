@@ -100,6 +100,7 @@ async def test_search_resource_all(
             assert shard.sentences == 3
 
             request = SearchRequest()
+            request.vectorset = "my-semantic-model"
             request.shard = shard_id
             request.body = "Ramon"
             request.result_per_page = 20
