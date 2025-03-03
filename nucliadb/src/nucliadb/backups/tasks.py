@@ -64,7 +64,6 @@ class Backup:
         await producer.send(msg)
 
 
-
 class TaskMetadata(BaseModel):
     class Status(Enum):
         RUNNING = "running"
@@ -117,7 +116,7 @@ class TaskRetryHandler:
             if metadata.status in (TaskMetadata.Status.COMPLETED, TaskMetadata.Status.FAILED):
                 logger.info(
                     f"{self.type} task is {metadata.status.value}. Skipping",
-                    extra={"task_id": self.task_id}
+                    extra={"task_id": self.task_id},
                 )
                 return
 
@@ -125,8 +124,7 @@ class TaskRetryHandler:
                 metadata.status = TaskMetadata.Status.FAILED
                 metadata.error_messages.append("Max retries reached")
                 logger.info(
-                    f"Task reached max retries. Setting to FAILED state",
-                    extra={"task_id": self.task_id}
+                    f"Task reached max retries. Setting to FAILED state", extra={"task_id": self.task_id}
                 )
                 await self.set_metadata(metadata)
                 return
@@ -136,16 +134,10 @@ class TaskRetryHandler:
             except Exception as ex:
                 metadata.retries += 1
                 metadata.error_messages.append(str(ex))
-                logger.info(
-                    f"Task failed. Will be retried",
-                    extra={"task_id": self.task_id}
-                )
+                logger.info(f"Task failed. Will be retried", extra={"task_id": self.task_id})
                 raise
             else:
-                logger.info(
-                    f"Task finished successfully",
-                    extra={"task_id": self.task_id}
-                )
+                logger.info(f"Task finished successfully", extra={"task_id": self.task_id})
                 metadata.status = TaskMetadata.Status.COMPLETED
                 return func_result
             finally:
