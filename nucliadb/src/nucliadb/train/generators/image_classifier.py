@@ -60,7 +60,6 @@ async def generate_image_classification_payloads(
 ) -> AsyncGenerator[ImageClassification, None]:
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
-    request.reload = True
     async for item in node.stream_get_fields(request):
         rid = item.uuid
         resource = await get_resource_from_cache_or_db(kbid, rid)

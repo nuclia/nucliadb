@@ -6,17 +6,6 @@ import public "nucliadb_protos/noderesources.proto";
 import "google/protobuf/timestamp.proto";
 import public "nucliadb_protos/utils.proto";
 
-
-message Filter {
-    repeated string field_labels = 1;
-    repeated string paragraph_labels = 2;
-    // JSON string with the filter expression for labels
-    string labels_expression = 3;
-    // JSON string with the filter expression for keywords
-    string keywords_expression = 4;
-}
-
-
 message StreamFilter {
     enum Conjunction {
         AND = 0;
@@ -46,15 +35,6 @@ message OrderBy {
     string field = 1 [deprecated = true];
     OrderType type = 2;
     OrderField sort_by = 3;
-}
-
-
-message Timestamps {
-    google.protobuf.Timestamp from_modified = 1;
-    google.protobuf.Timestamp to_modified = 2;
-
-    google.protobuf.Timestamp from_created = 3;
-    google.protobuf.Timestamp to_created = 4;
 }
 
 message FacetResult {
@@ -214,7 +194,6 @@ message EntitiesSubgraphResponse {
 //   - given some entry vertices, get the filtered subgraph around them
 message RelationSearchRequest {
     string shard_id = 1;
-    bool reload = 5 [deprecated = true];
 
     RelationPrefixSearchRequest prefix = 11;
     EntitiesSubgraphRequest subgraph = 12;
@@ -273,11 +252,8 @@ enum FilterOperator {
 message SearchRequest {
     string shard = 1;
 
-    repeated string fields = 2 [deprecated = true];
     // query this text in all the paragraphs
     string body = 3;
-
-    Filter filter = 4 [deprecated = true];
 
     OrderBy order = 5;
 
@@ -286,13 +262,10 @@ message SearchRequest {
     int32 page_number = 7;
     int32 result_per_page = 8;
 
-    Timestamps timestamps = 9 [deprecated = true];
-
     repeated float vector = 10; // Embedded vector search.
 
     string vectorset = 15;
 
-    bool reload = 11 [deprecated = true];
     bool paragraph = 12;
     bool document = 13;
 
@@ -300,11 +273,9 @@ message SearchRequest {
     bool only_faceted = 16;
 
     optional string advanced_query = 18;
-    optional noderesources.Resource.ResourceStatus with_status = 17 [deprecated = true];
 
     RelationPrefixSearchRequest relation_prefix = 20;
     EntitiesSubgraphRequest relation_subgraph = 21;
-    repeated string key_filters = 22 [deprecated = true];
 
     float min_score_semantic = 23;
     float min_score_bm25 = 25;
@@ -326,10 +297,6 @@ message SuggestRequest {
 
     string body = 2;
     repeated SuggestFeatures features = 6;
-
-    Filter filter = 3 [deprecated = true];
-    Timestamps timestamps = 4 [deprecated = true];
-    repeated string fields = 5 [deprecated = true];
 
     optional FilterExpression field_filter = 7;
     optional FilterExpression paragraph_filter = 8;
@@ -391,8 +358,6 @@ message DocumentItem {
 }
 
 message StreamRequest {
-    Filter filter__deprecated = 1 [deprecated = true];
-    bool reload = 2 [deprecated = true];
     noderesources.ShardId shard_id = 3;
     StreamFilter filter = 4;
 }

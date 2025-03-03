@@ -22,7 +22,10 @@ mod common;
 
 use common::services::NidxFixture;
 use itertools::Itertools;
-use nidx_protos::{Filter, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse, VectorIndexConfig};
+use nidx_protos::{
+    filter_expression::{Expr, FacetFilter, FieldFilter},
+    FilterExpression, NewShardRequest, SuggestFeatures, SuggestRequest, SuggestResponse, VectorIndexConfig,
+};
 use nidx_tests::*;
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -63,8 +66,13 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
         .suggest(Request::new(SuggestRequest {
             shard: shard.id.clone(),
             body: "prince".to_string(),
-            fields: vec!["a/title".to_string()],
             features: vec![SuggestFeatures::Paragraphs as i32],
+            field_filter: Some(FilterExpression {
+                expr: Some(Expr::Field(FieldFilter {
+                    field_type: "a".into(),
+                    field_id: Some("title".into()),
+                })),
+            }),
             ..Default::default()
         }))
         .await
@@ -84,10 +92,10 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
-            filter: Some(Filter {
-                field_labels: vec!["/s/p/en".to_string()],
-                paragraph_labels: vec![],
-                ..Default::default()
+            field_filter: Some(FilterExpression {
+                expr: Some(Expr::Facet(FacetFilter {
+                    facet: "/s/p/en".into(),
+                })),
             }),
             ..request.clone()
         }))
@@ -103,11 +111,10 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
-            filter: Some(Filter {
-                field_labels: vec!["/s/p/de".to_string()],
-                labels_expression: r#"{"literal": "/s/p/de"}"#.to_string(),
-                paragraph_labels: vec![],
-                ..Default::default()
+            field_filter: Some(FilterExpression {
+                expr: Some(Expr::Facet(FacetFilter {
+                    facet: "/s/p/de".into(),
+                })),
             }),
             ..request.clone()
         }))
@@ -121,11 +128,12 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
-            filter: Some(Filter {
-                field_labels: vec!["/s/p/de".to_string()],
-                labels_expression: r#"{"not": {"literal": "/s/p/de"}}"#.to_string(),
-                paragraph_labels: vec![],
-                ..Default::default()
+            field_filter: Some(FilterExpression {
+                expr: Some(Expr::BoolNot(Box::new(FilterExpression {
+                    expr: Some(Expr::Facet(FacetFilter {
+                        facet: "/s/p/de".into(),
+                    })),
+                }))),
             }),
             ..request.clone()
         }))
@@ -141,11 +149,12 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
-            filter: Some(Filter {
-                field_labels: vec!["/s/p/en".to_string()],
-                labels_expression: r#"{"not": {"literal": "/s/p/en"}}"#.to_string(),
-                paragraph_labels: vec![],
-                ..Default::default()
+            field_filter: Some(FilterExpression {
+                expr: Some(Expr::BoolNot(Box::new(FilterExpression {
+                    expr: Some(Expr::Facet(FacetFilter {
+                        facet: "/s/p/en".into(),
+                    })),
+                }))),
             }),
             ..request
         }))
