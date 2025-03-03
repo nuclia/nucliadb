@@ -229,3 +229,27 @@ async def test_field_status_errors_data_augmentation(
     assert resp_json["data"]["generics"]["title"]["status"] == "PROCESSED"
     assert resp_json["data"]["texts"]["text"]["status"] == "ERROR"
     assert len(resp_json["data"]["texts"]["text"]["errors"]) == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_empty_resource_is_processed(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    # Create a resource, processing
+    br = broker_resource(standalone_knowledgebox)
+    await inject_message(nucliadb_ingest_grpc, br)
+
+    resp = await nucliadb_writer.post(f"/kb/{standalone_knowledgebox}/resources", json={})
+    assert resp.status_code == 201
+    resp_json = resp.json()
+
+    uuid = resp_json["uuid"]
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{uuid}?show=basic&show=errors"
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
