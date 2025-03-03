@@ -443,14 +443,17 @@ class NotEnoughContextAskResult(AskResult):
 
     async def json(self) -> str:
         prequeries = (
-            {prequery.id: prequery_result for prequery, prequery_result in self.prequeries_results}
+            {
+                cast(str, prequery.id): prequery_result
+                for prequery, prequery_result in self.prequeries_results
+            }
             if self.prequeries_results
             else None
         )
         return SyncAskResponse(
             answer=NOT_ENOUGH_CONTEXT_ANSWER,
             retrieval_results=self.main_results,
-            prequeries=prequeries,  # type: ignore
+            prequeries=prequeries,
             status=AnswerStatusCode.NO_RETRIEVAL_DATA.prettify(),
         ).model_dump_json()
 
